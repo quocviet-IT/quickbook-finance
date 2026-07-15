@@ -79,3 +79,66 @@ export interface JournalLineRow {
   memo: string | null;
   line_order: number;
 }
+
+export type InvoiceStatus = "draft" | "issued" | "partial" | "paid" | "void";
+export type PaymentStatus = "unapplied" | "partial" | "applied" | "void";
+
+export interface CustomerRow {
+  id: string;
+  name: string;
+  email: string | null;
+  currency_code: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceRow {
+  id: string;
+  invoice_number: string | null;
+  customer_id: string;
+  issue_date: string;
+  due_date: string | null;
+  currency_code: string;
+  subtotal_minor: number;
+  tax_total_minor: number;
+  total_minor: number;
+  balance_due_minor: number;
+  status: InvoiceStatus;
+  order_id: string | null;
+  journal_entry_id: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceLineRow {
+  id: string;
+  invoice_id: string;
+  line_order: number;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  income_account_id: string;
+  tax_code_id: string | null;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+}
+
+export interface PaymentRow {
+  id: string;
+  payment_number: string | null;
+  customer_id: string;
+  payment_date: string;
+  currency_code: string;
+  amount_minor: number;
+  unapplied_minor: number;
+  method: string | null;
+  deposit_account_id: string;
+  status: PaymentStatus;
+  journal_entry_id: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
