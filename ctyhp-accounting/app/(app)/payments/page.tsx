@@ -1,9 +1,10 @@
-import { Empty, Typography } from "antd";
+import { Empty } from "antd";
+import PageHeader from "@/components/PageHeader";
 
 export default function Page() {
   return (
     <div>
-      <Typography.Title level={3}>Thanh toán</Typography.Title>
+      <PageHeader title="Thanh toán" />
       <Empty description="Module đang được xây dựng" />
     </div>
   );

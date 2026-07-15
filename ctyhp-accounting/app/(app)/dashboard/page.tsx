@@ -1,5 +1,5 @@
-import { Card, Col, Row, Statistic, Typography, Alert } from "antd";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import DashboardClient from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -15,28 +15,5 @@ export default async function DashboardPage() {
     countRows("acc_journal_entry"),
   ]);
 
-  return (
-    <div>
-      <Typography.Title level={3}>Bảng điều khiển</Typography.Title>
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message="Giai đoạn nền tảng"
-        description="Sổ kép đã sẵn sàng. Các module Hóa đơn, Ngân hàng, Báo cáo đang được xây dựng."
-      />
-      <Row gutter={16}>
-        <Col xs={24} sm={12} md={8}>
-          <Card>
-            <Statistic title="Tài khoản trong hệ thống" value={accounts} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card>
-            <Statistic title="Bút toán đã ghi sổ" value={entries} />
-          </Card>
-        </Col>
-      </Row>
-    </div>
-  );
+  return <DashboardClient accounts={accounts} entries={entries} />;
 }
