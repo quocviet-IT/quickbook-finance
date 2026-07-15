@@ -16,7 +16,7 @@ export default function DashboardClient({
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Foundation phase"
+        title="Foundation phase"
         description="The double-entry ledger is ready. Invoices, Banking, and Reports modules are being built."
       />
       <Row gutter={16}>
