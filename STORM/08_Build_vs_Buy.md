@@ -1,34 +1,25 @@
-# Executive Summary
+# Build vs Buy Recommendation
 
 [README](README.md) · [Executive Summary](01_Executive_Summary.md) · [Perspectives](02_Research_Perspectives.md) · [Questions & Findings](03_Research_Questions.md) · [Knowledge Base](04_Knowledge_Base.md) · [Comparative Report](05_Comparative_Report.md) · [System Architecture](06_System_Architecture.md) · [Gap Analysis](07_Gap_Analysis.md) · [Build vs Buy](08_Build_vs_Buy.md) · [Roadmap](09_Implementation_Roadmap.md)
 
-Decision summary for CTYHP accounting and ERP platform selection.
+Decision framework covering accounting-core purchase, integrated ERP, local statutory accounting, and CTYHP-owned integration layers.
 
-## Research information and evidence rules
+## Wave/QBO build-vs-buy baseline
 
-- Official Wave, Intuit, and QuickBooks documentation is prioritized.
+| **Option**                                | **Assessment**            | **Rationale**                                                                                                               |
+|-------------------------------------------|---------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| Buy Wave                                  | Not recommended           | Official Vietnam business support, bank connections, and compliance are unsuitable.                                         |
+| Buy QBO and place all workflows inside it | Insufficient              | Strong accounting core, but production/BOM/warehouse and bank-feed API gaps remain.                                         |
+| Build the entire accounting platform      | Not recommended yet       | CTYHP would need to build ledger correctness, AR/AP, close, audit, tax logic, migration, and accountant workflows.          |
+| QBO core + CTYHP internal layer           | Conditionally recommended | Use QBO for ledger/control and build the differentiating production integration, bank reconciliation, and custom reporting. |
 
-- Pricing and service scope are a research-time snapshot and may vary by country.
+> **Primary recommendation**
+>
+> Buy QuickBooks Online for the accounting ledger and controls; build the CTYHP Accounting Operations Layer on Next.js + TypeScript + Supabase + Vercel. Use Wave only as a reference for UX and feature simplification.
 
-- “Could not be determined” means no clear confirmation was found in current official sources; it does not prove the feature does not exist.
+---
 
-- The QuickBooks Online Business User Manual, Intuit Australia, Version 4 – July 2022 is used to validate historical workflow patterns, not 2026 pricing or availability. **[Q15]**
-
-## Executive conclusion from the Wave/QBO baseline
-
-> Wave is not recommended as CTYHP's production accounting platform in Vietnam. QuickBooks Online was initially considered only as a conditional accounting-core candidate, subject to commercial availability, banking, compliance, and PoC validation. The baseline architecture proposed a CTYHP Accounting Operations layer on Supabase for production integration, bank reconciliation, and custom reporting.
-
-## Screening outcome
-
-- Primary candidates for the next evaluation round: Oracle NetSuite, Odoo, MISA SME.VN, and FAST Accounting.
-
-- Needs further verification: QuickBooks Online, Xero, Zoho Books, and BRAVO 8.
-
-- Disqualified from the Vietnam production shortlist: Wave Apps.
-
-The next evaluation round should validate jewelry-manufacturing requirements rather than repeat broad accounting research: BOM and precious-material costing, work-in-progress, lot/serial traceability, gold-weight variance, multi-warehouse operations, production-order invoicing, local e-invoice compliance, and integration APIs.
-
-## Updated recommendation
+## Updated recommendation after the primary-candidate evaluation
 
 ### Recommendation 1 — Odoo Enterprise Custom, self-hosted in Vietnam
 
@@ -58,6 +49,8 @@ MISA SME is the strongest compliance-first option for Vietnamese accounting, Dec
 
 QuickBooks Online remains a useful benchmark for accounting UX, bank reconciliation, invoice workflows, API/OAuth, and reporting. It does not have a verified Vietnam statutory-compliance path, is not a manufacturing ERP, and provides limited control over data residency. It should therefore not proceed to final selection as CTYHP’s primary Vietnam accounting/ERP platform. [Q9][Q10][Q13]
 
+---
+
 ## Final consolidated comparison
 
 | **Platform**          | **Vietnam compliance**                                              | **International capability**                              | **Manufacturing**                 | **Data residency**                              | **Integration**                   | **Pricing / TCO**                                        | **Updated recommendation**                |
@@ -67,6 +60,22 @@ QuickBooks Online remains a useful benchmark for accounting UX, bank reconciliat
 | **Odoo**              | Vietnam localization + SInvoice; Decree 254 must be confirmed.      | Strong multi-company and multi-currency.                  | Strong and flexible.              | Cloud region or self-host in Vietnam.           | Very strong.                      | USD subscription plus implementation/customization.      | Preferred PoC candidate.                  |
 | **MISA SME**          | Strongest current evidence; meInvoice + mTax.                       | Export/FX supported; international consolidation limited. | Accounting/costing, not full ERP. | Can keep SQL Server in Vietnam.                 | MISA SME public API not verified. | Low, transparent VND pricing.                            | Compliance-first/statutory candidate.     |
 | **FAST Accounting**   | Fast e-Invoice and legal updates; Decree 254 demo required.         | Export/FX supported; multi-country unclear.               | Strong production costing.        | Can deploy on a Vietnam server.                 | Vendor-led/custom integration.    | Transparent VND entry pricing.                           | Local manufacturing-accounting candidate. |
+
+## Proposed PoC shortlist
+
+**Track A — Integrated ERP**
+
+12. Odoo Enterprise Custom — self-hosted in Vietnam.
+
+13. Oracle NetSuite OneWorld with Vietnam localization.
+
+**Track B — Local accounting and compliance**
+
+14. FAST Accounting Manufacturing.
+
+15. MISA SME 2026 + meInvoice + mTax.
+
+The two tracks should be tested in parallel. The PoC should determine whether CTYHP can use one integrated ERP or should combine an operational ERP with a Vietnam statutory-accounting platform.
 
 ## Final conclusion
 
