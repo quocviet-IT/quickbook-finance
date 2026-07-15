@@ -12,3 +12,15 @@ body {
 a {
   text-decoration: none;
 }
+
+/* Financial data reads best with tabular (monospaced-width) figures so digits
+   align in columns. Applied app-wide; money cells are right-aligned in tables. */
+body {
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeric table cells: keep amounts on one line. */
+.ant-table-cell {
+  font-variant-numeric: tabular-nums;
+}

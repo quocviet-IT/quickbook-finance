@@ -41,7 +41,8 @@ export default function AppShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
 
-  const selectedKey = NAV.find((n) => pathname.startsWith(n.key))?.key ?? "/dashboard";
+  const active = NAV.find((n) => pathname.startsWith(n.key));
+  const selectedKey = active?.key ?? "/dashboard";
 
   async function signOut() {
     const sb = createSupabaseBrowserClient();
@@ -50,13 +51,43 @@ export default function AppShell({
     router.push("/login");
   }
 
+  const roleColor = role === "admin" ? "gold" : role === "accountant" ? "blue" : "default";
+
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark">
-        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Typography.Text strong style={{ color: "#fff", fontSize: collapsed ? 14 : 16 }}>
-            {collapsed ? "CT" : "CTYHP Accounting"}
-          </Typography.Text>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" width={220}>
+        <div
+          style={{
+            height: 56,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: collapsed ? 0 : "0 20px",
+            justifyContent: collapsed ? "center" : "flex-start",
+          }}
+        >
+          <span
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              background: "#0f766e",
+              color: "#fff",
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              flexShrink: 0,
+            }}
+          >
+            CT
+          </span>
+          {!collapsed && (
+            <Typography.Text strong style={{ color: "#f8fafc", fontSize: 15 }}>
+              CTYHP Accounting
+            </Typography.Text>
+          )}
         </div>
         <Menu
           theme="dark"
@@ -72,23 +103,30 @@ export default function AppShell({
       <Layout>
         <Header
           style={{
-            background: "#fff",
-            padding: "0 20px",
+            padding: "0 24px",
             display: "flex",
             alignItems: "center",
-            justifyContent: "flex-end",
-            borderBottom: "1px solid #f0f0f0",
+            justifyContent: "space-between",
+            borderBottom: "1px solid #eef2f6",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
           }}
         >
-          <Space>
+          <Typography.Text type="secondary" style={{ fontSize: 13, letterSpacing: 0.2 }}>
+            {active?.label ?? "CTYHP Accounting"}
+          </Typography.Text>
+          <Space size="middle">
             <Typography.Text type="secondary">{email}</Typography.Text>
-            {role && <Tag color={role === "admin" ? "gold" : role === "accountant" ? "blue" : "default"}>{role}</Tag>}
+            {role && <Tag color={roleColor} style={{ textTransform: "capitalize", marginInlineEnd: 0 }}>{role}</Tag>}
             <Button icon={<LogoutOutlined />} onClick={signOut}>
               Sign out
             </Button>
           </Space>
         </Header>
-        <Content style={{ margin: 20 }}>{children}</Content>
+        <Content style={{ margin: 24 }}>
+          <div style={{ maxWidth: 1280, margin: "0 auto" }}>{children}</div>
+        </Content>
       </Layout>
     </Layout>
   );
