@@ -34,8 +34,10 @@ async function main() {
   // --- Seed data ---
   const cur = await client.query("select code, is_base, decimal_places from acc_currency order by code");
   check("2 currencies seeded", cur.rows.length === 2);
-  const vnd = cur.rows.find((r) => r.code === "VND");
-  check("VND is base with 0 decimals", vnd?.is_base === true && vnd?.decimal_places === 0);
+  const usd = cur.rows.find((r) => r.code === "USD");
+  check("USD is base with 2 decimals", usd?.is_base === true && usd?.decimal_places === 2);
+  const bases = cur.rows.filter((r) => r.is_base).length;
+  check("exactly one base currency", bases === 1, `(got ${bases})`);
 
   const acc = await client.query("select count(*)::int n from acc_account");
   check("chart of accounts seeded", acc.rows[0].n >= 17, `(got ${acc.rows[0].n})`);

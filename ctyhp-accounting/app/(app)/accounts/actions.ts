@@ -21,20 +21,20 @@ export interface ActionResult {
 
 async function guardWrite(): Promise<string | null> {
   const role = await getUserRole();
-  return canWrite(role) ? null : "Bạn không có quyền thực hiện thao tác này";
+  return canWrite(role) ? null : "You do not have permission to perform this action";
 }
 
 function messageFrom(err: unknown): string {
   if (err instanceof AccountServiceError) return err.message;
   if (err instanceof Error) return err.message;
-  return "Đã xảy ra lỗi không xác định";
+  return "An unexpected error occurred";
 }
 
 export async function createAccountAction(raw: unknown): Promise<ActionResult> {
   const denied = await guardWrite();
   if (denied) return { ok: false, error: denied };
   const parsed = accountCreateSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" };
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
     await createAccount(sb, parsed.data);
@@ -49,7 +49,7 @@ export async function updateAccountAction(id: string, raw: unknown): Promise<Act
   const denied = await guardWrite();
   if (denied) return { ok: false, error: denied };
   const parsed = accountUpdateSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" };
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
     await updateAccount(sb, id, parsed.data);
@@ -64,7 +64,7 @@ export async function setAccountStatusAction(id: string, status: unknown): Promi
   const denied = await guardWrite();
   if (denied) return { ok: false, error: denied };
   const parsed = accountStatusSchema.safeParse(status);
-  if (!parsed.success) return { ok: false, error: "Trạng thái không hợp lệ" };
+  if (!parsed.success) return { ok: false, error: "Invalid status" };
   try {
     const sb = await createSupabaseServerClient();
     await setAccountStatus(sb, id, parsed.data);

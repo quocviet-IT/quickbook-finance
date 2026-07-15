@@ -19,8 +19,8 @@ export default async function AccountsPage() {
   return (
     <div>
       <PageHeader
-        title="Hệ thống tài khoản"
-        description="Danh mục tài khoản kế toán — phân loại giao dịch và làm cơ sở cho báo cáo tài chính."
+        title="Chart of Accounts"
+        description="The ledger accounts used to classify transactions and produce financial statements."
       />
       <AccountsClient
         accounts={accounts}

@@ -42,28 +42,28 @@ export default function LoginPage() {
     >
       <Card style={{ width: 380 }}>
         <Typography.Title level={3} style={{ textAlign: "center", marginBottom: 4 }}>
-          CTYHP Kế toán
+          CTYHP Accounting
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ textAlign: "center" }}>
-          Đăng nhập để tiếp tục
+          Sign in to continue
         </Typography.Paragraph>
         <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
             name="email"
             label="Email"
-            rules={[{ required: true, type: "email", message: "Nhập email hợp lệ" }]}
+            rules={[{ required: true, type: "email", message: "Enter a valid email" }]}
           >
-            <Input autoComplete="email" placeholder="you@ctyhp.vn" />
+            <Input autoComplete="email" placeholder="you@company.com" />
           </Form.Item>
           <Form.Item
             name="password"
-            label="Mật khẩu"
-            rules={[{ required: true, message: "Nhập mật khẩu" }]}
+            label="Password"
+            rules={[{ required: true, message: "Enter your password" }]}
           >
             <Input.Password autoComplete="current-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loading}>
-            Đăng nhập
+            Sign in
           </Button>
         </Form>
       </Card>

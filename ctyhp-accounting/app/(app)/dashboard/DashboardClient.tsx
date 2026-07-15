@@ -11,23 +11,23 @@ export default function DashboardClient({
 }) {
   return (
     <div>
-      <PageHeader title="Bảng điều khiển" />
+      <PageHeader title="Dashboard" />
       <Alert
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Giai đoạn nền tảng"
-        description="Sổ kép đã sẵn sàng. Các module Hóa đơn, Ngân hàng, Báo cáo đang được xây dựng."
+        message="Foundation phase"
+        description="The double-entry ledger is ready. Invoices, Banking, and Reports modules are being built."
       />
       <Row gutter={16}>
         <Col xs={24} sm={12} md={8}>
           <Card>
-            <Statistic title="Tài khoản trong hệ thống" value={accounts} />
+            <Statistic title="Accounts in chart" value={accounts} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
           <Card>
-            <Statistic title="Bút toán đã ghi sổ" value={entries} />
+            <Statistic title="Journal entries posted" value={entries} />
           </Card>
         </Col>
       </Row>

@@ -34,7 +34,7 @@ async function main() {
     });
     const body = await res.text();
     const rendered =
-      path === "/dashboard" ? body.includes("Bảng điều khiển") : body.includes("Hệ thống tài khoản");
+      path === "/dashboard" ? body.includes("Dashboard") : body.includes("Chart of Accounts");
     const crashed = body.includes("Element type is invalid") || body.includes("Runtime Error");
     console.log(
       `${path}: HTTP ${res.status} · rendered=${rendered} · crashed=${crashed}` +

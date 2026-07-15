@@ -19,26 +19,26 @@ import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/d
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
 
 const TYPE_LABELS: Record<AccountType, string> = {
-  bank: "Tiền/Ngân hàng",
-  accounts_receivable: "Phải thu khách hàng",
-  current_asset: "Tài sản ngắn hạn",
-  fixed_asset: "Tài sản cố định",
-  accounts_payable: "Phải trả người bán",
-  credit_card: "Thẻ tín dụng",
-  current_liability: "Nợ ngắn hạn",
-  equity: "Vốn chủ sở hữu",
-  income: "Doanh thu",
-  cost_of_goods_sold: "Giá vốn hàng bán",
-  expense: "Chi phí",
-  other_income: "Thu nhập khác",
-  other_expense: "Chi phí khác",
+  bank: "Bank",
+  accounts_receivable: "Accounts Receivable",
+  current_asset: "Current Asset",
+  fixed_asset: "Fixed Asset",
+  accounts_payable: "Accounts Payable",
+  credit_card: "Credit Card",
+  current_liability: "Current Liability",
+  equity: "Equity",
+  income: "Income",
+  cost_of_goods_sold: "Cost of Goods Sold",
+  expense: "Expense",
+  other_income: "Other Income",
+  other_expense: "Other Expense",
 };
 
 const STATUS_LABELS: Record<AccountStatus, { text: string; color: string }> = {
-  draft: { text: "Nháp", color: "default" },
-  active: { text: "Đang dùng", color: "green" },
-  inactive: { text: "Ngừng", color: "orange" },
-  archived: { text: "Lưu trữ", color: "default" },
+  draft: { text: "Draft", color: "default" },
+  active: { text: "Active", color: "green" },
+  inactive: { text: "Inactive", color: "orange" },
+  archived: { text: "Archived", color: "default" },
 };
 
 interface FormValues {
@@ -114,10 +114,10 @@ export default function AccountsClient({
       : await createAccountAction(values);
     setSaving(false);
     if (result.ok) {
-      message.success(editing ? "Đã cập nhật tài khoản" : "Đã tạo tài khoản");
+      message.success(editing ? "Account updated" : "Account created");
       setOpen(false);
     } else {
-      message.error(result.error ?? "Lưu thất bại");
+      message.error(result.error ?? "Save failed");
     }
   }
 
@@ -126,14 +126,14 @@ export default function AccountsClient({
     setBusyId(row.id);
     const result = await setAccountStatusAction(row.id, next);
     setBusyId(null);
-    if (result.ok) message.success(next === "active" ? "Đã kích hoạt" : "Đã ngừng sử dụng");
-    else message.error(result.error ?? "Cập nhật trạng thái thất bại");
+    if (result.ok) message.success(next === "active" ? "Account activated" : "Account deactivated");
+    else message.error(result.error ?? "Failed to update status");
   }
 
   const columns: TableColumnsType<AccountRow> = [
-    { title: "Mã", dataIndex: "account_code", width: 90, sorter: (a, b) => a.account_code.localeCompare(b.account_code) },
+    { title: "Code", dataIndex: "account_code", width: 90, sorter: (a, b) => a.account_code.localeCompare(b.account_code) },
     {
-      title: "Tên tài khoản",
+      title: "Account name",
       dataIndex: "name",
       render: (name: string, row) => (
         <span>
@@ -143,30 +143,30 @@ export default function AccountsClient({
       ),
     },
     {
-      title: "Loại",
+      title: "Type",
       dataIndex: "account_type",
       render: (t: AccountType) => <Tag>{TYPE_LABELS[t]}</Tag>,
       filters: ACCOUNT_TYPES.map((t) => ({ text: TYPE_LABELS[t], value: t })),
       onFilter: (value, row) => row.account_type === value,
     },
     {
-      title: "Dư",
+      title: "Normal",
       dataIndex: "account_type",
       key: "normal",
-      width: 70,
-      render: (t: AccountType) => (normalBalanceOf(t) === "debit" ? "Nợ" : "Có"),
+      width: 80,
+      render: (t: AccountType) => (normalBalanceOf(t) === "debit" ? "Debit" : "Credit"),
     },
     {
-      title: "Báo cáo",
+      title: "Statement",
       dataIndex: "account_type",
       key: "statement",
-      width: 130,
+      width: 140,
       render: (t: AccountType) =>
-        statementSectionOf(t) === "balance_sheet" ? "Cân đối KT" : "Kết quả KD",
+        statementSectionOf(t) === "balance_sheet" ? "Balance Sheet" : "Profit & Loss",
     },
-    { title: "Tiền tệ", dataIndex: "currency_code", width: 80, render: (c) => c ?? "—" },
+    { title: "Currency", dataIndex: "currency_code", width: 90, render: (c) => c ?? "—" },
     {
-      title: "Trạng thái",
+      title: "Status",
       dataIndex: "status",
       width: 110,
       render: (s: AccountStatus) => <Tag color={STATUS_LABELS[s].color}>{STATUS_LABELS[s].text}</Tag>,
@@ -174,13 +174,13 @@ export default function AccountsClient({
     ...(canWrite
       ? [
           {
-            title: "Thao tác",
+            title: "Actions",
             key: "actions",
-            width: 170,
+            width: 180,
             render: (_: unknown, row: AccountRow) => (
               <Space>
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
-                  Sửa
+                  Edit
                 </Button>
                 <Button
                   size="small"
@@ -188,7 +188,7 @@ export default function AccountsClient({
                   onClick={() => toggleStatus(row)}
                   disabled={row.status !== "active" && row.status !== "inactive"}
                 >
-                  {row.status === "active" ? "Ngừng" : "Kích hoạt"}
+                  {row.status === "active" ? "Deactivate" : "Activate"}
                 </Button>
               </Space>
             ),
@@ -201,14 +201,14 @@ export default function AccountsClient({
     <div>
       <Space style={{ marginBottom: 16, justifyContent: "space-between", width: "100%" }}>
         <Input.Search
-          placeholder="Tìm theo mã hoặc tên"
+          placeholder="Search by code or name"
           allowClear
           style={{ width: 320 }}
           onChange={(e) => setSearch(e.target.value)}
         />
         {canWrite && (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Tạo tài khoản
+            New account
           </Button>
         )}
       </Space>
@@ -223,61 +223,68 @@ export default function AccountsClient({
       />
 
       <Modal
-        title={editing ? "Sửa tài khoản" : "Tạo tài khoản"}
+        title={editing ? "Edit account" : "New account"}
         open={open}
         onOk={onSubmit}
         onCancel={() => setOpen(false)}
         confirmLoading={saving}
-        okText="Lưu"
-        cancelText="Hủy"
+        okText="Save"
+        cancelText="Cancel"
         destroyOnHidden
       >
         <Form form={form} layout="vertical" requiredMark={false}>
           <Form.Item
             name="account_code"
-            label="Mã tài khoản"
-            rules={[{ required: true, message: "Nhập mã tài khoản" }]}
+            label="Account code"
+            rules={[{ required: true, message: "Enter an account code" }]}
           >
-            <Input disabled={!!editing} placeholder="Ví dụ: 4000" />
+            <Input disabled={!!editing} placeholder="e.g. 4000" />
           </Form.Item>
-          <Form.Item name="name" label="Tên tài khoản" rules={[{ required: true, message: "Nhập tên" }]}>
-            <Input placeholder="Ví dụ: Doanh thu bán hàng" />
+          <Form.Item name="name" label="Account name" rules={[{ required: true, message: "Enter a name" }]}>
+            <Input placeholder="e.g. Sales Revenue" />
           </Form.Item>
-          <Form.Item name="account_type" label="Loại tài khoản" rules={[{ required: true, message: "Chọn loại" }]}>
+          <Form.Item name="account_type" label="Account type" rules={[{ required: true, message: "Select a type" }]}>
             <Select
               options={ACCOUNT_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
-              placeholder="Chọn loại tài khoản"
+              placeholder="Select an account type"
             />
           </Form.Item>
-          <Form.Item name="parent_account_id" label="Tài khoản cha (tùy chọn)">
+          <Form.Item name="parent_account_id" label="Parent account (optional)">
             <Select
               allowClear
               showSearch
-              optionFilterProp="label"
-              placeholder="Không có"
+              filterOption={(input, option) =>
+                String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              placeholder="None"
               options={accounts
                 .filter((a) => a.id !== editing?.id)
                 .map((a) => ({ value: a.id, label: nameById.get(a.id)! }))}
             />
           </Form.Item>
-          <Form.Item name="currency_code" label="Tiền tệ">
+          <Form.Item name="currency_code" label="Currency">
             <Select
               allowClear
-              placeholder="Mặc định theo hệ thống"
+              placeholder="System default"
               options={currencies.map((c) => ({ value: c.code, label: `${c.code} — ${c.name}` }))}
             />
           </Form.Item>
-          <Form.Item name="default_tax_code_id" label="Mã thuế mặc định (tùy chọn)">
+          <Form.Item name="default_tax_code_id" label="Default tax code (optional)">
             <Select
               allowClear
-              placeholder="Không có"
+              placeholder="None"
               options={taxCodes.map((t) => ({ value: t.id, label: `${t.code} — ${t.name}` }))}
             />
           </Form.Item>
-          <Form.Item name="is_posting_account" label="Tài khoản ghi sổ" valuePropName="checked" tooltip="Tắt nếu đây là tài khoản tổng hợp (không ghi bút toán trực tiếp)">
+          <Form.Item
+            name="is_posting_account"
+            label="Posting account"
+            valuePropName="checked"
+            tooltip="Turn off for a summary account that does not receive direct postings"
+          >
             <Switch />
           </Form.Item>
-          <Form.Item name="description" label="Mô tả">
+          <Form.Item name="description" label="Description">
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>

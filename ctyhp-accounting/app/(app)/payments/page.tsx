@@ -4,8 +4,8 @@ import PageHeader from "@/components/PageHeader";
 export default function Page() {
   return (
     <div>
-      <PageHeader title="Thanh toán" />
-      <Empty description="Module đang được xây dựng" />
+      <PageHeader title="Payments" />
+      <Empty description="This module is under construction" />
     </div>
   );
 }

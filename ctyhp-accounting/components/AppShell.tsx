@@ -18,12 +18,12 @@ import type { AppRole } from "@/lib/db/types";
 const { Header, Sider, Content } = Layout;
 
 const NAV = [
-  { key: "/dashboard", icon: <DashboardOutlined />, label: "Bảng điều khiển" },
-  { key: "/accounts", icon: <TableOutlined />, label: "Hệ thống tài khoản" },
-  { key: "/invoices", icon: <FileTextOutlined />, label: "Hóa đơn" },
-  { key: "/payments", icon: <DollarOutlined />, label: "Thanh toán" },
-  { key: "/banking", icon: <BankOutlined />, label: "Ngân hàng" },
-  { key: "/reports", icon: <BarChartOutlined />, label: "Báo cáo" },
+  { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" },
+  { key: "/accounts", icon: <TableOutlined />, label: "Chart of Accounts" },
+  { key: "/invoices", icon: <FileTextOutlined />, label: "Invoices" },
+  { key: "/payments", icon: <DollarOutlined />, label: "Payments" },
+  { key: "/banking", icon: <BankOutlined />, label: "Banking" },
+  { key: "/reports", icon: <BarChartOutlined />, label: "Reports" },
 ];
 
 export default function AppShell({
@@ -53,7 +53,7 @@ export default function AppShell({
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark">
         <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Typography.Text strong style={{ color: "#fff", fontSize: collapsed ? 14 : 16 }}>
-            {collapsed ? "CT" : "CTYHP Kế toán"}
+            {collapsed ? "CT" : "CTYHP Accounting"}
           </Typography.Text>
         </div>
         <Menu
@@ -82,7 +82,7 @@ export default function AppShell({
             <Typography.Text type="secondary">{email}</Typography.Text>
             {role && <Tag color={role === "admin" ? "gold" : role === "accountant" ? "blue" : "default"}>{role}</Tag>}
             <Button icon={<LogoutOutlined />} onClick={signOut}>
-              Đăng xuất
+              Sign out
             </Button>
           </Space>
         </Header>
