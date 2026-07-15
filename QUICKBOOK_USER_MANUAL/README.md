@@ -29,29 +29,30 @@ This knowledge base reorganizes the **QuickBooks Online Business User Manual, Ve
 |---|---|---|
 | `README.md` | Knowledge-base guide and chapter index | Complete |
 | `01_Getting_Started.md` | Technology requirements, introduction, plans, benefits, mobile use, and business case study | Complete |
-| `02_Navigation.md` | Login, home page, search, recent transactions, menus, and create actions | Planned |
-| `03_Company_Setup.md` | Account and settings configuration | Planned |
-| `04_GST_Setup.md` | GST Centre, tax settings, GST and BAS reports | Planned |
-| `05_Audit_Log.md` | Audit history, filtering, and transaction-level audit trails | Planned |
-| `06_Chart_of_Accounts.md` | Account structure, types, subaccounts, GST codes, and batch actions | Planned |
-| `07_TPARS.md` | Taxable Payments Annual Report setup and workflow | Planned |
-| `08_Managing_Users.md` | User limits, access types, and accountant users | Planned |
-| `09_Multi_Currency.md` | Foreign currencies, exchange rates, customers, and suppliers | Planned |
-| `10_Importing_Data.md` | Data conversion, imports, mapping, and opening balances | Planned |
-| `11_Products_and_Services.md` | Products, services, categories, pricing, inventory, and FIFO | Planned |
-| `12_Banking_Centre.md` | Bank feeds, uploads, review, matching, categorization, rules, and receipts | Planned |
-| `13_Quotes_and_Invoices.md` | Quotes, invoices, payments, customization, and attachments | Planned |
-| `14_Expenses_and_Bills.md` | Expense entry, bills, and bill payments | Planned |
-| `15_Recurring_Transactions.md` | Scheduled, reminder, and unscheduled templates | Planned |
-| `16_Class_and_Location.md` | Class tracking, location tracking, and reporting dimensions | Planned |
-| `17_Purchase_Orders.md` | Purchase orders, partial receipt, bills, and open-order reports | Planned |
-| `18_Payroll.md` | Payroll setup, employee setup, accounts, pay runs, and reports | Planned |
-| `19_Cash_Flow.md` | Cash-flow tools and forecasting | Planned |
-| `20_Bank_Reconciliation.md` | Reconciliation workflow, reports, and adjustments | Planned |
-| `21_GST_and_BAS.md` | GST management, BAS review, lodgement, amendments, and IAS | Planned |
-| `22_Reports.md` | Profit and Loss, Balance Sheet, customization, groups, and automation | Planned |
-| `23_Mobile_App.md` | Mobile setup and quote/invoice workflows | Planned |
-| `24_Help_and_Support.md` | In-product support, QB Assistant, customer care, and feedback | Planned |
+| `02_Navigation.md` | Login, home page, search, recent transactions, menus, and create actions | Complete |
+| `03_Company_Setup.md` | Account and settings configuration | Complete |
+| `04_GST_Setup.md` | GST Centre, tax settings, GST and BAS reports | Complete |
+| `05_Audit_Log.md` | Audit history, filtering, and transaction-level audit trails | Complete |
+| `06_Chart_of_Accounts.md` | Account structure, types, subaccounts, GST codes, and batch actions | Complete |
+| `07_TPARS.md` | Taxable Payments Annual Report setup and workflow | Complete |
+| `08_Managing_Users.md` | User limits, access types, and accountant users | Complete |
+| `09_Multi_Currency.md` | Foreign currencies, exchange rates, customers, and suppliers | Complete |
+| `10_Importing_Data.md` | Data conversion, imports, mapping, and opening balances | Complete |
+| `11_Products_and_Services.md` | Products, services, categories, pricing, inventory, and FIFO | Complete |
+| `12_Banking_Centre.md` | Bank feeds, uploads, review, matching, categorization, rules, and receipts | Complete |
+| `13_Quotes_and_Invoices.md` | Quotes, invoices, payments, and quote-to-cash controls | Complete |
+| `14_Customising_Invoices_and_Attachments.md` | Invoice templates, branding, attachments, batch actions, and document controls | Complete |
+| `15_Expenses_and_Bills.md` | Expense entry, bills, bill payments, approvals, and Accounts Payable controls | Complete |
+| `16_Recurring_Transactions.md` | Scheduled, reminder, and unscheduled templates | Complete |
+| `17_Class_and_Location.md` | Class tracking, location tracking, and reporting dimensions | Complete |
+| `18_Purchase_Orders.md` | Purchase orders, partial receipt, bills, and open-order reports | Complete |
+| `19_Payroll.md` | Payroll setup, employee setup, accounts, pay runs, reports, and superannuation | Complete |
+| `20_Cash_Flow.md` | Cash-flow overview, planning, forecasting, scenarios, and liquidity controls | Complete |
+| `21_Bank_Reconciliation.md` | Reconciliation workflow, discrepancy reports, controls, and adjustments | Complete |
+| `22_GST_and_BAS.md` | GST management, BAS review, lodgement, amendments, IAS, and tax-payment controls | Complete |
+| `23_Reports.md` | Profit and Loss, Balance Sheet, customization, groups, exports, and automated delivery | Complete |
+| `24_Mobile_App.md` | Mobile setup, quotes, signatures, invoices, expenses, reports, and device controls | Complete |
+| `25_Help_and_Support.md` | In-product support, QB Assistant, customer care, knowledge management, and support controls | Complete |
 | `assets/` | Optional supporting images and diagrams | Available |
 
 ## Recommended Use with AI Coding Tools
