@@ -43,7 +43,11 @@ export default function ReportsClient({
     else message.error(res.error ?? "Failed to load report");
   }, [type, asOf, range, message]);
 
+  // Data-synchronization effect: recompute the report whenever the report type
+  // or date range changes. run() flips a loading flag then fetches via a server
+  // action — an intentional load, not derived render state.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     run();
   }, [run]);
 
