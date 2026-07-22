@@ -54,6 +54,7 @@ export const invoiceLineInputSchema = z.object({
   unit_price_minor: z.number().int("Unit price must be a whole minor-unit amount").min(0),
   income_account_id: z.uuid("Select an income account"),
   tax_code_id: z.uuid().optional().nullable(),
+  item_id: z.uuid().optional().nullable(),
 });
 export type InvoiceLineInputT = z.infer<typeof invoiceLineInputSchema>;
 
@@ -102,6 +103,7 @@ export const billLineInputSchema = z.object({
   description: z.string().trim().max(300).default(""),
   expense_account_id: z.uuid("Select an expense account"),
   amount_minor: z.number().int("Amount must be a whole minor-unit amount").positive("Amount must be greater than 0"),
+  item_id: z.uuid().optional().nullable(),
 });
 export type BillLineInputT = z.infer<typeof billLineInputSchema>;
 
@@ -151,3 +153,34 @@ export const billPaymentCreateSchema = z.object({
   allocations: z.array(billPaymentAllocationSchema).default([]),
 });
 export type BillPaymentCreateInput = z.infer<typeof billPaymentCreateSchema>;
+
+// --- Products & Services ---
+export const itemCreateSchema = z
+  .object({
+    item_code: z.string().trim().max(40).optional().or(z.literal("")).nullable(),
+    name: z.string().trim().min(1, "Item name is required").max(160),
+    description: z.string().trim().max(300).default(""),
+    is_sold: z.boolean().default(true),
+    sales_price_minor: z.number().int().min(0).default(0),
+    income_account_id: z.uuid().optional().nullable(),
+    sales_tax_code_id: z.uuid().optional().nullable(),
+    is_purchased: z.boolean().default(false),
+    purchase_cost_minor: z.number().int().min(0).default(0),
+    expense_account_id: z.uuid().optional().nullable(),
+  })
+  .refine((v) => v.is_sold || v.is_purchased, {
+    message: "Enable at least one of Sales or Purchase",
+    path: ["is_sold"],
+  })
+  .refine((v) => !v.is_sold || !!v.income_account_id, {
+    message: "Select an income account for a sold item",
+    path: ["income_account_id"],
+  })
+  .refine((v) => !v.is_purchased || !!v.expense_account_id, {
+    message: "Select an expense account for a purchased item",
+    path: ["expense_account_id"],
+  });
+export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
+
+export const itemUpdateSchema = itemCreateSchema;
+export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;

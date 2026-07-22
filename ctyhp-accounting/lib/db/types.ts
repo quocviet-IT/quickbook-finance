@@ -121,6 +121,7 @@ export interface InvoiceLineRow {
   unit_price_minor: number;
   income_account_id: string;
   tax_code_id: string | null;
+  item_id: string | null;
   line_subtotal_minor: number;
   line_tax_minor: number;
   line_total_minor: number;
@@ -223,6 +224,7 @@ export interface BillLineRow {
   description: string;
   expense_account_id: string;
   amount_minor: number;
+  item_id: string | null;
 }
 
 export type ExpenseStatus = "posted" | "void";
@@ -266,6 +268,24 @@ export interface BillPaymentRow {
   status: BillPaymentStatus;
   journal_entry_id: string | null;
   memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Products & Services ---
+export interface ItemRow {
+  id: string;
+  item_code: string | null;
+  name: string;
+  description: string;
+  is_sold: boolean;
+  sales_price_minor: number;
+  income_account_id: string | null;
+  sales_tax_code_id: string | null;
+  is_purchased: boolean;
+  purchase_cost_minor: number;
+  expense_account_id: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
