@@ -52,7 +52,6 @@ async function main() {
     auth: { persistSession: false },
   });
 
-  const apAcc = await acctId("2000");      // Accounts Payable
   const expAcc = await acctId("6000");     // Operating Expenses
   const bankAcc = await acctId("1010");    // Operating Bank Account
 
