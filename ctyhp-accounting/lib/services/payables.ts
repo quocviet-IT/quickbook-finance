@@ -111,6 +111,7 @@ export async function createDraftBill(sb: SupabaseClient, input: BillCreateInput
       description: l.description,
       expense_account_id: l.expense_account_id,
       amount_minor: l.amount_minor,
+      item_id: l.item_id || null,
     })),
   );
   if (e2) {

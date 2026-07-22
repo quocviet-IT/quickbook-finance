@@ -132,6 +132,7 @@ export async function createDraftInvoice(
       unit_price_minor: c.line.unit_price_minor,
       income_account_id: c.line.income_account_id,
       tax_code_id: c.line.tax_code_id || null,
+      item_id: c.line.item_id || null,
       line_subtotal_minor: c.amounts.subtotalMinor,
       line_tax_minor: c.amounts.taxMinor,
       line_total_minor: c.amounts.totalMinor,
