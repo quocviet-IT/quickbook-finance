@@ -289,3 +289,23 @@ export interface ItemRow {
   created_at: string;
   updated_at: string;
 }
+
+// --- Sales Tax ---
+export type TaxPaymentStatus = "posted" | "void";
+
+export interface TaxPaymentRow {
+  id: string;
+  payment_number: string | null;
+  tax_account_id: string;
+  bank_account_id: string;
+  payment_date: string;
+  currency_code: string;
+  amount_minor: number;
+  period_start: string | null;
+  period_end: string | null;
+  status: TaxPaymentStatus;
+  journal_entry_id: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}

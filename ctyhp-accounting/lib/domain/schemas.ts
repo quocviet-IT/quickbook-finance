@@ -184,3 +184,31 @@ export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
 
 export const itemUpdateSchema = itemCreateSchema;
 export type ItemUpdateInput = z.infer<typeof itemUpdateSchema>;
+
+// --- Sales Tax ---
+export const TAX_DIRECTIONS = ["sales", "purchase", "none"] as const;
+
+export const taxCodeCreateSchema = z.object({
+  code: z.string().trim().min(1, "Code is required").max(20),
+  name: z.string().trim().min(1, "Name is required").max(120),
+  rate_percent: z.number().min(0, "Rate must be >= 0").max(100, "Rate must be <= 100"),
+  direction: z.enum(TAX_DIRECTIONS),
+  tax_account_id: z.uuid().optional().nullable(),
+  is_active: z.boolean().default(true),
+});
+export type TaxCodeCreateInput = z.infer<typeof taxCodeCreateSchema>;
+
+export const taxCodeUpdateSchema = taxCodeCreateSchema;
+export type TaxCodeUpdateInput = z.infer<typeof taxCodeUpdateSchema>;
+
+export const taxPaymentCreateSchema = z.object({
+  tax_account_id: z.uuid("Select the Sales Tax Payable account"),
+  bank_account_id: z.uuid("Select a bank account"),
+  payment_date: z.string().optional(),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  amount_minor: z.number().int().positive("Amount must be greater than 0"),
+  period_start: z.string().optional().nullable(),
+  period_end: z.string().optional().nullable(),
+  memo: z.string().trim().max(500).optional().nullable(),
+});
+export type TaxPaymentCreateInput = z.infer<typeof taxPaymentCreateSchema>;
