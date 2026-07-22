@@ -14,8 +14,9 @@ import {
   Tag,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import type { AccountRow, CurrencyRow, VendorRow } from "@/lib/db/types";
+import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
+import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { createBillAction, postBillAction, voidBillAction } from "./actions";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -30,6 +31,7 @@ interface LineForm {
   description?: string;
   expense_account_id?: string;
   amount?: number; // decimal, converted to minor on submit
+  item_id?: string | null;
 }
 
 export default function BillsClient({
@@ -37,12 +39,14 @@ export default function BillsClient({
   vendors,
   expenseAccounts,
   currencies,
+  items,
   canWrite,
 }: {
   bills: BillWithVendor[];
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
   currencies: CurrencyRow[];
+  items: ItemRow[];
   canWrite: boolean;
 }) {
   const { message, modal } = App.useApp();
@@ -67,6 +71,7 @@ export default function BillsClient({
       description: l.description ?? "",
       expense_account_id: l.expense_account_id,
       amount_minor: Math.round((l.amount ?? 0) * 10 ** decimals),
+      item_id: l.item_id ?? null,
     }));
     setSaving(true);
     const res = await createBillAction({
@@ -206,6 +211,26 @@ export default function BillsClient({
               <>
                 {fields.map((field) => (
                   <Space key={field.key} align="baseline" style={{ display: "flex", marginBottom: 8 }}>
+                    <Form.Item name={[field.name, "item_id"]} style={{ marginBottom: 0 }}>
+                      <Select
+                        allowClear
+                        showSearch
+                        placeholder="Item (optional)"
+                        style={{ width: 180 }}
+                        optionFilterProp="label"
+                        options={items.map((i) => ({ value: i.id, label: i.name }))}
+                        onChange={(itemId) => {
+                          const it = items.find((i) => i.id === itemId);
+                          if (!it) return;
+                          const d = itemToBillLineDefaults(it);
+                          form.setFields([
+                            { name: ["lines", field.name, "description"], value: d.description },
+                            { name: ["lines", field.name, "expense_account_id"], value: d.expense_account_id ?? undefined },
+                            { name: ["lines", field.name, "amount"], value: d.amount_minor / 10 ** decimals },
+                          ]);
+                        }}
+                      />
+                    </Form.Item>
                     <Form.Item name={[field.name, "description"]} style={{ marginBottom: 0 }}>
                       <Input placeholder="Description" style={{ width: 220 }} />
                     </Form.Item>

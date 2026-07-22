@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listInvoices, listCustomers } from "@/lib/services/invoicing";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
+import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
@@ -10,12 +11,13 @@ export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage() {
   const sb = await createSupabaseServerClient();
-  const [invoices, customers, accounts, currencies, taxCodes, role] = await Promise.all([
+  const [invoices, customers, accounts, currencies, taxCodes, items, role] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
     listAccounts(sb),
     listCurrencies(sb),
     listTaxCodes(sb),
+    listItems(sb),
     getUserRole(),
   ]);
 
@@ -26,6 +28,8 @@ export default async function InvoicesPage() {
       a.status === "active",
   );
 
+  const salesItems = items.filter((i) => i.is_sold && i.is_active);
+
   return (
     <div>
       <PageHeader title="Invoices" description="Create invoices, issue them to the ledger, and track balances due." />
@@ -35,6 +39,7 @@ export default async function InvoicesPage() {
         incomeAccounts={incomeAccounts}
         taxCodes={taxCodes}
         currencies={currencies}
+        items={salesItems}
         canWrite={canWrite(role)}
       />
     </div>

@@ -24,10 +24,12 @@ import type {
   CustomerRow,
   InvoiceStatus,
   InvoiceLineRow,
+  ItemRow,
 } from "@/lib/db/types";
 import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
+import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
 import {
   createInvoiceAction,
   createCustomerAction,
@@ -50,6 +52,7 @@ interface LineForm {
   unit_price?: number; // major units
   income_account_id?: string;
   tax_code_id?: string | null;
+  item_id?: string | null;
 }
 
 export default function InvoicesClient({
@@ -58,6 +61,7 @@ export default function InvoicesClient({
   incomeAccounts,
   taxCodes,
   currencies,
+  items,
   canWrite,
 }: {
   invoices: InvoiceWithCustomer[];
@@ -65,6 +69,7 @@ export default function InvoicesClient({
   incomeAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
   currencies: CurrencyRow[];
+  items: ItemRow[];
   canWrite: boolean;
 }) {
   const { message } = App.useApp();
@@ -139,6 +144,7 @@ export default function InvoicesClient({
       unit_price_minor: toMinorUnits(Number(l.unit_price ?? 0), dec),
       income_account_id: l.income_account_id!,
       tax_code_id: l.tax_code_id || null,
+      item_id: l.item_id || null,
     }));
     setSaving(true);
     const res = await createInvoiceAction({
@@ -294,6 +300,27 @@ export default function InvoicesClient({
               <div style={{ marginTop: 8 }}>
                 {fields.map((field) => (
                   <Space key={field.key} align="baseline" style={{ display: "flex", marginBottom: 8 }} wrap>
+                    <Form.Item name={[field.name, "item_id"]} style={{ marginBottom: 0, width: 190 }}>
+                      <Select
+                        allowClear
+                        showSearch
+                        placeholder="Item (optional)"
+                        optionFilterProp="label"
+                        options={items.map((i) => ({ value: i.id, label: i.name }))}
+                        onChange={(itemId) => {
+                          const it = items.find((i) => i.id === itemId);
+                          if (!it) return;
+                          const d = itemToInvoiceLineDefaults(it);
+                          const dec = decimalsOf(form.getFieldValue("currency_code") ?? baseCurrency);
+                          form.setFields([
+                            { name: ["lines", field.name, "description"], value: d.description },
+                            { name: ["lines", field.name, "unit_price"], value: d.unit_price_minor / 10 ** dec },
+                            { name: ["lines", field.name, "income_account_id"], value: d.income_account_id ?? undefined },
+                            { name: ["lines", field.name, "tax_code_id"], value: d.tax_code_id ?? undefined },
+                          ]);
+                        }}
+                      />
+                    </Form.Item>
                     <Form.Item name={[field.name, "description"]} style={{ marginBottom: 0, width: 200 }}>
                       <Input placeholder="Description" />
                     </Form.Item>
