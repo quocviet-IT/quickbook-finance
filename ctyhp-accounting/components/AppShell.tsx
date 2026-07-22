@@ -14,6 +14,7 @@ import {
   TeamOutlined,
   ShopOutlined,
   CreditCardOutlined,
+  ShoppingOutlined,
 } from "@ant-design/icons";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { AppRole } from "@/lib/db/types";
@@ -23,6 +24,7 @@ const { Header, Sider, Content } = Layout;
 const NAV = [
   { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" },
   { key: "/accounts", icon: <TableOutlined />, label: "Chart of Accounts" },
+  { key: "/items", icon: <ShoppingOutlined />, label: "Products & Services" },
   { key: "/customers", icon: <TeamOutlined />, label: "Customers" },
   { key: "/invoices", icon: <FileTextOutlined />, label: "Invoices" },
   { key: "/payments", icon: <DollarOutlined />, label: "Payments" },
