@@ -73,4 +73,10 @@ async function main() {
   process.exitCode = fail === 0 ? 0 : 1;
 }
 
-main().catch((e) => { console.error("verify error:", e.message); process.exitCode = 1; }).finally(() => db.end());
+main().catch((e) => {
+  // Surface the real cause: pg timeout/aggregate errors carry an empty .message.
+  const parts = [e.code, e.message].filter(Boolean).join(" ");
+  const inner = (e.errors || []).map((x) => `${x.code} ${x.address}:${x.port}`).join(", ");
+  console.error("verify error:", parts || "(no message)", inner ? `| ${inner}` : "");
+  process.exitCode = 1;
+}).finally(() => db.end());
