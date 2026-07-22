@@ -255,6 +255,18 @@ begin
     if rec.amt is null or rec.amt <= 0 then continue; end if;
     select * into v_bill from acc_bill where id = rec.bill_id for update;
     if not found then raise exception 'Bill not found: %', rec.bill_id; end if;
+    -- The bill must be an open payable for this same vendor and currency, so a
+    -- payment can never be allocated to a draft/paid/void bill, another vendor's
+    -- bill, or a bill in a different currency (guards ledger/subledger integrity).
+    if v_bill.vendor_id <> p_vendor_id then
+      raise exception 'Bill % does not belong to vendor %', rec.bill_id, p_vendor_id;
+    end if;
+    if v_bill.status not in ('open', 'partial') then
+      raise exception 'Bill % is not an open payable (status %)', rec.bill_id, v_bill.status;
+    end if;
+    if v_bill.currency_code <> p_currency then
+      raise exception 'Bill % currency % does not match payment currency %', rec.bill_id, v_bill.currency_code, p_currency;
+    end if;
     if rec.amt > v_bill.balance_due_minor then
       raise exception 'Allocation % exceeds bill balance %', rec.amt, v_bill.balance_due_minor;
     end if;
