@@ -122,3 +122,84 @@ export function reverse(lines: JournalLineInput[]): JournalLineInput[] {
     memo: l.memo ? `Reversal: ${l.memo}` : "Reversal",
   }));
 }
+
+export interface ExpenseAllocationLine {
+  expenseAccountId: string;
+  amountMinor: Minor;
+}
+
+function groupExpenseLines(lines: ExpenseAllocationLine[]): Map<string, Minor> {
+  const byAccount = new Map<string, Minor>();
+  for (const l of lines) {
+    byAccount.set(l.expenseAccountId, (byAccount.get(l.expenseAccountId) ?? 0) + l.amountMinor);
+  }
+  return byAccount;
+}
+
+export interface BillPostingInput {
+  apAccountId: string;
+  lines: ExpenseAllocationLine[];
+}
+
+/**
+ * Bill posted (open):
+ *   DR Expense (grouped per account) = each line amount (tax-inclusive, US model)
+ *   CR Accounts Payable             = total
+ */
+export function buildBillPosting(input: BillPostingInput): JournalLineInput[] {
+  const lines: JournalLineInput[] = [];
+  let total: Minor = 0;
+  for (const [accountId, amount] of groupExpenseLines(input.lines)) {
+    if (amount !== 0) {
+      lines.push({ accountId, debitMinor: amount, creditMinor: 0, memo: "Expense" });
+      total += amount;
+    }
+  }
+  lines.push({ accountId: input.apAccountId, debitMinor: 0, creditMinor: total, memo: "Accounts payable" });
+  assertBalanced(lines);
+  return lines;
+}
+
+export interface ExpensePostingInput {
+  paymentAccountId: string;
+  lines: ExpenseAllocationLine[];
+}
+
+/**
+ * Expense (paid immediately):
+ *   DR Expense (grouped per account)
+ *   CR Bank / Credit Card = total
+ */
+export function buildExpensePosting(input: ExpensePostingInput): JournalLineInput[] {
+  const lines: JournalLineInput[] = [];
+  let total: Minor = 0;
+  for (const [accountId, amount] of groupExpenseLines(input.lines)) {
+    if (amount !== 0) {
+      lines.push({ accountId, debitMinor: amount, creditMinor: 0, memo: "Expense" });
+      total += amount;
+    }
+  }
+  lines.push({ accountId: input.paymentAccountId, debitMinor: 0, creditMinor: total, memo: "Payment" });
+  assertBalanced(lines);
+  return lines;
+}
+
+export interface BillPaymentPostingInput {
+  apAccountId: string;
+  paymentAccountId: string;
+  amountMinor: Minor;
+}
+
+/**
+ * Bill payment:
+ *   DR Accounts Payable   = amount
+ *   CR Bank / Credit Card = amount
+ */
+export function buildBillPaymentPosting(input: BillPaymentPostingInput): JournalLineInput[] {
+  const lines: JournalLineInput[] = [
+    { accountId: input.apAccountId, debitMinor: input.amountMinor, creditMinor: 0, memo: "Pay accounts payable" },
+    { accountId: input.paymentAccountId, debitMinor: 0, creditMinor: input.amountMinor, memo: "Bank/credit payment" },
+  ];
+  assertBalanced(lines);
+  return lines;
+}
