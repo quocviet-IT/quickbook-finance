@@ -142,3 +142,130 @@ export interface PaymentRow {
   created_at: string;
   updated_at: string;
 }
+
+export type BankTxnStatus = "unmatched" | "matched" | "ignored";
+export type ReconciliationStatus = "suggested" | "approved" | "rejected";
+
+export interface BankAccountRow {
+  id: string;
+  account_id: string;
+  bank_name: string;
+  account_number_masked: string | null;
+  currency_code: string;
+  created_at: string;
+}
+
+export interface BankTransactionRow {
+  id: string;
+  bank_account_id: string;
+  import_batch_id: string | null;
+  txn_date: string;
+  description: string;
+  reference: string | null;
+  amount_minor: number;
+  running_balance_minor: number | null;
+  raw_line: string | null;
+  raw_hash: string;
+  status: BankTxnStatus;
+  created_at: string;
+}
+
+export interface ReconciliationRow {
+  id: string;
+  bank_transaction_id: string;
+  payment_id: string | null;
+  rule_applied: string | null;
+  confidence: number;
+  status: ReconciliationStatus;
+  approved_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Payables (Module 3b) ---
+export interface VendorRow {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  currency_code: string | null;
+  ap_account_id: string | null;
+  default_expense_account_id: string | null;
+  payment_terms: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BillStatus = "draft" | "open" | "partial" | "paid" | "void";
+
+export interface BillRow {
+  id: string;
+  bill_number: string | null;
+  vendor_ref: string | null;
+  vendor_id: string;
+  bill_date: string;
+  due_date: string | null;
+  currency_code: string;
+  total_minor: number;
+  balance_due_minor: number;
+  status: BillStatus;
+  journal_entry_id: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillLineRow {
+  id: string;
+  bill_id: string;
+  line_order: number;
+  description: string;
+  expense_account_id: string;
+  amount_minor: number;
+}
+
+export type ExpenseStatus = "posted" | "void";
+
+export interface ExpenseRow {
+  id: string;
+  expense_number: string | null;
+  vendor_id: string | null;
+  payment_account_id: string;
+  expense_date: string;
+  currency_code: string;
+  total_minor: number;
+  status: ExpenseStatus;
+  journal_entry_id: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseLineRow {
+  id: string;
+  expense_id: string;
+  line_order: number;
+  description: string;
+  expense_account_id: string;
+  amount_minor: number;
+}
+
+export type BillPaymentStatus = "unapplied" | "partial" | "applied" | "void";
+
+export interface BillPaymentRow {
+  id: string;
+  payment_number: string | null;
+  vendor_id: string;
+  payment_date: string;
+  currency_code: string;
+  amount_minor: number;
+  unapplied_minor: number;
+  payment_account_id: string;
+  method: string | null;
+  status: BillPaymentStatus;
+  journal_entry_id: string | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -84,3 +84,70 @@ export const paymentCreateSchema = z.object({
   allocations: z.array(paymentAllocationSchema).default([]),
 });
 export type PaymentCreateInput = z.infer<typeof paymentCreateSchema>;
+
+// --- Vendors ---
+export const vendorCreateSchema = z.object({
+  name: z.string().trim().min(1, "Vendor name is required").max(160),
+  email: z.email("Enter a valid email").optional().or(z.literal("")).nullable(),
+  phone: z.string().trim().max(40).optional().or(z.literal("")).nullable(),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code").optional().nullable(),
+  ap_account_id: z.uuid().optional().nullable(),
+  default_expense_account_id: z.uuid().optional().nullable(),
+  payment_terms: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+});
+export type VendorCreateInput = z.infer<typeof vendorCreateSchema>;
+
+// --- Bills ---
+export const billLineInputSchema = z.object({
+  description: z.string().trim().max(300).default(""),
+  expense_account_id: z.uuid("Select an expense account"),
+  amount_minor: z.number().int("Amount must be a whole minor-unit amount").positive("Amount must be greater than 0"),
+});
+export type BillLineInputT = z.infer<typeof billLineInputSchema>;
+
+export const billCreateSchema = z.object({
+  vendor_id: z.uuid("Select a vendor"),
+  vendor_ref: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  bill_date: z.string().optional(),
+  due_date: z.string().optional().nullable(),
+  memo: z.string().trim().max(500).optional().nullable(),
+  lines: z.array(billLineInputSchema).min(1, "Add at least one line item"),
+});
+export type BillCreateInput = z.infer<typeof billCreateSchema>;
+
+// --- Expenses ---
+export const expenseLineInputSchema = z.object({
+  description: z.string().trim().max(300).default(""),
+  expense_account_id: z.uuid("Select an expense account"),
+  amount_minor: z.number().int("Amount must be a whole minor-unit amount").positive("Amount must be greater than 0"),
+});
+export type ExpenseLineInputT = z.infer<typeof expenseLineInputSchema>;
+
+export const expenseCreateSchema = z.object({
+  vendor_id: z.uuid().optional().nullable(),
+  payment_account_id: z.uuid("Select a payment account"),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  expense_date: z.string().optional(),
+  memo: z.string().trim().max(500).optional().nullable(),
+  lines: z.array(expenseLineInputSchema).min(1, "Add at least one line item"),
+});
+export type ExpenseCreateInput = z.infer<typeof expenseCreateSchema>;
+
+// --- Bill payments ---
+export const billPaymentAllocationSchema = z.object({
+  bill_id: z.uuid(),
+  amount_minor: z.number().int().positive(),
+});
+
+export const billPaymentCreateSchema = z.object({
+  vendor_id: z.uuid("Select a vendor"),
+  payment_date: z.string().optional(),
+  currency_code: z.string().regex(/^[A-Z]{3}$/),
+  amount_minor: z.number().int().positive("Amount must be greater than 0"),
+  payment_account_id: z.uuid("Select a payment account"),
+  method: z.string().trim().max(60).optional().nullable(),
+  memo: z.string().trim().max(500).optional().nullable(),
+  allocations: z.array(billPaymentAllocationSchema).default([]),
+});
+export type BillPaymentCreateInput = z.infer<typeof billPaymentCreateSchema>;
