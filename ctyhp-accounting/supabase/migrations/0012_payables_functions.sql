@@ -42,7 +42,7 @@ begin
   if v_ap is null then raise exception 'No active Accounts Payable account configured'; end if;
 
   for rec in
-    select expense_account_id as acc, sum(amount_minor) as amt
+    select expense_account_id as acc, sum(amount_minor)::bigint as amt
       from acc_bill_line where bill_id = p_bill_id
       group by expense_account_id having sum(amount_minor) <> 0
   loop
@@ -77,8 +77,6 @@ create or replace function acc_void_bill(p_bill_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare
   v_bill  acc_bill;
-  v_lines jsonb := '[]'::jsonb;
-  rec     record;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to void bills'; end if;
 
@@ -93,18 +91,9 @@ begin
     raise exception 'Cannot void a bill with payments applied; remove payments first';
   end if;
 
+  -- Reports include only status='posted' entries, so voiding the entry reverses
+  -- its ledger effect. Do NOT also post a reversal (that would double-count).
   if v_bill.journal_entry_id is not null then
-    for rec in
-      select account_id, debit_minor, credit_minor, amount_base_minor
-        from acc_journal_line where journal_entry_id = v_bill.journal_entry_id
-    loop
-      v_lines := v_lines || jsonb_build_object(
-        'account_id', rec.account_id, 'debit_minor', rec.credit_minor,
-        'credit_minor', rec.debit_minor, 'amount_base_minor', rec.amount_base_minor,
-        'memo', 'Void bill ' || coalesce(v_bill.bill_number, ''));
-    end loop;
-    perform acc_post_entry(current_date, 'Void bill ' || coalesce(v_bill.bill_number, ''),
-                           'bill', p_bill_id, v_bill.currency_code, v_lines);
     update acc_journal_entry set status = 'void', voided_at = now()
      where id = v_bill.journal_entry_id;
   end if;
@@ -144,7 +133,7 @@ begin
   if v_total <= 0 then raise exception 'Expense total must be positive'; end if;
 
   for rec in
-    select (l->>'expense_account_id')::uuid as acc, sum((l->>'amount_minor')::bigint) as amt
+    select (l->>'expense_account_id')::uuid as acc, sum((l->>'amount_minor')::bigint)::bigint as amt
       from jsonb_array_elements(p_lines) l
       group by (l->>'expense_account_id')::uuid having sum((l->>'amount_minor')::bigint) <> 0
   loop
@@ -183,8 +172,6 @@ create or replace function acc_void_expense(p_expense_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare
   v_exp   acc_expense;
-  v_lines jsonb := '[]'::jsonb;
-  rec     record;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to void expenses'; end if;
 
@@ -192,18 +179,9 @@ begin
   if not found then raise exception 'Expense not found'; end if;
   if v_exp.status = 'void' then raise exception 'Expense is already void'; end if;
 
+  -- Voiding the entry reverses its ledger effect (reports use status='posted' only);
+  -- do NOT also post a reversal.
   if v_exp.journal_entry_id is not null then
-    for rec in
-      select account_id, debit_minor, credit_minor, amount_base_minor
-        from acc_journal_line where journal_entry_id = v_exp.journal_entry_id
-    loop
-      v_lines := v_lines || jsonb_build_object(
-        'account_id', rec.account_id, 'debit_minor', rec.credit_minor,
-        'credit_minor', rec.debit_minor, 'amount_base_minor', rec.amount_base_minor,
-        'memo', 'Void expense ' || coalesce(v_exp.expense_number, ''));
-    end loop;
-    perform acc_post_entry(current_date, 'Void expense ' || coalesce(v_exp.expense_number, ''),
-                           'expense', p_expense_id, v_exp.currency_code, v_lines);
     update acc_journal_entry set status = 'void', voided_at = now()
      where id = v_exp.journal_entry_id;
   end if;
@@ -264,9 +242,9 @@ begin
       unapplied_minor, payment_account_id, method, status, journal_entry_id, memo, created_by)
     values (v_number, p_vendor_id, p_payment_date, p_currency, p_amount_minor,
       p_amount_minor - v_alloc_total, p_payment_account_id, p_method,
-      case when v_alloc_total = 0 then 'unapplied'
+      (case when v_alloc_total = 0 then 'unapplied'
            when v_alloc_total = p_amount_minor then 'applied'
-           else 'partial' end,
+           else 'partial' end)::acc_bill_payment_status,
       v_entry, p_memo, auth.uid())
     returning id into v_payment;
 
@@ -284,7 +262,7 @@ begin
       values (v_payment, rec.bill_id, rec.amt);
     update acc_bill
        set balance_due_minor = balance_due_minor - rec.amt,
-           status = case when balance_due_minor - rec.amt = 0 then 'paid' else 'partial' end,
+           status = (case when balance_due_minor - rec.amt = 0 then 'paid' else 'partial' end)::acc_bill_status,
            updated_at = now()
      where id = rec.bill_id;
   end loop;
@@ -300,8 +278,6 @@ create or replace function acc_void_bill_payment(p_payment_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare
   v_pay   acc_bill_payment;
-  v_lines jsonb := '[]'::jsonb;
-  rec     record;
   arec    record;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to void bill payments'; end if;
@@ -315,23 +291,14 @@ begin
   loop
     update acc_bill
        set balance_due_minor = balance_due_minor + arec.amount_minor,
-           status = case when balance_due_minor + arec.amount_minor >= total_minor then 'open' else 'partial' end,
+           status = (case when balance_due_minor + arec.amount_minor >= total_minor then 'open' else 'partial' end)::acc_bill_status,
            updated_at = now()
      where id = arec.bill_id and status <> 'void';
   end loop;
 
+  -- Voiding the entry reverses its ledger effect (reports use status='posted' only);
+  -- do NOT also post a reversal.
   if v_pay.journal_entry_id is not null then
-    for rec in
-      select account_id, debit_minor, credit_minor, amount_base_minor
-        from acc_journal_line where journal_entry_id = v_pay.journal_entry_id
-    loop
-      v_lines := v_lines || jsonb_build_object(
-        'account_id', rec.account_id, 'debit_minor', rec.credit_minor,
-        'credit_minor', rec.debit_minor, 'amount_base_minor', rec.amount_base_minor,
-        'memo', 'Void bill payment ' || coalesce(v_pay.payment_number, ''));
-    end loop;
-    perform acc_post_entry(current_date, 'Void bill payment ' || coalesce(v_pay.payment_number, ''),
-                           'bill_payment', p_payment_id, v_pay.currency_code, v_lines);
     update acc_journal_entry set status = 'void', voided_at = now()
      where id = v_pay.journal_entry_id;
   end if;
