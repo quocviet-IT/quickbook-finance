@@ -37,8 +37,9 @@ async function main() {
   if (e2) throw new Error("item: " + e2.message);
   check("item created", !!item.id);
 
-  const { data: cust } = await authed.from("acc_customer")
+  const { data: cust, error: ec } = await authed.from("acc_customer")
     .insert({ name: "E2E Item Customer", currency_code: "USD" }).select("id").single();
+  if (ec) throw new Error("customer: " + ec.message);
 
   const { data: inv, error: e3 } = await authed.from("acc_invoice").insert({
     customer_id: cust.id, currency_code: "USD",
