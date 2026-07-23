@@ -70,9 +70,11 @@ async function main() {
   const { error: e6 } = await authed.rpc("acc_post_opening_balances", { p_as_of: "2026-01-01", p_currency: "USD", p_lines: [{ account_id: bank, debit_minor: 1, credit_minor: 0 }] });
   check("duplicate opening batch rejected", !!e6);
 
-  // Cleanup
+  // Cleanup. Void entries BEFORE deleting lines: the acc_journal_line_immutable
+  // trigger blocks deleting/updating lines while their entry is still 'posted'.
   await db.query("begin");
   await db.query("delete from acc_journal_reversal_link");
+  await db.query("update acc_journal_entry set status='void'");
   await db.query("delete from acc_journal_line");
   await db.query("delete from acc_journal_entry");
   await db.query("update acc_sequence set next_value=1");

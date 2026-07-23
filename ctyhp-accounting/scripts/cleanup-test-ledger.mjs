@@ -12,6 +12,8 @@ const client = new pg.Client({
 async function main() {
   await client.connect();
   await client.query("begin");
+  // Reversal links FK-reference entries — clear them before deleting entries.
+  await client.query("delete from acc_journal_reversal_link");
   // Void first so the posted-line immutability trigger permits deletion.
   await client.query("update acc_journal_entry set status = 'void'");
   await client.query("delete from acc_journal_line");
