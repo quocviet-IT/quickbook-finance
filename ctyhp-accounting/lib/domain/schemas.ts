@@ -260,3 +260,79 @@ export const reverseEntrySchema = z.object({
   reversal_date: z.string().optional(),
 });
 export type ReverseEntryInput = z.infer<typeof reverseEntrySchema>;
+
+// --- AR/AP credits, refunds, write-offs ---
+export const creditMemoLineSchema = z.object({
+  description: z.string().trim().max(300).default(""),
+  quantity: z.number().positive("Quantity must be greater than 0"),
+  unit_price_minor: z.number().int("Unit price must be a whole minor-unit amount").min(0),
+  income_account_id: z.uuid("Select an income account"),
+  tax_code_id: z.uuid().optional().nullable(),
+});
+
+export const creditMemoCreateSchema = z.object({
+  customer_id: z.uuid("Select a customer"),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  memo_date: z.string().optional(),
+  reason: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
+  memo: z.string().trim().max(500).optional().nullable(),
+  lines: z.array(creditMemoLineSchema).min(1, "Add at least one line"),
+});
+export type CreditMemoCreateInput = z.infer<typeof creditMemoCreateSchema>;
+
+export const vendorCreditLineSchema = z.object({
+  description: z.string().trim().max(300).default(""),
+  expense_account_id: z.uuid("Select an expense account"),
+  amount_minor: z.number().int("Amount must be a whole minor-unit amount").positive("Amount must be greater than 0"),
+});
+
+export const vendorCreditCreateSchema = z.object({
+  vendor_id: z.uuid("Select a vendor"),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  credit_date: z.string().optional(),
+  vendor_ref: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+  reason: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
+  memo: z.string().trim().max(500).optional().nullable(),
+  lines: z.array(vendorCreditLineSchema).min(1, "Add at least one line"),
+});
+export type VendorCreditCreateInput = z.infer<typeof vendorCreditCreateSchema>;
+
+export const creditAllocationSchema = z.object({
+  target_id: z.uuid(),
+  amount_minor: z.number().int().positive(),
+});
+export type CreditAllocationInput = z.infer<typeof creditAllocationSchema>;
+
+export const customerRefundSchema = z
+  .object({
+    customer_id: z.uuid("Select a customer"),
+    refund_date: z.string().optional(),
+    currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+    amount_minor: z.number().int().positive("Amount must be greater than 0"),
+    source_type: z.enum(["payment", "credit_memo"]),
+    payment_id: z.uuid().optional().nullable(),
+    credit_memo_id: z.uuid().optional().nullable(),
+    bank_account_id: z.uuid("Select a bank account"),
+    memo: z.string().trim().max(500).optional().nullable(),
+  })
+  .refine((v) => (v.source_type === "payment" ? !!v.payment_id && !v.credit_memo_id : !!v.credit_memo_id && !v.payment_id), {
+    message: "Provide exactly the source matching the selected type",
+    path: ["source_type"],
+  });
+export type CustomerRefundInput = z.infer<typeof customerRefundSchema>;
+
+export const writeOffSchema = z
+  .object({
+    side: z.enum(["ar", "ap"]),
+    invoice_id: z.uuid().optional().nullable(),
+    bill_id: z.uuid().optional().nullable(),
+    offset_account_id: z.uuid("Select an offset account"),
+    amount_minor: z.number().int().positive("Amount must be greater than 0"),
+    write_off_date: z.string().optional(),
+    reason: z.string().trim().min(1, "A reason is required").max(300),
+  })
+  .refine((v) => (v.side === "ar" ? !!v.invoice_id && !v.bill_id : !!v.bill_id && !v.invoice_id), {
+    message: "Provide the target matching the selected side",
+    path: ["side"],
+  });
+export type WriteOffInput = z.infer<typeof writeOffSchema>;
