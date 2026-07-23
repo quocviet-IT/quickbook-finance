@@ -42,7 +42,8 @@ async function main() {
   const balBefore = await payableBalance("2100-12-31");
 
   // Issue a taxed invoice
-  const { data: cust } = await authed.from("acc_customer").insert({ name: "E2E Tax Cust", currency_code: "USD" }).select("id").single();
+  const { data: cust, error: ec } = await authed.from("acc_customer").insert({ name: "E2E Tax Cust", currency_code: "USD" }).select("id").single();
+  if (ec) throw new Error("customer: " + ec.message);
   const { data: inv, error: e2 } = await authed.from("acc_invoice").insert({
     customer_id: cust.id, currency_code: "USD",
     subtotal_minor: sub, tax_total_minor: taxMinor, total_minor: sub + taxMinor, balance_due_minor: sub + taxMinor,
