@@ -83,6 +83,9 @@ begin
   select * into v_src from acc_journal_entry where id = p_entry_id for update;
   if not found then raise exception 'Journal entry not found'; end if;
   if v_src.status <> 'posted' then raise exception 'Only a posted entry can be reversed'; end if;
+  if v_src.source_type not in ('manual', 'opening_balance') then
+    raise exception 'Only manual journals and opening balances can be reversed';
+  end if;
   if exists (select 1 from acc_journal_reversal_link where original_entry_id = p_entry_id) then
     raise exception 'Entry has already been reversed';
   end if;

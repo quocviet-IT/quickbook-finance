@@ -49,7 +49,10 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
         equity = equityLine.creditMinor > 0 ? equityLine.creditMinor : -equityLine.debitMinor;
       }
     } catch {
-      equity = d - c;
+      // Posting builder rejected the draft lines (e.g. still unbalanced/invalid);
+      // treat as indeterminate here rather than re-deriving the equity amount —
+      // the posting rule lives only in lib/domain (buildOpeningBalancePosting).
+      equity = 0;
     }
     return { d, c, equity };
   }, [rows, baseDecimals]);

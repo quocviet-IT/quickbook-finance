@@ -154,7 +154,7 @@ export default function JournalClient({ canWrite, accounts, baseCurrency, baseDe
             title: "",
             key: "actions",
             render: (_, e) =>
-              canWrite && e.status === "posted" && !e.isReversed && e.sourceType === "manual" ? (
+              canWrite && e.status === "posted" && !e.isReversed && !e.isReversal && e.sourceType === "manual" ? (
                 <Button size="small" onClick={() => reverse(e)}>
                   Reverse
                 </Button>

@@ -81,7 +81,7 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
             <Statistic title="Closing" value={fmt(gl.closingMinor)} />
           </Space>
           <Table<GeneralLedgerRow>
-            rowKey="entryId"
+            rowKey="lineId"
             dataSource={gl.rows}
             pagination={false}
             loading={loading}

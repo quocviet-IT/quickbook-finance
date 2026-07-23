@@ -31,11 +31,13 @@ export interface JournalEntrySummary {
   status: string;
   isReversed: boolean;
   reversalEntryId: string | null;
+  isReversal: boolean;
   lines: JournalEntryLineSummary[];
 }
 
 export interface GeneralLedgerRow {
   entryId: string;
+  lineId: string;
   entryNumber: string;
   entryDate: string;
   sourceType: string;
@@ -133,7 +135,11 @@ export async function listJournalEntries(sb: SupabaseClient, filters: JournalFil
   const links = await sb.from("acc_journal_reversal_link").select("original_entry_id,reversal_entry_id");
   if (links.error) throw new JournalError(links.error.message);
   const reversedOf = new Map<string, string>();
-  for (const l of links.data ?? []) reversedOf.set(l.original_entry_id as string, l.reversal_entry_id as string);
+  const reversalIds = new Set<string>();
+  for (const l of links.data ?? []) {
+    reversedOf.set(l.original_entry_id as string, l.reversal_entry_id as string);
+    reversalIds.add(l.reversal_entry_id as string);
+  }
 
   // Account filter keeps an entry when any of its lines references filters.accountId.
   const list = rows
@@ -148,6 +154,7 @@ export async function listJournalEntries(sb: SupabaseClient, filters: JournalFil
       status: e.status,
       isReversed: reversedOf.has(e.id),
       reversalEntryId: reversedOf.get(e.id) ?? null,
+      isReversal: reversalIds.has(e.id),
       lines: [...e.acc_journal_line]
         .sort((a, b) => a.line_order - b.line_order)
         .map((l) => ({
@@ -183,7 +190,7 @@ export async function getGeneralLedger(
   const linesRes = await sb
     .from("acc_journal_line")
     .select(
-      "debit_minor,credit_minor,memo,acc_journal_entry!inner(id,entry_number,entry_date,source_type,source_id,status)",
+      "id,debit_minor,credit_minor,amount_base_minor,memo,acc_journal_entry!inner(id,entry_number,entry_date,source_type,source_id,status)",
     )
     .eq("account_id", accountId)
     .eq("acc_journal_entry.status", "posted")
@@ -192,7 +199,7 @@ export async function getGeneralLedger(
   if (linesRes.error) throw new JournalError(linesRes.error.message);
 
   type LineRow = {
-    debit_minor: number; credit_minor: number; memo: string | null;
+    id: string; debit_minor: number; credit_minor: number; amount_base_minor: number; memo: string | null;
     acc_journal_entry: { id: string; entry_number: string; entry_date: string; source_type: string; source_id: string | null };
   };
   const raw = (linesRes.data ?? []) as unknown as LineRow[];
@@ -201,20 +208,24 @@ export async function getGeneralLedger(
       ? a.acc_journal_entry.entry_number.localeCompare(b.acc_journal_entry.entry_number)
       : a.acc_journal_entry.entry_date.localeCompare(b.acc_journal_entry.entry_date),
   );
-  const running = computeRunningBalance(
-    openingMinor,
-    raw.map((r) => ({ debitMinor: r.debit_minor, creditMinor: r.credit_minor })),
-    normal,
-  );
+  // Report in base-currency minor units throughout (matches openingMinor, which
+  // comes from acc_ledger_balances / amount_base_minor); the transaction-currency
+  // debit_minor/credit_minor only indicate which side the line is on.
+  const baseLines = raw.map((r) => ({
+    debitMinor: r.debit_minor > 0 ? r.amount_base_minor : 0,
+    creditMinor: r.credit_minor > 0 ? r.amount_base_minor : 0,
+  }));
+  const running = computeRunningBalance(openingMinor, baseLines, normal);
   const rows: GeneralLedgerRow[] = raw.map((r, i) => ({
     entryId: r.acc_journal_entry.id,
+    lineId: r.id,
     entryNumber: r.acc_journal_entry.entry_number,
     entryDate: r.acc_journal_entry.entry_date,
     sourceType: r.acc_journal_entry.source_type,
     sourceId: r.acc_journal_entry.source_id,
     memo: r.memo,
-    debitMinor: r.debit_minor,
-    creditMinor: r.credit_minor,
+    debitMinor: baseLines[i].debitMinor,
+    creditMinor: baseLines[i].creditMinor,
     runningMinor: running[i].runningMinor,
   }));
   return {
