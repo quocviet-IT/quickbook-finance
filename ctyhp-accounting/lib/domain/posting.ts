@@ -203,3 +203,34 @@ export function buildBillPaymentPosting(input: BillPaymentPostingInput): Journal
   assertBalanced(lines);
   return lines;
 }
+
+export interface OpeningLine {
+  accountId: string;
+  debitMinor: Minor;
+  creditMinor: Minor;
+}
+
+/**
+ * Opening balances: caller-supplied per-account lines, with the net difference
+ * booked to Opening Balance Equity so the entry balances. Mirrors the SQL in
+ * acc_post_opening_balances; kept pure for testing and client-side preview.
+ */
+export function buildOpeningBalancePosting(
+  lines: OpeningLine[],
+  equityAccountId: string,
+): JournalLineInput[] {
+  const out: JournalLineInput[] = lines
+    .filter((l) => l.debitMinor !== 0 || l.creditMinor !== 0)
+    .map((l) => ({ accountId: l.accountId, debitMinor: l.debitMinor, creditMinor: l.creditMinor }));
+  const net = out.reduce((s, l) => s + l.debitMinor - l.creditMinor, 0);
+  if (net !== 0) {
+    out.push({
+      accountId: equityAccountId,
+      debitMinor: net < 0 ? -net : 0,
+      creditMinor: net > 0 ? net : 0,
+      memo: "Opening balance equity",
+    });
+  }
+  assertBalanced(out);
+  return out;
+}

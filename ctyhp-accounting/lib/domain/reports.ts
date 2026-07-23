@@ -4,7 +4,7 @@
  * netting is derived from account type via the rules in ./accounts, so reports
  * cannot disagree with the chart of accounts.
  */
-import { type AccountType, naturalBalance, statementSectionOf } from "./accounts";
+import { type AccountType, type NormalBalance, naturalBalance, statementSectionOf } from "./accounts";
 
 export interface LedgerBalance {
   accountCode: string;
@@ -140,4 +140,28 @@ export function buildBalanceSheet(rows: LedgerBalance[]): BalanceSheet {
     totalEquity: equity.total,
     balanced: assets.total === liabilities.total + equity.total,
   };
+}
+
+// --- Running Balance ---------------------------------------------------------
+export interface LedgerActivityRow {
+  debitMinor: number;
+  creditMinor: number;
+}
+export type RunningRow = LedgerActivityRow & { runningMinor: number };
+
+/**
+ * Running balance for a General Ledger account. `normal` decides which side
+ * increases the balance: debit-normal adds debits, credit-normal adds credits.
+ */
+export function computeRunningBalance(
+  openingMinor: number,
+  rows: LedgerActivityRow[],
+  normal: NormalBalance,
+): RunningRow[] {
+  let running = openingMinor;
+  return rows.map((r) => {
+    const delta = normal === "debit" ? r.debitMinor - r.creditMinor : r.creditMinor - r.debitMinor;
+    running += delta;
+    return { ...r, runningMinor: running };
+  });
 }
