@@ -309,3 +309,13 @@ export interface TaxPaymentRow {
   created_at: string;
   updated_at: string;
 }
+
+// --- Manual journal / reversal (Module B) ---
+export interface JournalReversalLinkRow {
+  id: string;
+  original_entry_id: string;
+  reversal_entry_id: string;
+  reason: string;
+  created_by: string | null;
+  created_at: string;
+}
