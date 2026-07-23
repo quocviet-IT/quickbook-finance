@@ -15,7 +15,7 @@ language sql stable as $$
     from acc_invoice_line il
     join acc_invoice inv on inv.id = il.invoice_id
     join acc_tax_code tc  on tc.id = il.tax_code_id
-   where inv.status <> 'void'
+   where inv.status not in ('draft', 'void')
      and inv.issue_date between p_from and p_to
    group by tc.id, tc.code, tc.name, tc.rate_percent
    having coalesce(sum(il.line_tax_minor), 0) <> 0
