@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getSalesTaxLiability, listTaxPayments } from "@/lib/services/salestax";
 import { listTaxCodes, listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import SalesTaxClient from "./SalesTaxClient";
 
@@ -31,8 +31,14 @@ export default async function SalesTaxPage() {
     getUserRole(),
   ]);
 
+  // Only the account(s) actually used as the Sales Tax Payable by sales-direction
+  // tax codes — the same set acc_sales_tax_payable_balance counts. Paying into any
+  // other liability account would not reduce the reported "Net owed".
+  const salesTaxAccountIds = new Set(
+    taxCodes.filter((t) => t.direction === "sales" && t.tax_account_id).map((t) => t.tax_account_id as string),
+  );
   const taxPayableAccounts = accounts.filter(
-    (a) => (a.account_type === "current_liability" || a.account_type === "accounts_payable") && a.is_posting_account && a.status === "active",
+    (a) => salesTaxAccountIds.has(a.id) && a.is_posting_account && a.status === "active",
   );
   const bankAccounts = accounts.filter(
     (a) => (a.account_type === "bank" || a.account_type === "credit_card") && a.is_posting_account && a.status === "active",
@@ -53,6 +59,7 @@ export default async function SalesTaxPage() {
         postingAccounts={postingAccounts}
         currencies={currencies}
         canWrite={canWrite(role)}
+        isAdmin={isAdmin(role)}
       />
     </div>
   );

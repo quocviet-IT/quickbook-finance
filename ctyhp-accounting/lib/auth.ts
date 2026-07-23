@@ -34,3 +34,8 @@ export async function requireUser(): Promise<User> {
 export function canWrite(role: AppRole | null): boolean {
   return role === "admin" || role === "accountant";
 }
+
+/** Config that only admins may change (tax rates, currencies, COA approval). */
+export function isAdmin(role: AppRole | null): boolean {
+  return role === "admin";
+}

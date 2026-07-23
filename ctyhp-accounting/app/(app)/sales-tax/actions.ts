@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import {
   getSalesTaxLiability,
   recordTaxPayment,
@@ -23,6 +23,12 @@ export interface ActionResult<T = undefined> {
 async function guard(): Promise<string | null> {
   const role = await getUserRole();
   return canWrite(role) ? null : "You do not have permission to perform this action";
+}
+
+// Tax rates are admin-only config (acc_tax_code RLS is admin-only).
+async function adminGuard(): Promise<string | null> {
+  const role = await getUserRole();
+  return isAdmin(role) ? null : "Only an admin can change tax rates";
 }
 
 function msg(err: unknown): string {
@@ -68,7 +74,7 @@ export async function voidTaxPaymentAction(id: string): Promise<ActionResult> {
 }
 
 export async function createTaxCodeAction(raw: unknown): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await adminGuard();
   if (denied) return { ok: false, error: denied };
   const parsed = taxCodeCreateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -83,7 +89,7 @@ export async function createTaxCodeAction(raw: unknown): Promise<ActionResult> {
 }
 
 export async function updateTaxCodeAction(id: string, raw: unknown): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await adminGuard();
   if (denied) return { ok: false, error: denied };
   const parsed = taxCodeUpdateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -98,7 +104,7 @@ export async function updateTaxCodeAction(id: string, raw: unknown): Promise<Act
 }
 
 export async function setTaxCodeActiveAction(id: string, active: boolean): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await adminGuard();
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();

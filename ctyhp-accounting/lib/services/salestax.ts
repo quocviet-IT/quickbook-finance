@@ -97,7 +97,14 @@ export async function updateTaxCode(sb: SupabaseClient, id: string, input: TaxCo
 }
 
 export async function setTaxCodeActive(sb: SupabaseClient, id: string, active: boolean): Promise<void> {
-  const { error } = await sb.from("acc_tax_code").update({ is_active: active }).eq("id", id);
+  // .select().single() so an RLS-blocked update surfaces as an error (0 rows)
+  // rather than a silent, misleading success.
+  const { error } = await sb
+    .from("acc_tax_code")
+    .update({ is_active: active })
+    .eq("id", id)
+    .select("id")
+    .single();
   if (error) throw new SalesTaxError(error.message);
   await writeAudit(sb, { table_name: "acc_tax_code", record_id: id, action: "update", after: { is_active: active } });
 }

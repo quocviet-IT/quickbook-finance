@@ -24,6 +24,7 @@ interface Props {
   postingAccounts: AccountRow[];
   currencies: CurrencyRow[];
   canWrite: boolean;
+  isAdmin: boolean;
 }
 
 export default function SalesTaxClient(props: Props) {
@@ -187,7 +188,7 @@ export default function SalesTaxClient(props: Props) {
           children: (
             <>
               <Space style={{ marginBottom: 16 }}>
-                {props.canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={() => openTaxCode(null)}>New rate</Button>}
+                {props.isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => openTaxCode(null)}>New rate</Button>}
               </Space>
               <Table<TaxCodeRow>
                 rowKey="id"
@@ -202,7 +203,7 @@ export default function SalesTaxClient(props: Props) {
                   { title: "Status", dataIndex: "is_active", render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Active" : "Inactive"}</Tag> },
                   {
                     title: "Actions", key: "actions",
-                    render: (_, r) => props.canWrite ? (
+                    render: (_, r) => props.isAdmin ? (
                       <Space>
                         <Button size="small" type="link" onClick={() => openTaxCode(r)}>Edit</Button>
                         <Button size="small" type="link" onClick={async () => {

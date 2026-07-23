@@ -57,6 +57,14 @@ declare
 begin
   if not acc_is_staff() then raise exception 'Not authorized to record tax payments'; end if;
   if p_amount_minor <= 0 then raise exception 'Tax payment amount must be positive'; end if;
+  -- The tax account must be a Sales Tax Payable account (referenced by a sales
+  -- tax code); otherwise the remittance would not reduce the reported liability.
+  if not exists (
+    select 1 from acc_tax_code
+     where direction = 'sales' and tax_account_id = p_tax_account_id
+  ) then
+    raise exception 'Account % is not a Sales Tax Payable account', p_tax_account_id;
+  end if;
 
   v_base := acc_to_base_minor(p_amount_minor, p_currency, p_payment_date);
   v_number := acc_next_number('tax_payment');
