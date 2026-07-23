@@ -212,3 +212,51 @@ export const taxPaymentCreateSchema = z.object({
   memo: z.string().trim().max(500).optional().nullable(),
 });
 export type TaxPaymentCreateInput = z.infer<typeof taxPaymentCreateSchema>;
+
+// --- Manual journal / opening balances / reversal ---
+export const manualJournalLineSchema = z
+  .object({
+    account_id: z.uuid("Select an account"),
+    debit_minor: z.number().int("Amounts must be whole minor units").min(0),
+    credit_minor: z.number().int("Amounts must be whole minor units").min(0),
+  })
+  .refine((l) => (l.debit_minor > 0) !== (l.credit_minor > 0), {
+    message: "Each line needs exactly one of debit or credit",
+    path: ["debit_minor"],
+  });
+
+export const manualJournalSchema = z
+  .object({
+    entry_date: z.string().optional(),
+    description: z.string().trim().max(500).optional().nullable(),
+    source_ref: z.string().trim().max(120).optional().or(z.literal("")).nullable(),
+    currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+    lines: z.array(manualJournalLineSchema).min(2, "Add at least two lines"),
+  })
+  .refine(
+    (v) =>
+      v.lines.reduce((s, l) => s + l.debit_minor, 0) ===
+      v.lines.reduce((s, l) => s + l.credit_minor, 0),
+    { message: "Debits and credits must be equal", path: ["lines"] },
+  );
+export type ManualJournalInput = z.infer<typeof manualJournalSchema>;
+
+export const openingBalanceLineSchema = z.object({
+  account_id: z.uuid("Select an account"),
+  debit_minor: z.number().int().min(0).default(0),
+  credit_minor: z.number().int().min(0).default(0),
+});
+
+export const openingBalanceSchema = z.object({
+  as_of: z.string().optional(),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  lines: z.array(openingBalanceLineSchema).min(1, "Enter at least one opening balance"),
+});
+export type OpeningBalanceInput = z.infer<typeof openingBalanceSchema>;
+
+export const reverseEntrySchema = z.object({
+  entry_id: z.uuid(),
+  reason: z.string().trim().min(1, "A reversal reason is required").max(300),
+  reversal_date: z.string().optional(),
+});
+export type ReverseEntryInput = z.infer<typeof reverseEntrySchema>;
