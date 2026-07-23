@@ -36,6 +36,8 @@ const NAV = [
   { key: "/banking", icon: <BankOutlined />, label: "Banking" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Reports" },
   { key: "/sales-tax", icon: <PercentageOutlined />, label: "Sales Tax" },
+  { key: "/journal", icon: <FileTextOutlined />, label: "Journal Entries" },
+  { key: "/opening-balances", icon: <TableOutlined />, label: "Opening Balances" },
 ];
 
 export default function AppShell({
