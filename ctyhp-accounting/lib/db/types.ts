@@ -319,3 +319,60 @@ export interface JournalReversalLinkRow {
   created_by: string | null;
   created_at: string;
 }
+
+// --- AR/AP credits, refunds, write-offs ---
+export type CreditStatus = "draft" | "issued" | "partial" | "applied" | "void";
+
+export interface CreditMemoRow {
+  id: string;
+  credit_memo_number: string | null;
+  customer_id: string;
+  memo_date: string;
+  currency_code: string;
+  subtotal_minor: number;
+  tax_total_minor: number;
+  total_minor: number;
+  balance_remaining_minor: number;
+  status: CreditStatus;
+  reason: string | null;
+  memo: string | null;
+}
+
+export interface VendorCreditRow {
+  id: string;
+  vendor_credit_number: string | null;
+  vendor_id: string;
+  credit_date: string;
+  currency_code: string;
+  total_minor: number;
+  balance_remaining_minor: number;
+  status: CreditStatus;
+  vendor_ref: string | null;
+  reason: string | null;
+  memo: string | null;
+}
+
+export interface CustomerRefundRow {
+  id: string;
+  refund_number: string | null;
+  customer_id: string;
+  refund_date: string;
+  currency_code: string;
+  amount_minor: number;
+  source_type: "payment" | "credit_memo";
+  payment_id: string | null;
+  credit_memo_id: string | null;
+  status: "posted" | "void";
+}
+
+export interface WriteOffRow {
+  id: string;
+  write_off_number: string | null;
+  side: "ar" | "ap";
+  invoice_id: string | null;
+  bill_id: string | null;
+  amount_minor: number;
+  offset_account_id: string;
+  reason: string;
+  status: "posted" | "void";
+}
