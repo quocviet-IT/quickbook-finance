@@ -139,8 +139,9 @@ begin
   perform acc_assert_postable(p_lines);
 
   if exists (
-    select 1 from acc_journal_entry
-     where source_type = 'opening_balance' and status = 'posted' and entry_date = p_as_of
+    select 1 from acc_journal_entry e
+     where e.source_type = 'opening_balance' and e.status = 'posted' and e.entry_date = p_as_of
+       and not exists (select 1 from acc_journal_reversal_link where original_entry_id = e.id)
   ) then
     raise exception 'Opening balances for % already exist', p_as_of;
   end if;
