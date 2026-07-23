@@ -15,6 +15,7 @@ import {
   ShopOutlined,
   CreditCardOutlined,
   ShoppingOutlined,
+  PercentageOutlined,
 } from "@ant-design/icons";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { AppRole } from "@/lib/db/types";
@@ -34,6 +35,7 @@ const NAV = [
   { key: "/pay-bills", icon: <DollarOutlined />, label: "Pay Bills" },
   { key: "/banking", icon: <BankOutlined />, label: "Banking" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Reports" },
+  { key: "/sales-tax", icon: <PercentageOutlined />, label: "Sales Tax" },
 ];
 
 export default function AppShell({
