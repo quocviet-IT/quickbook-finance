@@ -117,7 +117,10 @@ begin
   if not found then raise exception 'Credit memo not found'; end if;
   if v_cm.status = 'void' then raise exception 'Credit memo is already void'; end if;
   if v_cm.status = 'draft' then
-    update acc_credit_memo set status='void', updated_at=now() where id=p_credit_memo_id; return;
+    update acc_credit_memo set status='void', updated_at=now() where id=p_credit_memo_id;
+    insert into acc_audit_log (table_name, record_id, action, actor_id)
+      values ('acc_credit_memo', p_credit_memo_id, 'void', auth.uid());
+    return;
   end if;
   if exists (select 1 from acc_credit_memo_allocation where credit_memo_id = p_credit_memo_id) then
     raise exception 'Remove credit-memo allocations before voiding';
@@ -220,7 +223,10 @@ begin
   if not found then raise exception 'Vendor credit not found'; end if;
   if v_vc.status = 'void' then raise exception 'Vendor credit is already void'; end if;
   if v_vc.status = 'draft' then
-    update acc_vendor_credit set status='void', updated_at=now() where id=p_vendor_credit_id; return;
+    update acc_vendor_credit set status='void', updated_at=now() where id=p_vendor_credit_id;
+    insert into acc_audit_log (table_name, record_id, action, actor_id)
+      values ('acc_vendor_credit', p_vendor_credit_id, 'void', auth.uid());
+    return;
   end if;
   if exists (select 1 from acc_vendor_credit_allocation where vendor_credit_id = p_vendor_credit_id) then
     raise exception 'Remove vendor-credit allocations before voiding';
@@ -252,6 +258,7 @@ begin
     if not found then raise exception 'Payment not found'; end if;
     if v_pay.customer_id <> p_customer_id then raise exception 'Payment is not for this customer'; end if;
     if v_pay.status = 'void' then raise exception 'Payment is void'; end if;
+    if p_currency <> v_pay.currency_code then raise exception 'Refund currency % does not match payment currency %', p_currency, v_pay.currency_code; end if;
     if p_amount_minor > v_pay.unapplied_minor then raise exception 'Refund % exceeds unapplied payment %', p_amount_minor, v_pay.unapplied_minor; end if;
     update acc_payment set unapplied_minor = unapplied_minor - p_amount_minor, updated_at=now() where id = p_payment_id;
   elsif p_source_type = 'credit_memo' then
@@ -259,6 +266,7 @@ begin
     if not found then raise exception 'Credit memo not found'; end if;
     if v_cm.customer_id <> p_customer_id then raise exception 'Credit memo is not for this customer'; end if;
     if v_cm.status not in ('issued','partial') then raise exception 'Credit memo is not open'; end if;
+    if p_currency <> v_cm.currency_code then raise exception 'Refund currency % does not match credit memo currency %', p_currency, v_cm.currency_code; end if;
     if p_amount_minor > v_cm.balance_remaining_minor then raise exception 'Refund % exceeds credit remaining %', p_amount_minor, v_cm.balance_remaining_minor; end if;
     update acc_credit_memo set balance_remaining_minor = balance_remaining_minor - p_amount_minor,
         status = case when balance_remaining_minor - p_amount_minor = 0 then 'applied' else 'partial' end, updated_at=now()
@@ -336,6 +344,7 @@ begin
     if p_amount_minor > v_inv.balance_due_minor then raise exception 'Write-off % exceeds invoice balance %', p_amount_minor, v_inv.balance_due_minor; end if;
     v_ccy := v_inv.currency_code;
     v_ar := acc_active_ar_account();
+    if v_ar is null then raise exception 'No active Accounts Receivable account configured'; end if;
     v_base := acc_to_base_minor(p_amount_minor, v_ccy, p_date);
     v_number := acc_next_number('write_off');
     v_entry := acc_post_entry(p_date, 'Write-off ' || v_number, 'manual', p_target_id, v_ccy,
@@ -359,6 +368,7 @@ begin
     if p_amount_minor > v_bill.balance_due_minor then raise exception 'Write-off % exceeds bill balance %', p_amount_minor, v_bill.balance_due_minor; end if;
     v_ccy := v_bill.currency_code;
     v_ap := coalesce((select ap_account_id from acc_vendor where id = v_bill.vendor_id), acc_active_ap_account());
+    if v_ap is null then raise exception 'No active Accounts Payable account configured'; end if;
     v_base := acc_to_base_minor(p_amount_minor, v_ccy, p_date);
     v_number := acc_next_number('write_off');
     v_entry := acc_post_entry(p_date, 'Write-off ' || v_number, 'manual', p_target_id, v_ccy,
@@ -392,10 +402,12 @@ begin
   if v_w.status = 'void' then raise exception 'Write-off is already void'; end if;
   if v_w.side = 'ar' then
     update acc_invoice set balance_due_minor = balance_due_minor + v_w.amount_minor,
-        status = 'partial', updated_at=now() where id = v_w.invoice_id and status <> 'void';
+        status = case when balance_due_minor + v_w.amount_minor >= total_minor then 'issued' else 'partial' end,
+        updated_at=now() where id = v_w.invoice_id and status <> 'void';
   else
     update acc_bill set balance_due_minor = balance_due_minor + v_w.amount_minor,
-        status = 'partial'::acc_bill_status, updated_at=now() where id = v_w.bill_id and status <> 'void';
+        status = (case when balance_due_minor + v_w.amount_minor >= total_minor then 'open' else 'partial' end)::acc_bill_status,
+        updated_at=now() where id = v_w.bill_id and status <> 'void';
   end if;
   if v_w.journal_entry_id is not null then
     update acc_journal_entry set status='void', voided_at=now() where id = v_w.journal_entry_id;
