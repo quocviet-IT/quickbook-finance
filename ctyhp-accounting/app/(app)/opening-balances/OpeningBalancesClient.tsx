@@ -2,7 +2,10 @@
 import { useMemo, useState } from "react";
 import { App, Alert, Button, DatePicker, InputNumber, Select, Space, Table } from "antd";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { buildOpeningBalancePosting } from "@/lib/domain/posting";
 import { postOpeningBalancesAction } from "./actions";
+
+const EQUITY_SENTINEL = "__opening_balance_equity";
 
 interface Account {
   id: string;
@@ -31,7 +34,24 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
   const totals = useMemo(() => {
     const d = rows.reduce((s, r) => s + toMinor(r.debit ?? 0, baseDecimals), 0);
     const c = rows.reduce((s, r) => s + toMinor(r.credit ?? 0, baseDecimals), 0);
-    return { d, c, equity: d - c };
+    const lines = rows
+      .map((r) => ({
+        accountId: r.account_id ?? `__row${r.key}`,
+        debitMinor: toMinor(r.debit ?? 0, baseDecimals),
+        creditMinor: toMinor(r.credit ?? 0, baseDecimals),
+      }))
+      .filter((l) => l.debitMinor !== 0 || l.creditMinor !== 0);
+    let equity = 0;
+    try {
+      const posting = buildOpeningBalancePosting(lines, EQUITY_SENTINEL);
+      const equityLine = posting.find((l) => l.accountId === EQUITY_SENTINEL);
+      if (equityLine) {
+        equity = equityLine.creditMinor > 0 ? equityLine.creditMinor : -equityLine.debitMinor;
+      }
+    } catch {
+      equity = d - c;
+    }
+    return { d, c, equity };
   }, [rows, baseDecimals]);
 
   const fmt = (m: number) => fromMinor(Math.abs(m), baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
