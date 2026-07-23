@@ -234,3 +234,80 @@ export function buildOpeningBalancePosting(
   assertBalanced(out);
   return out;
 }
+
+export interface CreditMemoPostingInput {
+  arAccountId: string;
+  taxPayableAccountId: string | null;
+  lines: InvoicePostingLine[];
+}
+
+/** Credit memo issued: DR income (per account), DR tax payable, CR AR = total. */
+export function buildCreditMemoPosting(input: CreditMemoPostingInput): JournalLineInput[] {
+  const totalMinor = input.lines.reduce((s, l) => s + l.subtotalMinor + l.taxMinor, 0);
+  const taxTotalMinor = input.lines.reduce((s, l) => s + l.taxMinor, 0);
+  const lines: JournalLineInput[] = [];
+  const byIncome = new Map<string, Minor>();
+  for (const l of input.lines) {
+    byIncome.set(l.incomeAccountId, (byIncome.get(l.incomeAccountId) ?? 0) + l.subtotalMinor);
+  }
+  for (const [accountId, amount] of byIncome) {
+    if (amount !== 0) lines.push({ accountId, debitMinor: amount, creditMinor: 0, memo: "Credit memo income" });
+  }
+  if (taxTotalMinor > 0) {
+    if (!input.taxPayableAccountId) throw new Error("Credit memo has tax but no tax payable account was provided");
+    lines.push({ accountId: input.taxPayableAccountId, debitMinor: taxTotalMinor, creditMinor: 0, memo: "Credit memo tax" });
+  }
+  lines.push({ accountId: input.arAccountId, debitMinor: 0, creditMinor: totalMinor, memo: "Accounts receivable credit" });
+  assertBalanced(lines);
+  return lines;
+}
+
+export interface VendorCreditPostingInput {
+  apAccountId: string;
+  lines: ExpenseAllocationLine[];
+}
+
+/** Vendor credit issued: DR AP = total, CR expense (grouped per account). */
+export function buildVendorCreditPosting(input: VendorCreditPostingInput): JournalLineInput[] {
+  const byAccount = new Map<string, Minor>();
+  for (const l of input.lines) byAccount.set(l.expenseAccountId, (byAccount.get(l.expenseAccountId) ?? 0) + l.amountMinor);
+  let total: Minor = 0;
+  const credits: JournalLineInput[] = [];
+  for (const [accountId, amount] of byAccount) {
+    if (amount !== 0) { credits.push({ accountId, debitMinor: 0, creditMinor: amount, memo: "Vendor credit expense" }); total += amount; }
+  }
+  const lines: JournalLineInput[] = [
+    { accountId: input.apAccountId, debitMinor: total, creditMinor: 0, memo: "Accounts payable credit" },
+    ...credits,
+  ];
+  assertBalanced(lines);
+  return lines;
+}
+
+/** Customer refund: DR AR / CR bank. */
+export function buildRefundPosting(input: { arAccountId: string; bankAccountId: string; amountMinor: Minor }): JournalLineInput[] {
+  const lines: JournalLineInput[] = [
+    { accountId: input.arAccountId, debitMinor: input.amountMinor, creditMinor: 0, memo: "Refund to customer" },
+    { accountId: input.bankAccountId, debitMinor: 0, creditMinor: input.amountMinor, memo: "Bank payment" },
+  ];
+  assertBalanced(lines);
+  return lines;
+}
+
+/** Write-off. AR: DR offset expense / CR AR. AP: DR AP / CR offset income. */
+export function buildWriteOffPosting(input: {
+  side: "ar" | "ap"; controlAccountId: string; offsetAccountId: string; amountMinor: Minor;
+}): JournalLineInput[] {
+  const lines: JournalLineInput[] =
+    input.side === "ar"
+      ? [
+          { accountId: input.offsetAccountId, debitMinor: input.amountMinor, creditMinor: 0, memo: "Bad debt write-off" },
+          { accountId: input.controlAccountId, debitMinor: 0, creditMinor: input.amountMinor, memo: "Write off receivable" },
+        ]
+      : [
+          { accountId: input.controlAccountId, debitMinor: input.amountMinor, creditMinor: 0, memo: "Write off payable" },
+          { accountId: input.offsetAccountId, debitMinor: 0, creditMinor: input.amountMinor, memo: "Payable write-off income" },
+        ];
+  assertBalanced(lines);
+  return lines;
+}
