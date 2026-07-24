@@ -41,6 +41,8 @@ const NAV = [
   { key: "/sales-tax", icon: <PercentageOutlined />, label: "Sales Tax" },
   { key: "/journal", icon: <FileTextOutlined />, label: "Journal Entries" },
   { key: "/opening-balances", icon: <TableOutlined />, label: "Opening Balances" },
+  { key: "/settings/company", icon: <TableOutlined />, label: "Company" },
+  { key: "/settings/periods", icon: <TableOutlined />, label: "Periods" },
 ];
 
 export default function AppShell({
