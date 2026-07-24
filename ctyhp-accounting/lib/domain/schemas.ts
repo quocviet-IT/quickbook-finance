@@ -355,3 +355,25 @@ export const reconciliationReopenSchema = z.object({
   reason: z.string().trim().min(1, "A reopen reason is required").max(300),
 });
 export type ReconciliationReopenInput = z.infer<typeof reconciliationReopenSchema>;
+
+// --- Company settings + accounting periods ---
+export const companySettingsSchema = z.object({
+  legal_name: z.string().trim().min(1, "Legal name is required").max(200),
+  dba_name: z.string().trim().max(200).optional().or(z.literal("")).nullable(),
+  ein_ref: z.string().trim().max(40).optional().or(z.literal("")).nullable(),
+  address_line1: z.string().trim().max(200).optional().or(z.literal("")).nullable(),
+  address_line2: z.string().trim().max(200).optional().or(z.literal("")).nullable(),
+  city: z.string().trim().max(120).optional().or(z.literal("")).nullable(),
+  region: z.string().trim().max(120).optional().or(z.literal("")).nullable(),
+  postal_code: z.string().trim().max(20).optional().or(z.literal("")).nullable(),
+  country: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+  fiscal_year_start_month: z.number().int().min(1, "Month 1-12").max(12, "Month 1-12"),
+  base_currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code").default("USD"),
+  time_zone: z.string().trim().min(1).max(60).default("America/New_York"),
+  accounting_basis: z.enum(["accrual", "cash"]),
+  default_payment_terms_days: z.number().int().min(0, "Terms must be >= 0"),
+});
+export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
+
+export const closePeriodSchema = z.object({ reason: z.string().trim().min(1, "A reason is required").max(300) });
+export const reopenPeriodSchema = z.object({ reason: z.string().trim().min(1, "A reason is required").max(300) });
