@@ -56,6 +56,10 @@ export default function VendorStatementClient({ vendors, baseCurrency, baseDecim
       {rep && (
         <>
           <Typography.Text type="secondary">Base currency {baseCurrency} · Accrual basis</Typography.Text>
+          <Typography.Text type="secondary">
+            Opening balance reflects current open items dated before the period (historical point-in-time statements
+            are a later enhancement).
+          </Typography.Text>
           <Space size="large">
             <Statistic title="Opening balance" value={fmt(rep.openingMinor)} />
             <Statistic title="Closing balance" value={fmt(rep.closingMinor)} />

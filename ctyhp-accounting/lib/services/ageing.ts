@@ -35,7 +35,11 @@ async function ageing(sb: SupabaseClient, rpc: string, asOf: string, idKey: stri
   }));
   const items: AgeingItem[] = rows.map((r) => ({ dueDate: r.dueDate, balanceMinor: r.balanceMinor }));
   const { buckets, total } = computeAgeing(items, asOf);
-  const control = await controlBalance(sb, accountType, asOf);
+  // The ageing total is the CURRENT (base-currency) open position; `asOf` only
+  // drives bucket assignment, so reconcile against the control account as of
+  // today, not as of the (possibly past) as-of date.
+  const today = new Date().toISOString().slice(0, 10);
+  const control = await controlBalance(sb, accountType, today);
   // AR control net is debit-positive; AP control net is credit-positive (so negate).
   const controlBalanceMinor = accountType === "accounts_receivable" ? control : -control;
   return { rows, buckets, total, controlBalanceMinor, reconciled: total === controlBalanceMinor };

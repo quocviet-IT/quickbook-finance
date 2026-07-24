@@ -43,7 +43,9 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
       </Space>
       {rep && (
         <>
-          <Typography.Text type="secondary">Base currency {baseCurrency} · Accrual basis</Typography.Text>
+          <Typography.Text type="secondary">
+            Current open balances in {baseCurrency} · aged as of {asOf!.format("YYYY-MM-DD")} · Accrual basis
+          </Typography.Text>
           <Alert
             type={rep.reconciled ? "success" : "warning"}
             message={

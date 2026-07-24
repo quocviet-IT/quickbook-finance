@@ -45,6 +45,11 @@ UI — it does not alter existing tables.
 - Statement PDF templating/versioning → Module K (Documents).
 - Approval/maker-checker gating (write-off reason is captured now; independent approval → Module C).
 - 1099 / vendor tax profile → Module G.
+- Historical point-in-time ageing/statements — the ageing and statement reports show the current
+  open position (aged relative to a chosen date); exact as-of-historical reconstruction is a later
+  enhancement.
+- Multi-currency-native ageing — ageing/statements convert open balances to base currency; native
+  per-currency ageing columns are deferred (multi-currency FX is Module I).
 
 ## 2. Alignment with the user manual
 
