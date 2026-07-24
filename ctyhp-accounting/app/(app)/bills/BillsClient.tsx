@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   App,
   Button,
@@ -18,6 +19,7 @@ import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { createBillAction, postBillAction, voidBillAction } from "./actions";
+import WriteOffModal from "../settlements/WriteOffModal";
 
 const STATUS_COLOR: Record<string, string> = {
   draft: "default",
@@ -38,6 +40,7 @@ export default function BillsClient({
   bills,
   vendors,
   expenseAccounts,
+  incomeAccounts,
   currencies,
   items,
   canWrite,
@@ -45,23 +48,30 @@ export default function BillsClient({
   bills: BillWithVendor[];
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
+  incomeAccounts: AccountRow[];
   currencies: CurrencyRow[];
   items: ItemRow[];
   canWrite: boolean;
 }) {
   const { message, modal } = App.useApp();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [currency, setCurrency] = useState<string>(currencies.find((c) => c.is_base)?.code ?? "USD");
+  const [writeOffFor, setWriteOffFor] = useState<BillWithVendor | null>(null);
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
     [currencies, currency],
   );
 
+  function decimalsOf(code: string): number {
+    return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
+  }
+
   function fmt(minor: number, code: string): string {
-    const d = currencies.find((c) => c.code === code)?.decimal_places ?? 2;
+    const d = decimalsOf(code);
     return `${(minor / 10 ** d).toFixed(d)} ${code}`;
   }
 
@@ -163,6 +173,11 @@ export default function BillsClient({
                   {r.status !== "void" && r.status !== "paid" && (
                     <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
                       Void
+                    </Button>
+                  )}
+                  {(r.status === "open" || r.status === "partial") && (
+                    <Button size="small" type="link" onClick={() => setWriteOffFor(r)}>
+                      Write off
                     </Button>
                   )}
                 </Space>
@@ -268,6 +283,20 @@ export default function BillsClient({
           </Form.Item>
         </Form>
       </Modal>
+
+      {writeOffFor && (
+        <WriteOffModal
+          open={!!writeOffFor}
+          onClose={() => setWriteOffFor(null)}
+          onDone={() => router.refresh()}
+          side="ap"
+          targetId={writeOffFor.id}
+          currency={writeOffFor.currency_code}
+          balanceMinor={writeOffFor.balance_due_minor}
+          baseDecimals={decimalsOf(writeOffFor.currency_code)}
+          offsetAccounts={incomeAccounts}
+        />
+      )}
     </>
   );
 }

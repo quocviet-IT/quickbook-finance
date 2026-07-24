@@ -27,6 +27,13 @@ export default async function BillsPage() {
       a.status === "active",
   );
 
+  const incomeAccounts = accounts.filter(
+    (a) =>
+      (a.account_type === "income" || a.account_type === "other_income") &&
+      a.is_posting_account &&
+      a.status === "active",
+  );
+
   const purchaseItems = items.filter((i) => i.is_purchased && i.is_active);
 
   return (
@@ -36,6 +43,7 @@ export default async function BillsPage() {
         bills={bills}
         vendors={vendors}
         expenseAccounts={expenseAccounts}
+        incomeAccounts={incomeAccounts}
         currencies={currencies}
         items={purchaseItems}
         canWrite={canWrite(role)}

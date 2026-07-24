@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   App,
   Button,
@@ -19,6 +20,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow, PaymentStatus } from "@/lib/db/types";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { recordPaymentAction, getOpenInvoicesAction } from "./actions";
+import RefundModal from "../settlements/RefundModal";
 
 const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
   unapplied: { text: "Unapplied", color: "orange" },
@@ -41,11 +43,13 @@ export default function PaymentsClient({
   canWrite: boolean;
 }) {
   const { message } = App.useApp();
+  const router = useRouter();
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openInvoices, setOpenInvoices] = useState<InvoiceRow[]>([]);
   const [alloc, setAlloc] = useState<Record<string, number>>({}); // invoiceId -> major units
+  const [refundFor, setRefundFor] = useState<(PaymentRow & { customer_name: string }) | null>(null);
 
   const baseCurrency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
@@ -141,6 +145,17 @@ export default function PaymentsClient({
       dataIndex: "status",
       width: 150,
       render: (s: PaymentStatus) => <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>,
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      width: 100,
+      render: (_: unknown, r) =>
+        canWrite && r.unapplied_minor > 0 ? (
+          <Button size="small" onClick={() => setRefundFor(r)}>
+            Refund
+          </Button>
+        ) : null,
     },
   ];
 
@@ -257,6 +272,26 @@ export default function PaymentsClient({
           </Form.Item>
         </Form>
       </Modal>
+
+      {refundFor && (
+        <RefundModal
+          open={!!refundFor}
+          onClose={() => setRefundFor(null)}
+          onDone={() => router.refresh()}
+          customerId={refundFor.customer_id}
+          currency={refundFor.currency_code}
+          baseDecimals={decimalsOf(refundFor.currency_code)}
+          bankAccounts={depositAccounts}
+          sources={[
+            {
+              kind: "payment",
+              id: refundFor.id,
+              label: refundFor.payment_number ?? "(unnumbered payment)",
+              remainingMinor: refundFor.unapplied_minor,
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

@@ -28,6 +28,13 @@ export default async function InvoicesPage() {
       a.status === "active",
   );
 
+  const expenseAccounts = accounts.filter(
+    (a) =>
+      (a.account_type === "expense" || a.account_type === "cost_of_goods_sold" || a.account_type === "other_expense") &&
+      a.is_posting_account &&
+      a.status === "active",
+  );
+
   const salesItems = items.filter((i) => i.is_sold && i.is_active);
 
   return (
@@ -37,6 +44,7 @@ export default async function InvoicesPage() {
         invoices={invoices}
         customers={customers}
         incomeAccounts={incomeAccounts}
+        expenseAccounts={expenseAccounts}
         taxCodes={taxCodes}
         currencies={currencies}
         items={salesItems}

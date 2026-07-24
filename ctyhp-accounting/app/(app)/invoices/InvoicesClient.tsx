@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   App,
   Button,
@@ -37,6 +38,7 @@ import {
   voidInvoiceAction,
   getInvoiceLinesAction,
 } from "./actions";
+import WriteOffModal from "../settlements/WriteOffModal";
 
 const STATUS: Record<InvoiceStatus, { text: string; color: string }> = {
   draft: { text: "Draft", color: "default" },
@@ -59,6 +61,7 @@ export default function InvoicesClient({
   invoices,
   customers,
   incomeAccounts,
+  expenseAccounts,
   taxCodes,
   currencies,
   items,
@@ -67,16 +70,19 @@ export default function InvoicesClient({
   invoices: InvoiceWithCustomer[];
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
+  expenseAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
   currencies: CurrencyRow[];
   items: ItemRow[];
   canWrite: boolean;
 }) {
   const { message } = App.useApp();
+  const router = useRouter();
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [writeOffFor, setWriteOffFor] = useState<InvoiceWithCustomer | null>(null);
 
   // Inline customer creation
   const [custOpen, setCustOpen] = useState(false);
@@ -233,6 +239,11 @@ export default function InvoicesClient({
                 Void
               </Button>
             </Popconfirm>
+          )}
+          {canWrite && (r.status === "issued" || r.status === "partial") && (
+            <Button size="small" onClick={() => setWriteOffFor(r)}>
+              Write off
+            </Button>
           )}
         </Space>
       ),
@@ -430,6 +441,20 @@ export default function InvoicesClient({
           ]}
         />
       </Modal>
+
+      {writeOffFor && (
+        <WriteOffModal
+          open={!!writeOffFor}
+          onClose={() => setWriteOffFor(null)}
+          onDone={() => router.refresh()}
+          side="ar"
+          targetId={writeOffFor.id}
+          currency={writeOffFor.currency_code}
+          balanceMinor={writeOffFor.balance_due_minor}
+          baseDecimals={decimalsOf(writeOffFor.currency_code)}
+          offsetAccounts={expenseAccounts}
+        />
+      )}
     </div>
   );
 }
