@@ -36,6 +36,7 @@ const NAV = [
   { key: "/expenses", icon: <CreditCardOutlined />, label: "Expenses" },
   { key: "/pay-bills", icon: <DollarOutlined />, label: "Pay Bills" },
   { key: "/banking", icon: <BankOutlined />, label: "Banking" },
+  { key: "/banking/reconcile", icon: <BankOutlined />, label: "Reconcile" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Reports" },
   { key: "/sales-tax", icon: <PercentageOutlined />, label: "Sales Tax" },
   { key: "/journal", icon: <FileTextOutlined />, label: "Journal Entries" },

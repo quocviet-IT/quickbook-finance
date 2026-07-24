@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { App, Alert, Button, Form, Input, Modal, Select, Space, Statistic, Table, Tag } from "antd";
 import { fromMinor } from "@/lib/domain/money";
 import {
@@ -126,6 +127,7 @@ export default function ReconcileWorkspaceClient({
           <Tag color={completed ? "green" : "blue"}>{detail.status}</Tag>
         </Space>
       )}
+      <p><Link href={`/banking/reconcile/${reconciliationId}/report`}>View report</Link></p>
       {detail && !completed && (
         <Alert
           type={detail.differenceMinor === 0 ? "success" : "warning"}
