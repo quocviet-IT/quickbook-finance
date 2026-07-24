@@ -335,8 +335,8 @@ export default function InvoicesClient({
                     <Form.Item name={[field.name, "description"]} style={{ marginBottom: 0, width: 200 }}>
                       <Input placeholder="Description" />
                     </Form.Item>
-                    <Form.Item name={[field.name, "quantity"]} style={{ marginBottom: 0 }} rules={[{ required: true, message: "Qty" }]}>
-                      <InputNumber placeholder="Qty" min={0} style={{ width: 90 }} />
+                    <Form.Item name={[field.name, "quantity"]} style={{ marginBottom: 0 }} rules={[{ required: true, message: "Quantity" }]}>
+                      <InputNumber placeholder="Quantity" min={0} style={{ width: 90 }} />
                     </Form.Item>
                     <Form.Item name={[field.name, "unit_price"]} style={{ marginBottom: 0 }} rules={[{ required: true, message: "Price" }]}>
                       <InputNumber placeholder="Unit price" min={0} step={0.01} style={{ width: 130 }} prefix="$" />
@@ -413,7 +413,7 @@ export default function InvoicesClient({
           dataSource={viewLines}
           columns={[
             { title: "Description", dataIndex: "description" },
-            { title: "Qty", dataIndex: "quantity", width: 70, align: "right" },
+            { title: "Quantity", dataIndex: "quantity", width: 90, align: "right" },
             {
               title: "Unit price",
               dataIndex: "unit_price_minor",

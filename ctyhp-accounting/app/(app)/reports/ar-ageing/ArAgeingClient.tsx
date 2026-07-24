@@ -50,8 +50,8 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
             type={rep.reconciled ? "success" : "warning"}
             message={
               rep.reconciled
-                ? `Reconciled to AR control account: ${fmt(rep.total)} ${baseCurrency}.`
-                : `Ageing total ${fmt(rep.total)} does not match AR control ${fmt(rep.controlBalanceMinor)} — investigate.`
+                ? `Reconciled to Accounts Receivable control account: ${fmt(rep.total)} ${baseCurrency}.`
+                : `Ageing total ${fmt(rep.total)} does not match Accounts Receivable control ${fmt(rep.controlBalanceMinor)} — investigate.`
             }
           />
           <Space size="large">

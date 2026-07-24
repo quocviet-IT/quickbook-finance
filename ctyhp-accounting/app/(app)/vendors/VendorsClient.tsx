@@ -82,7 +82,7 @@ export default function VendorsClient({
           <Form.Item name="payment_terms" label="Payment terms">
             <Input placeholder="e.g. Net 30" />
           </Form.Item>
-          <Form.Item name="ap_account_id" label="A/P account (optional)">
+          <Form.Item name="ap_account_id" label="Accounts Payable account (optional)">
             <Select allowClear options={apAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))} />
           </Form.Item>
           <Form.Item name="default_expense_account_id" label="Default expense account (optional)">

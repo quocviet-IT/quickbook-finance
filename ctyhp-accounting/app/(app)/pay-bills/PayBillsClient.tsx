@@ -103,7 +103,7 @@ export default function PayBillsClient({
         scroll={{ x: "max-content" }}
         pagination={{ pageSize: 20, showSizeChanger: true }}
         columns={[
-          { title: "Payment #", dataIndex: "payment_number", render: (v) => v ?? "—" },
+          { title: "Payment Number", dataIndex: "payment_number", render: (v) => v ?? "—" },
           { title: "Vendor", dataIndex: "vendor_name" },
           { title: "Date", dataIndex: "payment_date" },
           { title: "Amount", dataIndex: "amount_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
@@ -178,7 +178,7 @@ export default function PayBillsClient({
             scroll={{ x: "max-content" }}
             style={{ marginTop: 8 }}
             columns={[
-              { title: "Bill #", dataIndex: "bill_number", render: (v) => v ?? "—" },
+              { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? "—" },
               { title: "Date", dataIndex: "bill_date" },
               { title: "Balance", dataIndex: "balance_due_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
               {

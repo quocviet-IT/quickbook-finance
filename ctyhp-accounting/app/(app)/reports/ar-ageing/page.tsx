@@ -11,7 +11,7 @@ export default async function ArAgeingPage() {
   return (
     <div>
       <PageHeader
-        title="AR Ageing"
+        title="Accounts Receivable Ageing"
         description="Open receivables by age, reconciled to the Accounts Receivable control account."
       />
       <ArAgeingClient baseCurrency={base?.code ?? "USD"} baseDecimals={base?.decimal_places ?? 2} />

@@ -97,7 +97,7 @@ export default function ExpensesClient({
         scroll={{ x: "max-content" }}
         pagination={{ pageSize: 20, showSizeChanger: true }}
         columns={[
-          { title: "Expense #", dataIndex: "expense_number", render: (v) => v ?? "—" },
+          { title: "Expense Number", dataIndex: "expense_number", render: (v) => v ?? "—" },
           { title: "Vendor", dataIndex: "vendor_name" },
           { title: "Date", dataIndex: "expense_date" },
           { title: "Total", dataIndex: "total_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },

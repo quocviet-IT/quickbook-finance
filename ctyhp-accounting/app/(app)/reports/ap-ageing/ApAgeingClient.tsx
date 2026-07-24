@@ -51,7 +51,7 @@ export default function ApAgeingClient({ baseCurrency, baseDecimals }: { baseCur
             message={
               rep.reconciled
                 ? `Reconciled to Accounts Payable control account: ${fmt(rep.total)} ${baseCurrency}.`
-                : `Ageing total ${fmt(rep.total)} does not match AP control ${fmt(rep.controlBalanceMinor)} — investigate.`
+                : `Ageing total ${fmt(rep.total)} does not match Accounts Payable control ${fmt(rep.controlBalanceMinor)} — investigate.`
             }
           />
           <Space size="large">

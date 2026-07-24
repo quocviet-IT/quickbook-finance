@@ -11,7 +11,7 @@ export default async function ApAgeingPage() {
   return (
     <div>
       <PageHeader
-        title="AP Ageing"
+        title="Accounts Payable Ageing"
         description="Open payables by age, reconciled to the Accounts Payable control account."
       />
       <ApAgeingClient baseCurrency={base?.code ?? "USD"} baseDecimals={base?.decimal_places ?? 2} />

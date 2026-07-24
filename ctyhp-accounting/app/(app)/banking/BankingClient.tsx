@@ -335,12 +335,12 @@ export default function BankingClient({
         width={640}
       >
         <Typography.Paragraph type="secondary">
-          Upload a CSV with columns: <code>date, description, amount, reference, balance</code>. Positive amounts are
+          Upload a comma-separated values file with columns: <code>date, description, amount, reference, balance</code>. Positive amounts are
           money in. Dates as YYYY-MM-DD or MM/DD/YYYY.
         </Typography.Paragraph>
         <Upload.Dragger accept=".csv" beforeUpload={handleFile} maxCount={1} showUploadList={{ showRemoveIcon: false }}>
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">Click or drag a CSV file here</p>
+          <p className="ant-upload-text">Click or drag a comma-separated values file here</p>
         </Upload.Dragger>
         {parsed.length > 0 && (
           <Typography.Paragraph style={{ marginTop: 12 }}>
@@ -367,7 +367,7 @@ function CreateAccountModal({
   return (
     <Modal title="Add bank account" open={open} onOk={onOk} onCancel={onCancel} okText="Create" cancelText="Cancel" destroyOnHidden>
       <Form form={form} layout="vertical" requiredMark={false}>
-        <Form.Item name="account_id" label="GL bank account" rules={[{ required: true, message: "Select an account" }]}>
+        <Form.Item name="account_id" label="General Ledger bank account" rules={[{ required: true, message: "Select an account" }]}>
           <Select
             placeholder="Select a Bank-type account"
             options={glBankAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}

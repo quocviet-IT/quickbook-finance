@@ -137,9 +137,9 @@ export default function BillsClient({
         scroll={{ x: "max-content" }}
         pagination={{ pageSize: 20, showSizeChanger: true }}
         columns={[
-          { title: "Bill #", dataIndex: "bill_number", render: (v) => v ?? <Tag>draft</Tag> },
+          { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? <Tag>draft</Tag> },
           { title: "Vendor", dataIndex: "vendor_name" },
-          { title: "Ref", dataIndex: "vendor_ref", render: (v) => v ?? "—" },
+          { title: "Vendor Reference", dataIndex: "vendor_ref", render: (v) => v ?? "—" },
           { title: "Date", dataIndex: "bill_date" },
           { title: "Due", dataIndex: "due_date", render: (v) => v ?? "—" },
           {
@@ -203,8 +203,8 @@ export default function BillsClient({
             />
           </Form.Item>
           <Space size="middle" style={{ display: "flex" }}>
-            <Form.Item name="vendor_ref" label="Vendor ref #">
-              <Input placeholder="Vendor's invoice #" />
+            <Form.Item name="vendor_ref" label="Vendor Reference Number">
+              <Input placeholder="Vendor invoice number" />
             </Form.Item>
             <Form.Item label="Currency">
               <Select
