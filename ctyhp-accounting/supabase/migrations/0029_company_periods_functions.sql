@@ -96,7 +96,7 @@ begin
 end;
 $$;
 
-create trigger acc_journal_entry_closed_period_void
+create or replace trigger acc_journal_entry_closed_period_void
   before update on acc_journal_entry
   for each row execute function acc_block_closed_period_void();
 
