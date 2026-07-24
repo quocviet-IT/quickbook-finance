@@ -336,3 +336,22 @@ export const writeOffSchema = z
     path: ["side"],
   });
 export type WriteOffInput = z.infer<typeof writeOffSchema>;
+
+// --- Bank reconciliation ---
+export const reconciliationCreateSchema = z.object({
+  bank_account_id: z.uuid("Select a bank account"),
+  statement_ending_date: z.string().min(1, "Statement ending date is required"),
+  statement_ending_balance_minor: z.number().int("Ending balance must be a whole minor-unit amount"),
+});
+export type ReconciliationCreateInput = z.infer<typeof reconciliationCreateSchema>;
+
+export const reconciliationAdjustmentSchema = z.object({
+  offset_account_id: z.uuid("Select an offset account"),
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+export type ReconciliationAdjustmentInput = z.infer<typeof reconciliationAdjustmentSchema>;
+
+export const reconciliationReopenSchema = z.object({
+  reason: z.string().trim().min(1, "A reopen reason is required").max(300),
+});
+export type ReconciliationReopenInput = z.infer<typeof reconciliationReopenSchema>;
