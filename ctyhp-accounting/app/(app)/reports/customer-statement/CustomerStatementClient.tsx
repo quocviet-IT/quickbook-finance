@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Button, DatePicker, Select, Space, Statistic, Table, Typography } from "antd";
+import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { customerStatementAction } from "./actions";
 import type { StatementReport, StatementRow } from "@/lib/services/ageing";
@@ -38,7 +40,15 @@ export default function CustomerStatementClient({ customers, baseCurrency, baseD
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space wrap>
+      <FilterBar
+        resultCount={rep?.rows.length}
+        ariaLabel="Customer statement filters"
+        actions={
+          <Button type="primary" loading={loading} onClick={run}>
+            Run statement
+          </Button>
+        }
+      >
         <Select
           showSearch
           style={{ width: 320 }}
@@ -49,10 +59,7 @@ export default function CustomerStatementClient({ customers, baseCurrency, baseD
           onChange={setCustomerId}
         />
         <DatePicker.RangePicker value={range} onChange={(v) => v && setRange([v[0]!, v[1]!])} />
-        <Button type="primary" loading={loading} onClick={run}>
-          Run
-        </Button>
-      </Space>
+      </FilterBar>
       {rep && (
         <>
           <Typography.Text type="secondary">Base currency {baseCurrency} · Accrual basis</Typography.Text>
@@ -64,12 +71,13 @@ export default function CustomerStatementClient({ customers, baseCurrency, baseD
             <Statistic title="Opening balance" value={fmt(rep.openingMinor)} />
             <Statistic title="Closing balance" value={fmt(rep.closingMinor)} />
           </Space>
-          <Table<StatementRow>
+          <DataTable<StatementRow>
             rowKey={(r) => `${r.docType}-${r.docNumber}-${r.txnDate}`}
             dataSource={rep.rows}
             pagination={false}
             loading={loading}
-            scroll={{ x: "max-content" }}
+            emptyTitle="No statement activity"
+            emptyDescription="No customer transactions were found for this date range."
             columns={[
               { title: "Date", dataIndex: "txnDate" },
               { title: "Type", dataIndex: "docType" },

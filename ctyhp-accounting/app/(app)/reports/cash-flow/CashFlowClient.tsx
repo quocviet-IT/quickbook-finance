@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Alert, Button, DatePicker, Space, Table, Typography } from "antd";
+import { App, Alert, Button, DatePicker, Space, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { cashFlowAction } from "./actions";
 import type { CashFlowReport } from "@/lib/services/cashflow";
@@ -32,20 +34,29 @@ export default function CashFlowClient({ baseCurrency, baseDecimals }: { baseCur
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space>
+      <FilterBar
+        resultCount={rep ? rows.length : undefined}
+        ariaLabel="Cash Flow Statement filters"
+        actions={
+          <Button type="primary" loading={loading} onClick={run}>
+            Run report
+          </Button>
+        }
+      >
         <DatePicker.RangePicker
           value={range}
           onChange={(v) => setRange(v as [Dayjs, Dayjs] | null)}
         />
-        <Button type="primary" loading={loading} onClick={run}>Run</Button>
-      </Space>
+      </FilterBar>
       {rep && (
         <>
           <Typography.Text type="secondary">Base currency {baseCurrency} · Direct method</Typography.Text>
-          <Table
+          <DataTable
             rowKey="key"
             pagination={false}
             dataSource={rows}
+            emptyTitle="No cash activity"
+            emptyDescription="No cash movements were found for this date range."
             columns={[
               { title: "Activity", dataIndex: "label", render: (t, r) => (r.key === "net" ? <b>{t}</b> : t) },
               { title: "Amount", align: "right", render: (_, r) => (r.key === "net" ? <b>{fmt(r.amount)}</b> : fmt(r.amount)) },

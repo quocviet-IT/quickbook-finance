@@ -1,23 +1,23 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   App,
   Button,
-  Card,
-  Empty,
   Form,
   Input,
   Modal,
   Segmented,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   Upload,
   type TableColumnsType,
 } from "antd";
 import { InboxOutlined, PlusOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
+import { EmptyState } from "@/components/ui/PageStates";
 import type { AccountRow, CurrencyRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { BankAccountWithGl, SuggestionView } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
@@ -251,21 +251,24 @@ export default function BankingClient({
 
   if (!bankAccounts.length) {
     return (
-      <Card>
-        <Empty description="No bank accounts yet">
-          {canWrite && (
+      <>
+        <EmptyState
+          title="No bank accounts yet"
+          description={
+            glBankAccounts.length
+              ? "Connect a ledger bank account before importing transactions."
+              : "Create a Bank-type account in the Chart of Accounts first."
+          }
+          action={
+            canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setAcctOpen(true)} disabled={!glBankAccounts.length}>
               Add bank account
             </Button>
-          )}
-          {!glBankAccounts.length && (
-            <Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>
-              Create a Bank-type account in the Chart of Accounts first.
-            </Typography.Paragraph>
-          )}
-        </Empty>
+            ) : null
+          }
+        />
         <CreateAccountModal open={acctOpen} onCancel={() => setAcctOpen(false)} onOk={submitAccount} form={acctForm} glBankAccounts={glBankAccounts} currencies={currencies} />
-      </Card>
+      </>
     );
   }
 
@@ -273,7 +276,29 @@ export default function BankingClient({
 
   return (
     <div>
-      <Space wrap style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+      <FilterBar
+        resultCount={tab === "transactions" ? txns.length : suggestions.length}
+        actions={
+          canWrite ? (
+            <Space wrap>
+              {glBankAccounts.length > 0 && (
+                <Button icon={<PlusOutlined />} onClick={() => setAcctOpen(true)}>
+                  Add account
+                </Button>
+              )}
+              {tab === "transactions" ? (
+                <Button type="primary" icon={<InboxOutlined />} onClick={() => setImportOpen(true)}>
+                  Import statement
+                </Button>
+              ) : (
+                <Button type="primary" icon={<ThunderboltOutlined />} loading={busy === "match"} onClick={findMatches}>
+                  Find matches
+                </Button>
+              )}
+            </Space>
+          ) : null
+        }
+      >
         <Space wrap>
           <Select
             style={{ minWidth: 280 }}
@@ -293,35 +318,31 @@ export default function BankingClient({
             ]}
           />
         </Space>
-        {canWrite && (
-          <Space>
-            {glBankAccounts.length > 0 && (
-              <Button icon={<PlusOutlined />} onClick={() => setAcctOpen(true)}>
-                Add account
-              </Button>
-            )}
-            {tab === "transactions" ? (
-              <Button type="primary" icon={<InboxOutlined />} onClick={() => setImportOpen(true)}>
-                Import statement
-              </Button>
-            ) : (
-              <Button type="primary" icon={<ThunderboltOutlined />} loading={busy === "match"} onClick={findMatches}>
-                Find matches
-              </Button>
-            )}
-          </Space>
-        )}
-      </Space>
+      </FilterBar>
 
-      <Card loading={loading}>
-        {tab === "transactions" ? (
-          <Table rowKey="id" size="small" columns={txnColumns} dataSource={txns} pagination={{ pageSize: 25 }} sticky
-            locale={{ emptyText: "No transactions. Import a statement to get started." }} />
-        ) : (
-          <Table rowKey="id" size="small" columns={suggestionColumns} dataSource={suggestions} pagination={{ pageSize: 25 }} sticky
-            locale={{ emptyText: 'No suggestions. Click "Find matches" to reconcile against recorded payments.' }} />
-        )}
-      </Card>
+      {tab === "transactions" ? (
+        <DataTable
+          rowKey="id"
+          columns={txnColumns}
+          dataSource={txns}
+          pagination={{ pageSize: 25 }}
+          sticky
+          loading={loading}
+          emptyTitle="No bank transactions"
+          emptyDescription="Import a statement to start reviewing and matching transactions."
+        />
+      ) : (
+        <DataTable
+          rowKey="id"
+          columns={suggestionColumns}
+          dataSource={suggestions}
+          pagination={{ pageSize: 25 }}
+          sticky
+          loading={loading}
+          emptyTitle="No match suggestions"
+          emptyDescription='Select "Find matches" to compare bank activity with recorded payments.'
+        />
+      )}
 
       {/* Import modal */}
       <Modal

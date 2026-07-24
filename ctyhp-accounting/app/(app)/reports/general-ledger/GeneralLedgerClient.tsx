@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { App, Button, DatePicker, Select, Space, Statistic, Table, Typography } from "antd";
+import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { generalLedgerAction } from "./actions";
 import type { GeneralLedger, GeneralLedgerRow } from "@/lib/services/journal";
@@ -56,7 +58,15 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space wrap>
+      <FilterBar
+        resultCount={gl?.rows.length}
+        ariaLabel="General Ledger filters"
+        actions={
+          <Button type="primary" loading={loading} onClick={run}>
+            Run report
+          </Button>
+        }
+      >
         <Select
           showSearch
           style={{ width: 320 }}
@@ -67,10 +77,7 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
           onChange={setAccountId}
         />
         <DatePicker.RangePicker value={range} onChange={(v) => v && setRange([v[0]!, v[1]!])} />
-        <Button type="primary" loading={loading} onClick={run}>
-          Run
-        </Button>
-      </Space>
+      </FilterBar>
       {gl && (
         <>
           <Typography.Text type="secondary">
@@ -80,12 +87,13 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
             <Statistic title="Opening" value={fmt(gl.openingMinor)} />
             <Statistic title="Closing" value={fmt(gl.closingMinor)} />
           </Space>
-          <Table<GeneralLedgerRow>
+          <DataTable<GeneralLedgerRow>
             rowKey="lineId"
             dataSource={gl.rows}
             pagination={false}
             loading={loading}
-            scroll={{ x: "max-content" }}
+            emptyTitle="No ledger activity"
+            emptyDescription="No posted entries were found for this account and date range."
             columns={[
               { title: "Date", dataIndex: "entryDate" },
               {

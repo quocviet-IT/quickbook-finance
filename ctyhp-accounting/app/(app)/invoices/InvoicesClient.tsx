@@ -18,6 +18,8 @@ import {
   type TableColumnsType,
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type {
   AccountRow,
   CurrencyRow,
@@ -252,21 +254,24 @@ export default function InvoicesClient({
 
   return (
     <div>
-      {canWrite && (
-        <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            New invoice
-          </Button>
-        </Space>
-      )}
+      <FilterBar
+        resultCount={invoices.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              New invoice
+            </Button>
+          ) : null
+        }
+      />
 
-      <Table<InvoiceWithCustomer>
+      <DataTable<InvoiceWithCustomer>
         rowKey="id"
         columns={columns}
         dataSource={invoices}
-        size="small"
-        pagination={{ pageSize: 20, showSizeChanger: true }}
         sticky
+        emptyTitle="No invoices yet"
+        emptyDescription="Create a draft invoice, review it, then issue it to the ledger."
       />
 
       {/* Create invoice */}

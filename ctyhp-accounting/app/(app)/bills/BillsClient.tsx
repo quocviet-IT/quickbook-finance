@@ -11,10 +11,11 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
@@ -124,18 +125,21 @@ export default function BillsClient({
 
   return (
     <>
-      <Space style={{ marginBottom: 16 }}>
-        {canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-            New bill
-          </Button>
-        )}
-      </Space>
-      <Table<BillWithVendor>
+      <FilterBar
+        resultCount={bills.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New bill
+            </Button>
+          ) : null
+        }
+      />
+      <DataTable<BillWithVendor>
         rowKey="id"
         dataSource={bills}
-        scroll={{ x: "max-content" }}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        emptyTitle="No bills yet"
+        emptyDescription="Enter a vendor bill to track Accounts Payable and due dates."
         columns={[
           { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? <Tag>draft</Tag> },
           { title: "Vendor", dataIndex: "vendor_name" },

@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag } from "antd";
+import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type { AccountRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
 import { createItemAction, updateItemAction, setItemActiveAction } from "./actions";
 
@@ -79,18 +81,21 @@ export default function ItemsClient({ items, incomeAccounts, expenseAccounts, ta
 
   return (
     <>
-      <Space style={{ marginBottom: 16 }}>
-        {canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            New item
-          </Button>
-        )}
-      </Space>
-      <Table<ItemRow>
+      <FilterBar
+        resultCount={items.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              New item
+            </Button>
+          ) : null
+        }
+      />
+      <DataTable<ItemRow>
         rowKey="id"
         dataSource={items}
-        scroll={{ x: "max-content" }}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        emptyTitle="No products or services yet"
+        emptyDescription="Add jewelry, services, or purchasing items to reuse them on transactions."
         columns={[
           { title: "Code", dataIndex: "item_code", render: (v) => v ?? "—" },
           { title: "Name", dataIndex: "name" },

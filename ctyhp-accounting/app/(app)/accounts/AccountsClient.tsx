@@ -9,11 +9,12 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   type TableColumnsType,
 } from "antd";
 import { PlusOutlined, EditOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { ACCOUNT_TYPES, normalBalanceOf, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
@@ -199,27 +200,35 @@ export default function AccountsClient({
 
   return (
     <div>
-      <Space style={{ marginBottom: 16, justifyContent: "space-between", width: "100%" }}>
+      <FilterBar
+        resultCount={filtered.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              New account
+            </Button>
+          ) : null
+        }
+      >
         <Input.Search
           placeholder="Search by code or name"
           allowClear
           style={{ width: 320 }}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            New account
-          </Button>
-        )}
-      </Space>
+      </FilterBar>
 
-      <Table<AccountRow>
+      <DataTable<AccountRow>
         rowKey="id"
         columns={columns}
         dataSource={filtered}
-        size="small"
-        pagination={{ pageSize: 20, showSizeChanger: true }}
         sticky
+        emptyTitle={search ? "No matching accounts" : "No accounts yet"}
+        emptyDescription={
+          search
+            ? "Try a different account code or name."
+            : "Create an account to start building the chart of accounts."
+        }
       />
 
       <Modal

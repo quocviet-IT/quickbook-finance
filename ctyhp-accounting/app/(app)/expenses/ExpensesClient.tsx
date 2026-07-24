@@ -1,7 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
-import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type { AccountRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import type { ExpenseWithVendor } from "@/lib/services/payables";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
@@ -84,18 +86,21 @@ export default function ExpensesClient({
 
   return (
     <>
-      <Space style={{ marginBottom: 16 }}>
-        {canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-            New expense
-          </Button>
-        )}
-      </Space>
-      <Table<ExpenseWithVendor>
+      <FilterBar
+        resultCount={expenses.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New expense
+            </Button>
+          ) : null
+        }
+      />
+      <DataTable<ExpenseWithVendor>
         rowKey="id"
         dataSource={expenses}
-        scroll={{ x: "max-content" }}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        emptyTitle="No expenses yet"
+        emptyDescription="Record money already paid from a bank or credit card account."
         columns={[
           { title: "Expense Number", dataIndex: "expense_number", render: (v) => v ?? "—" },
           { title: "Vendor", dataIndex: "vendor_name" },

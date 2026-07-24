@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { journalReportAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
@@ -54,7 +56,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals }: Prop
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space wrap>
+      <FilterBar resultCount={data.length} ariaLabel="Journal report filters">
         <Select
           allowClear
           style={{ width: 200 }}
@@ -64,13 +66,14 @@ export default function JournalReportClient({ baseCurrency, baseDecimals }: Prop
           options={SOURCES.map((s) => ({ value: s, label: s }))}
         />
         <DatePicker.RangePicker value={range} onChange={(v) => setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)} />
-      </Space>
+      </FilterBar>
       <Typography.Text type="secondary">Base currency {baseCurrency}</Typography.Text>
-      <Table<JournalEntrySummary>
+      <DataTable<JournalEntrySummary>
         rowKey="id"
         loading={loading}
         dataSource={data}
-        scroll={{ x: "max-content" }}
+        emptyTitle="No journal entries"
+        emptyDescription="No entries match the selected source and date range."
         expandable={{
           expandedRowRender: (e) => (
             <Table

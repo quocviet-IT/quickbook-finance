@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Alert, Button, DatePicker, Space, Table, Tag, Typography } from "antd";
+import { App, Alert, Button, DatePicker, Space, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { arAgeingAction } from "./actions";
 import type { AgeingReport, AgeingReportRow } from "@/lib/services/ageing";
@@ -35,12 +37,17 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space>
+      <FilterBar
+        resultCount={rep?.rows.length}
+        ariaLabel="Accounts Receivable ageing filters"
+        actions={
+          <Button type="primary" loading={loading} onClick={run}>
+            Run report
+          </Button>
+        }
+      >
         <DatePicker value={asOf} onChange={setAsOf} placeholder="As of" />
-        <Button type="primary" loading={loading} onClick={run}>
-          Run
-        </Button>
-      </Space>
+      </FilterBar>
       {rep && (
         <>
           <Typography.Text type="secondary">
@@ -62,10 +69,12 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
             ))}
             <b>Total: {fmt(rep.total)}</b>
           </Space>
-          <Table<AgeingReportRow>
+          <DataTable<AgeingReportRow>
             rowKey={(r) => `${r.docType}-${r.docNumber}`}
             loading={loading}
             dataSource={rep.rows}
+            emptyTitle="No open receivables"
+            emptyDescription="There are no customer balances outstanding as of this date."
             columns={[
               { title: "Customer", dataIndex: "entityName" },
               { title: "Type", dataIndex: "docType" },
