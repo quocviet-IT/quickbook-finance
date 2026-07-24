@@ -41,7 +41,7 @@ export default function CashFlowClient({ baseCurrency, baseDecimals }: { baseCur
       </Space>
       {rep && (
         <>
-          <Typography.Text type="secondary">Base currency {baseCurrency} · Accrual basis</Typography.Text>
+          <Typography.Text type="secondary">Base currency {baseCurrency} · Direct method</Typography.Text>
           <Table
             rowKey="key"
             pagination={false}
