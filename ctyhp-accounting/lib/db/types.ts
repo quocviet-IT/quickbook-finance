@@ -393,3 +393,39 @@ export interface StatementReconciliationRow {
   completed_at: string | null;
   created_at: string;
 }
+
+// --- Company & Periods ---
+export type AccountingBasis = "accrual" | "cash";
+export type PeriodStatus = "open" | "closed";
+
+export interface AccountingPeriodRow {
+  id: string;
+  fiscal_year: number;
+  period_month: number;
+  period_start: string;
+  period_end: string;
+  label: string;
+  status: PeriodStatus;
+  close_reason: string | null;
+  reopen_reason: string | null;
+}
+export interface CompanySettingRow {
+  id: string;
+  version: number;
+  effective_from: string;
+  legal_name: string;
+  dba_name: string | null;
+  ein_ref: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  fiscal_year_start_month: number;
+  base_currency_code: string;
+  time_zone: string;
+  accounting_basis: AccountingBasis;
+  default_payment_terms_days: number;
+  created_at: string;
+}
