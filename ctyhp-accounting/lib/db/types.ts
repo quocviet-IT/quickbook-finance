@@ -376,3 +376,20 @@ export interface WriteOffRow {
   reason: string;
   status: "posted" | "void";
 }
+
+// --- Bank Reconciliation ---
+export type ReconciliationSessionStatus = "in_progress" | "completed";
+
+export interface StatementReconciliationRow {
+  id: string;
+  bank_account_id: string;
+  statement_ending_date: string;
+  beginning_balance_minor: number;
+  statement_ending_balance_minor: number;
+  status: ReconciliationSessionStatus;
+  adjustment_entry_id: string | null;
+  adjustment_reason: string | null;
+  statement_ref: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
