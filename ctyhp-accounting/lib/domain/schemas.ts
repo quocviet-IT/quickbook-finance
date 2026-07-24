@@ -377,3 +377,10 @@ export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 
 export const closePeriodSchema = z.object({ reason: z.string().trim().min(1, "A reason is required").max(300) });
 export const reopenPeriodSchema = z.object({ reason: z.string().trim().min(1, "A reason is required").max(300) });
+
+// --- Cash flow ---
+export const cashFlowRangeSchema = z.object({
+  from: z.string().min(1, "From date is required"),
+  to: z.string().min(1, "To date is required"),
+});
+export type CashFlowRangeInput = z.infer<typeof cashFlowRangeSchema>;
