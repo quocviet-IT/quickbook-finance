@@ -1,49 +1,185 @@
 "use client";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Layout, Menu, Typography, Button, Tag, Space } from "antd";
 import {
   BankOutlined,
-  FileTextOutlined,
-  DollarOutlined,
   BarChartOutlined,
   TableOutlined,
   LogoutOutlined,
   DashboardOutlined,
-  TeamOutlined,
   ShopOutlined,
-  CreditCardOutlined,
   ShoppingOutlined,
-  PercentageOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { AppRole } from "@/lib/db/types";
 
 const { Header, Sider, Content } = Layout;
 
-const NAV = [
+type NavPage = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+};
+
+type NavGroup = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  children: NavPage[];
+};
+
+type NavItem = NavPage | NavGroup;
+
+const NAV: NavItem[] = [
   { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" },
-  { key: "/accounts", icon: <TableOutlined />, label: "Chart of Accounts" },
-  { key: "/items", icon: <ShoppingOutlined />, label: "Products & Services" },
-  { key: "/customers", icon: <TeamOutlined />, label: "Customers" },
-  { key: "/invoices", icon: <FileTextOutlined />, label: "Invoices" },
-  { key: "/credit-memos", icon: <FileTextOutlined />, label: "Credit Memos" },
-  { key: "/payments", icon: <DollarOutlined />, label: "Payments" },
-  { key: "/vendors", icon: <ShopOutlined />, label: "Vendors" },
-  { key: "/bills", icon: <FileTextOutlined />, label: "Bills" },
-  { key: "/vendor-credits", icon: <FileTextOutlined />, label: "Vendor Credits" },
-  { key: "/expenses", icon: <CreditCardOutlined />, label: "Expenses" },
-  { key: "/pay-bills", icon: <DollarOutlined />, label: "Pay Bills" },
-  { key: "/banking", icon: <BankOutlined />, label: "Banking" },
-  { key: "/banking/reconcile", icon: <BankOutlined />, label: "Reconcile" },
-  { key: "/reports", icon: <BarChartOutlined />, label: "Reports" },
-  { key: "/sales-tax", icon: <PercentageOutlined />, label: "Sales Tax" },
-  { key: "/journal", icon: <FileTextOutlined />, label: "Journal Entries" },
-  { key: "/opening-balances", icon: <TableOutlined />, label: "Opening Balances" },
-  { key: "/settings/company", icon: <TableOutlined />, label: "Company" },
-  { key: "/settings/periods", icon: <TableOutlined />, label: "Periods" },
+  {
+    key: "sales",
+    icon: <ShoppingOutlined />,
+    label: "Sales & Customers",
+    children: [
+      { key: "/items", label: "Jewelry Catalog" },
+      { key: "/customers", label: "Customers" },
+      { key: "/invoices", label: "Invoices" },
+      { key: "/credit-memos", label: "Credit Memos" },
+      { key: "/payments", label: "Payments" },
+    ],
+  },
+  {
+    key: "purchases",
+    icon: <ShopOutlined />,
+    label: "Purchases & Vendors",
+    children: [
+      { key: "/vendors", label: "Vendors" },
+      { key: "/bills", label: "Bills" },
+      { key: "/vendor-credits", label: "Vendor Credits" },
+      { key: "/expenses", label: "Expenses" },
+      { key: "/pay-bills", label: "Pay Bills" },
+    ],
+  },
+  {
+    key: "banking",
+    icon: <BankOutlined />,
+    label: "Banking",
+    children: [
+      { key: "/banking", label: "Bank Transactions" },
+      { key: "/banking/reconcile", label: "Reconcile" },
+    ],
+  },
+  {
+    key: "accounting",
+    icon: <TableOutlined />,
+    label: "Accounting",
+    children: [
+      { key: "/accounts", label: "Chart of Accounts" },
+      { key: "/journal", label: "Journal Entries" },
+      { key: "/sales-tax", label: "Sales Tax" },
+    ],
+  },
+  {
+    key: "reports",
+    icon: <BarChartOutlined />,
+    label: "Reports",
+    children: [
+      { key: "/reports", label: "Report Center" },
+      { key: "/reports/general-ledger", label: "General Ledger" },
+      { key: "/reports/journal", label: "Journal Report" },
+      { key: "/reports/ar-ageing", label: "A/R Ageing" },
+      { key: "/reports/customer-statement", label: "Customer Statements" },
+      { key: "/reports/ap-ageing", label: "A/P Ageing" },
+      { key: "/reports/vendor-statement", label: "Vendor Statements" },
+      { key: "/reports/cash-flow", label: "Cash Flow" },
+    ],
+  },
+  {
+    key: "settings",
+    icon: <SettingOutlined />,
+    label: "Settings",
+    children: [
+      { key: "/settings/company", label: "Company" },
+      { key: "/settings/periods", label: "Accounting Periods" },
+      { key: "/opening-balances", label: "Opening Balances" },
+    ],
+  },
 ];
+
+function isNavGroup(item: NavItem): item is NavGroup {
+  return "children" in item;
+}
+
+const NAV_PAGES = NAV.flatMap((item) => (isNavGroup(item) ? item.children : [item]));
+const ROOT_GROUP_KEYS = NAV.filter(isNavGroup).map((item) => item.key);
+
+function findActivePage(pathname: string): NavPage {
+  return (
+    NAV_PAGES.filter(
+      (page) => pathname === page.key || pathname.startsWith(`${page.key}/`),
+    ).sort((a, b) => b.key.length - a.key.length)[0] ?? NAV_PAGES[0]
+  );
+}
+
+function findActiveGroup(pageKey: string): string | undefined {
+  return NAV.find(
+    (item): item is NavGroup =>
+      isNavGroup(item) && item.children.some((child) => child.key === pageKey),
+  )?.key;
+}
+
+function NavigationMenu({
+  activePageKey,
+  activeGroupKey,
+  collapsed,
+}: {
+  activePageKey: string;
+  activeGroupKey?: string;
+  collapsed: boolean;
+}) {
+  const [openKeys, setOpenKeys] = useState<string[]>(
+    activeGroupKey ? [activeGroupKey] : [],
+  );
+
+  function handleOpenChange(nextOpenKeys: string[]) {
+    const latestKey = nextOpenKeys.find((key) => !openKeys.includes(key));
+
+    if (latestKey && ROOT_GROUP_KEYS.includes(latestKey)) {
+      setOpenKeys([latestKey]);
+      return;
+    }
+
+    setOpenKeys(nextOpenKeys.filter((key) => ROOT_GROUP_KEYS.includes(key)));
+  }
+
+  return (
+    <Menu
+      aria-label="Primary navigation"
+      theme="dark"
+      mode="inline"
+      selectedKeys={[activePageKey]}
+      openKeys={collapsed ? undefined : openKeys}
+      onOpenChange={handleOpenChange}
+      items={NAV.map((item) =>
+        isNavGroup(item)
+          ? {
+              key: item.key,
+              icon: item.icon,
+              label: item.label,
+              children: item.children.map((child) => ({
+                key: child.key,
+                label: <Link href={child.key}>{child.label}</Link>,
+              })),
+            }
+          : {
+              key: item.key,
+              icon: item.icon,
+              label: <Link href={item.key}>{item.label}</Link>,
+            },
+      )}
+    />
+  );
+}
 
 export default function AppShell({
   email,
@@ -58,8 +194,8 @@ export default function AppShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
 
-  const active = NAV.find((n) => pathname.startsWith(n.key));
-  const selectedKey = active?.key ?? "/dashboard";
+  const activePage = findActivePage(pathname);
+  const activeGroupKey = findActiveGroup(activePage.key);
 
   async function signOut() {
     const sb = createSupabaseBrowserClient();
@@ -106,15 +242,11 @@ export default function AppShell({
             </Typography.Text>
           )}
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={NAV.map((n) => ({
-            key: n.key,
-            icon: n.icon,
-            label: <Link href={n.key}>{n.label}</Link>,
-          }))}
+        <NavigationMenu
+          key={activeGroupKey ?? activePage.key}
+          activePageKey={activePage.key}
+          activeGroupKey={activeGroupKey}
+          collapsed={collapsed}
         />
       </Sider>
       <Layout>
@@ -131,7 +263,7 @@ export default function AppShell({
           }}
         >
           <Typography.Text type="secondary" style={{ fontSize: 13, letterSpacing: 0.2 }}>
-            {active?.label ?? "CTYHP Accounting"}
+            {activePage.label}
           </Typography.Text>
           <Space size="middle">
             <Typography.Text type="secondary">{email}</Typography.Text>
