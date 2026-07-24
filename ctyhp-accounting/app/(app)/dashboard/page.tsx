@@ -1,19 +1,13 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { getDashboardMetrics } from "@/lib/services/dashboard";
+import { listCurrencies } from "@/lib/services/reference";
 import DashboardClient from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
 
-async function countRows(table: string): Promise<number> {
-  const sb = await createSupabaseServerClient();
-  const { count } = await sb.from(table).select("id", { count: "exact", head: true });
-  return count ?? 0;
-}
-
 export default async function DashboardPage() {
-  const [accounts, entries] = await Promise.all([
-    countRows("acc_account"),
-    countRows("acc_journal_entry"),
-  ]);
-
-  return <DashboardClient accounts={accounts} entries={entries} />;
+  const sb = await createSupabaseServerClient();
+  const [metrics, currencies] = await Promise.all([getDashboardMetrics(sb), listCurrencies(sb)]);
+  const base = currencies.find((c) => c.is_base);
+  return <DashboardClient metrics={metrics} baseCurrency={base?.code ?? "USD"} baseDecimals={base?.decimal_places ?? 2} />;
 }
