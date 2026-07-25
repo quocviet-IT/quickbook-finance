@@ -65,11 +65,13 @@ capability.
 ## 4. Settings hub (`/settings`)
 
 A new index page with grouped cards:
-- **Company** — Company profile, Accounting Periods, Opening Balances
+- **Company** — Company profile, Accounting Periods
 - **People and control** — Users, Permissions, Approval Policies, Audit History
 - **Purchasing** — Purchasing Tolerances
 
-Opening Balances moves out of the sidebar into this hub (it is a one-time setup task).
+Opening Balances **stays under Accounting** rather than moving here: it posts a journal entry, so it
+belongs with the ledger tools and not with configuration. A unit test asserts the hub covers every
+`/settings/*` route, so a future settings page cannot go unreachable.
 
 ## 5. Top bar
 
