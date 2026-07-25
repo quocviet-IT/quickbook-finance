@@ -7,7 +7,8 @@ export class ItemsError extends Error {}
 
 const COLS =
   "id,item_code,name,description,is_sold,sales_price_minor,income_account_id,sales_tax_code_id," +
-  "is_purchased,purchase_cost_minor,expense_account_id,is_active,created_at,updated_at";
+  "is_purchased,purchase_cost_minor,expense_account_id," +
+  "is_inventory,inventory_account_id,cogs_account_id,is_active,created_at,updated_at";
 
 export async function listItems(sb: SupabaseClient): Promise<ItemRow[]> {
   const { data, error } = await sb.from("acc_item").select(COLS).order("name");
@@ -27,6 +28,9 @@ function toRow(input: ItemCreateInput | ItemUpdateInput) {
     is_purchased: input.is_purchased,
     purchase_cost_minor: input.purchase_cost_minor,
     expense_account_id: input.expense_account_id || null,
+    is_inventory: input.is_inventory,
+    inventory_account_id: input.is_inventory ? input.inventory_account_id || null : null,
+    cogs_account_id: input.is_inventory ? input.cogs_account_id || null : null,
   };
 }
 
