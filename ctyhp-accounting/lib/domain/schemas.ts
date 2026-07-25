@@ -167,6 +167,9 @@ export const itemCreateSchema = z
     is_purchased: z.boolean().default(false),
     purchase_cost_minor: z.number().int().min(0).default(0),
     expense_account_id: z.uuid().optional().nullable(),
+    is_inventory: z.boolean().default(false),
+    inventory_account_id: z.uuid().optional().nullable(),
+    cogs_account_id: z.uuid().optional().nullable(),
   })
   .refine((v) => v.is_sold || v.is_purchased, {
     message: "Enable at least one of Sales or Purchase",
@@ -179,6 +182,20 @@ export const itemCreateSchema = z
   .refine((v) => !v.is_purchased || !!v.expense_account_id, {
     message: "Select an expense account for a purchased item",
     path: ["expense_account_id"],
+  })
+  // An inventory item is bought, held as an asset, then relieved into COGS when
+  // sold — so it needs both sides and both accounts.
+  .refine((v) => !v.is_inventory || (v.is_sold && v.is_purchased), {
+    message: "An inventory item must be both sold and purchased",
+    path: ["is_inventory"],
+  })
+  .refine((v) => !v.is_inventory || !!v.inventory_account_id, {
+    message: "Select an inventory asset account",
+    path: ["inventory_account_id"],
+  })
+  .refine((v) => !v.is_inventory || !!v.cogs_account_id, {
+    message: "Select a Cost of Goods Sold account",
+    path: ["cogs_account_id"],
   });
 export type ItemCreateInput = z.infer<typeof itemCreateSchema>;
 
@@ -451,3 +468,28 @@ export const purchaseOrderReasonSchema = z.object({
   reason: z.string().trim().min(1, "A reason is required").max(300),
 });
 export type PurchaseOrderReasonInput = z.infer<typeof purchaseOrderReasonSchema>;
+
+// --- Inventory adjustments ---
+export const inventoryAdjustmentSchema = z
+  .object({
+    item_id: z.uuid("Select an inventory item"),
+    adjust_date: z.string().min(1, "Adjustment date is required"),
+    qty_delta: z.number("Enter a quantity change"),
+    unit_cost_minor: z.number().int().min(0).default(0),
+    value_delta_minor: z.number().int().default(0),
+    offset_account_id: z.uuid("Select an offset account"),
+    reason: z.string().trim().min(1, "A reason is required").max(300),
+  })
+  .refine((v) => v.qty_delta !== 0 || v.value_delta_minor !== 0, {
+    message: "An adjustment must change quantity or value",
+    path: ["qty_delta"],
+  })
+  .refine((v) => v.qty_delta <= 0 || v.unit_cost_minor > 0, {
+    message: "A unit cost is required when adding quantity",
+    path: ["unit_cost_minor"],
+  });
+export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>;
+
+export const inventoryValuationSchema = z.object({
+  as_of: z.string().min(1, "As-of date is required"),
+});

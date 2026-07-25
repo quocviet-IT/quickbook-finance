@@ -285,6 +285,9 @@ export interface ItemRow {
   is_purchased: boolean;
   purchase_cost_minor: number;
   expense_account_id: string | null;
+  is_inventory: boolean;
+  inventory_account_id: string | null;
+  cogs_account_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -516,4 +519,34 @@ export interface ReceivedNotBilledRow {
   unit_cost_minor: number;
   value_minor: number;
   currency_code: string;
+}
+
+// --- Inventory (Module G2) ---
+export type InventorySource = "receipt" | "bill_variance" | "sale" | "adjustment" | "reversal";
+
+export interface InventoryTxnRow {
+  id: string;
+  seq: number;
+  item_id: string;
+  txn_date: string;
+  source: InventorySource;
+  source_id: string | null;
+  qty_delta: number;
+  cost_delta_minor: number;
+  running_qty: number;
+  running_value_minor: number;
+  journal_entry_id: string | null;
+  reversal_of: string | null;
+  memo: string | null;
+  created_at: string;
+}
+
+export interface InventoryValuationRow {
+  item_id: string;
+  item_code: string | null;
+  name: string;
+  inventory_account_id: string | null;
+  qty_on_hand: number;
+  value_minor: number;
+  unit_cost_minor: number;
 }
