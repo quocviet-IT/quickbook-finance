@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { App, Button, Card, DatePicker, Segmented, Space, Table, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import { formatMoney } from "@/lib/format";
 import {
   buildTrialBalance,
@@ -53,7 +55,15 @@ export default function ReportsClient({
 
   return (
     <div>
-      <Space wrap style={{ marginBottom: 16 }}>
+      <FilterBar
+        resultCount={rows.length}
+        ariaLabel="Report filters and actions"
+        actions={
+          <Button type="primary" onClick={run} loading={loading}>
+            Run report
+          </Button>
+        }
+      >
         <Segmented
           value={type}
           onChange={(v) => setType(v as ReportType)}
@@ -75,10 +85,7 @@ export default function ReportsClient({
             <DatePicker value={asOf} allowClear={false} onChange={(v) => v && setAsOf(v)} />
           </Space>
         )}
-        <Button type="primary" onClick={run} loading={loading}>
-          Run
-        </Button>
-      </Space>
+      </FilterBar>
 
       <Card loading={loading}>
         {type === "trial" && <TrialBalanceView rows={rows} money={money} asOf={asOf} />}
@@ -113,11 +120,12 @@ function TrialBalanceView({
   return (
     <div>
       <ReportTitle title="Trial Balance" subtitle={`As of ${asOf.format("MMM D, YYYY")}`} />
-      <Table
+      <DataTable
         rowKey="accountCode"
-        size="small"
         pagination={false}
         dataSource={tb.lines}
+        emptyTitle="No balances for this date"
+        emptyDescription="Choose another date or confirm that transactions have been posted."
         columns={[
           { title: "Account", render: (_, r) => `${r.accountCode} — ${r.name}` },
           { title: "Debit", dataIndex: "debit", align: "right", width: 160, render: (v: number) => (v ? money(v) : "") },

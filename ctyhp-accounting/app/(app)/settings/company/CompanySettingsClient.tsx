@@ -58,8 +58,8 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
           {current ? (
             <Descriptions column={2} size="small">
               <Descriptions.Item label="Legal name">{current.legal_name}</Descriptions.Item>
-              <Descriptions.Item label="DBA">{current.dba_name ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="EIN">{maskEin(current.ein_ref)}</Descriptions.Item>
+              <Descriptions.Item label="Doing Business As">{current.dba_name ?? "—"}</Descriptions.Item>
+              <Descriptions.Item label="Employer Identification Number">{maskEin(current.ein_ref)}</Descriptions.Item>
               <Descriptions.Item label="Fiscal year start">{MONTHS[(current.fiscal_year_start_month ?? 1) - 1]}</Descriptions.Item>
               <Descriptions.Item label="Accounting basis">{current.accounting_basis}</Descriptions.Item>
               <Descriptions.Item label="Base currency">{current.base_currency_code}</Descriptions.Item>
@@ -75,8 +75,8 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
         <Card title="Edit settings">
           <Form form={form} layout="vertical">
             <Form.Item name="legal_name" label="Legal name" rules={[{ required: true }]}><Input /></Form.Item>
-            <Form.Item name="dba_name" label="DBA name"><Input /></Form.Item>
-            <Form.Item name="ein_ref" label="EIN reference"><Input /></Form.Item>
+            <Form.Item name="dba_name" label="Doing Business As"><Input /></Form.Item>
+            <Form.Item name="ein_ref" label="Employer Identification Number reference"><Input /></Form.Item>
             <Form.Item name="address_line1" label="Address line 1"><Input /></Form.Item>
             <Form.Item name="address_line2" label="Address line 2"><Input /></Form.Item>
             <Space wrap>
@@ -110,7 +110,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
             { title: "Effective", dataIndex: "effective_from" },
             { title: "Legal name", dataIndex: "legal_name" },
             { title: "Basis", dataIndex: "accounting_basis" },
-            { title: "EIN", render: (_, r) => maskEin(r.ein_ref) },
+            { title: "Employer Identification Number", render: (_, r) => maskEin(r.ein_ref) },
           ]} />
       </Card>
     </Space>

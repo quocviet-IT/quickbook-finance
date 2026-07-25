@@ -208,7 +208,7 @@ export default function VendorCreditsClient({
             <Form.Item name="credit_date" label="Date">
               <DatePicker />
             </Form.Item>
-            <Form.Item name="vendor_ref" label="Vendor Ref">
+            <Form.Item name="vendor_ref" label="Vendor Reference">
               <Input />
             </Form.Item>
           </Space>

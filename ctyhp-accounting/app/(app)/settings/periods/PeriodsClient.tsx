@@ -104,8 +104,16 @@ export default function PeriodsClient({
       <Card title="Closing checklist" size="small">
         <p>Review these controls before closing a period:</p>
         <ul>
-          <li><Link href="/reports/ar-ageing">AR ageing reconciles to the AR control account</Link></li>
-          <li><Link href="/reports/ap-ageing">AP ageing reconciles to the AP control account</Link></li>
+          <li>
+            <Link href="/reports/ar-ageing">
+              Accounts Receivable ageing reconciles to the Accounts Receivable control account
+            </Link>
+          </li>
+          <li>
+            <Link href="/reports/ap-ageing">
+              Accounts Payable ageing reconciles to the Accounts Payable control account
+            </Link>
+          </li>
           <li><Link href="/banking/reconcile">Bank accounts are reconciled</Link></li>
           <li><Link href="/sales-tax">Sales-tax liability is reviewed</Link></li>
         </ul>

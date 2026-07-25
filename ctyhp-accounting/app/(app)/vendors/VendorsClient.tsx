@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag } from "antd";
+import { App, Button, Form, Input, Modal, Select, Tag } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type { AccountRow, VendorRow } from "@/lib/db/types";
 import { createVendorAction } from "./actions";
 
@@ -37,18 +39,21 @@ export default function VendorsClient({
 
   return (
     <>
-      <Space style={{ marginBottom: 16 }}>
-        {canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-            New vendor
-          </Button>
-        )}
-      </Space>
-      <Table<VendorRow>
+      <FilterBar
+        resultCount={vendors.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New vendor
+            </Button>
+          ) : null
+        }
+      />
+      <DataTable<VendorRow>
         rowKey="id"
         dataSource={vendors}
-        scroll={{ x: "max-content" }}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        emptyTitle="No vendors yet"
+        emptyDescription="Add a vendor to record bills, expenses, and payments."
         columns={[
           { title: "Name", dataIndex: "name" },
           { title: "Email", dataIndex: "email", render: (v) => v ?? "—" },
@@ -82,7 +87,7 @@ export default function VendorsClient({
           <Form.Item name="payment_terms" label="Payment terms">
             <Input placeholder="e.g. Net 30" />
           </Form.Item>
-          <Form.Item name="ap_account_id" label="A/P account (optional)">
+          <Form.Item name="ap_account_id" label="Accounts Payable account (optional)">
             <Select allowClear options={apAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))} />
           </Form.Item>
           <Form.Item name="default_expense_account_id" label="Default expense account (optional)">

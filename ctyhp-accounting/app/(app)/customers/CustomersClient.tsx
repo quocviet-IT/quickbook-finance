@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Form, Input, Modal, Space, Table, Tag, type TableColumnsType } from "antd";
+import { App, Button, Form, Input, Modal, Tag, type TableColumnsType } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type { CustomerRow } from "@/lib/db/types";
 import { createCustomerAction } from "./actions";
 
@@ -45,14 +47,24 @@ export default function CustomersClient({
 
   return (
     <div>
-      {canWrite && (
-        <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-            New customer
-          </Button>
-        </Space>
-      )}
-      <Table rowKey="id" columns={columns} dataSource={customers} size="small" pagination={{ pageSize: 20 }} sticky />
+      <FilterBar
+        resultCount={customers.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New customer
+            </Button>
+          ) : null
+        }
+      />
+      <DataTable
+        rowKey="id"
+        columns={columns}
+        dataSource={customers}
+        sticky
+        emptyTitle="No customers yet"
+        emptyDescription="Add a customer to create invoices and receive payments."
+      />
 
       <Modal
         title="New customer"

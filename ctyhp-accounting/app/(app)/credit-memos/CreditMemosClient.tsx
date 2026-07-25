@@ -232,7 +232,7 @@ export default function CreditMemosClient({
                 }
               />
               <InputNumber
-                placeholder="Qty"
+                placeholder="Quantity"
                 min={0}
                 value={l.quantity}
                 onChange={(v) => setLines((p) => p.map((x, j) => (j === i ? { ...x, quantity: v ?? undefined } : x)))}
