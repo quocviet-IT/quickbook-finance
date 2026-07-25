@@ -384,3 +384,70 @@ export const cashFlowRangeSchema = z.object({
   to: z.string().min(1, "To date is required"),
 });
 export type CashFlowRangeInput = z.infer<typeof cashFlowRangeSchema>;
+
+// --- Purchasing: purchase orders, receiving, three-way matching ---
+export const purchaseOrderLineInputSchema = z.object({
+  item_id: z.uuid().optional().nullable(),
+  description: z.string().trim().max(300).default(""),
+  quantity: z.number().positive("Quantity must be greater than 0"),
+  unit_cost_minor: z
+    .number()
+    .int("Unit cost must be a whole minor-unit amount")
+    .min(0, "Unit cost cannot be negative"),
+  expense_account_id: z.uuid("Select an expense account"),
+});
+export type PurchaseOrderLineInput = z.infer<typeof purchaseOrderLineInputSchema>;
+
+export const purchaseOrderSaveSchema = z.object({
+  vendor_id: z.uuid("Select a vendor"),
+  order_date: z.string().min(1, "Order date is required"),
+  expected_date: z.string().optional().nullable(),
+  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  ship_to: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
+  memo: z.string().trim().max(500).optional().or(z.literal("")).nullable(),
+  lines: z.array(purchaseOrderLineInputSchema).min(1, "Add at least one line item"),
+});
+export type PurchaseOrderSaveInput = z.infer<typeof purchaseOrderSaveSchema>;
+
+export const goodsReceiptLineSchema = z.object({
+  purchase_order_line_id: z.uuid(),
+  quantity: z.number().positive("Received quantity must be greater than 0"),
+});
+
+export const goodsReceiptSchema = z.object({
+  receipt_date: z.string().min(1, "Receipt date is required"),
+  memo: z.string().trim().max(500).optional().or(z.literal("")).nullable(),
+  lines: z.array(goodsReceiptLineSchema).min(1, "Receive at least one line"),
+});
+export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;
+
+export const billFromPoLineSchema = z.object({
+  purchase_order_line_id: z.uuid(),
+  quantity: z.number().positive("Billed quantity must be greater than 0"),
+  unit_cost_minor: z
+    .number()
+    .int("Unit cost must be a whole minor-unit amount")
+    .min(0, "Unit cost cannot be negative"),
+});
+
+export const billFromPoSchema = z.object({
+  bill_date: z.string().min(1, "Bill date is required"),
+  due_date: z.string().optional().nullable(),
+  vendor_ref: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+  memo: z.string().trim().max(500).optional().or(z.literal("")).nullable(),
+  lines: z.array(billFromPoLineSchema).min(1, "Bill at least one line"),
+  /** Required by the server only when a line falls outside the matching tolerance. */
+  variance_reason: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
+});
+export type BillFromPoInput = z.infer<typeof billFromPoSchema>;
+
+export const purchasingConfigSchema = z.object({
+  price_tolerance_bps: z.number().int().min(0, "Tolerance must be 0-10000").max(10000, "Tolerance must be 0-10000"),
+  qty_tolerance_bps: z.number().int().min(0, "Tolerance must be 0-10000").max(10000, "Tolerance must be 0-10000"),
+});
+export type PurchasingConfigInput = z.infer<typeof purchasingConfigSchema>;
+
+export const purchaseOrderReasonSchema = z.object({
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+export type PurchaseOrderReasonInput = z.infer<typeof purchaseOrderReasonSchema>;
