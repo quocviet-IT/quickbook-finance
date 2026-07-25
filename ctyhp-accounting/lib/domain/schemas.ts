@@ -493,3 +493,66 @@ export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>
 export const inventoryValuationSchema = z.object({
   as_of: z.string().min(1, "As-of date is required"),
 });
+
+// --- Access control: users, permissions, approvals, audit ---
+export const APP_ROLES = ["admin", "accountant", "viewer"] as const;
+export const USER_STATUSES = ["invited", "active", "suspended", "offboarded"] as const;
+
+export const userInviteSchema = z.object({
+  email: z.email("Enter a valid email"),
+  full_name: z.string().trim().max(160).optional().or(z.literal("")).nullable(),
+  role: z.enum(APP_ROLES),
+});
+export type UserInviteInput = z.infer<typeof userInviteSchema>;
+
+export const userRoleSchema = z.object({
+  role: z.enum(APP_ROLES),
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+export type UserRoleInput = z.infer<typeof userRoleSchema>;
+
+export const userStatusSchema = z.object({
+  status: z.enum(USER_STATUSES),
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+export type UserStatusInput = z.infer<typeof userStatusSchema>;
+
+export const rolePermissionSchema = z.object({
+  role: z.enum(APP_ROLES),
+  permission_key: z.string().trim().min(1),
+  allowed: z.boolean(),
+});
+export type RolePermissionInput = z.infer<typeof rolePermissionSchema>;
+
+export const approvalPolicySchema = z.object({
+  action_key: z.string().trim().min(1),
+  enabled: z.boolean(),
+  threshold_minor: z.number().int().min(0, "Threshold cannot be negative"),
+  require_segregation: z.boolean(),
+});
+export type ApprovalPolicyInput = z.infer<typeof approvalPolicySchema>;
+
+export const approvalSubmitSchema = z.object({
+  action_key: z.string().trim().min(1),
+  title: z.string().trim().max(200).optional().or(z.literal("")).nullable(),
+  amount_minor: z.number().int().default(0),
+  payload: z.record(z.string(), z.unknown()),
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+export type ApprovalSubmitInput = z.infer<typeof approvalSubmitSchema>;
+
+export const approvalDecisionSchema = z.object({
+  note: z.string().trim().min(1, "A note is required").max(300),
+});
+export type ApprovalDecisionInput = z.infer<typeof approvalDecisionSchema>;
+
+export const auditFilterSchema = z.object({
+  table_name: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+  record_id: z.uuid().optional().or(z.literal("")).nullable(),
+  actor_id: z.uuid().optional().or(z.literal("")).nullable(),
+  action: z.string().trim().max(20).optional().or(z.literal("")).nullable(),
+  from: z.string().optional().or(z.literal("")).nullable(),
+  to: z.string().optional().or(z.literal("")).nullable(),
+  limit: z.number().int().min(1).max(1000).default(200),
+});
+export type AuditFilterInput = z.infer<typeof auditFilterSchema>;

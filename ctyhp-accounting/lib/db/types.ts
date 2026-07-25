@@ -550,3 +550,72 @@ export interface InventoryValuationRow {
   value_minor: number;
   unit_cost_minor: number;
 }
+
+// --- Access control (Module C) ---
+export type UserStatus = "invited" | "active" | "suspended" | "offboarded";
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface AppUserRow {
+  id: string;
+  email: string;
+  full_name: string;
+  role: AppRole;
+  status: UserStatus;
+  mfa_enrolled: boolean;
+  last_sign_in: string | null;
+  invited_at: string | null;
+  status_reason: string | null;
+}
+
+export interface PermissionRow {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  is_enforced: boolean;
+}
+
+export interface RolePermissionRow {
+  role: AppRole;
+  permission_key: string;
+  allowed: boolean;
+}
+
+export interface ApprovalPolicyRow {
+  action_key: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  threshold_minor: number;
+  require_segregation: boolean;
+  updated_at: string;
+}
+
+export interface ApprovalRequestRow {
+  id: string;
+  action_key: string;
+  title: string;
+  amount_minor: number;
+  payload: Record<string, unknown>;
+  reason: string;
+  status: ApprovalStatus;
+  requested_by: string | null;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  result_id: string | null;
+  error_message: string | null;
+}
+
+export interface AuditEntryRow {
+  id: string;
+  table_name: string;
+  record_id: string | null;
+  action: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  before_json: unknown;
+  after_json: unknown;
+  created_at: string;
+}

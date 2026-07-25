@@ -24,6 +24,7 @@ import {
   DashboardOutlined,
   ShopOutlined,
   ShoppingOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
   MenuOutlined,
   UserOutlined,
@@ -50,6 +51,7 @@ type NavItem = NavPage | NavGroup;
 
 const NAV: NavItem[] = [
   { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" },
+  { key: "/approvals", icon: <SafetyCertificateOutlined />, label: "Approvals" },
   {
     key: "sales",
     icon: <ShoppingOutlined />,
@@ -119,6 +121,10 @@ const NAV: NavItem[] = [
       { key: "/settings/company", label: "Company" },
       { key: "/settings/periods", label: "Accounting Periods" },
       { key: "/settings/purchasing", label: "Purchasing Tolerances" },
+      { key: "/settings/users", label: "Users" },
+      { key: "/settings/permissions", label: "Permissions" },
+      { key: "/settings/approvals", label: "Approval Policies" },
+      { key: "/settings/audit", label: "Audit History" },
       { key: "/opening-balances", label: "Opening Balances" },
     ],
   },

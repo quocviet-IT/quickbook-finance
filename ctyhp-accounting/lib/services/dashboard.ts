@@ -13,6 +13,7 @@ export interface DashboardMetrics {
   unreconciledMinor: number;
   openPastPeriods: number;
   mtdNetIncomeMinor: number;
+  pendingApprovals: number;
 }
 
 function today(): string {
@@ -25,16 +26,18 @@ function monthStart(): string {
 
 export async function getDashboardMetrics(sb: SupabaseClient): Promise<DashboardMetrics> {
   const asOf = today();
-  const [bal, ar, ap, unrecon, periods, mtdRows] = await Promise.all([
+  const [bal, ar, ap, unrecon, periods, mtdRows, approvals] = await Promise.all([
     getLedgerBalances(sb, null, asOf),
     getArAgeing(sb, asOf),
     getApAgeing(sb, asOf),
     sb.rpc("acc_unreconciled_bank", { p_as_of: asOf }),
     sb.from("acc_accounting_period").select("id", { count: "exact", head: true }).eq("status", "open").lt("period_end", asOf),
     getLedgerBalances(sb, monthStart(), asOf),
+    sb.from("acc_approval_request").select("id", { count: "exact", head: true }).eq("status", "pending"),
   ]);
   if (unrecon.error) throw new DashboardError(unrecon.error.message);
   if (periods.error) throw new DashboardError(periods.error.message);
+  if (approvals.error) throw new DashboardError(approvals.error.message);
 
   const cashMinor = bal.filter((r) => r.accountType === "bank").reduce((s, r) => s + (r.debitBase - r.creditBase), 0);
   // Overdue = total minus the "current" bucket (current = not yet overdue).
@@ -51,5 +54,6 @@ export async function getDashboardMetrics(sb: SupabaseClient): Promise<Dashboard
     unreconciledMinor: Number(u?.amount_minor ?? 0),
     openPastPeriods: periods.count ?? 0,
     mtdNetIncomeMinor: pnl.netIncome,
+    pendingApprovals: approvals.count ?? 0,
   };
 }
