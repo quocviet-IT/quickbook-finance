@@ -12,6 +12,7 @@ export default function DashboardClient({ metrics, baseCurrency, baseDecimals }:
     { title: "Overdue receivables", value: fmt(metrics.overdueArMinor), href: "/reports/ar-ageing" },
     { title: "Overdue payables", value: fmt(metrics.overdueApMinor), href: "/reports/ap-ageing" },
     { title: "Unreconciled bank items", value: `${metrics.unreconciledCount} · ${fmt(metrics.unreconciledMinor)}`, href: "/banking/reconcile" },
+    { title: "Pending approvals", value: String(metrics.pendingApprovals), href: "/approvals" },
     { title: "Open periods past end date", value: String(metrics.openPastPeriods), href: "/settings/periods" },
     { title: "Net income (this month)", value: fmt(metrics.mtdNetIncomeMinor), href: "/reports" },
   ];
