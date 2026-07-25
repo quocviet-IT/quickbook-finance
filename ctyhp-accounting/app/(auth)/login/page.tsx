@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Card, Form, Input, Typography } from "antd";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
@@ -13,6 +13,29 @@ export default function LoginPage() {
   const router = useRouter();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const sb = createSupabaseBrowserClient();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("password-created") === "1") {
+      message.success("Password created. Sign in with your new password.");
+      window.history.replaceState(null, "", "/login");
+    }
+
+    const {
+      data: { subscription },
+    } = sb.auth.onAuthStateChange((event) => {
+      // If Supabase falls back to the configured Site URL, Proxy forwards the
+      // recovery fragment to /login. Send that authenticated recovery session
+      // to the password form instead of treating it as a normal sign-in.
+      if (event === "PASSWORD_RECOVERY") {
+        window.sessionStorage.setItem("ctyhp-password-recovery", "1");
+        router.replace("/auth/set-password");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [message, router]);
 
   async function onFinish(values: LoginValues) {
     setLoading(true);

@@ -33,7 +33,7 @@ export default async function UsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Invite people, set their role, and revoke access. Every change is recorded with a reason."
+        description="Create users, send password setup emails, assign roles, and revoke access. Every change is audited."
       />
       <UsersClient
         users={users}

@@ -40,15 +40,22 @@ export async function listUsers(sb: SupabaseClient): Promise<AppUserRow[]> {
 }
 
 /**
- * Invite a user: create the auth account through the admin API, then record the
- * application role. The admin API is the only step that needs the service role;
- * the acc_app_user row is written with the caller's own client so RLS still
- * applies to it.
+ * Create an account without assigning a password, record its application role,
+ * then send a password-recovery email so the person chooses their own password.
+ * The service-role client is used only for identity administration.
  */
-export async function inviteUser(sb: SupabaseClient, input: UserInviteInput): Promise<string> {
+export async function inviteUser(
+  sb: SupabaseClient,
+  input: UserInviteInput,
+  passwordSetupUrl: string,
+): Promise<string> {
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(input.email);
-  if (error) throw new AccessError(`Could not send the invitation: ${error.message}`);
+  const { data, error } = await admin.auth.admin.createUser({
+    email: input.email,
+    email_confirm: true,
+    user_metadata: { full_name: input.full_name || "" },
+  });
+  if (error) throw new AccessError(`Could not create the user: ${error.message}`);
   const userId = data.user?.id;
   if (!userId) throw new AccessError("The identity provider did not return a user id");
 
@@ -62,13 +69,26 @@ export async function inviteUser(sb: SupabaseClient, input: UserInviteInput): Pr
     },
     { onConflict: "id" },
   );
-  if (eRow) throw new AccessError(eRow.message);
+  if (eRow) {
+    await admin.auth.admin.deleteUser(userId);
+    throw new AccessError(eRow.message);
+  }
+
+  const { error: emailError } = await admin.auth.resetPasswordForEmail(input.email, {
+    redirectTo: passwordSetupUrl,
+  });
+  if (emailError) {
+    // acc_app_user cascades from auth.users, so a failed email leaves no
+    // unusable account behind.
+    await admin.auth.admin.deleteUser(userId);
+    throw new AccessError(`Could not send the password setup email: ${emailError.message}`);
+  }
 
   await writeAudit(sb, {
     table_name: "acc_app_user",
     record_id: userId,
     action: "insert",
-    after: { email: input.email, role: input.role, status: "invited" },
+    after: { email: input.email, role: input.role, status: "invited", delivery: "password_setup" },
   });
   return userId;
 }

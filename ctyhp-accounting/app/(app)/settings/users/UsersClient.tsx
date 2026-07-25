@@ -15,6 +15,13 @@ const STATUS_COLOR: Record<UserStatus, string> = {
   offboarded: "red",
 };
 
+const STATUS_LABEL: Record<UserStatus, string> = {
+  invited: "Password setup pending",
+  active: "Active",
+  suspended: "Suspended",
+  offboarded: "Offboarded",
+};
+
 const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "accountant", label: "Accountant" },
@@ -30,7 +37,7 @@ export default function UsersClient({
   users: AppUserRow[];
   currentUserId: string;
   canManage: boolean;
-  /** Inviting goes through the Auth admin API, which needs the service-role key. */
+  /** Account creation goes through the Auth admin API, which needs the service-role key. */
   canInvite: boolean;
 }) {
   const { message, modal } = App.useApp();
@@ -104,8 +111,8 @@ export default function UsersClient({
         <Alert
           type="warning"
           showIcon
-          message="Invitations are not configured"
-          description="Sending an invitation uses the identity provider's admin API, which needs SUPABASE_SERVICE_ROLE_KEY set in the server environment. Until it is, add users by having them sign up and then set their role here."
+          message="User creation is not configured"
+          description="Creating a user and sending their password setup email needs SUPABASE_SERVICE_ROLE_KEY in the server environment."
         />
       )}
 
@@ -113,14 +120,14 @@ export default function UsersClient({
         resultCount={users.length}
         actions={
           canManage ? (
-            <Tooltip title={canInvite ? "" : "Set SUPABASE_SERVICE_ROLE_KEY to send invitations"}>
+            <Tooltip title={canInvite ? "" : "Set SUPABASE_SERVICE_ROLE_KEY to create users"}>
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 disabled={!canInvite}
                 onClick={() => setInviteOpen(true)}
               >
-                Invite user
+                Add user
               </Button>
             </Tooltip>
           ) : null
@@ -166,7 +173,7 @@ export default function UsersClient({
             dataIndex: "status",
             render: (v: UserStatus, r) => (
               <Space>
-                <Tag color={STATUS_COLOR[v]}>{v}</Tag>
+                <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v]}</Tag>
                 {isLastActiveAdmin(users, r.id) && <Tag color="gold">last admin</Tag>}
               </Space>
             ),
@@ -240,17 +247,17 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     const res = await inviteUserAction({ email: v.email, full_name: v.full_name ?? null, role: v.role });
     setSaving(false);
     if (res.ok) {
-      message.success("Invitation sent");
+      message.success("User created and password setup email sent");
       onDone();
     } else {
-      message.error(res.error ?? "Failed to invite");
+      message.error(res.error ?? "Failed to create the user");
     }
   }
 
   return (
-    <Modal title="Invite a user" open onOk={submit} onCancel={onClose} confirmLoading={saving} okText="Send invitation">
+    <Modal title="Add a user" open onOk={submit} onCancel={onClose} confirmLoading={saving} okText="Create and send email">
       <Typography.Paragraph type="secondary">
-        The identity provider emails the invitation. The role below applies as soon as they accept.
+        The account is created without a password. The user receives a secure email link to create their password.
       </Typography.Paragraph>
       <Form form={form} layout="vertical" initialValues={{ role: "viewer" }}>
         <Form.Item name="email" label="Email" rules={[{ required: true, message: "Enter an email" }]}>
