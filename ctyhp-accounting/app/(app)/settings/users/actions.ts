@@ -1,11 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
-import { buildPasswordSetupUrl } from "@/lib/auth-url";
-import { userInviteSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
-import { AccessError, inviteUser, setUserRole, setUserStatus } from "@/lib/services/access";
+import { userCreateSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
+import { AccessError, createUser, setUserRole, setUserStatus } from "@/lib/services/access";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
@@ -21,19 +19,14 @@ function msg(e: unknown): string {
   return e instanceof AccessError || e instanceof Error ? e.message : "An unexpected error occurred";
 }
 
-export async function inviteUserAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
+export async function createUserAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
-  const parsed = userInviteSchema.safeParse(raw);
+  const parsed = userCreateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
-    const requestHeaders = await headers();
-    const origin = requestHeaders.get("origin");
-    if (!origin) {
-      throw new AccessError("The application origin is unavailable; the password email was not sent");
-    }
     const sb = await createSupabaseServerClient();
-    const id = await inviteUser(sb, parsed.data, buildPasswordSetupUrl(origin));
+    const id = await createUser(sb, parsed.data);
     revalidatePath("/settings/users");
     return { ok: true, data: { id } };
   } catch (e) {

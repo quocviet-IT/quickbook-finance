@@ -12,7 +12,7 @@ import type {
   ApprovalSubmitInput,
   AuditFilterInput,
   RolePermissionInput,
-  UserInviteInput,
+  UserCreateInput,
   UserRoleInput,
   UserStatusInput,
 } from "@/lib/domain/schemas";
@@ -40,18 +40,18 @@ export async function listUsers(sb: SupabaseClient): Promise<AppUserRow[]> {
 }
 
 /**
- * Create an account without assigning a password, record its application role,
- * then send a password-recovery email so the person chooses their own password.
- * The service-role client is used only for identity administration.
+ * Create a confirmed account with the password supplied by the administrator,
+ * then record its application role. Supabase Admin createUser does not send an
+ * email, and the password is never written to application tables or audit data.
  */
-export async function inviteUser(
+export async function createUser(
   sb: SupabaseClient,
-  input: UserInviteInput,
-  passwordSetupUrl: string,
+  input: UserCreateInput,
 ): Promise<string> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
     email: input.email,
+    password: input.password,
     email_confirm: true,
     user_metadata: { full_name: input.full_name || "" },
   });
@@ -64,8 +64,8 @@ export async function inviteUser(
       id: userId,
       full_name: input.full_name || "",
       role: input.role,
-      status: "invited",
-      invited_at: new Date().toISOString(),
+      status: "active",
+      invited_at: null,
     },
     { onConflict: "id" },
   );
@@ -74,21 +74,11 @@ export async function inviteUser(
     throw new AccessError(eRow.message);
   }
 
-  const { error: emailError } = await admin.auth.resetPasswordForEmail(input.email, {
-    redirectTo: passwordSetupUrl,
-  });
-  if (emailError) {
-    // acc_app_user cascades from auth.users, so a failed email leaves no
-    // unusable account behind.
-    await admin.auth.admin.deleteUser(userId);
-    throw new AccessError(`Could not send the password setup email: ${emailError.message}`);
-  }
-
   await writeAudit(sb, {
     table_name: "acc_app_user",
     record_id: userId,
     action: "insert",
-    after: { email: input.email, role: input.role, status: "invited", delivery: "password_setup" },
+    after: { email: input.email, role: input.role, status: "active", delivery: "admin_assigned" },
   });
   return userId;
 }

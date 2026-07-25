@@ -10,7 +10,7 @@ import {
 import {
   approvalDecisionSchema,
   approvalPolicySchema,
-  userInviteSchema,
+  userCreateSchema,
   userStatusSchema,
 } from "@/lib/domain/schemas";
 
@@ -133,17 +133,28 @@ describe("controlled action catalog", () => {
 });
 
 describe("access schemas", () => {
-  it("accepts a valid invitation", () => {
-    const r = userInviteSchema.safeParse({ email: "new@ctyhp.vn", full_name: "New Person", role: "accountant" });
+  const strongPassword = "Jewelry!2026Secure";
+
+  it("accepts a valid user account", () => {
+    const r = userCreateSchema.safeParse({
+      email: "new@ctyhp.vn",
+      full_name: "New Person",
+      role: "accountant",
+      password: strongPassword,
+    });
     expect(r.success).toBe(true);
   });
 
-  it("rejects an invitation with a bad email", () => {
-    expect(userInviteSchema.safeParse({ email: "nope", role: "accountant" }).success).toBe(false);
+  it("rejects a user account with a bad email", () => {
+    expect(userCreateSchema.safeParse({ email: "nope", role: "accountant", password: strongPassword }).success).toBe(false);
   });
 
   it("rejects an unknown role", () => {
-    expect(userInviteSchema.safeParse({ email: "a@b.vn", role: "owner" }).success).toBe(false);
+    expect(userCreateSchema.safeParse({ email: "a@b.vn", role: "owner", password: strongPassword }).success).toBe(false);
+  });
+
+  it("rejects a weak administrator-assigned password", () => {
+    expect(userCreateSchema.safeParse({ email: "a@b.vn", role: "viewer", password: "password" }).success).toBe(false);
   });
 
   it("requires a reason for a status change", () => {

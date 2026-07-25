@@ -511,12 +511,19 @@ export const inventoryValuationSchema = z.object({
 export const APP_ROLES = ["admin", "accountant", "viewer"] as const;
 export const USER_STATUSES = ["invited", "active", "suspended", "offboarded"] as const;
 
-export const userInviteSchema = z.object({
+export const userCreateSchema = z.object({
   email: z.email("Enter a valid email"),
   full_name: z.string().trim().max(160).optional().or(z.literal("")).nullable(),
   role: z.enum(APP_ROLES),
+  password: z
+    .string()
+    .min(12, "Use at least 12 characters")
+    .regex(/[a-z]/, "Include a lowercase letter")
+    .regex(/[A-Z]/, "Include an uppercase letter")
+    .regex(/\d/, "Include a number")
+    .regex(/[^A-Za-z0-9]/, "Include a special character"),
 });
-export type UserInviteInput = z.infer<typeof userInviteSchema>;
+export type UserCreateInput = z.infer<typeof userCreateSchema>;
 
 export const userRoleSchema = z.object({
   role: z.enum(APP_ROLES),

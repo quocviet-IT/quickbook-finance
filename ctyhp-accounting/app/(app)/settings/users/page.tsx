@@ -33,13 +33,13 @@ export default async function UsersPage() {
     <div>
       <PageHeader
         title="Users"
-        description="Create users, send password setup emails, assign roles, and revoke access. Every change is audited."
+        description="Create login accounts, assign roles, and revoke access. Every change is audited."
       />
       <UsersClient
         users={users}
         currentUserId={user?.id ?? ""}
         canManage={canManage}
-        canInvite={isAdminClientConfigured()}
+        canCreateUsers={isAdminClientConfigured()}
       />
     </div>
   );

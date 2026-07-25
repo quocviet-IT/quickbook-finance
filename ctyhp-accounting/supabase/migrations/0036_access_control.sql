@@ -61,7 +61,7 @@ insert into acc_permission (key, label, category, description, is_enforced) valu
   ('po.approve',                'Approve purchase orders',    'Purchases',  'Move a purchase order from draft to open', false),
   ('po.variance_approve',       'Approve match variances',    'Purchases',  'Approve a three-way matching variance', false),
   ('approval.decide',           'Approve or reject requests', 'Governance', 'Decide on a maker-checker approval request', true),
-  ('users.manage',              'Manage users',               'Governance', 'Invite users, change roles, suspend, offboard', true),
+  ('users.manage',              'Manage users',               'Governance', 'Create users, change roles, suspend, offboard', true),
   ('permissions.manage',        'Manage permissions',         'Governance', 'Change the role to permission matrix', true),
   ('settings.manage',           'Manage settings',            'Governance', 'Company settings, tolerances, approval policies', true),
   ('audit.read',                'Read the audit log',         'Governance', 'Search audit history', true);

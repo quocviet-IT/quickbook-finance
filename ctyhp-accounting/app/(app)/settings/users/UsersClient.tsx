@@ -6,7 +6,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
-import { inviteUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
+import { createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
 
 const STATUS_COLOR: Record<UserStatus, string> = {
   invited: "blue",
@@ -16,7 +16,7 @@ const STATUS_COLOR: Record<UserStatus, string> = {
 };
 
 const STATUS_LABEL: Record<UserStatus, string> = {
-  invited: "Password setup pending",
+  invited: "Pending",
   active: "Active",
   suspended: "Suspended",
   offboarded: "Offboarded",
@@ -32,17 +32,17 @@ export default function UsersClient({
   users,
   currentUserId,
   canManage,
-  canInvite,
+  canCreateUsers,
 }: {
   users: AppUserRow[];
   currentUserId: string;
   canManage: boolean;
   /** Account creation goes through the Auth admin API, which needs the service-role key. */
-  canInvite: boolean;
+  canCreateUsers: boolean;
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   /** Ask for the reason every access change is required to carry. */
   function promptReason(title: string, content: string, onReason: (reason: string) => Promise<void>) {
@@ -107,12 +107,12 @@ export default function UsersClient({
         description="Admins and accountants are privileged users: they must enrol multi-factor authentication with the identity provider, and the MFA column below is how that policy is checked. Suspending or offboarding a user revokes read and write access immediately across the whole application. The last remaining active admin cannot be demoted or suspended."
       />
 
-      {canManage && !canInvite && (
+      {canManage && !canCreateUsers && (
         <Alert
           type="warning"
           showIcon
           message="User creation is not configured"
-          description="Creating a user and sending their password setup email needs SUPABASE_SERVICE_ROLE_KEY in the server environment."
+          description="Creating a login with an administrator-assigned password needs SUPABASE_SERVICE_ROLE_KEY in the server environment."
         />
       )}
 
@@ -120,12 +120,12 @@ export default function UsersClient({
         resultCount={users.length}
         actions={
           canManage ? (
-            <Tooltip title={canInvite ? "" : "Set SUPABASE_SERVICE_ROLE_KEY to create users"}>
+            <Tooltip title={canCreateUsers ? "" : "Set SUPABASE_SERVICE_ROLE_KEY to create users"}>
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                disabled={!canInvite}
-                onClick={() => setInviteOpen(true)}
+                disabled={!canCreateUsers}
+                onClick={() => setCreateOpen(true)}
               >
                 Add user
               </Button>
@@ -223,11 +223,11 @@ export default function UsersClient({
         ]}
       />
 
-      {inviteOpen && (
-        <InviteModal
-          onClose={() => setInviteOpen(false)}
+      {createOpen && (
+        <CreateUserModal
+          onClose={() => setCreateOpen(false)}
           onDone={() => {
-            setInviteOpen(false);
+            setCreateOpen(false);
             router.refresh();
           }}
         />
@@ -236,7 +236,7 @@ export default function UsersClient({
   );
 }
 
-function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function CreateUserModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -244,10 +244,15 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   async function submit() {
     const v = await form.validateFields();
     setSaving(true);
-    const res = await inviteUserAction({ email: v.email, full_name: v.full_name ?? null, role: v.role });
+    const res = await createUserAction({
+      email: v.email,
+      full_name: v.full_name ?? null,
+      role: v.role,
+      password: v.password,
+    });
     setSaving(false);
     if (res.ok) {
-      message.success("User created and password setup email sent");
+      message.success("User account created");
       onDone();
     } else {
       message.error(res.error ?? "Failed to create the user");
@@ -255,9 +260,9 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   }
 
   return (
-    <Modal title="Add a user" open onOk={submit} onCancel={onClose} confirmLoading={saving} okText="Create and send email">
+    <Modal title="Add a user" open onOk={submit} onCancel={onClose} confirmLoading={saving} okText="Create account">
       <Typography.Paragraph type="secondary">
-        The account is created without a password. The user receives a secure email link to create their password.
+        Set the user&apos;s initial password and share the credentials through an approved secure channel. No email is sent.
       </Typography.Paragraph>
       <Form form={form} layout="vertical" initialValues={{ role: "viewer" }}>
         <Form.Item name="email" label="Email" rules={[{ required: true, message: "Enter an email" }]}>
@@ -268,6 +273,37 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         </Form.Item>
         <Form.Item name="role" label="Role" rules={[{ required: true, message: "Select a role" }]}>
           <Select options={ROLE_OPTIONS} />
+        </Form.Item>
+        <Form.Item
+          name="password"
+          label="Initial password"
+          rules={[
+            { required: true, message: "Enter a password" },
+            { min: 12, message: "Use at least 12 characters" },
+            { pattern: /[a-z]/, message: "Include a lowercase letter" },
+            { pattern: /[A-Z]/, message: "Include an uppercase letter" },
+            { pattern: /\d/, message: "Include a number" },
+            { pattern: /[^A-Za-z0-9]/, message: "Include a special character" },
+          ]}
+        >
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item
+          name="confirm_password"
+          label="Confirm password"
+          dependencies={["password"]}
+          rules={[
+            { required: true, message: "Confirm the password" },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                return !value || getFieldValue("password") === value
+                  ? Promise.resolve()
+                  : Promise.reject(new Error("The passwords do not match"));
+              },
+            }),
+          ]}
+        >
+          <Input.Password autoComplete="new-password" />
         </Form.Item>
       </Form>
     </Modal>

@@ -148,7 +148,7 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
       {
         href: "/settings/users",
         title: "Users",
-        description: "Invite people, set roles, suspend or offboard access, and check MFA.",
+        description: "Create login accounts, set roles, suspend or offboard access, and check MFA.",
       },
       {
         href: "/settings/permissions",
