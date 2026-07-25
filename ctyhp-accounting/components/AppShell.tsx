@@ -108,6 +108,7 @@ const NAV: NavItem[] = [
       { key: "/reports/ap-ageing", label: "Accounts Payable Ageing" },
       { key: "/reports/vendor-statement", label: "Vendor Statements" },
       { key: "/reports/cash-flow", label: "Cash Flow" },
+      { key: "/reports/inventory-valuation", label: "Inventory Valuation" },
     ],
   },
   {

@@ -1,33 +1,61 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag } from "antd";
+import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import type { AccountRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
+import type { AccountRow, InventoryValuationRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
 import { createItemAction, updateItemAction, setItemActiveAction } from "./actions";
+import AdjustInventoryModal from "./AdjustInventoryModal";
+import ItemMovementsModal from "./ItemMovementsModal";
 
 interface Props {
   items: ItemRow[];
   incomeAccounts: AccountRow[];
   expenseAccounts: AccountRow[];
+  inventoryAccounts: AccountRow[];
+  cogsAccounts: AccountRow[];
+  adjustmentAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
+  /** Quantity and value per inventory item, as of today. */
+  onHand: InventoryValuationRow[];
   canWrite: boolean;
 }
 
-export default function ItemsClient({ items, incomeAccounts, expenseAccounts, taxCodes, canWrite }: Props) {
+export default function ItemsClient({
+  items,
+  incomeAccounts,
+  expenseAccounts,
+  inventoryAccounts,
+  cogsAccounts,
+  adjustmentAccounts,
+  taxCodes,
+  onHand,
+  canWrite,
+}: Props) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ItemRow | null>(null);
+  const [adjusting, setAdjusting] = useState<ItemRow | null>(null);
+  const [viewing, setViewing] = useState<ItemRow | null>(null);
   const [form] = Form.useForm();
   const isSold = Form.useWatch("is_sold", form);
   const isPurchased = Form.useWatch("is_purchased", form);
+  const isInventory = Form.useWatch("is_inventory", form);
+
+  const onHandById = new Map(onHand.map((r) => [r.item_id, r]));
 
   function openCreate() {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ is_sold: true, is_purchased: false, sales_price: 0, purchase_cost: 0 });
+    form.setFieldsValue({
+      is_sold: true,
+      is_purchased: false,
+      is_inventory: false,
+      sales_price: 0,
+      purchase_cost: 0,
+    });
     setOpen(true);
   }
 
@@ -44,6 +72,9 @@ export default function ItemsClient({ items, incomeAccounts, expenseAccounts, ta
       is_purchased: it.is_purchased,
       purchase_cost: it.purchase_cost_minor / 100,
       expense_account_id: it.expense_account_id ?? undefined,
+      is_inventory: it.is_inventory,
+      inventory_account_id: it.inventory_account_id ?? undefined,
+      cogs_account_id: it.cogs_account_id ?? undefined,
     });
     setOpen(true);
   }
@@ -61,6 +92,9 @@ export default function ItemsClient({ items, incomeAccounts, expenseAccounts, ta
       is_purchased: !!v.is_purchased,
       purchase_cost_minor: Math.round((v.purchase_cost ?? 0) * 100),
       expense_account_id: v.expense_account_id ?? null,
+      is_inventory: !!v.is_inventory,
+      inventory_account_id: v.inventory_account_id ?? null,
+      cogs_account_id: v.cogs_account_id ?? null,
     };
     setSaving(true);
     const res = editing ? await updateItemAction(editing.id, payload) : await createItemAction(payload);
@@ -112,12 +146,26 @@ export default function ItemsClient({ items, incomeAccounts, expenseAccounts, ta
             render: (v: number, r) => (r.is_purchased ? `$${(v / 100).toFixed(2)}` : "—"),
           },
           {
+            title: "On hand",
+            key: "on_hand",
+            align: "right",
+            render: (_, r) => (r.is_inventory ? Number(onHandById.get(r.id)?.qty_on_hand ?? 0) : "—"),
+          },
+          {
+            title: "Inventory value",
+            key: "inventory_value",
+            align: "right",
+            render: (_, r) =>
+              r.is_inventory ? `$${((onHandById.get(r.id)?.value_minor ?? 0) / 100).toFixed(2)}` : "—",
+          },
+          {
             title: "Used for",
             key: "used",
             render: (_, r) => (
               <Space>
                 {r.is_sold && <Tag color="blue">Sales</Tag>}
                 {r.is_purchased && <Tag color="gold">Purchase</Tag>}
+                {r.is_inventory && <Tag color="purple">Inventory</Tag>}
               </Space>
             ),
           },
@@ -138,6 +186,16 @@ export default function ItemsClient({ items, incomeAccounts, expenseAccounts, ta
                   <Button size="small" type="link" onClick={() => toggleActive(r)}>
                     {r.is_active ? "Deactivate" : "Activate"}
                   </Button>
+                  {r.is_inventory && (
+                    <>
+                      <Button size="small" type="link" onClick={() => setAdjusting(r)}>
+                        Adjust
+                      </Button>
+                      <Button size="small" type="link" onClick={() => setViewing(r)}>
+                        Movements
+                      </Button>
+                    </>
+                  )}
                 </Space>
               ) : null,
           },
@@ -217,8 +275,52 @@ export default function ItemsClient({ items, incomeAccounts, expenseAccounts, ta
               </Form.Item>
             </Space>
           )}
+
+          <Divider titlePlacement="left">
+            <Space>
+              <Form.Item name="is_inventory" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
+              I track quantity on hand
+            </Space>
+          </Divider>
+          {isInventory && (
+            <>
+              <Space size="middle" style={{ display: "flex" }} align="start">
+                <Form.Item name="inventory_account_id" label="Inventory asset account" style={{ flex: 1, minWidth: 220 }}>
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    options={inventoryAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}
+                  />
+                </Form.Item>
+                <Form.Item name="cogs_account_id" label="Cost of Goods Sold account" style={{ flex: 1, minWidth: 220 }}>
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    options={cogsAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}
+                  />
+                </Form.Item>
+              </Space>
+              <Typography.Paragraph type="secondary">
+                Tracked items are costed at weighted average. Receiving on a purchase order debits the
+                asset account; selling relieves it into Cost of Goods Sold. A tracked item must be both
+                sold and bought, is purchased through a purchase order rather than a direct bill, and
+                appears only on base-currency documents.
+              </Typography.Paragraph>
+            </>
+          )}
         </Form>
       </Modal>
+
+      <AdjustInventoryModal
+        open={!!adjusting}
+        item={adjusting}
+        offsetAccounts={adjustmentAccounts}
+        onHandQty={adjusting ? Number(onHandById.get(adjusting.id)?.qty_on_hand ?? 0) : 0}
+        onClose={() => setAdjusting(null)}
+      />
+      <ItemMovementsModal open={!!viewing} item={viewing} onClose={() => setViewing(null)} />
     </>
   );
 }

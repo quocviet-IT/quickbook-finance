@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listItems } from "@/lib/services/items";
 import { listAccounts } from "@/lib/services/accounts";
 import { listTaxCodes } from "@/lib/services/reference";
+import { getInventoryValuation } from "@/lib/services/inventory";
 import { getUserRole, canWrite } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import ItemsClient from "./ItemsClient";
@@ -10,10 +11,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ItemsPage() {
   const sb = await createSupabaseServerClient();
-  const [items, accounts, taxCodes, role] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const [items, accounts, taxCodes, valuation, role] = await Promise.all([
     listItems(sb),
     listAccounts(sb),
     listTaxCodes(sb),
+    getInventoryValuation(sb, today),
     getUserRole(),
   ]);
 
@@ -27,14 +30,35 @@ export default async function ItemsPage() {
       a.status === "active",
   );
 
+  const inventoryAccounts = accounts.filter(
+    (a) => a.account_type === "current_asset" && a.is_posting_account && a.status === "active",
+  );
+  const cogsAccounts = accounts.filter(
+    (a) => a.account_type === "cost_of_goods_sold" && a.is_posting_account && a.status === "active",
+  );
+  // Where a write-off, shrinkage, or found-stock adjustment lands.
+  const adjustmentAccounts = accounts.filter(
+    (a) =>
+      ["expense", "cost_of_goods_sold", "other_expense", "income", "other_income"].includes(a.account_type) &&
+      a.is_posting_account &&
+      a.status === "active",
+  );
+
   return (
     <div>
-      <PageHeader title="Products & Services" description="Reusable items that prefill invoice and bill lines." />
+      <PageHeader
+        title="Products & Services"
+        description="Reusable items that prefill invoice and bill lines. Tracked items also carry quantity on hand and a weighted-average value."
+      />
       <ItemsClient
         items={items}
         incomeAccounts={incomeAccounts}
         expenseAccounts={expenseAccounts}
+        inventoryAccounts={inventoryAccounts}
+        cogsAccounts={cogsAccounts}
+        adjustmentAccounts={adjustmentAccounts}
         taxCodes={taxCodes}
+        onHand={valuation.rows}
         canWrite={canWrite(role)}
       />
     </div>
