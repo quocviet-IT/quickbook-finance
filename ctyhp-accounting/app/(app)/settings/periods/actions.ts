@@ -4,6 +4,11 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { closePeriodSchema, reopenPeriodSchema } from "@/lib/domain/schemas";
 import { generatePeriods, closePeriod, reopenPeriod, listPeriods, PeriodsError } from "@/lib/services/periods";
+import {
+  executeOrSubmitForApproval,
+  toControlledActionResponse,
+  type ControlledActionResponse,
+} from "@/lib/services/approval-flow";
 import type { AccountingPeriodRow } from "@/lib/db/types";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
@@ -25,11 +30,32 @@ export async function closePeriodAction(id: string, raw: unknown): Promise<Actio
   try { const sb = await createSupabaseServerClient(); await closePeriod(sb, id, parsed.data.reason); revalidatePath("/settings/periods"); return { ok: true }; }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
-export async function reopenPeriodAction(id: string, raw: unknown): Promise<ActionResult> {
+export async function reopenPeriodAction(
+  id: string,
+  raw: unknown,
+): Promise<ActionResult<ControlledActionResponse>> {
   const denied = await adminGuard(); if (denied) return { ok: false, error: denied };
   const parsed = reopenPeriodSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  try { const sb = await createSupabaseServerClient(); await reopenPeriod(sb, id, parsed.data.reason); revalidatePath("/settings/periods"); return { ok: true }; }
+  try {
+    const sb = await createSupabaseServerClient();
+    const outcome = await executeOrSubmitForApproval({
+      sb,
+      actionKey: "period_reopen",
+      title: "Accounting period reopen",
+      amountMinor: 0,
+      reason: parsed.data.reason,
+      payload: { period_id: id },
+      execute: async () => {
+        await reopenPeriod(sb, id, parsed.data.reason);
+        return id;
+      },
+    });
+    revalidatePath("/settings/periods");
+    revalidatePath("/approvals");
+    revalidatePath("/dashboard");
+    return { ok: true, data: toControlledActionResponse(outcome, String) };
+  }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 export async function listPeriodsAction(fiscalYear: number): Promise<ActionResult<AccountingPeriodRow[]>> {

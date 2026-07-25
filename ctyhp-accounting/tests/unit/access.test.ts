@@ -107,19 +107,24 @@ describe("describeStatusChange", () => {
 });
 
 describe("controlled action catalog", () => {
-  it("covers exactly the five wired actions", () => {
+  it("covers exactly the six wired actions", () => {
     expect(CONTROLLED_ACTIONS.map((a) => a.key)).toEqual([
       "manual_journal",
       "write_off",
       "inventory_adjustment",
       "period_reopen",
       "reconciliation_reopen",
+      "vendor_tax_profile",
     ]);
   });
 
   it("marks the two on/off policies as amount-independent", () => {
     const onOff = CONTROLLED_ACTIONS.filter((a) => !a.usesThreshold).map((a) => a.key);
-    expect(onOff).toEqual(["period_reopen", "reconciliation_reopen"]);
+    expect(onOff).toEqual([
+      "period_reopen",
+      "reconciliation_reopen",
+      "vendor_tax_profile",
+    ]);
   });
 
   it("lists permission categories for the matrix UI", () => {

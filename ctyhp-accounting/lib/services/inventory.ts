@@ -105,3 +105,18 @@ export async function adjustInventory(
   });
   return txnId;
 }
+
+/** The same materiality amount used by the database approval policy guard. */
+export async function inventoryAdjustmentApprovalAmount(
+  sb: SupabaseClient,
+  input: InventoryAdjustmentInput,
+): Promise<number> {
+  const { data, error } = await sb.rpc("acc_inventory_adjust_amount", {
+    p_item_id: input.item_id,
+    p_qty_delta: input.qty_delta,
+    p_unit_cost_minor: input.unit_cost_minor,
+    p_value_delta_minor: input.value_delta_minor,
+  });
+  if (error) throw new InventoryError(error.message);
+  return Number(data ?? 0);
+}

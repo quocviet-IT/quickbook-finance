@@ -83,6 +83,7 @@ export const CONTROLLED_ACTIONS: ControlledAction[] = [
   { key: "inventory_adjustment", label: "Inventory adjustment", usesThreshold: true },
   { key: "period_reopen", label: "Accounting period reopen", usesThreshold: false },
   { key: "reconciliation_reopen", label: "Reconciliation reopen", usesThreshold: false },
+  { key: "vendor_tax_profile", label: "Vendor tax profile change", usesThreshold: false },
 ];
 
 /** Display order for the permission matrix. */

@@ -105,8 +105,12 @@ export default function ReconcileWorkspaceClient({
       onOk: async () => {
         const r = await reopenReconciliationAction(reconciliationId, { reason });
         if (r.ok) {
-          message.success("Reopened");
-          void load();
+          message.success(
+            r.data?.submittedForApproval
+              ? "Reconciliation reopen submitted for approval"
+              : "Reopened",
+          );
+          if (!r.data?.submittedForApproval) void load();
         } else {
           message.error(r.error ?? "Failed");
           throw new Error(r.error);

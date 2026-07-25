@@ -11,6 +11,11 @@ import {
   type Report1099,
 } from "@/lib/services/vendorTax";
 import type { VendorTaxProfileRow } from "@/lib/db/types";
+import {
+  executeOrSubmitForApproval,
+  toControlledActionResponse,
+  type ControlledActionResponse,
+} from "@/lib/services/approval-flow";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
@@ -26,17 +31,49 @@ function msg(e: unknown): string {
 export async function saveVendorTaxProfileAction(
   vendorId: string,
   raw: unknown,
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<ControlledActionResponse>> {
   const role = await getUserRole();
   if (!canWrite(role)) return { ok: false, error: "You do not have permission to change tax data" };
   const parsed = vendorTaxProfileSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    const id = await saveVendorTaxProfile(sb, vendorId, parsed.data);
+    const vendorResult = await sb.from("acc_vendor").select("name").eq("id", vendorId).single();
+    if (vendorResult.error) throw new VendorTaxError(vendorResult.error.message);
+    const input = parsed.data;
+    const outcome = await executeOrSubmitForApproval({
+      sb,
+      actionKey: "vendor_tax_profile",
+      title: `Vendor tax profile — ${vendorResult.data.name}`,
+      amountMinor: 0,
+      reason: input.reason,
+      payload: {
+        vendor_id: vendorId,
+        w9_status: input.w9_status,
+        w9_received_date: input.w9_received_date || null,
+        w9_expires_date: input.w9_expires_date || null,
+        classification: input.classification || null,
+        reporting_name: input.reporting_name || null,
+        tin_ref: input.tin_ref || null,
+        tin_type: input.tin_type || null,
+        address_line1: input.address_line1 || null,
+        address_line2: input.address_line2 || null,
+        city: input.city || null,
+        region: input.region || null,
+        postal_code: input.postal_code || null,
+        country: input.country || "US",
+        is_1099_eligible: input.is_1099_eligible,
+        box_code: input.box_code || null,
+        eligibility_override: input.eligibility_override,
+        override_reason: input.override_reason || null,
+      },
+      execute: () => saveVendorTaxProfile(sb, vendorId, input),
+    });
     revalidatePath("/vendors");
     revalidatePath("/reports/1099");
-    return { ok: true, data: { id } };
+    revalidatePath("/approvals");
+    revalidatePath("/dashboard");
+    return { ok: true, data: toControlledActionResponse(outcome, String) };
   } catch (e) {
     return { ok: false, error: msg(e) };
   }

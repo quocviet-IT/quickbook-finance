@@ -9,6 +9,11 @@ import {
   BankRecError, type ReconLineView, type ReconDetail, type DiscrepancyRow,
 } from "@/lib/services/bankrec";
 import type { StatementReconciliationRow } from "@/lib/db/types";
+import {
+  executeOrSubmitForApproval,
+  toControlledActionResponse,
+  type ControlledActionResponse,
+} from "@/lib/services/approval-flow";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 async function guard(): Promise<string | null> {
@@ -45,12 +50,34 @@ export async function completeReconciliationAction(id: string): Promise<ActionRe
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 
-export async function reopenReconciliationAction(id: string, raw: unknown): Promise<ActionResult> {
+export async function reopenReconciliationAction(
+  id: string,
+  raw: unknown,
+): Promise<ActionResult<ControlledActionResponse>> {
   const role = await getUserRole();
   if (!isAdmin(role)) return { ok: false, error: "Only an admin can reopen a reconciliation" };
   const parsed = reconciliationReopenSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  try { const sb = await createSupabaseServerClient(); await reopenReconciliation(sb, id, parsed.data); revalidatePath("/banking/reconcile"); return { ok: true }; }
+  try {
+    const sb = await createSupabaseServerClient();
+    const outcome = await executeOrSubmitForApproval({
+      sb,
+      actionKey: "reconciliation_reopen",
+      title: "Bank reconciliation reopen",
+      amountMinor: 0,
+      reason: parsed.data.reason,
+      payload: { reconciliation_id: id },
+      execute: async () => {
+        await reopenReconciliation(sb, id, parsed.data);
+        return id;
+      },
+    });
+    revalidatePath("/banking/reconcile");
+    revalidatePath(`/banking/reconcile/${id}`);
+    revalidatePath("/approvals");
+    revalidatePath("/dashboard");
+    return { ok: true, data: toControlledActionResponse(outcome, String) };
+  }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 

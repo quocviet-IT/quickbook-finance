@@ -60,9 +60,13 @@ export default function WriteOffModal({
     });
     setSaving(false);
     if (res.ok) {
-      message.success("Write-off recorded");
+      message.success(
+        res.data?.submittedForApproval
+          ? "Write-off submitted for approval"
+          : "Write-off recorded",
+      );
       onClose();
-      onDone();
+      if (!res.data?.submittedForApproval) onDone();
     } else {
       message.error(res.error ?? "Failed to record write-off");
     }

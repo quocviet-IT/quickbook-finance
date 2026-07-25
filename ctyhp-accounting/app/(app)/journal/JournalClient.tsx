@@ -74,10 +74,14 @@ export default function JournalClient({ canWrite, accounts, baseCurrency, baseDe
     const r = await createJournalAction(payload);
     setSaving(false);
     if (r.ok) {
-      message.success("Journal entry posted");
+      message.success(
+        r.data?.submittedForApproval
+          ? "Journal entry submitted for approval"
+          : "Journal entry posted",
+      );
       setOpen(false);
       resetForm();
-      void load();
+      if (!r.data?.submittedForApproval) void load();
     } else {
       message.error(r.error ?? "Failed to post journal entry");
     }

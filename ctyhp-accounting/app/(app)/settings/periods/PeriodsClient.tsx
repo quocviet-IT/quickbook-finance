@@ -48,8 +48,14 @@ export default function PeriodsClient({
       onOk: async () => {
         const r = kind === "close" ? await closePeriodAction(row.id, { reason }) : await reopenPeriodAction(row.id, { reason });
         if (r.ok) {
-          message.success(kind === "close" ? "Period closed" : "Period reopened");
-          void load(year);
+          message.success(
+            kind === "close"
+              ? "Period closed"
+              : r.data?.submittedForApproval
+                ? "Period reopen submitted for approval"
+                : "Period reopened",
+          );
+          if (kind === "close" || !r.data?.submittedForApproval) void load(year);
         } else {
           message.error(r.error ?? "Failed");
           throw new Error(r.error);

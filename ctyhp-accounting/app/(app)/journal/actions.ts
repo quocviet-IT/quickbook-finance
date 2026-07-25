@@ -4,6 +4,11 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { manualJournalSchema, reverseEntrySchema } from "@/lib/domain/schemas";
 import { createManualJournal, reverseEntry, listJournalEntries, listReversedEntries, JournalError, type JournalFilters, type JournalEntrySummary, type ReversedEntryRow } from "@/lib/services/journal";
+import {
+  executeOrSubmitForApproval,
+  toControlledActionResponse,
+  type ControlledActionResponse,
+} from "@/lib/services/approval-flow";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
@@ -16,16 +21,38 @@ function msg(err: unknown): string {
   return "An unexpected error occurred";
 }
 
-export async function createJournalAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
+export async function createJournalAction(raw: unknown): Promise<ActionResult<ControlledActionResponse>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
   const parsed = manualJournalSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    const id = await createManualJournal(sb, parsed.data);
+    const entryDate = parsed.data.entry_date || new Date().toISOString().slice(0, 10);
+    const input = { ...parsed.data, entry_date: entryDate };
+    const amountMinor = input.lines.reduce((sum, line) => sum + line.debit_minor, 0);
+    const outcome = await executeOrSubmitForApproval({
+      sb,
+      actionKey: "manual_journal",
+      title: input.description?.trim() || "Manual journal entry",
+      amountMinor,
+      reason:
+        input.description?.trim() ||
+        input.source_ref?.trim() ||
+        "Manual journal entry submitted for review",
+      payload: {
+        entry_date: entryDate,
+        description: input.description || null,
+        source_ref: input.source_ref || null,
+        currency: input.currency_code,
+        lines: input.lines,
+      },
+      execute: () => createManualJournal(sb, input),
+    });
     revalidatePath("/journal");
-    return { ok: true, data: { id } };
+    revalidatePath("/approvals");
+    revalidatePath("/dashboard");
+    return { ok: true, data: toControlledActionResponse(outcome, String) };
   } catch (err) { return { ok: false, error: msg(err) }; }
 }
 

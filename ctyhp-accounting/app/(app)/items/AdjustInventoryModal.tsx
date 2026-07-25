@@ -50,9 +50,13 @@ function AdjustInventoryModalBody({
     });
     setSaving(false);
     if (res.ok) {
-      message.success("Inventory adjusted");
+      message.success(
+        res.data?.submittedForApproval
+          ? "Inventory adjustment submitted for approval"
+          : "Inventory adjusted",
+      );
       onClose();
-      router.refresh();
+      if (!res.data?.submittedForApproval) router.refresh();
     } else {
       message.error(res.error ?? "Failed to adjust inventory");
     }

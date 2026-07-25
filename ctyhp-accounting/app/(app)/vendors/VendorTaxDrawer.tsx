@@ -120,9 +120,13 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
     });
     setSaving(false);
     if (res.ok) {
-      message.success("Tax profile saved as a new version");
+      message.success(
+        res.data?.submittedForApproval
+          ? "Tax profile change submitted for approval"
+          : "Tax profile saved as a new version",
+      );
       onClose();
-      router.refresh();
+      if (!res.data?.submittedForApproval) router.refresh();
     } else {
       message.error(res.error ?? "Failed to save the tax profile");
     }
