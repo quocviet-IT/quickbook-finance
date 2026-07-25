@@ -68,6 +68,8 @@ const NAV: NavItem[] = [
     label: "Purchases & Vendors",
     children: [
       { key: "/vendors", label: "Vendors" },
+      { key: "/purchase-orders", label: "Purchase Orders" },
+      { key: "/purchase-orders/received-not-billed", label: "Received Not Billed" },
       { key: "/bills", label: "Bills" },
       { key: "/vendor-credits", label: "Vendor Credits" },
       { key: "/expenses", label: "Expenses" },
@@ -115,6 +117,7 @@ const NAV: NavItem[] = [
     children: [
       { key: "/settings/company", label: "Company" },
       { key: "/settings/periods", label: "Accounting Periods" },
+      { key: "/settings/purchasing", label: "Purchasing Tolerances" },
       { key: "/opening-balances", label: "Opening Balances" },
     ],
   },
