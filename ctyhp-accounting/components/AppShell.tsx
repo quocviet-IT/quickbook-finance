@@ -111,6 +111,7 @@ const NAV: NavItem[] = [
       { key: "/reports/vendor-statement", label: "Vendor Statements" },
       { key: "/reports/cash-flow", label: "Cash Flow" },
       { key: "/reports/inventory-valuation", label: "Inventory Valuation" },
+      { key: "/reports/1099", label: "1099 Review" },
     ],
   },
   {

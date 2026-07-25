@@ -49,3 +49,29 @@ export function parseCsv(text: string): Record<string, string>[] {
     return rec;
   });
 }
+
+export interface CsvColumn<T> {
+  key: keyof T & string;
+  header: string;
+}
+
+/**
+ * Serialize rows to CSV (RFC 4180: CRLF line breaks, quotes doubled, a field
+ * quoted whenever it contains a comma, a quote, or a line break). Used for report
+ * exports, so a value with a comma in it must never shift a column.
+ */
+export function toCsv<T extends Record<string, unknown>>(
+  rows: T[],
+  columns: CsvColumn<T>[],
+): string {
+  const cell = (value: unknown): string => {
+    if (value === null || value === undefined) return "";
+    const text = String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const lines = [columns.map((c) => cell(c.header)).join(",")];
+  for (const row of rows) {
+    lines.push(columns.map((c) => cell(row[c.key])).join(","));
+  }
+  return lines.join("\r\n");
+}
