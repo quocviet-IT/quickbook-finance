@@ -14,6 +14,7 @@ contract required by its Part 05.
 
 ## 2. How to verify (mandatory before claiming "done")
 - Run build + test + typecheck + lint, zero errors, and paste the real output.
+- UI change: also run `node --env-file=.env.local scripts/smoke-pages.mjs` against a running dev server. The four gates above all pass on a page that throws at render time.
 - Money logic: add/adjust a unit test with concrete input/output in `tests/unit/`; never verify by "looks right in the UI".
 - Posting builders must assert `debit == credit` (`assertBalanced`).
 
@@ -28,6 +29,7 @@ contract required by its Part 05.
 - Postgres enums: you cannot `ALTER TYPE ... ADD VALUE` and then use the new value in the same transaction/migration. Add the value in one migration, use it in the next.
 - Money is minor units end-to-end; only convert to decimal at the UI edge using the currency's `decimal_places`.
 - US market: purchase-side tax is part of expense cost — no recoverable input tax, no separate tax line on bills/expenses.
+- A Server Component must not read an Ant Design *sub*-component (`Typography.Title`, `Form.Item`, `Input.TextArea`, …). antd ships `"use client"`, so the server gets client-reference proxies and reading a static property off one throws at render time. Plain components (`Button`, `Card`, `Alert`, `Row`) are fine. Put the markup in a `"use client"` component and keep `page.tsx` a thin server wrapper. Guarded by `tests/unit/rsc-antd.test.ts`.
 
 ## 5. Things NOT to do
 - Never force-push to `main`.
