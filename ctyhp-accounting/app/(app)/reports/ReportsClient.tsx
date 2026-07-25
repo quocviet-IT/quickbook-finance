@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   App,
   Button,
@@ -27,6 +28,7 @@ import { formatMoney } from "@/lib/format";
 import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import { fromMinor } from "@/lib/domain/money";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
+import type { InternalReportId } from "@/lib/domain/report-catalog";
 import {
   buildBalanceSheet,
   buildProfitAndLoss,
@@ -46,9 +48,8 @@ import {
   getStatementOfEquityAction,
 } from "./actions";
 
-type ReportType = "trial" | "pnl" | "balance" | "budget" | "equity";
-
 interface ReportsClientProps {
+  initialReportType: InternalReportId;
   baseCurrency: string;
   baseDecimals: number;
   companyName: string;
@@ -57,6 +58,7 @@ interface ReportsClientProps {
 }
 
 export default function ReportsClient({
+  initialReportType,
   baseCurrency,
   baseDecimals,
   companyName,
@@ -64,9 +66,10 @@ export default function ReportsClient({
   canManageBudget,
 }: ReportsClientProps) {
   const { message } = App.useApp();
+  const router = useRouter();
   const today = dayjs();
   const initialFiscalYear = fiscalYearForDate(today.format("YYYY-MM-DD"), fiscalStartMonth);
-  const [type, setType] = useState<ReportType>("trial");
+  const [type, setType] = useState<InternalReportId>(initialReportType);
   const [asOf, setAsOf] = useState<Dayjs>(today);
   const [range, setRange] = useState<[Dayjs, Dayjs]>([today.startOf("year"), today]);
   const [rows, setRows] = useState<LedgerBalance[]>([]);
@@ -86,6 +89,11 @@ export default function ReportsClient({
   const [budgetToPeriod, setBudgetToPeriod] = useState(initialPeriod || 12);
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  function handleReportTypeChange(nextType: InternalReportId) {
+    setType(nextType);
+    router.replace(`/reports?report=${nextType}`, { scroll: false });
+  }
 
   const money = useCallback(
     (minor: number) => formatMoney(minor, baseCurrency, baseDecimals),
@@ -192,7 +200,7 @@ export default function ReportsClient({
           aria-label="Report type"
           value={type}
           style={{ width: 230 }}
-          onChange={setType}
+          onChange={handleReportTypeChange}
           options={[
             { label: "Trial Balance", value: "trial" },
             { label: "Profit & Loss Comparison", value: "pnl" },

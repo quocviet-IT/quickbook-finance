@@ -1,13 +1,35 @@
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
+import ReportsHub from "@/components/reports/ReportsHub";
+import { isInternalReportId } from "@/lib/domain/report-catalog";
 import ReportsClient from "./ReportsClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ report?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const requestedReport = Array.isArray(params.report) ? params.report[0] : params.report;
+
+  if (!isInternalReportId(requestedReport)) {
+    return (
+      <div>
+        <PageHeader
+          title="Report Center"
+          description="Find financial, customer, vendor, accounting, inventory, and tax reports."
+        />
+        <ReportsHub />
+      </div>
+    );
+  }
+
   const sb = await createSupabaseServerClient();
   const [currencies, company, canManageBudget] = await Promise.all([
     listCurrencies(sb),
@@ -20,9 +42,16 @@ export default async function ReportsPage() {
     <div>
       <PageHeader
         title="Reports"
-        description="Financial statements derived directly from the ledger."
+        description="Run, compare, drill down, and export financial statements."
+        actions={
+          <Link href="/reports" className="report-center-back-link">
+            Back to Report Center
+          </Link>
+        }
       />
       <ReportsClient
+        key={requestedReport}
+        initialReportType={requestedReport}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
         companyName={company?.legal_name ?? "CTYHP Accounting"}
