@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { App, Alert, Button, DatePicker, Space, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import { AgeingComparisonChart } from "@/components/charts/FinancialCharts";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
@@ -53,6 +54,16 @@ export default function ApAgeingClient({ baseCurrency, baseDecimals }: { baseCur
           <Typography.Text type="secondary">
             Current open balances in {baseCurrency} · aged as of {asOf!.format("YYYY-MM-DD")} · Accrual basis
           </Typography.Text>
+          <AgeingComparisonChart
+            payables={{
+              current: rep.buckets.current ?? 0,
+              d1_30: rep.buckets.d1_30 ?? 0,
+              d31_60: rep.buckets.d31_60 ?? 0,
+              d61_90: rep.buckets.d61_90 ?? 0,
+              d90_plus: rep.buckets.d90_plus ?? 0,
+            }}
+            formatMoney={(value) => `${fmt(value)} ${baseCurrency}`}
+          />
           <Alert
             type={rep.reconciled ? "success" : "warning"}
             message={

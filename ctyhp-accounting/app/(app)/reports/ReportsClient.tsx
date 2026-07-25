@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { App, Button, Card, DatePicker, Segmented, Space, Table, Tag, Typography } from "antd";
+import { App, Button, DatePicker, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
+import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { formatMoney } from "@/lib/format";
@@ -87,11 +88,13 @@ export default function ReportsClient({
         )}
       </FilterBar>
 
-      <Card loading={loading}>
-        {type === "trial" && <TrialBalanceView rows={rows} money={money} asOf={asOf} />}
-        {type === "pnl" && <PnlView rows={rows} money={money} range={range} />}
-        {type === "balance" && <BalanceSheetView rows={rows} money={money} asOf={asOf} />}
-      </Card>
+      <Spin spinning={loading}>
+        <div aria-live="polite">
+          {type === "trial" && <TrialBalanceView rows={rows} money={money} asOf={asOf} />}
+          {type === "pnl" && <PnlView rows={rows} money={money} range={range} />}
+          {type === "balance" && <BalanceSheetView rows={rows} money={money} asOf={asOf} />}
+        </div>
+      </Spin>
     </div>
   );
 }
@@ -210,19 +213,57 @@ function PnlView({
   range: [Dayjs, Dayjs];
 }) {
   const p = buildProfitAndLoss(rows);
+  const chart = (
+    <ComparisonBars
+      title="Profitability composition"
+      description="Income, costs, operating expenses, and resulting net income."
+      formatMoney={money}
+      data={[
+        {
+          key: "income",
+          label: "Total income",
+          value: p.income.total + p.otherIncome.total,
+          color: chartColors.income,
+        },
+        {
+          key: "cogs",
+          label: "Cost of goods sold",
+          value: p.costOfGoodsSold.total,
+          color: chartColors.expense,
+        },
+        {
+          key: "operating",
+          label: "Operating expenses",
+          value: p.operatingExpenses.total + p.otherExpenses.total,
+          color: chartColors.payable,
+        },
+        {
+          key: "net",
+          label: "Net income",
+          value: p.netIncome,
+          color: p.netIncome < 0 ? chartColors.negative : chartColors.net,
+        },
+      ]}
+    />
+  );
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+    <div>
       <ReportTitle
         title="Profit & Loss"
         subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")}`}
       />
-      <StatementRows section={p.income} money={money} />
-      <StatementRows section={p.costOfGoodsSold} money={money} />
-      <Row label="Gross Profit" value={money(p.grossProfit)} emphasize />
-      <StatementRows section={p.operatingExpenses} money={money} />
-      <StatementRows section={p.otherIncome} money={money} />
-      <StatementRows section={p.otherExpenses} money={money} />
-      <Row label="Net Income" value={money(p.netIncome)} emphasize />
+      <div className="report-visual-layout">
+        {chart}
+        <div className="report-statement">
+          <StatementRows section={p.income} money={money} />
+          <StatementRows section={p.costOfGoodsSold} money={money} />
+          <Row label="Gross Profit" value={money(p.grossProfit)} emphasize />
+          <StatementRows section={p.operatingExpenses} money={money} />
+          <StatementRows section={p.otherIncome} money={money} />
+          <StatementRows section={p.otherExpenses} money={money} />
+          <Row label="Net Income" value={money(p.netIncome)} emphasize />
+        </div>
+      </div>
     </div>
   );
 }
@@ -237,17 +278,39 @@ function BalanceSheetView({
   asOf: Dayjs;
 }) {
   const bs = buildBalanceSheet(rows);
+  const chart = (
+    <ComparisonBars
+      title="Financial position"
+      description="Assets compared with the claims from liabilities and equity."
+      formatMoney={money}
+      data={[
+        { key: "assets", label: "Assets", value: bs.totalAssets, color: chartColors.receivable },
+        {
+          key: "liabilities",
+          label: "Liabilities",
+          value: bs.totalLiabilities,
+          color: chartColors.expense,
+        },
+        { key: "equity", label: "Equity", value: bs.totalEquity, color: chartColors.net },
+      ]}
+    />
+  );
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+    <div>
       <ReportTitle title="Balance Sheet" subtitle={`As of ${asOf.format("MMM D, YYYY")}`} />
-      <StatementRows section={bs.assets} money={money} />
-      <Row label="Total Assets" value={money(bs.totalAssets)} emphasize />
-      <div style={{ height: 12 }} />
-      <StatementRows section={bs.liabilities} money={money} />
-      <StatementRows section={bs.equity} money={money} />
-      <Row label="Total Liabilities + Equity" value={money(bs.totalLiabilities + bs.totalEquity)} emphasize />
-      <div style={{ textAlign: "right", marginTop: 12 }}>
-        <Tag color={bs.balanced ? "green" : "red"}>{bs.balanced ? "Balanced" : "Out of balance"}</Tag>
+      <div className="report-visual-layout">
+        {chart}
+        <div className="report-statement">
+          <StatementRows section={bs.assets} money={money} />
+          <Row label="Total Assets" value={money(bs.totalAssets)} emphasize />
+          <div style={{ height: 12 }} />
+          <StatementRows section={bs.liabilities} money={money} />
+          <StatementRows section={bs.equity} money={money} />
+          <Row label="Total Liabilities + Equity" value={money(bs.totalLiabilities + bs.totalEquity)} emphasize />
+          <div style={{ textAlign: "right", marginTop: 12 }}>
+            <Tag color={bs.balanced ? "green" : "red"}>{bs.balanced ? "Balanced" : "Out of balance"}</Tag>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { App, Alert, Button, DatePicker, Space, Typography } from "antd";
 import type { Dayjs } from "dayjs";
+import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
@@ -51,6 +52,37 @@ export default function CashFlowClient({ baseCurrency, baseDecimals }: { baseCur
       {rep && (
         <>
           <Typography.Text type="secondary">Base currency {baseCurrency} · Direct method</Typography.Text>
+          <ComparisonBars
+            title="Cash movement by activity"
+            description="Operating, investing, and financing movements reconcile to the net change in cash."
+            formatMoney={(value) => `${fmt(value)} ${baseCurrency}`}
+            data={[
+              {
+                key: "operating",
+                label: "Operating activities",
+                value: rep.operating,
+                color: chartColors.income,
+              },
+              {
+                key: "investing",
+                label: "Investing activities",
+                value: rep.investing,
+                color: chartColors.payable,
+              },
+              {
+                key: "financing",
+                label: "Financing activities",
+                value: rep.financing,
+                color: chartColors.expense,
+              },
+              {
+                key: "net",
+                label: "Net change in cash",
+                value: rep.netChange,
+                color: rep.netChange < 0 ? chartColors.negative : chartColors.net,
+              },
+            ]}
+          />
           <DataTable
             rowKey="key"
             pagination={false}
