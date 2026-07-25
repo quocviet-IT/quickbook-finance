@@ -8,7 +8,12 @@ import PaymentsClient from "./PaymentsClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function PaymentsPage() {
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
   const [payments, customers, accounts, currencies, role] = await Promise.all([
     listPayments(sb),
@@ -26,6 +31,7 @@ export default async function PaymentsPage() {
     <div>
       <PageHeader title="Payments" description="Record customer payments and apply them to open invoices." />
       <PaymentsClient
+        initialCreateOpen={initialCreateOpen}
         payments={payments}
         customers={customers}
         depositAccounts={depositAccounts}

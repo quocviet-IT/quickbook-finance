@@ -3,12 +3,12 @@
 - **Date:** 2026-07-15
 - **Status:** Draft for review
 - **Owner:** AI Team — CTYHP
-- **Related:** `PRD/PRD_Accounting_Operations_Layer.md`, `QUICKBOOK_USER_MANUAL/`, `STORM/06_System_Architecture.md`
+- **Related:** `PRD/PRD_US_Accounting_Web_App.md`, `US_ACCOUNTING_USER_MANUAL/README.md`
 
 ## 1. Goal & Scope
 
-Build a full accounting web application (backend + UI), QuickBooks-style, grounded in
-the workflows documented in `QUICKBOOK_USER_MANUAL/`. Build a solid foundation first
+Build a full US accounting web application (backend + UI), QuickBooks-style, grounded in
+the workflows documented in `US_ACCOUNTING_USER_MANUAL/`. Build a solid foundation first
 (double-entry ledger), then implement each module thoroughly — not superficially.
 
 **MVP modules:** Chart of Accounts + Ledger, Invoice → Payment, Banking + Reconciliation,
@@ -26,11 +26,11 @@ Reports (Trial Balance, Profit & Loss, Balance Sheet).
 | Ledger model | **Approach A — full double-entry.** Every document posts a balanced journal entry; all balances and reports derive from the ledger. |
 | Supabase project | `ctyhp-accounting` (`-dev` / `-prod` when split) |
 | Table prefix | `acc_` |
-| Naming | `snake_case`, English (PRD NFR-06) |
+| Naming | `snake_case`; English is the canonical product and implementation language (US-NFR-009) |
 
 ### Out of scope (this phase)
 
-- Vietnam e-invoice issuance / Decree 254 integration (blocked by Gate 0 — legal).
+- Country-specific e-invoice integrations. The canonical US scope uses standard invoices and configurable US sales-tax workflows.
 - Historical data migration.
 - Payroll, purchase orders, inventory/FIFO costing, recurring transactions, class/location
   dimensions (later phases — foundation must not preclude them).
@@ -89,11 +89,11 @@ Supabase Postgres — acc_* schema, RLS, plpgsql functions for atomic posting
 
 ### 3.1 Foundation / configuration
 
-**`acc_currency`** — `code` (PK, e.g. `VND`,`USD`), `name`, `symbol`, `decimal_places`, `is_base` (exactly one true).
+**`acc_currency`** — `code` (PK, e.g. `USD`,`EUR`), `name`, `symbol`, `decimal_places`, `is_base` (exactly one true; USD by default).
 
 **`acc_exchange_rate`** — `id`, `currency_code` → currency, `rate_date`, `rate_to_base` (numeric). Unique (currency_code, rate_date).
 
-**`acc_tax_code`** — `id`, `code`, `name`, `rate_percent` (numeric), `direction` (`sales`|`purchase`|`none`), `tax_account_id` → account, `is_active`. Configurable VAT/GST rates.
+**`acc_tax_code`** — `id`, `code`, `name`, `rate_percent` (numeric), `direction` (`sales`|`purchase`|`none`), `tax_account_id` → account, `is_active`. This foundation is extended by the canonical US sales-tax model for agencies, jurisdictions, effective-dated rates, and taxability.
 
 **`acc_account`** (Chart of Accounts) — `id`, `account_code` (unique), `name`, `account_type` (enum below), `detail_type`, `parent_account_id` (self-FK, no cycles), `description`, `default_tax_code_id`, `currency_code`, `is_posting_account` (bool — distinguishes posting vs summary accounts), `status` (`draft`|`active`|`inactive`|`archived`), `effective_from`, `effective_to`, `created_by`, `approved_by`, timestamps.
 
@@ -118,7 +118,7 @@ Invariants (enforced in the posting function, not just app code):
 **`acc_customer`** — `id`, `name`, `email`, `currency_code`, `ar_account_id`, timestamps.
 **`acc_vendor`** — mirror of customer for future AP (created now, minimal).
 
-**`acc_invoice`** — `id`, `invoice_number` (sequenced), `customer_id`, `issue_date`, `due_date`, `currency_code`, `subtotal`, `tax_total`, `total`, `balance_due`, `status` (`draft`|`issued`|`partial`|`paid`|`void`), `order_id` (nullable — production link, PRD FR-01), `journal_entry_id` (nullable until issued), `created_by`, timestamps.
+**`acc_invoice`** — `id`, `invoice_number` (sequenced), `customer_id`, `issue_date`, `due_date`, `currency_code`, `subtotal`, `tax_total`, `total`, `balance_due`, `status` (`draft`|`issued`|`partial`|`paid`|`void`), optional external business reference, `journal_entry_id` (nullable until issued), `created_by`, timestamps.
 
 **`acc_invoice_line`** — `id`, `invoice_id`, `line_order`, `description`, `quantity`, `unit_price`, `income_account_id`, `tax_code_id`, `line_subtotal`, `line_tax`, `line_total`.
 
@@ -132,7 +132,7 @@ Invariants (enforced in the posting function, not just app code):
 
 **`acc_bank_import_batch`** — `id`, `bank_account_id`, `filename`, `row_count`, `imported_by`, `imported_at`.
 
-**`acc_bank_transaction`** — `id`, `bank_account_id`, `import_batch_id`, `txn_date`, `description`, `reference`, `amount` (signed: +credit/−debit), `running_balance` (nullable), `raw_line` (original text — immutable), `raw_hash` (dedupe key, unique per bank_account), `status` (`unmatched`|`matched`|`ignored`). **Raw bank data is immutable** (PRD FR-03).
+**`acc_bank_transaction`** — `id`, `bank_account_id`, `import_batch_id`, `txn_date`, `description`, `reference`, `amount` (signed: +credit/−debit), `running_balance` (nullable), `raw_line` (original text — immutable), `raw_hash` (collision-resistant dedupe key, unique per bank account), `status` (`unmatched`|`matched`|`ignored`). **Raw bank data is immutable** (US-FR-060).
 
 **`acc_reconciliation`** — `id`, `bank_transaction_id`, `payment_id` (nullable), `journal_entry_id` (nullable), `rule_applied`, `confidence` (numeric), `status` (`suggested`|`approved`|`rejected`), `approved_by`, timestamps.
 
@@ -170,12 +170,12 @@ batch actions with confirmation; audit history. Seed a default CTYHP COA.
 ### 5.2 Invoice → Payment (manual ch. 13)
 Invoice draft → issued (posts entry) → partial → paid → void. Line items with tax codes;
 subtotal/tax/total computed and verified server-side. Payment receipt, allocation to one or
-more invoices, `balance_due` maintained. Optional `order_id` link (PRD FR-01).
+more invoices, with `balance_due` maintained and optional external business references.
 
-### 5.3 Banking + Reconciliation (manual ch. 12, 21; PRD FR-03/04)
+### 5.3 Banking + Reconciliation (US manual chapter 05; US-FR-060 through US-FR-065)
 CSV statement import into immutable `acc_bank_transaction` (dedupe by `raw_hash`).
 Reconciliation engine v0: rule-based match (amount + reference + date window) → suggestions
-with confidence; ≥80% auto-match target (PRD FR-04); unmatched → manual review queue;
+with confidence; unmatched items enter a manual review queue;
 approve/reject; approval confirms/creates the payment↔invoice link.
 
 ### 5.4 Reports (manual ch. 23)
@@ -191,7 +191,7 @@ Advanced report groups/scheduling from the manual are later-phase.
 - Supabase Auth (email/password) → app users with a `role`.
 - RLS on all `acc_*` tables; write policies gated by role (`viewer` read-only,
   `accountant` operational writes, `admin` config + COA approval).
-- API secrets in Vercel env / Supabase Vault, never committed (PRD NFR-02).
+- API secrets in Vercel environment variables or Supabase Vault, never committed (US-NFR-001).
 - Every financial write appends to `acc_audit_log`.
 
 ## 7. Testing Strategy

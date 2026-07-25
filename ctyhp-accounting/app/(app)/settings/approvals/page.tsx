@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { listApprovalPolicies } from "@/lib/services/access";
+import { getApproverCount, listApprovalPolicies } from "@/lib/services/access";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
@@ -9,9 +9,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ApprovalPoliciesPage() {
   const sb = await createSupabaseServerClient();
-  const [policies, currencies, role] = await Promise.all([
+  const [policies, currencies, approverCount, role] = await Promise.all([
     listApprovalPolicies(sb),
     listCurrencies(sb),
+    getApproverCount(sb),
     getUserRole(),
   ]);
   const base = currencies.find((c) => c.is_base);
@@ -24,6 +25,7 @@ export default async function ApprovalPoliciesPage() {
       />
       <ApprovalPoliciesClient
         policies={policies}
+        approverCount={approverCount}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
         canManage={isAdmin(role)}

@@ -10,7 +10,12 @@ import PurchaseOrdersClient from "./PurchaseOrdersClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function PurchaseOrdersPage() {
+export default async function PurchaseOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
   const [orders, vendors, accounts, currencies, items, role] = await Promise.all([
     listPurchaseOrders(sb),
@@ -39,6 +44,7 @@ export default async function PurchaseOrdersPage() {
         description="Commit to a vendor, receive against the order, and convert what arrived into a bill. A purchase order itself posts nothing to the ledger."
       />
       <PurchaseOrdersClient
+        initialCreateOpen={initialCreateOpen}
         orders={orders}
         vendors={vendors}
         expenseAccounts={expenseAccounts}

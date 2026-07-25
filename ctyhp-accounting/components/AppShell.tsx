@@ -5,13 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Avatar,
+  Badge,
   Button,
   Drawer,
   Dropdown,
   Grid,
   Layout,
   Menu,
-  Space,
   Tag,
   Tooltip,
   Typography,
@@ -22,120 +22,44 @@ import {
   TableOutlined,
   LogoutOutlined,
   DashboardOutlined,
+  GoldOutlined,
+  SafetyCertificateOutlined,
   ShopOutlined,
   ShoppingOutlined,
-  SafetyCertificateOutlined,
   SettingOutlined,
   MenuOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { AppRole } from "@/lib/db/types";
+import {
+  NAV,
+  findActiveGroup,
+  findActivePage,
+  isNavGroup,
+  type NavItem,
+} from "@/lib/domain/navigation";
+import GlobalSearch from "./GlobalSearch";
+import NewMenu from "./NewMenu";
 
 const { Header, Sider, Content } = Layout;
 
-type NavPage = {
-  key: string;
-  label: string;
-  icon?: ReactNode;
+/**
+ * Icons live here rather than in the nav data, so `lib/domain/navigation.ts`
+ * stays plain data that a unit test can check against the app's routes.
+ */
+const NAV_ICONS: Record<string, ReactNode> = {
+  "/dashboard": <DashboardOutlined />,
+  sales: <ShoppingOutlined />,
+  purchases: <ShopOutlined />,
+  products: <GoldOutlined />,
+  banking: <BankOutlined />,
+  accounting: <TableOutlined />,
+  "/reports": <BarChartOutlined />,
+  "/settings": <SettingOutlined />,
 };
 
-type NavGroup = {
-  key: string;
-  label: string;
-  icon: ReactNode;
-  children: NavPage[];
-};
-
-type NavItem = NavPage | NavGroup;
-
-const NAV: NavItem[] = [
-  { key: "/dashboard", icon: <DashboardOutlined />, label: "Dashboard" },
-  { key: "/approvals", icon: <SafetyCertificateOutlined />, label: "Approvals" },
-  {
-    key: "sales",
-    icon: <ShoppingOutlined />,
-    label: "Sales & Customers",
-    children: [
-      { key: "/items", label: "Jewelry Catalog" },
-      { key: "/customers", label: "Customers" },
-      { key: "/invoices", label: "Invoices" },
-      { key: "/credit-memos", label: "Credit Memos" },
-      { key: "/payments", label: "Payments" },
-    ],
-  },
-  {
-    key: "purchases",
-    icon: <ShopOutlined />,
-    label: "Purchases & Vendors",
-    children: [
-      { key: "/vendors", label: "Vendors" },
-      { key: "/purchase-orders", label: "Purchase Orders" },
-      { key: "/purchase-orders/received-not-billed", label: "Received Not Billed" },
-      { key: "/bills", label: "Bills" },
-      { key: "/vendor-credits", label: "Vendor Credits" },
-      { key: "/expenses", label: "Expenses" },
-      { key: "/pay-bills", label: "Pay Bills" },
-    ],
-  },
-  {
-    key: "banking",
-    icon: <BankOutlined />,
-    label: "Banking",
-    children: [
-      { key: "/banking", label: "Bank Transactions" },
-      { key: "/banking/reconcile", label: "Reconcile" },
-    ],
-  },
-  {
-    key: "accounting",
-    icon: <TableOutlined />,
-    label: "Accounting",
-    children: [
-      { key: "/accounts", label: "Chart of Accounts" },
-      { key: "/journal", label: "Journal Entries" },
-      { key: "/sales-tax", label: "Sales Tax" },
-    ],
-  },
-  { key: "/reports", icon: <BarChartOutlined />, label: "Reports" },
-  {
-    key: "settings",
-    icon: <SettingOutlined />,
-    label: "Settings",
-    children: [
-      { key: "/settings/company", label: "Company" },
-      { key: "/settings/periods", label: "Accounting Periods" },
-      { key: "/settings/purchasing", label: "Purchasing Tolerances" },
-      { key: "/settings/users", label: "Users" },
-      { key: "/settings/permissions", label: "Permissions" },
-      { key: "/settings/approvals", label: "Approval Policies" },
-      { key: "/settings/audit", label: "Audit History" },
-      { key: "/opening-balances", label: "Opening Balances" },
-    ],
-  },
-];
-
-function isNavGroup(item: NavItem): item is NavGroup {
-  return "children" in item;
-}
-
-const NAV_PAGES = NAV.flatMap((item) => (isNavGroup(item) ? item.children : [item]));
 const ROOT_GROUP_KEYS = NAV.filter(isNavGroup).map((item) => item.key);
-
-function findActivePage(pathname: string): NavPage {
-  return (
-    NAV_PAGES.filter(
-      (page) => pathname === page.key || pathname.startsWith(`${page.key}/`),
-    ).sort((a, b) => b.key.length - a.key.length)[0] ?? NAV_PAGES[0]
-  );
-}
-
-function findActiveGroup(pageKey: string): string | undefined {
-  return NAV.find(
-    (item): item is NavGroup =>
-      isNavGroup(item) && item.children.some((child) => child.key === pageKey),
-  )?.key;
-}
 
 function NavigationMenu({
   activePageKey,
@@ -148,20 +72,33 @@ function NavigationMenu({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  const [openKeys, setOpenKeys] = useState<string[]>(
-    activeGroupKey ? [activeGroupKey] : [],
-  );
+  const [openKeys, setOpenKeys] = useState<string[]>(activeGroupKey ? [activeGroupKey] : []);
 
   function handleOpenChange(nextOpenKeys: string[]) {
     const latestKey = nextOpenKeys.find((key) => !openKeys.includes(key));
-
     if (latestKey && ROOT_GROUP_KEYS.includes(latestKey)) {
       setOpenKeys([latestKey]);
       return;
     }
-
     setOpenKeys(nextOpenKeys.filter((key) => ROOT_GROUP_KEYS.includes(key)));
   }
+
+  const toMenuItem = (item: NavItem) =>
+    isNavGroup(item)
+      ? {
+          key: item.key,
+          icon: NAV_ICONS[item.key],
+          label: item.label,
+          children: item.children.map((child) => ({
+            key: child.key,
+            label: <Link href={child.key}>{child.label}</Link>,
+          })),
+        }
+      : {
+          key: item.key,
+          icon: NAV_ICONS[item.key],
+          label: <Link href={item.key}>{item.label}</Link>,
+        };
 
   return (
     <Menu
@@ -172,23 +109,7 @@ function NavigationMenu({
       openKeys={collapsed ? undefined : openKeys}
       onOpenChange={handleOpenChange}
       onClick={onNavigate}
-      items={NAV.map((item) =>
-        isNavGroup(item)
-          ? {
-              key: item.key,
-              icon: item.icon,
-              label: item.label,
-              children: item.children.map((child) => ({
-                key: child.key,
-                label: <Link href={child.key}>{child.label}</Link>,
-              })),
-            }
-          : {
-              key: item.key,
-              icon: item.icon,
-              label: <Link href={item.key}>{item.label}</Link>,
-            },
-      )}
+      items={NAV.map(toMenuItem)}
     />
   );
 }
@@ -196,10 +117,13 @@ function NavigationMenu({
 export default function AppShell({
   email,
   role,
+  pendingApprovals,
   children,
 }: {
   email: string;
   role: AppRole | null;
+  /** Badge count, so the approvals queue is visible without a sidebar slot. */
+  pendingApprovals: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -210,7 +134,10 @@ export default function AppShell({
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
   const activePage = findActivePage(pathname);
-  const activeGroupKey = findActiveGroup(activePage.key);
+  const activePageKey = activePage?.key ?? "";
+  const activeGroupKey = activePage ? findActiveGroup(activePage.key) : undefined;
+  // Routes outside the sidebar (Approvals) still deserve a title.
+  const routeTitle = activePage?.label ?? (pathname.startsWith("/approvals") ? "Approvals" : "");
 
   async function signOut() {
     const sb = createSupabaseBrowserClient();
@@ -255,13 +182,13 @@ export default function AppShell({
           collapsed={collapsed}
           onCollapse={setCollapsed}
           theme="dark"
-          width={232}
+          width={224}
           className="app-shell__sider"
         >
           <Brand collapsed={collapsed} />
           <NavigationMenu
-            key={activeGroupKey ?? activePage.key}
-            activePageKey={activePage.key}
+            key={activeGroupKey ?? activePageKey}
+            activePageKey={activePageKey}
             activeGroupKey={activeGroupKey}
             collapsed={collapsed}
           />
@@ -273,7 +200,7 @@ export default function AppShell({
         placement="left"
         open={isMobile && mobileNavigationOpen}
         onClose={() => setMobileNavigationOpen(false)}
-        width={300}
+        width={288}
         className="app-shell__mobile-drawer"
         styles={{
           header: { background: "#0f172a", borderBottomColor: "#1e293b" },
@@ -281,8 +208,8 @@ export default function AppShell({
         }}
       >
         <NavigationMenu
-          key={`mobile-${activeGroupKey ?? activePage.key}`}
-          activePageKey={activePage.key}
+          key={`mobile-${activeGroupKey ?? activePageKey}`}
+          activePageKey={activePageKey}
           activeGroupKey={activeGroupKey}
           collapsed={false}
           onNavigate={() => setMobileNavigationOpen(false)}
@@ -304,34 +231,42 @@ export default function AppShell({
                 />
               </Tooltip>
             )}
-            <Typography.Text className="app-shell__route-title">{activePage.label}</Typography.Text>
+            <Typography.Text className="app-shell__route-title">{routeTitle}</Typography.Text>
           </div>
 
-          {isMobile ? (
+          <div className="app-shell__header-search">
+            <GlobalSearch />
+          </div>
+
+          <div className="app-shell__header-end">
+            <NewMenu />
+            <Tooltip
+              title={pendingApprovals > 0 ? `${pendingApprovals} waiting for a decision` : "Approvals"}
+            >
+              <Link href="/approvals" className="app-shell__approvals" aria-label="Approvals">
+                <Badge count={pendingApprovals} size="small" offset={[2, -2]}>
+                  <SafetyCertificateOutlined className="app-shell__approvals-icon" />
+                </Badge>
+              </Link>
+            </Tooltip>
+            {!isMobile && (
+              <>
+                <Typography.Text type="secondary" className="app-shell__email">
+                  {email}
+                </Typography.Text>
+                {role && (
+                  <Tag color={roleColor} className="app-shell__role">
+                    {role}
+                  </Tag>
+                )}
+              </>
+            )}
             <Dropdown menu={accountMenu} placement="bottomRight" trigger={["click"]}>
-              <Button
-                type="text"
-                aria-label="Open account menu"
-                className="app-shell__account-button"
-              >
-                <Avatar size={32} icon={<UserOutlined />} />
+              <Button type="text" aria-label="Open account menu" className="app-shell__account-button">
+                <Avatar size={30} icon={<UserOutlined />} />
               </Button>
             </Dropdown>
-          ) : (
-            <Space size="middle">
-              <Typography.Text type="secondary" className="app-shell__email">
-                {email}
-              </Typography.Text>
-              {role && (
-                <Tag color={roleColor} className="app-shell__role">
-                  {role}
-                </Tag>
-              )}
-              <Button icon={<LogoutOutlined />} onClick={signOut}>
-                Sign out
-              </Button>
-            </Space>
-          )}
+          </div>
         </Header>
         <Content id="main-content" tabIndex={-1} className="app-shell__content">
           <div className="app-shell__content-inner">{children}</div>

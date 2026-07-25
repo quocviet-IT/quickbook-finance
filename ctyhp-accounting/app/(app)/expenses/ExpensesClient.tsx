@@ -15,6 +15,7 @@ interface LineForm {
 }
 
 export default function ExpensesClient({
+  initialCreateOpen,
   expenses,
   vendors,
   expenseAccounts,
@@ -22,6 +23,8 @@ export default function ExpensesClient({
   currencies,
   canWrite,
 }: {
+  /** Seeded by the top-bar New menu via `?new=1`. */
+  initialCreateOpen: boolean;
   expenses: ExpenseWithVendor[];
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
@@ -30,7 +33,7 @@ export default function ExpensesClient({
   canWrite: boolean;
 }) {
   const { message, modal } = App.useApp();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [currency, setCurrency] = useState<string>(currencies.find((c) => c.is_base)?.code ?? "USD");

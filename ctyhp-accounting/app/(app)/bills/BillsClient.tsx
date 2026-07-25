@@ -38,6 +38,7 @@ interface LineForm {
 }
 
 export default function BillsClient({
+  initialCreateOpen,
   bills,
   vendors,
   expenseAccounts,
@@ -46,6 +47,8 @@ export default function BillsClient({
   items,
   canWrite,
 }: {
+  /** Seeded by the top-bar New menu via `?new=1`. */
+  initialCreateOpen: boolean;
   bills: BillWithVendor[];
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
@@ -56,7 +59,7 @@ export default function BillsClient({
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [currency, setCurrency] = useState<string>(currencies.find((c) => c.is_base)?.code ?? "USD");

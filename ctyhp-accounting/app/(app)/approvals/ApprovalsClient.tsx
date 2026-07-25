@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/lib/db/types";
@@ -121,8 +122,38 @@ export default function ApprovalsClient({
     { title: "Requested", dataIndex: "requested_at", render: (v: string) => v.slice(0, 16).replace("T", " ") },
   ];
 
+  const enabledPolicies = policies.filter((p) => p.enabled);
+  const nothingEverSubmitted = pending.length === 0 && history.length === 0;
+
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
+      {/* An empty queue has two very different causes; say which one it is
+          instead of showing two blank grids. */}
+      {nothingEverSubmitted && enabledPolicies.length === 0 && (
+        <Alert
+          type="info"
+          showIcon
+          message="No approval policy is enabled"
+          description={
+            <>
+              Nothing needs approval yet, so this queue stays empty. Turn on a policy in{" "}
+              <Link href="/settings/approvals">Settings → Approval policies</Link> to route an action
+              here for a second person to authorize.
+            </>
+          }
+        />
+      )}
+      {nothingEverSubmitted && enabledPolicies.length > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          message="Nothing has been submitted yet"
+          description={`${enabledPolicies.length} ${enabledPolicies.length === 1 ? "policy is" : "policies are"} enabled (${enabledPolicies
+            .map((p) => p.label)
+            .join(", ")}). A request appears here the moment someone performs one of those actions.`}
+        />
+      )}
+
       {!canDecideRequests && (
         <Alert
           type="info"
