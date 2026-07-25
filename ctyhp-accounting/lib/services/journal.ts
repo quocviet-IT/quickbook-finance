@@ -7,6 +7,7 @@ import type { ManualJournalInput, OpeningBalanceInput, ReverseEntryInput } from 
 export class JournalError extends Error {}
 
 export interface JournalFilters {
+  entryId?: string | null;
   from?: string | null;
   to?: string | null;
   sourceType?: string | null;
@@ -126,6 +127,7 @@ export async function listJournalEntries(sb: SupabaseClient, filters: JournalFil
     .order("entry_number", { ascending: false });
   if (filters.from) q = q.gte("entry_date", filters.from);
   if (filters.to) q = q.lte("entry_date", filters.to);
+  if (filters.entryId) q = q.eq("id", filters.entryId);
   if (filters.sourceType) q = q.eq("source_type", filters.sourceType);
   if (filters.status) q = q.eq("status", filters.status);
   const { data, error } = await q;

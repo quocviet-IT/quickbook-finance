@@ -6,8 +6,13 @@ import GeneralLedgerClient from "./GeneralLedgerClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function GeneralLedgerPage() {
+export default async function GeneralLedgerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ account?: string; from?: string; to?: string }>;
+}) {
   const sb = await createSupabaseServerClient();
+  const filters = await searchParams;
   const [currencies, accounts] = await Promise.all([listCurrencies(sb), listAccounts(sb)]);
   const base = currencies.find((c) => c.is_base);
   const postingAccounts = accounts.filter((a) => a.is_posting_account && a.status === "active");
@@ -21,6 +26,9 @@ export default async function GeneralLedgerPage() {
         accounts={postingAccounts.map((a) => ({ id: a.id, account_code: a.account_code, name: a.name }))}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        initialAccountId={filters.account}
+        initialFrom={filters.from}
+        initialTo={filters.to}
       />
     </div>
   );

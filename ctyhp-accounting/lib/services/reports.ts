@@ -14,6 +14,7 @@ export async function getLedgerBalances(
   const { data, error } = await sb.rpc("acc_ledger_balances", { p_from: from, p_to: to });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r: Record<string, unknown>) => ({
+    accountId: r.account_id as string,
     accountCode: r.account_code as string,
     name: r.name as string,
     accountType: r.account_type as LedgerBalance["accountType"],

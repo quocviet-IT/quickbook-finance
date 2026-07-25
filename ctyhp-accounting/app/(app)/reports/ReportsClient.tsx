@@ -1,34 +1,90 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { App, Button, DatePicker, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  App,
+  Button,
+  DatePicker,
+  InputNumber,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import { EditOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
-import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
+import BudgetEditorDrawer from "@/components/reports/BudgetEditorDrawer";
+import BudgetVsActualView from "@/components/reports/BudgetVsActualView";
+import StatementOfEquityView from "@/components/reports/StatementOfEquityView";
+import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { formatMoney } from "@/lib/format";
+import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
+import { fromMinor } from "@/lib/domain/money";
+import type { ReportExportSheet } from "@/lib/domain/report-export";
 import {
-  buildTrialBalance,
-  buildProfitAndLoss,
   buildBalanceSheet,
+  buildProfitAndLoss,
+  buildTrialBalance,
+  compareReportLines,
+  previousMonthEnd,
+  previousPeriodRange,
+  type BalanceSheet,
+  type BudgetVsActual,
   type LedgerBalance,
   type ReportSection,
+  type StatementOfEquity,
 } from "@/lib/domain/reports";
-import { getLedgerBalancesAction } from "./actions";
+import {
+  getBudgetVsActualAction,
+  getLedgerBalancesAction,
+  getStatementOfEquityAction,
+} from "./actions";
 
-type ReportType = "trial" | "pnl" | "balance";
+type ReportType = "trial" | "pnl" | "balance" | "budget" | "equity";
+
+interface ReportsClientProps {
+  baseCurrency: string;
+  baseDecimals: number;
+  companyName: string;
+  fiscalStartMonth: number;
+  canManageBudget: boolean;
+}
 
 export default function ReportsClient({
   baseCurrency,
   baseDecimals,
-}: {
-  baseCurrency: string;
-  baseDecimals: number;
-}) {
+  companyName,
+  fiscalStartMonth,
+  canManageBudget,
+}: ReportsClientProps) {
   const { message } = App.useApp();
+  const today = dayjs();
+  const initialFiscalYear = fiscalYearForDate(today.format("YYYY-MM-DD"), fiscalStartMonth);
   const [type, setType] = useState<ReportType>("trial");
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs());
-  const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf("year"), dayjs()]);
+  const [asOf, setAsOf] = useState<Dayjs>(today);
+  const [range, setRange] = useState<[Dayjs, Dayjs]>([today.startOf("year"), today]);
   const [rows, setRows] = useState<LedgerBalance[]>([]);
+  const [priorRows, setPriorRows] = useState<LedgerBalance[]>([]);
+  const [budgetReport, setBudgetReport] = useState<BudgetVsActual | null>(null);
+  const [equityReport, setEquityReport] = useState<StatementOfEquity | null>(null);
+  const [fiscalYear, setFiscalYear] = useState(initialFiscalYear);
+  const months = useMemo(
+    () => fiscalMonths(fiscalYear, fiscalStartMonth),
+    [fiscalYear, fiscalStartMonth],
+  );
+  const initialPeriod = Math.max(
+    1,
+    months.findIndex((month) => today.format("YYYY-MM-DD") >= month.start && today.format("YYYY-MM-DD") <= month.end) + 1,
+  );
+  const [budgetFromPeriod, setBudgetFromPeriod] = useState(1);
+  const [budgetToPeriod, setBudgetToPeriod] = useState(initialPeriod || 12);
+  const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const money = useCallback(
@@ -38,74 +94,254 @@ export default function ReportsClient({
 
   const run = useCallback(async () => {
     setLoading(true);
-    const from = type === "pnl" ? range[0].format("YYYY-MM-DD") : null;
-    const to = type === "pnl" ? range[1].format("YYYY-MM-DD") : asOf.format("YYYY-MM-DD");
-    const res = await getLedgerBalancesAction(from, to);
-    setLoading(false);
-    if (res.ok && res.data) setRows(res.data);
-    else message.error(res.error ?? "Failed to load report");
-  }, [type, asOf, range, message]);
+    try {
+      if (type === "budget") {
+        if (budgetFromPeriod > budgetToPeriod) {
+          message.warning("The first budget period must not be after the last period");
+          return;
+        }
+        const from = months[budgetFromPeriod - 1].start;
+        const to = months[budgetToPeriod - 1].end;
+        const result = await getBudgetVsActualAction(fiscalYear, from, to);
+        if (!result.ok || !result.data) throw new Error(result.error ?? "Failed to load Budget vs Actual");
+        setBudgetReport(result.data);
+        return;
+      }
+      if (type === "equity") {
+        const from = range[0].format("YYYY-MM-DD");
+        const to = range[1].format("YYYY-MM-DD");
+        const result = await getStatementOfEquityAction(from, to);
+        if (!result.ok || !result.data) throw new Error(result.error ?? "Failed to load Statement of Equity");
+        setEquityReport(result.data);
+        return;
+      }
 
-  // Data-synchronization effect: recompute the report whenever the report type
-  // or date range changes. run() flips a loading flag then fetches via a server
-  // action — an intentional load, not derived render state.
+      const currentFrom = type === "pnl" ? range[0].format("YYYY-MM-DD") : null;
+      const currentTo = type === "pnl" ? range[1].format("YYYY-MM-DD") : asOf.format("YYYY-MM-DD");
+      let priorFrom: string | null = null;
+      let priorTo: string | null = null;
+      if (type === "pnl") {
+        const prior = previousPeriodRange(currentFrom!, currentTo);
+        priorFrom = prior.from;
+        priorTo = prior.to;
+      } else if (type === "balance") {
+        priorTo = previousMonthEnd(currentTo);
+      }
+      const [currentResult, priorResult] = await Promise.all([
+        getLedgerBalancesAction(currentFrom, currentTo),
+        priorTo ? getLedgerBalancesAction(priorFrom, priorTo) : Promise.resolve(null),
+      ]);
+      if (!currentResult.ok || !currentResult.data) {
+        throw new Error(currentResult.error ?? "Failed to load report");
+      }
+      if (priorResult && (!priorResult.ok || !priorResult.data)) {
+        throw new Error(priorResult.error ?? "Failed to load prior-period comparison");
+      }
+      setRows(currentResult.data);
+      setPriorRows(priorResult?.data ?? []);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Failed to load report");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    type,
+    range,
+    asOf,
+    fiscalYear,
+    budgetFromPeriod,
+    budgetToPeriod,
+    months,
+    message,
+  ]);
+
   useEffect(() => {
+    // Data-synchronization effect: report filters intentionally trigger a server load.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    run();
+    void run();
   }, [run]);
+
+  const resultCount =
+    type === "budget"
+      ? budgetReport?.lines.length
+      : type === "equity"
+        ? equityReport?.lines.length
+        : rows.length;
+  const budgetFrom = months[budgetFromPeriod - 1]?.start ?? months[0].start;
+  const budgetTo = months[budgetToPeriod - 1]?.end ?? months[11].end;
 
   return (
     <div>
       <FilterBar
-        resultCount={rows.length}
-        ariaLabel="Report filters and actions"
+        resultCount={resultCount}
+        ariaLabel="Financial report filters and actions"
         actions={
-          <Button type="primary" onClick={run} loading={loading}>
-            Run report
-          </Button>
+          <>
+            {type === "budget" && canManageBudget && (
+              <Button icon={<EditOutlined />} onClick={() => setBudgetEditorOpen(true)}>
+                Manage budget
+              </Button>
+            )}
+            <Button type="primary" onClick={() => void run()} loading={loading}>
+              Run report
+            </Button>
+          </>
         }
       >
-        <Segmented
+        <Select
+          aria-label="Report type"
           value={type}
-          onChange={(v) => setType(v as ReportType)}
+          style={{ width: 230 }}
+          onChange={setType}
           options={[
             { label: "Trial Balance", value: "trial" },
-            { label: "Profit & Loss", value: "pnl" },
-            { label: "Balance Sheet", value: "balance" },
+            { label: "Profit & Loss Comparison", value: "pnl" },
+            { label: "Balance Sheet Comparison", value: "balance" },
+            { label: "Budget vs Actual", value: "budget" },
+            { label: "Statement of Equity", value: "equity" },
           ]}
         />
-        {type === "pnl" ? (
+        {(type === "pnl" || type === "equity") && (
           <DatePicker.RangePicker
+            aria-label="Report date range"
             value={range}
             allowClear={false}
-            onChange={(v) => v && setRange([v[0]!, v[1]!])}
+            onChange={(value) => value && setRange([value[0]!, value[1]!])}
           />
-        ) : (
+        )}
+        {(type === "trial" || type === "balance") && (
           <Space>
             <Typography.Text type="secondary">As of</Typography.Text>
-            <DatePicker value={asOf} allowClear={false} onChange={(v) => v && setAsOf(v)} />
+            <DatePicker value={asOf} allowClear={false} onChange={(value) => value && setAsOf(value)} />
           </Space>
+        )}
+        {type === "budget" && (
+          <>
+            <Space>
+              <Typography.Text type="secondary">Fiscal year</Typography.Text>
+              <InputNumber
+                aria-label="Fiscal year"
+                min={2000}
+                max={2100}
+                value={fiscalYear}
+                onChange={(value) => setFiscalYear(Number(value ?? initialFiscalYear))}
+              />
+            </Space>
+            <Select
+              aria-label="Budget start period"
+              value={budgetFromPeriod}
+              style={{ width: 145 }}
+              options={months.map((month) => ({ value: month.period, label: `From ${month.label}` }))}
+              onChange={setBudgetFromPeriod}
+            />
+            <Select
+              aria-label="Budget end period"
+              value={budgetToPeriod}
+              style={{ width: 135 }}
+              options={months.map((month) => ({ value: month.period, label: `To ${month.label}` }))}
+              onChange={setBudgetToPeriod}
+            />
+          </>
         )}
       </FilterBar>
 
       <Spin spinning={loading}>
-        <div aria-live="polite">
-          {type === "trial" && <TrialBalanceView rows={rows} money={money} asOf={asOf} />}
-          {type === "pnl" && <PnlView rows={rows} money={money} range={range} />}
-          {type === "balance" && <BalanceSheetView rows={rows} money={money} asOf={asOf} />}
+        <div aria-live="polite" aria-busy={loading}>
+          {type === "trial" && (
+            <TrialBalanceView
+              rows={rows}
+              asOf={asOf}
+              companyName={companyName}
+              baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
+              money={money}
+            />
+          )}
+          {type === "pnl" && (
+            <PnlComparisonView
+              rows={rows}
+              priorRows={priorRows}
+              range={range}
+              companyName={companyName}
+              baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
+              money={money}
+            />
+          )}
+          {type === "balance" && (
+            <BalanceSheetComparisonView
+              rows={rows}
+              priorRows={priorRows}
+              asOf={asOf}
+              companyName={companyName}
+              baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
+              money={money}
+            />
+          )}
+          {type === "budget" && budgetReport && (
+            <BudgetVsActualView
+              report={budgetReport}
+              fiscalYear={fiscalYear}
+              from={budgetFrom}
+              to={budgetTo}
+              companyName={companyName}
+              baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
+              money={money}
+            />
+          )}
+          {type === "equity" && equityReport && (
+            <StatementOfEquityView
+              report={equityReport}
+              from={range[0].format("YYYY-MM-DD")}
+              to={range[1].format("YYYY-MM-DD")}
+              companyName={companyName}
+              baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
+              money={money}
+            />
+          )}
         </div>
       </Spin>
+
+      {type === "budget" && canManageBudget && (
+        <BudgetEditorDrawer
+          key={fiscalYear}
+          open={budgetEditorOpen}
+          onClose={() => setBudgetEditorOpen(false)}
+          onSaved={() => {
+            setBudgetEditorOpen(false);
+            void run();
+          }}
+          fiscalYear={fiscalYear}
+          months={months}
+          baseCurrency={baseCurrency}
+          baseDecimals={baseDecimals}
+        />
+      )}
     </div>
   );
 }
 
-function ReportTitle({ title, subtitle }: { title: string; subtitle: string }) {
+function ReportHeading({
+  title,
+  subtitle,
+  exportSheet,
+  disabled = false,
+}: {
+  title: string;
+  subtitle: string;
+  exportSheet: ReportExportSheet;
+  disabled?: boolean;
+}) {
   return (
-    <div style={{ textAlign: "center", marginBottom: 16 }}>
-      <Typography.Title level={4} style={{ marginBottom: 2 }}>
-        {title}
-      </Typography.Title>
-      <Typography.Text type="secondary">{subtitle}</Typography.Text>
+    <div className="report-result__heading">
+      <div>
+        <Typography.Title level={4}>{title}</Typography.Title>
+        <Typography.Text type="secondary">{subtitle}</Typography.Text>
+      </div>
+      <ReportExportButtons sheet={exportSheet} disabled={disabled} />
     </div>
   );
 }
@@ -114,204 +350,430 @@ function TrialBalanceView({
   rows,
   money,
   asOf,
+  companyName,
+  baseCurrency,
+  baseDecimals,
 }: {
   rows: LedgerBalance[];
-  money: (n: number) => string;
+  money: (value: number) => string;
   asOf: Dayjs;
+  companyName: string;
+  baseCurrency: string;
+  baseDecimals: number;
 }) {
-  const tb = buildTrialBalance(rows);
+  const report = buildTrialBalance(rows);
+  const to = asOf.format("YYYY-MM-DD");
+  const exportSheet: ReportExportSheet = {
+    fileName: `trial-balance-${to}`,
+    companyName,
+    title: "Trial Balance",
+    subtitle: `As of ${to}`,
+    currencyCode: baseCurrency,
+    columns: [
+      { key: "account", header: "Account", width: 40 },
+      { key: "debit", header: "Debit", kind: "money", width: 18 },
+      { key: "credit", header: "Credit", kind: "money", width: 18 },
+    ],
+    rows: report.lines.map((line) => ({
+      account: `${line.accountCode} — ${line.name}`,
+      debit: fromMinor(line.debit, baseDecimals),
+      credit: fromMinor(line.credit, baseDecimals),
+    })),
+  };
   return (
-    <div>
-      <ReportTitle title="Trial Balance" subtitle={`As of ${asOf.format("MMM D, YYYY")}`} />
+    <div className="report-result">
+      <ReportHeading
+        title="Trial Balance"
+        subtitle={`As of ${asOf.format("MMM D, YYYY")}`}
+        exportSheet={exportSheet}
+        disabled={report.lines.length === 0}
+      />
       <DataTable
-        rowKey="accountCode"
+        rowKey="accountId"
         pagination={false}
-        dataSource={tb.lines}
+        dataSource={report.lines}
         emptyTitle="No balances for this date"
         emptyDescription="Choose another date or confirm that transactions have been posted."
         columns={[
-          { title: "Account", render: (_, r) => `${r.accountCode} — ${r.name}` },
-          { title: "Debit", dataIndex: "debit", align: "right", width: 160, render: (v: number) => (v ? money(v) : "") },
-          { title: "Credit", dataIndex: "credit", align: "right", width: 160, render: (v: number) => (v ? money(v) : "") },
+          {
+            title: "Account",
+            render: (_, line) => (
+              <Link href={`/reports/general-ledger?account=${line.accountId}&to=${to}`}>
+                {line.accountCode} — {line.name}
+              </Link>
+            ),
+          },
+          { title: "Debit", align: "right", width: 160, render: (_, line) => line.debit ? money(line.debit) : "" },
+          { title: "Credit", align: "right", width: 160, render: (_, line) => line.credit ? money(line.credit) : "" },
         ]}
         summary={() => (
-          <Table.Summary.Row style={{ fontWeight: 600, background: "#f8fafc" }}>
+          <Table.Summary.Row className="report-summary-row">
             <Table.Summary.Cell index={0}>Total</Table.Summary.Cell>
-            <Table.Summary.Cell index={1} align="right">{money(tb.totalDebit)}</Table.Summary.Cell>
-            <Table.Summary.Cell index={2} align="right">{money(tb.totalCredit)}</Table.Summary.Cell>
+            <Table.Summary.Cell index={1} align="right">{money(report.totalDebit)}</Table.Summary.Cell>
+            <Table.Summary.Cell index={2} align="right">{money(report.totalCredit)}</Table.Summary.Cell>
           </Table.Summary.Row>
         )}
       />
-      <div style={{ textAlign: "right", marginTop: 12 }}>
-        <Tag color={tb.balanced ? "green" : "red"}>{tb.balanced ? "Balanced" : "Out of balance"}</Tag>
+      <div className="report-balance-status">
+        <Tag color={report.balanced ? "green" : "red"}>{report.balanced ? "Balanced" : "Out of balance"}</Tag>
       </div>
     </div>
   );
 }
 
-function StatementRows({
-  section,
-  money,
-  indent = 0,
-}: {
-  section: ReportSection;
-  money: (n: number) => string;
-  indent?: number;
-}) {
-  return (
-    <>
-      <Row label={section.title} bold />
-      {section.lines.map((l, i) => (
-        <Row key={l.accountCode + i} label={`${l.accountCode ? l.accountCode + " — " : ""}${l.name}`} value={money(l.amount)} indent={indent + 1} />
-      ))}
-      <Row label={`Total ${section.title}`} value={money(section.total)} indent={indent} subtotal />
-    </>
-  );
-}
-
-function Row({
-  label,
-  value,
-  bold,
-  subtotal,
-  emphasize,
-  indent = 0,
-}: {
+interface ComparisonRow {
+  key: string;
   label: string;
-  value?: string;
-  bold?: boolean;
-  subtotal?: boolean;
-  emphasize?: boolean;
-  indent?: number;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "6px 4px",
-        paddingLeft: 4 + indent * 20,
-        borderTop: subtotal || emphasize ? "1px solid #e5e7eb" : undefined,
-        fontWeight: bold || subtotal || emphasize ? 600 : 400,
-        fontSize: emphasize ? 15 : 14,
-        background: emphasize ? "#f8fafc" : undefined,
-      }}
-    >
-      <span>{label}</span>
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>{value}</span>
-    </div>
-  );
+  accountId: string | null;
+  current: number;
+  prior: number;
+  variance: number;
+  variancePercent: number | null;
+  kind: "section" | "line" | "total";
 }
 
-function PnlView({
+function sectionRows(current: ReportSection, prior: ReportSection): ComparisonRow[] {
+  const lines = compareReportLines(current.lines, prior.lines);
+  return [
+    {
+      key: `section:${current.key}`,
+      label: current.title,
+      accountId: null,
+      current: 0,
+      prior: 0,
+      variance: 0,
+      variancePercent: null,
+      kind: "section",
+    },
+    ...lines.map((line) => ({
+      key: `${current.key}:${line.accountId ?? `${line.accountCode}:${line.name}`}`,
+      label: `${line.accountCode ? `${line.accountCode} — ` : ""}${line.name}`,
+      accountId: line.accountId,
+      current: line.current,
+      prior: line.prior,
+      variance: line.variance,
+      variancePercent: line.variancePercent,
+      kind: "line" as const,
+    })),
+    totalRow(`total:${current.key}`, `Total ${current.title}`, current.total, prior.total),
+  ];
+}
+
+function totalRow(key: string, label: string, current: number, prior: number): ComparisonRow {
+  const variance = current - prior;
+  return {
+    key,
+    label,
+    accountId: null,
+    current,
+    prior,
+    variance,
+    variancePercent: prior === 0 ? null : (variance / Math.abs(prior)) * 100,
+    kind: "total",
+  };
+}
+
+function PnlComparisonView({
   rows,
+  priorRows,
   money,
   range,
+  companyName,
+  baseCurrency,
+  baseDecimals,
 }: {
   rows: LedgerBalance[];
-  money: (n: number) => string;
+  priorRows: LedgerBalance[];
+  money: (value: number) => string;
   range: [Dayjs, Dayjs];
+  companyName: string;
+  baseCurrency: string;
+  baseDecimals: number;
 }) {
-  const p = buildProfitAndLoss(rows);
-  const chart = (
-    <ComparisonBars
-      title="Profitability composition"
-      description="Income, costs, operating expenses, and resulting net income."
-      formatMoney={money}
-      data={[
-        {
-          key: "income",
-          label: "Total income",
-          value: p.income.total + p.otherIncome.total,
-          color: chartColors.income,
-        },
-        {
-          key: "cogs",
-          label: "Cost of goods sold",
-          value: p.costOfGoodsSold.total,
-          color: chartColors.expense,
-        },
-        {
-          key: "operating",
-          label: "Operating expenses",
-          value: p.operatingExpenses.total + p.otherExpenses.total,
-          color: chartColors.payable,
-        },
-        {
-          key: "net",
-          label: "Net income",
-          value: p.netIncome,
-          color: p.netIncome < 0 ? chartColors.negative : chartColors.net,
-        },
-      ]}
-    />
-  );
+  const current = buildProfitAndLoss(rows);
+  const prior = buildProfitAndLoss(priorRows);
+  const currentFrom = range[0].format("YYYY-MM-DD");
+  const currentTo = range[1].format("YYYY-MM-DD");
+  const priorRange = previousPeriodRange(currentFrom, currentTo);
+  const comparisonRows = [
+    ...sectionRows(current.income, prior.income),
+    ...sectionRows(current.costOfGoodsSold, prior.costOfGoodsSold),
+    totalRow("gross-profit", "Gross Profit", current.grossProfit, prior.grossProfit),
+    ...sectionRows(current.operatingExpenses, prior.operatingExpenses),
+    ...sectionRows(current.otherIncome, prior.otherIncome),
+    ...sectionRows(current.otherExpenses, prior.otherExpenses),
+    totalRow("net-income", "Net Income", current.netIncome, prior.netIncome),
+  ];
+  const exportSheet = comparisonExportSheet({
+    fileName: `profit-and-loss-comparison-${currentFrom}-${currentTo}`,
+    companyName,
+    title: "Profit & Loss Comparison",
+    subtitle: `${currentFrom} to ${currentTo} compared with ${priorRange.from} to ${priorRange.to}`,
+    currencyCode: baseCurrency,
+    baseDecimals,
+    currentLabel: "Current period",
+    priorLabel: "Prior period",
+    rows: comparisonRows,
+  });
   return (
-    <div>
-      <ReportTitle
-        title="Profit & Loss"
-        subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")}`}
+    <div className="report-result">
+      <ReportHeading
+        title="Profit & Loss Comparison"
+        subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")} · Prior ${priorRange.from} – ${priorRange.to}`}
+        exportSheet={exportSheet}
       />
       <div className="report-visual-layout">
-        {chart}
-        <div className="report-statement">
-          <StatementRows section={p.income} money={money} />
-          <StatementRows section={p.costOfGoodsSold} money={money} />
-          <Row label="Gross Profit" value={money(p.grossProfit)} emphasize />
-          <StatementRows section={p.operatingExpenses} money={money} />
-          <StatementRows section={p.otherIncome} money={money} />
-          <StatementRows section={p.otherExpenses} money={money} />
-          <Row label="Net Income" value={money(p.netIncome)} emphasize />
-        </div>
+        <ComparisonBars
+          title="Period performance"
+          description="Current period profitability compared with the immediately preceding period."
+          formatMoney={money}
+          data={[
+            { key: "current-income", label: "Current income", value: current.income.total + current.otherIncome.total, color: chartColors.income },
+            { key: "prior-income", label: "Prior income", value: prior.income.total + prior.otherIncome.total, color: chartColors.receivable },
+            { key: "current-net", label: "Current net income", value: current.netIncome, color: current.netIncome < 0 ? chartColors.negative : chartColors.net },
+            { key: "prior-net", label: "Prior net income", value: prior.netIncome, color: chartColors.neutral },
+          ]}
+        />
+        <ComparisonTable
+          rows={comparisonRows}
+          currentLabel="Current"
+          priorLabel="Prior"
+          currentRange={{ from: currentFrom, to: currentTo }}
+          priorRange={priorRange}
+          money={money}
+        />
       </div>
     </div>
   );
 }
 
-function BalanceSheetView({
+function BalanceSheetComparisonView({
   rows,
+  priorRows,
   money,
   asOf,
+  companyName,
+  baseCurrency,
+  baseDecimals,
 }: {
   rows: LedgerBalance[];
-  money: (n: number) => string;
+  priorRows: LedgerBalance[];
+  money: (value: number) => string;
   asOf: Dayjs;
+  companyName: string;
+  baseCurrency: string;
+  baseDecimals: number;
 }) {
-  const bs = buildBalanceSheet(rows);
-  const chart = (
-    <ComparisonBars
-      title="Financial position"
-      description="Assets compared with the claims from liabilities and equity."
-      formatMoney={money}
-      data={[
-        { key: "assets", label: "Assets", value: bs.totalAssets, color: chartColors.receivable },
-        {
-          key: "liabilities",
-          label: "Liabilities",
-          value: bs.totalLiabilities,
-          color: chartColors.expense,
-        },
-        { key: "equity", label: "Equity", value: bs.totalEquity, color: chartColors.net },
-      ]}
-    />
-  );
+  const current = buildBalanceSheet(rows);
+  const prior = buildBalanceSheet(priorRows);
+  const currentTo = asOf.format("YYYY-MM-DD");
+  const priorTo = previousMonthEnd(currentTo);
+  const comparisonRows = balanceComparisonRows(current, prior);
+  const exportSheet = comparisonExportSheet({
+    fileName: `balance-sheet-comparison-${currentTo}`,
+    companyName,
+    title: "Balance Sheet Comparison",
+    subtitle: `As of ${currentTo} compared with ${priorTo}`,
+    currencyCode: baseCurrency,
+    baseDecimals,
+    currentLabel: currentTo,
+    priorLabel: priorTo,
+    rows: comparisonRows,
+  });
   return (
-    <div>
-      <ReportTitle title="Balance Sheet" subtitle={`As of ${asOf.format("MMM D, YYYY")}`} />
+    <div className="report-result">
+      <ReportHeading
+        title="Balance Sheet Comparison"
+        subtitle={`As of ${asOf.format("MMM D, YYYY")} · Prior month end ${priorTo}`}
+        exportSheet={exportSheet}
+      />
       <div className="report-visual-layout">
-        {chart}
-        <div className="report-statement">
-          <StatementRows section={bs.assets} money={money} />
-          <Row label="Total Assets" value={money(bs.totalAssets)} emphasize />
-          <div style={{ height: 12 }} />
-          <StatementRows section={bs.liabilities} money={money} />
-          <StatementRows section={bs.equity} money={money} />
-          <Row label="Total Liabilities + Equity" value={money(bs.totalLiabilities + bs.totalEquity)} emphasize />
-          <div style={{ textAlign: "right", marginTop: 12 }}>
-            <Tag color={bs.balanced ? "green" : "red"}>{bs.balanced ? "Balanced" : "Out of balance"}</Tag>
+        <ComparisonBars
+          title="Financial position comparison"
+          description="Current assets, liabilities, and equity compared with the prior month end."
+          formatMoney={money}
+          data={[
+            { key: "assets", label: "Current assets", value: current.totalAssets, color: chartColors.receivable },
+            { key: "prior-assets", label: "Prior assets", value: prior.totalAssets, color: chartColors.income },
+            { key: "liabilities", label: "Current liabilities", value: current.totalLiabilities, color: chartColors.expense },
+            { key: "equity", label: "Current equity", value: current.totalEquity, color: chartColors.net },
+          ]}
+        />
+        <div>
+          <ComparisonTable
+            rows={comparisonRows}
+            currentLabel={currentTo}
+            priorLabel={priorTo}
+            currentRange={{ from: "", to: currentTo }}
+            priorRange={{ from: "", to: priorTo }}
+            money={money}
+          />
+          <div className="report-balance-status">
+            <Tag color={current.balanced ? "green" : "red"}>{current.balanced ? "Balanced" : "Out of balance"}</Tag>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function balanceComparisonRows(current: BalanceSheet, prior: BalanceSheet): ComparisonRow[] {
+  return [
+    ...sectionRows(current.assets, prior.assets),
+    ...sectionRows(current.liabilities, prior.liabilities),
+    ...sectionRows(current.equity, prior.equity),
+    totalRow(
+      "liabilities-equity",
+      "Total Liabilities + Equity",
+      current.totalLiabilities + current.totalEquity,
+      prior.totalLiabilities + prior.totalEquity,
+    ),
+  ];
+}
+
+function ComparisonTable({
+  rows,
+  currentLabel,
+  priorLabel,
+  currentRange,
+  priorRange,
+  money,
+}: {
+  rows: ComparisonRow[];
+  currentLabel: string;
+  priorLabel: string;
+  currentRange: { from: string; to: string };
+  priorRange: { from: string; to: string };
+  money: (value: number) => string;
+}) {
+  return (
+    <DataTable
+      rowKey="key"
+      dataSource={rows}
+      pagination={false}
+      columns={[
+        {
+          title: "Account",
+          width: 260,
+          render: (_, row) => {
+            if (row.kind === "section") return <strong>{row.label}</strong>;
+            if (row.accountId) {
+              const from = currentRange.from ? `&from=${currentRange.from}` : "";
+              return (
+                <Link href={`/reports/general-ledger?account=${row.accountId}${from}&to=${currentRange.to}`}>
+                  {row.label}
+                </Link>
+              );
+            }
+            return row.label;
+          },
+        },
+        {
+          title: currentLabel,
+          width: 145,
+          align: "right",
+          render: (_, row) =>
+            row.kind === "section"
+              ? ""
+              : row.accountId
+                ? <LedgerAmountLink accountId={row.accountId} range={currentRange} label={money(row.current)} />
+                : money(row.current),
+        },
+        {
+          title: priorLabel,
+          width: 145,
+          align: "right",
+          render: (_, row) =>
+            row.kind === "section"
+              ? ""
+              : row.accountId
+                ? <LedgerAmountLink accountId={row.accountId} range={priorRange} label={money(row.prior)} />
+                : money(row.prior),
+        },
+        {
+          title: "Variance",
+          width: 145,
+          align: "right",
+          render: (_, row) => row.kind === "section" ? "" : money(row.variance),
+        },
+        {
+          title: "Variance %",
+          width: 110,
+          align: "right",
+          render: (_, row) =>
+            row.kind === "section" || row.variancePercent === null
+              ? ""
+              : `${row.variancePercent.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`,
+        },
+      ]}
+      rowClassName={(row) =>
+        row.kind === "section"
+          ? "report-table-row--section"
+          : row.kind === "total"
+            ? "report-table-row--emphasis"
+            : ""
+      }
+    />
+  );
+}
+
+function LedgerAmountLink({
+  accountId,
+  range,
+  label,
+}: {
+  accountId: string;
+  range: { from: string; to: string };
+  label: string;
+}) {
+  const from = range.from ? `&from=${range.from}` : "";
+  return (
+    <Link href={`/reports/general-ledger?account=${accountId}${from}&to=${range.to}`}>
+      {label}
+    </Link>
+  );
+}
+
+function comparisonExportSheet({
+  fileName,
+  companyName,
+  title,
+  subtitle,
+  currencyCode,
+  baseDecimals,
+  currentLabel,
+  priorLabel,
+  rows,
+}: {
+  fileName: string;
+  companyName: string;
+  title: string;
+  subtitle: string;
+  currencyCode: string;
+  baseDecimals: number;
+  currentLabel: string;
+  priorLabel: string;
+  rows: ComparisonRow[];
+}): ReportExportSheet {
+  return {
+    fileName,
+    companyName,
+    title,
+    subtitle,
+    currencyCode,
+    columns: [
+      { key: "account", header: "Account", width: 40 },
+      { key: "current", header: currentLabel, kind: "money", width: 18 },
+      { key: "prior", header: priorLabel, kind: "money", width: 18 },
+      { key: "variance", header: "Variance", kind: "money", width: 18 },
+      { key: "variancePercent", header: "Variance %", kind: "percent", width: 14 },
+    ],
+    rows: rows.map((row) => ({
+      account: row.label,
+      current: row.kind === "section" ? null : fromMinor(row.current, baseDecimals),
+      prior: row.kind === "section" ? null : fromMinor(row.prior, baseDecimals),
+      variance: row.kind === "section" ? null : fromMinor(row.variance, baseDecimals),
+      variancePercent: row.variancePercent,
+    })),
+  };
 }

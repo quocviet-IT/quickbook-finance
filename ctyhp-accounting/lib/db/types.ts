@@ -433,6 +433,27 @@ export interface CompanySettingRow {
   created_at: string;
 }
 
+// --- Budgets and management reporting ---
+export interface BudgetRow {
+  id: string;
+  fiscal_year: number;
+  name: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BudgetLineRow {
+  id: string;
+  budget_id: string;
+  account_id: string;
+  period_start: string;
+  amount_minor: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // --- Purchasing (Module G1) ---
 export type PoStatus = "draft" | "open" | "partial" | "received" | "closed" | "cancelled";
 export type ReceiptStatus = "posted" | "void";

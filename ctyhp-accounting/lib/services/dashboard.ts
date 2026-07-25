@@ -160,6 +160,7 @@ const ACTIVITY_ENTITIES: Record<string, { entity: string; href: string }> = {
   acc_accounting_period: { entity: "Accounting period", href: "/settings/periods" },
   acc_company_setting: { entity: "Company settings", href: "/settings/company" },
   acc_vendor_tax_profile: { entity: "Vendor tax profile", href: "/vendors" },
+  acc_budget: { entity: "Budget", href: "/reports" },
 };
 
 const ACTIVITY_VERBS: Record<string, string> = {

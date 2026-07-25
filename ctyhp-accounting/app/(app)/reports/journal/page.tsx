@@ -5,8 +5,13 @@ import JournalReportClient from "./JournalReportClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function JournalReportPage() {
+export default async function JournalReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ entry?: string }>;
+}) {
   const sb = await createSupabaseServerClient();
+  const filters = await searchParams;
   const currencies = await listCurrencies(sb);
   const base = currencies.find((c) => c.is_base);
   return (
@@ -15,7 +20,11 @@ export default async function JournalReportPage() {
         title="Journal Report"
         description="All journal entries with their lines, filterable by date, source, and status."
       />
-      <JournalReportClient baseCurrency={base?.code ?? "USD"} baseDecimals={base?.decimal_places ?? 2} />
+      <JournalReportClient
+        baseCurrency={base?.code ?? "USD"}
+        baseDecimals={base?.decimal_places ?? 2}
+        initialEntryId={filters.entry}
+      />
     </div>
   );
 }

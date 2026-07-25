@@ -402,6 +402,19 @@ export const cashFlowRangeSchema = z.object({
 });
 export type CashFlowRangeInput = z.infer<typeof cashFlowRangeSchema>;
 
+// --- Budgets and management reporting ---
+export const budgetLineInputSchema = z.object({
+  account_id: z.uuid("Select a valid account"),
+  amount_minor: z.number().int("Budget amount must use whole minor units").safe(),
+});
+
+export const budgetMonthSaveSchema = z.object({
+  fiscal_year: z.number().int().min(2000).max(2100),
+  period_start: z.string().regex(/^\d{4}-\d{2}-01$/, "Budget period must start on the first day of a month"),
+  lines: z.array(budgetLineInputSchema).max(500),
+});
+export type BudgetMonthSaveInput = z.infer<typeof budgetMonthSaveSchema>;
+
 // --- Purchasing: purchase orders, receiving, three-way matching ---
 export const purchaseOrderLineInputSchema = z.object({
   item_id: z.uuid().optional().nullable(),

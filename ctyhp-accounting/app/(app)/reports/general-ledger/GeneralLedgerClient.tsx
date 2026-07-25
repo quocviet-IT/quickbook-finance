@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "antd";
-import type { Dayjs } from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
@@ -18,6 +18,9 @@ interface Props {
   accounts: Account[];
   baseCurrency: string;
   baseDecimals: number;
+  initialAccountId?: string;
+  initialFrom?: string;
+  initialTo?: string;
 }
 
 // Drill-down: map a posted line back to its source document route. Manual
@@ -32,18 +35,40 @@ function sourceHref(sourceType: string, sourceId: string | null): string | null 
     expense: "/expenses",
     bill_payment: "/pay-bills",
     tax_payment: "/sales-tax",
+    credit_memo: "/credit-memos",
+    vendor_credit: "/vendor-credits",
+    customer_refund: "/payments",
+    write_off: "/journal",
+    goods_receipt: "/purchase-orders",
+    bill_variance: "/bills",
+    inventory_adjustment: "/items",
   };
-  return map[sourceType] ?? null;
+  const route = map[sourceType];
+  return route ? `${route}?source=${sourceId}` : null;
 }
 
-export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecimals }: Props) {
+export default function GeneralLedgerClient({
+  accounts,
+  baseCurrency,
+  baseDecimals,
+  initialAccountId,
+  initialFrom,
+  initialTo,
+}: Props) {
   const { message } = App.useApp();
-  const [accountId, setAccountId] = useState<string>();
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const validInitialAccount = accounts.some((account) => account.id === initialAccountId)
+    ? initialAccountId
+    : undefined;
+  const [accountId, setAccountId] = useState<string | undefined>(validInitialAccount);
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(
+    initialTo
+      ? [dayjs(initialFrom ?? "2000-01-01"), dayjs(initialTo)]
+      : null,
+  );
   const [gl, setGl] = useState<GeneralLedger | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const run = async () => {
+  const run = useCallback(async () => {
     if (!accountId || !range) {
       message.warning("Pick an account and date range");
       return;
@@ -53,7 +78,13 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
     setLoading(false);
     if (r.ok && r.data) setGl(r.data);
     else message.error(r.error ?? "Failed to load");
-  };
+  }, [accountId, range, message]);
+
+  useEffect(() => {
+    // Deep-linked report filters intentionally trigger the initial server load.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (validInitialAccount && initialTo) void run();
+  }, [validInitialAccount, initialTo, run]);
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
 
   return (
@@ -62,7 +93,7 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
         resultCount={gl?.rows.length}
         ariaLabel="General Ledger filters"
         actions={
-          <Button type="primary" loading={loading} onClick={run}>
+          <Button type="primary" loading={loading} onClick={() => void run()}>
             Run report
           </Button>
         }
@@ -99,12 +130,18 @@ export default function GeneralLedgerClient({ accounts, baseCurrency, baseDecima
               {
                 title: "Entry",
                 dataIndex: "entryNumber",
-                render: (n, r) => {
-                  const href = sourceHref(r.sourceType, r.sourceId);
-                  return href ? <Link href={href}>{n}</Link> : n;
+                render: (number, row) => (
+                  <Link href={`/reports/journal?entry=${row.entryId}`}>{number}</Link>
+                ),
+              },
+              {
+                title: "Source",
+                dataIndex: "sourceType",
+                render: (source, row) => {
+                  const href = sourceHref(row.sourceType, row.sourceId);
+                  return href ? <Link href={href}>{source}</Link> : source;
                 },
               },
-              { title: "Source", dataIndex: "sourceType" },
               { title: "Memo", dataIndex: "memo" },
               { title: "Debit", align: "right", render: (_, r) => (r.debitMinor ? fmt(r.debitMinor) : "") },
               { title: "Credit", align: "right", render: (_, r) => (r.creditMinor ? fmt(r.creditMinor) : "") },

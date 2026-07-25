@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type Key } from "react";
 import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
@@ -24,19 +24,24 @@ const SOURCES = [
 interface Props {
   baseCurrency: string;
   baseDecimals: number;
+  initialEntryId?: string;
 }
 
-export default function JournalReportClient({ baseCurrency, baseDecimals }: Props) {
+export default function JournalReportClient({ baseCurrency, baseDecimals, initialEntryId }: Props) {
   const { message } = App.useApp();
   const [data, setData] = useState<JournalEntrySummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState<string>();
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>(
+    initialEntryId ? [initialEntryId] : [],
+  );
   const fmt = (m: number) => (m ? fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals }) : "");
 
   const load = useCallback(async () => {
     setLoading(true);
     const r = await journalReportAction({
+      entryId: initialEntryId ?? null,
       sourceType: source ?? null,
       from: range ? range[0].format("YYYY-MM-DD") : null,
       to: range ? range[1].format("YYYY-MM-DD") : null,
@@ -44,7 +49,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals }: Prop
     setLoading(false);
     if (r.ok && r.data) setData(r.data);
     else message.error(r.error ?? "Failed to load");
-  }, [source, range, message]);
+  }, [source, range, initialEntryId, message]);
 
   // Data-synchronization effect: reload the report whenever the source or
   // date-range filter changes. load() flips a loading flag then fetches via a
@@ -75,6 +80,8 @@ export default function JournalReportClient({ baseCurrency, baseDecimals }: Prop
         emptyTitle="No journal entries"
         emptyDescription="No entries match the selected source and date range."
         expandable={{
+          expandedRowKeys,
+          onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys]),
           expandedRowRender: (e) => (
             <Table
               size="small"

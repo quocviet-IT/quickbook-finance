@@ -3,16 +3,21 @@ import {
   buildTrialBalance,
   buildProfitAndLoss,
   buildBalanceSheet,
+  buildBudgetVsActual,
+  buildStatementOfEquity,
+  compareReportLines,
+  previousMonthEnd,
+  previousPeriodRange,
   type LedgerBalance,
 } from "@/lib/domain/reports";
 
 // Cumulative balances after: issue $378.88 invoice (sub 350, tax 28.88) and
 // receive full payment. Amounts in minor units (USD cents).
 const rows: LedgerBalance[] = [
-  { accountCode: "1010", name: "Operating Bank Account", accountType: "bank", debitBase: 37888, creditBase: 0 },
-  { accountCode: "1100", name: "Accounts Receivable", accountType: "accounts_receivable", debitBase: 37888, creditBase: 37888 },
-  { accountCode: "2100", name: "Sales Tax Payable", accountType: "current_liability", debitBase: 0, creditBase: 2888 },
-  { accountCode: "4000", name: "Sales Revenue", accountType: "income", debitBase: 0, creditBase: 35000 },
+  { accountId: "1010", accountCode: "1010", name: "Operating Bank Account", accountType: "bank", debitBase: 37888, creditBase: 0 },
+  { accountId: "1100", accountCode: "1100", name: "Accounts Receivable", accountType: "accounts_receivable", debitBase: 37888, creditBase: 37888 },
+  { accountId: "2100", accountCode: "2100", name: "Sales Tax Payable", accountType: "current_liability", debitBase: 0, creditBase: 2888 },
+  { accountId: "4000", accountCode: "4000", name: "Sales Revenue", accountType: "income", debitBase: 0, creditBase: 35000 },
 ];
 
 describe("trial balance", () => {
@@ -47,5 +52,72 @@ describe("balance sheet", () => {
     expect(bs.totalEquity).toBe(35000);
     expect(bs.balanced).toBe(true);
     expect(bs.equity.lines.find((l) => l.name === "Current earnings")!.amount).toBe(35000);
+  });
+});
+
+describe("period comparison", () => {
+  it("uses the immediately preceding inclusive range", () => {
+    expect(previousPeriodRange("2026-04-01", "2026-06-30")).toEqual({
+      from: "2025-12-31",
+      to: "2026-03-31",
+    });
+    expect(previousMonthEnd("2026-07-25")).toBe("2026-06-30");
+  });
+
+  it("aligns account lines and calculates variance", () => {
+    const compared = compareReportLines(
+      [{ accountId: "4000", accountCode: "4000", name: "Sales", amount: 12000 }],
+      [{ accountId: "4000", accountCode: "4000", name: "Sales", amount: 10000 }],
+    );
+    expect(compared[0]).toMatchObject({
+      current: 12000,
+      prior: 10000,
+      variance: 2000,
+      variancePercent: 20,
+    });
+  });
+});
+
+describe("Budget vs Actual", () => {
+  const actual: LedgerBalance[] = [
+    { accountId: "income", accountCode: "4000", name: "Sales", accountType: "income", debitBase: 0, creditBase: 120000 },
+    { accountId: "expense", accountCode: "6000", name: "Operating Expense", accountType: "expense", debitBase: 70000, creditBase: 0 },
+  ];
+
+  it("uses natural balances and assesses favorable variance by account type", () => {
+    const report = buildBudgetVsActual(actual, [
+      { accountId: "income", accountCode: "4000", name: "Sales", accountType: "income", amountMinor: 100000 },
+      { accountId: "expense", accountCode: "6000", name: "Operating Expense", accountType: "expense", amountMinor: 60000 },
+    ]);
+    expect(report.actual.netIncome).toBe(50000);
+    expect(report.budget.netIncome).toBe(40000);
+    expect(report.lines.find((line) => line.accountId === "income")).toMatchObject({
+      variance: 20000,
+      favorable: true,
+    });
+    expect(report.lines.find((line) => line.accountId === "expense")).toMatchObject({
+      variance: 10000,
+      favorable: false,
+    });
+  });
+});
+
+describe("Statement of Equity", () => {
+  it("reconciles beginning equity, direct activity, earnings, and ending equity", () => {
+    const opening: LedgerBalance[] = [
+      { accountId: "equity", accountCode: "3000", name: "Owner Equity", accountType: "equity", debitBase: 0, creditBase: 50000 },
+      { accountId: "prior-income", accountCode: "4000", name: "Sales", accountType: "income", debitBase: 0, creditBase: 30000 },
+    ];
+    const activity: LedgerBalance[] = [
+      { accountId: "equity", accountCode: "3000", name: "Owner Equity", accountType: "equity", debitBase: 0, creditBase: 20000 },
+      { accountId: "income", accountCode: "4000", name: "Sales", accountType: "income", debitBase: 0, creditBase: 40000 },
+      { accountId: "expense", accountCode: "6000", name: "Expense", accountType: "expense", debitBase: 10000, creditBase: 0 },
+    ];
+    expect(buildStatementOfEquity(opening, activity)).toMatchObject({
+      openingEquity: 80000,
+      equityActivity: 20000,
+      netIncome: 30000,
+      closingEquity: 130000,
+    });
   });
 });
