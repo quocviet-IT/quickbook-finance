@@ -429,3 +429,91 @@ export interface CompanySettingRow {
   default_payment_terms_days: number;
   created_at: string;
 }
+
+// --- Purchasing (Module G1) ---
+export type PoStatus = "draft" | "open" | "partial" | "received" | "closed" | "cancelled";
+export type ReceiptStatus = "posted" | "void";
+export type VarianceKindRow = "price" | "quantity";
+
+export interface PurchaseOrderRow {
+  id: string;
+  po_number: string | null;
+  vendor_id: string;
+  order_date: string;
+  expected_date: string | null;
+  currency_code: string;
+  ship_to: string | null;
+  memo: string | null;
+  total_minor: number;
+  status: PoStatus;
+  close_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseOrderLineRow {
+  id: string;
+  purchase_order_id: string;
+  line_order: number;
+  item_id: string | null;
+  description: string;
+  quantity: number;
+  unit_cost_minor: number;
+  expense_account_id: string;
+  line_total_minor: number;
+  qty_received: number;
+  qty_billed: number;
+  is_closed: boolean;
+}
+
+export interface GoodsReceiptRow {
+  id: string;
+  receipt_number: string | null;
+  purchase_order_id: string;
+  vendor_id: string;
+  receipt_date: string;
+  memo: string | null;
+  status: ReceiptStatus;
+  void_reason: string | null;
+  created_at: string;
+}
+
+export interface GoodsReceiptLineRow {
+  id: string;
+  goods_receipt_id: string;
+  purchase_order_line_id: string;
+  quantity: number;
+  unit_cost_minor: number;
+}
+
+export interface PurchasingConfigRow {
+  price_tolerance_bps: number;
+  qty_tolerance_bps: number;
+  updated_at: string;
+}
+
+export interface PoVarianceExceptionRow {
+  id: string;
+  bill_id: string;
+  purchase_order_id: string;
+  purchase_order_line_id: string;
+  kind: VarianceKindRow;
+  expected_value: number;
+  actual_value: number;
+  variance_bps: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface ReceivedNotBilledRow {
+  purchase_order_id: string;
+  purchase_order_line_id: string;
+  po_number: string | null;
+  vendor_name: string;
+  order_date: string;
+  description: string;
+  qty_outstanding: number;
+  unit_cost_minor: number;
+  value_minor: number;
+  currency_code: string;
+}
