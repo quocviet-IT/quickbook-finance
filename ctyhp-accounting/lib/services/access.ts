@@ -235,3 +235,14 @@ export async function searchAudit(
   if (error) throw new AccessError(error.message);
   return (data ?? []) as unknown as AuditEntryRow[];
 }
+
+/**
+ * Ask the server whether the current user holds a permission. Used by pages to
+ * decide what to render; the RPC that performs the action checks it again, so
+ * this is presentation only.
+ */
+export async function hasPermission(sb: SupabaseClient, key: string): Promise<boolean> {
+  const { data, error } = await sb.rpc("acc_has_permission", { p_key: key });
+  if (error) throw new AccessError(error.message);
+  return Boolean(data);
+}

@@ -556,3 +556,48 @@ export const auditFilterSchema = z.object({
   limit: z.number().int().min(1).max(1000).default(200),
 });
 export type AuditFilterInput = z.infer<typeof auditFilterSchema>;
+
+// --- Vendor tax profile + 1099 review ---
+export const W9_STATUSES = ["not_requested", "requested", "on_file", "expired"] as const;
+export const TIN_TYPES = ["ssn", "ein", "itin"] as const;
+export const TAX_CLASSIFICATIONS = [
+  "individual", "sole_proprietor", "partnership", "c_corporation", "s_corporation",
+  "llc", "trust_estate", "exempt_payee", "other",
+] as const;
+
+export const vendorTaxProfileSchema = z
+  .object({
+    w9_status: z.enum(W9_STATUSES),
+    w9_received_date: z.string().optional().or(z.literal("")).nullable(),
+    w9_expires_date: z.string().optional().or(z.literal("")).nullable(),
+    classification: z.enum(TAX_CLASSIFICATIONS).optional().nullable(),
+    reporting_name: z.string().trim().max(160).optional().or(z.literal("")).nullable(),
+    /** A reference to the identifier, never rendered in full outside the form. */
+    tin_ref: z.string().trim().max(40).optional().or(z.literal("")).nullable(),
+    tin_type: z.enum(TIN_TYPES).optional().nullable(),
+    address_line1: z.string().trim().max(200).optional().or(z.literal("")).nullable(),
+    address_line2: z.string().trim().max(200).optional().or(z.literal("")).nullable(),
+    city: z.string().trim().max(120).optional().or(z.literal("")).nullable(),
+    region: z.string().trim().max(120).optional().or(z.literal("")).nullable(),
+    postal_code: z.string().trim().max(20).optional().or(z.literal("")).nullable(),
+    country: z.string().trim().max(80).default("US"),
+    is_1099_eligible: z.boolean().default(false),
+    box_code: z.string().trim().max(20).optional().or(z.literal("")).nullable(),
+    eligibility_override: z.boolean().default(false),
+    override_reason: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
+    reason: z.string().trim().min(1, "A change reason is required").max(300),
+  })
+  .refine((v) => !v.is_1099_eligible || !!v.box_code, {
+    message: "Select the reporting box for an eligible vendor",
+    path: ["box_code"],
+  })
+  .refine((v) => !v.eligibility_override || !!v.override_reason, {
+    message: "An override needs its own documented reason",
+    path: ["override_reason"],
+  });
+export type VendorTaxProfileInput = z.infer<typeof vendorTaxProfileSchema>;
+
+export const taxYearSchema = z.object({
+  year: z.number().int().min(2000, "Enter a four-digit tax year").max(2100, "Enter a four-digit tax year"),
+});
+export type TaxYearInput = z.infer<typeof taxYearSchema>;

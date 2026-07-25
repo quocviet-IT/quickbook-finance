@@ -619,3 +619,60 @@ export interface AuditEntryRow {
   after_json: unknown;
   created_at: string;
 }
+
+// --- Vendor tax profile + 1099 (Module G3) ---
+export type W9StatusRow = "not_requested" | "requested" | "on_file" | "expired";
+export type TinTypeRow = "ssn" | "ein" | "itin";
+export type TaxClassificationRow =
+  | "individual" | "sole_proprietor" | "partnership" | "c_corporation" | "s_corporation"
+  | "llc" | "trust_estate" | "exempt_payee" | "other";
+
+export interface VendorTaxProfileRow {
+  id: string;
+  vendor_id: string;
+  version: number;
+  w9_status: W9StatusRow;
+  w9_received_date: string | null;
+  w9_expires_date: string | null;
+  classification: TaxClassificationRow | null;
+  reporting_name: string | null;
+  tin_ref: string | null;
+  tin_type: TinTypeRow | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string;
+  is_1099_eligible: boolean;
+  box_code: string | null;
+  eligibility_override: boolean;
+  override_reason: string | null;
+  change_reason: string;
+  created_at: string;
+}
+
+export interface Box1099Row {
+  code: string;
+  form: string;
+  box_label: string;
+  threshold_minor: number;
+  is_active: boolean;
+}
+
+export interface Vendor1099SummaryRow {
+  vendor_id: string;
+  vendor_name: string;
+  reporting_name: string | null;
+  classification: TaxClassificationRow | null;
+  w9_status: W9StatusRow;
+  w9_expires_date: string | null;
+  tin_on_file: boolean;
+  address_complete: boolean;
+  is_1099_eligible: boolean;
+  box_code: string | null;
+  box_label: string | null;
+  threshold_minor: number;
+  paid_minor: number;
+  eligibility_override: boolean;
+}
