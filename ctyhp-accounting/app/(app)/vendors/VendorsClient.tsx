@@ -1,25 +1,32 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Form, Input, Modal, Select, Tag } from "antd";
+import { App, Button, Form, Input, Modal, Select, Space, Tag } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import type { AccountRow, VendorRow } from "@/lib/db/types";
+import type { AccountRow, Box1099Row, VendorRow } from "@/lib/db/types";
 import { createVendorAction } from "./actions";
+import VendorTaxDrawer from "./VendorTaxDrawer";
 
 export default function VendorsClient({
   vendors,
   apAccounts,
   expenseAccounts,
+  boxes,
   canWrite,
+  canManageTax,
 }: {
   vendors: VendorRow[];
   apAccounts: AccountRow[];
   expenseAccounts: AccountRow[];
+  boxes: Box1099Row[];
   canWrite: boolean;
+  /** The elevated vendor.tax_manage permission. */
+  canManageTax: boolean;
 }) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
+  const [taxFor, setTaxFor] = useState<VendorRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
 
@@ -64,6 +71,17 @@ export default function VendorsClient({
             dataIndex: "is_active",
             render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Active" : "Inactive"}</Tag>,
           },
+          {
+            title: "Actions",
+            key: "actions",
+            render: (_, r) => (
+              <Space>
+                <Button size="small" type="link" onClick={() => setTaxFor(r)}>
+                  Tax profile
+                </Button>
+              </Space>
+            ),
+          },
         ]}
       />
       <Modal
@@ -95,6 +113,14 @@ export default function VendorsClient({
           </Form.Item>
         </Form>
       </Modal>
+
+      <VendorTaxDrawer
+        open={!!taxFor}
+        vendor={taxFor}
+        boxes={boxes}
+        canManage={canManageTax}
+        onClose={() => setTaxFor(null)}
+      />
     </>
   );
 }
