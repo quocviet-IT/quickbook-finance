@@ -15,6 +15,8 @@ interface Props {
   accounts: Account[];
   baseCurrency: string;
   baseDecimals: number;
+  /** Seeded by the top-bar New menu via `?new=1`. */
+  initialCreateOpen: boolean;
 }
 interface LineForm {
   account_id?: string;
@@ -22,11 +24,11 @@ interface LineForm {
   credit?: number;
 }
 
-export default function JournalClient({ canWrite, accounts, baseCurrency, baseDecimals }: Props) {
+export default function JournalClient({ canWrite, accounts, baseCurrency, baseDecimals, initialCreateOpen }: Props) {
   const { message, modal } = App.useApp();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [lines, setLines] = useState<LineForm[]>([{}, {}]);

@@ -8,7 +8,12 @@ import ExpensesClient from "./ExpensesClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
   const [expenses, vendors, accounts, currencies, role] = await Promise.all([
     listExpenses(sb),
@@ -32,6 +37,7 @@ export default async function ExpensesPage() {
     <div>
       <PageHeader title="Expenses" description="Record money already spent by bank or credit card." />
       <ExpensesClient
+        initialCreateOpen={initialCreateOpen}
         expenses={expenses}
         vendors={vendors}
         expenseAccounts={expenseAccounts}

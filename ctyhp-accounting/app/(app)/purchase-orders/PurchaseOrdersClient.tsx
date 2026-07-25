@@ -30,6 +30,7 @@ const STATUS_OPTIONS: { value: PoStatus | "all"; label: string }[] = [
 ];
 
 export default function PurchaseOrdersClient({
+  initialCreateOpen,
   orders,
   vendors,
   expenseAccounts,
@@ -37,6 +38,8 @@ export default function PurchaseOrdersClient({
   items,
   canWrite,
 }: {
+  /** Seeded by the top-bar New menu via `?new=1`. */
+  initialCreateOpen: boolean;
   orders: PurchaseOrderWithVendor[];
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
@@ -46,7 +49,7 @@ export default function PurchaseOrdersClient({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<PoStatus | "all">("all");
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(initialCreateOpen);
 
   const rows = useMemo(
     () => (status === "all" ? orders : orders.filter((o) => o.status === status)),

@@ -7,7 +7,12 @@ import JournalClient from "./JournalClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function JournalPage() {
+export default async function JournalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
   const [currencies, accounts, role] = await Promise.all([
     listCurrencies(sb),
@@ -20,6 +25,7 @@ export default async function JournalPage() {
     <div>
       <PageHeader title="Journal Entries" description="Create balanced manual journals and correct posted entries with linked reversals." />
       <JournalClient
+        initialCreateOpen={initialCreateOpen}
         canWrite={canWrite(role)}
         accounts={postingAccounts.map((a) => ({ id: a.id, account_code: a.account_code, name: a.name }))}
         baseCurrency={base?.code ?? "USD"}

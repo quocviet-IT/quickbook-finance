@@ -16,7 +16,9 @@ export default function DataTable<RecordType extends object>({
   pagination,
   locale,
   scroll,
-  size = "middle",
+  // Accounting work means comparing many rows at once, so lists default to the
+  // dense row height; a page can still opt into a roomier table.
+  size = "small",
   ...props
 }: DataTableProps<RecordType>) {
   const normalizedPagination =

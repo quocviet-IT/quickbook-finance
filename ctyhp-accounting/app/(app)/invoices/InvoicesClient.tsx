@@ -60,6 +60,7 @@ interface LineForm {
 }
 
 export default function InvoicesClient({
+  initialCreateOpen,
   invoices,
   customers,
   incomeAccounts,
@@ -69,6 +70,8 @@ export default function InvoicesClient({
   items,
   canWrite,
 }: {
+  /** Seeded by the top-bar New menu via `?new=1`. */
+  initialCreateOpen: boolean;
   invoices: InvoiceWithCustomer[];
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
@@ -81,7 +84,7 @@ export default function InvoicesClient({
   const { message } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [writeOffFor, setWriteOffFor] = useState<InvoiceWithCustomer | null>(null);
@@ -286,7 +289,14 @@ export default function InvoicesClient({
         width={860}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        {/* Defaults live here too, so opening straight from the New menu matches
+            what the New invoice button sets up. */}
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          initialValues={{ currency_code: baseCurrency, lines: [{ quantity: 1 }] }}
+        >
           <Space align="end" wrap>
             <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>
               <Select

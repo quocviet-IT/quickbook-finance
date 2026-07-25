@@ -9,7 +9,12 @@ import BillsClient from "./BillsClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function BillsPage() {
+export default async function BillsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
   const [bills, vendors, accounts, currencies, items, role] = await Promise.all([
     listBills(sb),
@@ -40,6 +45,7 @@ export default async function BillsPage() {
     <div>
       <PageHeader title="Bills" description="Enter bills you owe, post them to Accounts Payable, and track balances." />
       <BillsClient
+        initialCreateOpen={initialCreateOpen}
         bills={bills}
         vendors={vendors}
         expenseAccounts={expenseAccounts}

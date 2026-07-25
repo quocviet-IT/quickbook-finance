@@ -246,3 +246,14 @@ export async function hasPermission(sb: SupabaseClient, key: string): Promise<bo
   if (error) throw new AccessError(error.message);
   return Boolean(data);
 }
+
+/**
+ * How many people hold `approval.decide` and can actually sign off. With fewer
+ * than two, a policy that requires segregation of duties blocks its action for
+ * everyone — the UI warns before an admin enables that.
+ */
+export async function getApproverCount(sb: SupabaseClient): Promise<number> {
+  const { data, error } = await sb.rpc("acc_approver_count");
+  if (error) throw new AccessError(error.message);
+  return Number(data ?? 0);
+}

@@ -1115,3 +1115,125 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Navigation redesign: top-bar search, create menu, approvals badge, the
+   settings hub, and a denser list template. Accounting work means reading many
+   rows at once, so the page is one compact block rather than nested cards.
+   --------------------------------------------------------------------------- */
+
+.app-shell__header-search {
+  flex: 1 1 420px;
+  min-width: 0;
+  max-width: 460px;
+}
+
+.global-search {
+  width: 100%;
+}
+
+.global-search__option {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.global-search__option-meta {
+  font-size: 12px;
+}
+
+.app-shell__header-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.app-shell__new-button {
+  font-weight: 600;
+}
+
+.app-shell__approvals {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  color: #475569;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-shell__approvals:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.app-shell__approvals-icon {
+  font-size: 20px;
+}
+
+/* Filter bar stays reachable while a long list scrolls. */
+.accounting-filter-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 10;
+}
+
+/* Denser page header: title and primary action share a row. */
+.accounting-page-header {
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.accounting-page-header__title.ant-typography {
+  font-size: 22px;
+}
+
+.accounting-page-header__description.ant-typography {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+/* Settings hub */
+.settings-hub__group {
+  margin-bottom: 28px;
+}
+
+.settings-hub__group-title.ant-typography {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.settings-hub__card-link {
+  display: block;
+  height: 100%;
+  color: inherit;
+}
+
+.settings-hub__card {
+  height: 100%;
+  border-color: #e5eaf0;
+}
+
+.settings-hub__card-description.ant-typography {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 991px) {
+  .app-shell__header-search {
+    flex-basis: 200px;
+    max-width: none;
+  }
+
+  .app-shell__header-end {
+    gap: 8px;
+  }
+
+  .accounting-filter-bar {
+    position: static;
+  }
+}

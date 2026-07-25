@@ -9,7 +9,12 @@ import InvoicesClient from "./InvoicesClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
   const [invoices, customers, accounts, currencies, taxCodes, items, role] = await Promise.all([
     listInvoices(sb),
@@ -41,6 +46,7 @@ export default async function InvoicesPage() {
     <div>
       <PageHeader title="Invoices" description="Create invoices, issue them to the ledger, and track balances due." />
       <InvoicesClient
+        initialCreateOpen={initialCreateOpen}
         invoices={invoices}
         customers={customers}
         incomeAccounts={incomeAccounts}

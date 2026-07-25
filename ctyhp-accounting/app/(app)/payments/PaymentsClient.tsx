@@ -30,12 +30,15 @@ const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
 };
 
 export default function PaymentsClient({
+  initialCreateOpen,
   payments,
   customers,
   depositAccounts,
   currencies,
   canWrite,
 }: {
+  /** Seeded by the top-bar New menu via `?new=1`. */
+  initialCreateOpen: boolean;
   payments: (PaymentRow & { customer_name: string })[];
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
@@ -45,7 +48,7 @@ export default function PaymentsClient({
   const { message } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [openInvoices, setOpenInvoices] = useState<InvoiceRow[]>([]);
   const [alloc, setAlloc] = useState<Record<string, number>>({}); // invoiceId -> major units
@@ -182,7 +185,14 @@ export default function PaymentsClient({
         width={760}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        {/* Same defaults the New payment button applies, so the top-bar New menu
+            can open this modal directly. */}
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          initialValues={{ currency_code: baseCurrency }}
+        >
           <Space wrap align="end">
             <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>
               <Select

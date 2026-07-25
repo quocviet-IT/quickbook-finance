@@ -14,11 +14,14 @@ interface Draft {
 
 export default function ApprovalPoliciesClient({
   policies,
+  approverCount,
   baseCurrency,
   baseDecimals,
   canManage,
 }: {
   policies: ApprovalPolicyRow[];
+  /** People who hold `approval.decide`; below two, segregation blocks everyone. */
+  approverCount: number;
   baseCurrency: string;
   baseDecimals: number;
   canManage: boolean;
@@ -69,6 +72,25 @@ export default function ApprovalPoliciesClient({
 
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
+      {/* The deadlock this warns about is real: one approver plus segregation
+          means nobody can ever sign off, so the action is blocked for everyone. */}
+      {approverCount < 2 && (
+        <Alert
+          type="warning"
+          showIcon
+          message={
+            approverCount === 0
+              ? "Nobody can approve requests"
+              : "Only one person can approve requests"
+          }
+          description={
+            approverCount === 0
+              ? "No active user holds the 'Approve or reject requests' permission. Enabling any policy below would block its action for everyone. Grant the permission in Settings → Permissions first."
+              : "Segregation of duties stops the requester approving their own request, so with a single approver an enabled policy blocks its action for everyone — including that approver. Either add a second person who can approve, or turn segregation off for the policies you enable."
+          }
+        />
+      )}
+
       <Alert
         type="info"
         showIcon
