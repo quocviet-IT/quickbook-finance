@@ -19,6 +19,7 @@ import {
 } from "@/lib/services/banking";
 import { createPlaidLinkToken } from "@/lib/services/plaid";
 import type { BankTransactionRow } from "@/lib/db/types";
+import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -50,7 +51,10 @@ export async function createBankAccountAction(input: {
 }): Promise<ActionResult> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
-  if (!input.account_id || !input.currency_code) return { ok: false, error: "Select a GL account and currency" };
+  if (!input.account_id) return { ok: false, error: "Select a General Ledger bank account" };
+  if (input.currency_code !== USD_CURRENCY_CODE) {
+    return { ok: false, error: "This company supports USD bank accounts only" };
+  }
   try {
     const sb = await createSupabaseServerClient();
     await createBankAccount(sb, input);

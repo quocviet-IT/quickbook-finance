@@ -6,6 +6,7 @@ import type {
   BankFeedAccountRow,
   BankTransactionRow,
 } from "@/lib/db/types";
+import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -193,8 +194,11 @@ export async function connectPlaidBank(
 
   const accounts = selectedAccounts.map((account) => {
     const currency = account.balances.iso_currency_code?.toUpperCase();
-    if (!currency || !decimals.has(currency)) {
-      throw new BankingError(`${account.name} uses an unsupported or unofficial currency`);
+    if (currency !== USD_CURRENCY_CODE) {
+      throw new BankingError(`${account.name} is not a USD account`);
+    }
+    if (!decimals.has(currency)) {
+      throw new BankingError("USD currency configuration is missing");
     }
     const mapping = mappingByProvider.get(account.account_id);
     if (!mapping) throw new BankingError(`Ledger mapping is missing for ${account.name}`);

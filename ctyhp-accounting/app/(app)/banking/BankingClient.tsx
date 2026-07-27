@@ -503,7 +503,10 @@ export default function BankingClient({
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => setAcctOpen(true)}
+                onClick={() => {
+                  acctForm.setFieldsValue({ currency_code: "USD" });
+                  setAcctOpen(true);
+                }}
                 disabled={!glBankAccounts.length}
               >
                 Add bank account
@@ -574,7 +577,13 @@ export default function BankingClient({
           canWrite ? (
             <Space wrap>
               {glBankAccounts.length > 0 ? (
-                <Button icon={<PlusOutlined />} onClick={() => setAcctOpen(true)}>
+                <Button
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    acctForm.setFieldsValue({ currency_code: "USD" });
+                    setAcctOpen(true);
+                  }}
+                >
                   Add account
                 </Button>
               ) : null}
@@ -786,6 +795,7 @@ function CreateAccountModal({
         </Form.Item>
         <Form.Item name="currency_code" label="Currency" rules={[{ required: true, message: "Select a currency" }]}>
           <Select
+            disabled
             options={currencies.map((currency) => ({
               value: currency.code,
               label: `${currency.code} — ${currency.name}`,

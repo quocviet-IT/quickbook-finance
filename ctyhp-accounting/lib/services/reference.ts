@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CurrencyRow, TaxCodeRow } from "@/lib/db/types";
+import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 
 export async function listCurrencies(sb: SupabaseClient): Promise<CurrencyRow[]> {
   const { data, error } = await sb
     .from("acc_currency")
     .select("code,name,symbol,decimal_places,is_base")
+    .eq("code", USD_CURRENCY_CODE)
     .order("code");
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as CurrencyRow[];

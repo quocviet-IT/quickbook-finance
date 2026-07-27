@@ -54,9 +54,7 @@ function PurchaseOrderFormModalBody({
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
-  const [currency, setCurrency] = useState<string>(
-    order?.currency_code ?? currencies.find((c) => c.is_base)?.code ?? "USD",
-  );
+  const currency = order?.currency_code ?? currencies.find((c) => c.is_base)?.code ?? "USD";
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -148,9 +146,9 @@ function PurchaseOrderFormModalBody({
           </Form.Item>
           <Form.Item label="Currency">
             <Select
+              disabled
               value={currency}
               style={{ width: 120 }}
-              onChange={setCurrency}
               options={currencies.map((c) => ({ value: c.code, label: c.code }))}
             />
           </Form.Item>

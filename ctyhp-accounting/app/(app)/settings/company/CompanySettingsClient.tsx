@@ -92,7 +92,9 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
               <Form.Item name="accounting_basis" label="Accounting basis" rules={[{ required: true }]}>
                 <Select style={{ width: 140 }} options={[{ value: "accrual", label: "Accrual" }, { value: "cash", label: "Cash" }]} />
               </Form.Item>
-              <Form.Item name="base_currency_code" label="Base currency"><Input style={{ width: 100 }} /></Form.Item>
+              <Form.Item name="base_currency_code" label="Base currency">
+                <Input disabled style={{ width: 100 }} />
+              </Form.Item>
               <Form.Item name="time_zone" label="Time zone"><Input /></Form.Item>
               <Form.Item name="default_payment_terms_days" label="Default terms (days)"><InputNumber min={0} /></Form.Item>
             </Space>

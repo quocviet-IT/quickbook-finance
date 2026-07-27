@@ -37,7 +37,7 @@ export default function ExpensesClient({
   const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
-  const [currency, setCurrency] = useState<string>(currencies.find((c) => c.is_base)?.code ?? "USD");
+  const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -157,9 +157,9 @@ export default function ExpensesClient({
             </Form.Item>
             <Form.Item label="Currency">
               <Select
+                disabled
                 value={currency}
                 style={{ width: 120 }}
-                onChange={setCurrency}
                 options={currencies.map((c) => ({ value: c.code, label: c.code }))}
               />
             </Form.Item>

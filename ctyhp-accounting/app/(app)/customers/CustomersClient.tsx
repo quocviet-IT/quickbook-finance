@@ -36,7 +36,6 @@ export default function CustomersClient({
   const columns: TableColumnsType<CustomerRow> = [
     { title: "Name", dataIndex: "name" },
     { title: "Email", dataIndex: "email", render: (e) => e ?? "—" },
-    { title: "Currency", dataIndex: "currency_code", width: 100, render: (c) => c ?? "—" },
     {
       title: "Status",
       dataIndex: "is_active",

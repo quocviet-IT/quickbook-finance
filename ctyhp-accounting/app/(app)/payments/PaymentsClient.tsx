@@ -204,7 +204,7 @@ export default function PaymentsClient({
               />
             </Form.Item>
             <Form.Item name="currency_code" label="Currency" rules={[{ required: true }]} style={{ width: 120 }}>
-              <Select options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
+              <Select disabled options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
             </Form.Item>
             <Form.Item name="amount" label="Amount" rules={[{ required: true, message: "Enter amount" }]}>
               <InputNumber min={0} step={0.01} prefix="$" style={{ width: 160 }} />

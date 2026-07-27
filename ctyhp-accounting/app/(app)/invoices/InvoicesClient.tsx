@@ -313,7 +313,7 @@ export default function InvoicesClient({
               <Button onClick={() => setCustOpen(true)}>+ New customer</Button>
             </Form.Item>
             <Form.Item name="currency_code" label="Currency" rules={[{ required: true }]} style={{ width: 150 }}>
-              <Select options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
+              <Select disabled options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
             </Form.Item>
             <Form.Item name="issue_date" label="Issue date">
               <DatePicker />

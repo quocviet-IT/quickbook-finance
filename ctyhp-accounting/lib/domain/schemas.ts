@@ -1,8 +1,12 @@
 /** Zod validation schemas for the accounting domain (input boundary). */
 import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
+import { USD_CURRENCY_CODE } from "./currency";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
+export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
+  error: "Only USD is supported",
+});
 
 export const accountCreateSchema = z.object({
   account_code: z
@@ -17,12 +21,7 @@ export const accountCreateSchema = z.object({
   parent_account_id: z.uuid().optional().nullable(),
   description: z.string().trim().max(500).optional().nullable(),
   default_tax_code_id: z.uuid().optional().nullable(),
-  currency_code: z
-    .string()
-    .trim()
-    .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code")
-    .optional()
-    .nullable(),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   is_posting_account: z.boolean().default(true),
   status: z.enum(ACCOUNT_STATUSES).default("active"),
 });
@@ -39,11 +38,7 @@ export const accountStatusSchema = z.enum(ACCOUNT_STATUSES);
 export const customerCreateSchema = z.object({
   name: z.string().trim().min(1, "Customer name is required").max(160),
   email: z.email("Enter a valid email").optional().or(z.literal("")).nullable(),
-  currency_code: z
-    .string()
-    .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code")
-    .optional()
-    .nullable(),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
 });
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 
@@ -60,7 +55,7 @@ export type InvoiceLineInputT = z.infer<typeof invoiceLineInputSchema>;
 
 export const invoiceCreateSchema = z.object({
   customer_id: z.uuid("Select a customer"),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   issue_date: z.string().optional(),
   due_date: z.string().optional().nullable(),
   memo: z.string().trim().max(500).optional().nullable(),
@@ -77,7 +72,7 @@ export const paymentAllocationSchema = z.object({
 export const paymentCreateSchema = z.object({
   customer_id: z.uuid("Select a customer"),
   payment_date: z.string().optional(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   amount_minor: z.number().int().positive("Amount must be greater than 0"),
   deposit_account_id: z.uuid("Select a deposit account"),
   method: z.string().trim().max(60).optional().nullable(),
@@ -91,7 +86,7 @@ export const vendorCreateSchema = z.object({
   name: z.string().trim().min(1, "Vendor name is required").max(160),
   email: z.email("Enter a valid email").optional().or(z.literal("")).nullable(),
   phone: z.string().trim().max(40).optional().or(z.literal("")).nullable(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code").optional().nullable(),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   ap_account_id: z.uuid().optional().nullable(),
   default_expense_account_id: z.uuid().optional().nullable(),
   payment_terms: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
@@ -110,7 +105,7 @@ export type BillLineInputT = z.infer<typeof billLineInputSchema>;
 export const billCreateSchema = z.object({
   vendor_id: z.uuid("Select a vendor"),
   vendor_ref: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   bill_date: z.string().optional(),
   due_date: z.string().optional().nullable(),
   memo: z.string().trim().max(500).optional().nullable(),
@@ -129,7 +124,7 @@ export type ExpenseLineInputT = z.infer<typeof expenseLineInputSchema>;
 export const expenseCreateSchema = z.object({
   vendor_id: z.uuid().optional().nullable(),
   payment_account_id: z.uuid("Select a payment account"),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   expense_date: z.string().optional(),
   memo: z.string().trim().max(500).optional().nullable(),
   lines: z.array(expenseLineInputSchema).min(1, "Add at least one line item"),
@@ -145,7 +140,7 @@ export const billPaymentAllocationSchema = z.object({
 export const billPaymentCreateSchema = z.object({
   vendor_id: z.uuid("Select a vendor"),
   payment_date: z.string().optional(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   amount_minor: z.number().int().positive("Amount must be greater than 0"),
   payment_account_id: z.uuid("Select a payment account"),
   method: z.string().trim().max(60).optional().nullable(),
@@ -222,7 +217,7 @@ export const taxPaymentCreateSchema = z.object({
   tax_account_id: z.uuid("Select the Sales Tax Payable account"),
   bank_account_id: z.uuid("Select a bank account"),
   payment_date: z.string().optional(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   amount_minor: z.number().int().positive("Amount must be greater than 0"),
   period_start: z.string().optional().nullable(),
   period_end: z.string().optional().nullable(),
@@ -247,7 +242,7 @@ export const manualJournalSchema = z
     entry_date: z.string().optional(),
     description: z.string().trim().max(500).optional().nullable(),
     source_ref: z.string().trim().max(120).optional().or(z.literal("")).nullable(),
-    currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+    currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
     lines: z.array(manualJournalLineSchema).min(2, "Add at least two lines"),
   })
   .refine(
@@ -266,7 +261,7 @@ export const openingBalanceLineSchema = z.object({
 
 export const openingBalanceSchema = z.object({
   as_of: z.string().optional(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   lines: z.array(openingBalanceLineSchema).min(1, "Enter at least one opening balance"),
 });
 export type OpeningBalanceInput = z.infer<typeof openingBalanceSchema>;
@@ -289,7 +284,7 @@ export const creditMemoLineSchema = z.object({
 
 export const creditMemoCreateSchema = z.object({
   customer_id: z.uuid("Select a customer"),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   memo_date: z.string().optional(),
   reason: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
   memo: z.string().trim().max(500).optional().nullable(),
@@ -305,7 +300,7 @@ export const vendorCreditLineSchema = z.object({
 
 export const vendorCreditCreateSchema = z.object({
   vendor_id: z.uuid("Select a vendor"),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   credit_date: z.string().optional(),
   vendor_ref: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
   reason: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
@@ -324,7 +319,7 @@ export const customerRefundSchema = z
   .object({
     customer_id: z.uuid("Select a customer"),
     refund_date: z.string().optional(),
-    currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+    currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
     amount_minor: z.number().int().positive("Amount must be greater than 0"),
     source_type: z.enum(["payment", "credit_memo"]),
     payment_id: z.uuid().optional().nullable(),
@@ -385,7 +380,7 @@ export const companySettingsSchema = z.object({
   postal_code: z.string().trim().max(20).optional().or(z.literal("")).nullable(),
   country: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
   fiscal_year_start_month: z.number().int().min(1, "Month 1-12").max(12, "Month 1-12"),
-  base_currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code").default("USD"),
+  base_currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   time_zone: z.string().trim().min(1).max(60).default("America/New_York"),
   accounting_basis: z.enum(["accrual", "cash"]),
   default_payment_terms_days: z.number().int().min(0, "Terms must be >= 0"),
@@ -432,7 +427,7 @@ export const purchaseOrderSaveSchema = z.object({
   vendor_id: z.uuid("Select a vendor"),
   order_date: z.string().min(1, "Order date is required"),
   expected_date: z.string().optional().nullable(),
-  currency_code: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code"),
+  currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   ship_to: z.string().trim().max(300).optional().or(z.literal("")).nullable(),
   memo: z.string().trim().max(500).optional().or(z.literal("")).nullable(),
   lines: z.array(purchaseOrderLineInputSchema).min(1, "Add at least one line item"),

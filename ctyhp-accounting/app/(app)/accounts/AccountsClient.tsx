@@ -94,7 +94,7 @@ export default function AccountsClient({
   function openCreate() {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ is_posting_account: true });
+    form.setFieldsValue({ currency_code: "USD", is_posting_account: true });
     setOpen(true);
   }
 
@@ -171,7 +171,6 @@ export default function AccountsClient({
       render: (t: AccountType) =>
         statementSectionOf(t) === "balance_sheet" ? "Balance Sheet" : "Profit & Loss",
     },
-    { title: "Currency", dataIndex: "currency_code", width: 90, render: (c) => c ?? "—" },
     {
       title: "Status",
       dataIndex: "status",
@@ -280,8 +279,8 @@ export default function AccountsClient({
           </Form.Item>
           <Form.Item name="currency_code" label="Currency">
             <Select
-              allowClear
-              placeholder="System default"
+              disabled
+              placeholder="USD"
               options={currencies.map((c) => ({ value: c.code, label: `${c.code} — ${c.name}` }))}
             />
           </Form.Item>
