@@ -59,7 +59,7 @@ export default function GlobalSearch() {
       value={value}
       options={options}
       className="global-search"
-      popupMatchSelectWidth={360}
+      popupMatchSelectWidth
       onChange={onChange}
       onSelect={(_, option) => {
         const href = (option as { href?: string }).href;

@@ -4,6 +4,7 @@ body {
   margin: 0;
   max-width: 100vw;
   min-height: 100%;
+  overflow-x: clip;
 }
 
 * {
@@ -110,9 +111,11 @@ body {
 
 .app-shell__workspace {
   min-width: 0;
+  overflow-x: clip;
 }
 
 .app-shell__header {
+  min-width: 0;
   padding: 0 24px !important;
   display: flex;
   align-items: center;
@@ -290,6 +293,7 @@ body {
 
 .accounting-data-table .ant-pagination {
   padding-inline: 12px;
+  flex-wrap: wrap;
 }
 
 .accounting-empty-description.ant-typography {
@@ -341,6 +345,78 @@ body {
 .accounting-icon-action.ant-btn:focus-visible {
   outline: 3px solid rgba(13, 148, 136, 0.3);
   outline-offset: 2px;
+}
+
+/*
+ * Keep interaction surfaces inside the viewport. Accounting forms contain
+ * wide line-item rows, so modal and drawer bodies scroll independently instead
+ * of stretching the application shell when they open.
+ */
+.ant-modal-root .ant-modal {
+  max-width: calc(100vw - 32px);
+}
+
+.ant-modal-root .ant-modal-content {
+  display: flex;
+  max-height: calc(100dvh - 32px);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ant-modal-root .ant-modal-header,
+.ant-modal-root .ant-modal-footer {
+  flex: 0 0 auto;
+}
+
+.ant-modal-root .ant-modal-body {
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.ant-modal-root .ant-modal-body form .ant-space-horizontal,
+.ant-drawer .ant-drawer-body form .ant-space-horizontal {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.ant-modal-root .ant-modal-body form .ant-space-item,
+.ant-drawer .ant-drawer-body form .ant-space-item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ant-modal-root .ant-table-wrapper,
+.ant-drawer .ant-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ant-drawer {
+  max-width: 100vw;
+}
+
+.ant-drawer .ant-drawer-content,
+.ant-drawer .ant-drawer-body {
+  min-width: 0;
+}
+
+.ant-drawer .ant-drawer-body {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.ant-dropdown,
+.ant-select-dropdown,
+.ant-popover {
+  max-width: calc(100vw - 24px);
+}
+
+.ant-dropdown-menu-title-content,
+.ant-select-item-option-content,
+.ant-popover-inner-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .accounting-page-state {
@@ -1026,6 +1102,17 @@ body {
     min-height: 40px;
   }
 
+  .app-shell__new-button {
+    width: 40px;
+    padding-inline: 0;
+    border-radius: 50%;
+  }
+
+  .app-shell__new-label,
+  .app-shell__new-chevron {
+    display: none;
+  }
+
   .app-shell__approvals {
     justify-content: center;
   }
@@ -1051,6 +1138,10 @@ body {
 
   .accounting-page-header__actions > * {
     flex: 1 1 auto;
+  }
+
+  .accounting-page-header__actions > .accounting-icon-action-wrap {
+    flex: 0 0 auto;
   }
 
   .accounting-filter-bar {
@@ -1084,7 +1175,75 @@ body {
   }
 
   .accounting-data-table .ant-table-pagination {
+    gap: 8px 4px;
     justify-content: center;
+  }
+
+  .accounting-data-table .ant-pagination-total-text {
+    width: 100%;
+    margin-inline-end: 0;
+    text-align: center;
+  }
+
+  .ant-modal-root .ant-modal {
+    top: 12px;
+    max-width: calc(100vw - 24px);
+    margin-bottom: 12px;
+    padding-bottom: 0;
+  }
+
+  .ant-modal-root .ant-modal-content {
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+  }
+
+  .ant-modal-root .ant-modal-title {
+    padding-inline-end: 28px;
+    line-height: 1.35;
+  }
+
+  .ant-modal-root .ant-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .ant-modal-root .ant-modal-footer .ant-btn {
+    min-height: 40px;
+    margin-inline-start: 0;
+  }
+
+  .ant-modal-root .ant-modal-body form .ant-space-horizontal,
+  .ant-drawer .ant-drawer-body form .ant-space-horizontal {
+    width: 100%;
+  }
+
+  .ant-modal-root .ant-modal-body form .ant-space-horizontal > .ant-space-item,
+  .ant-drawer .ant-drawer-body form .ant-space-horizontal > .ant-space-item {
+    width: 100%;
+  }
+
+  .ant-modal-root .ant-form-item,
+  .ant-drawer .ant-form-item {
+    width: 100% !important;
+    max-width: 100%;
+    min-width: 0 !important;
+  }
+
+  .ant-modal-root .ant-form-item-control-input-content > .ant-input-number,
+  .ant-modal-root .ant-form-item-control-input-content > .ant-picker,
+  .ant-modal-root .ant-form-item-control-input-content > .ant-select,
+  .ant-drawer .ant-form-item-control-input-content > .ant-input-number,
+  .ant-drawer .ant-form-item-control-input-content > .ant-picker,
+  .ant-drawer .ant-form-item-control-input-content > .ant-select {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .ant-modal-root .ant-modal-body .accounting-icon-action-wrap,
+  .ant-drawer .ant-drawer-body .accounting-icon-action-wrap {
+    width: auto;
   }
 
   .accounting-page-state--centered {
@@ -1209,8 +1368,15 @@ body {
 
 .global-search__option {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   line-height: 1.35;
+}
+
+.global-search__option .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .global-search__option-meta {
@@ -1226,6 +1392,11 @@ body {
 
 .app-shell__new-button {
   font-weight: 600;
+}
+
+.app-shell__new-label,
+.app-shell__new-chevron {
+  display: inline-flex;
 }
 
 .app-shell__approvals {

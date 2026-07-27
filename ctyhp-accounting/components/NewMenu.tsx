@@ -1,7 +1,7 @@
 "use client";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Dropdown, Grid, Tooltip } from "antd";
+import { Button, Dropdown, Tooltip } from "antd";
 import { DownOutlined, PlusOutlined } from "@ant-design/icons";
 import { NEW_MENU } from "@/lib/domain/navigation";
 
@@ -12,35 +12,30 @@ import { NEW_MENU } from "@/lib/domain/navigation";
  */
 export default function NewMenu() {
   const router = useRouter();
-  const screens = Grid.useBreakpoint();
-  const compact = screens.sm === false;
   const [pending, startTransition] = useTransition();
-  const menu = (
-    <Dropdown
-      trigger={["click"]}
-      menu={{
-        items: NEW_MENU.map((item) => ({ key: item.key, label: item.label })),
-        onClick: ({ key }) => {
-          const target = NEW_MENU.find((i) => i.key === key);
-          if (target) startTransition(() => router.push(target.href));
-        },
-      }}
-    >
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        loading={pending}
-        shape={compact ? "circle" : "default"}
-        aria-label={compact ? "Create new" : undefined}
-        className="app-shell__new-button"
+  return (
+    <Tooltip title="Create new">
+      <Dropdown
+        trigger={["click"]}
+        menu={{
+          items: NEW_MENU.map((item) => ({ key: item.key, label: item.label })),
+          onClick: ({ key }) => {
+            const target = NEW_MENU.find((i) => i.key === key);
+            if (target) startTransition(() => router.push(target.href));
+          },
+        }}
       >
-        {!compact && (
-          <>
-            New <DownOutlined />
-          </>
-        )}
-      </Button>
-    </Dropdown>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          loading={pending}
+          aria-label="Create new"
+          className="app-shell__new-button"
+        >
+          <span className="app-shell__new-label">New</span>
+          <DownOutlined className="app-shell__new-chevron" />
+        </Button>
+      </Dropdown>
+    </Tooltip>
   );
-  return compact ? <Tooltip title="Create new">{menu}</Tooltip> : menu;
 }
