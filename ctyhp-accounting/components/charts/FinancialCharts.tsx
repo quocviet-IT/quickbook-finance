@@ -2,7 +2,11 @@
 
 import type { ReactNode } from "react";
 import { Card, Empty, Typography } from "antd";
-import type { AgeingSnapshot, MonthlyPerformancePoint } from "@/lib/services/dashboard";
+import type {
+  AgeingSnapshot,
+  CashMovementSnapshot,
+  MonthlyPerformancePoint,
+} from "@/lib/services/dashboard";
 
 const PALETTE = {
   income: "#0f766e",
@@ -317,6 +321,79 @@ function AgeingBar({
       </div>
       <Typography.Text className="ageing-chart__value">{formatMoney(value)}</Typography.Text>
     </div>
+  );
+}
+
+export function CashFlowBridgeChart({
+  cash,
+  formatMoney,
+  extra,
+}: {
+  cash: CashMovementSnapshot;
+  formatMoney: (value: number) => string;
+  extra?: ReactNode;
+}) {
+  const components = [
+    { key: "operating", label: "Operating activities", value: cash.operatingMinor },
+    { key: "investing", label: "Investing activities", value: cash.investingMinor },
+    { key: "financing", label: "Financing activities", value: cash.financingMinor },
+  ];
+  const max = Math.max(1, ...components.map((item) => Math.abs(item.value)));
+
+  return (
+    <ChartCard
+      title="Cash flow bridge"
+      description="Month-to-date movement from opening to closing cash."
+      extra={extra}
+    >
+      <div className="cash-flow-balance-strip">
+        <div>
+          <Typography.Text type="secondary">Opening cash</Typography.Text>
+          <Typography.Text strong>{formatMoney(cash.openingMinor)}</Typography.Text>
+        </div>
+        <div className={cash.netChangeMinor < 0 ? "amount-negative" : "amount-positive"}>
+          <span aria-hidden="true">→</span>
+          <Typography.Text strong>{formatMoney(cash.netChangeMinor)}</Typography.Text>
+          <small>net change</small>
+        </div>
+        <div>
+          <Typography.Text type="secondary">Closing cash</Typography.Text>
+          <Typography.Text strong>{formatMoney(cash.closingMinor)}</Typography.Text>
+        </div>
+      </div>
+      <div className="cash-flow-components">
+        {components.map((item) => (
+          <div className="cash-flow-component" key={item.key}>
+            <div className="cash-flow-component__header">
+              <Typography.Text>{item.label}</Typography.Text>
+              <Typography.Text
+                strong
+                className={item.value < 0 ? "amount-negative" : "amount-positive"}
+              >
+                {formatMoney(item.value)}
+              </Typography.Text>
+            </div>
+            <div
+              className="cash-flow-component__scale"
+              aria-label={`${item.label}: ${formatMoney(item.value)}`}
+            >
+              <span className="cash-flow-component__axis" />
+              <span
+                className={`cash-flow-component__bar cash-flow-component__bar--${item.value < 0 ? "negative" : "positive"}`}
+                style={{ width: `${(Math.abs(item.value) / max) * 50}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="cash-bridge-summary">
+        <Typography.Text type="secondary">
+          {cash.tiesOut
+            ? "Closing cash agrees with the balance sheet."
+            : "Cash flow does not agree with the balance sheet; review required."}
+        </Typography.Text>
+      </div>
+    </ChartCard>
   );
 }
 

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getLedgerBalances } from "./reports";
 import { getArAgeing, getApAgeing, type AgeingReport } from "./ageing";
 import { searchAudit } from "./access";
+import { getCashFlow } from "./cashflow";
+import { getInventoryValuation } from "./inventory";
 import { buildProfitAndLoss } from "@/lib/domain/reports";
 import type { AuditEntryRow } from "@/lib/db/types";
 
@@ -17,6 +19,10 @@ export interface AgeingSnapshot {
 
 export interface DashboardMetrics {
   cashMinor: number;
+  currentAssetsMinor: number;
+  currentLiabilitiesMinor: number;
+  workingCapitalMinor: number;
+  currentRatio: number | null;
   overdueArMinor: number;
   overdueApMinor: number;
   overdueArCount: number;
@@ -38,6 +44,74 @@ export interface MonthlyPerformancePoint {
   netIncomeMinor: number;
 }
 
+export interface PerformanceSnapshot {
+  revenueMinor: number;
+  cogsMinor: number;
+  grossProfitMinor: number;
+  operatingExpenseMinor: number;
+  totalExpenseMinor: number;
+  netIncomeMinor: number;
+  grossMarginPercent: number | null;
+  netMarginPercent: number | null;
+}
+
+export interface PeriodComparison {
+  currentLabel: string;
+  priorLabel: string;
+  current: PerformanceSnapshot;
+  prior: PerformanceSnapshot;
+  revenueChangePercent: number | null;
+  expenseChangePercent: number | null;
+  netIncomeChangeMinor: number;
+  grossMarginChangePoints: number | null;
+}
+
+export interface CashMovementSnapshot {
+  operatingMinor: number;
+  investingMinor: number;
+  financingMinor: number;
+  netChangeMinor: number;
+  openingMinor: number;
+  closingMinor: number;
+  tiesOut: boolean;
+}
+
+export interface InventoryHolding {
+  itemId: string;
+  code: string | null;
+  name: string;
+  quantity: number;
+  valueMinor: number;
+  sharePercent: number;
+}
+
+export interface InventoryDashboardSnapshot {
+  valueMinor: number;
+  quantity: number;
+  itemCount: number;
+  zeroStockCount: number;
+  slowMovingCount: number;
+  slowMovingValueMinor: number;
+  tiesOut: boolean;
+  topHoldings: InventoryHolding[];
+}
+
+export interface OperatingPulse {
+  invoices: { count: number; amountMinor: number };
+  customerPayments: { count: number; amountMinor: number };
+  bills: { count: number; amountMinor: number };
+  goodsReceipts: { count: number };
+}
+
+export type DashboardActivityCategory =
+  | "sales"
+  | "purchases"
+  | "inventory"
+  | "banking"
+  | "close"
+  | "governance"
+  | "other";
+
 export interface DashboardActivity {
   id: string;
   occurredAt: string;
@@ -46,12 +120,17 @@ export interface DashboardActivity {
   entity: string;
   reference: string | null;
   href: string;
+  category: DashboardActivityCategory;
 }
 
 export interface DashboardAnalytics {
   asOf: string;
   metrics: DashboardMetrics;
   monthlyPerformance: MonthlyPerformancePoint[];
+  periodComparison: PeriodComparison;
+  cashMovement: CashMovementSnapshot;
+  inventory: InventoryDashboardSnapshot;
+  operatingPulse: OperatingPulse;
   recentActivity: DashboardActivity[];
 }
 
@@ -63,6 +142,46 @@ function ageingSnapshot(report: AgeingReport): AgeingSnapshot {
 
 function monthStart(asOf: string): string {
   return `${asOf.slice(0, 7)}-01`;
+}
+
+function isoDate(year: number, monthIndex: number, day: number): string {
+  return new Date(Date.UTC(year, monthIndex, day)).toISOString().slice(0, 10);
+}
+
+export function comparablePreviousMonthRange(asOf: string): MonthRange {
+  const [year, month, day] = asOf.split("-").map(Number);
+  const previousMonthEnd = new Date(Date.UTC(year, month - 1, 0));
+  const comparableDay = Math.min(day, previousMonthEnd.getUTCDate());
+  const key = isoDate(previousMonthEnd.getUTCFullYear(), previousMonthEnd.getUTCMonth(), 1).slice(0, 7);
+  return {
+    key,
+    label: previousMonthEnd.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }),
+    from: `${key}-01`,
+    to: isoDate(previousMonthEnd.getUTCFullYear(), previousMonthEnd.getUTCMonth(), comparableDay),
+  };
+}
+
+export function percentChange(current: number, prior: number): number | null {
+  return prior === 0 ? null : ((current - prior) / Math.abs(prior)) * 100;
+}
+
+function performanceSnapshot(rows: Awaited<ReturnType<typeof getLedgerBalances>>): PerformanceSnapshot {
+  const pnl = buildProfitAndLoss(rows);
+  const revenueMinor = pnl.income.total + pnl.otherIncome.total;
+  const totalExpenseMinor =
+    pnl.costOfGoodsSold.total + pnl.operatingExpenses.total + pnl.otherExpenses.total;
+  return {
+    revenueMinor,
+    cogsMinor: pnl.costOfGoodsSold.total,
+    grossProfitMinor: pnl.grossProfit,
+    operatingExpenseMinor: pnl.operatingExpenses.total,
+    totalExpenseMinor,
+    netIncomeMinor: pnl.netIncome,
+    grossMarginPercent:
+      pnl.income.total === 0 ? null : (pnl.grossProfit / Math.abs(pnl.income.total)) * 100,
+    netMarginPercent:
+      revenueMinor === 0 ? null : (pnl.netIncome / Math.abs(revenueMinor)) * 100,
+  };
 }
 
 export function todayInTimeZone(timeZone: string): string {
@@ -120,7 +239,15 @@ export async function getDashboardMetrics(
   if (periods.error) throw new DashboardError(periods.error.message);
   if (approvals.error) throw new DashboardError(approvals.error.message);
 
-  const cashMinor = bal.filter((r) => r.accountType === "bank").reduce((s, r) => s + (r.debitBase - r.creditBase), 0);
+  const naturalAsset = (row: (typeof bal)[number]) => row.debitBase - row.creditBase;
+  const naturalLiability = (row: (typeof bal)[number]) => row.creditBase - row.debitBase;
+  const cashMinor = bal.filter((r) => r.accountType === "bank").reduce((s, r) => s + naturalAsset(r), 0);
+  const currentAssetsMinor = bal
+    .filter((r) => ["bank", "accounts_receivable", "current_asset"].includes(r.accountType))
+    .reduce((s, r) => s + naturalAsset(r), 0);
+  const currentLiabilitiesMinor = bal
+    .filter((r) => ["accounts_payable", "credit_card", "current_liability"].includes(r.accountType))
+    .reduce((s, r) => s + naturalLiability(r), 0);
   // Overdue = total minus the "current" bucket (current = not yet overdue).
   const overdue = (rep: AgeingReport) =>
     Object.entries(rep.buckets).filter(([k]) => k !== "current").reduce((s, [, v]) => s + v, 0);
@@ -129,6 +256,10 @@ export async function getDashboardMetrics(
 
   return {
     cashMinor,
+    currentAssetsMinor,
+    currentLiabilitiesMinor,
+    workingCapitalMinor: currentAssetsMinor - currentLiabilitiesMinor,
+    currentRatio: currentLiabilitiesMinor === 0 ? null : currentAssetsMinor / currentLiabilitiesMinor,
     overdueArMinor: overdue(ar),
     overdueApMinor: overdue(ap),
     overdueArCount: ar.rows.filter((row) => row.bucket !== "current").length,
@@ -143,24 +274,24 @@ export async function getDashboardMetrics(
   };
 }
 
-const ACTIVITY_ENTITIES: Record<string, { entity: string; href: string }> = {
-  acc_invoice: { entity: "Invoice", href: "/invoices" },
-  acc_payment: { entity: "Customer payment", href: "/payments" },
-  acc_credit_memo: { entity: "Credit memo", href: "/credit-memos" },
-  acc_bill: { entity: "Bill", href: "/bills" },
-  acc_bill_payment: { entity: "Bill payment", href: "/pay-bills" },
-  acc_vendor_credit: { entity: "Vendor credit", href: "/vendor-credits" },
-  acc_expense: { entity: "Expense", href: "/expenses" },
-  acc_purchase_order: { entity: "Purchase order", href: "/purchase-orders" },
-  acc_goods_receipt: { entity: "Goods receipt", href: "/purchase-orders" },
-  acc_inventory_txn: { entity: "Inventory movement", href: "/items" },
-  acc_journal_entry: { entity: "Journal entry", href: "/journal" },
-  acc_statement_reconciliation: { entity: "Bank reconciliation", href: "/banking/reconcile" },
-  acc_approval_request: { entity: "Approval request", href: "/approvals" },
-  acc_accounting_period: { entity: "Accounting period", href: "/settings/periods" },
-  acc_company_setting: { entity: "Company settings", href: "/settings/company" },
-  acc_vendor_tax_profile: { entity: "Vendor tax profile", href: "/vendors" },
-  acc_budget: { entity: "Budget", href: "/reports" },
+const ACTIVITY_ENTITIES: Record<string, { entity: string; href: string; category: DashboardActivityCategory }> = {
+  acc_invoice: { entity: "Invoice", href: "/invoices", category: "sales" },
+  acc_payment: { entity: "Customer payment", href: "/payments", category: "sales" },
+  acc_credit_memo: { entity: "Credit memo", href: "/credit-memos", category: "sales" },
+  acc_bill: { entity: "Bill", href: "/bills", category: "purchases" },
+  acc_bill_payment: { entity: "Bill payment", href: "/pay-bills", category: "purchases" },
+  acc_vendor_credit: { entity: "Vendor credit", href: "/vendor-credits", category: "purchases" },
+  acc_expense: { entity: "Expense", href: "/expenses", category: "purchases" },
+  acc_purchase_order: { entity: "Purchase order", href: "/purchase-orders", category: "purchases" },
+  acc_goods_receipt: { entity: "Goods receipt", href: "/purchase-orders", category: "inventory" },
+  acc_inventory_txn: { entity: "Inventory movement", href: "/items", category: "inventory" },
+  acc_journal_entry: { entity: "Journal entry", href: "/journal", category: "close" },
+  acc_statement_reconciliation: { entity: "Bank reconciliation", href: "/banking/reconcile", category: "banking" },
+  acc_approval_request: { entity: "Approval request", href: "/approvals", category: "governance" },
+  acc_accounting_period: { entity: "Accounting period", href: "/settings/periods", category: "close" },
+  acc_company_setting: { entity: "Company settings", href: "/settings/company", category: "governance" },
+  acc_vendor_tax_profile: { entity: "Vendor tax profile", href: "/vendors", category: "governance" },
+  acc_budget: { entity: "Budget", href: "/reports", category: "close" },
 };
 
 const ACTIVITY_VERBS: Record<string, string> = {
@@ -199,6 +330,7 @@ export function describeAuditActivity(row: AuditEntryRow): DashboardActivity {
   const meta = ACTIVITY_ENTITIES[row.table_name] ?? {
     entity: row.table_name.replace(/^acc_/, "").replaceAll("_", " "),
     href: "/settings/audit",
+    category: "other" as const,
   };
   const exactHref =
     row.table_name === "acc_purchase_order" && row.record_id
@@ -212,6 +344,7 @@ export function describeAuditActivity(row: AuditEntryRow): DashboardActivity {
     entity: meta.entity,
     reference: referenceFromAudit(row.after_json) ?? referenceFromAudit(row.before_json),
     href: exactHref,
+    category: meta.category,
   };
 }
 
@@ -247,19 +380,156 @@ async function getRecentActivity(sb: SupabaseClient): Promise<DashboardActivity[
     action: null,
     from: null,
     to: null,
-    limit: 10,
+    limit: 24,
   });
   return rows.map(describeAuditActivity);
+}
+
+async function getPeriodComparison(
+  sb: SupabaseClient,
+  asOf: string,
+): Promise<PeriodComparison> {
+  const previous = comparablePreviousMonthRange(asOf);
+  const [currentRows, priorRows] = await Promise.all([
+    getLedgerBalances(sb, monthStart(asOf), asOf),
+    getLedgerBalances(sb, previous.from, previous.to),
+  ]);
+  const current = performanceSnapshot(currentRows);
+  const prior = performanceSnapshot(priorRows);
+  return {
+    currentLabel: `${asOf.slice(0, 7)} MTD`,
+    priorLabel: `${previous.label} 1-${Number(previous.to.slice(-2))}`,
+    current,
+    prior,
+    revenueChangePercent: percentChange(current.revenueMinor, prior.revenueMinor),
+    expenseChangePercent: percentChange(current.totalExpenseMinor, prior.totalExpenseMinor),
+    netIncomeChangeMinor: current.netIncomeMinor - prior.netIncomeMinor,
+    grossMarginChangePoints:
+      current.grossMarginPercent === null || prior.grossMarginPercent === null
+        ? null
+        : current.grossMarginPercent - prior.grossMarginPercent,
+  };
+}
+
+async function getInventoryDashboard(
+  sb: SupabaseClient,
+  asOf: string,
+): Promise<InventoryDashboardSnapshot> {
+  const [valuation, movements] = await Promise.all([
+    getInventoryValuation(sb, asOf),
+    sb
+      .from("acc_inventory_txn")
+      .select("item_id,txn_date")
+      .lte("txn_date", asOf)
+      .order("txn_date", { ascending: false }),
+  ]);
+  if (movements.error) throw new DashboardError(movements.error.message);
+
+  const latestMovement = new Map<string, string>();
+  for (const row of movements.data ?? []) {
+    const itemId = String(row.item_id);
+    if (!latestMovement.has(itemId)) latestMovement.set(itemId, String(row.txn_date));
+  }
+  const staleCutoff = new Date(`${asOf}T00:00:00.000Z`);
+  staleCutoff.setUTCDate(staleCutoff.getUTCDate() - 90);
+  const staleRows = valuation.rows.filter((row) => {
+    if (row.qty_on_hand <= 0) return false;
+    const moved = latestMovement.get(row.item_id);
+    return !moved || new Date(`${moved}T00:00:00.000Z`) < staleCutoff;
+  });
+  const sorted = [...valuation.rows].sort((a, b) => b.value_minor - a.value_minor);
+
+  return {
+    valueMinor: valuation.subledgerValueMinor,
+    quantity: valuation.rows.reduce((sum, row) => sum + row.qty_on_hand, 0),
+    itemCount: valuation.rows.length,
+    zeroStockCount: valuation.rows.filter((row) => row.qty_on_hand === 0).length,
+    slowMovingCount: staleRows.length,
+    slowMovingValueMinor: staleRows.reduce((sum, row) => sum + row.value_minor, 0),
+    tiesOut: valuation.tiesOut,
+    topHoldings: sorted.slice(0, 5).map((row) => ({
+      itemId: row.item_id,
+      code: row.item_code,
+      name: row.name,
+      quantity: row.qty_on_hand,
+      valueMinor: row.value_minor,
+      sharePercent:
+        valuation.subledgerValueMinor === 0
+          ? 0
+          : (row.value_minor / Math.abs(valuation.subledgerValueMinor)) * 100,
+    })),
+  };
+}
+
+async function getOperatingPulse(sb: SupabaseClient, asOf: string): Promise<OperatingPulse> {
+  const from = monthStart(asOf);
+  const [invoices, payments, bills, receipts] = await Promise.all([
+    sb.from("acc_invoice").select("status,total_minor").gte("issue_date", from).lte("issue_date", asOf),
+    sb.from("acc_payment").select("status,amount_minor").gte("payment_date", from).lte("payment_date", asOf),
+    sb.from("acc_bill").select("status,total_minor").gte("bill_date", from).lte("bill_date", asOf),
+    sb.from("acc_goods_receipt").select("status").gte("receipt_date", from).lte("receipt_date", asOf),
+  ]);
+  for (const result of [invoices, payments, bills, receipts]) {
+    if (result.error) throw new DashboardError(result.error.message);
+  }
+  const issuedInvoices = (invoices.data ?? []).filter((row) => !["draft", "void"].includes(String(row.status)));
+  const receivedPayments = (payments.data ?? []).filter((row) => String(row.status) !== "void");
+  const postedBills = (bills.data ?? []).filter((row) => !["draft", "void"].includes(String(row.status)));
+  const postedReceipts = (receipts.data ?? []).filter((row) => String(row.status) === "posted");
+  return {
+    invoices: {
+      count: issuedInvoices.length,
+      amountMinor: issuedInvoices.reduce((sum, row) => sum + Number(row.total_minor), 0),
+    },
+    customerPayments: {
+      count: receivedPayments.length,
+      amountMinor: receivedPayments.reduce((sum, row) => sum + Number(row.amount_minor), 0),
+    },
+    bills: {
+      count: postedBills.length,
+      amountMinor: postedBills.reduce((sum, row) => sum + Number(row.total_minor), 0),
+    },
+    goodsReceipts: { count: postedReceipts.length },
+  };
 }
 
 export async function getDashboardAnalytics(
   sb: SupabaseClient,
   asOf = new Date().toISOString().slice(0, 10),
 ): Promise<DashboardAnalytics> {
-  const [metrics, monthlyPerformance, recentActivity] = await Promise.all([
+  const [
+    metrics,
+    monthlyPerformance,
+    periodComparison,
+    cashFlow,
+    inventory,
+    operatingPulse,
+    recentActivity,
+  ] = await Promise.all([
     getDashboardMetrics(sb, asOf),
     getMonthlyPerformance(sb, asOf),
+    getPeriodComparison(sb, asOf),
+    getCashFlow(sb, monthStart(asOf), asOf),
+    getInventoryDashboard(sb, asOf),
+    getOperatingPulse(sb, asOf),
     getRecentActivity(sb),
   ]);
-  return { asOf, metrics, monthlyPerformance, recentActivity };
+  return {
+    asOf,
+    metrics,
+    monthlyPerformance,
+    periodComparison,
+    cashMovement: {
+      operatingMinor: cashFlow.operating,
+      investingMinor: cashFlow.investing,
+      financingMinor: cashFlow.financing,
+      netChangeMinor: cashFlow.netChange,
+      openingMinor: cashFlow.openingMinor,
+      closingMinor: cashFlow.closingMinor,
+      tiesOut: cashFlow.tiesOut,
+    },
+    inventory,
+    operatingPulse,
+    recentActivity,
+  };
 }
