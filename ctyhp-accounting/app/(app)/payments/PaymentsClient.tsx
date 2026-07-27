@@ -16,7 +16,11 @@ import {
   Typography,
   type TableColumnsType,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
+import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow, PaymentStatus } from "@/lib/db/types";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { recordPaymentAction, getOpenInvoicesAction } from "./actions";
@@ -36,6 +40,10 @@ export default function PaymentsClient({
   depositAccounts,
   currencies,
   canWrite,
+  canReadDocuments,
+  canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -44,6 +52,10 @@ export default function PaymentsClient({
   depositAccounts: AccountRow[];
   currencies: CurrencyRow[];
   canWrite: boolean;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -53,6 +65,7 @@ export default function PaymentsClient({
   const [openInvoices, setOpenInvoices] = useState<InvoiceRow[]>([]);
   const [alloc, setAlloc] = useState<Record<string, number>>({}); // invoiceId -> major units
   const [refundFor, setRefundFor] = useState<(PaymentRow & { customer_name: string }) | null>(null);
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const baseCurrency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
@@ -152,12 +165,29 @@ export default function PaymentsClient({
     {
       title: "Actions",
       key: "actions",
-      width: 100,
+      width: 145,
       render: (_: unknown, r) =>
-        canWrite && r.unapplied_minor > 0 ? (
-          <Button size="small" onClick={() => setRefundFor(r)}>
-            Refund
-          </Button>
+        canReadDocuments || (canWrite && r.unapplied_minor > 0) ? (
+          <Space size={4}>
+            {canReadDocuments ? (
+              <IconActionButton
+                label="View payment attachments"
+                icon={<PaperClipOutlined />}
+                onClick={() =>
+                  setAttachmentTarget({
+                    entityType: "payment",
+                    entityId: r.id,
+                    label: `${r.payment_number ?? "Payment"} · ${r.customer_name}`,
+                  })
+                }
+              />
+            ) : null}
+            {canWrite && r.unapplied_minor > 0 ? (
+              <Button size="small" onClick={() => setRefundFor(r)}>
+                Refund
+              </Button>
+            ) : null}
+          </Space>
         ) : null,
     },
   ];
@@ -172,7 +202,23 @@ export default function PaymentsClient({
         </Space>
       )}
 
-      <Table rowKey="id" columns={columns} dataSource={payments} size="small" pagination={{ pageSize: 20 }} sticky />
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={payments}
+        size="small"
+        pagination={{ pageSize: 20 }}
+        scroll={{ x: "max-content" }}
+        sticky
+      />
+
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
+        onClose={() => setAttachmentTarget(null)}
+      />
 
       <Modal
         title="Receive payment"

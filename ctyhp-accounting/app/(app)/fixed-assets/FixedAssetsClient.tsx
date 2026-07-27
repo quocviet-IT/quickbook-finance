@@ -31,6 +31,7 @@ import {
   CalendarOutlined,
   CloudUploadOutlined,
   DollarOutlined,
+  PaperClipOutlined,
   PlusOutlined,
   ScheduleOutlined,
   StopOutlined,
@@ -39,6 +40,10 @@ import {
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import type {
   AccountRow,
   AssetDepreciationScheduleRow,
@@ -130,6 +135,10 @@ interface FixedAssetsClientProps {
   canPost: boolean;
   canImport: boolean;
   canDispose: boolean;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
   proceedsAccounts: AccountRow[];
   gainAccounts: AccountRow[];
   lossAccounts: AccountRow[];
@@ -210,6 +219,10 @@ export default function FixedAssetsClient({
   canPost,
   canImport,
   canDispose,
+  canReadDocuments,
+  canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
   proceedsAccounts,
   gainAccounts,
   lossAccounts,
@@ -244,6 +257,7 @@ export default function FixedAssetsClient({
   const [disposalAsset, setDisposalAsset] = useState<FixedAssetView | null>(null);
   const [disposalSchedule, setDisposalSchedule] = useState<AssetDepreciationScheduleRow[]>([]);
   const [disposalScheduleLoading, setDisposalScheduleLoading] = useState(false);
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const money = (value: number) => formatMoney(value, currency.code, currency.decimal_places);
   const toMinor = (value: number) => toMinorUnits(value, currency.decimal_places);
@@ -746,10 +760,23 @@ export default function FixedAssetsClient({
     {
       title: "Actions",
       key: "action",
-      width: 265,
+      width: 315,
       fixed: "right",
       render: (_value, asset) => (
         <Space size={4}>
+          {canReadDocuments ? (
+            <IconActionButton
+              label="View fixed asset attachments"
+              icon={<PaperClipOutlined />}
+              onClick={() =>
+                setAttachmentTarget({
+                  entityType: "fixed_asset",
+                  entityId: asset.id,
+                  label: `${asset.asset_number} · ${asset.name}`,
+                })
+              }
+            />
+          ) : null}
           <Button size="small" icon={<ScheduleOutlined />} onClick={() => void openSchedule(asset)}>
             Schedule
           </Button>
@@ -920,6 +947,14 @@ export default function FixedAssetsClient({
         sticky
         emptyTitle="No fixed assets"
         emptyDescription="Register equipment, fixtures, security systems, and other long-lived assets."
+      />
+
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
+        onClose={() => setAttachmentTarget(null)}
       />
 
       <Modal

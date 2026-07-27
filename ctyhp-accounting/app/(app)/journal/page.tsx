@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
+import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import JournalClient from "./JournalClient";
 
@@ -16,10 +18,20 @@ export default async function JournalPage({
   const initialCreateOpen = params.new === "1";
   const initialEntryId = Array.isArray(params.entry) ? params.entry[0] : params.entry;
   const sb = await createSupabaseServerClient();
-  const [currencies, accounts, role] = await Promise.all([
+  const [
+    currencies,
+    accounts,
+    role,
+    canReadDocuments,
+    canManageDocuments,
+    canGovernDocuments,
+  ] = await Promise.all([
     listCurrencies(sb),
     listAccounts(sb),
     getUserRole(),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
   const base = currencies.find((c) => c.is_base);
   const postingAccounts = accounts.filter((a) => a.is_posting_account && a.status === "active");
@@ -33,6 +45,10 @@ export default async function JournalPage({
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
         initialEntryId={initialEntryId}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

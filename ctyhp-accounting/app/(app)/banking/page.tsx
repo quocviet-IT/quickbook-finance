@@ -5,6 +5,8 @@ import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { bankFeedEncryptionConfigured } from "@/lib/services/bank-token-crypto";
 import { plaidConfiguration } from "@/lib/services/plaid";
+import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import BankingClient from "./BankingClient";
 
@@ -12,12 +14,24 @@ export const dynamic = "force-dynamic";
 
 export default async function BankingPage() {
   const sb = await createSupabaseServerClient();
-  const [bankAccounts, bankConnections, accounts, currencies, role] = await Promise.all([
+  const [
+    bankAccounts,
+    bankConnections,
+    accounts,
+    currencies,
+    role,
+    canReadDocuments,
+    canManageDocuments,
+    canGovernDocuments,
+  ] = await Promise.all([
     listBankAccounts(sb),
     listBankConnections(sb),
     listAccounts(sb),
     listCurrencies(sb),
     getUserRole(),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
 
   const linkedIds = new Set(bankAccounts.map((b) => b.account_id));
@@ -40,6 +54,10 @@ export default async function BankingPage() {
         canWrite={canWrite(role)}
         plaidConfigured={plaid.configured && bankFeedEncryptionConfigured()}
         plaidEnvironment={plaid.environment}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

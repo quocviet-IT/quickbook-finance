@@ -23,12 +23,17 @@ import {
   CloudSyncOutlined,
   InboxOutlined,
   LinkOutlined,
+  PaperClipOutlined,
   PlusOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { EmptyState } from "@/components/ui/PageStates";
+import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type {
   BankAccountWithGl,
@@ -127,6 +132,10 @@ export default function BankingClient({
   canWrite,
   plaidConfigured,
   plaidEnvironment,
+  canReadDocuments,
+  canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
 }: {
   bankAccounts: BankAccountWithGl[];
   bankConnections: BankConnectionView[];
@@ -135,6 +144,10 @@ export default function BankingClient({
   canWrite: boolean;
   plaidConfigured: boolean;
   plaidEnvironment: string;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
   const [selectedId, setSelectedId] = useState<string | undefined>(bankAccounts[0]?.id);
@@ -143,6 +156,7 @@ export default function BankingClient({
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
@@ -438,6 +452,29 @@ export default function BankingClient({
         </Space>
       ),
     },
+    ...(canReadDocuments
+      ? [
+          {
+            title: "",
+            key: "attachments",
+            width: 56,
+            fixed: "right" as const,
+            render: (_value: unknown, row: BankTransactionRow) => (
+              <IconActionButton
+                label="View bank transaction attachments"
+                icon={<PaperClipOutlined />}
+                onClick={() =>
+                  setAttachmentTarget({
+                    entityType: "bank_transaction",
+                    entityId: row.id,
+                    label: `${row.txn_date} · ${row.description}`,
+                  })
+                }
+              />
+            ),
+          } as TableColumnsType<BankTransactionRow>[number],
+        ]
+      : []),
   ];
 
   const suggestionColumns: TableColumnsType<SuggestionView> = [
@@ -663,6 +700,14 @@ export default function BankingClient({
           emptyDescription="Run matching to compare bank activity with posted General Ledger bank lines."
         />
       )}
+
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
+        onClose={() => setAttachmentTarget(null)}
+      />
 
       <Modal
         title="Import bank statement"

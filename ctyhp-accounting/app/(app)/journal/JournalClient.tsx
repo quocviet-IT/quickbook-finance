@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
 
@@ -21,6 +24,10 @@ interface Props {
   initialCreateOpen: boolean;
   /** Opens one journal from an operational report via `?entry=<uuid>`. */
   initialEntryId?: string;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
 }
 interface LineForm {
   account_id?: string;
@@ -35,6 +42,10 @@ export default function JournalClient({
   baseDecimals,
   initialCreateOpen,
   initialEntryId,
+  canReadDocuments,
+  canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
 }: Props) {
   const { message, modal } = App.useApp();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
@@ -46,6 +57,7 @@ export default function JournalClient({
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>(
     initialEntryId ? [initialEntryId] : [],
   );
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -175,14 +187,41 @@ export default function JournalClient({
           {
             title: "",
             key: "actions",
-            render: (_, e) =>
-              canWrite && e.status === "posted" && !e.isReversed && !e.isReversal && e.sourceType === "manual" ? (
-                <Button size="small" onClick={() => reverse(e)}>
-                  Reverse
-                </Button>
-              ) : null,
+            render: (_, e) => (
+              <Space size={4}>
+                {canReadDocuments ? (
+                  <IconActionButton
+                    label="View journal entry attachments"
+                    icon={<PaperClipOutlined />}
+                    onClick={() =>
+                      setAttachmentTarget({
+                        entityType: "journal_entry",
+                        entityId: e.id,
+                        label: `${e.entryNumber} · ${e.description ?? "Journal entry"}`,
+                      })
+                    }
+                  />
+                ) : null}
+                {canWrite &&
+                e.status === "posted" &&
+                !e.isReversed &&
+                !e.isReversal &&
+                e.sourceType === "manual" ? (
+                  <Button size="small" onClick={() => reverse(e)}>
+                    Reverse
+                  </Button>
+                ) : null}
+              </Space>
+            ),
           },
         ]}
+      />
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
+        onClose={() => setAttachmentTarget(null)}
       />
       <Modal
         open={open}

@@ -4,6 +4,8 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listFixedAssets } from "@/lib/services/fixed-assets";
 import { listBills, listVendors } from "@/lib/services/payables";
 import { listCurrencies } from "@/lib/services/reference";
+import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import FixedAssetsClient from "./FixedAssetsClient";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,9 @@ export default async function FixedAssetsPage({
     postPermission,
     importPermission,
     disposePermission,
+    canReadDocuments,
+    canManageDocuments,
+    canGovernDocuments,
   ] = await Promise.all([
     listFixedAssets(sb),
     listAccounts(sb),
@@ -36,6 +41,9 @@ export default async function FixedAssetsPage({
     sb.rpc("acc_has_permission", { p_key: "fixed_assets.post" }),
     sb.rpc("acc_has_permission", { p_key: "fixed_assets.import" }),
     sb.rpc("acc_has_permission", { p_key: "fixed_assets.dispose" }),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
   const baseCurrency = currencies.find((currency) => currency.is_base) ?? currencies[0];
   const postedBills = bills.filter((bill) => bill.status !== "draft" && bill.status !== "void" && bill.journal_entry_id);
@@ -65,6 +73,10 @@ export default async function FixedAssetsPage({
         canPost={!postPermission.error && postPermission.data === true}
         canImport={!importPermission.error && importPermission.data === true}
         canDispose={!disposePermission.error && disposePermission.data === true}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
         proceedsAccounts={accounts.filter(
           (account) =>
             (account.account_type === "bank" ||

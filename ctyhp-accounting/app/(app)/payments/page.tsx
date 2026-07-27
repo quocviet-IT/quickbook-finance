@@ -3,6 +3,8 @@ import { listPayments, listCustomers } from "@/lib/services/invoicing";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import PaymentsClient from "./PaymentsClient";
 
@@ -15,12 +17,24 @@ export default async function PaymentsPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [payments, customers, accounts, currencies, role] = await Promise.all([
+  const [
+    payments,
+    customers,
+    accounts,
+    currencies,
+    role,
+    canReadDocuments,
+    canManageDocuments,
+    canGovernDocuments,
+  ] = await Promise.all([
     listPayments(sb),
     listCustomers(sb),
     listAccounts(sb),
     listCurrencies(sb),
     getUserRole(),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
 
   const depositAccounts = accounts.filter(
@@ -37,6 +51,10 @@ export default async function PaymentsPage({
         depositAccounts={depositAccounts}
         currencies={currencies}
         canWrite={canWrite(role)}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );
