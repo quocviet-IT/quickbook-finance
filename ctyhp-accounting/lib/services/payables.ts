@@ -84,7 +84,11 @@ export async function getBillLines(sb: SupabaseClient, billId: string): Promise<
 }
 
 /** Create a draft bill. Line amounts are already minor units and tax-inclusive. */
-export async function createDraftBill(sb: SupabaseClient, input: BillCreateInput): Promise<BillRow> {
+export async function createDraftBill(
+  sb: SupabaseClient,
+  input: BillCreateInput,
+  options?: { recurringRunId?: string },
+): Promise<BillRow> {
   const total = input.lines.reduce((s, l) => s + l.amount_minor, 0);
 
   const { data: bill, error: e1 } = await sb
@@ -98,6 +102,7 @@ export async function createDraftBill(sb: SupabaseClient, input: BillCreateInput
       memo: input.memo || null,
       total_minor: total,
       balance_due_minor: total,
+      recurring_run_id: options?.recurringRunId ?? null,
     })
     .select("*")
     .single();

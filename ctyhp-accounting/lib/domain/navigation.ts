@@ -79,6 +79,7 @@ export const NAV: NavItem[] = [
     children: [
       { key: "/accounts", label: "Chart of Accounts" },
       { key: "/journal", label: "Journal Entries" },
+      { key: "/recurring", label: "Recurring Transactions" },
       { key: "/fixed-assets", label: "Fixed Assets" },
       { key: "/sales-tax", label: "Sales Tax" },
       { key: "/opening-balances", label: "Opening Balances" },

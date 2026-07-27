@@ -3,6 +3,10 @@
     {
       "path": "/api/bank-feeds/sync",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/recurring/run",
+      "schedule": "15 11 * * *"
     }
   ]
 }

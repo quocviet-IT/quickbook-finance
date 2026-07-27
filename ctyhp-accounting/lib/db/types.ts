@@ -557,6 +557,54 @@ export interface AssetDepreciationScheduleRow {
   created_at: string;
 }
 
+export type RecurringDocumentType = "invoice" | "bill" | "expense" | "journal";
+export type RecurringFrequency = "weekly" | "monthly" | "quarterly" | "yearly";
+export type RecurringTemplateStatus = "active" | "paused" | "ended";
+export type RecurringRunStatus =
+  | "processing"
+  | "generated"
+  | "pending_review"
+  | "awaiting_approval"
+  | "failed";
+
+export interface RecurringTemplateRow {
+  id: string;
+  name: string;
+  document_type: RecurringDocumentType;
+  frequency: RecurringFrequency;
+  interval_count: number;
+  start_date: string;
+  next_run_date: string;
+  end_date: string | null;
+  payload: Record<string, unknown>;
+  total_minor: number;
+  status: RecurringTemplateStatus;
+  last_run_at: string | null;
+  last_run_status: RecurringRunStatus | null;
+  last_error: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecurringRunRow {
+  id: string;
+  template_id: string;
+  template_name?: string;
+  document_type: RecurringDocumentType;
+  scheduled_date: string;
+  payload_snapshot: Record<string, unknown>;
+  status: RecurringRunStatus;
+  document_id: string | null;
+  approval_request_id: string | null;
+  error_message: string | null;
+  generated_by: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+}
+
 export interface BudgetLineRow {
   id: string;
   budget_id: string;

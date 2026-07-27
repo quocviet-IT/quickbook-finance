@@ -83,6 +83,7 @@ export async function getInvoiceLines(sb: SupabaseClient, invoiceId: string): Pr
 export async function createDraftInvoice(
   sb: SupabaseClient,
   input: InvoiceCreateInput,
+  options?: { recurringRunId?: string },
 ): Promise<InvoiceRow> {
   const taxCodeIds = [...new Set(input.lines.map((l) => l.tax_code_id).filter(Boolean))] as string[];
   const rates = new Map<string, number>();
@@ -117,6 +118,7 @@ export async function createDraftInvoice(
       tax_total_minor: totals.taxTotalMinor,
       total_minor: totals.totalMinor,
       balance_due_minor: totals.totalMinor,
+      recurring_run_id: options?.recurringRunId ?? null,
     })
     .select("*")
     .single();
