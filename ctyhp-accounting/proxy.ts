@@ -8,6 +8,12 @@ import { createServerClient } from "@supabase/ssr";
  * (Next.js 16 renamed the middleware convention to `proxy`.)
  */
 export async function proxy(request: NextRequest) {
+  // Route Handlers are independent security boundaries. Cron endpoints verify
+  // CRON_SECRET themselves and have no browser session to refresh.
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
