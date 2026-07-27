@@ -1,11 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BankAccountRow, BankTransactionRow } from "@/lib/db/types";
+import { createHash } from "node:crypto";
+import type {
+  BankAccountRow,
+  BankConnectionRow,
+  BankFeedAccountRow,
+  BankTransactionRow,
+} from "@/lib/db/types";
 import {
-  matchTransactions,
+  matchLedgerTransactions,
   type BankTxnLite,
-  type PaymentLite,
+  type LedgerMatchCandidate,
 } from "@/lib/domain/reconciliation";
 import { writeAudit } from "./audit";
+import { decryptBankToken, encryptBankToken } from "./bank-token-crypto";
+import {
+  exchangePlaidPublicToken as exchangePublicToken,
+  getPlaidAccounts,
+  PlaidError,
+  syncPlaidTransactions,
+  type PlaidTransaction,
+} from "./plaid";
 
 export class BankingError extends Error {}
 
@@ -88,6 +102,7 @@ export async function importStatement(
     running_balance_minor: r.running_balance_minor,
     raw_line: r.raw_line,
     raw_hash: rawHash([bankAccountId, r.txn_date, r.amount_minor, r.description, r.reference]),
+    source: "file_upload",
   }));
 
   const { data, error } = await sb
@@ -114,64 +129,378 @@ export async function listBankTransactions(
     .from("acc_bank_transaction")
     .select("*")
     .eq("bank_account_id", bankAccountId)
+    .is("provider_removed_at", null)
     .order("txn_date", { ascending: false });
   if (error) throw new BankingError(error.message);
   return (data ?? []) as unknown as BankTransactionRow[];
 }
 
-/** Generate reconciliation suggestions for a bank account's unmatched txns. */
-export async function generateSuggestions(sb: SupabaseClient, bankAccountId: string): Promise<number> {
-  const { data: txnData, error: e1 } = await sb
-    .from("acc_bank_transaction")
-    .select("id,txn_date,amount_minor,description,reference")
-    .eq("bank_account_id", bankAccountId)
-    .eq("status", "unmatched");
-  if (e1) throw new BankingError(e1.message);
+export interface BankConnectionView extends BankConnectionRow {
+  accounts: BankFeedAccountRow[];
+}
 
-  const { data: approved } = await sb.from("acc_reconciliation").select("payment_id").eq("status", "approved");
-  const takenPayments = new Set((approved ?? []).map((r) => r.payment_id as string).filter(Boolean));
-
-  const { data: payData, error: e2 } = await sb
-    .from("acc_payment")
-    .select("id,payment_number,payment_date,amount_minor,acc_customer(name)")
-    .neq("status", "void");
-  if (e2) throw new BankingError(e2.message);
-
-  const txns: BankTxnLite[] = (txnData ?? []).map((t) => ({
-    id: t.id as string,
-    txnDate: t.txn_date as string,
-    amountMinor: Number(t.amount_minor),
-    description: (t.description as string) ?? "",
-    reference: (t.reference as string) ?? null,
+export async function listBankConnections(sb: SupabaseClient): Promise<BankConnectionView[]> {
+  const [{ data: connections, error: connectionError }, { data: accounts, error: accountError }] = await Promise.all([
+    sb.from("acc_bank_connection").select("*").order("created_at"),
+    sb.from("acc_bank_feed_account").select("*").eq("is_active", true).order("created_at"),
+  ]);
+  if (connectionError) throw new BankingError(connectionError.message);
+  if (accountError) throw new BankingError(accountError.message);
+  const feedAccounts = (accounts ?? []) as unknown as BankFeedAccountRow[];
+  return ((connections ?? []) as unknown as BankConnectionRow[]).map((connection) => ({
+    ...connection,
+    accounts: feedAccounts.filter((account) => account.connection_id === connection.id),
   }));
-  const payments: PaymentLite[] = ((payData ?? []) as unknown as Record<string, unknown>[])
-    .filter((p) => !takenPayments.has(p.id as string))
-    .map((p) => ({
-      id: p.id as string,
-      paymentDate: p.payment_date as string,
-      amountMinor: Number(p.amount_minor),
-      number: (p.payment_number as string) ?? null,
-      customerName: (p.acc_customer as { name?: string } | null)?.name ?? "",
-    }));
+}
 
-  const suggestions = matchTransactions(txns, payments);
-  if (!suggestions.length) return 0;
+export interface PlaidAccountMappingInput {
+  provider_account_id: string;
+  bank_account_id: string;
+}
 
-  const { data, error } = await sb
-    .from("acc_reconciliation")
-    .upsert(
-      suggestions.map((s) => ({
-        bank_transaction_id: s.bankTransactionId,
-        payment_id: s.paymentId,
-        rule_applied: s.rule,
-        confidence: s.confidence,
-        status: "suggested",
-      })),
-      { onConflict: "bank_transaction_id,payment_id", ignoreDuplicates: true },
-    )
-    .select("id");
+export interface ConnectedPlaidResult {
+  connectionId: string;
+  sync: BankFeedSyncResult;
+}
+
+export async function connectPlaidBank(
+  sb: SupabaseClient,
+  input: {
+    publicToken: string;
+    institutionId: string | null;
+    institutionName: string;
+    mappings: PlaidAccountMappingInput[];
+  },
+): Promise<ConnectedPlaidResult> {
+  if (!input.publicToken || !input.institutionName || !input.mappings.length) {
+    throw new BankingError("Institution and at least one account mapping are required");
+  }
+
+  const { accessToken, itemId } = await exchangePublicToken(input.publicToken);
+  const providerAccounts = await getPlaidAccounts(accessToken);
+  const selectedProviderIds = new Set(input.mappings.map((mapping) => mapping.provider_account_id));
+  const selectedAccounts = providerAccounts.filter((account) => selectedProviderIds.has(account.account_id));
+  if (selectedAccounts.length !== input.mappings.length) {
+    throw new BankingError("One or more selected provider accounts are no longer available");
+  }
+
+  const { data: currencies, error: currencyError } = await sb
+    .from("acc_currency")
+    .select("code,decimal_places");
+  if (currencyError) throw new BankingError(currencyError.message);
+  const decimals = new Map((currencies ?? []).map((row) => [row.code as string, Number(row.decimal_places)]));
+  const mappingByProvider = new Map(input.mappings.map((mapping) => [mapping.provider_account_id, mapping]));
+
+  const accounts = selectedAccounts.map((account) => {
+    const currency = account.balances.iso_currency_code?.toUpperCase();
+    if (!currency || !decimals.has(currency)) {
+      throw new BankingError(`${account.name} uses an unsupported or unofficial currency`);
+    }
+    const mapping = mappingByProvider.get(account.account_id);
+    if (!mapping) throw new BankingError(`Ledger mapping is missing for ${account.name}`);
+    const current = account.balances.current;
+    return {
+      bank_account_id: mapping.bank_account_id,
+      provider_account_id: account.account_id,
+      account_name: account.official_name || account.name,
+      account_mask: account.mask,
+      account_type: account.type,
+      account_subtype: account.subtype,
+      currency_code: currency,
+      last_balance_minor: current === null ? null : Math.round(current * 10 ** (decimals.get(currency) ?? 2)),
+    };
+  });
+
+  const encryptedToken = encryptBankToken(accessToken);
+  const { data, error } = await sb.rpc("acc_save_bank_connection", {
+    p_provider_item_id: itemId,
+    p_institution_id: input.institutionId,
+    p_institution_name: input.institutionName,
+    p_encrypted_access_token: encryptedToken,
+    p_accounts: accounts,
+  });
   if (error) throw new BankingError(error.message);
-  return (data ?? []).length;
+  const connectionId = data as string;
+  const sync = await syncBankConnection(sb, connectionId);
+  return { connectionId, sync };
+}
+
+interface NormalizedFeedTransaction {
+  external_transaction_id: string;
+  provider_account_id: string;
+  txn_date: string;
+  authorized_date: string | null;
+  description: string;
+  merchant_name: string | null;
+  category: string | null;
+  reference: string | null;
+  amount_minor: number;
+  pending: boolean;
+  running_balance_minor: null;
+  raw_line: string;
+  raw_hash: string;
+}
+
+export interface BankFeedSyncResult {
+  added: number;
+  modified: number;
+  removed: number;
+  suggestions: number;
+}
+
+function normalizePlaidTransaction(
+  transaction: PlaidTransaction,
+  decimalsByAccount: Map<string, number>,
+): NormalizedFeedTransaction {
+  const decimalPlaces = decimalsByAccount.get(transaction.account_id);
+  if (decimalPlaces === undefined) {
+    throw new BankingError(`No mapped currency was found for provider account ${transaction.account_id}`);
+  }
+  const raw = JSON.stringify(transaction);
+  return {
+    external_transaction_id: transaction.transaction_id,
+    provider_account_id: transaction.account_id,
+    txn_date: transaction.date,
+    authorized_date: transaction.authorized_date,
+    description: transaction.merchant_name || transaction.name || "Bank transaction",
+    merchant_name: transaction.merchant_name,
+    category:
+      transaction.personal_finance_category?.detailed ||
+      transaction.personal_finance_category?.primary ||
+      null,
+    reference: null,
+    // Plaid is positive for money out; the accounting app is positive for money in.
+    amount_minor: -Math.round(transaction.amount * 10 ** decimalPlaces),
+    pending: transaction.pending,
+    running_balance_minor: null,
+    raw_line: raw,
+    raw_hash: createHash("sha256").update(raw).digest("hex"),
+  };
+}
+
+async function collectPlaidChanges(
+  accessToken: string,
+  initialCursor: string | null,
+): Promise<{
+  added: PlaidTransaction[];
+  modified: PlaidTransaction[];
+  removed: string[];
+  nextCursor: string;
+}> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const added: PlaidTransaction[] = [];
+    const modified: PlaidTransaction[] = [];
+    const removed: string[] = [];
+    let cursor = initialCursor;
+    try {
+      while (true) {
+        const page = await syncPlaidTransactions(accessToken, cursor);
+        added.push(...page.added);
+        modified.push(...page.modified);
+        removed.push(...page.removed.map((row) => row.transaction_id));
+        cursor = page.next_cursor;
+        if (!page.has_more) return { added, modified, removed, nextCursor: page.next_cursor };
+      }
+    } catch (error) {
+      if (error instanceof PlaidError && error.code === "TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION" && attempt === 0) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new BankingError("Plaid transaction pagination could not stabilize");
+}
+
+function chunks<T>(rows: T[], size = 200): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < rows.length; index += size) result.push(rows.slice(index, index + size));
+  return result;
+}
+
+export async function syncBankConnection(
+  sb: SupabaseClient,
+  connectionId: string,
+): Promise<BankFeedSyncResult> {
+  const { data: connection, error: connectionError } = await sb
+    .from("acc_bank_connection")
+    .select("id,sync_cursor,status")
+    .eq("id", connectionId)
+    .single();
+  if (connectionError) throw new BankingError(connectionError.message);
+  if ((connection as { status: string }).status === "disconnected") {
+    throw new BankingError("This bank connection is disconnected");
+  }
+
+  const { data: runId, error: beginError } = await sb.rpc("acc_begin_bank_feed_sync", {
+    p_connection_id: connectionId,
+  });
+  if (beginError) throw new BankingError(beginError.message);
+
+  const totals = { added: 0, modified: 0, removed: 0, suggestions: 0 };
+  let nextCursor = (connection as { sync_cursor: string | null }).sync_cursor;
+  try {
+    const [{ data: encryptedToken, error: tokenError }, { data: mappings, error: mappingError }] = await Promise.all([
+      sb.rpc("acc_get_bank_connection_token", { p_connection_id: connectionId }),
+      sb
+        .from("acc_bank_feed_account")
+        .select("bank_account_id,provider_account_id,currency_code")
+        .eq("connection_id", connectionId)
+        .eq("is_active", true),
+    ]);
+    if (tokenError) throw new BankingError(tokenError.message);
+    if (mappingError) throw new BankingError(mappingError.message);
+
+    const currencyCodes = [...new Set((mappings ?? []).map((row) => row.currency_code as string))];
+    const { data: currencies, error: currencyError } = await sb
+      .from("acc_currency")
+      .select("code,decimal_places")
+      .in("code", currencyCodes);
+    if (currencyError) throw new BankingError(currencyError.message);
+    const currencyDecimals = new Map((currencies ?? []).map((row) => [row.code as string, Number(row.decimal_places)]));
+    const decimalsByAccount = new Map(
+      (mappings ?? []).map((row) => [
+        row.provider_account_id as string,
+        currencyDecimals.get(row.currency_code as string) ?? 2,
+      ]),
+    );
+
+    const changes = await collectPlaidChanges(
+      decryptBankToken(encryptedToken as string),
+      (connection as { sync_cursor: string | null }).sync_cursor,
+    );
+    nextCursor = changes.nextCursor;
+    const added = changes.added
+      .filter((row) => decimalsByAccount.has(row.account_id))
+      .map((row) => normalizePlaidTransaction(row, decimalsByAccount));
+    const modified = changes.modified
+      .filter((row) => decimalsByAccount.has(row.account_id))
+      .map((row) => normalizePlaidTransaction(row, decimalsByAccount));
+
+    const pageCount = Math.max(chunks(added).length, chunks(modified).length, chunks(changes.removed).length, 1);
+    const addedChunks = chunks(added);
+    const modifiedChunks = chunks(modified);
+    const removedChunks = chunks(changes.removed);
+    for (let index = 0; index < pageCount; index++) {
+      const { data: applied, error: applyError } = await sb.rpc("acc_apply_bank_feed_page", {
+        p_connection_id: connectionId,
+        p_added: addedChunks[index] ?? [],
+        p_modified: modifiedChunks[index] ?? [],
+        p_removed: removedChunks[index] ?? [],
+      });
+      if (applyError) throw new BankingError(applyError.message);
+      const counts = applied as { added?: number; modified?: number; removed?: number };
+      totals.added += Number(counts.added ?? 0);
+      totals.modified += Number(counts.modified ?? 0);
+      totals.removed += Number(counts.removed ?? 0);
+    }
+
+    for (const bankAccountId of new Set((mappings ?? []).map((row) => row.bank_account_id as string))) {
+      totals.suggestions += await generateSuggestions(sb, bankAccountId);
+    }
+
+    const { error: finishError } = await sb.rpc("acc_finish_bank_feed_sync", {
+      p_run_id: runId,
+      p_cursor: nextCursor,
+      p_added_count: totals.added,
+      p_modified_count: totals.modified,
+      p_removed_count: totals.removed,
+      p_matched_count: totals.suggestions,
+      p_error_message: null,
+    });
+    if (finishError) throw new BankingError(finishError.message);
+    return totals;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Bank feed synchronization failed";
+    await sb.rpc("acc_finish_bank_feed_sync", {
+      p_run_id: runId,
+      p_cursor: nextCursor,
+      p_added_count: totals.added,
+      p_modified_count: totals.modified,
+      p_removed_count: totals.removed,
+      p_matched_count: totals.suggestions,
+      p_error_message: message.slice(0, 1000),
+    });
+    throw error instanceof BankingError ? error : new BankingError(message);
+  }
+}
+
+/** Generate one-to-one match suggestions against posted lines in the linked bank GL account. */
+export async function generateSuggestions(sb: SupabaseClient, bankAccountId: string): Promise<number> {
+  const { data: bankAccount, error: bankError } = await sb
+    .from("acc_bank_account")
+    .select("account_id")
+    .eq("id", bankAccountId)
+    .single();
+  if (bankError) throw new BankingError(bankError.message);
+
+  const [{ data: txnData, error: txnError }, { data: approved, error: approvedError }, { data: lineData, error: lineError }] =
+    await Promise.all([
+      sb
+        .from("acc_bank_transaction")
+        .select("id,txn_date,amount_minor,description,reference")
+        .eq("bank_account_id", bankAccountId)
+        .eq("status", "unmatched")
+        .eq("pending", false)
+        .is("provider_removed_at", null),
+      sb.from("acc_reconciliation").select("journal_line_id").eq("status", "approved").not("journal_line_id", "is", null),
+      sb
+        .from("acc_journal_line")
+        .select(
+          "id,journal_entry_id,debit_minor,credit_minor,memo," +
+            "acc_journal_entry!inner(id,entry_number,entry_date,description,source_type,source_id,source_ref,status)",
+        )
+        .eq("account_id", (bankAccount as { account_id: string }).account_id)
+        .eq("acc_journal_entry.status", "posted"),
+    ]);
+  if (txnError) throw new BankingError(txnError.message);
+  if (approvedError) throw new BankingError(approvedError.message);
+  if (lineError) throw new BankingError(lineError.message);
+
+  const takenLines = new Set((approved ?? []).map((row) => row.journal_line_id as string).filter(Boolean));
+  const txns: BankTxnLite[] = (txnData ?? []).map((txn) => ({
+    id: txn.id as string,
+    txnDate: txn.txn_date as string,
+    amountMinor: Number(txn.amount_minor),
+    description: (txn.description as string) ?? "",
+    reference: (txn.reference as string) ?? null,
+  }));
+  const candidates: LedgerMatchCandidate[] = ((lineData ?? []) as unknown as Record<string, unknown>[])
+    .filter((line) => !takenLines.has(line.id as string))
+    .map((line) => {
+      const entry = line.acc_journal_entry as {
+        id: string;
+        entry_number: string;
+        entry_date: string;
+        description: string | null;
+        source_type: string;
+        source_id: string | null;
+        source_ref: string | null;
+      };
+      return {
+        journalLineId: line.id as string,
+        journalEntryId: line.journal_entry_id as string,
+        entryDate: entry.entry_date,
+        amountMinor: Number(line.debit_minor) - Number(line.credit_minor),
+        entryNumber: entry.entry_number,
+        sourceType: entry.source_type,
+        sourceId: entry.source_id,
+        description: `${entry.description ?? ""} ${(line.memo as string | null) ?? ""}`.trim(),
+        reference: entry.source_ref,
+      };
+    });
+
+  const suggestions = matchLedgerTransactions(txns, candidates);
+  if (!suggestions.length) return 0;
+  const { data, error } = await sb.rpc("acc_upsert_bank_match_suggestions", {
+    p_suggestions: suggestions.map((suggestion) => ({
+      bank_transaction_id: suggestion.bankTransactionId,
+      journal_line_id: suggestion.journalLineId,
+      rule_applied: suggestion.rule,
+      confidence: suggestion.confidence,
+    })),
+  });
+  if (error) throw new BankingError(error.message);
+  return Number(data ?? 0);
 }
 
 export interface SuggestionView {
@@ -183,66 +512,65 @@ export interface SuggestionView {
   txn_date: string;
   txn_description: string;
   amount_minor: number;
-  payment_id: string;
-  payment_number: string | null;
+  journal_line_id: string | null;
+  journal_entry_id: string | null;
+  target_number: string | null;
+  target_type: string;
+  target_description: string | null;
 }
 
 export async function listSuggestions(sb: SupabaseClient, bankAccountId: string): Promise<SuggestionView[]> {
   const { data, error } = await sb
     .from("acc_reconciliation")
     .select(
-      "id,confidence,rule_applied,status,bank_transaction_id,payment_id," +
-        "acc_bank_transaction!inner(txn_date,description,amount_minor,bank_account_id),acc_payment(payment_number)",
+      "id,confidence,rule_applied,status,bank_transaction_id,payment_id,journal_line_id," +
+        "acc_bank_transaction!inner(txn_date,description,amount_minor,bank_account_id)," +
+        "acc_payment(payment_number)," +
+        "acc_journal_line(id,journal_entry_id,acc_journal_entry(entry_number,description,source_type))",
     )
     .eq("status", "suggested")
     .eq("acc_bank_transaction.bank_account_id", bankAccountId)
     .order("confidence", { ascending: false });
   if (error) throw new BankingError(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => {
-    const txn = r.acc_bank_transaction as { txn_date: string; description: string; amount_minor: number };
-    const pay = r.acc_payment as { payment_number?: string } | null;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => {
+    const txn = row.acc_bank_transaction as { txn_date: string; description: string; amount_minor: number };
+    const payment = row.acc_payment as { payment_number?: string } | null;
+    const line = row.acc_journal_line as {
+      id?: string;
+      journal_entry_id?: string;
+      acc_journal_entry?: { entry_number?: string; description?: string | null; source_type?: string };
+    } | null;
+    const entry = line?.acc_journal_entry;
     return {
-      id: r.id as string,
-      confidence: Number(r.confidence),
-      rule_applied: (r.rule_applied as string) ?? null,
-      status: r.status as string,
-      bank_transaction_id: r.bank_transaction_id as string,
+      id: row.id as string,
+      confidence: Number(row.confidence),
+      rule_applied: (row.rule_applied as string) ?? null,
+      status: row.status as string,
+      bank_transaction_id: row.bank_transaction_id as string,
       txn_date: txn.txn_date,
       txn_description: txn.description,
       amount_minor: Number(txn.amount_minor),
-      payment_id: r.payment_id as string,
-      payment_number: pay?.payment_number ?? null,
+      journal_line_id: (row.journal_line_id as string) ?? null,
+      journal_entry_id: line?.journal_entry_id ?? null,
+      target_number: entry?.entry_number ?? payment?.payment_number ?? null,
+      target_type: entry?.source_type ?? "payment",
+      target_description: entry?.description ?? null,
     };
   });
 }
 
 export async function approveReconciliation(sb: SupabaseClient, id: string): Promise<void> {
-  const { data: rec, error: e0 } = await sb
-    .from("acc_reconciliation")
-    .select("bank_transaction_id")
-    .eq("id", id)
-    .single();
-  if (e0) throw new BankingError(e0.message);
-
-  const { error: e1 } = await sb
-    .from("acc_reconciliation")
-    .update({ status: "approved", updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (e1) throw new BankingError(e1.message);
-
-  const { error: e2 } = await sb
-    .from("acc_bank_transaction")
-    .update({ status: "matched" })
-    .eq("id", (rec as { bank_transaction_id: string }).bank_transaction_id);
-  if (e2) throw new BankingError(e2.message);
-
-  await writeAudit(sb, { table_name: "acc_reconciliation", record_id: id, action: "update", after: { status: "approved" } });
+  const { error } = await sb.rpc("acc_decide_bank_match", {
+    p_reconciliation_id: id,
+    p_decision: "approved",
+  });
+  if (error) throw new BankingError(error.message);
 }
 
 export async function rejectReconciliation(sb: SupabaseClient, id: string): Promise<void> {
-  const { error } = await sb
-    .from("acc_reconciliation")
-    .update({ status: "rejected", updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const { error } = await sb.rpc("acc_decide_bank_match", {
+    p_reconciliation_id: id,
+    p_decision: "rejected",
+  });
   if (error) throw new BankingError(error.message);
 }

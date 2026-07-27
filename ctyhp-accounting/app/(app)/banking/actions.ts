@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, getSessionUser } from "@/lib/auth";
 import {
   createBankAccount,
   importStatement,
@@ -13,7 +13,11 @@ import {
   type ImportRow,
   type SuggestionView,
   BankingError,
+  connectPlaidBank,
+  syncBankConnection,
+  type PlaidAccountMappingInput,
 } from "@/lib/services/banking";
+import { createPlaidLinkToken } from "@/lib/services/plaid";
 import type { BankTransactionRow } from "@/lib/db/types";
 
 export interface ActionResult<T = undefined> {
@@ -25,6 +29,13 @@ export interface ActionResult<T = undefined> {
 async function guard(): Promise<string | null> {
   const role = await getUserRole();
   return canWrite(role) ? null : "You do not have permission to perform this action";
+}
+
+async function guardPermission(permission: string): Promise<string | null> {
+  const sb = await createSupabaseServerClient();
+  const { data, error } = await sb.rpc("acc_has_permission", { p_key: permission });
+  if (error || data !== true) return "You do not have permission to perform this action";
+  return null;
 }
 function msg(err: unknown): string {
   if (err instanceof BankingError || err instanceof Error) return err.message;
@@ -78,7 +89,7 @@ export async function getTransactionsAction(bankAccountId: string): Promise<Acti
 }
 
 export async function generateSuggestionsAction(bankAccountId: string): Promise<ActionResult<{ count: number }>> {
-  const denied = await guard();
+  const denied = await guardPermission("banking.match");
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
@@ -99,7 +110,7 @@ export async function getSuggestionsAction(bankAccountId: string): Promise<Actio
 }
 
 export async function approveReconciliationAction(id: string): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await guardPermission("banking.match");
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
@@ -112,13 +123,65 @@ export async function approveReconciliationAction(id: string): Promise<ActionRes
 }
 
 export async function rejectReconciliationAction(id: string): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = await guardPermission("banking.match");
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
     await rejectReconciliation(sb, id);
     revalidatePath("/banking");
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function createPlaidLinkTokenAction(): Promise<ActionResult<{ linkToken: string }>> {
+  const denied = await guardPermission("bank_feed.manage");
+  if (denied) return { ok: false, error: denied };
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "Your session has expired" };
+  try {
+    return { ok: true, data: { linkToken: await createPlaidLinkToken(user.id) } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function connectPlaidBankAction(input: {
+  publicToken: string;
+  institutionId: string | null;
+  institutionName: string;
+  mappings: PlaidAccountMappingInput[];
+}): Promise<ActionResult<{ connectionId: string; added: number; suggestions: number }>> {
+  const denied = await guardPermission("bank_feed.manage");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const result = await connectPlaidBank(sb, input);
+    revalidatePath("/banking");
+    return {
+      ok: true,
+      data: {
+        connectionId: result.connectionId,
+        added: result.sync.added,
+        suggestions: result.sync.suggestions,
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function syncBankConnectionAction(
+  connectionId: string,
+): Promise<ActionResult<{ added: number; modified: number; removed: number; suggestions: number }>> {
+  const denied = await guardPermission("bank_feed.manage");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const result = await syncBankConnection(sb, connectionId);
+    revalidatePath("/banking");
+    return { ok: true, data: result };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

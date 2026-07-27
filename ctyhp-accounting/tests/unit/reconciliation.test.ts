@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { scoreMatch, matchTransactions, type BankTxnLite, type PaymentLite } from "@/lib/domain/reconciliation";
+import {
+  matchLedgerTransactions,
+  scoreLedgerMatch,
+  scoreMatch,
+  matchTransactions,
+  type BankTxnLite,
+  type LedgerMatchCandidate,
+  type PaymentLite,
+} from "@/lib/domain/reconciliation";
 
 const txn = (over: Partial<BankTxnLite>): BankTxnLite => ({
   id: "t1", txnDate: "2026-07-15", amountMinor: 37888, description: "", reference: null, ...over,
@@ -54,5 +62,51 @@ describe("matchTransactions", () => {
     ];
     const res = matchTransactions(txns, payments);
     expect(res).toHaveLength(2);
+  });
+});
+
+const ledger = (over: Partial<LedgerMatchCandidate>): LedgerMatchCandidate => ({
+  journalLineId: "line-1",
+  journalEntryId: "journal-1",
+  entryDate: "2026-07-15",
+  amountMinor: -37888,
+  entryNumber: "JE-000101",
+  sourceType: "expense",
+  sourceId: "expense-1",
+  description: "Jewelers Mutual insurance",
+  reference: "POL-2026",
+  ...over,
+});
+
+describe("ledger-level bank matching", () => {
+  it("matches both inflows and outflows when the signed bank-account amount agrees", () => {
+    const result = scoreLedgerMatch(
+      txn({ amountMinor: -37888, description: "JEWELERS MUTUAL POL-2026" }),
+      ledger({}),
+    );
+    expect(result?.score).toBeGreaterThanOrEqual(0.9);
+    expect(result?.rule).toContain("reference");
+  });
+
+  it("never suggests a different amount or a candidate outside the 30-day window", () => {
+    expect(scoreLedgerMatch(txn({ amountMinor: -100 }), ledger({ amountMinor: -200 }))).toBeNull();
+    expect(
+      scoreLedgerMatch(
+        txn({ txnDate: "2026-01-01", amountMinor: -37888 }),
+        ledger({ entryDate: "2026-07-15" }),
+      ),
+    ).toBeNull();
+  });
+
+  it("uses each journal line and each bank line at most once", () => {
+    const result = matchLedgerTransactions(
+      [
+        txn({ id: "bank-1", amountMinor: -37888 }),
+        txn({ id: "bank-2", amountMinor: -37888 }),
+      ],
+      [ledger({ journalLineId: "line-1" })],
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].journalLineId).toBe("line-1");
   });
 });

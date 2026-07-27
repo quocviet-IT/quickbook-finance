@@ -91,3 +91,115 @@ export function matchTransactions(txns: BankTxnLite[], payments: PaymentLite[]):
   }
   return result;
 }
+
+export interface LedgerMatchCandidate {
+  journalLineId: string;
+  journalEntryId: string;
+  entryDate: string;
+  amountMinor: number; // signed from the bank account's perspective
+  entryNumber: string;
+  sourceType: string;
+  sourceId: string | null;
+  description: string;
+  reference: string | null;
+}
+
+export interface LedgerMatchSuggestion {
+  bankTransactionId: string;
+  journalLineId: string;
+  confidence: number;
+  rule: string;
+}
+
+function normalizedTokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 3),
+  );
+}
+
+/** Score an immutable bank line against the corresponding posted bank-GL line. */
+export function scoreLedgerMatch(
+  txn: BankTxnLite,
+  candidate: LedgerMatchCandidate,
+): { score: number; rule: string } | null {
+  if (txn.amountMinor === 0 || txn.amountMinor !== candidate.amountMinor) return null;
+
+  const days = daysBetween(txn.txnDate, candidate.entryDate);
+  if (days > 30) return null;
+
+  let score = 0.62;
+  const reasons = ["amount"];
+  if (days <= 2) {
+    score += 0.2;
+    reasons.push("date");
+  } else if (days <= 7) {
+    score += 0.12;
+    reasons.push("date~");
+  } else {
+    score += 0.04;
+    reasons.push("date-window");
+  }
+
+  const bankText = `${txn.reference ?? ""} ${txn.description}`.toLowerCase();
+  const exactReferences = [candidate.entryNumber, candidate.reference]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .map((value) => value.toLowerCase());
+  if (exactReferences.some((value) => bankText.includes(value))) {
+    score += 0.16;
+    reasons.push("reference");
+  } else {
+    const bankTokens = normalizedTokens(bankText);
+    const ledgerTokens = normalizedTokens(`${candidate.description} ${candidate.reference ?? ""}`);
+    const overlap = [...bankTokens].filter((token) => ledgerTokens.has(token)).length;
+    if (overlap >= 2) {
+      score += 0.1;
+      reasons.push("description");
+    } else if (overlap === 1) {
+      score += 0.05;
+      reasons.push("description~");
+    }
+  }
+
+  return { score: Math.min(1, Number(score.toFixed(3))), rule: reasons.join("+") };
+}
+
+/**
+ * Strongest-first, one-to-one matching at journal-line level. Journal line is
+ * the correct grain because a transfer journal can contain two different bank
+ * account lines.
+ */
+export function matchLedgerTransactions(
+  txns: BankTxnLite[],
+  candidates: LedgerMatchCandidate[],
+): LedgerMatchSuggestion[] {
+  const pairs: LedgerMatchSuggestion[] = [];
+  for (const txn of txns) {
+    for (const candidate of candidates) {
+      const scored = scoreLedgerMatch(txn, candidate);
+      if (scored) {
+        pairs.push({
+          bankTransactionId: txn.id,
+          journalLineId: candidate.journalLineId,
+          confidence: scored.score,
+          rule: scored.rule,
+        });
+      }
+    }
+  }
+  pairs.sort((a, b) => b.confidence - a.confidence);
+
+  const usedTransactions = new Set<string>();
+  const usedJournalLines = new Set<string>();
+  return pairs.filter((pair) => {
+    if (usedTransactions.has(pair.bankTransactionId) || usedJournalLines.has(pair.journalLineId)) {
+      return false;
+    }
+    usedTransactions.add(pair.bankTransactionId);
+    usedJournalLines.add(pair.journalLineId);
+    return true;
+  });
+}

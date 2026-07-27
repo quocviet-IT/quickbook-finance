@@ -12,7 +12,16 @@ export type JournalSource =
   | "manual"
   | "bank"
   | "reconciliation"
-  | "opening_balance";
+  | "opening_balance"
+  | "bill"
+  | "expense"
+  | "bill_payment"
+  | "tax_payment"
+  | "goods_receipt"
+  | "inventory"
+  | "inventory_adjustment"
+  | "depreciation"
+  | "asset_disposal";
 export type JournalStatus = "posted" | "void";
 export type AppRole = "admin" | "accountant" | "viewer";
 
@@ -168,13 +177,24 @@ export interface BankTransactionRow {
   raw_line: string | null;
   raw_hash: string;
   status: BankTxnStatus;
+  source: "file_upload" | "bank_feed";
+  external_transaction_id: string | null;
+  provider_account_id: string | null;
+  provider_revision: number;
+  pending: boolean;
+  authorized_date: string | null;
+  merchant_name: string | null;
+  category: string | null;
+  provider_removed_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ReconciliationRow {
   id: string;
   bank_transaction_id: string;
   payment_id: string | null;
+  journal_line_id: string | null;
   rule_applied: string | null;
   confidence: number;
   status: ReconciliationStatus;
@@ -442,6 +462,87 @@ export interface BudgetRow {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type BankConnectionStatus = "active" | "attention_required" | "disconnected";
+
+export interface BankFeedAccountRow {
+  id: string;
+  connection_id: string;
+  bank_account_id: string;
+  provider_account_id: string;
+  account_name: string;
+  account_mask: string | null;
+  account_type: string | null;
+  account_subtype: string | null;
+  currency_code: string;
+  is_active: boolean;
+  last_balance_minor: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BankConnectionRow {
+  id: string;
+  provider: "plaid";
+  provider_item_id: string;
+  institution_id: string | null;
+  institution_name: string;
+  status: BankConnectionStatus;
+  sync_cursor: string | null;
+  consent_expires_at: string | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FixedAssetMethod = "straight_line" | "none";
+export type FixedAssetStatus = "in_service" | "fully_depreciated" | "disposed";
+export type DepreciationScheduleStatus = "planned" | "posted";
+
+export interface FixedAssetRow {
+  id: string;
+  asset_number: string;
+  name: string;
+  description: string | null;
+  category: string;
+  serial_number: string | null;
+  location: string | null;
+  acquisition_date: string;
+  in_service_date: string;
+  currency_code: string;
+  cost_minor: number;
+  salvage_value_minor: number;
+  useful_life_months: number | null;
+  depreciation_method: FixedAssetMethod;
+  asset_account_id: string;
+  accumulated_depreciation_account_id: string | null;
+  depreciation_expense_account_id: string | null;
+  vendor_id: string | null;
+  source_bill_id: string | null;
+  status: FixedAssetStatus;
+  disposed_at: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetDepreciationScheduleRow {
+  id: string;
+  asset_id: string;
+  sequence_number: number;
+  period_start: string;
+  period_end: string;
+  planned_amount_minor: number;
+  posted_amount_minor: number;
+  status: DepreciationScheduleStatus;
+  journal_entry_id: string | null;
+  posted_by: string | null;
+  posted_at: string | null;
+  created_at: string;
 }
 
 export interface BudgetLineRow {
