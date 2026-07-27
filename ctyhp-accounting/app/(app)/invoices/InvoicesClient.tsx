@@ -75,6 +75,8 @@ export default function InvoicesClient({
   canWrite,
   canReadDocuments,
   canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -88,6 +90,8 @@ export default function InvoicesClient({
   canWrite: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -304,6 +308,8 @@ export default function InvoicesClient({
       <AttachmentDrawer
         target={attachmentTarget}
         canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
         onClose={() => setAttachmentTarget(null)}
       />
 

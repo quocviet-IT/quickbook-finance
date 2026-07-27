@@ -53,6 +53,8 @@ export default function BillsClient({
   canRegisterAsset,
   canReadDocuments,
   canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -66,6 +68,8 @@ export default function BillsClient({
   canRegisterAsset: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
@@ -231,6 +235,8 @@ export default function BillsClient({
       <AttachmentDrawer
         target={attachmentTarget}
         canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
         onClose={() => setAttachmentTarget(null)}
       />
       <Modal

@@ -3,6 +3,9 @@ import {
   DOCUMENT_MAX_FILE_SIZE_BYTES,
   defaultDocumentKind,
   documentAttachmentCreateSchema,
+  documentCanBeAccessed,
+  documentGovernanceSchema,
+  documentScannerResponseSchema,
   fileExtensionForMime,
   formatDocumentFileSize,
   validateDocumentFile,
@@ -75,5 +78,44 @@ describe("document presentation helpers", () => {
     expect(fileExtensionForMime("image/jpeg")).toBe("jpg");
     expect(formatDocumentFileSize(1_572_864)).toBe("1.5 MB");
     expect(() => fileExtensionForMime("application/x-msdownload")).toThrow(/unsupported/i);
+  });
+
+  it("fails closed while a file is pending, blocked, or errored", () => {
+    expect(documentCanBeAccessed("clean")).toBe(true);
+    expect(documentCanBeAccessed("not_configured")).toBe(true);
+    expect(documentCanBeAccessed("pending")).toBe(false);
+    expect(documentCanBeAccessed("blocked")).toBe(false);
+    expect(documentCanBeAccessed("error")).toBe(false);
+  });
+
+  it("requires a threat name when a scanner blocks a file", () => {
+    expect(documentScannerResponseSchema.safeParse({ verdict: "clean" }).success).toBe(true);
+    expect(documentScannerResponseSchema.safeParse({ verdict: "blocked" }).success).toBe(false);
+    expect(
+      documentScannerResponseSchema.safeParse({
+        verdict: "blocked",
+        engine: "ClamAV",
+        threat: "Eicar-Test-Signature",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("validates retention and legal-hold governance changes", () => {
+    expect(
+      documentGovernanceSchema.safeParse({
+        attachment_id: storageId,
+        retention_until: "2027-12-31",
+        legal_hold: true,
+        reason: "Tax audit preservation",
+      }).success,
+    ).toBe(true);
+    expect(
+      documentGovernanceSchema.safeParse({
+        attachment_id: storageId,
+        retention_until: "not-a-date",
+        legal_hold: false,
+        reason: "",
+      }).success,
+    ).toBe(false);
   });
 });

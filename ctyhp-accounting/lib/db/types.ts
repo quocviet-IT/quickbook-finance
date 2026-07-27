@@ -63,6 +63,12 @@ export interface DocumentAttachmentRow {
   sha256: string;
   description: string | null;
   scan_status: DocumentScanStatus;
+  scan_attempts: number;
+  scan_started_at: string | null;
+  scan_completed_at: string | null;
+  scan_engine: string | null;
+  threat_name: string | null;
+  scan_error: string | null;
   retention_until: string | null;
   legal_hold: boolean;
   status: DocumentStatus;

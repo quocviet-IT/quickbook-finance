@@ -1,20 +1,29 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import type { DocumentAttachmentRow } from "@/lib/db/types";
 import {
   documentAccessSchema,
   documentArchiveSchema,
   documentAttachmentCreateSchema,
   documentAttachmentQuerySchema,
+  documentGovernanceSchema,
+  documentRescanSchema,
 } from "@/lib/domain/documents";
 import {
   archiveDocumentAttachment,
   createDocumentAccessUrl,
   DocumentsError,
   listDocumentAttachments,
+  queueDocumentScan,
   registerDocumentAttachment,
+  updateDocumentGovernance,
 } from "@/lib/services/documents";
+import {
+  isDocumentScannerConfigured,
+  scanDocumentAttachment,
+} from "@/lib/services/document-scanner";
 
 export interface DocumentActionResult<T = undefined> {
   ok: boolean;
@@ -22,7 +31,9 @@ export interface DocumentActionResult<T = undefined> {
   data?: T;
 }
 
-async function authorize(permission: "documents.read" | "documents.manage") {
+async function authorize(
+  permission: "documents.read" | "documents.manage" | "documents.govern",
+) {
   const sb = await createSupabaseServerClient();
   const {
     data: { user },
@@ -35,6 +46,8 @@ async function authorize(permission: "documents.read" | "documents.manage") {
       error:
         permission === "documents.read"
           ? "You do not have permission to read supporting documents."
+          : permission === "documents.govern"
+            ? "You do not have permission to govern document retention."
           : "You do not have permission to manage supporting documents.",
     } as const;
   }
@@ -82,11 +95,33 @@ export async function registerDocumentAttachmentAction(
 
   const context = await authorize("documents.manage");
   if ("error" in context) return { ok: false, error: context.error };
-  try {
+  if (!isDocumentScannerConfigured()) {
     return {
-      ok: true,
-      data: await registerDocumentAttachment(context.sb, parsed.data, context.user.id),
+      ok: false,
+      error:
+        "Document upload is disabled until DOCUMENT_SCANNER_URL and DOCUMENT_SCANNER_TOKEN are configured.",
     };
+  }
+  try {
+    const attachment = await registerDocumentAttachment(
+      context.sb,
+      parsed.data,
+      context.user.id,
+    );
+
+    try {
+      return {
+        ok: true,
+        data: await scanDocumentAttachment(
+          createSupabaseAutomationClient(),
+          attachment.id,
+        ),
+      };
+    } catch {
+      // The upload remains safely pending. The cron and retry action can resume
+      // scanning without losing the accounting evidence.
+      return { ok: true, data: attachment };
+    }
   } catch (error) {
     return { ok: false, error: message(error) };
   }
@@ -127,6 +162,60 @@ export async function createDocumentAccessUrlAction(
         ),
       },
     };
+  } catch (error) {
+    return { ok: false, error: message(error) };
+  }
+}
+
+export async function rescanDocumentAttachmentAction(
+  raw: unknown,
+): Promise<DocumentActionResult<DocumentAttachmentRow>> {
+  const parsed = documentRescanSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Invalid scan request." };
+  if (!isDocumentScannerConfigured()) {
+    return {
+      ok: false,
+      error: "Set DOCUMENT_SCANNER_URL and DOCUMENT_SCANNER_TOKEN to scan documents.",
+    };
+  }
+
+  const context = await authorize("documents.manage");
+  if ("error" in context) return { ok: false, error: context.error };
+  try {
+    await queueDocumentScan(context.sb, parsed.data.attachment_id);
+    return {
+      ok: true,
+      data: await scanDocumentAttachment(
+        createSupabaseAutomationClient(),
+        parsed.data.attachment_id,
+      ),
+    };
+  } catch (error) {
+    return { ok: false, error: message(error) };
+  }
+}
+
+export async function updateDocumentGovernanceAction(
+  raw: unknown,
+): Promise<DocumentActionResult> {
+  const parsed = documentGovernanceSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid governance change.",
+    };
+  }
+  const context = await authorize("documents.govern");
+  if ("error" in context) return { ok: false, error: context.error };
+  try {
+    await updateDocumentGovernance(
+      context.sb,
+      parsed.data.attachment_id,
+      parsed.data.retention_until,
+      parsed.data.legal_hold,
+      parsed.data.reason,
+    );
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: message(error) };
   }

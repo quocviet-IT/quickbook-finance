@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DocumentAttachmentRow } from "@/lib/db/types";
 import {
   DOCUMENT_BUCKET,
+  documentCanBeAccessed,
   type DocumentAttachmentCreateInput,
 } from "@/lib/domain/documents";
 
@@ -9,7 +10,8 @@ export class DocumentsError extends Error {}
 
 const ATTACHMENT_COLUMNS =
   "id,entity_type,entity_id,document_kind,file_name,storage_bucket,storage_path," +
-  "mime_type,size_bytes,sha256,description,scan_status,retention_until,legal_hold," +
+  "mime_type,size_bytes,sha256,description,scan_status,scan_attempts,scan_started_at," +
+  "scan_completed_at,scan_engine,threat_name,scan_error,retention_until,legal_hold," +
   "status,uploaded_by,uploaded_at,archived_by,archived_at,archive_reason";
 
 export async function listDocumentAttachments(
@@ -40,6 +42,7 @@ export async function registerDocumentAttachment(
       description: input.description || null,
       storage_bucket: DOCUMENT_BUCKET,
       uploaded_by: userId,
+      scan_status: "pending",
     })
     .select(ATTACHMENT_COLUMNS)
     .single();
@@ -64,6 +67,32 @@ export async function archiveDocumentAttachment(
   if (error) throw new DocumentsError(error.message);
 }
 
+export async function updateDocumentGovernance(
+  sb: SupabaseClient,
+  attachmentId: string,
+  retentionUntil: string | null,
+  legalHold: boolean,
+  reason: string,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_update_document_governance", {
+    p_attachment_id: attachmentId,
+    p_retention_until: retentionUntil,
+    p_legal_hold: legalHold,
+    p_reason: reason,
+  });
+  if (error) throw new DocumentsError(error.message);
+}
+
+export async function queueDocumentScan(
+  sb: SupabaseClient,
+  attachmentId: string,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_queue_document_scan", {
+    p_attachment_id: attachmentId,
+  });
+  if (error) throw new DocumentsError(error.message);
+}
+
 export async function createDocumentAccessUrl(
   sb: SupabaseClient,
   attachmentId: string,
@@ -71,12 +100,19 @@ export async function createDocumentAccessUrl(
 ): Promise<string> {
   const { data: attachment, error: attachmentError } = await sb
     .from("acc_document_attachment")
-    .select("id,file_name,storage_bucket,storage_path,status")
+    .select("id,file_name,storage_bucket,storage_path,status,scan_status")
     .eq("id", attachmentId)
     .eq("status", "active")
     .maybeSingle();
   if (attachmentError) throw new DocumentsError(attachmentError.message);
   if (!attachment) throw new DocumentsError("Attachment not found.");
+  if (!documentCanBeAccessed(attachment.scan_status)) {
+    throw new DocumentsError(
+      attachment.scan_status === "blocked"
+        ? "This attachment was quarantined after a security scan."
+        : "This attachment is unavailable until it passes security scanning.",
+    );
+  }
 
   const options = action === "download" ? { download: attachment.file_name as string } : undefined;
   const { data, error } = await sb.storage

@@ -4,6 +4,7 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import ExpensesClient from "./ExpensesClient";
 
@@ -24,6 +25,7 @@ export default async function ExpensesPage({
     role,
     canReadDocuments,
     canManageDocuments,
+    canGovernDocuments,
   ] = await Promise.all([
     listExpenses(sb),
     listVendors(sb),
@@ -32,6 +34,7 @@ export default async function ExpensesPage({
     getUserRole(),
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
 
   const expenseAccounts = accounts.filter(
@@ -57,6 +60,8 @@ export default async function ExpensesPage({
         canWrite={canWrite(role)}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

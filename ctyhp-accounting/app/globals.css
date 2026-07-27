@@ -453,7 +453,8 @@ body {
 }
 
 .document-upload-fields label,
-.document-archive-reason {
+.document-archive-reason,
+.document-governance-fields label {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -461,6 +462,19 @@ body {
   color: #334155;
   font-size: 13px;
   font-weight: 600;
+}
+
+.document-governance-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.document-governance-fields .ant-picker {
+  width: 100%;
+}
+
+.document-governance-fields .document-legal-hold-control {
+  align-items: flex-start;
 }
 
 .document-upload-fields .ant-select {

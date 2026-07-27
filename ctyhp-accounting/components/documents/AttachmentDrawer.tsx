@@ -5,6 +5,7 @@ import {
   Alert,
   App,
   Button,
+  DatePicker,
   Drawer,
   Empty,
   Input,
@@ -12,7 +13,9 @@ import {
   Modal,
   Select,
   Space,
+  Switch,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   type UploadFile,
@@ -27,8 +30,11 @@ import {
   FileImageOutlined,
   FilePdfOutlined,
   FileTextOutlined,
+  LockOutlined,
   PaperClipOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
+import dayjs, { type Dayjs } from "dayjs";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { DocumentAttachmentRow } from "@/lib/db/types";
 import {
@@ -36,6 +42,7 @@ import {
   DOCUMENT_BUCKET,
   DOCUMENT_KIND_OPTIONS,
   defaultDocumentKind,
+  documentCanBeAccessed,
   formatDocumentFileSize,
   validateDocumentFile,
   type DocumentEntityType,
@@ -50,6 +57,8 @@ import {
   createDocumentAccessUrlAction,
   listDocumentAttachmentsAction,
   registerDocumentAttachmentAction,
+  rescanDocumentAttachmentAction,
+  updateDocumentGovernanceAction,
 } from "@/app/(app)/documents/actions";
 
 export interface AttachmentTarget {
@@ -61,10 +70,14 @@ export interface AttachmentTarget {
 export default function AttachmentDrawer({
   target,
   canManage,
+  canGovern,
+  scannerConfigured,
   onClose,
 }: {
   target: AttachmentTarget | null;
   canManage: boolean;
+  canGovern: boolean;
+  scannerConfigured: boolean;
   onClose: () => void;
 }) {
   const { message } = App.useApp();
@@ -80,6 +93,13 @@ export default function AttachmentDrawer({
   const [archiveReason, setArchiveReason] = useState("");
   const [archiving, setArchiving] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [scanningId, setScanningId] = useState<string | null>(null);
+  const [governanceTarget, setGovernanceTarget] =
+    useState<DocumentAttachmentRow | null>(null);
+  const [retentionUntil, setRetentionUntil] = useState<Dayjs | null>(null);
+  const [legalHold, setLegalHold] = useState(false);
+  const [governanceReason, setGovernanceReason] = useState("");
+  const [savingGovernance, setSavingGovernance] = useState(false);
   const targetEntityType = target?.entityType;
   const targetEntityId = target?.entityId;
 
@@ -189,7 +209,14 @@ export default function AttachmentDrawer({
         throw new Error(result.error ?? "Could not register the uploaded file.");
       }
 
-      message.success("Attachment uploaded.");
+      const scanStatus = result.data?.scan_status;
+      message.success(
+        scanStatus === "clean"
+          ? "Attachment uploaded and passed security scanning."
+          : scanStatus === "blocked"
+            ? "Attachment uploaded but quarantined by security scanning."
+            : "Attachment uploaded.",
+      );
       setFileList([]);
       setDescription("");
       await refresh();
@@ -252,6 +279,58 @@ export default function AttachmentDrawer({
     await refresh();
   }
 
+  async function rescanAttachment(attachment: DocumentAttachmentRow) {
+    setScanningId(attachment.id);
+    const result = await rescanDocumentAttachmentAction({
+      attachment_id: attachment.id,
+    });
+    setScanningId(null);
+    if (!result.ok) {
+      message.error(result.error ?? "Could not scan the attachment.");
+      return;
+    }
+    if (result.data?.scan_status === "clean") {
+      message.success("Attachment passed security scanning.");
+    } else if (result.data?.scan_status === "blocked") {
+      message.error("Attachment was quarantined by security scanning.");
+    } else {
+      message.warning("The scanner could not verify this attachment.");
+    }
+    await refresh();
+  }
+
+  function openGovernance(attachment: DocumentAttachmentRow) {
+    setGovernanceTarget(attachment);
+    setRetentionUntil(
+      attachment.retention_until ? dayjs(attachment.retention_until) : null,
+    );
+    setLegalHold(attachment.legal_hold);
+    setGovernanceReason("");
+  }
+
+  async function saveGovernance() {
+    if (!governanceTarget || governanceReason.trim().length < 3) {
+      message.warning("Enter a short reason for this governance change.");
+      return;
+    }
+    setSavingGovernance(true);
+    const result = await updateDocumentGovernanceAction({
+      attachment_id: governanceTarget.id,
+      retention_until: retentionUntil?.format("YYYY-MM-DD") ?? null,
+      legal_hold: legalHold,
+      reason: governanceReason,
+    });
+    setSavingGovernance(false);
+    if (!result.ok) {
+      message.error(result.error ?? "Could not update document governance.");
+      return;
+    }
+    message.success("Retention and legal-hold controls updated.");
+    setGovernanceTarget(null);
+    setGovernanceReason("");
+    await refresh();
+  }
+
   function closeDrawer() {
     setAttachmentState(null);
     setFileList([]);
@@ -259,6 +338,8 @@ export default function AttachmentDrawer({
     setDocumentKind(null);
     setArchiveTarget(null);
     setArchiveReason("");
+    setGovernanceTarget(null);
+    setGovernanceReason("");
     onClose();
   }
 
@@ -279,10 +360,14 @@ export default function AttachmentDrawer({
         className="document-attachment-drawer"
       >
         <Alert
-          type="info"
+          type={scannerConfigured ? "success" : "warning"}
           showIcon
           message="Private accounting evidence"
-          description="Files are permission-controlled and access is logged. Malware scanning is not configured yet, so only upload files from trusted sources."
+          description={
+            scannerConfigured
+              ? "New files are scanned before access. Pending, failed, and unsafe files remain quarantined; every preview and download is logged."
+              : "Files are private and access is logged. Configure the malware scanner to quarantine unsafe uploads automatically."
+          }
         />
 
         {canManage ? (
@@ -300,7 +385,7 @@ export default function AttachmentDrawer({
                 setFileList([]);
                 return true;
               }}
-              disabled={uploading}
+              disabled={uploading || !scannerConfigured}
             >
               <p className="ant-upload-drag-icon">
                 <CloudUploadOutlined />
@@ -332,7 +417,7 @@ export default function AttachmentDrawer({
               type="primary"
               icon={<CloudUploadOutlined />}
               loading={uploading}
-              disabled={!selectedFile}
+              disabled={!selectedFile || !scannerConfigured}
               onClick={uploadAttachment}
             >
               Upload attachment
@@ -362,6 +447,7 @@ export default function AttachmentDrawer({
               const previewable =
                 attachment.mime_type === "application/pdf" ||
                 attachment.mime_type.startsWith("image/");
+              const accessible = documentCanBeAccessed(attachment.scan_status);
               const retained =
                 Boolean(attachment.retention_until) &&
                 attachment.retention_until! > new Date().toISOString().slice(0, 10);
@@ -376,6 +462,7 @@ export default function AttachmentDrawer({
                         icon={<EyeOutlined />}
                         aria-label={`Preview ${attachment.file_name}`}
                         loading={openingId === attachment.id}
+                        disabled={!accessible}
                         onClick={() => accessAttachment(attachment, "preview")}
                       >
                         Preview
@@ -387,10 +474,36 @@ export default function AttachmentDrawer({
                       icon={<DownloadOutlined />}
                       aria-label={`Download ${attachment.file_name}`}
                       loading={openingId === attachment.id}
+                      disabled={!accessible}
                       onClick={() => accessAttachment(attachment, "download")}
                     >
                       Download
                     </Button>,
+                    canManage &&
+                    scannerConfigured &&
+                    attachment.scan_status !== "clean" &&
+                    attachment.scan_status !== "pending" ? (
+                      <Tooltip title="Run the private malware scanner again" key="rescan">
+                        <Button
+                          type="text"
+                          icon={<ReloadOutlined />}
+                          loading={scanningId === attachment.id}
+                          onClick={() => rescanAttachment(attachment)}
+                        >
+                          Scan
+                        </Button>
+                      </Tooltip>
+                    ) : null,
+                    canGovern ? (
+                      <Button
+                        key="governance"
+                        type="text"
+                        icon={<LockOutlined />}
+                        onClick={() => openGovernance(attachment)}
+                      >
+                        Controls
+                      </Button>
+                    ) : null,
                     canManage ? (
                       <Button
                         key="archive"
@@ -429,6 +542,16 @@ export default function AttachmentDrawer({
                             <Tag color="blue">Retain until {attachment.retention_until}</Tag>
                           ) : null}
                         </Space>
+                        {attachment.threat_name ? (
+                          <Typography.Text type="danger">
+                            Threat: {attachment.threat_name}
+                          </Typography.Text>
+                        ) : null}
+                        {attachment.scan_error ? (
+                          <Typography.Text type="danger">
+                            Scan error: {attachment.scan_error}
+                          </Typography.Text>
+                        ) : null}
                       </Space>
                     }
                   />
@@ -466,6 +589,51 @@ export default function AttachmentDrawer({
             placeholder="Why this attachment should be archived"
           />
         </label>
+      </Modal>
+
+      <Modal
+        title="Document controls"
+        open={Boolean(governanceTarget)}
+        onCancel={() => {
+          setGovernanceTarget(null);
+          setGovernanceReason("");
+        }}
+        onOk={saveGovernance}
+        okText="Save controls"
+        okButtonProps={{ disabled: governanceReason.trim().length < 3 }}
+        confirmLoading={savingGovernance}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>
+          Retention prevents archiving until the selected date. Legal hold prevents
+          archiving until an administrator removes the hold.
+        </Typography.Paragraph>
+        <div className="document-governance-fields">
+          <label>
+            <span>Retain until (optional)</span>
+            <DatePicker
+              value={retentionUntil}
+              onChange={setRetentionUntil}
+              minDate={dayjs().startOf("day")}
+              format="MM/DD/YYYY"
+              placeholder="Select retention date"
+            />
+          </label>
+          <label className="document-legal-hold-control">
+            <span>Legal hold</span>
+            <Switch checked={legalHold} onChange={setLegalHold} />
+          </label>
+          <label>
+            <span>Change reason</span>
+            <Input.TextArea
+              value={governanceReason}
+              rows={3}
+              maxLength={500}
+              onChange={(event) => setGovernanceReason(event.target.value)}
+              placeholder="Why these controls are being changed"
+            />
+          </label>
+        </div>
       </Modal>
     </>
   );

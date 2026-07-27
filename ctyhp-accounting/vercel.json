@@ -7,6 +7,10 @@
     {
       "path": "/api/recurring/run",
       "schedule": "15 11 * * *"
+    },
+    {
+      "path": "/api/documents/scan",
+      "schedule": "30 11 * * *"
     }
   ]
 }

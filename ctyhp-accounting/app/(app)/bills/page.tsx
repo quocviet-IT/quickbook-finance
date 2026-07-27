@@ -5,6 +5,7 @@ import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import BillsClient from "./BillsClient";
 
@@ -27,6 +28,7 @@ export default async function BillsPage({
     fixedAssetPermission,
     canReadDocuments,
     canManageDocuments,
+    canGovernDocuments,
   ] = await Promise.all([
     listBills(sb),
     listVendors(sb),
@@ -37,6 +39,7 @@ export default async function BillsPage({
     sb.rpc("acc_has_permission", { p_key: "fixed_assets.manage" }),
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
 
   const billDebitAccounts = accounts.filter(
@@ -73,6 +76,8 @@ export default async function BillsPage({
         canRegisterAsset={!fixedAssetPermission.error && fixedAssetPermission.data === true}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

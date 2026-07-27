@@ -80,6 +80,17 @@ export const documentAttachmentCreateSchema = documentAttachmentQuerySchema.exte
   description: z.string().trim().max(500).nullable().optional(),
 });
 
+export const documentGovernanceSchema = z.object({
+  attachment_id: z.string().uuid(),
+  retention_until: z.iso.date().nullable(),
+  legal_hold: z.boolean(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const documentRescanSchema = z.object({
+  attachment_id: z.string().uuid(),
+});
+
 export const documentArchiveSchema = z.object({
   attachment_id: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
@@ -91,6 +102,20 @@ export const documentAccessSchema = z.object({
 });
 
 export type DocumentAttachmentCreateInput = z.infer<typeof documentAttachmentCreateSchema>;
+
+export const documentScannerResponseSchema = z.object({
+  verdict: z.enum(["clean", "blocked"]),
+  engine: z.string().trim().min(1).max(100).optional(),
+  threat: z.string().trim().min(1).max(255).optional(),
+}).refine((value) => value.verdict !== "blocked" || Boolean(value.threat), {
+  message: "Blocked scanner responses require a threat name",
+});
+
+export function documentCanBeAccessed(
+  scanStatus: "not_configured" | "pending" | "clean" | "blocked" | "error",
+): boolean {
+  return scanStatus === "clean" || scanStatus === "not_configured";
+}
 
 export function defaultDocumentKind(entityType: DocumentEntityType): DocumentKind {
   switch (entityType) {

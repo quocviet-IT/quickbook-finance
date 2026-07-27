@@ -28,6 +28,8 @@ export default function ExpensesClient({
   canWrite,
   canReadDocuments,
   canManageDocuments,
+  canGovernDocuments,
+  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -39,6 +41,8 @@ export default function ExpensesClient({
   canWrite: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
+  canGovernDocuments: boolean;
+  scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
   const [open, setOpen] = useState(initialCreateOpen);
@@ -151,6 +155,8 @@ export default function ExpensesClient({
       <AttachmentDrawer
         target={attachmentTarget}
         canManage={canManageDocuments}
+        canGovern={canGovernDocuments}
+        scannerConfigured={scannerConfigured}
         onClose={() => setAttachmentTarget(null)}
       />
       <Modal

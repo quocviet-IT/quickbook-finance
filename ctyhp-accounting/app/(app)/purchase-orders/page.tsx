@@ -6,6 +6,7 @@ import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
+import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import PurchaseOrdersClient from "./PurchaseOrdersClient";
 
@@ -27,6 +28,7 @@ export default async function PurchaseOrdersPage({
     role,
     canReadDocuments,
     canManageDocuments,
+    canGovernDocuments,
   ] = await Promise.all([
     listPurchaseOrders(sb),
     listVendors(sb),
@@ -36,6 +38,7 @@ export default async function PurchaseOrdersPage({
     getUserRole(),
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
+    hasPermission(sb, "documents.govern"),
   ]);
 
   const expenseAccounts = accounts.filter(
@@ -65,6 +68,8 @@ export default async function PurchaseOrdersPage({
         canWrite={canWrite(role)}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
+        canGovernDocuments={canGovernDocuments}
+        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );
