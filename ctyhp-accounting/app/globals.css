@@ -15,6 +15,25 @@ html {
   color-scheme: light;
 }
 
+/*
+ * Ant Design locks background scrolling while a modal or drawer is open by
+ * subtracting the scrollbar width from `body`. That compensation makes the
+ * accounting shell, sticky header, and wide tables jump horizontally.
+ *
+ * Modern browsers can reserve the scrollbar track instead, so the viewport
+ * width remains stable throughout the interaction. Keep Ant Design's default
+ * fallback on older browsers by scoping the width override to @supports.
+ */
+@supports (scrollbar-gutter: stable) {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  html body {
+    width: 100% !important;
+  }
+}
+
 a {
   text-decoration: none;
 }
