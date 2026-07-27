@@ -13,10 +13,13 @@ import {
   Space,
   Tag,
 } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
@@ -48,6 +51,8 @@ export default function BillsClient({
   items,
   canWrite,
   canRegisterAsset,
+  canReadDocuments,
+  canManageDocuments,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -59,6 +64,8 @@ export default function BillsClient({
   items: ItemRow[];
   canWrite: boolean;
   canRegisterAsset: boolean;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
@@ -67,6 +74,7 @@ export default function BillsClient({
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const [writeOffFor, setWriteOffFor] = useState<BillWithVendor | null>(null);
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -173,8 +181,21 @@ export default function BillsClient({
             title: "Actions",
             key: "actions",
             render: (_, r) =>
-              canWrite || canRegisterAsset ? (
+              canReadDocuments || canWrite || canRegisterAsset ? (
                 <Space>
+                  {canReadDocuments ? (
+                    <IconActionButton
+                      label="Manage bill attachments"
+                      icon={<PaperClipOutlined />}
+                      onClick={() =>
+                        setAttachmentTarget({
+                          entityType: "bill",
+                          entityId: r.id,
+                          label: `${r.bill_number ?? "Draft bill"} · ${r.vendor_name}`,
+                        })
+                      }
+                    />
+                  ) : null}
                   {canWrite && r.status === "draft" && (
                     <Button size="small" type="link" onClick={() => post(r.id)}>
                       Post
@@ -206,6 +227,11 @@ export default function BillsClient({
               ) : null,
           },
         ]}
+      />
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        onClose={() => setAttachmentTarget(null)}
       />
       <Modal
         title="New bill"

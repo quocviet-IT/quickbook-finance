@@ -4,6 +4,7 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import BillsClient from "./BillsClient";
 
@@ -16,7 +17,17 @@ export default async function BillsPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [bills, vendors, accounts, currencies, items, role, fixedAssetPermission] = await Promise.all([
+  const [
+    bills,
+    vendors,
+    accounts,
+    currencies,
+    items,
+    role,
+    fixedAssetPermission,
+    canReadDocuments,
+    canManageDocuments,
+  ] = await Promise.all([
     listBills(sb),
     listVendors(sb),
     listAccounts(sb),
@@ -24,6 +35,8 @@ export default async function BillsPage({
     listItems(sb),
     getUserRole(),
     sb.rpc("acc_has_permission", { p_key: "fixed_assets.manage" }),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
   ]);
 
   const billDebitAccounts = accounts.filter(
@@ -58,6 +71,8 @@ export default async function BillsPage({
         items={purchaseItems}
         canWrite={canWrite(role)}
         canRegisterAsset={!fixedAssetPermission.error && fixedAssetPermission.data === true}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
       />
     </div>
   );

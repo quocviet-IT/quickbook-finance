@@ -17,10 +17,13 @@ import {
   Typography,
   type TableColumnsType,
 } from "antd";
-import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import type {
   AccountRow,
   CurrencyRow,
@@ -70,6 +73,8 @@ export default function InvoicesClient({
   currencies,
   items,
   canWrite,
+  canReadDocuments,
+  canManageDocuments,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -81,6 +86,8 @@ export default function InvoicesClient({
   currencies: CurrencyRow[];
   items: ItemRow[];
   canWrite: boolean;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -89,6 +96,7 @@ export default function InvoicesClient({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [writeOffFor, setWriteOffFor] = useState<InvoiceWithCustomer | null>(null);
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   // Inline customer creation
   const [custOpen, setCustOpen] = useState(false);
@@ -236,6 +244,19 @@ export default function InvoicesClient({
             icon={<EyeOutlined />}
             onClick={() => viewInvoiceLines(r)}
           />
+          {canReadDocuments ? (
+            <IconActionButton
+              label="Manage invoice attachments"
+              icon={<PaperClipOutlined />}
+              onClick={() =>
+                setAttachmentTarget({
+                  entityType: "invoice",
+                  entityId: r.id,
+                  label: `${r.invoice_number ?? "Draft invoice"} · ${r.customer_name}`,
+                })
+              }
+            />
+          ) : null}
           {canWrite && r.status === "draft" && (
             <Button size="small" type="primary" loading={busyId === r.id} onClick={() => issue(r.id)}>
               Issue
@@ -278,6 +299,12 @@ export default function InvoicesClient({
         sticky
         emptyTitle="No invoices yet"
         emptyDescription="Create a draft invoice, review it, then issue it to the ledger."
+      />
+
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        onClose={() => setAttachmentTarget(null)}
       />
 
       {/* Create invoice */}

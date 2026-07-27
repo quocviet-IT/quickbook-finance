@@ -3,6 +3,7 @@ import { listExpenses, listVendors } from "@/lib/services/payables";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import ExpensesClient from "./ExpensesClient";
 
@@ -15,12 +16,22 @@ export default async function ExpensesPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [expenses, vendors, accounts, currencies, role] = await Promise.all([
+  const [
+    expenses,
+    vendors,
+    accounts,
+    currencies,
+    role,
+    canReadDocuments,
+    canManageDocuments,
+  ] = await Promise.all([
     listExpenses(sb),
     listVendors(sb),
     listAccounts(sb),
     listCurrencies(sb),
     getUserRole(),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
   ]);
 
   const expenseAccounts = accounts.filter(
@@ -44,6 +55,8 @@ export default async function ExpensesPage({
         paymentAccounts={paymentAccounts}
         currencies={currencies}
         canWrite={canWrite(role)}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
       />
     </div>
   );

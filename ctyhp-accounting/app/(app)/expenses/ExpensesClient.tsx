@@ -1,10 +1,13 @@
 "use client";
 import { useMemo, useState } from "react";
 import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import type { ExpenseWithVendor } from "@/lib/services/payables";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
@@ -23,6 +26,8 @@ export default function ExpensesClient({
   paymentAccounts,
   currencies,
   canWrite,
+  canReadDocuments,
+  canManageDocuments,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -32,12 +37,15 @@ export default function ExpensesClient({
   paymentAccounts: AccountRow[];
   currencies: CurrencyRow[];
   canWrite: boolean;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
 }) {
   const { message, modal } = App.useApp();
   const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -115,13 +123,35 @@ export default function ExpensesClient({
             title: "Actions",
             key: "actions",
             render: (_, r) =>
-              canWrite && r.status !== "void" ? (
-                <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
-                  Void
-                </Button>
+              canReadDocuments || (canWrite && r.status !== "void") ? (
+                <Space>
+                  {canReadDocuments ? (
+                    <IconActionButton
+                      label="Manage expense attachments"
+                      icon={<PaperClipOutlined />}
+                      onClick={() =>
+                        setAttachmentTarget({
+                          entityType: "expense",
+                          entityId: r.id,
+                          label: `${r.expense_number ?? "Expense"} · ${r.vendor_name ?? "No vendor"}`,
+                        })
+                      }
+                    />
+                  ) : null}
+                  {canWrite && r.status !== "void" ? (
+                    <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
+                      Void
+                    </Button>
+                  ) : null}
+                </Space>
               ) : null,
           },
         ]}
+      />
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        onClose={() => setAttachmentTarget(null)}
       />
       <Modal
         title="New expense"

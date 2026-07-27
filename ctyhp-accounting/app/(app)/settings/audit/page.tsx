@@ -18,6 +18,7 @@ const AUDITED_TABLES = [
   "acc_company_setting_version",
   "acc_credit_memo",
   "acc_customer",
+  "acc_document_attachment",
   "acc_goods_receipt",
   "acc_inventory_txn",
   "acc_invoice",

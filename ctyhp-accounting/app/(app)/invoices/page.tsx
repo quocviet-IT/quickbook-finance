@@ -4,6 +4,7 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
 
@@ -16,7 +17,17 @@ export default async function InvoicesPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [invoices, customers, accounts, currencies, taxCodes, items, role] = await Promise.all([
+  const [
+    invoices,
+    customers,
+    accounts,
+    currencies,
+    taxCodes,
+    items,
+    role,
+    canReadDocuments,
+    canManageDocuments,
+  ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
     listAccounts(sb),
@@ -24,6 +35,8 @@ export default async function InvoicesPage({
     listTaxCodes(sb),
     listItems(sb),
     getUserRole(),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
   ]);
 
   const incomeAccounts = accounts.filter(
@@ -55,6 +68,8 @@ export default async function InvoicesPage({
         currencies={currencies}
         items={salesItems}
         canWrite={canWrite(role)}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
       />
     </div>
   );

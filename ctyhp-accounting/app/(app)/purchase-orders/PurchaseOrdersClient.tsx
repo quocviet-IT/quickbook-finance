@@ -3,9 +3,13 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Select, Space, Tag } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import IconActionButton from "@/components/ui/IconActionButton";
+import AttachmentDrawer, {
+  type AttachmentTarget,
+} from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderWithVendor } from "@/lib/services/purchasing";
 import PurchaseOrderFormModal from "./PurchaseOrderFormModal";
@@ -37,6 +41,8 @@ export default function PurchaseOrdersClient({
   currencies,
   items,
   canWrite,
+  canReadDocuments,
+  canManageDocuments,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -46,10 +52,13 @@ export default function PurchaseOrdersClient({
   currencies: CurrencyRow[];
   items: ItemRow[];
   canWrite: boolean;
+  canReadDocuments: boolean;
+  canManageDocuments: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<PoStatus | "all">("all");
   const [formOpen, setFormOpen] = useState(initialCreateOpen);
+  const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const rows = useMemo(
     () => (status === "all" ? orders : orders.filter((o) => o.status === status)),
@@ -113,10 +122,29 @@ export default function PurchaseOrdersClient({
             render: (_, r) => (
               <Space>
                 <Link href={`/purchase-orders/${r.id}`}>Open</Link>
+                {canReadDocuments ? (
+                  <IconActionButton
+                    label="Manage purchase order attachments"
+                    icon={<PaperClipOutlined />}
+                    onClick={() =>
+                      setAttachmentTarget({
+                        entityType: "purchase_order",
+                        entityId: r.id,
+                        label: `${r.po_number ?? "Draft purchase order"} · ${r.vendor_name}`,
+                      })
+                    }
+                  />
+                ) : null}
               </Space>
             ),
           },
         ]}
+      />
+
+      <AttachmentDrawer
+        target={attachmentTarget}
+        canManage={canManageDocuments}
+        onClose={() => setAttachmentTarget(null)}
       />
 
       <PurchaseOrderFormModal

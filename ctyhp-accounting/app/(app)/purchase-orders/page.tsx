@@ -5,6 +5,7 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import PurchaseOrdersClient from "./PurchaseOrdersClient";
 
@@ -17,13 +18,24 @@ export default async function PurchaseOrdersPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [orders, vendors, accounts, currencies, items, role] = await Promise.all([
+  const [
+    orders,
+    vendors,
+    accounts,
+    currencies,
+    items,
+    role,
+    canReadDocuments,
+    canManageDocuments,
+  ] = await Promise.all([
     listPurchaseOrders(sb),
     listVendors(sb),
     listAccounts(sb),
     listCurrencies(sb),
     listItems(sb),
     getUserRole(),
+    hasPermission(sb, "documents.read"),
+    hasPermission(sb, "documents.manage"),
   ]);
 
   const expenseAccounts = accounts.filter(
@@ -51,6 +63,8 @@ export default async function PurchaseOrdersPage({
         currencies={currencies}
         items={items.filter((i) => i.is_purchased && i.is_active)}
         canWrite={canWrite(role)}
+        canReadDocuments={canReadDocuments}
+        canManageDocuments={canManageDocuments}
       />
     </div>
   );

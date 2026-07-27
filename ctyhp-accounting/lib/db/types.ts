@@ -25,6 +25,54 @@ export type JournalSource =
 export type JournalStatus = "posted" | "void";
 export type AppRole = "admin" | "accountant" | "viewer";
 
+export type DocumentEntityType =
+  | "invoice"
+  | "bill"
+  | "expense"
+  | "purchase_order"
+  | "payment"
+  | "bill_payment"
+  | "credit_memo"
+  | "vendor_credit"
+  | "journal_entry"
+  | "fixed_asset"
+  | "bank_transaction"
+  | "goods_receipt";
+export type DocumentKind =
+  | "receipt"
+  | "vendor_bill"
+  | "customer_document"
+  | "purchase_order"
+  | "bank_statement"
+  | "contract"
+  | "tax_document"
+  | "other";
+export type DocumentScanStatus = "not_configured" | "pending" | "clean" | "blocked" | "error";
+export type DocumentStatus = "active" | "archived";
+
+export interface DocumentAttachmentRow {
+  id: string;
+  entity_type: DocumentEntityType;
+  entity_id: string;
+  document_kind: DocumentKind;
+  file_name: string;
+  storage_bucket: string;
+  storage_path: string;
+  mime_type: string;
+  size_bytes: number;
+  sha256: string;
+  description: string | null;
+  scan_status: DocumentScanStatus;
+  retention_until: string | null;
+  legal_hold: boolean;
+  status: DocumentStatus;
+  uploaded_by: string;
+  uploaded_at: string;
+  archived_by: string | null;
+  archived_at: string | null;
+  archive_reason: string | null;
+}
+
 export interface AccountRow {
   id: string;
   account_code: string;

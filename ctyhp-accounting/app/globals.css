@@ -425,6 +425,102 @@ body {
   overscroll-behavior: contain;
 }
 
+.document-attachment-drawer .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.document-upload-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #dbe4ea;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.document-upload-panel .ant-typography,
+.document-list-heading .ant-typography {
+  margin: 0;
+}
+
+.document-upload-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.2fr);
+  gap: 12px;
+}
+
+.document-upload-fields label,
+.document-archive-reason {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.document-upload-fields .ant-select {
+  width: 100%;
+}
+
+.document-list-section {
+  min-width: 0;
+}
+
+.document-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.document-list-item {
+  align-items: flex-start !important;
+  gap: 12px;
+}
+
+.document-list-item .ant-list-item-meta {
+  min-width: 0;
+}
+
+.document-list-item .ant-list-item-meta-title,
+.document-list-item .ant-list-item-meta-description {
+  overflow-wrap: anywhere;
+}
+
+.document-list-item .ant-list-item-action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-inline-start: 8px;
+}
+
+.document-list-item .ant-list-item-action .ant-btn {
+  min-height: 40px;
+}
+
+.document-file-icon {
+  color: #475569;
+  font-size: 28px;
+}
+
+.document-file-icon--pdf {
+  color: #b91c1c;
+}
+
+.document-file-icon--image {
+  color: #0369a1;
+}
+
+.document-file-icon--sheet {
+  color: #15803d;
+}
+
 .ant-dropdown,
 .ant-select-dropdown,
 .ant-popover {
@@ -1263,6 +1359,21 @@ body {
   .ant-modal-root .ant-modal-body .accounting-icon-action-wrap,
   .ant-drawer .ant-drawer-body .accounting-icon-action-wrap {
     width: auto;
+  }
+
+  .document-upload-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .document-list-item {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .document-list-item .ant-list-item-action {
+    width: 100%;
+    margin-inline-start: 0;
+    justify-content: flex-start;
   }
 
   .accounting-page-state--centered {
