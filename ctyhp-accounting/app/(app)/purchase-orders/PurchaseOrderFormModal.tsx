@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Typography } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, CurrencyRow, ItemRow, PurchaseOrderLineRow, PurchaseOrderRow, VendorRow } from "@/lib/db/types";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { poLineTotalMinor } from "@/lib/domain/purchasing";
@@ -215,9 +216,15 @@ function PurchaseOrderFormModalBody({
                     <InputNumber min={0} precision={decimals} placeholder="Unit cost" style={{ width: 130 }} />
                   </Form.Item>
                   {fields.length > 1 && (
-                    <Button type="link" danger onClick={() => { remove(field.name); setWatchedLines(form.getFieldValue("lines") ?? []); }}>
-                      Remove
-                    </Button>
+                    <IconActionButton
+                      label="Remove purchase order line"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => {
+                        remove(field.name);
+                        setWatchedLines(form.getFieldValue("lines") ?? []);
+                      }}
+                    />
                   )}
                 </Space>
               ))}

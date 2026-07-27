@@ -12,9 +12,15 @@ import {
   Tag,
   type TableColumnsType,
 } from "antd";
-import { PlusOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  CheckOutlined,
+  EditOutlined,
+  PlusOutlined,
+  StopOutlined,
+} from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import IconActionButton from "@/components/ui/IconActionButton";
 import { ACCOUNT_TYPES, normalBalanceOf, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
@@ -177,20 +183,21 @@ export default function AccountsClient({
           {
             title: "Actions",
             key: "actions",
-            width: 180,
+            width: 90,
             render: (_: unknown, row: AccountRow) => (
-              <Space>
-                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
-                  Edit
-                </Button>
-                <Button
-                  size="small"
+              <Space size={4}>
+                <IconActionButton
+                  label="Edit account"
+                  icon={<EditOutlined />}
+                  onClick={() => openEdit(row)}
+                />
+                <IconActionButton
+                  label={row.status === "active" ? "Deactivate account" : "Activate account"}
+                  icon={row.status === "active" ? <StopOutlined /> : <CheckOutlined />}
                   loading={busyId === row.id}
                   onClick={() => toggleStatus(row)}
                   disabled={row.status !== "active" && row.status !== "inactive"}
-                >
-                  {row.status === "active" ? "Deactivate" : "Activate"}
-                </Button>
+                />
               </Space>
             ),
           } as TableColumnsType<AccountRow>[number],

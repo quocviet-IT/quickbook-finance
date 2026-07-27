@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import IconActionButton from "@/components/ui/IconActionButton";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
 
@@ -220,12 +222,18 @@ export default function JournalClient({ canWrite, accounts, baseCurrency, baseDe
                   setLines((p) => p.map((x, j) => (j === i ? { ...x, credit: v ?? undefined, debit: undefined } : x)))
                 }
               />
-              <Button danger onClick={() => setLines((p) => p.filter((_, j) => j !== i))} disabled={lines.length <= 2}>
-                ×
-              </Button>
+              <IconActionButton
+                label="Remove journal line"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => setLines((p) => p.filter((_, j) => j !== i))}
+                disabled={lines.length <= 2}
+              />
             </Space>
           ))}
-          <Button onClick={() => setLines((p) => [...p, {}])}>Add line</Button>
+          <Button icon={<PlusOutlined />} onClick={() => setLines((p) => [...p, {}])}>
+            Add line
+          </Button>
           <div style={{ marginTop: 12 }}>
             Debit: {fmt(totals.d)} &nbsp; Credit: {fmt(totals.c)} &nbsp;
             <Tag color={totals.diff === 0 ? "green" : "red"}>Difference: {fmt(Math.abs(totals.diff))}</Tag>

@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, InputNumber, Space, Switch, Table, Tooltip, Typography } from "antd";
+import { Alert, App, InputNumber, Space, Switch, Table, Tooltip, Typography } from "antd";
+import { SaveOutlined } from "@ant-design/icons";
 import type { ApprovalPolicyRow } from "@/lib/db/types";
 import { CONTROLLED_ACTIONS } from "@/lib/domain/access";
+import IconActionButton from "@/components/ui/IconActionButton";
 import { setApprovalPolicyAction } from "../permissions/actions";
 
 interface Draft {
@@ -164,9 +166,12 @@ export default function ApprovalPoliciesClient({
             key: "save",
             render: (_, r) =>
               canManage ? (
-                <Button size="small" loading={saving === r.action_key} onClick={() => save(r)}>
-                  Save
-                </Button>
+                <IconActionButton
+                  label={`Save ${r.label} approval policy`}
+                  icon={<SaveOutlined />}
+                  loading={saving === r.action_key}
+                  onClick={() => save(r)}
+                />
               ) : null,
           },
         ]}

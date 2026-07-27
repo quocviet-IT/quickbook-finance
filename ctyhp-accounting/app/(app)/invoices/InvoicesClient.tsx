@@ -17,9 +17,10 @@ import {
   Typography,
   type TableColumnsType,
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import IconActionButton from "@/components/ui/IconActionButton";
 import type {
   AccountRow,
   CurrencyRow,
@@ -230,9 +231,11 @@ export default function InvoicesClient({
       width: 230,
       render: (_: unknown, r) => (
         <Space>
-          <Button size="small" onClick={() => viewInvoiceLines(r)}>
-            View
-          </Button>
+          <IconActionButton
+            label="View invoice lines"
+            icon={<EyeOutlined />}
+            onClick={() => viewInvoiceLines(r)}
+          />
           {canWrite && r.status === "draft" && (
             <Button size="small" type="primary" loading={busyId === r.id} onClick={() => issue(r.id)}>
               Issue
@@ -369,7 +372,12 @@ export default function InvoicesClient({
                         options={taxCodes.map((t) => ({ value: t.id, label: `${t.code} (${t.rate_percent}%)` }))}
                       />
                     </Form.Item>
-                    <DeleteOutlined onClick={() => remove(field.name)} style={{ color: "#c00" }} />
+                    <IconActionButton
+                      label="Remove invoice line"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => remove(field.name)}
+                    />
                   </Space>
                 ))}
                 <Button type="dashed" onClick={() => add({ quantity: 1 })} icon={<PlusOutlined />} block>

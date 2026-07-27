@@ -184,6 +184,20 @@ function performanceSnapshot(rows: Awaited<ReturnType<typeof getLedgerBalances>>
   };
 }
 
+type LedgerRows = Awaited<ReturnType<typeof getLedgerBalances>>;
+
+interface DashboardLedgerPromises {
+  asOf: Promise<LedgerRows>;
+  monthToDate: Promise<LedgerRows>;
+  priorComparable: Promise<LedgerRows>;
+}
+
+function cashFromLedger(rows: LedgerRows): number {
+  return rows
+    .filter((row) => row.accountType === "bank")
+    .reduce((sum, row) => sum + row.debitBase - row.creditBase, 0);
+}
+
 export function todayInTimeZone(timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -225,14 +239,15 @@ export function trailingMonthRanges(asOf: string, count = 6): MonthRange[] {
 export async function getDashboardMetrics(
   sb: SupabaseClient,
   asOf = new Date().toISOString().slice(0, 10),
+  ledger?: Pick<DashboardLedgerPromises, "asOf" | "monthToDate">,
 ): Promise<DashboardMetrics> {
   const [bal, ar, ap, unrecon, periods, mtdRows, approvals] = await Promise.all([
-    getLedgerBalances(sb, null, asOf),
+    ledger?.asOf ?? getLedgerBalances(sb, null, asOf),
     getArAgeing(sb, asOf),
     getApAgeing(sb, asOf),
     sb.rpc("acc_unreconciled_bank", { p_as_of: asOf }),
     sb.from("acc_accounting_period").select("id", { count: "exact", head: true }).eq("status", "open").lt("period_end", asOf),
-    getLedgerBalances(sb, monthStart(asOf), asOf),
+    ledger?.monthToDate ?? getLedgerBalances(sb, monthStart(asOf), asOf),
     sb.from("acc_approval_request").select("id", { count: "exact", head: true }).eq("status", "pending"),
   ]);
   if (unrecon.error) throw new DashboardError(unrecon.error.message);
@@ -241,7 +256,7 @@ export async function getDashboardMetrics(
 
   const naturalAsset = (row: (typeof bal)[number]) => row.debitBase - row.creditBase;
   const naturalLiability = (row: (typeof bal)[number]) => row.creditBase - row.debitBase;
-  const cashMinor = bal.filter((r) => r.accountType === "bank").reduce((s, r) => s + naturalAsset(r), 0);
+  const cashMinor = cashFromLedger(bal);
   const currentAssetsMinor = bal
     .filter((r) => ["bank", "accounts_receivable", "current_asset"].includes(r.accountType))
     .reduce((s, r) => s + naturalAsset(r), 0);
@@ -351,10 +366,15 @@ export function describeAuditActivity(row: AuditEntryRow): DashboardActivity {
 async function getMonthlyPerformance(
   sb: SupabaseClient,
   asOf: string,
+  currentRows?: Promise<LedgerRows>,
 ): Promise<MonthlyPerformancePoint[]> {
   const ranges = trailingMonthRanges(asOf);
   const balances = await Promise.all(
-    ranges.map((range) => getLedgerBalances(sb, range.from, range.to)),
+    ranges.map((range, index) =>
+      index === ranges.length - 1 && currentRows
+        ? currentRows
+        : getLedgerBalances(sb, range.from, range.to),
+    ),
   );
   return ranges.map((range, index) => {
     const pnl = buildProfitAndLoss(balances[index]);
@@ -388,11 +408,13 @@ async function getRecentActivity(sb: SupabaseClient): Promise<DashboardActivity[
 async function getPeriodComparison(
   sb: SupabaseClient,
   asOf: string,
+  currentRowsPromise?: Promise<LedgerRows>,
+  priorComparableRows?: Promise<LedgerRows>,
 ): Promise<PeriodComparison> {
   const previous = comparablePreviousMonthRange(asOf);
   const [currentRows, priorRows] = await Promise.all([
-    getLedgerBalances(sb, monthStart(asOf), asOf),
-    getLedgerBalances(sb, previous.from, previous.to),
+    currentRowsPromise ?? getLedgerBalances(sb, monthStart(asOf), asOf),
+    priorComparableRows ?? getLedgerBalances(sb, previous.from, previous.to),
   ]);
   const current = performanceSnapshot(currentRows);
   const prior = performanceSnapshot(priorRows);
@@ -415,28 +437,23 @@ async function getInventoryDashboard(
   sb: SupabaseClient,
   asOf: string,
 ): Promise<InventoryDashboardSnapshot> {
+  const staleCutoff = new Date(`${asOf}T00:00:00.000Z`);
+  staleCutoff.setUTCDate(staleCutoff.getUTCDate() - 90);
+  const staleCutoffIso = staleCutoff.toISOString().slice(0, 10);
   const [valuation, movements] = await Promise.all([
     getInventoryValuation(sb, asOf),
     sb
       .from("acc_inventory_txn")
-      .select("item_id,txn_date")
+      .select("item_id")
+      .gte("txn_date", staleCutoffIso)
       .lte("txn_date", asOf)
-      .order("txn_date", { ascending: false }),
   ]);
   if (movements.error) throw new DashboardError(movements.error.message);
 
-  const latestMovement = new Map<string, string>();
-  for (const row of movements.data ?? []) {
-    const itemId = String(row.item_id);
-    if (!latestMovement.has(itemId)) latestMovement.set(itemId, String(row.txn_date));
-  }
-  const staleCutoff = new Date(`${asOf}T00:00:00.000Z`);
-  staleCutoff.setUTCDate(staleCutoff.getUTCDate() - 90);
-  const staleRows = valuation.rows.filter((row) => {
-    if (row.qty_on_hand <= 0) return false;
-    const moved = latestMovement.get(row.item_id);
-    return !moved || new Date(`${moved}T00:00:00.000Z`) < staleCutoff;
-  });
+  const recentlyMoved = new Set((movements.data ?? []).map((row) => String(row.item_id)));
+  const staleRows = valuation.rows.filter(
+    (row) => row.qty_on_hand > 0 && !recentlyMoved.has(row.item_id),
+  );
   const sorted = [...valuation.rows].sort((a, b) => b.value_minor - a.value_minor);
 
   return {
@@ -497,6 +514,12 @@ export async function getDashboardAnalytics(
   sb: SupabaseClient,
   asOf = new Date().toISOString().slice(0, 10),
 ): Promise<DashboardAnalytics> {
+  const previous = comparablePreviousMonthRange(asOf);
+  const ledger: DashboardLedgerPromises = {
+    asOf: getLedgerBalances(sb, null, asOf),
+    monthToDate: getLedgerBalances(sb, monthStart(asOf), asOf),
+    priorComparable: getLedgerBalances(sb, previous.from, previous.to),
+  };
   const [
     metrics,
     monthlyPerformance,
@@ -506,10 +529,12 @@ export async function getDashboardAnalytics(
     operatingPulse,
     recentActivity,
   ] = await Promise.all([
-    getDashboardMetrics(sb, asOf),
-    getMonthlyPerformance(sb, asOf),
-    getPeriodComparison(sb, asOf),
-    getCashFlow(sb, monthStart(asOf), asOf),
+    getDashboardMetrics(sb, asOf, ledger),
+    getMonthlyPerformance(sb, asOf, ledger.monthToDate),
+    getPeriodComparison(sb, asOf, ledger.monthToDate, ledger.priorComparable),
+    getCashFlow(sb, monthStart(asOf), asOf, {
+      closingMinor: ledger.asOf.then(cashFromLedger),
+    }),
     getInventoryDashboard(sb, asOf),
     getOperatingPulse(sb, asOf),
     getRecentActivity(sb),

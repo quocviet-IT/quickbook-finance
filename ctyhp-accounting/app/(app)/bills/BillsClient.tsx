@@ -13,9 +13,10 @@ import {
   Space,
   Tag,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
@@ -276,7 +277,14 @@ export default function BillsClient({
                     >
                       <InputNumber min={0} precision={decimals} placeholder="Amount" style={{ width: 140 }} />
                     </Form.Item>
-                    {fields.length > 1 && <Button type="link" danger onClick={() => remove(field.name)}>Remove</Button>}
+                    {fields.length > 1 && (
+                      <IconActionButton
+                        label="Remove bill line"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => remove(field.name)}
+                      />
+                    )}
                   </Space>
                 ))}
                 <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>

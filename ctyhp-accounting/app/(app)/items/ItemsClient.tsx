@@ -1,9 +1,17 @@
 "use client";
 import { useState } from "react";
 import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag, Typography } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import {
+  CheckOutlined,
+  EditOutlined,
+  HistoryOutlined,
+  PlusOutlined,
+  StopOutlined,
+  ToolOutlined,
+} from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, InventoryValuationRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
 import { createItemAction, updateItemAction, setItemActiveAction } from "./actions";
 import AdjustInventoryModal from "./AdjustInventoryModal";
@@ -177,23 +185,32 @@ export default function ItemsClient({
           {
             title: "Actions",
             key: "actions",
+            width: 160,
             render: (_, r) =>
               canWrite ? (
-                <Space>
-                  <Button size="small" type="link" onClick={() => openEdit(r)}>
-                    Edit
-                  </Button>
-                  <Button size="small" type="link" onClick={() => toggleActive(r)}>
-                    {r.is_active ? "Deactivate" : "Activate"}
-                  </Button>
+                <Space size={4}>
+                  <IconActionButton
+                    label="Edit item"
+                    icon={<EditOutlined />}
+                    onClick={() => openEdit(r)}
+                  />
+                  <IconActionButton
+                    label={r.is_active ? "Deactivate item" : "Activate item"}
+                    icon={r.is_active ? <StopOutlined /> : <CheckOutlined />}
+                    onClick={() => toggleActive(r)}
+                  />
                   {r.is_inventory && (
                     <>
-                      <Button size="small" type="link" onClick={() => setAdjusting(r)}>
-                        Adjust
-                      </Button>
-                      <Button size="small" type="link" onClick={() => setViewing(r)}>
-                        Movements
-                      </Button>
+                      <IconActionButton
+                        label="Adjust inventory"
+                        icon={<ToolOutlined />}
+                        onClick={() => setAdjusting(r)}
+                      />
+                      <IconActionButton
+                        label="View inventory movements"
+                        icon={<HistoryOutlined />}
+                        onClick={() => setViewing(r)}
+                      />
                     </>
                   )}
                 </Space>

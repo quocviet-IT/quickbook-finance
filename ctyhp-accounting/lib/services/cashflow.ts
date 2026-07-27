@@ -16,13 +16,21 @@ function dayBefore(iso: string): string {
   return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 }
 
-export async function getCashFlow(sb: SupabaseClient, from: string, to: string): Promise<CashFlowReport> {
+export async function getCashFlow(
+  sb: SupabaseClient,
+  from: string,
+  to: string,
+  prefetched?: { closingMinor?: number | Promise<number> },
+): Promise<CashFlowReport> {
   const { data, error } = await sb.rpc("acc_cash_flow", { p_from: from, p_to: to });
   if (error) throw new CashFlowError(error.message);
   const categories = (data ?? []).map((r: Record<string, unknown>) => ({
     category: r.category as CashFlowCategory,
     amountMinor: Number(r.amount_minor),
   }));
-  const [opening, closing] = await Promise.all([cashAsOf(sb, dayBefore(from)), cashAsOf(sb, to)]);
+  const [opening, closing] = await Promise.all([
+    cashAsOf(sb, dayBefore(from)),
+    prefetched?.closingMinor ?? cashAsOf(sb, to),
+  ]);
   return assembleCashFlow(categories, opening, closing);
 }

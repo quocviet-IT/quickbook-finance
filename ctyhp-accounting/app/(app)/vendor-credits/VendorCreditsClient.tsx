@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import IconActionButton from "@/components/ui/IconActionButton";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import {
   createVendorCreditAction,
@@ -243,12 +245,18 @@ export default function VendorCreditsClient({
                 value={l.amount}
                 onChange={(v) => setLines((p) => p.map((x, j) => (j === i ? { ...x, amount: v ?? undefined } : x)))}
               />
-              <Button danger onClick={() => setLines((p) => p.filter((_, j) => j !== i))} disabled={lines.length <= 1}>
-                ×
-              </Button>
+              <IconActionButton
+                label="Remove vendor credit line"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => setLines((p) => p.filter((_, j) => j !== i))}
+                disabled={lines.length <= 1}
+              />
             </Space>
           ))}
-          <Button onClick={() => setLines((p) => [...p, {}])}>Add line</Button>
+          <Button icon={<PlusOutlined />} onClick={() => setLines((p) => [...p, {}])}>
+            Add line
+          </Button>
           <div style={{ marginTop: 12 }}>
             Total: {fmt(total)} {baseCurrency}
           </div>

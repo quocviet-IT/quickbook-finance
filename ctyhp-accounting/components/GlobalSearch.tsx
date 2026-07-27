@@ -16,17 +16,21 @@ export default function GlobalSearch() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestId = useRef(0);
 
   function onChange(next: string) {
     setValue(next);
     if (timer.current) clearTimeout(timer.current);
+    const currentRequest = ++requestId.current;
     if (next.trim().length < 2) {
       setHits([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
     timer.current = setTimeout(async () => {
       const res = await globalSearchAction(next);
+      if (currentRequest !== requestId.current) return;
       setLoading(false);
       setHits(res.ok && res.data ? res.data : []);
     }, 250);
@@ -59,8 +63,11 @@ export default function GlobalSearch() {
       onChange={onChange}
       onSelect={(_, option) => {
         const href = (option as { href?: string }).href;
+        requestId.current++;
+        if (timer.current) clearTimeout(timer.current);
         setValue("");
         setHits([]);
+        setLoading(false);
         if (href) router.push(href);
       }}
       notFoundContent={

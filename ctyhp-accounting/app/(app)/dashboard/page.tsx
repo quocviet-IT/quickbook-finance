@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const sb = await createSupabaseServerClient();
-  const [currencies, company] = await Promise.all([
-    listCurrencies(sb),
-    getCurrentCompanySettings(sb),
-  ]);
+  const company = await getCurrentCompanySettings(sb);
   const timeZone = company?.time_zone ?? "America/New_York";
-  const analytics = await getDashboardAnalytics(sb, todayInTimeZone(timeZone));
+  const [currencies, analytics] = await Promise.all([
+    listCurrencies(sb),
+    getDashboardAnalytics(sb, todayInTimeZone(timeZone)),
+  ]);
   const base = currencies.find((c) => c.is_base);
   return (
     <DashboardClient
