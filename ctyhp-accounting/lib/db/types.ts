@@ -500,7 +500,7 @@ export interface BankConnectionRow {
 
 export type FixedAssetMethod = "straight_line" | "none";
 export type FixedAssetStatus = "in_service" | "fully_depreciated" | "disposed";
-export type DepreciationScheduleStatus = "planned" | "posted";
+export type DepreciationScheduleStatus = "planned" | "opening" | "posted" | "cancelled";
 
 export interface FixedAssetRow {
   id: string;
@@ -524,6 +524,18 @@ export interface FixedAssetRow {
   source_bill_id: string | null;
   status: FixedAssetStatus;
   disposed_at: string | null;
+  opening_accumulated_depreciation_minor: number;
+  opening_as_of_date: string | null;
+  opening_journal_entry_id: string | null;
+  disposal_sale_price_minor: number | null;
+  disposal_cost_minor: number | null;
+  disposal_net_proceeds_minor: number | null;
+  disposal_gain_loss_minor: number | null;
+  disposal_proceeds_account_id: string | null;
+  disposal_gain_account_id: string | null;
+  disposal_loss_account_id: string | null;
+  disposal_journal_entry_id: string | null;
+  disposal_reason: string | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;

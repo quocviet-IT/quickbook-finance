@@ -10,9 +10,11 @@ export const dynamic = "force-dynamic";
 export default async function JournalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{ new?: string; entry?: string | string[] }>;
 }) {
-  const initialCreateOpen = (await searchParams).new === "1";
+  const params = await searchParams;
+  const initialCreateOpen = params.new === "1";
+  const initialEntryId = Array.isArray(params.entry) ? params.entry[0] : params.entry;
   const sb = await createSupabaseServerClient();
   const [currencies, accounts, role] = await Promise.all([
     listCurrencies(sb),
@@ -30,6 +32,7 @@ export default async function JournalPage({
         accounts={postingAccounts.map((a) => ({ id: a.id, account_code: a.account_code, name: a.name }))}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        initialEntryId={initialEntryId}
       />
     </div>
   );

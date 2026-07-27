@@ -47,6 +47,7 @@ export default function BillsClient({
   currencies,
   items,
   canWrite,
+  canRegisterAsset,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -57,6 +58,7 @@ export default function BillsClient({
   currencies: CurrencyRow[];
   items: ItemRow[];
   canWrite: boolean;
+  canRegisterAsset: boolean;
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
@@ -171,23 +173,35 @@ export default function BillsClient({
             title: "Actions",
             key: "actions",
             render: (_, r) =>
-              canWrite ? (
+              canWrite || canRegisterAsset ? (
                 <Space>
-                  {r.status === "draft" && (
+                  {canWrite && r.status === "draft" && (
                     <Button size="small" type="link" onClick={() => post(r.id)}>
                       Post
                     </Button>
                   )}
-                  {r.status !== "void" && r.status !== "paid" && (
+                  {canWrite && r.status !== "void" && r.status !== "paid" && (
                     <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
                       Void
                     </Button>
                   )}
-                  {(r.status === "open" || r.status === "partial") && (
+                  {canWrite && (r.status === "open" || r.status === "partial") && (
                     <Button size="small" type="link" onClick={() => setWriteOffFor(r)}>
                       Write off
                     </Button>
                   )}
+                  {canRegisterAsset &&
+                  r.status !== "draft" &&
+                  r.status !== "void" &&
+                  r.journal_entry_id ? (
+                    <Button
+                      size="small"
+                      type="link"
+                      onClick={() => router.push(`/fixed-assets?bill=${r.id}`)}
+                    >
+                      Register asset
+                    </Button>
+                  ) : null}
                 </Space>
               ) : null,
           },
@@ -263,7 +277,7 @@ export default function BillsClient({
                       style={{ marginBottom: 0 }}
                     >
                       <Select
-                        placeholder="Expense account"
+                        placeholder="Expense or asset account"
                         style={{ width: 220 }}
                         showSearch
                         optionFilterProp="label"

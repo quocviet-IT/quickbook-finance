@@ -16,18 +16,22 @@ export default async function BillsPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [bills, vendors, accounts, currencies, items, role] = await Promise.all([
+  const [bills, vendors, accounts, currencies, items, role, fixedAssetPermission] = await Promise.all([
     listBills(sb),
     listVendors(sb),
     listAccounts(sb),
     listCurrencies(sb),
     listItems(sb),
     getUserRole(),
+    sb.rpc("acc_has_permission", { p_key: "fixed_assets.manage" }),
   ]);
 
-  const expenseAccounts = accounts.filter(
+  const billDebitAccounts = accounts.filter(
     (a) =>
-      (a.account_type === "expense" || a.account_type === "cost_of_goods_sold" || a.account_type === "other_expense") &&
+      (a.account_type === "expense" ||
+        a.account_type === "cost_of_goods_sold" ||
+        a.account_type === "other_expense" ||
+        a.account_type === "fixed_asset") &&
       a.is_posting_account &&
       a.status === "active",
   );
@@ -48,11 +52,12 @@ export default async function BillsPage({
         initialCreateOpen={initialCreateOpen}
         bills={bills}
         vendors={vendors}
-        expenseAccounts={expenseAccounts}
+        expenseAccounts={billDebitAccounts}
         incomeAccounts={incomeAccounts}
         currencies={currencies}
         items={purchaseItems}
         canWrite={canWrite(role)}
+        canRegisterAsset={!fixedAssetPermission.error && fixedAssetPermission.data === true}
       />
     </div>
   );

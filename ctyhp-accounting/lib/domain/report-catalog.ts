@@ -148,6 +148,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "fixed-assets",
+    title: "Fixed Asset Register & Depreciation",
+    description: "Review asset cost, book value, depreciation schedules, and disposal results.",
+    href: "/reports/fixed-assets",
+    group: "accounting",
+  },
+  {
     id: "inventory-valuation",
     title: "Inventory Valuation",
     description: "Analyze jewelry quantities, unit costs, and inventory value.",

@@ -19,6 +19,8 @@ interface Props {
   baseDecimals: number;
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  /** Opens one journal from an operational report via `?entry=<uuid>`. */
+  initialEntryId?: string;
 }
 interface LineForm {
   account_id?: string;
@@ -26,7 +28,14 @@ interface LineForm {
   credit?: number;
 }
 
-export default function JournalClient({ canWrite, accounts, baseCurrency, baseDecimals, initialCreateOpen }: Props) {
+export default function JournalClient({
+  canWrite,
+  accounts,
+  baseCurrency,
+  baseDecimals,
+  initialCreateOpen,
+  initialEntryId,
+}: Props) {
   const { message, modal } = App.useApp();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,10 +43,13 @@ export default function JournalClient({ canWrite, accounts, baseCurrency, baseDe
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [lines, setLines] = useState<LineForm[]>([{}, {}]);
+  const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>(
+    initialEntryId ? [initialEntryId] : [],
+  );
 
   const load = async () => {
     setLoading(true);
-    const r = await listJournalAction({});
+    const r = await listJournalAction({ entryId: initialEntryId ?? null });
     setLoading(false);
     if (r.ok && r.data) setEntries(r.data);
     else message.error(r.error ?? "Failed to load journal entries");
@@ -134,6 +146,8 @@ export default function JournalClient({ canWrite, accounts, baseCurrency, baseDe
         dataSource={entries}
         scroll={{ x: "max-content" }}
         expandable={{
+          expandedRowKeys,
+          onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys].map(String)),
           expandedRowRender: (e) => (
             <Table
               size="small"
