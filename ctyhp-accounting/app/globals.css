@@ -1699,9 +1699,10 @@ body {
    --------------------------------------------------------------------------- */
 
 .app-shell__header-search {
-  flex: 1 1 360px;
+  flex: 0 1 320px;
+  width: 100%;
   min-width: 0;
-  max-width: 460px;
+  max-width: 320px;
 }
 
 .global-search {
@@ -1709,7 +1710,7 @@ body {
 }
 
 .global-search .ant-input-affix-wrapper {
-  min-height: 40px;
+  min-height: 36px;
   border-color: #dbe2ea;
   border-radius: 8px;
   background: #f8fafc;
@@ -1961,7 +1962,7 @@ body {
 
 @media (max-width: 991px) {
   .app-shell__header-search {
-    flex-basis: 200px;
+    flex: 1 1 200px;
     max-width: none;
   }
 
