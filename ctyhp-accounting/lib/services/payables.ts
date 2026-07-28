@@ -13,7 +13,6 @@ import type {
   ExpenseCreateInput,
   BillPaymentCreateInput,
 } from "@/lib/domain/schemas";
-import { writeAudit } from "./audit";
 
 export class PayablesError extends Error {}
 
@@ -48,9 +47,7 @@ export async function createVendor(sb: SupabaseClient, input: VendorCreateInput)
     )
     .single();
   if (error) throw new PayablesError(error.message);
-  const row = data as unknown as VendorRow;
-  await writeAudit(sb, { table_name: "acc_vendor", record_id: row.id, action: "insert", after: row });
-  return row;
+  return data as unknown as VendorRow;
 }
 
 // --- Bills ---
@@ -89,55 +86,35 @@ export async function createDraftBill(
   input: BillCreateInput,
   options?: { recurringRunId?: string },
 ): Promise<BillRow> {
-  const total = input.lines.reduce((s, l) => s + l.amount_minor, 0);
+  const { data: id, error } = await sb.rpc("acc_create_draft_bill", {
+    p_vendor_id: input.vendor_id,
+    p_vendor_ref: input.vendor_ref || null,
+    p_bill_date: input.bill_date || null,
+    p_due_date: input.due_date || null,
+    p_currency: input.currency_code,
+    p_memo: input.memo || null,
+    p_lines: input.lines,
+    p_recurring_run_id: options?.recurringRunId ?? null,
+  });
+  if (error) throw new PayablesError(error.message);
 
-  const { data: bill, error: e1 } = await sb
+  const { data: bill, error: readError } = await sb
     .from("acc_bill")
-    .insert({
-      vendor_id: input.vendor_id,
-      vendor_ref: input.vendor_ref || null,
-      currency_code: input.currency_code,
-      bill_date: input.bill_date || undefined,
-      due_date: input.due_date || null,
-      memo: input.memo || null,
-      total_minor: total,
-      balance_due_minor: total,
-      recurring_run_id: options?.recurringRunId ?? null,
-    })
     .select("*")
+    .eq("id", String(id))
     .single();
-  if (e1) throw new PayablesError(e1.message);
-  const row = bill as unknown as BillRow;
-
-  const { error: e2 } = await sb.from("acc_bill_line").insert(
-    input.lines.map((l, i) => ({
-      bill_id: row.id,
-      line_order: i,
-      description: l.description,
-      expense_account_id: l.expense_account_id,
-      amount_minor: l.amount_minor,
-      item_id: l.item_id || null,
-    })),
-  );
-  if (e2) {
-    await sb.from("acc_bill").delete().eq("id", row.id);
-    throw new PayablesError(e2.message);
-  }
-
-  await writeAudit(sb, { table_name: "acc_bill", record_id: row.id, action: "insert", after: row });
-  return row;
+  if (readError) throw new PayablesError(readError.message);
+  return bill as unknown as BillRow;
 }
 
 export async function postBill(sb: SupabaseClient, billId: string): Promise<void> {
   const { error } = await sb.rpc("acc_post_bill", { p_bill_id: billId });
   if (error) throw new PayablesError(error.message);
-  await writeAudit(sb, { table_name: "acc_bill", record_id: billId, action: "post" });
 }
 
 export async function voidBill(sb: SupabaseClient, billId: string): Promise<void> {
   const { error } = await sb.rpc("acc_void_bill", { p_bill_id: billId });
   if (error) throw new PayablesError(error.message);
-  await writeAudit(sb, { table_name: "acc_bill", record_id: billId, action: "void" });
 }
 
 // --- Expenses ---
@@ -180,14 +157,12 @@ export async function recordExpense(sb: SupabaseClient, input: ExpenseCreateInpu
     p_lines: input.lines,
   });
   if (error) throw new PayablesError(error.message);
-  await writeAudit(sb, { table_name: "acc_expense", record_id: (data as string) ?? null, action: "post" });
   return data as string;
 }
 
 export async function voidExpense(sb: SupabaseClient, expenseId: string): Promise<void> {
   const { error } = await sb.rpc("acc_void_expense", { p_expense_id: expenseId });
   if (error) throw new PayablesError(error.message);
-  await writeAudit(sb, { table_name: "acc_expense", record_id: expenseId, action: "void" });
 }
 
 // --- Bill payments ---
@@ -232,12 +207,10 @@ export async function payBills(sb: SupabaseClient, input: BillPaymentCreateInput
     p_allocations: input.allocations,
   });
   if (error) throw new PayablesError(error.message);
-  await writeAudit(sb, { table_name: "acc_bill_payment", record_id: (data as string) ?? null, action: "post" });
   return data as string;
 }
 
 export async function voidBillPayment(sb: SupabaseClient, paymentId: string): Promise<void> {
   const { error } = await sb.rpc("acc_void_bill_payment", { p_payment_id: paymentId });
   if (error) throw new PayablesError(error.message);
-  await writeAudit(sb, { table_name: "acc_bill_payment", record_id: paymentId, action: "void" });
 }

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ItemRow } from "@/lib/db/types";
 import type { ItemCreateInput, ItemUpdateInput } from "@/lib/domain/schemas";
-import { writeAudit } from "./audit";
 
 export class ItemsError extends Error {}
 
@@ -37,9 +36,7 @@ function toRow(input: ItemCreateInput | ItemUpdateInput) {
 export async function createItem(sb: SupabaseClient, input: ItemCreateInput): Promise<ItemRow> {
   const { data, error } = await sb.from("acc_item").insert(toRow(input)).select(COLS).single();
   if (error) throw new ItemsError(error.message);
-  const row = data as unknown as ItemRow;
-  await writeAudit(sb, { table_name: "acc_item", record_id: row.id, action: "insert", after: row });
-  return row;
+  return data as unknown as ItemRow;
 }
 
 export async function updateItem(sb: SupabaseClient, id: string, input: ItemUpdateInput): Promise<ItemRow> {
@@ -50,9 +47,7 @@ export async function updateItem(sb: SupabaseClient, id: string, input: ItemUpda
     .select(COLS)
     .single();
   if (error) throw new ItemsError(error.message);
-  const row = data as unknown as ItemRow;
-  await writeAudit(sb, { table_name: "acc_item", record_id: id, action: "update", after: row });
-  return row;
+  return data as unknown as ItemRow;
 }
 
 export async function setItemActive(sb: SupabaseClient, id: string, active: boolean): Promise<void> {
@@ -61,5 +56,4 @@ export async function setItemActive(sb: SupabaseClient, id: string, active: bool
     .update({ is_active: active, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw new ItemsError(error.message);
-  await writeAudit(sb, { table_name: "acc_item", record_id: id, action: "update", after: { is_active: active } });
 }

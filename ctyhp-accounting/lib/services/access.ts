@@ -17,7 +17,6 @@ import type {
   UserStatusInput,
 } from "@/lib/domain/schemas";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
-import { writeAudit } from "./audit";
 
 export class AccessError extends Error {}
 
@@ -74,12 +73,6 @@ export async function createUser(
     throw new AccessError(eRow.message);
   }
 
-  await writeAudit(sb, {
-    table_name: "acc_app_user",
-    record_id: userId,
-    action: "insert",
-    after: { email: input.email, role: input.role, status: "active", delivery: "admin_assigned" },
-  });
   return userId;
 }
 

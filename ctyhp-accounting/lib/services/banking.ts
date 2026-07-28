@@ -7,12 +7,12 @@ import type {
   BankTransactionRow,
 } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
+import { statementRowHash } from "@/lib/domain/banking-import";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
   type LedgerMatchCandidate,
 } from "@/lib/domain/reconciliation";
-import { writeAudit } from "./audit";
 import { decryptBankToken, encryptBankToken } from "./bank-token-crypto";
 import {
   exchangePlaidPublicToken as exchangePublicToken,
@@ -23,14 +23,6 @@ import {
 } from "./plaid";
 
 export class BankingError extends Error {}
-
-/** Deterministic short hash (djb2) used to dedupe re-imported statement lines. */
-export function rawHash(parts: (string | number | null | undefined)[]): string {
-  const s = parts.map((p) => String(p ?? "")).join("|");
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return h.toString(16).padStart(8, "0");
-}
 
 export interface BankAccountWithGl extends BankAccountRow {
   account_code: string;
@@ -85,41 +77,30 @@ export async function importStatement(
 ): Promise<{ inserted: number; skipped: number }> {
   if (!rows.length) return { inserted: 0, skipped: 0 };
 
-  const { data: batch, error: e1 } = await sb
-    .from("acc_bank_import_batch")
-    .insert({ bank_account_id: bankAccountId, filename, row_count: rows.length })
-    .select("id")
-    .single();
-  if (e1) throw new BankingError(e1.message);
-  const batchId = (batch as { id: string }).id;
-
-  const toInsert = rows.map((r) => ({
-    bank_account_id: bankAccountId,
-    import_batch_id: batchId,
+  const payload = rows.map((r) => ({
     txn_date: r.txn_date,
     description: r.description,
     reference: r.reference,
     amount_minor: r.amount_minor,
     running_balance_minor: r.running_balance_minor,
     raw_line: r.raw_line,
-    raw_hash: rawHash([bankAccountId, r.txn_date, r.amount_minor, r.description, r.reference]),
+    raw_hash: statementRowHash([bankAccountId, r.txn_date, r.amount_minor, r.description, r.reference]),
     source: "file_upload",
   }));
 
-  const { data, error } = await sb
-    .from("acc_bank_transaction")
-    .upsert(toInsert, { onConflict: "bank_account_id,raw_hash", ignoreDuplicates: true })
-    .select("id");
-  if (error) throw new BankingError(error.message);
-
-  const inserted = (data ?? []).length;
-  await writeAudit(sb, {
-    table_name: "acc_bank_transaction",
-    record_id: batchId,
-    action: "insert",
-    after: { imported: inserted, filename },
+  const { data, error } = await sb.rpc("acc_import_bank_statement", {
+    p_bank_account_id: bankAccountId,
+    p_filename: filename,
+    p_rows: payload,
   });
-  return { inserted, skipped: rows.length - inserted };
+  if (error) throw new BankingError(error.message);
+  const result = (Array.isArray(data) ? data[0] : data) as
+    | { inserted?: number; skipped?: number }
+    | null;
+  return {
+    inserted: Number(result?.inserted ?? 0),
+    skipped: Number(result?.skipped ?? rows.length),
+  };
 }
 
 export async function listBankTransactions(

@@ -120,28 +120,79 @@ describe("document → journal → ledger → report", () => {
         [marker],
       );
       const customerId = customer.rows[0].id;
+      const invoiceLines = JSON.stringify([
+        {
+          description: "Jewelry appraisal and setting service",
+          quantity: 1,
+          unit_price_minor: amountMinor,
+          income_account_id: incomeAccountId,
+          tax_code_id: null,
+          item_id: null,
+        },
+      ]);
       const invoice = await db.query<{ id: string }>(
-        `insert into acc_invoice (
-           customer_id, issue_date, due_date, currency_code,
-           subtotal_minor, tax_total_minor, total_minor, balance_due_minor,
-           status, memo, created_by
-         )
-         values (
-           $1, current_date, current_date + 30, 'USD',
-           $2, 0, $2, 0, 'draft', $3, $4
-         )
-         returning id`,
-        [customerId, amountMinor, marker, adminId],
+        `select acc_create_draft_invoice(
+           $1::uuid,
+           current_date,
+           current_date + 30,
+           'USD',
+           $2,
+           $3::jsonb,
+           null
+         ) as id`,
+        [customerId, marker, invoiceLines],
       );
       const invoiceId = invoice.rows[0].id;
-      await db.query(
-        `insert into acc_invoice_line (
-           invoice_id, line_order, description, quantity, unit_price_minor,
-           income_account_id, line_subtotal_minor, line_tax_minor, line_total_minor
-         )
-         values ($1, 0, 'Jewelry appraisal and setting service', 1, $2, $3, $2, 0, $2)`,
-        [invoiceId, amountMinor, incomeAccountId],
+
+      const atomicDraft = await db.query<{
+        line_count: number;
+        audit_count: number;
+      }>(
+        `select
+           (select count(*)::int
+              from acc_invoice_line
+             where invoice_id = $1::uuid) as line_count,
+           (select count(*)::int
+              from acc_audit_log
+             where table_name = 'acc_invoice'
+               and record_id = $1::uuid
+               and action = 'insert') as audit_count`,
+        [invoiceId],
       );
+      expect(atomicDraft.rows[0]).toEqual({ line_count: 1, audit_count: 1 });
+
+      const failedMarker = `${marker}-EXPECTED-ROLLBACK`;
+      await db.query("savepoint invalid_document");
+      let invalidDocumentRejected = false;
+      try {
+        await db.query(
+          `select acc_create_draft_invoice(
+             $1::uuid,
+             current_date,
+             null,
+             'USD',
+             $2,
+             jsonb_build_array(jsonb_build_object(
+               'description', 'Invalid account must roll back',
+               'quantity', 1,
+               'unit_price_minor', 100,
+               'income_account_id', gen_random_uuid()
+             )),
+             null
+           )`,
+          [customerId, failedMarker],
+        );
+      } catch {
+        invalidDocumentRejected = true;
+      } finally {
+        await db.query("rollback to savepoint invalid_document");
+      }
+      expect(invalidDocumentRejected).toBe(true);
+      const orphanedHeader = await db.query<{ count: number }>(
+        `select count(*)::int as count from acc_invoice where memo = $1`,
+        [failedMarker],
+      );
+      expect(orphanedHeader.rows[0].count).toBe(0);
 
       const posting = await db.query<{ journal_entry_id: string }>(
         `select acc_issue_invoice($1::uuid) as journal_entry_id`,
@@ -149,6 +200,16 @@ describe("document → journal → ledger → report", () => {
       );
       const journalEntryId = posting.rows[0].journal_entry_id;
       expect(journalEntryId).toBeTruthy();
+
+      const postAudit = await db.query<{ count: number }>(
+        `select count(*)::int as count
+           from acc_audit_log
+          where table_name = 'acc_invoice'
+            and record_id = $1::uuid
+            and action = 'post'`,
+        [invoiceId],
+      );
+      expect(postAudit.rows[0].count).toBe(1);
 
       // Force the database's deferred balanced-entry invariant now rather than
       // relying only on the application-side assertions below.

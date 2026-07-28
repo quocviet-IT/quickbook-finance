@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CreditMemoRow, VendorCreditRow } from "@/lib/db/types";
-import { computeInvoiceLine } from "@/lib/domain/money";
 import type {
   CreditMemoCreateInput,
   VendorCreditCreateInput,
@@ -13,67 +12,16 @@ export class CreditsError extends Error {}
 
 // --- Credit memo (AR) ---
 export async function createCreditMemo(sb: SupabaseClient, input: CreditMemoCreateInput): Promise<string> {
-  // Tax rate is resolved from the tax code server-side (never trust the client),
-  // then line + document totals are computed once from the resolved rates.
-  const rates = await taxRates(sb, input.lines.map((l) => l.tax_code_id).filter(Boolean) as string[]);
-  const memoRows = input.lines.map((l) => ({
-    l,
-    a: computeInvoiceLine({
-      quantity: l.quantity,
-      unitPriceMinor: l.unit_price_minor,
-      taxRatePercent: l.tax_code_id ? (rates[l.tax_code_id] ?? 0) : 0,
-    }),
-  }));
-  const subtotal = memoRows.reduce((s, r) => s + r.a.subtotalMinor, 0);
-  const tax = memoRows.reduce((s, r) => s + r.a.taxMinor, 0);
-  const total = subtotal + tax;
-
-  const ins = await sb
-    .from("acc_credit_memo")
-    .insert({
-      customer_id: input.customer_id,
-      currency_code: input.currency_code,
-      memo_date: input.memo_date || undefined,
-      reason: input.reason || null,
-      memo: input.memo || null,
-      subtotal_minor: subtotal,
-      tax_total_minor: tax,
-      total_minor: total,
-      balance_remaining_minor: 0,
-      status: "draft",
-    })
-    .select("id")
-    .single();
-  if (ins.error) throw new CreditsError(ins.error.message);
-  const id = (ins.data as { id: string }).id;
-
-  const lineRows = memoRows.map((r, i) => ({
-    credit_memo_id: id,
-    line_order: i,
-    description: r.l.description ?? "",
-    quantity: r.l.quantity,
-    unit_price_minor: r.l.unit_price_minor,
-    income_account_id: r.l.income_account_id,
-    tax_code_id: r.l.tax_code_id || null,
-    line_subtotal_minor: r.a.subtotalMinor,
-    line_tax_minor: r.a.taxMinor,
-    line_total_minor: r.a.totalMinor,
-  }));
-  const lineIns = await sb.from("acc_credit_memo_line").insert(lineRows);
-  if (lineIns.error) throw new CreditsError(lineIns.error.message);
-
-  const rpc = await sb.rpc("acc_issue_credit_memo", { p_credit_memo_id: id });
-  if (rpc.error) throw new CreditsError(rpc.error.message);
-  return id;
-}
-
-async function taxRates(sb: SupabaseClient, ids: string[]): Promise<Record<string, number>> {
-  if (ids.length === 0) return {};
-  const { data, error } = await sb.from("acc_tax_code").select("id,rate_percent").in("id", ids);
+  const { data, error } = await sb.rpc("acc_create_and_issue_credit_memo", {
+    p_customer_id: input.customer_id,
+    p_memo_date: input.memo_date || null,
+    p_currency: input.currency_code,
+    p_reason: input.reason || null,
+    p_memo: input.memo || null,
+    p_lines: input.lines,
+  });
   if (error) throw new CreditsError(error.message);
-  const out: Record<string, number> = {};
-  for (const r of data ?? []) out[(r as { id: string }).id] = Number((r as { rate_percent: number }).rate_percent);
-  return out;
+  return data as string;
 }
 
 export async function applyCreditMemo(
@@ -119,36 +67,17 @@ export async function listOpenInvoices(sb: SupabaseClient, customerId: string, c
 
 // --- Vendor credit (AP) ---
 export async function createVendorCredit(sb: SupabaseClient, input: VendorCreditCreateInput): Promise<string> {
-  const total = input.lines.reduce((s, l) => s + l.amount_minor, 0);
-  const ins = await sb
-    .from("acc_vendor_credit")
-    .insert({
-      vendor_id: input.vendor_id,
-      currency_code: input.currency_code,
-      credit_date: input.credit_date || undefined,
-      vendor_ref: input.vendor_ref || null,
-      reason: input.reason || null,
-      memo: input.memo || null,
-      total_minor: total,
-      balance_remaining_minor: 0,
-      status: "draft",
-    })
-    .select("id")
-    .single();
-  if (ins.error) throw new CreditsError(ins.error.message);
-  const id = (ins.data as { id: string }).id;
-  const lineRows = input.lines.map((l, i) => ({
-    vendor_credit_id: id,
-    line_order: i,
-    description: l.description ?? "",
-    expense_account_id: l.expense_account_id,
-    amount_minor: l.amount_minor,
-  }));
-  const lineIns = await sb.from("acc_vendor_credit_line").insert(lineRows);
-  if (lineIns.error) throw new CreditsError(lineIns.error.message);
-  const rpc = await sb.rpc("acc_issue_vendor_credit", { p_vendor_credit_id: id });
-  if (rpc.error) throw new CreditsError(rpc.error.message);
-  return id;
+  const { data, error } = await sb.rpc("acc_create_and_issue_vendor_credit", {
+    p_vendor_id: input.vendor_id,
+    p_credit_date: input.credit_date || null,
+    p_currency: input.currency_code,
+    p_vendor_ref: input.vendor_ref || null,
+    p_reason: input.reason || null,
+    p_memo: input.memo || null,
+    p_lines: input.lines,
+  });
+  if (error) throw new CreditsError(error.message);
+  return data as string;
 }
 
 export async function applyVendorCredit(

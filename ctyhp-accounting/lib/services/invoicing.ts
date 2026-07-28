@@ -5,13 +5,11 @@ import type {
   InvoiceLineRow,
   PaymentRow,
 } from "@/lib/db/types";
-import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import type {
   CustomerCreateInput,
   InvoiceCreateInput,
   PaymentCreateInput,
 } from "@/lib/domain/schemas";
-import { writeAudit } from "./audit";
 
 export class InvoicingError extends Error {}
 
@@ -39,9 +37,7 @@ export async function createCustomer(
     .select("id,name,email,currency_code,is_active,created_at,updated_at")
     .single();
   if (error) throw new InvoicingError(error.message);
-  const row = data as unknown as CustomerRow;
-  await writeAudit(sb, { table_name: "acc_customer", record_id: row.id, action: "insert", after: row });
-  return row;
+  return data as unknown as CustomerRow;
 }
 
 // --- Invoices ---
@@ -85,81 +81,34 @@ export async function createDraftInvoice(
   input: InvoiceCreateInput,
   options?: { recurringRunId?: string },
 ): Promise<InvoiceRow> {
-  const taxCodeIds = [...new Set(input.lines.map((l) => l.tax_code_id).filter(Boolean))] as string[];
-  const rates = new Map<string, number>();
-  if (taxCodeIds.length) {
-    const { data, error } = await sb
-      .from("acc_tax_code")
-      .select("id,rate_percent")
-      .in("id", taxCodeIds);
-    if (error) throw new InvoicingError(error.message);
-    for (const t of data ?? []) rates.set(t.id as string, Number(t.rate_percent));
-  }
-
-  const computed = input.lines.map((l) => {
-    const amounts = computeInvoiceLine({
-      quantity: l.quantity,
-      unitPriceMinor: l.unit_price_minor,
-      taxRatePercent: l.tax_code_id ? rates.get(l.tax_code_id) ?? 0 : 0,
-    });
-    return { line: l, amounts };
+  const { data: id, error } = await sb.rpc("acc_create_draft_invoice", {
+    p_customer_id: input.customer_id,
+    p_issue_date: input.issue_date || null,
+    p_due_date: input.due_date || null,
+    p_currency: input.currency_code,
+    p_memo: input.memo || null,
+    p_lines: input.lines,
+    p_recurring_run_id: options?.recurringRunId ?? null,
   });
-  const totals = sumInvoiceTotals(computed.map((c) => c.amounts));
+  if (error) throw new InvoicingError(error.message);
 
-  const { data: inv, error: e1 } = await sb
+  const { data: invoice, error: readError } = await sb
     .from("acc_invoice")
-    .insert({
-      customer_id: input.customer_id,
-      currency_code: input.currency_code,
-      issue_date: input.issue_date || undefined,
-      due_date: input.due_date || null,
-      memo: input.memo || null,
-      subtotal_minor: totals.subtotalMinor,
-      tax_total_minor: totals.taxTotalMinor,
-      total_minor: totals.totalMinor,
-      balance_due_minor: totals.totalMinor,
-      recurring_run_id: options?.recurringRunId ?? null,
-    })
     .select("*")
+    .eq("id", String(id))
     .single();
-  if (e1) throw new InvoicingError(e1.message);
-  const invoice = inv as unknown as InvoiceRow;
-
-  const { error: e2 } = await sb.from("acc_invoice_line").insert(
-    computed.map((c, i) => ({
-      invoice_id: invoice.id,
-      line_order: i,
-      description: c.line.description,
-      quantity: c.line.quantity,
-      unit_price_minor: c.line.unit_price_minor,
-      income_account_id: c.line.income_account_id,
-      tax_code_id: c.line.tax_code_id || null,
-      item_id: c.line.item_id || null,
-      line_subtotal_minor: c.amounts.subtotalMinor,
-      line_tax_minor: c.amounts.taxMinor,
-      line_total_minor: c.amounts.totalMinor,
-    })),
-  );
-  if (e2) {
-    // Roll back the orphaned draft header (best effort).
-    await sb.from("acc_invoice").delete().eq("id", invoice.id);
-    throw new InvoicingError(e2.message);
-  }
-
-  await writeAudit(sb, { table_name: "acc_invoice", record_id: invoice.id, action: "insert", after: invoice });
-  return invoice;
+  if (readError) throw new InvoicingError(readError.message);
+  return invoice as unknown as InvoiceRow;
 }
 
 export async function issueInvoice(sb: SupabaseClient, invoiceId: string): Promise<void> {
   const { error } = await sb.rpc("acc_issue_invoice", { p_invoice_id: invoiceId });
   if (error) throw new InvoicingError(error.message);
-  await writeAudit(sb, { table_name: "acc_invoice", record_id: invoiceId, action: "post" });
 }
 
 export async function voidInvoice(sb: SupabaseClient, invoiceId: string): Promise<void> {
   const { error } = await sb.rpc("acc_void_invoice", { p_invoice_id: invoiceId });
   if (error) throw new InvoicingError(error.message);
-  await writeAudit(sb, { table_name: "acc_invoice", record_id: invoiceId, action: "void" });
 }
 
 // --- Payments ---
@@ -205,6 +154,5 @@ export async function recordPayment(sb: SupabaseClient, input: PaymentCreateInpu
     p_allocations: input.allocations,
   });
   if (error) throw new InvoicingError(error.message);
-  await writeAudit(sb, { table_name: "acc_payment", record_id: (data as string) ?? null, action: "post" });
   return data as string;
 }

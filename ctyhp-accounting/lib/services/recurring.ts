@@ -20,7 +20,6 @@ import {
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { createDraftInvoice } from "./invoicing";
 import { createDraftBill } from "./payables";
-import { writeAudit } from "./audit";
 
 export class RecurringError extends Error {}
 
@@ -108,14 +107,7 @@ export async function createRecurringTemplate(
   };
   const { data, error } = await sb.from("acc_recurring_template").insert(row).select("*").single();
   if (error) throw new RecurringError(error.message);
-  const created = data as unknown as RecurringTemplateRow;
-  await writeAudit(sb, {
-    table_name: "acc_recurring_template",
-    record_id: created.id,
-    action: "insert",
-    after: created,
-  });
-  return created;
+  return data as unknown as RecurringTemplateRow;
 }
 
 export async function setRecurringTemplateStatus(
@@ -133,7 +125,7 @@ export async function setRecurringTemplateStatus(
   if ((before as { status: RecurringTemplateStatus }).status === "ended") {
     throw new RecurringError("An ended schedule cannot be resumed");
   }
-  const { data: after, error } = await sb
+  const { error } = await sb
     .from("acc_recurring_template")
     .update({
       status,
@@ -144,13 +136,6 @@ export async function setRecurringTemplateStatus(
     .select("*")
     .single();
   if (error) throw new RecurringError(error.message);
-  await writeAudit(sb, {
-    table_name: "acc_recurring_template",
-    record_id: templateId,
-    action: "update",
-    before,
-    after,
-  });
 }
 
 export async function generateRecurringTemplate(

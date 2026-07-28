@@ -3,7 +3,6 @@ import type { InventoryTxnRow, InventoryValuationRow } from "@/lib/db/types";
 import type { InventoryAdjustmentInput } from "@/lib/domain/schemas";
 import { inventoryTiesOut } from "@/lib/domain/inventory";
 import { getLedgerBalances } from "./reports";
-import { writeAudit } from "./audit";
 
 export class InventoryError extends Error {}
 
@@ -96,14 +95,7 @@ export async function adjustInventory(
     p_reason: input.reason,
   });
   if (error) throw new InventoryError(error.message);
-  const txnId = String(data);
-  await writeAudit(sb, {
-    table_name: "acc_inventory_txn",
-    record_id: txnId,
-    action: "insert",
-    after: input,
-  });
-  return txnId;
+  return String(data);
 }
 
 /** The same materiality amount used by the database approval policy guard. */

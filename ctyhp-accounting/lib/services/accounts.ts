@@ -6,7 +6,6 @@ import {
   type AccountCreateInput,
   type AccountUpdateInput,
 } from "@/lib/domain/schemas";
-import { writeAudit } from "./audit";
 
 const TABLE = "acc_account";
 const COLUMNS =
@@ -45,9 +44,7 @@ export async function createAccount(
   const parsed = accountCreateSchema.parse(input);
   const { data, error } = await sb.from(TABLE).insert(parsed).select(COLUMNS).single();
   if (error) mapWriteError(error.message);
-  const row = data as unknown as AccountRow;
-  await writeAudit(sb, { table_name: TABLE, record_id: row.id, action: "insert", after: row });
-  return row;
+  return data as unknown as AccountRow;
 }
 
 export async function updateAccount(
@@ -65,9 +62,7 @@ export async function updateAccount(
     .select(COLUMNS)
     .single();
   if (error) mapWriteError(error.message);
-  const row = data as unknown as AccountRow;
-  await writeAudit(sb, { table_name: TABLE, record_id: id, action: "update", before, after: row });
-  return row;
+  return data as unknown as AccountRow;
 }
 
 /**
@@ -88,15 +83,7 @@ export async function setAccountStatus(
     .select(COLUMNS)
     .single();
   if (error) throw new AccountServiceError(error.message);
-  const row = data as unknown as AccountRow;
-  await writeAudit(sb, {
-    table_name: TABLE,
-    record_id: id,
-    action: "update",
-    before: { status: before.status },
-    after: { status: row.status },
-  });
-  return row;
+  return data as unknown as AccountRow;
 }
 
 /** True if the account has any journal lines (blocks hard delete in the UI). */

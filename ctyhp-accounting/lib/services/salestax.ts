@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TaxPaymentRow, TaxCodeRow } from "@/lib/db/types";
 import type { TaxCodeCreateInput, TaxCodeUpdateInput, TaxPaymentCreateInput } from "@/lib/domain/schemas";
 import { summarizeSalesTaxLiability, type SalesTaxLiability, type TaxCollectedLine } from "@/lib/domain/salestax";
-import { writeAudit } from "./audit";
 
 export class SalesTaxError extends Error {}
 
@@ -57,14 +56,12 @@ export async function recordTaxPayment(sb: SupabaseClient, input: TaxPaymentCrea
     p_memo: input.memo || null,
   });
   if (error) throw new SalesTaxError(error.message);
-  await writeAudit(sb, { table_name: "acc_tax_payment", record_id: (data as string) ?? null, action: "post" });
   return data as string;
 }
 
 export async function voidTaxPayment(sb: SupabaseClient, id: string): Promise<void> {
   const { error } = await sb.rpc("acc_void_tax_payment", { p_payment_id: id });
   if (error) throw new SalesTaxError(error.message);
-  await writeAudit(sb, { table_name: "acc_tax_payment", record_id: id, action: "void" });
 }
 
 const TC_COLS = "id,code,name,rate_percent,direction,tax_account_id,is_active";
@@ -83,17 +80,13 @@ function taxCodeRow(input: TaxCodeCreateInput | TaxCodeUpdateInput) {
 export async function createTaxCode(sb: SupabaseClient, input: TaxCodeCreateInput): Promise<TaxCodeRow> {
   const { data, error } = await sb.from("acc_tax_code").insert(taxCodeRow(input)).select(TC_COLS).single();
   if (error) throw new SalesTaxError(error.message);
-  const row = data as unknown as TaxCodeRow;
-  await writeAudit(sb, { table_name: "acc_tax_code", record_id: row.id, action: "insert", after: row });
-  return row;
+  return data as unknown as TaxCodeRow;
 }
 
 export async function updateTaxCode(sb: SupabaseClient, id: string, input: TaxCodeUpdateInput): Promise<TaxCodeRow> {
   const { data, error } = await sb.from("acc_tax_code").update(taxCodeRow(input)).eq("id", id).select(TC_COLS).single();
   if (error) throw new SalesTaxError(error.message);
-  const row = data as unknown as TaxCodeRow;
-  await writeAudit(sb, { table_name: "acc_tax_code", record_id: id, action: "update", after: row });
-  return row;
+  return data as unknown as TaxCodeRow;
 }
 
 export async function setTaxCodeActive(sb: SupabaseClient, id: string, active: boolean): Promise<void> {
@@ -106,5 +99,4 @@ export async function setTaxCodeActive(sb: SupabaseClient, id: string, active: b
     .select("id")
     .single();
   if (error) throw new SalesTaxError(error.message);
-  await writeAudit(sb, { table_name: "acc_tax_code", record_id: id, action: "update", after: { is_active: active } });
 }

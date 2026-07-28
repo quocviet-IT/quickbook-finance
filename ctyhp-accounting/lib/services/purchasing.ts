@@ -15,7 +15,6 @@ import type {
   PurchaseOrderSaveInput,
   PurchasingConfigInput,
 } from "@/lib/domain/schemas";
-import { writeAudit } from "./audit";
 
 export class PurchasingError extends Error {}
 
@@ -134,49 +133,23 @@ export async function savePurchaseOrder(
     })),
   });
   if (error) throw new PurchasingError(error.message);
-  const poId = String(data);
-  await writeAudit(sb, {
-    table_name: "acc_purchase_order",
-    record_id: poId,
-    action: id ? "update" : "insert",
-    after: { ...input, id: poId },
-  });
-  return poId;
+  return String(data);
 }
 
 export async function approvePurchaseOrder(sb: SupabaseClient, id: string): Promise<string> {
   const { data, error } = await sb.rpc("acc_approve_purchase_order", { p_po_id: id });
   if (error) throw new PurchasingError(error.message);
-  const number = String(data);
-  await writeAudit(sb, {
-    table_name: "acc_purchase_order",
-    record_id: id,
-    action: "post",
-    after: { po_number: number, status: "open" },
-  });
-  return number;
+  return String(data);
 }
 
 export async function cancelPurchaseOrder(sb: SupabaseClient, id: string, reason: string): Promise<void> {
   const { error } = await sb.rpc("acc_cancel_purchase_order", { p_po_id: id, p_reason: reason });
   if (error) throw new PurchasingError(error.message);
-  await writeAudit(sb, {
-    table_name: "acc_purchase_order",
-    record_id: id,
-    action: "void",
-    after: { status: "cancelled", reason },
-  });
 }
 
 export async function closePurchaseOrder(sb: SupabaseClient, id: string, reason: string): Promise<void> {
   const { error } = await sb.rpc("acc_close_purchase_order", { p_po_id: id, p_reason: reason });
   if (error) throw new PurchasingError(error.message);
-  await writeAudit(sb, {
-    table_name: "acc_purchase_order",
-    record_id: id,
-    action: "update",
-    after: { status: "closed", reason },
-  });
 }
 
 export async function receivePurchaseOrder(
@@ -191,25 +164,12 @@ export async function receivePurchaseOrder(
     p_lines: input.lines,
   });
   if (error) throw new PurchasingError(error.message);
-  const receiptId = String(data);
-  await writeAudit(sb, {
-    table_name: "acc_goods_receipt",
-    record_id: receiptId,
-    action: "insert",
-    after: { purchase_order_id: id, ...input },
-  });
-  return receiptId;
+  return String(data);
 }
 
 export async function voidGoodsReceipt(sb: SupabaseClient, id: string, reason: string): Promise<void> {
   const { error } = await sb.rpc("acc_void_goods_receipt", { p_receipt_id: id, p_reason: reason });
   if (error) throw new PurchasingError(error.message);
-  await writeAudit(sb, {
-    table_name: "acc_goods_receipt",
-    record_id: id,
-    action: "void",
-    after: { reason },
-  });
 }
 
 /** Create a draft bill from received PO lines. Three-way matching is enforced server-side. */
@@ -228,14 +188,7 @@ export async function createBillFromPo(
     p_variance_reason: input.variance_reason || null,
   });
   if (error) throw new PurchasingError(error.message);
-  const billId = String(data);
-  await writeAudit(sb, {
-    table_name: "acc_bill",
-    record_id: billId,
-    action: "insert",
-    after: { purchase_order_id: id, ...input },
-  });
-  return billId;
+  return String(data);
 }
 
 export async function setPurchasingConfig(
@@ -247,10 +200,4 @@ export async function setPurchasingConfig(
     p_qty_tolerance_bps: input.qty_tolerance_bps,
   });
   if (error) throw new PurchasingError(error.message);
-  await writeAudit(sb, {
-    table_name: "acc_purchasing_config",
-    record_id: null,
-    action: "update",
-    after: input,
-  });
 }

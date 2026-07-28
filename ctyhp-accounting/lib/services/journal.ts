@@ -69,7 +69,8 @@ export interface ReversedEntryRow {
 // --- writes ---------------------------------------------------------------
 // Note: the acc_post_manual_journal / acc_reverse_entry / acc_post_opening_balances
 // RPCs already append acc_audit_log atomically inside their own transaction, so
-// this service does not call writeAudit again (that would duplicate audit rows).
+// Audit is committed inside the database transaction; never add a second
+// application-layer audit request here.
 export async function createManualJournal(sb: SupabaseClient, input: ManualJournalInput): Promise<string> {
   const { data, error } = await sb.rpc("acc_post_manual_journal", {
     p_entry_date: input.entry_date || undefined,
