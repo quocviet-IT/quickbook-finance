@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AutoComplete, Input, Typography } from "antd";
+import { AutoComplete, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { searchKindLabel } from "@/lib/domain/navigation";
 import { globalSearchAction, type SearchHit } from "@/app/(app)/search-actions";
@@ -58,6 +58,11 @@ export default function GlobalSearch() {
     <AutoComplete
       value={value}
       options={options}
+      size="large"
+      allowClear
+      prefix={<SearchOutlined />}
+      placeholder="Search invoices, bills, contacts…"
+      aria-label="Search documents and contacts"
       className="global-search"
       popupMatchSelectWidth
       onChange={onChange}
@@ -73,13 +78,6 @@ export default function GlobalSearch() {
       notFoundContent={
         value.trim().length < 2 ? null : loading ? "Searching…" : "Nothing matched"
       }
-    >
-      <Input
-        allowClear
-        prefix={<SearchOutlined />}
-        placeholder="Search invoices, bills, contacts…"
-        aria-label="Search documents and contacts"
-      />
-    </AutoComplete>
+    />
   );
 }

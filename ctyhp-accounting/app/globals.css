@@ -1705,13 +1705,13 @@ body {
   max-width: 320px;
 }
 
-.global-search {
+.global-search.ant-select {
   width: 100%;
-}
-
-.global-search .ant-input-affix-wrapper {
-  height: 36px;
-  min-height: 36px;
+  min-height: 40px;
+  align-items: center;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
   border-color: #dbe2ea;
   border-radius: 8px;
   background: #f8fafc;
@@ -1722,15 +1722,20 @@ body {
     box-shadow 160ms ease-out;
 }
 
-.global-search .ant-input-affix-wrapper:hover {
+.global-search.ant-select:not(.ant-select-disabled):hover {
   border-color: #9fbfbb;
   background: #ffffff;
 }
 
-.global-search .ant-input-affix-wrapper-focused {
+.global-search.ant-select-focused {
   border-color: #0f766e;
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.global-search.ant-select .ant-select-prefix {
+  color: #475569;
+  font-size: 16px;
 }
 
 .global-search__option {
