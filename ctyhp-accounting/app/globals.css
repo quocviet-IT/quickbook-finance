@@ -1710,6 +1710,7 @@ body {
 }
 
 .global-search .ant-input-affix-wrapper {
+  height: 36px;
   min-height: 36px;
   border-color: #dbe2ea;
   border-radius: 8px;

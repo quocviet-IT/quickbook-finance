@@ -413,8 +413,9 @@ export default function AppShell({
             <GlobalSearch />
           </div>
 
+          {canCreate && <NewMenu />}
+
           <div className="app-shell__header-end">
-            {canCreate && <NewMenu />}
             <ApprovalsLink
               pendingApprovals={pendingApprovals}
               active={pathname.startsWith("/approvals")}
