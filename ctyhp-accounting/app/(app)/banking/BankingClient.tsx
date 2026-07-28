@@ -126,6 +126,9 @@ interface PendingPlaidLink {
 
 export default function BankingClient({
   bankAccounts,
+  initialAccountId,
+  initialQueueStatus,
+  initialFocusId,
   bankConnections,
   glBankAccounts,
   currencies,
@@ -138,6 +141,9 @@ export default function BankingClient({
   scannerConfigured,
 }: {
   bankAccounts: BankAccountWithGl[];
+  initialAccountId: string | null;
+  initialQueueStatus: "unmatched" | null;
+  initialFocusId: string | null;
   bankConnections: BankConnectionView[];
   glBankAccounts: AccountRow[];
   currencies: CurrencyRow[];
@@ -150,8 +156,15 @@ export default function BankingClient({
   scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
-  const [selectedId, setSelectedId] = useState<string | undefined>(bankAccounts[0]?.id);
+  const [selectedId, setSelectedId] = useState<string | undefined>(
+    bankAccounts.some((account) => account.id === initialAccountId)
+      ? initialAccountId!
+      : bankAccounts[0]?.id,
+  );
   const [tab, setTab] = useState<"transactions" | "reconcile">("transactions");
+  const [transactionStatus, setTransactionStatus] = useState<"all" | BankTxnStatus>(
+    initialQueueStatus ?? "all",
+  );
   const [txns, setTxns] = useState<BankTransactionRow[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
   const [loading, setLoading] = useState(false);
@@ -564,6 +577,10 @@ export default function BankingClient({
   }
 
   const unmatchedCount = txns.filter((transaction) => transaction.status === "unmatched").length;
+  const visibleTransactions =
+    transactionStatus === "all"
+      ? txns
+      : txns.filter((transaction) => transaction.status === transactionStatus);
 
   return (
     <div>
@@ -609,7 +626,7 @@ export default function BankingClient({
       </Card>
 
       <FilterBar
-        resultCount={tab === "transactions" ? txns.length : suggestions.length}
+        resultCount={tab === "transactions" ? visibleTransactions.length : suggestions.length}
         actions={
           canWrite ? (
             <Space wrap>
@@ -670,10 +687,24 @@ export default function BankingClient({
             value={tab}
             onChange={(value) => setTab(value as "transactions" | "reconcile")}
             options={[
-              { label: `For review${unmatchedCount ? ` (${unmatchedCount})` : ""}`, value: "transactions" },
+              { label: `Transactions${unmatchedCount ? ` (${unmatchedCount} for review)` : ""}`, value: "transactions" },
               { label: `Suggested matches${suggestions.length ? ` (${suggestions.length})` : ""}`, value: "reconcile" },
             ]}
           />
+          {tab === "transactions" ? (
+            <Select
+              aria-label="Filter bank transactions by status"
+              value={transactionStatus}
+              onChange={(value) => setTransactionStatus(value)}
+              style={{ minWidth: 150 }}
+              options={[
+                { value: "all", label: "All statuses" },
+                { value: "unmatched", label: "For review" },
+                { value: "matched", label: "Matched" },
+                { value: "ignored", label: "Excluded" },
+              ]}
+            />
+          ) : null}
         </Space>
       </FilterBar>
 
@@ -681,7 +712,10 @@ export default function BankingClient({
         <DataTable
           rowKey="id"
           columns={transactionColumns}
-          dataSource={txns}
+          dataSource={visibleTransactions}
+          rowClassName={(transaction) =>
+            transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
+          }
           pagination={{ pageSize: 25 }}
           sticky
           loading={loading}

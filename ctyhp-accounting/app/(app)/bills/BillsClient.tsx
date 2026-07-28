@@ -43,6 +43,7 @@ interface LineForm {
 
 export default function BillsClient({
   initialCreateOpen,
+  initialQueue,
   bills,
   vendors,
   expenseAccounts,
@@ -58,6 +59,7 @@ export default function BillsClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  initialQueue: { dueThrough: string; focusId: string | null } | null;
   bills: BillWithVendor[];
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
@@ -84,6 +86,22 @@ export default function BillsClient({
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
     [currencies, currency],
   );
+
+  const visibleBills = useMemo(() => {
+    if (!initialQueue) return bills;
+    const filtered = bills.filter(
+      (bill) =>
+        (bill.status === "open" || bill.status === "partial") &&
+        bill.balance_due_minor > 0 &&
+        Boolean(bill.due_date) &&
+        bill.due_date! <= initialQueue.dueThrough,
+    );
+    return [...filtered].sort((left, right) => {
+      if (left.id === initialQueue.focusId) return -1;
+      if (right.id === initialQueue.focusId) return 1;
+      return (left.due_date ?? "").localeCompare(right.due_date ?? "");
+    });
+  }, [bills, initialQueue]);
 
   function decimalsOf(code: string): number {
     return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
@@ -144,7 +162,7 @@ export default function BillsClient({
   return (
     <>
       <FilterBar
-        resultCount={bills.length}
+        resultCount={visibleBills.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
@@ -152,12 +170,27 @@ export default function BillsClient({
             </Button>
           ) : null
         }
-      />
+      >
+        {initialQueue ? (
+          <div className="accounting-queue-filter">
+            <Tag color="orange">Work queue · bills due</Tag>
+            <span>Through {initialQueue.dueThrough}</span>
+            <Button onClick={() => router.push("/bills")}>Show all</Button>
+          </div>
+        ) : null}
+      </FilterBar>
       <DataTable<BillWithVendor>
         rowKey="id"
-        dataSource={bills}
-        emptyTitle="No bills yet"
-        emptyDescription="Enter a vendor bill to track Accounts Payable and due dates."
+        dataSource={visibleBills}
+        rowClassName={(bill) =>
+          bill.id === initialQueue?.focusId ? "accounting-data-row--focused" : ""
+        }
+        emptyTitle={initialQueue ? "No bills due" : "No bills yet"}
+        emptyDescription={
+          initialQueue
+            ? "No open vendor bills are due within the selected work queue window."
+            : "Enter a vendor bill to track Accounts Payable and due dates."
+        }
         columns={[
           { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? <Tag>draft</Tag> },
           { title: "Vendor", dataIndex: "vendor_name" },

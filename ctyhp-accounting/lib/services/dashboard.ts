@@ -4,7 +4,9 @@ import { getArAgeing, getApAgeing, type AgeingReport } from "./ageing";
 import { searchAudit } from "./access";
 import { getCashFlow } from "./cashflow";
 import { getInventoryValuation } from "./inventory";
+import { getDashboardWorkQueue } from "./work-queue";
 import { buildProfitAndLoss } from "@/lib/domain/reports";
+import type { DashboardWorkQueue } from "@/lib/domain/work-queue";
 import type { AuditEntryRow } from "@/lib/db/types";
 
 export class DashboardError extends Error {}
@@ -126,6 +128,7 @@ export interface DashboardActivity {
 export interface DashboardAnalytics {
   asOf: string;
   metrics: DashboardMetrics;
+  workQueue: DashboardWorkQueue;
   monthlyPerformance: MonthlyPerformancePoint[];
   periodComparison: PeriodComparison;
   cashMovement: CashMovementSnapshot;
@@ -522,6 +525,7 @@ export async function getDashboardAnalytics(
   };
   const [
     metrics,
+    workQueue,
     monthlyPerformance,
     periodComparison,
     cashFlow,
@@ -530,6 +534,7 @@ export async function getDashboardAnalytics(
     recentActivity,
   ] = await Promise.all([
     getDashboardMetrics(sb, asOf, ledger),
+    getDashboardWorkQueue(sb, asOf),
     getMonthlyPerformance(sb, asOf, ledger.monthToDate),
     getPeriodComparison(sb, asOf, ledger.monthToDate, ledger.priorComparable),
     getCashFlow(sb, monthStart(asOf), asOf, {
@@ -542,6 +547,7 @@ export async function getDashboardAnalytics(
   return {
     asOf,
     metrics,
+    workQueue,
     monthlyPerformance,
     periodComparison,
     cashMovement: {

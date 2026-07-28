@@ -12,7 +12,16 @@ import BankingClient from "./BankingClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function BankingPage() {
+export default async function BankingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    queue?: string;
+    account?: string;
+    focus?: string;
+  }>;
+}) {
+  const params = await searchParams;
   const sb = await createSupabaseServerClient();
   const [
     bankAccounts,
@@ -48,6 +57,9 @@ export default async function BankingPage() {
       />
       <BankingClient
         bankAccounts={bankAccounts}
+        initialAccountId={params.account ?? null}
+        initialQueueStatus={params.queue === "unmatched" ? "unmatched" : null}
+        initialFocusId={params.focus ?? null}
         bankConnections={bankConnections}
         glBankAccounts={glBankAccounts}
         currencies={currencies}

@@ -8,9 +8,7 @@ import {
   ArrowUpOutlined,
   AuditOutlined,
   BankOutlined,
-  CalendarOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   DollarOutlined,
   FileTextOutlined,
   InboxOutlined,
@@ -21,6 +19,7 @@ import {
 } from "@ant-design/icons";
 import { Card, Tag, Timeline, Typography } from "antd";
 import PageHeader from "@/components/PageHeader";
+import WorkQueueCard from "@/components/dashboard/WorkQueueCard";
 import {
   AgeingComparisonChart,
   CashFlowBridgeChart,
@@ -42,16 +41,6 @@ interface DashboardClientProps {
   baseDecimals: number;
   accountingBasis: string;
   timeZone: string;
-}
-
-interface ActionItem {
-  key: string;
-  title: string;
-  detail: string;
-  count: number;
-  href: string;
-  priority: "high" | "medium" | "normal";
-  icon: ReactNode;
 }
 
 type TrendTone = "positive" | "negative" | "neutral";
@@ -82,81 +71,6 @@ export default function DashboardClient({
       : `${value > 0 ? "+" : ""}${value.toFixed(1)}${suffix}`;
   const formatInteger = (value: number) =>
     new Intl.NumberFormat("en-US").format(value);
-
-  const actions: ActionItem[] = [
-    {
-      key: "approvals",
-      title: "Pending approvals",
-      detail: "Transactions waiting for authorization.",
-      count: metrics.pendingApprovals,
-      href: "/approvals",
-      priority: "high",
-      icon: <CheckCircleOutlined />,
-    },
-    {
-      key: "periods",
-      title: "Periods past close date",
-      detail: "Accounting periods still open after their end date.",
-      count: metrics.openPastPeriods,
-      href: "/settings/periods",
-      priority: "high",
-      icon: <CalendarOutlined />,
-    },
-    {
-      key: "inventory-tieout",
-      title: "Inventory ledger mismatch",
-      detail: "Inventory subledger does not agree with the general ledger.",
-      count: inventory.tiesOut ? 0 : 1,
-      href: "/reports/inventory-valuation",
-      priority: "high",
-      icon: <WarningOutlined />,
-    },
-    {
-      key: "bank",
-      title: "Unreconciled bank items",
-      detail: `${formatMoney(metrics.unreconciledMinor)} needs matching or review.`,
-      count: metrics.unreconciledCount,
-      href: "/banking/reconcile",
-      priority: "medium",
-      icon: <BankOutlined />,
-    },
-    {
-      key: "receivables",
-      title: "Overdue customer balances",
-      detail: `${formatMoney(metrics.overdueArMinor)} is past due.`,
-      count: metrics.overdueArCount,
-      href: "/reports/ar-ageing",
-      priority: "medium",
-      icon: <ClockCircleOutlined />,
-    },
-    {
-      key: "slow-inventory",
-      title: "Slow-moving inventory",
-      detail: `${formatMoney(inventory.slowMovingValueMinor)} has no movement in 90 days.`,
-      count: inventory.slowMovingCount,
-      href: "/reports/inventory-valuation",
-      priority: "medium",
-      icon: <InboxOutlined />,
-    },
-    {
-      key: "payables",
-      title: "Overdue vendor balances",
-      detail: `${formatMoney(metrics.overdueApMinor)} requires payment planning.`,
-      count: metrics.overdueApCount,
-      href: "/reports/ap-ageing",
-      priority: "normal",
-      icon: <DollarOutlined />,
-    },
-    {
-      key: "zero-stock",
-      title: "Out-of-stock items",
-      detail: "Active inventory items with no quantity on hand.",
-      count: inventory.zeroStockCount,
-      href: "/items",
-      priority: "normal",
-      icon: <ShopOutlined />,
-    },
-  ];
 
   return (
     <div className="management-dashboard">
@@ -288,7 +202,7 @@ export default function DashboardClient({
             </Link>
           }
         />
-        <ActionCenter actions={actions} />
+        <WorkQueueCard queue={analytics.workQueue} formatMoney={formatMoney} />
       </div>
 
       <div className="dashboard-layout dashboard-layout--cash">
@@ -406,64 +320,6 @@ function MetricDetail({
       <span>{label}</span>
       <strong className={status ? `amount-${status}` : ""}>{value}</strong>
     </div>
-  );
-}
-
-function ActionCenter({ actions }: { actions: ActionItem[] }) {
-  const active = actions
-    .filter((item) => item.count > 0)
-    .sort((a, b) => {
-      const rank = { high: 3, medium: 2, normal: 1 };
-      return rank[b.priority] - rank[a.priority] || b.count - a.count;
-    });
-
-  return (
-    <Card
-      className="dashboard-action-card"
-      title="Action center"
-      extra={<Typography.Text type="secondary">{active.length} queues</Typography.Text>}
-    >
-      {active.length === 0 ? (
-        <div className="dashboard-action-card__clear">
-          <CheckCircleOutlined />
-          <div>
-            <Typography.Text strong>No immediate exceptions</Typography.Text>
-            <Typography.Paragraph type="secondary">
-              Approval, close, banking, ageing, and inventory queues are clear.
-            </Typography.Paragraph>
-          </div>
-        </div>
-      ) : (
-        <div className="dashboard-action-list">
-          {active.slice(0, 6).map((item) => (
-            <Link href={item.href} className="dashboard-action" key={item.key}>
-              <span
-                className={`dashboard-action__icon dashboard-action__icon--${item.priority}`}
-                aria-hidden="true"
-              >
-                {item.icon}
-              </span>
-              <span className="dashboard-action__body">
-                <span className="dashboard-action__title">{item.title}</span>
-                <span className="dashboard-action__detail">{item.detail}</span>
-              </span>
-              <Tag
-                color={
-                  item.priority === "high"
-                    ? "red"
-                    : item.priority === "medium"
-                      ? "orange"
-                      : "default"
-                }
-              >
-                {item.count}
-              </Tag>
-              <ArrowRightOutlined aria-hidden="true" />
-            </Link>
-          ))}
-        </div>
-      )}
-    </Card>
   );
 }
 

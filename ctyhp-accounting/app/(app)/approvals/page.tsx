@@ -8,7 +8,12 @@ import ApprovalsClient from "./ApprovalsClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ApprovalsPage() {
+export default async function ApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string }>;
+}) {
+  const params = await searchParams;
   const sb = await createSupabaseServerClient();
   const [requests, policies, currencies, user, canDecideRequests] = await Promise.all([
     listApprovalRequests(sb),
@@ -26,6 +31,7 @@ export default async function ApprovalsPage() {
         description="Controlled actions waiting for a second pair of eyes. Approving performs the action."
       />
       <ApprovalsClient
+        initialFocusId={params.focus ?? null}
         pending={requests.filter((r) => r.status === "pending")}
         history={requests.filter((r) => r.status !== "pending")}
         policies={policies}

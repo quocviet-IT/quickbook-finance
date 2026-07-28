@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Space, Table, Tag, Tooltip, Typography } from "antd";
@@ -16,6 +16,7 @@ const STATUS_COLOR: Record<ApprovalStatus, string> = {
 };
 
 export default function ApprovalsClient({
+  initialFocusId,
   pending,
   history,
   policies,
@@ -24,6 +25,7 @@ export default function ApprovalsClient({
   baseCurrency,
   baseDecimals,
 }: {
+  initialFocusId: string | null;
   pending: ApprovalRequestRow[];
   history: ApprovalRequestRow[];
   policies: ApprovalPolicyRow[];
@@ -124,6 +126,15 @@ export default function ApprovalsClient({
 
   const enabledPolicies = policies.filter((p) => p.enabled);
   const nothingEverSubmitted = pending.length === 0 && history.length === 0;
+  const visiblePending = useMemo(
+    () =>
+      [...pending].sort((left, right) => {
+        if (left.id === initialFocusId) return -1;
+        if (right.id === initialFocusId) return 1;
+        return left.requested_at.localeCompare(right.requested_at);
+      }),
+    [initialFocusId, pending],
+  );
 
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
@@ -163,10 +174,13 @@ export default function ApprovalsClient({
         />
       )}
 
-      <Card title={`Pending (${pending.length})`}>
+      <Card title={`Pending (${visiblePending.length})`}>
         <Table<ApprovalRequestRow>
           rowKey="id"
-          dataSource={pending}
+          dataSource={visiblePending}
+          rowClassName={(request) =>
+            request.id === initialFocusId ? "accounting-data-row--focused" : ""
+          }
           pagination={false}
           scroll={{ x: "max-content" }}
           locale={{ emptyText: "Nothing waiting for a decision" }}

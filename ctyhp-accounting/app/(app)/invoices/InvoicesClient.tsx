@@ -65,6 +65,7 @@ interface LineForm {
 
 export default function InvoicesClient({
   initialCreateOpen,
+  initialQueue,
   invoices,
   customers,
   incomeAccounts,
@@ -80,6 +81,7 @@ export default function InvoicesClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  initialQueue: { asOf: string; focusId: string | null } | null;
   invoices: InvoiceWithCustomer[];
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
@@ -134,6 +136,22 @@ export default function InvoicesClient({
     return sumInvoiceTotals(computed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLines, currency]);
+
+  const visibleInvoices = useMemo(() => {
+    if (!initialQueue) return invoices;
+    const filtered = invoices.filter(
+      (invoice) =>
+        (invoice.status === "issued" || invoice.status === "partial") &&
+        invoice.balance_due_minor > 0 &&
+        Boolean(invoice.due_date) &&
+        invoice.due_date! < initialQueue.asOf,
+    );
+    return [...filtered].sort((left, right) => {
+      if (left.id === initialQueue.focusId) return -1;
+      if (right.id === initialQueue.focusId) return 1;
+      return (left.due_date ?? "").localeCompare(right.due_date ?? "");
+    });
+  }, [initialQueue, invoices]);
 
   function openCreate() {
     form.resetFields();
@@ -286,7 +304,7 @@ export default function InvoicesClient({
   return (
     <div>
       <FilterBar
-        resultCount={invoices.length}
+        resultCount={visibleInvoices.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -294,15 +312,30 @@ export default function InvoicesClient({
             </Button>
           ) : null
         }
-      />
+      >
+        {initialQueue ? (
+          <div className="accounting-queue-filter">
+            <Tag color="red">Work queue · overdue invoices</Tag>
+            <Typography.Text type="secondary">As of {initialQueue.asOf}</Typography.Text>
+            <Button onClick={() => router.push("/invoices")}>Show all</Button>
+          </div>
+        ) : null}
+      </FilterBar>
 
       <DataTable<InvoiceWithCustomer>
         rowKey="id"
         columns={columns}
-        dataSource={invoices}
+        dataSource={visibleInvoices}
+        rowClassName={(invoice) =>
+          invoice.id === initialQueue?.focusId ? "accounting-data-row--focused" : ""
+        }
         sticky
-        emptyTitle="No invoices yet"
-        emptyDescription="Create a draft invoice, review it, then issue it to the ledger."
+        emptyTitle={initialQueue ? "No overdue invoices" : "No invoices yet"}
+        emptyDescription={
+          initialQueue
+            ? "Customer balances are current as of the selected work queue date."
+            : "Create a draft invoice, review it, then issue it to the ledger."
+        }
       />
 
       <AttachmentDrawer

@@ -14,9 +14,19 @@ export const dynamic = "force-dynamic";
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{
+    new?: string;
+    queue?: string;
+    asOf?: string;
+    focus?: string;
+  }>;
 }) {
-  const initialCreateOpen = (await searchParams).new === "1";
+  const params = await searchParams;
+  const initialCreateOpen = params.new === "1";
+  const initialQueue =
+    params.queue === "overdue" && /^\d{4}-\d{2}-\d{2}$/.test(params.asOf ?? "")
+      ? { asOf: params.asOf!, focusId: params.focus ?? null }
+      : null;
   const sb = await createSupabaseServerClient();
   const [
     invoices,
@@ -63,6 +73,7 @@ export default async function InvoicesPage({
       <PageHeader title="Invoices" description="Create invoices, issue them to the ledger, and track balances due." />
       <InvoicesClient
         initialCreateOpen={initialCreateOpen}
+        initialQueue={initialQueue}
         invoices={invoices}
         customers={customers}
         incomeAccounts={incomeAccounts}

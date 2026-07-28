@@ -14,9 +14,19 @@ export const dynamic = "force-dynamic";
 export default async function BillsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{
+    new?: string;
+    queue?: string;
+    through?: string;
+    focus?: string;
+  }>;
 }) {
-  const initialCreateOpen = (await searchParams).new === "1";
+  const params = await searchParams;
+  const initialCreateOpen = params.new === "1";
+  const initialQueue =
+    params.queue === "due" && /^\d{4}-\d{2}-\d{2}$/.test(params.through ?? "")
+      ? { dueThrough: params.through!, focusId: params.focus ?? null }
+      : null;
   const sb = await createSupabaseServerClient();
   const [
     bills,
@@ -66,6 +76,7 @@ export default async function BillsPage({
       <PageHeader title="Bills" description="Enter bills you owe, post them to Accounts Payable, and track balances." />
       <BillsClient
         initialCreateOpen={initialCreateOpen}
+        initialQueue={initialQueue}
         bills={bills}
         vendors={vendors}
         expenseAccounts={billDebitAccounts}
