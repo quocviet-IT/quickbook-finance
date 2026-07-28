@@ -14,7 +14,7 @@ export default function NewMenu() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   return (
-    <Tooltip title="Create new">
+    <Tooltip title="Create new transaction">
       <Dropdown
         trigger={["click"]}
         menu={{
@@ -29,10 +29,10 @@ export default function NewMenu() {
           type="primary"
           icon={<PlusOutlined />}
           loading={pending}
-          aria-label="Create new"
+          aria-label="Create new transaction"
           className="app-shell__new-button"
         >
-          <span className="app-shell__new-label">New</span>
+          <span className="app-shell__new-label">New transaction</span>
           <DownOutlined className="app-shell__new-chevron" />
         </Button>
       </Dropdown>

@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag, Typography } from "antd";
 import {
+  BarChartOutlined,
   CheckOutlined,
   EditOutlined,
   HistoryOutlined,
@@ -126,11 +128,17 @@ export default function ItemsClient({
       <FilterBar
         resultCount={items.length}
         actions={
-          canWrite ? (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              New item
-            </Button>
-          ) : null
+          <Space size={8} wrap>
+            <Link href="/reports/inventory-valuation" className="accounting-context-link">
+              <BarChartOutlined aria-hidden="true" />
+              <span>Inventory valuation</span>
+            </Link>
+            {canWrite ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                New item
+              </Button>
+            ) : null}
+          </Space>
         }
       />
       <DataTable<ItemRow>

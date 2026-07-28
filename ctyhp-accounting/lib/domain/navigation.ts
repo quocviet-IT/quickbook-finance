@@ -8,16 +8,23 @@
  * address book — and configuration lives behind one Settings entry instead of a
  * sidebar leaf per screen.
  */
+import type { AppRole } from "@/lib/db/types";
 
 export interface NavPage {
   key: string;
   label: string;
+  /** Optional presentation gate. Server authorization remains authoritative. */
+  roles?: AppRole[];
+  /** Show when the user holds at least one permission in this list. */
+  anyPermissions?: string[];
 }
 
 export interface NavGroup {
   key: string;
   label: string;
   children: NavPage[];
+  roles?: AppRole[];
+  anyPermissions?: string[];
 }
 
 export type NavItem = NavPage | NavGroup;
@@ -26,12 +33,8 @@ export function isNavGroup(item: NavItem): item is NavGroup {
   return "children" in item;
 }
 
-/**
- * Reports live in the Report Center. These two are the deliberate exceptions:
- * stock value is a daily question in a jewelry business, so it is reachable
- * where the catalog is, not only from the report index.
- */
-export const ALLOWED_REPORT_DEEP_LINKS = ["/reports/inventory-valuation"] as const;
+/** Detailed reports live in the Report Center rather than the primary sidebar. */
+export const ALLOWED_REPORT_DEEP_LINKS: readonly string[] = [];
 
 export const NAV: NavItem[] = [
   { key: "/dashboard", label: "Dashboard" },
@@ -39,30 +42,31 @@ export const NAV: NavItem[] = [
     key: "sales",
     label: "Sales",
     children: [
+      { key: "/customers", label: "Customers" },
       { key: "/invoices", label: "Invoices" },
       { key: "/payments", label: "Payments" },
       { key: "/credit-memos", label: "Credit Memos" },
-      { key: "/customers", label: "Customers" },
+      { key: "/sales-tax", label: "Sales Tax" },
     ],
   },
   {
     key: "purchases",
     label: "Purchases",
     children: [
-      { key: "/bills", label: "Bills" },
-      { key: "/expenses", label: "Expenses" },
-      { key: "/purchase-orders", label: "Purchase Orders" },
-      { key: "/pay-bills", label: "Pay Bills" },
-      { key: "/vendor-credits", label: "Vendor Credits" },
       { key: "/vendors", label: "Vendors" },
+      { key: "/purchase-orders", label: "Purchase Orders" },
+      { key: "/bills", label: "Bills" },
+      { key: "/pay-bills", label: "Pay Bills" },
+      { key: "/expenses", label: "Expenses" },
+      { key: "/vendor-credits", label: "Vendor Credits" },
     ],
   },
   {
-    key: "products",
-    label: "Products",
+    key: "inventory-assets",
+    label: "Inventory & Assets",
     children: [
       { key: "/items", label: "Products & Services" },
-      { key: "/reports/inventory-valuation", label: "Inventory Valuation" },
+      { key: "/fixed-assets", label: "Fixed Assets" },
     ],
   },
   {
@@ -80,17 +84,67 @@ export const NAV: NavItem[] = [
       { key: "/accounts", label: "Chart of Accounts" },
       { key: "/journal", label: "Journal Entries" },
       { key: "/recurring", label: "Recurring Transactions" },
-      { key: "/fixed-assets", label: "Fixed Assets" },
-      { key: "/sales-tax", label: "Sales Tax" },
       { key: "/opening-balances", label: "Opening Balances" },
     ],
   },
   { key: "/reports", label: "Reports" },
-  { key: "/settings", label: "Settings" },
+  {
+    key: "/settings",
+    label: "Settings",
+    anyPermissions: [
+      "settings.manage",
+      "users.manage",
+      "permissions.manage",
+      "audit.read",
+      "period.close",
+      "period.reopen",
+    ],
+  },
 ];
 
 export function navLeaves(items: NavItem[] = NAV): NavPage[] {
   return items.flatMap((item) => (isNavGroup(item) ? item.children : [item]));
+}
+
+export interface NavigationAccess {
+  role: AppRole | null;
+  /**
+   * Null means the permission lookup was unavailable, so the menu degrades
+   * without hiding valid destinations. Authorization is still checked server-side.
+   */
+  permissionKeys: readonly string[] | null;
+}
+
+function canShowNavItem(
+  item: Pick<NavItem, "roles" | "anyPermissions">,
+  access: NavigationAccess,
+): boolean {
+  const permissionKeys = access.permissionKeys;
+  if (item.roles && (!access.role || !item.roles.includes(access.role))) return false;
+  if (
+    item.anyPermissions?.length &&
+    permissionKeys !== null &&
+    !item.anyPermissions.some((key) => permissionKeys.includes(key))
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Presentation-only navigation filtering. It reduces clutter for limited users;
+ * every destination and mutation keeps its existing server/RLS authorization.
+ */
+export function navigationForAccess(
+  access: NavigationAccess,
+  items: NavItem[] = NAV,
+): NavItem[] {
+  return items.flatMap((item) => {
+    if (!canShowNavItem(item, access)) return [];
+    if (!isNavGroup(item)) return [item];
+    const children = item.children.filter((child) => canShowNavItem(child, access));
+    return children.length > 0 ? [{ ...item, children }] : [];
+  });
 }
 
 /**

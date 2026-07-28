@@ -9,6 +9,7 @@ import {
   isNavGroup,
   navLeaves,
   findActivePage,
+  navigationForAccess,
   searchKindLabel,
 } from "@/lib/domain/navigation";
 import { REPORT_CATALOG } from "@/lib/domain/report-catalog";
@@ -58,15 +59,14 @@ describe("NAV tree", () => {
     expect(keys.length).toBe(new Set(keys).size);
   });
 
-  it("does not duplicate the Report Center, apart from the deliberate deep links", () => {
+  it("keeps detailed reports out of the primary sidebar", () => {
     const reportLeaves = leaves.map((l) => l.key).filter((key) => key.startsWith("/reports/"));
-    expect(reportLeaves.sort()).toEqual([...ALLOWED_REPORT_DEEP_LINKS].sort());
+    expect(reportLeaves).toEqual([]);
+    expect(ALLOWED_REPORT_DEEP_LINKS).toEqual([]);
   });
 
-  it("keeps every allowed deep link in the report catalog, so a rename cannot rot it", () => {
-    for (const href of ALLOWED_REPORT_DEEP_LINKS) {
-      expect(REPORT_CATALOG.some((r) => r.href === href)).toBe(true);
-    }
+  it("keeps inventory valuation in the report catalog", () => {
+    expect(REPORT_CATALOG.some((r) => r.href === "/reports/inventory-valuation")).toBe(true);
   });
 
   it("sends Reports and Settings to their hub pages, not to leaves", () => {
@@ -84,6 +84,52 @@ describe("NAV tree", () => {
       if (isNavGroup(item)) expect(item.children.length).toBeGreaterThanOrEqual(2);
     }
   });
+
+  it("follows the accounting work areas and their expected order", () => {
+    expect(NAV.map((item) => item.key)).toEqual([
+      "/dashboard",
+      "sales",
+      "purchases",
+      "inventory-assets",
+      "banking",
+      "accounting",
+      "/reports",
+      "/settings",
+    ]);
+    const sales = NAV.find((item) => item.key === "sales");
+    const inventory = NAV.find((item) => item.key === "inventory-assets");
+    expect(isNavGroup(sales!) ? sales.children.map((item) => item.key) : []).toContain("/sales-tax");
+    expect(isNavGroup(inventory!) ? inventory.children.map((item) => item.key) : []).toEqual([
+      "/items",
+      "/fixed-assets",
+    ]);
+  });
+});
+
+describe("navigationForAccess", () => {
+  it("shows settings when the role has a relevant permission", () => {
+    const items = navigationForAccess({
+      role: "viewer",
+      permissionKeys: ["audit.read"],
+    });
+    expect(items.some((item) => item.key === "/settings")).toBe(true);
+  });
+
+  it("hides settings when the resolved permission set has no settings access", () => {
+    const items = navigationForAccess({
+      role: "viewer",
+      permissionKeys: [],
+    });
+    expect(items.some((item) => item.key === "/settings")).toBe(false);
+  });
+
+  it("fails open for navigation when permission lookup is unavailable", () => {
+    const items = navigationForAccess({
+      role: "accountant",
+      permissionKeys: null,
+    });
+    expect(items.some((item) => item.key === "/settings")).toBe(true);
+  });
 });
 
 describe("findActivePage", () => {
@@ -99,8 +145,8 @@ describe("findActivePage", () => {
     expect(findActivePage("/banking/reconcile/abc")?.key).toBe("/banking/reconcile");
   });
 
-  it("matches a report deep link to the report entry", () => {
-    expect(findActivePage("/reports/inventory-valuation")?.key).toBe("/reports/inventory-valuation");
+  it("matches every detailed report to the Report Center entry", () => {
+    expect(findActivePage("/reports/inventory-valuation")?.key).toBe("/reports");
   });
 
   it("falls back to the Reports hub for a report with no sidebar entry", () => {
