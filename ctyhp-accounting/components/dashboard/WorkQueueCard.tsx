@@ -83,7 +83,7 @@ export default function WorkQueueCard({
     () =>
       queue.items
         .filter((item) => filter === "all" || item.kind === filter)
-        .slice(0, filter === "all" ? 8 : 12),
+        .slice(0, 4),
     [filter, queue.items],
   );
   const fullHref = fullQueueHref(queue, filter);

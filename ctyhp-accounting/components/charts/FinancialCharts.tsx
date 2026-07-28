@@ -64,7 +64,7 @@ export function PerformanceChart({
   extra?: ReactNode;
 }) {
   const width = 720;
-  const height = 270;
+  const height = 300;
   const plot = { left: 64, right: 18, top: 22, bottom: 42 };
   const plotWidth = width - plot.left - plot.right;
   const plotHeight = height - plot.top - plot.bottom;

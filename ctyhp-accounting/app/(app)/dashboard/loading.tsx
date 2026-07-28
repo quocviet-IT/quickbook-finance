@@ -7,7 +7,7 @@ export default function DashboardLoading() {
     >
       <div className="dashboard-loading__heading" />
       <div className="dashboard-loading__metrics">
-        {Array.from({ length: 5 }, (_, index) => (
+        {Array.from({ length: 6 }, (_, index) => (
           <div className="dashboard-loading__metric" key={index} />
         ))}
       </div>

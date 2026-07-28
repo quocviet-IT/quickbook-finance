@@ -105,7 +105,6 @@ export default function DashboardClient({
 
         <div className="dashboard-overview-grid">
           <SummaryMetric
-            className="dashboard-summary--cash"
             title="Cash position"
             value={formatMoney(metrics.cashMinor)}
             href="/reports/cash-flow"
@@ -114,23 +113,7 @@ export default function DashboardClient({
             trend={formatMoney(cashMovement.netChangeMinor)}
             trendLabel="net movement this month"
             featured
-          >
-            <div className="dashboard-cash-details">
-              <MetricDetail
-                label="Opening"
-                value={formatMoney(cashMovement.openingMinor)}
-              />
-              <MetricDetail
-                label="Closing"
-                value={formatMoney(cashMovement.closingMinor)}
-              />
-              <MetricDetail
-                label="Ledger tie-out"
-                value={cashMovement.tiesOut ? "Balanced" : "Review"}
-                status={cashMovement.tiesOut ? "positive" : "negative"}
-              />
-            </div>
-          </SummaryMetric>
+          />
           <SummaryMetric
             title="Revenue"
             value={formatMoney(periodComparison.current.revenueMinor)}
@@ -150,7 +133,6 @@ export default function DashboardClient({
             trendLabel={`vs ${periodComparison.priorLabel}`}
           />
           <SummaryMetric
-            className="dashboard-summary--compact"
             title="Gross margin"
             value={
               periodComparison.current.grossMarginPercent === null
@@ -164,7 +146,6 @@ export default function DashboardClient({
             trendLabel="margin change"
           />
           <SummaryMetric
-            className="dashboard-summary--compact"
             title="Working capital"
             value={formatMoney(metrics.workingCapitalMinor)}
             href={INTERNAL_REPORT_HREFS.balance}
@@ -180,7 +161,6 @@ export default function DashboardClient({
             trendLabel="current ratio"
           />
           <SummaryMetric
-            className="dashboard-summary--compact"
             title="Inventory value"
             value={formatMoney(inventory.valueMinor)}
             href="/reports/inventory-valuation"
@@ -263,9 +243,7 @@ function SummaryMetric({
   tone,
   trend,
   trendLabel,
-  className = "",
   featured = false,
-  children,
 }: {
   title: string;
   value: string;
@@ -274,14 +252,12 @@ function SummaryMetric({
   tone: TrendTone;
   trend: string;
   trendLabel: string;
-  className?: string;
   featured?: boolean;
-  children?: ReactNode;
 }) {
   return (
     <Link
       href={href}
-      className={`dashboard-summary ${featured ? "dashboard-summary--featured" : ""} ${className}`}
+      className={`dashboard-summary${featured ? " dashboard-summary--featured" : ""}`}
     >
       <div className="dashboard-summary__header">
         <Typography.Text>{title}</Typography.Text>
@@ -301,25 +277,7 @@ function SummaryMetric({
         <strong>{trend}</strong>
         <span>{trendLabel}</span>
       </div>
-      {children}
     </Link>
-  );
-}
-
-function MetricDetail({
-  label,
-  value,
-  status,
-}: {
-  label: string;
-  value: string;
-  status?: TrendTone;
-}) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong className={status ? `amount-${status}` : ""}>{value}</strong>
-    </div>
   );
 }
 
@@ -572,7 +530,7 @@ function ActivityTimeline({
         <Timeline
           items={visibleActivities.map((activity) => ({
             color: ACTIVITY_COLORS[activity.category],
-            children: (
+            content: (
               <div className="dashboard-activity">
                 <Link href={activity.href} className="dashboard-activity__title">
                   {activity.verb} {activity.entity.toLowerCase()}
