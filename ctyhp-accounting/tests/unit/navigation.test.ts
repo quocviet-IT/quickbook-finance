@@ -12,7 +12,10 @@ import {
   navigationForAccess,
   searchKindLabel,
 } from "@/lib/domain/navigation";
-import { REPORT_CATALOG } from "@/lib/domain/report-catalog";
+import {
+  INTERNAL_REPORT_HREFS,
+  REPORT_CATALOG,
+} from "@/lib/domain/report-catalog";
 
 /** Every route the app actually serves, read from the filesystem. */
 function appRoutes(): string[] {
@@ -39,6 +42,23 @@ describe("app route inventory", () => {
     expect(ROUTES).toContain("/dashboard");
     expect(ROUTES).toContain("/invoices");
     expect(ROUTES.length).toBeGreaterThan(30);
+  });
+});
+
+describe("report links", () => {
+  it("points every report catalog entry at a route that exists", () => {
+    const missing = REPORT_CATALOG
+      .map((report) => report.href.split("?")[0])
+      .filter((path) => !ROUTES.includes(path));
+
+    expect(missing).toEqual([]);
+  });
+
+  it("keeps internal financial statement links aligned with the Report Center", () => {
+    for (const report of REPORT_CATALOG) {
+      if (!report.internalReport) continue;
+      expect(report.href).toBe(INTERNAL_REPORT_HREFS[report.internalReport]);
+    }
   });
 });
 

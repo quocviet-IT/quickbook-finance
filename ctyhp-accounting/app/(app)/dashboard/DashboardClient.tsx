@@ -27,6 +27,7 @@ import {
   PerformanceChart,
 } from "@/components/charts/FinancialCharts";
 import { fromMinor } from "@/lib/domain/money";
+import { INTERNAL_REPORT_HREFS } from "@/lib/domain/report-catalog";
 import type {
   DashboardActivity,
   DashboardActivityCategory,
@@ -219,7 +220,7 @@ export default function DashboardClient({
           <SummaryMetric
             title="Revenue"
             value={formatMoney(periodComparison.current.revenueMinor)}
-            href="/reports/profit-loss"
+            href={INTERNAL_REPORT_HREFS.pnl}
             icon={<RiseOutlined />}
             tone={trendTone(periodComparison.revenueChangePercent)}
             trend={formatPercent(periodComparison.revenueChangePercent)}
@@ -228,7 +229,7 @@ export default function DashboardClient({
           <SummaryMetric
             title="Net income"
             value={formatMoney(periodComparison.current.netIncomeMinor)}
-            href="/reports/profit-loss"
+            href={INTERNAL_REPORT_HREFS.pnl}
             icon={<DollarOutlined />}
             tone={periodComparison.netIncomeChangeMinor >= 0 ? "positive" : "negative"}
             trend={`${periodComparison.netIncomeChangeMinor > 0 ? "+" : ""}${formatMoney(periodComparison.netIncomeChangeMinor)}`}
@@ -242,7 +243,7 @@ export default function DashboardClient({
                 ? "n/a"
                 : `${periodComparison.current.grossMarginPercent.toFixed(1)}%`
             }
-            href="/reports/profit-loss"
+            href={INTERNAL_REPORT_HREFS.pnl}
             icon={<RiseOutlined />}
             tone={trendTone(periodComparison.grossMarginChangePoints)}
             trend={formatPercent(periodComparison.grossMarginChangePoints, " pts")}
@@ -252,7 +253,7 @@ export default function DashboardClient({
             className="dashboard-summary--compact"
             title="Working capital"
             value={formatMoney(metrics.workingCapitalMinor)}
-            href="/reports/balance-sheet"
+            href={INTERNAL_REPORT_HREFS.balance}
             icon={<SwapOutlined />}
             tone={
               metrics.currentRatio === null
@@ -282,7 +283,7 @@ export default function DashboardClient({
           data={analytics.monthlyPerformance}
           formatCompact={formatCompact}
           extra={
-            <Link href="/reports/profit-loss">
+            <Link href={INTERNAL_REPORT_HREFS.pnl}>
               Profit and loss <ArrowRightOutlined />
             </Link>
           }

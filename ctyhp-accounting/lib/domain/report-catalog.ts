@@ -7,6 +7,14 @@ export type ReportGroupId =
 
 export type InternalReportId = "trial" | "pnl" | "balance" | "budget" | "equity";
 
+export const INTERNAL_REPORT_HREFS: Record<InternalReportId, string> = {
+  trial: "/reports?report=trial",
+  pnl: "/reports?report=pnl",
+  balance: "/reports?report=balance",
+  budget: "/reports?report=budget",
+  equity: "/reports?report=equity",
+};
+
 export interface ReportGroupDefinition {
   id: ReportGroupId;
   label: string;
@@ -55,7 +63,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "profit-and-loss",
     title: "Profit and Loss",
     description: "Review income, expenses, and net profit with prior-period comparison.",
-    href: "/reports?report=pnl",
+    href: INTERNAL_REPORT_HREFS.pnl,
     group: "business-overview",
     internalReport: "pnl",
   },
@@ -63,7 +71,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "balance-sheet",
     title: "Balance Sheet",
     description: "Compare assets, liabilities, and equity as of a selected date.",
-    href: "/reports?report=balance",
+    href: INTERNAL_REPORT_HREFS.balance,
     group: "business-overview",
     internalReport: "balance",
   },
@@ -78,7 +86,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "statement-of-equity",
     title: "Statement of Equity",
     description: "Track opening equity, period activity, and closing balances.",
-    href: "/reports?report=equity",
+    href: INTERNAL_REPORT_HREFS.equity,
     group: "business-overview",
     internalReport: "equity",
   },
@@ -86,7 +94,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "budget-vs-actual",
     title: "Budget vs. Actual",
     description: "Compare budget targets with posted financial results.",
-    href: "/reports?report=budget",
+    href: INTERNAL_REPORT_HREFS.budget,
     group: "business-overview",
     internalReport: "budget",
   },
@@ -129,7 +137,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "trial-balance",
     title: "Trial Balance",
     description: "Validate debit and credit balances across the chart of accounts.",
-    href: "/reports?report=trial",
+    href: INTERNAL_REPORT_HREFS.trial,
     group: "accounting",
     internalReport: "trial",
   },
