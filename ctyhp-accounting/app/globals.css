@@ -1880,8 +1880,17 @@ body {
   --dashboard-surface: #ffffff;
   --dashboard-soft: #f4f8f7;
   display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: 20px;
+}
+
+.management-dashboard > *,
+.management-dashboard section {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .management-dashboard .accounting-page-header {
@@ -1899,6 +1908,82 @@ body {
   color: #3f5654;
   border-color: #d7e2e0;
   background: #f7faf9;
+}
+
+.dashboard-filter-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 12px;
+  background: var(--dashboard-soft);
+}
+
+.dashboard-filter-bar__summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-filter-bar__summary > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-filter-bar__summary strong {
+  color: var(--dashboard-ink);
+  font-size: 13px;
+}
+
+.dashboard-filter-bar__summary small {
+  max-width: 680px;
+  color: var(--dashboard-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.dashboard-filter-bar__icon {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #0f766e;
+  border-radius: 8px;
+  background: #e2f1ee;
+}
+
+.dashboard-filter-bar__control {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 5px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dashboard-filter-bar__control .ant-segmented {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 3px;
+  background: #e4ecea;
+}
+
+.dashboard-filter-bar__control .ant-segmented-item {
+  min-width: 48px;
+  min-height: 38px;
+  line-height: 38px;
 }
 
 .dashboard-section-heading {
@@ -2086,8 +2171,14 @@ body {
 
 .dashboard-layout {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   align-items: stretch;
   gap: 16px;
+}
+
+.dashboard-layout > * {
+  min-width: 0;
 }
 
 .dashboard-layout--performance {
@@ -2101,6 +2192,10 @@ body {
 
 .dashboard-layout--operations {
   grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+}
+
+.dashboard-layout--analysis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dashboard-layout--performance > .ant-card,
@@ -2727,6 +2822,7 @@ body {
 }
 
 .dashboard-loading__heading,
+.dashboard-loading__filter,
 .dashboard-loading__metric,
 .dashboard-loading__panel {
   position: relative;
@@ -2739,6 +2835,11 @@ body {
 .dashboard-loading__heading {
   width: min(520px, 80%);
   height: 62px;
+}
+
+.dashboard-loading__filter {
+  width: 100%;
+  height: 72px;
 }
 
 .dashboard-loading__metrics {
@@ -2762,6 +2863,7 @@ body {
 }
 
 .dashboard-loading__heading::after,
+.dashboard-loading__filter::after,
 .dashboard-loading__metric::after,
 .dashboard-loading__panel::after {
   position: absolute;
@@ -2786,7 +2888,8 @@ body {
 @container app-workspace (max-width: 1040px) {
   .dashboard-layout--performance,
   .dashboard-layout--cash,
-  .dashboard-layout--operations {
+  .dashboard-layout--operations,
+  .dashboard-layout--analysis {
     grid-template-columns: 1fr;
   }
 }
@@ -2837,6 +2940,28 @@ body {
     gap: 18px;
   }
 
+  .dashboard-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-filter-bar__summary {
+    align-items: flex-start;
+  }
+
+  .dashboard-filter-bar__summary small {
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard-filter-bar__control .ant-segmented,
+  .dashboard-filter-bar__control .ant-segmented-group {
+    width: 100%;
+  }
+
+  .dashboard-filter-bar__control .ant-segmented-item {
+    flex: 1;
+  }
+
   .dashboard-section-heading {
     flex-direction: column;
     gap: 8px;
@@ -2857,7 +2982,18 @@ body {
 
   .management-dashboard .ant-card-head-wrapper {
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .management-dashboard .ant-card-head-title {
+    min-width: 0;
+    flex: 1 1 220px;
+  }
+
+  .management-dashboard .ant-card-extra {
+    max-width: 100%;
+    flex: 0 1 auto;
   }
 
   .management-dashboard .ant-card-body {
@@ -2952,6 +3088,7 @@ body {
   }
 
   .dashboard-loading__heading::after,
+  .dashboard-loading__filter::after,
   .dashboard-loading__metric::after,
   .dashboard-loading__panel::after {
     animation: none;

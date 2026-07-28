@@ -6,6 +6,7 @@ export default function DashboardLoading() {
       aria-label="Loading financial dashboard"
     >
       <div className="dashboard-loading__heading" />
+      <div className="dashboard-loading__filter" />
       <div className="dashboard-loading__metrics">
         {Array.from({ length: 6 }, (_, index) => (
           <div className="dashboard-loading__metric" key={index} />

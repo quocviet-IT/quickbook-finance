@@ -57,10 +57,12 @@ function ChartEmpty({ description }: { description: string }) {
 export function PerformanceChart({
   data,
   formatCompact,
+  periodMonths,
   extra,
 }: {
   data: MonthlyPerformancePoint[];
   formatCompact: (value: number) => string;
+  periodMonths: number;
   extra?: ReactNode;
 }) {
   const width = 720;
@@ -94,7 +96,7 @@ export function PerformanceChart({
   return (
     <ChartCard
       title="Income and expense trend"
-      description="Six-month ledger view; the current month is month-to-date."
+      description={`${periodMonths}-month ledger view; the current month is month-to-date.`}
       extra={extra}
     >
       {!hasData ? (
@@ -111,7 +113,7 @@ export function PerformanceChart({
               className="financial-chart"
               viewBox={`0 0 ${width} ${height}`}
               role="img"
-              aria-label="Monthly income, expenses, and net income for the last six months"
+              aria-label={`Monthly income, expenses, and net income for the last ${periodMonths} months`}
             >
               {ticks.map((tick) => (
                 <g key={tick}>
@@ -424,30 +426,52 @@ export function ComparisonBars({
       {!hasData ? (
         <ChartEmpty description="No values are available for the selected period." />
       ) : (
-        <div className="comparison-bars">
-          {data.map((item) => (
-            <div className="comparison-bars__row" key={item.key}>
-              <div className="comparison-bars__header">
-                <Typography.Text>{item.label}</Typography.Text>
-                <Typography.Text strong>{formatMoney(item.value)}</Typography.Text>
+        <>
+          <div
+            className="comparison-bars"
+            role="img"
+            aria-label={`${title}: ${data
+              .map((item) => `${item.label} ${formatMoney(item.value)}`)
+              .join(", ")}`}
+          >
+            {data.map((item) => (
+              <div className="comparison-bars__row" key={item.key}>
+                <div className="comparison-bars__header">
+                  <Typography.Text>{item.label}</Typography.Text>
+                  <Typography.Text strong>{formatMoney(item.value)}</Typography.Text>
+                </div>
+                <div className="comparison-bars__track" aria-hidden="true">
+                  <div
+                    className="comparison-bars__fill"
+                    style={{
+                      width: `${(Math.abs(item.value) / max) * 100}%`,
+                      backgroundColor:
+                        item.color ??
+                        (item.value < 0 ? PALETTE.negative : PALETTE.positive),
+                    }}
+                  />
+                </div>
               </div>
-              <div
-                className="comparison-bars__track"
-                aria-label={`${item.label}: ${formatMoney(item.value)}`}
-              >
-                <div
-                  className="comparison-bars__fill"
-                  style={{
-                    width: `${(Math.abs(item.value) / max) * 100}%`,
-                    backgroundColor:
-                      item.color ??
-                      (item.value < 0 ? PALETTE.negative : PALETTE.positive),
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <table className="accounting-sr-only">
+            <caption>{title}</caption>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item.key}>
+                  <th>{item.label}</th>
+                  <td>{formatMoney(item.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
     </ChartCard>
   );

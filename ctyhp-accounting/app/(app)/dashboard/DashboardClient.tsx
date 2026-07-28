@@ -11,18 +11,20 @@ import {
   CheckCircleOutlined,
   DollarOutlined,
   FileTextOutlined,
+  FilterOutlined,
   InboxOutlined,
   RiseOutlined,
   ShopOutlined,
   SwapOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Card, Tag, Timeline, Typography } from "antd";
+import { Card, Segmented, Tag, Timeline, Typography } from "antd";
 import PageHeader from "@/components/PageHeader";
 import WorkQueueCard from "@/components/dashboard/WorkQueueCard";
 import {
   AgeingComparisonChart,
   CashFlowBridgeChart,
+  ComparisonBars,
   PerformanceChart,
 } from "@/components/charts/FinancialCharts";
 import { fromMinor } from "@/lib/domain/money";
@@ -44,6 +46,7 @@ interface DashboardClientProps {
 }
 
 type TrendTone = "positive" | "negative" | "neutral";
+type DashboardRange = 3 | 6 | 12;
 
 export default function DashboardClient({
   analytics,
@@ -52,6 +55,7 @@ export default function DashboardClient({
   accountingBasis,
   timeZone,
 }: DashboardClientProps) {
+  const [range, setRange] = useState<DashboardRange>(6);
   const { metrics, periodComparison, cashMovement, inventory, operatingPulse } = analytics;
   const formatMoney = (minor: number) =>
     new Intl.NumberFormat("en-US", {
@@ -71,6 +75,11 @@ export default function DashboardClient({
       : `${value > 0 ? "+" : ""}${value.toFixed(1)}${suffix}`;
   const formatInteger = (value: number) =>
     new Intl.NumberFormat("en-US").format(value);
+  const visiblePerformance = analytics.monthlyPerformance.slice(-range);
+  const activityFrom = visiblePerformance[0]?.key ?? analytics.asOf.slice(0, 7);
+  const visibleActivity = analytics.recentActivity.filter(
+    (activity) => activity.occurredAt.slice(0, 7) >= activityFrom,
+  );
 
   return (
     <div className="management-dashboard">
@@ -86,6 +95,37 @@ export default function DashboardClient({
           </div>
         }
       />
+
+      <section className="dashboard-filter-bar" aria-label="Dashboard analysis filters">
+        <div className="dashboard-filter-bar__summary">
+          <span className="dashboard-filter-bar__icon" aria-hidden="true">
+            <FilterOutlined />
+          </span>
+          <span>
+            <strong>Analysis window</strong>
+            <small>
+              Trends and activity use the selected period. Balance and ageing
+              figures remain as of {analytics.asOf}.
+            </small>
+          </span>
+        </div>
+        <label className="dashboard-filter-bar__control">
+          <span>Trend period</span>
+          <Segmented
+            aria-label="Dashboard trend period"
+            options={[
+              { label: "3M", value: 3 },
+              { label: "6M", value: 6 },
+              { label: "12M", value: 12 },
+            ]}
+            value={range}
+            onChange={(value) => setRange(value as DashboardRange)}
+          />
+        </label>
+        <span className="accounting-sr-only" aria-live="polite">
+          Dashboard trends now show {range} months.
+        </span>
+      </section>
 
       <section aria-labelledby="executive-overview-title">
         <div className="dashboard-section-heading">
@@ -174,8 +214,9 @@ export default function DashboardClient({
 
       <div className="dashboard-layout dashboard-layout--performance">
         <PerformanceChart
-          data={analytics.monthlyPerformance}
+          data={visiblePerformance}
           formatCompact={formatCompact}
+          periodMonths={range}
           extra={
             <Link href={INTERNAL_REPORT_HREFS.pnl}>
               Profit and loss <ArrowRightOutlined />
@@ -216,7 +257,83 @@ export default function DashboardClient({
         <InventoryPanel inventory={inventory} formatMoney={formatMoney} />
       </div>
 
-      <ActivityTimeline activities={analytics.recentActivity} timeZone={timeZone} />
+      <section aria-labelledby="financial-diagnostics-title">
+        <div className="dashboard-section-heading">
+          <div>
+            <Typography.Title level={4} id="financial-diagnostics-title">
+              Financial diagnostics
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              Snapshot views of short-term liquidity and balances that require
+              operational attention.
+            </Typography.Text>
+          </div>
+        </div>
+        <div className="dashboard-layout dashboard-layout--analysis">
+          <ComparisonBars
+            title="Liquidity structure"
+            description={`Current balance-sheet position as of ${analytics.asOf}.`}
+            data={[
+              {
+                key: "current-assets",
+                label: "Current assets",
+                value: metrics.currentAssetsMinor,
+                color: "#0f766e",
+              },
+              {
+                key: "current-liabilities",
+                label: "Current liabilities",
+                value: metrics.currentLiabilitiesMinor,
+                color: "#c2410c",
+              },
+              {
+                key: "working-capital",
+                label: "Working capital",
+                value: metrics.workingCapitalMinor,
+                color: "#1d4ed8",
+              },
+            ]}
+            formatMoney={formatMoney}
+            extra={
+              <Link href={INTERNAL_REPORT_HREFS.balance}>
+                Balance sheet <ArrowRightOutlined />
+              </Link>
+            }
+          />
+          <ComparisonBars
+            title="Exception exposure"
+            description="Open monetary exposure requiring collection, payment, or bank review."
+            data={[
+              {
+                key: "overdue-receivables",
+                label: "Overdue receivables",
+                value: metrics.overdueArMinor,
+                color: "#b91c1c",
+              },
+              {
+                key: "overdue-payables",
+                label: "Overdue payables",
+                value: metrics.overdueApMinor,
+                color: "#b45309",
+              },
+              {
+                key: "unreconciled-bank",
+                label: "Unreconciled bank activity",
+                value: metrics.unreconciledMinor,
+                color: "#7c3aed",
+              },
+            ]}
+            formatMoney={formatMoney}
+            extra={
+              <Link href="/banking">
+                Review banking <ArrowRightOutlined />
+              </Link>
+            }
+          />
+        </div>
+      </section>
+
+      <ActivityTimeline activities={visibleActivity} timeZone={timeZone} />
 
       <div className="dashboard-data-lineage">
         <AuditOutlined aria-hidden="true" />

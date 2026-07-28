@@ -10,6 +10,7 @@ import {
   trailingMonthWindows,
   within,
   type WorkAreaActivity,
+  type WorkAreaBreakdownPoint,
   type WorkAreaOverviewData,
   type WorkAreaTrendPoint,
 } from "@/lib/domain/work-area-overview";
@@ -79,12 +80,73 @@ function monthTrend(
   primary: (from: string, to: string) => number,
   secondary: (from: string, to: string) => number,
 ): WorkAreaTrendPoint[] {
-  return trailingMonthWindows(asOf).map((window) => ({
+  return trailingMonthWindows(asOf, 12).map((window) => ({
     key: window.key,
     label: window.label,
     primary: primary(window.from, window.to),
     secondary: secondary(window.from, window.to),
   }));
+}
+
+const AGEING_BREAKDOWN = [
+  { key: "current", label: "Current", tone: "positive" },
+  { key: "d1_30", label: "1-30 days", tone: "warning" },
+  { key: "d31_60", label: "31-60 days", tone: "warning" },
+  { key: "d61_90", label: "61-90 days", tone: "negative" },
+  { key: "d90_plus", label: "90+ days", tone: "negative" },
+] as const;
+
+function ageingBreakdownPoints(
+  buckets: Record<string, number>,
+  href: string,
+): WorkAreaBreakdownPoint[] {
+  return AGEING_BREAKDOWN.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    value: Number(buckets[bucket.key] ?? 0),
+    href,
+    tone: bucket.tone,
+  }));
+}
+
+function topCountBreakdown(
+  values: string[],
+  href: string,
+  limit = 5,
+): WorkAreaBreakdownPoint[] {
+  const counts = values.reduce<Record<string, number>>((result, value) => {
+    const label = statusLabel(value || "other");
+    result[label] = (result[label] ?? 0) + 1;
+    return result;
+  }, {});
+  const sorted = Object.entries(counts).sort(
+    ([labelA, countA], [labelB, countB]) =>
+      countB - countA || labelA.localeCompare(labelB),
+  );
+  const visible = sorted.slice(0, limit);
+  const remainder = sorted
+    .slice(limit)
+    .reduce((sum, [, count]) => sum + count, 0);
+  return [
+    ...visible.map(([label, value]) => ({
+      key: label.toLowerCase().replace(/\s+/g, "-"),
+      label,
+      value,
+      href,
+      tone: "neutral" as const,
+    })),
+    ...(remainder > 0
+      ? [
+          {
+            key: "other",
+            label: "Other",
+            value: remainder,
+            href,
+            tone: "neutral" as const,
+          },
+        ]
+      : []),
+  ];
 }
 
 function moneyLabel(
@@ -203,7 +265,7 @@ export async function getSalesOverview(
     ],
     trend: {
       title: "Billing and collections",
-      description: "Issued invoices compared with customer payments over six months.",
+      description: "Issued invoices compared with customer payments for the selected trend window.",
       primaryLabel: "Invoiced",
       secondaryLabel: "Collected",
       valueType: "money",
@@ -219,6 +281,51 @@ export async function getSalesOverview(
             .reduce((sum, payment) => sum + Number(payment.amount_minor), 0),
       ),
     },
+    breakdowns: [
+      {
+        key: "receivables-ageing",
+        title: "Receivables ageing",
+        description: "Open customer balances grouped by due-date risk.",
+        valueType: "money",
+        points: ageingBreakdownPoints(ageing.buckets, "/reports/ar-ageing"),
+      },
+      {
+        key: "invoice-status",
+        title: "Invoice status mix",
+        description: "Invoice volume by current workflow status.",
+        valueType: "number",
+        points: [
+          {
+            key: "draft",
+            label: "Draft",
+            value: invoices.filter((invoice) => invoice.status === "draft").length,
+            href: "/invoices",
+            tone: "neutral",
+          },
+          {
+            key: "open",
+            label: "Awaiting payment",
+            value: open.length,
+            href: "/invoices",
+            tone: "warning",
+          },
+          {
+            key: "paid",
+            label: "Paid",
+            value: invoices.filter((invoice) => invoice.status === "paid").length,
+            href: "/invoices",
+            tone: "positive",
+          },
+          {
+            key: "void",
+            label: "Void",
+            value: invoices.filter((invoice) => invoice.status === "void").length,
+            href: "/invoices",
+            tone: "negative",
+          },
+        ],
+      },
+    ],
     stages: [
       {
         key: "draft",
@@ -439,7 +546,7 @@ export async function getPurchasesOverview(
     ],
     trend: {
       title: "Bills and vendor payments",
-      description: "Posted vendor bills compared with cash paid over six months.",
+      description: "Posted vendor bills compared with cash paid for the selected trend window.",
       primaryLabel: "Bills",
       secondaryLabel: "Paid",
       valueType: "money",
@@ -455,6 +562,53 @@ export async function getPurchasesOverview(
             .reduce((sum, payment) => sum + Number(payment.amount_minor), 0),
       ),
     },
+    breakdowns: [
+      {
+        key: "payables-ageing",
+        title: "Payables ageing",
+        description: "Open vendor balances grouped by payment urgency.",
+        valueType: "money",
+        points: ageingBreakdownPoints(ageing.buckets, "/reports/ap-ageing"),
+      },
+      {
+        key: "purchase-order-status",
+        title: "Purchase order pipeline",
+        description: "Purchase orders grouped by receiving progress.",
+        valueType: "number",
+        points: [
+          {
+            key: "draft",
+            label: "Draft",
+            value: purchaseOrders.filter((order) => order.status === "draft").length,
+            href: "/purchase-orders",
+            tone: "neutral",
+          },
+          {
+            key: "open",
+            label: "Open or partial",
+            value: purchaseOrders.filter((order) =>
+              ["open", "partial"].includes(order.status),
+            ).length,
+            href: "/purchase-orders",
+            tone: "warning",
+          },
+          {
+            key: "received",
+            label: "Received",
+            value: purchaseOrders.filter((order) => order.status === "received").length,
+            href: "/purchase-orders",
+            tone: "positive",
+          },
+          {
+            key: "closed",
+            label: "Closed",
+            value: purchaseOrders.filter((order) => order.status === "closed").length,
+            href: "/purchase-orders",
+            tone: "positive",
+          },
+        ],
+      },
+    ],
     stages: [
       {
         key: "draft",
@@ -612,6 +766,7 @@ export async function getBankingOverview(
     (connection) => connection.status !== "active" || Boolean(connection.last_error),
   );
   const pendingTransactions = transactions.filter((transaction) => transaction.pending);
+  const readyForReview = unmatched.filter((transaction) => !transaction.pending);
   const inProgress = reconciliations.filter(
     (reconciliation) => reconciliation.status === "in_progress",
   );
@@ -675,7 +830,7 @@ export async function getBankingOverview(
     ],
     trend: {
       title: "Bank activity",
-      description: "Imported inflows and outflows over the latest six months.",
+      description: "Imported inflows and outflows for the selected trend window.",
       primaryLabel: "Inflows",
       secondaryLabel: "Outflows",
       valueType: "money",
@@ -699,6 +854,66 @@ export async function getBankingOverview(
             .reduce((sum, transaction) => sum + Math.abs(Number(transaction.amount_minor)), 0),
       ),
     },
+    breakdowns: [
+      {
+        key: "transaction-review-status",
+        title: "Transaction review status",
+        description: "Imported activity grouped by matching disposition.",
+        valueType: "number",
+        points: [
+          {
+            key: "unmatched",
+            label: "For review",
+            value: readyForReview.length,
+            href: "/banking",
+            tone: "warning",
+          },
+          {
+            key: "matched",
+            label: "Matched",
+            value: matched.length,
+            href: "/banking",
+            tone: "positive",
+          },
+          {
+            key: "ignored",
+            label: "Excluded",
+            value: ignored.length,
+            href: "/banking",
+            tone: "neutral",
+          },
+          {
+            key: "pending",
+            label: "Provider pending",
+            value: pendingTransactions.length,
+            href: "/banking",
+            tone: "warning",
+          },
+        ],
+      },
+      {
+        key: "reconciliation-status",
+        title: "Reconciliation sessions",
+        description: "Statement reconciliations grouped by completion status.",
+        valueType: "number",
+        points: [
+          {
+            key: "in-progress",
+            label: "In progress",
+            value: inProgress.length,
+            href: "/banking/reconcile",
+            tone: "warning",
+          },
+          {
+            key: "completed",
+            label: "Completed",
+            value: completed.length,
+            href: "/banking/reconcile",
+            tone: "positive",
+          },
+        ],
+      },
+    ],
     stages: [
       {
         key: "unmatched",
@@ -828,7 +1043,7 @@ export async function getInventoryOverview(
   context: WorkAreaOverviewContext,
 ): Promise<WorkAreaOverviewData> {
   const { asOf, currencyCode, currencyDecimals } = context;
-  const sixMonthsAgo = trailingMonthWindows(asOf)[0].from;
+  const twelveMonthsAgo = trailingMonthWindows(asOf, 12)[0].from;
   const [items, valuation, assets, movementResult] = await Promise.all([
     listItems(sb),
     getInventoryValuation(sb, asOf),
@@ -836,7 +1051,7 @@ export async function getInventoryOverview(
     sb
       .from("acc_inventory_txn")
       .select("*")
-      .gte("txn_date", sixMonthsAgo)
+      .gte("txn_date", twelveMonthsAgo)
       .lte("txn_date", asOf)
       .order("txn_date", { ascending: false }),
   ]);
@@ -851,6 +1066,10 @@ export async function getInventoryOverview(
     (sum, asset) => sum + Number(asset.net_book_value_minor),
     0,
   );
+  const topInventory = [...valuation.rows]
+    .filter((row) => Number(row.value_minor) > 0)
+    .sort((left, right) => Number(right.value_minor) - Number(left.value_minor))
+    .slice(0, 5);
 
   return {
     area: "inventory",
@@ -908,7 +1127,7 @@ export async function getInventoryOverview(
     ],
     trend: {
       title: "Inventory movement",
-      description: "Receipt value compared with issues and adjustments over six months.",
+      description: "Receipt value compared with issues and adjustments for the selected trend window.",
       primaryLabel: "Inbound value",
       secondaryLabel: "Outbound value",
       valueType: "money",
@@ -935,6 +1154,50 @@ export async function getInventoryOverview(
             ),
       ),
     },
+    breakdowns: [
+      {
+        key: "inventory-concentration",
+        title: "Jewelry value concentration",
+        description: "Highest-value jewelry holdings at the reporting date.",
+        valueType: "money",
+        points: topInventory.map((row) => ({
+          key: row.item_id,
+          label: row.item_code ? `${row.item_code} - ${row.name}` : row.name,
+          value: Number(row.value_minor),
+          href: "/reports/inventory-valuation",
+          tone: "neutral",
+        })),
+      },
+      {
+        key: "stock-availability",
+        title: "Stock availability",
+        description: "Active jewelry items grouped by quantity position.",
+        valueType: "number",
+        points: [
+          {
+            key: "in-stock",
+            label: "In stock",
+            value: valuation.rows.filter((row) => Number(row.qty_on_hand) > 0).length,
+            href: "/items",
+            tone: "positive",
+          },
+          {
+            key: "zero-stock",
+            label: "Out of stock",
+            value: zeroStock.length,
+            href: "/items",
+            tone: "warning",
+          },
+          {
+            key: "negative-stock",
+            label: "Negative stock",
+            value: negativeStock.length,
+            href: "/items",
+            tone: "negative",
+          },
+        ],
+      },
+    ],
     stages: [
       {
         key: "active-items",
@@ -1066,7 +1329,10 @@ export async function getAccountingOverview(
   const [accounts, journals, analytics, recurringTemplates, recurringRuns, periodResult] =
     await Promise.all([
       listAccounts(sb),
-      listJournalEntries(sb, { from: trailingMonthWindows(asOf)[0].from, to: asOf }),
+      listJournalEntries(sb, {
+        from: trailingMonthWindows(asOf, 12)[0].from,
+        to: asOf,
+      }),
       getDashboardAnalytics(sb, asOf),
       listRecurringTemplates(sb),
       listRecurringRuns(sb, 50),
@@ -1156,7 +1422,7 @@ export async function getAccountingOverview(
     ],
     trend: {
       title: "Ledger performance",
-      description: "Income and expense activity derived from posted journal entries.",
+      description: "Income and expense activity for the selected trend window.",
       primaryLabel: "Income",
       secondaryLabel: "Expenses",
       valueType: "money",
@@ -1167,6 +1433,40 @@ export async function getAccountingOverview(
         secondary: point.expenseMinor,
       })),
     },
+    breakdowns: [
+      {
+        key: "journal-source",
+        title: "Journal source mix",
+        description: "Posted entries grouped by originating workflow.",
+        valueType: "number",
+        points: topCountBreakdown(
+          journals.map((journal) => journal.sourceType),
+          "/journal",
+        ),
+      },
+      {
+        key: "period-close",
+        title: "Period close progress",
+        description: "Fiscal-year periods grouped by current close status.",
+        valueType: "number",
+        points: [
+          {
+            key: "open",
+            label: "Open",
+            value: openPeriods.length,
+            href: "/settings/periods",
+            tone: analytics.metrics.openPastPeriods > 0 ? "warning" : "neutral",
+          },
+          {
+            key: "closed",
+            label: "Closed",
+            value: periods.filter((period) => period.status === "closed").length,
+            href: "/settings/periods",
+            tone: "positive",
+          },
+        ],
+      },
+    ],
     stages: [
       {
         key: "open-periods",

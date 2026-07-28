@@ -51,6 +51,22 @@ export interface WorkAreaTrend {
   points: WorkAreaTrendPoint[];
 }
 
+export interface WorkAreaBreakdownPoint {
+  key: string;
+  label: string;
+  value: number;
+  href?: string;
+  tone?: OverviewTone;
+}
+
+export interface WorkAreaBreakdown {
+  key: string;
+  title: string;
+  description: string;
+  valueType: OverviewValueType;
+  points: WorkAreaBreakdownPoint[];
+}
+
 export interface WorkAreaStage {
   key: string;
   label: string;
@@ -107,6 +123,7 @@ export interface WorkAreaOverviewData {
   };
   metrics: WorkAreaMetric[];
   trend: WorkAreaTrend;
+  breakdowns: WorkAreaBreakdown[];
   stages: WorkAreaStage[];
   exceptions: WorkAreaException[];
   activities: WorkAreaActivity[];

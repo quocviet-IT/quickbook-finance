@@ -371,7 +371,7 @@ async function getMonthlyPerformance(
   asOf: string,
   currentRows?: Promise<LedgerRows>,
 ): Promise<MonthlyPerformancePoint[]> {
-  const ranges = trailingMonthRanges(asOf);
+  const ranges = trailingMonthRanges(asOf, 12);
   const balances = await Promise.all(
     ranges.map((range, index) =>
       index === ranges.length - 1 && currentRows

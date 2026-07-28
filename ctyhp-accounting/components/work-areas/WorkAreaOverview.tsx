@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowRightOutlined,
@@ -12,6 +12,7 @@ import {
   DollarOutlined,
   FileDoneOutlined,
   FileTextOutlined,
+  FilterOutlined,
   GoldOutlined,
   InboxOutlined,
   PlusOutlined,
@@ -22,12 +23,14 @@ import {
   TeamOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Card, Empty, Tag, Typography } from "antd";
+import { Card, Empty, Segmented, Select, Tag, Typography } from "antd";
 import PageHeader from "@/components/PageHeader";
 import { fromMinor } from "@/lib/domain/money";
 import type {
   OverviewIcon,
   OverviewTone,
+  WorkAreaBreakdown,
+  WorkAreaBreakdownPoint,
   WorkAreaOverviewData,
   WorkAreaTrend,
 } from "@/lib/domain/work-area-overview";
@@ -51,7 +54,12 @@ const ICONS: Record<OverviewIcon, ReactNode> = {
   approval: <CheckCircleOutlined />,
 };
 
+type AnalysisRange = 3 | 6 | 12;
+type TrendSeries = "both" | "primary" | "secondary";
+
 export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData }) {
+  const [range, setRange] = useState<AnalysisRange>(6);
+  const [series, setSeries] = useState<TrendSeries>("both");
   const money = (minor: number) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -67,6 +75,14 @@ export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData 
     return number(value);
   };
   const activeExceptions = data.exceptions.filter((exception) => exception.count > 0);
+  const visibleTrend: WorkAreaTrend = {
+    ...data.trend,
+    points: data.trend.points.slice(-range),
+  };
+  const activityFrom = visibleTrend.points[0]?.key ?? data.asOf.slice(0, 7);
+  const visibleActivities = data.activities.filter(
+    (activity) => activity.occurredOn.slice(0, 7) >= activityFrom,
+  );
 
   return (
     <div className={`${styles.root} ${styles[data.area]}`}>
@@ -89,6 +105,58 @@ export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData 
           ) : undefined
         }
       />
+
+      <section className={styles.filterBar} aria-label="Overview analysis filters">
+        <div className={styles.filterSummary}>
+          <span className={styles.filterIcon} aria-hidden="true">
+            <FilterOutlined />
+          </span>
+          <span>
+            <strong>Analysis controls</strong>
+            <small>
+              Trend and activity follow the selected window. Balance charts remain as
+              of {data.asOf}.
+            </small>
+          </span>
+        </div>
+        <div className={styles.filterControls}>
+          <label className={styles.filterControl}>
+            <span>Trend window</span>
+            <Segmented
+              aria-label="Trend window"
+              options={[
+                { label: "3M", value: 3 },
+                { label: "6M", value: 6 },
+                { label: "12M", value: 12 },
+              ]}
+              value={range}
+              onChange={(value) => setRange(value as AnalysisRange)}
+            />
+          </label>
+          <label className={styles.filterControl}>
+            <span>Series</span>
+            <Select
+              aria-label="Visible trend series"
+              value={series}
+              onChange={(value) => setSeries(value)}
+              options={[
+                { label: "Both series", value: "both" },
+                { label: data.trend.primaryLabel, value: "primary" },
+                { label: data.trend.secondaryLabel, value: "secondary" },
+              ]}
+            />
+          </label>
+        </div>
+        <span className="accounting-sr-only" aria-live="polite">
+          Showing {range} months with{" "}
+          {series === "both"
+            ? "both trend series"
+            : series === "primary"
+              ? data.trend.primaryLabel
+              : data.trend.secondaryLabel}
+          .
+        </span>
+      </section>
 
       <section aria-labelledby={`${data.area}-metrics`}>
         <h2 id={`${data.area}-metrics`} className="accounting-sr-only">
@@ -123,10 +191,11 @@ export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData 
       <div className={styles.mainGrid}>
         <Card className={styles.panel} title={data.trend.title}>
           <Typography.Paragraph type="secondary" className={styles.panelDescription}>
-            {data.trend.description}
+            {data.trend.description} Showing {range} months.
           </Typography.Paragraph>
           <TrendChart
-            trend={data.trend}
+            trend={visibleTrend}
+            series={series}
             formatValue={(value) => formatValue(value, data.trend.valueType)}
           />
         </Card>
@@ -184,6 +253,20 @@ export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData 
         </Card>
       </div>
 
+      <section className={styles.analysisGrid} aria-label={`${data.title} analysis charts`}>
+        {data.breakdowns.map((breakdown) => (
+          <Card className={styles.panel} title={breakdown.title} key={breakdown.key}>
+            <Typography.Paragraph type="secondary" className={styles.panelDescription}>
+              {breakdown.description}
+            </Typography.Paragraph>
+            <BreakdownChart
+              breakdown={breakdown}
+              formatValue={(value) => formatValue(value, breakdown.valueType)}
+            />
+          </Card>
+        ))}
+      </section>
+
       <div className={styles.secondaryGrid}>
         <Card className={styles.panel} title="Workflow position">
           <div className={styles.stageList}>
@@ -204,14 +287,14 @@ export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData 
         </Card>
 
         <Card className={styles.panel} title="Recent activity">
-          {data.activities.length === 0 ? (
+          {visibleActivities.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="No recent activity is available."
+              description={`No activity is available in the selected ${range}-month window.`}
             />
           ) : (
             <div className={styles.activityList}>
-              {data.activities.map((activity) => (
+              {visibleActivities.map((activity) => (
                 <Link href={activity.href} className={styles.activity} key={activity.key}>
                   <span className={styles.activityDate}>
                     {shortDate(activity.occurredOn)}
@@ -284,12 +367,19 @@ export default function WorkAreaOverview({ data }: { data: WorkAreaOverviewData 
 
 function TrendChart({
   trend,
+  series,
   formatValue,
 }: {
   trend: WorkAreaTrend;
+  series: TrendSeries;
   formatValue: (value: number) => string;
 }) {
-  const values = trend.points.flatMap((point) => [point.primary, point.secondary]);
+  const showPrimary = series !== "secondary";
+  const showSecondary = series !== "primary";
+  const values = trend.points.flatMap((point) => [
+    ...(showPrimary ? [point.primary] : []),
+    ...(showSecondary ? [point.secondary] : []),
+  ]);
   const max = Math.max(1, ...values.map((value) => Math.abs(value)));
   const hasData = values.some((value) => value !== 0);
 
@@ -297,7 +387,7 @@ function TrendChart({
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="Post activity to build this six-month trend."
+        description="Post activity to build the selected trend."
       />
     );
   }
@@ -305,27 +395,42 @@ function TrendChart({
   return (
     <>
       <div className={styles.legend} aria-hidden="true">
-        <span><i className={styles.primarySwatch} />{trend.primaryLabel}</span>
-        <span><i className={styles.secondarySwatch} />{trend.secondaryLabel}</span>
+        {showPrimary && (
+          <span><i className={styles.primarySwatch} />{trend.primaryLabel}</span>
+        )}
+        {showSecondary && (
+          <span><i className={styles.secondarySwatch} />{trend.secondaryLabel}</span>
+        )}
       </div>
       <div
         className={styles.trendChart}
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(1, trend.points.length)}, minmax(46px, 1fr))`,
+        }}
         role="img"
-        aria-label={`${trend.title}: ${trend.primaryLabel} compared with ${trend.secondaryLabel} over six months`}
+        aria-label={`${trend.title}: ${showPrimary ? trend.primaryLabel : ""}${showPrimary && showSecondary ? " compared with " : ""}${showSecondary ? trend.secondaryLabel : ""} over ${trend.points.length} months`}
       >
         {trend.points.map((point) => (
           <div className={styles.trendGroup} key={point.key}>
             <div className={styles.trendPlot}>
-              <span
-                className={styles.primaryBar}
-                style={{ height: `${Math.max(point.primary ? 4 : 0, (Math.abs(point.primary) / max) * 100)}%` }}
-                title={`${point.label} ${trend.primaryLabel}: ${formatValue(point.primary)}`}
-              />
-              <span
-                className={styles.secondaryBar}
-                style={{ height: `${Math.max(point.secondary ? 4 : 0, (Math.abs(point.secondary) / max) * 100)}%` }}
-                title={`${point.label} ${trend.secondaryLabel}: ${formatValue(point.secondary)}`}
-              />
+              {showPrimary && (
+                <span
+                  className={styles.primaryBar}
+                  style={{ height: `${Math.max(point.primary ? 4 : 0, (Math.abs(point.primary) / max) * 100)}%` }}
+                  title={`${point.label} ${trend.primaryLabel}: ${formatValue(point.primary)}`}
+                  aria-label={`${point.label} ${trend.primaryLabel}: ${formatValue(point.primary)}`}
+                  tabIndex={0}
+                />
+              )}
+              {showSecondary && (
+                <span
+                  className={styles.secondaryBar}
+                  style={{ height: `${Math.max(point.secondary ? 4 : 0, (Math.abs(point.secondary) / max) * 100)}%` }}
+                  title={`${point.label} ${trend.secondaryLabel}: ${formatValue(point.secondary)}`}
+                  aria-label={`${point.label} ${trend.secondaryLabel}: ${formatValue(point.secondary)}`}
+                  tabIndex={0}
+                />
+              )}
             </div>
             <span className={styles.trendLabel}>{point.label}</span>
           </div>
@@ -336,21 +441,115 @@ function TrendChart({
         <thead>
           <tr>
             <th>Month</th>
-            <th>{trend.primaryLabel}</th>
-            <th>{trend.secondaryLabel}</th>
+            {showPrimary && <th>{trend.primaryLabel}</th>}
+            {showSecondary && <th>{trend.secondaryLabel}</th>}
           </tr>
         </thead>
         <tbody>
           {trend.points.map((point) => (
             <tr key={point.key}>
               <th>{point.label}</th>
-              <td>{formatValue(point.primary)}</td>
-              <td>{formatValue(point.secondary)}</td>
+              {showPrimary && <td>{formatValue(point.primary)}</td>}
+              {showSecondary && <td>{formatValue(point.secondary)}</td>}
             </tr>
           ))}
         </tbody>
       </table>
     </>
+  );
+}
+
+function BreakdownChart({
+  breakdown,
+  formatValue,
+}: {
+  breakdown: WorkAreaBreakdown;
+  formatValue: (value: number) => string;
+}) {
+  const max = Math.max(
+    1,
+    ...breakdown.points.map((point) => Math.abs(point.value)),
+  );
+  const hasData = breakdown.points.some((point) => point.value !== 0);
+
+  if (!hasData) {
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="No values are available at the reporting date."
+      />
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.breakdownChart}>
+        {breakdown.points.map((point) => (
+          <BreakdownRow
+            point={point}
+            max={max}
+            formatValue={formatValue}
+            key={point.key}
+          />
+        ))}
+      </div>
+      <table className="accounting-sr-only">
+        <caption>{breakdown.title}</caption>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {breakdown.points.map((point) => (
+            <tr key={point.key}>
+              <th>{point.label}</th>
+              <td>{formatValue(point.value)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function BreakdownRow({
+  point,
+  max,
+  formatValue,
+}: {
+  point: WorkAreaBreakdownPoint;
+  max: number;
+  formatValue: (value: number) => string;
+}) {
+  const content = (
+    <>
+      <span className={styles.breakdownHeader}>
+        <span>{point.label}</span>
+        <strong>{formatValue(point.value)}</strong>
+      </span>
+      <span className={styles.breakdownTrack} aria-hidden="true">
+        <span
+          className={`${styles.breakdownFill} ${toneClass(point.tone ?? "neutral")}`}
+          style={{
+            width: `${Math.max(point.value ? 2 : 0, (Math.abs(point.value) / max) * 100)}%`,
+          }}
+        />
+      </span>
+    </>
+  );
+  const label = `${point.label}: ${formatValue(point.value)}`;
+
+  return point.href ? (
+    <Link href={point.href} className={styles.breakdownRow} aria-label={label}>
+      {content}
+      <ArrowRightOutlined aria-hidden="true" />
+    </Link>
+  ) : (
+    <div className={styles.breakdownRow} role="img" aria-label={label}>
+      {content}
+    </div>
   );
 }
 
