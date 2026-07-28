@@ -278,6 +278,8 @@ body {
 .app-shell__workspace {
   min-width: 0;
   overflow-x: clip;
+  container-name: app-workspace;
+  container-type: inline-size;
 }
 
 .app-shell__header {
@@ -285,7 +287,7 @@ body {
   padding: 0 24px !important;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   border-bottom: 1px solid #e5eaf0;
   position: sticky;
@@ -300,29 +302,56 @@ body {
   gap: 8px;
 }
 
-.app-shell__route-title {
-  color: #475569;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.app-shell__role {
-  margin-inline-end: 0 !important;
-  text-transform: capitalize;
-}
-
 .app-shell__menu-button,
 .app-shell__account-button {
   min-width: 44px;
   min-height: 44px;
 }
 
-.app-shell__account-button {
-  padding: 4px !important;
+.app-shell__account-button.ant-btn {
+  display: inline-flex;
+  max-width: 220px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 4px 8px !important;
+  color: #334155;
+  border-radius: 8px;
+}
+
+.app-shell__account-button.ant-btn:hover,
+.app-shell__account-button.ant-btn:focus-visible {
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+}
+
+.app-shell__account-avatar {
+  flex: 0 0 auto;
+}
+
+.app-shell__account-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
+.app-shell__account-email {
+  display: block;
+  max-width: 164px;
+  overflow: hidden;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell__account-role {
+  color: #64748b;
+  font-size: 11px;
+  text-transform: capitalize;
 }
 
 .app-shell__account-summary {
@@ -1380,10 +1409,6 @@ body {
     flex: 0 0 auto;
   }
 
-  .app-shell__route-title {
-    display: none;
-  }
-
   .app-shell__header-search {
     min-width: 72px;
     flex: 1 1 auto;
@@ -1674,13 +1699,36 @@ body {
    --------------------------------------------------------------------------- */
 
 .app-shell__header-search {
-  flex: 1 1 420px;
+  flex: 1 1 360px;
   min-width: 0;
   max-width: 460px;
 }
 
 .global-search {
   width: 100%;
+}
+
+.global-search .ant-input-affix-wrapper {
+  min-height: 40px;
+  border-color: #dbe2ea;
+  border-radius: 8px;
+  background: #f8fafc;
+  box-shadow: none;
+  transition:
+    border-color 160ms ease-out,
+    background-color 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.global-search .ant-input-affix-wrapper:hover {
+  border-color: #9fbfbb;
+  background: #ffffff;
+}
+
+.global-search .ant-input-affix-wrapper-focused {
+  border-color: #0f766e;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .global-search__option {
@@ -1705,10 +1753,14 @@ body {
   align-items: center;
   gap: 12px;
   flex: 0 0 auto;
+  margin-inline-start: auto;
 }
 
-.app-shell__new-button {
+.app-shell__new-button.ant-btn {
+  min-height: 40px;
+  padding-inline: 14px;
   font-weight: 600;
+  box-shadow: none;
 }
 
 .app-shell__new-label,
@@ -1783,8 +1835,51 @@ body {
   height: 20px;
   padding-inline: 5px;
   line-height: 20px;
-  background: #b45309;
+  background: #b45309 !important;
   box-shadow: none;
+}
+
+.app-shell__approvals-count--clear .ant-badge-count {
+  color: #475569;
+  background: #e2e8f0 !important;
+}
+
+@container app-workspace (max-width: 1120px) {
+  .app-shell__account-identity {
+    display: none;
+  }
+
+  .app-shell__account-button.ant-btn {
+    width: 44px;
+    justify-content: center;
+    padding-inline: 4px !important;
+  }
+
+  .app-shell__header-end {
+    gap: 8px;
+  }
+}
+
+@container app-workspace (max-width: 980px) {
+  .app-shell__new-button.ant-btn {
+    width: 44px;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .app-shell__new-label,
+  .app-shell__new-chevron,
+  .app-shell__approvals-label {
+    display: none;
+  }
+
+  .app-shell__approvals {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px;
+  }
 }
 
 /* Filter bar stays reachable while a long list scrolls. */
@@ -2856,10 +2951,6 @@ body {
 
   .app-shell__header-start {
     flex: 0 0 auto;
-  }
-
-  .app-shell__route-title {
-    display: none;
   }
 
   .app-shell__header-search {

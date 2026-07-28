@@ -12,7 +12,6 @@ import {
   Grid,
   Layout,
   Menu,
-  Tag,
   Tooltip,
   Typography,
 } from "antd";
@@ -260,9 +259,6 @@ export default function AppShell({
   const activePage = findActivePage(pathname);
   const activePageKey = activePage?.key ?? "";
   const activeGroupKey = activePage ? findActiveGroup(activePage.key) : undefined;
-  // Routes outside the sidebar (Approvals) still deserve a title.
-  const routeTitle = activePage?.label ?? (pathname.startsWith("/approvals") ? "Approvals" : "");
-
   async function signOut() {
     const sb = createSupabaseBrowserClient();
     await sb.auth.signOut();
@@ -275,7 +271,6 @@ export default function AppShell({
   }
 
   const canCreate = role === "admin" || role === "accountant";
-  const roleColor = role === "admin" ? "gold" : role === "accountant" ? "blue" : "default";
   const accountMenu = {
     items: [
       {
@@ -399,8 +394,8 @@ export default function AppShell({
 
       <Layout className="app-shell__workspace">
         <Header className="app-shell__header">
-          <div className="app-shell__header-start">
-            {isMobile && (
+          {isMobile && (
+            <div className="app-shell__header-start">
               <Tooltip title="Open navigation">
                 <Button
                   type="text"
@@ -411,9 +406,8 @@ export default function AppShell({
                   className="app-shell__menu-button"
                 />
               </Tooltip>
-            )}
-            <Typography.Text className="app-shell__route-title">{routeTitle}</Typography.Text>
-          </div>
+            </div>
+          )}
 
           <div className="app-shell__header-search">
             <GlobalSearch />
@@ -426,21 +420,23 @@ export default function AppShell({
               active={pathname.startsWith("/approvals")}
               compact={isMobile}
             />
-            {!isMobile && (
-              <>
-                <Typography.Text type="secondary" className="app-shell__email">
-                  {email}
-                </Typography.Text>
-                {role && (
-                  <Tag color={roleColor} className="app-shell__role">
-                    {role}
-                  </Tag>
-                )}
-              </>
-            )}
             <Dropdown menu={accountMenu} placement="bottomRight" trigger={["click"]}>
-              <Button type="text" aria-label="Open account menu" className="app-shell__account-button">
-                <Avatar size={30} icon={<UserOutlined />} />
+              <Button
+                type="text"
+                aria-label={`Open account menu for ${email}`}
+                className="app-shell__account-button"
+              >
+                <Avatar
+                  size={32}
+                  icon={<UserOutlined />}
+                  className="app-shell__account-avatar"
+                />
+                {!isMobile && (
+                  <span className="app-shell__account-identity" aria-hidden="true">
+                    <span className="app-shell__account-email">{email}</span>
+                    {role && <span className="app-shell__account-role">{role}</span>}
+                  </span>
+                )}
               </Button>
             </Dropdown>
           </div>
@@ -516,7 +512,12 @@ function ApprovalsLink({
           showZero
           overflowCount={99}
           size="small"
-          className="app-shell__approvals-count"
+          className={[
+            "app-shell__approvals-count",
+            pendingApprovals === 0 ? "app-shell__approvals-count--clear" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         />
       </Link>
     </Tooltip>
