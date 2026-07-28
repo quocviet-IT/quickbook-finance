@@ -42,6 +42,7 @@ export const NAV: NavItem[] = [
     key: "sales",
     label: "Sales",
     children: [
+      { key: "/sales", label: "Overview" },
       { key: "/customers", label: "Customers" },
       { key: "/invoices", label: "Invoices" },
       { key: "/payments", label: "Payments" },
@@ -53,6 +54,7 @@ export const NAV: NavItem[] = [
     key: "purchases",
     label: "Purchases",
     children: [
+      { key: "/purchases", label: "Overview" },
       { key: "/vendors", label: "Vendors" },
       { key: "/purchase-orders", label: "Purchase Orders" },
       { key: "/bills", label: "Bills" },
@@ -62,25 +64,28 @@ export const NAV: NavItem[] = [
     ],
   },
   {
-    key: "inventory-assets",
-    label: "Inventory & Assets",
-    children: [
-      { key: "/items", label: "Products & Services" },
-      { key: "/fixed-assets", label: "Fixed Assets" },
-    ],
-  },
-  {
     key: "banking",
     label: "Banking",
     children: [
+      { key: "/banking/overview", label: "Overview" },
       { key: "/banking", label: "Bank Transactions" },
       { key: "/banking/reconcile", label: "Reconcile" },
+    ],
+  },
+  {
+    key: "inventory-assets",
+    label: "Inventory & Assets",
+    children: [
+      { key: "/inventory", label: "Overview" },
+      { key: "/items", label: "Products & Services" },
+      { key: "/fixed-assets", label: "Fixed Assets" },
     ],
   },
   {
     key: "accounting",
     label: "Accounting",
     children: [
+      { key: "/accounting", label: "Overview" },
       { key: "/accounts", label: "Chart of Accounts" },
       { key: "/journal", label: "Journal Entries" },
       { key: "/recurring", label: "Recurring Transactions" },

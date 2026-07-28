@@ -110,19 +110,41 @@ describe("NAV tree", () => {
       "/dashboard",
       "sales",
       "purchases",
-      "inventory-assets",
       "banking",
+      "inventory-assets",
       "accounting",
       "/reports",
       "/settings",
     ]);
     const sales = NAV.find((item) => item.key === "sales");
     const inventory = NAV.find((item) => item.key === "inventory-assets");
-    expect(isNavGroup(sales!) ? sales.children.map((item) => item.key) : []).toContain("/sales-tax");
+    expect(isNavGroup(sales!) ? sales.children.map((item) => item.key) : []).toEqual([
+      "/sales",
+      "/customers",
+      "/invoices",
+      "/payments",
+      "/credit-memos",
+      "/sales-tax",
+    ]);
     expect(isNavGroup(inventory!) ? inventory.children.map((item) => item.key) : []).toEqual([
+      "/inventory",
       "/items",
       "/fixed-assets",
     ]);
+  });
+
+  it("starts every operational group with its overview", () => {
+    const expected: Record<string, string> = {
+      sales: "/sales",
+      purchases: "/purchases",
+      banking: "/banking/overview",
+      "inventory-assets": "/inventory",
+      accounting: "/accounting",
+    };
+    for (const [groupKey, overviewHref] of Object.entries(expected)) {
+      const group = NAV.find((item) => item.key === groupKey);
+      expect(isNavGroup(group!) ? group.children[0]?.key : undefined).toBe(overviewHref);
+    }
   });
 });
 
