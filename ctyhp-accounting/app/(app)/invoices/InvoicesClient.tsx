@@ -17,7 +17,13 @@ import {
   Typography,
   type TableColumnsType,
 } from "antd";
-import { DeleteOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  EyeOutlined,
+  FilePdfOutlined,
+  PaperClipOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
@@ -43,7 +49,9 @@ import {
   issueInvoiceAction,
   voidInvoiceAction,
   getInvoiceLinesAction,
+  getInvoiceDocumentAction,
 } from "./actions";
+import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
 
 const STATUS: Record<InvoiceStatus, { text: string; color: string }> = {
@@ -101,6 +109,7 @@ export default function InvoicesClient({
   const [open, setOpen] = useState(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pdfId, setPdfId] = useState<string | null>(null);
   const [writeOffFor, setWriteOffFor] = useState<InvoiceWithCustomer | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
@@ -233,6 +242,20 @@ export default function InvoicesClient({
     else message.error(res.error ?? "Failed to load lines");
   }
 
+  async function downloadPdf(inv: InvoiceWithCustomer) {
+    setPdfId(inv.id);
+    try {
+      const res = await getInvoiceDocumentAction(inv.id);
+      if (!res.ok || !res.data) {
+        message.error(res.error ?? "Failed to build the invoice PDF");
+        return;
+      }
+      downloadInvoicePdf(res.data, inv.invoice_number, inv.issue_date);
+    } finally {
+      setPdfId(null);
+    }
+  }
+
   const columns: TableColumnsType<InvoiceWithCustomer> = [
     { title: "Number", dataIndex: "invoice_number", width: 120, render: (n) => n ?? <Tag>draft</Tag> },
     { title: "Customer", dataIndex: "customer_name" },
@@ -267,6 +290,12 @@ export default function InvoicesClient({
             label="View invoice lines"
             icon={<EyeOutlined />}
             onClick={() => viewInvoiceLines(r)}
+          />
+          <IconActionButton
+            label="Download PDF"
+            icon={<FilePdfOutlined />}
+            loading={pdfId === r.id}
+            onClick={() => downloadPdf(r)}
           />
           {canReadDocuments ? (
             <IconActionButton
