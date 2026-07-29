@@ -8,10 +8,15 @@ import {
   voidInvoice,
   createCustomer,
   getInvoiceLines,
+  getInvoiceDocumentSource,
   InvoicingError,
 } from "@/lib/services/invoicing";
 import type { InvoiceLineRow } from "@/lib/db/types";
 import { invoiceCreateSchema, customerCreateSchema } from "@/lib/domain/schemas";
+import {
+  buildInvoiceDocument,
+  type InvoiceDocument,
+} from "@/lib/domain/invoice-document";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -64,6 +69,24 @@ export async function getInvoiceLinesAction(id: string): Promise<ActionResult<In
     const sb = await createSupabaseServerClient();
     const lines = await getInvoiceLines(sb, id);
     return { ok: true, data: lines };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * The printable form of one invoice. Built on the server so the balance check
+ * in buildInvoiceDocument fails as a normal action error rather than inside a
+ * PDF call in the browser. Reading is not gated by canWrite: anyone who may
+ * see the invoice may print it, and RLS decides who that is.
+ */
+export async function getInvoiceDocumentAction(
+  id: string,
+): Promise<ActionResult<InvoiceDocument>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    const source = await getInvoiceDocumentSource(sb, id);
+    return { ok: true, data: buildInvoiceDocument(source) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

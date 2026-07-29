@@ -152,6 +152,15 @@ export interface CustomerRow {
   email: string | null;
   currency_code: string | null;
   is_active: boolean;
+  /** Contact and billing address (migration 0060); null on records predating it. */
+  contact_name: string | null;
+  phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
   created_at: string;
   updated_at: string;
 }

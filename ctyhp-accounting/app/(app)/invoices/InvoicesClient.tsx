@@ -165,7 +165,9 @@ export default function InvoicesClient({
     if (res.ok && res.data) {
       const c: CustomerRow = {
         id: res.data.id, name: res.data.name, email: null, currency_code: null,
-        is_active: true, created_at: "", updated_at: "",
+        is_active: true, contact_name: null, phone: null, address_line1: null,
+        address_line2: null, city: null, region: null, postal_code: null,
+        country: null, created_at: "", updated_at: "",
       };
       setLocalCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
       form.setFieldValue("customer_id", c.id);

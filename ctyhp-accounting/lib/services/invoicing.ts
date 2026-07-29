@@ -7,17 +7,40 @@ import type {
 } from "@/lib/db/types";
 import type {
   CustomerCreateInput,
+  CustomerUpdateInput,
   InvoiceCreateInput,
   PaymentCreateInput,
 } from "@/lib/domain/schemas";
+import type { InvoiceDocumentSource } from "@/lib/domain/invoice-document";
+import { getCurrentCompanySettings } from "@/lib/services/company";
 
 export class InvoicingError extends Error {}
+
+const CUSTOMER_COLS =
+  "id,name,email,currency_code,is_active,contact_name,phone,address_line1," +
+  "address_line2,city,region,postal_code,country,created_at,updated_at";
+
+/** Empty strings from a form mean "not set", which the column stores as null. */
+function contactFields(input: Omit<CustomerUpdateInput, "id">) {
+  return {
+    name: input.name,
+    email: input.email || null,
+    contact_name: input.contact_name || null,
+    phone: input.phone || null,
+    address_line1: input.address_line1 || null,
+    address_line2: input.address_line2 || null,
+    city: input.city || null,
+    region: input.region || null,
+    postal_code: input.postal_code || null,
+    country: input.country || null,
+  };
+}
 
 // --- Customers ---
 export async function listCustomers(sb: SupabaseClient): Promise<CustomerRow[]> {
   const { data, error } = await sb
     .from("acc_customer")
-    .select("id,name,email,currency_code,is_active,created_at,updated_at")
+    .select(CUSTOMER_COLS)
     .order("name");
   if (error) throw new InvoicingError(error.message);
   return (data ?? []) as unknown as CustomerRow[];
@@ -30,11 +53,29 @@ export async function createCustomer(
   const { data, error } = await sb
     .from("acc_customer")
     .insert({
-      name: input.name,
-      email: input.email || null,
+      ...contactFields(input),
       currency_code: input.currency_code || null,
     })
-    .select("id,name,email,currency_code,is_active,created_at,updated_at")
+    .select(CUSTOMER_COLS)
+    .single();
+  if (error) throw new InvoicingError(error.message);
+  return data as unknown as CustomerRow;
+}
+
+/**
+ * Update contact details. The currency is deliberately not updatable: it is
+ * baked into every document already issued to this customer.
+ */
+export async function updateCustomer(
+  sb: SupabaseClient,
+  input: CustomerUpdateInput,
+): Promise<CustomerRow> {
+  const { id, ...fields } = input;
+  const { data, error } = await sb
+    .from("acc_customer")
+    .update({ ...contactFields(fields), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select(CUSTOMER_COLS)
     .single();
   if (error) throw new InvoicingError(error.message);
   return data as unknown as CustomerRow;
@@ -99,6 +140,56 @@ export async function createDraftInvoice(
     .single();
   if (readError) throw new InvoicingError(readError.message);
   return invoice as unknown as InvoiceRow;
+}
+
+/** Everything a printable invoice needs, read in one place under the caller's RLS. */
+export async function getInvoiceDocumentSource(
+  sb: SupabaseClient,
+  invoiceId: string,
+): Promise<InvoiceDocumentSource> {
+  const [invoice, lines, company] = await Promise.all([
+    sb
+      .from("acc_invoice")
+      .select(
+        "invoice_number,issue_date,due_date,currency_code,subtotal_minor,tax_total_minor," +
+          "total_minor,balance_due_minor,status,memo,customer_id",
+      )
+      .eq("id", invoiceId)
+      .single(),
+    sb
+      .from("acc_invoice_line")
+      .select(
+        "line_order,description,quantity,unit_price_minor,line_subtotal_minor," +
+          "line_tax_minor,line_total_minor",
+      )
+      .eq("invoice_id", invoiceId)
+      .order("line_order"),
+    getCurrentCompanySettings(sb),
+  ]);
+
+  if (invoice.error) throw new InvoicingError(invoice.error.message);
+  if (lines.error) throw new InvoicingError(lines.error.message);
+  if (!company) {
+    throw new InvoicingError(
+      "Company settings are required before an invoice can be printed. Set them in Settings → Company.",
+    );
+  }
+
+  const customer = await sb
+    .from("acc_customer")
+    .select(
+      "name,email,contact_name,phone,address_line1,address_line2,city,region,postal_code,country",
+    )
+    .eq("id", (invoice.data as unknown as { customer_id: string }).customer_id)
+    .single();
+  if (customer.error) throw new InvoicingError(customer.error.message);
+
+  return {
+    invoice: invoice.data as unknown as InvoiceDocumentSource["invoice"],
+    lines: (lines.data ?? []) as unknown as InvoiceDocumentSource["lines"],
+    customer: customer.data as unknown as InvoiceDocumentSource["customer"],
+    company: company as unknown as InvoiceDocumentSource["company"],
+  };
 }
 
 export async function issueInvoice(sb: SupabaseClient, invoiceId: string): Promise<void> {
