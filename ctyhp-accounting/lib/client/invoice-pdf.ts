@@ -15,7 +15,7 @@ const MARGIN = 48;
  * string here already came from that module — this file decides placement,
  * never content.
  */
-function render(doc: InvoiceDocument): jsPDF {
+export function renderInvoicePdf(doc: InvoiceDocument): jsPDF {
   const pdf = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const rightEdge = pageWidth - MARGIN;
@@ -137,10 +137,10 @@ export function downloadInvoicePdf(
   invoiceNumber: string | null,
   issueDate: string,
 ): void {
-  render(doc).save(invoiceDocumentFileName(invoiceNumber, issueDate));
+  renderInvoicePdf(doc).save(invoiceDocumentFileName(invoiceNumber, issueDate));
 }
 
 /** Opens the browser print dialog on the rendered document. */
 export function printInvoicePdf(doc: InvoiceDocument): void {
-  render(doc).autoPrint().output("dataurlnewwindow");
+  renderInvoicePdf(doc).autoPrint().output("dataurlnewwindow");
 }
