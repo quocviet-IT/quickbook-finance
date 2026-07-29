@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { LedgerBalance } from "@/lib/domain/reports";
 
 export interface LedgerSnapshot {
   totalDebitMinor: number;
@@ -64,6 +65,30 @@ export async function readSnapshot(
     journalLineCount: count ?? 0,
     byAccount,
   };
+}
+
+/** The same rows the reports read, shaped for the pure builders in lib/domain/reports. */
+export async function readLedgerBalances(
+  sb: SupabaseClient,
+  asOf: string,
+): Promise<LedgerBalance[]> {
+  const rows = await rpc<{
+    account_id: string;
+    account_code: string;
+    name: string;
+    account_type: LedgerBalance["accountType"];
+    debit_base: number;
+    credit_base: number;
+  }>(sb, "acc_ledger_balances", { p_from: FROM, p_to: asOf });
+
+  return rows.map((row) => ({
+    accountId: row.account_id,
+    accountCode: row.account_code,
+    name: row.name,
+    accountType: row.account_type,
+    debitBase: Number(row.debit_base),
+    creditBase: Number(row.credit_base),
+  }));
 }
 
 /** Human-readable difference, used as the assertion message when a run leaves residue. */
