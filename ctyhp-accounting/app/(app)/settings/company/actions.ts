@@ -83,6 +83,7 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
       datasets,
       files,
       totals,
+      controlTotalsAsOf: asOf,
       schemaVersion,
       generatedAt,
       actorEmail: user.email ?? "unknown",

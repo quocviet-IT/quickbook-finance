@@ -120,6 +120,13 @@ export function buildManifest(input: {
   datasets: ExportDataset[];
   files: Array<{ path: string; sha256: string; rowCount: number }>;
   totals: ExportControlTotals;
+  /**
+   * The date the control totals were measured at. Balances move with the
+   * reporting date — a future-dated entry is excluded until its date arrives —
+   * so a restore must be checked at this same date or the figures will differ
+   * for a reason that has nothing to do with the restore.
+   */
+  controlTotalsAsOf: string;
   schemaVersion: string;
   generatedAt: string;
   actorEmail: string;
@@ -134,6 +141,7 @@ export function buildManifest(input: {
       containsSensitiveData: input.datasets.some((dataset) => dataset.sensitive),
       excludedTables: EXCLUDED_TABLES,
       controlTotals: input.totals,
+      controlTotalsAsOf: input.controlTotalsAsOf,
       files: input.files,
       tables: input.datasets.map((dataset) => ({
         table: dataset.table,

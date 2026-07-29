@@ -93,6 +93,7 @@ describe("buildManifest", () => {
           apTotalMinor: 1_586_500,
           journalLineCount: 120,
         },
+        controlTotalsAsOf: "2026-07-29",
         schemaVersion: "0059_company_export.sql",
         generatedAt: "2026-07-29T02:00:00.000Z",
         actorEmail: "admin@ctyhp.vn",
@@ -122,6 +123,12 @@ describe("buildManifest", () => {
 
   it("names the migration the data was written under", () => {
     expect(manifest().schemaVersion).toBe("0059_company_export.sql");
+  });
+
+  it("states the date the control totals were measured at", () => {
+    // Balances exclude future-dated entries, so a restore checked at a
+    // different date would differ for reasons unrelated to the restore.
+    expect(manifest().controlTotalsAsOf).toBe("2026-07-29");
   });
 });
 
