@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { App, Button, Card, Descriptions, Form, Input, InputNumber, Select, Space, Table } from "antd";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
+import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -115,6 +116,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
             { title: "Employer Identification Number", render: (_, r) => maskEin(r.ein_ref) },
           ]} />
       </Card>
+      <CompanyExportCard />
     </Space>
   );
 }
