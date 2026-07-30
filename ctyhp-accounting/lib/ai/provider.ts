@@ -1,4 +1,5 @@
 import "server-only";
+import { parseChatCompletion } from "./parse-completion";
 
 /**
  * The one place that talks to an AI provider.
@@ -58,13 +59,6 @@ export interface AiAnswer {
   usage: { inputTokens?: number; outputTokens?: number } | null;
 }
 
-interface ChatCompletionResponse {
-  model?: string;
-  choices?: Array<{ message?: { content?: string | null } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
-  error?: { message?: string };
-}
-
 /**
  * One question, one answer. No conversation state is kept server-side: each ask
  * carries its own system prompt, so an answer can never be shaped by another
@@ -108,28 +102,22 @@ export async function askProvider(input: {
     );
   }
 
-  const body = (await response.json().catch(() => null)) as ChatCompletionResponse | null;
+  const parsed = parseChatCompletion(await response.json().catch(() => null));
   if (!response.ok) {
-    // Never surface the provider's raw body: it can echo the request, and the
-    // request carries the company's own guides.
+    // The provider's own wording is the useful part (a bad key, a model the key
+    // cannot use); the request body is not echoed back, because it carries the
+    // company's own guides.
     throw new AiProviderError(
-      body?.error?.message
-        ? `The model refused the request (${response.status}).`
+      parsed.providerMessage
+        ? `The model rejected the request (${response.status}): ${parsed.providerMessage}`
         : `The model returned ${response.status}.`,
     );
   }
-
-  const text = body?.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new AiProviderError("The model returned an empty answer.");
+  if (!parsed.text) throw new AiProviderError("The model returned an empty answer.");
 
   return {
-    text,
-    model: body?.model ?? config.model,
-    usage: body?.usage
-      ? {
-          inputTokens: body.usage.prompt_tokens,
-          outputTokens: body.usage.completion_tokens,
-        }
-      : null,
+    text: parsed.text,
+    model: parsed.model ?? config.model,
+    usage: parsed.usage,
   };
 }

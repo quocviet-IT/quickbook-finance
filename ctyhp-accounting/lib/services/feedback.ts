@@ -12,8 +12,8 @@ const SCREENSHOT_BUCKET = "feedback-screenshots";
 
 const COLS =
   "id,kind,description,status,page_url,page_route,page_title,viewport_width," +
-  "viewport_height,screenshot_path,reporter_id,triaged_by,triaged_at,triage_note," +
-  "created_at,updated_at";
+  "viewport_height,screenshot_path,reporter_id,reporter_email,triaged_by," +
+  "triaged_at,triage_note,created_at,updated_at";
 
 interface FeedbackRow {
   id: string;
@@ -27,6 +27,7 @@ interface FeedbackRow {
   viewport_height: number;
   screenshot_path: string | null;
   reporter_id: string | null;
+  reporter_email: string | null;
   triaged_by: string | null;
   triaged_at: string | null;
   triage_note: string | null;
@@ -41,7 +42,7 @@ export interface FeedbackReportView extends FeedbackReport {
   triageNote: string | null;
 }
 
-function toView(row: FeedbackRow, reporterEmail: string | null): FeedbackReportView {
+function toView(row: FeedbackRow): FeedbackReportView {
   return {
     id: row.id,
     kind: row.kind,
@@ -53,7 +54,7 @@ function toView(row: FeedbackRow, reporterEmail: string | null): FeedbackReportV
       title: row.page_title,
       viewport: { width: row.viewport_width, height: row.viewport_height },
     },
-    reporter: { email: reporterEmail, role: null },
+    reporter: { email: row.reporter_email, role: null },
     screenshot: row.screenshot_path,
     createdAt: row.created_at,
     reporterId: row.reporter_id,
@@ -149,24 +150,9 @@ export async function listFeedbackReports(
     .order("created_at", { ascending: false });
   if (error) throw new FeedbackError(error.message);
 
-  const rows = (data ?? []) as unknown as FeedbackRow[];
-  const emails = await reporterEmails(sb, rows);
-  return rows.map((row) => toView(row, emails.get(row.reporter_id ?? "") ?? null));
-}
-
-/** Reporter emails come from the app user table; auth.users is not readable. */
-async function reporterEmails(
-  sb: SupabaseClient,
-  rows: readonly FeedbackRow[],
-): Promise<Map<string, string>> {
-  const ids = [...new Set(rows.map((r) => r.reporter_id).filter(Boolean))] as string[];
-  if (!ids.length) return new Map();
-  const { data } = await sb.from("acc_app_user").select("id,email").in("id", ids);
-  return new Map(
-    ((data ?? []) as Array<{ id: string; email: string | null }>)
-      .filter((row) => row.email)
-      .map((row) => [row.id, row.email as string]),
-  );
+  // reporter_email is stamped onto the row by a trigger at insert time, so the
+  // queue names the reporter without needing auth.users or an admin-only RPC.
+  return ((data ?? []) as unknown as FeedbackRow[]).map(toView);
 }
 
 export async function setFeedbackStatus(
