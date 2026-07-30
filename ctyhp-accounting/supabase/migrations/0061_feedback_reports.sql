@@ -5,10 +5,19 @@
 -- screenshot are immutable. Only the triage status moves, and only through
 -- acc_set_feedback_status, which audits every move.
 
-create type acc_feedback_kind as enum ('broken', 'suggestion');
-create type acc_feedback_status as enum ('new', 'reviewing', 'resolved', 'declined');
+-- Idempotent: this file must be safe to re-run (the SQL Editor does not wrap a
+-- script in one transaction, so a half-applied run must be recoverable).
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'acc_feedback_kind') then
+    create type acc_feedback_kind as enum ('broken', 'suggestion');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'acc_feedback_status') then
+    create type acc_feedback_status as enum ('new', 'reviewing', 'resolved', 'declined');
+  end if;
+end $$;
 
-create table acc_feedback_report (
+create table if not exists acc_feedback_report (
   id              uuid primary key default gen_random_uuid(),
   kind            acc_feedback_kind not null,
   description     text check (description is null or length(description) <= 4000),
@@ -28,8 +37,8 @@ create table acc_feedback_report (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
-create index acc_feedback_report_status_idx on acc_feedback_report (status, created_at desc);
-create index acc_feedback_report_reporter_idx on acc_feedback_report (reporter_id);
+create index if not exists acc_feedback_report_status_idx on acc_feedback_report (status, created_at desc);
+create index if not exists acc_feedback_report_reporter_idx on acc_feedback_report (reporter_id);
 
 -- ----------------------------------------------------------------------------
 -- Permissions. During the test period every role may read the queue so testers
@@ -76,11 +85,13 @@ begin
 end;
 $$;
 
+drop trigger if exists acc_feedback_report_immutable on acc_feedback_report;
 create trigger acc_feedback_report_immutable
   before update on acc_feedback_report
   for each row execute function acc_block_feedback_edit();
 
 -- Master-data style atomic auditing, same function the 0058 triggers use.
+drop trigger if exists acc_feedback_report_atomic_audit on acc_feedback_report;
 create trigger acc_feedback_report_atomic_audit
   after insert or update or delete on acc_feedback_report
   for each row execute function acc_audit_row_change();
@@ -89,10 +100,12 @@ alter table acc_feedback_report enable row level security;
 
 -- Filing is open to anyone signed in: a tester who cannot report a bug will
 -- simply not report it. The row records who filed it.
+drop policy if exists acc_feedback_report_insert on acc_feedback_report;
 create policy acc_feedback_report_insert on acc_feedback_report
   for insert to authenticated
   with check (reporter_id = auth.uid() and status = 'new');
 
+drop policy if exists acc_feedback_report_read on acc_feedback_report;
 create policy acc_feedback_report_read on acc_feedback_report
   for select to authenticated
   using (acc_has_permission('feedback.read') or reporter_id = auth.uid());
@@ -173,6 +186,7 @@ set public = false,
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists acc_feedback_object_insert on storage.objects;
 create policy acc_feedback_object_insert on storage.objects
   for insert to authenticated
   with check (
@@ -182,6 +196,7 @@ create policy acc_feedback_object_insert on storage.objects
 
 -- A screenshot of an accounting page can show customer names and amounts, so
 -- reading one needs the same permission as reading the queue.
+drop policy if exists acc_feedback_object_read on storage.objects;
 create policy acc_feedback_object_read on storage.objects
   for select to authenticated
   using (
