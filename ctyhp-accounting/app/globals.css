@@ -3120,15 +3120,15 @@ body {
 
 /* Floating feedback launcher — present on every page, excluded from the
    screenshot the report dialog captures. */
-.feedback-launcher {
+.assistant-launcher {
   position: fixed;
   right: 20px;
   bottom: 20px;
   z-index: 1200;
 }
-.feedback-launcher .ant-btn {
+.assistant-launcher .ant-btn {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
 }
 @media print {
-  .feedback-launcher { display: none; }
+  .assistant-launcher { display: none; }
 }

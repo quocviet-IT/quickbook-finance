@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "@/lib/domain/feedback";
 import type { FeedbackKind, FeedbackStatus } from "@/lib/domain/feedback";
 import {
@@ -37,12 +38,18 @@ export async function fileFeedbackReportAction(
   }
   try {
     const sb = await createSupabaseServerClient();
-    const result = await fileFeedbackReport(sb, {
-      kind: parsed.data.kind as FeedbackKind,
-      description: parsed.data.description || null,
-      page: parsed.data.page,
-      screenshotBase64: parsed.data.screenshot_base64 || null,
-    });
+    // The reporter's own client inserts the row; the screenshot link is a
+    // server-side write, because the table deliberately has no update policy.
+    const result = await fileFeedbackReport(
+      sb,
+      {
+        kind: parsed.data.kind as FeedbackKind,
+        description: parsed.data.description || null,
+        page: parsed.data.page,
+        screenshotBase64: parsed.data.screenshot_base64 || null,
+      },
+      parsed.data.screenshot_base64 ? createSupabaseAutomationClient() : undefined,
+    );
     revalidatePath("/settings/feedback");
     return { ok: true, data: result };
   } catch (err) {

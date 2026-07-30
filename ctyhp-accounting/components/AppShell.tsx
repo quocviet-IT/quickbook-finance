@@ -42,7 +42,7 @@ import {
 } from "@/lib/domain/navigation";
 import GlobalSearch from "./GlobalSearch";
 import NewMenu from "./NewMenu";
-import FeedbackLauncher from "./feedback/FeedbackLauncher";
+import AssistantLauncher from "./assistant/AssistantLauncher";
 
 const { Header, Sider, Content } = Layout;
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "ctyhp-accounting:sidebar-collapsed";
@@ -447,7 +447,7 @@ export default function AppShell({
           <div className="app-shell__content-inner">{children}</div>
         </Content>
       </Layout>
-      <FeedbackLauncher />
+      <AssistantLauncher />
     </Layout>
   );
 }

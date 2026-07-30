@@ -81,6 +81,13 @@ export interface FileFeedbackInput {
 export async function fileFeedbackReport(
   sb: SupabaseClient,
   input: FileFeedbackInput,
+  /**
+   * Client used for the one-time screenshot link. The table has no update
+   * policy on purpose — a reporter must not be able to touch a filed row — so
+   * linking runs server-side with the service role. Omit it and the report is
+   * filed without its picture.
+   */
+  linker?: SupabaseClient,
 ): Promise<{ id: string; screenshotStored: boolean }> {
   const {
     data: { user },
@@ -104,7 +111,9 @@ export async function fileFeedbackReport(
   if (error) throw new FeedbackError(error.message);
 
   const reportId = (data as { id: string }).id;
-  if (!input.screenshotBase64) return { id: reportId, screenshotStored: false };
+  if (!input.screenshotBase64 || !linker) {
+    return { id: reportId, screenshotStored: false };
+  }
 
   const path = `${reportId}/${crypto.randomUUID()}.png`;
   const bytes = Buffer.from(input.screenshotBase64, "base64");
@@ -116,11 +125,19 @@ export async function fileFeedbackReport(
     return { id: reportId, screenshotStored: false };
   }
 
-  const linked = await sb
+  // Count the affected rows: without an update policy a client write reports no
+  // error and changes nothing, which is how the first version silently filed
+  // reports whose stored screenshot was never referenced.
+  const linked = await linker
     .from("acc_feedback_report")
     .update({ screenshot_path: path })
-    .eq("id", reportId);
-  return { id: reportId, screenshotStored: !linked.error };
+    .eq("id", reportId)
+    .select("id");
+  const stored = !linked.error && (linked.data ?? []).length === 1;
+  if (!stored) {
+    await linker.storage.from(SCREENSHOT_BUCKET).remove([path]);
+  }
+  return { id: reportId, screenshotStored: stored };
 }
 
 export async function listFeedbackReports(
