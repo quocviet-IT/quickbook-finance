@@ -89,7 +89,7 @@ export function plaidConfiguration() {
   return {
     configured: clientId.length > 8 && secret.length > 8,
     environment: env,
-    clientName: process.env.PLAID_CLIENT_NAME?.trim() || "CTYHP Accounting",
+    clientName: process.env.PLAID_CLIENT_NAME?.trim() || "One Book",
   };
 }
 

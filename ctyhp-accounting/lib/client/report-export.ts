@@ -140,7 +140,7 @@ function xlsxFiles(sheet: ReportExportSheet): Record<string, Uint8Array> {
   <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>
 </cp:coreProperties>`,
     "docProps/app.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>CTYHP Accounting</Application></Properties>`,
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>One Book</Application></Properties>`,
   };
   return Object.fromEntries(Object.entries(files).map(([path, value]) => [path, strToU8(value)]));
 }

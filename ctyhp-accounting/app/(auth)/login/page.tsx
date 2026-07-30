@@ -42,7 +42,7 @@ export default function LoginPage() {
     >
       <Card style={{ width: 380 }}>
         <Typography.Title level={3} style={{ textAlign: "center", marginBottom: 4 }}>
-          CTYHP Accounting
+          One Book
         </Typography.Title>
         <Typography.Paragraph type="secondary" style={{ textAlign: "center" }}>
           Sign in to continue

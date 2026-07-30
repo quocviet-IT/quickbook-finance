@@ -1,4 +1,10 @@
-# CTYHP Accounting — AI working rulebook
+# One Book — AI working rulebook
+
+The product is called **One Book** in everything a user sees. `ctyhp-accounting`
+survives as the repository folder, package name and Vercel project — renaming
+those would change the deployment URL, so it was deliberately left alone. CTYHP
+also remains the *company* whose books these are; do not rewrite company or
+customer names.
 
 @AGENTS.md
 

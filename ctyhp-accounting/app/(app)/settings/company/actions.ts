@@ -92,7 +92,7 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
     entries["manifest.json"] = strToU8(manifest);
     entries["README.txt"] = strToU8(
       [
-        "CTYHP Accounting — company data export",
+        "One Book — company data export",
         "",
         `Generated ${generatedAt} under schema ${schemaVersion}.`,
         "",

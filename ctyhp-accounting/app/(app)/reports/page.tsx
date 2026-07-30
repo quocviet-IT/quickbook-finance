@@ -54,7 +54,9 @@ export default async function ReportsPage({
         initialReportType={requestedReport}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
-        companyName={company?.legal_name ?? "CTYHP Accounting"}
+        // A report header names the business, not the software. If settings are
+        // missing, say so rather than printing the product name as the company.
+        companyName={company?.legal_name ?? "Company name not set"}
         fiscalStartMonth={company?.fiscal_year_start_month ?? 1}
         canManageBudget={canManageBudget}
       />
