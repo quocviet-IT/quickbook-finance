@@ -3117,3 +3117,18 @@ body {
     gap: 4px;
   }
 }
+
+/* Floating feedback launcher — present on every page, excluded from the
+   screenshot the report dialog captures. */
+.assistant-launcher {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1200;
+}
+.assistant-launcher .ant-btn {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+}
+@media print {
+  .assistant-launcher { display: none; }
+}
