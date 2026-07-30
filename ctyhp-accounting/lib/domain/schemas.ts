@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { USD_CURRENCY_CODE } from "./currency";
+import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "./feedback";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
 export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
@@ -633,3 +634,35 @@ export const taxYearSchema = z.object({
   year: z.number().int().min(2000, "Enter a four-digit tax year").max(2100, "Enter a four-digit tax year"),
 });
 export type TaxYearInput = z.infer<typeof taxYearSchema>;
+
+// --- Feedback (bug reports and suggestions) ---
+export const feedbackPageContextSchema = z.object({
+  url: z.string().trim().min(1).max(2000),
+  route: z.string().trim().min(1).max(300),
+  title: z.string().trim().max(300).default(""),
+  viewport: z.object({
+    width: z.number().int().positive().max(20000),
+    height: z.number().int().positive().max(20000),
+  }),
+});
+
+export const feedbackReportSchema = z.object({
+  kind: z.enum(FEEDBACK_KINDS),
+  description: z.string().trim().max(4000).optional().or(z.literal("")).nullable(),
+  page: feedbackPageContextSchema,
+  /** Base64 PNG without the data-URL prefix; ~5 MB cap matches the bucket. */
+  screenshot_base64: z
+    .string()
+    .max(7_000_000, "The screenshot is too large to send")
+    .optional()
+    .or(z.literal(""))
+    .nullable(),
+});
+export type FeedbackReportInput = z.infer<typeof feedbackReportSchema>;
+
+export const feedbackStatusChangeSchema = z.object({
+  report_id: z.uuid("Select a report"),
+  status: z.enum(FEEDBACK_STATUSES),
+  note: z.string().trim().max(2000).optional().or(z.literal("")).nullable(),
+});
+export type FeedbackStatusChangeInput = z.infer<typeof feedbackStatusChangeSchema>;

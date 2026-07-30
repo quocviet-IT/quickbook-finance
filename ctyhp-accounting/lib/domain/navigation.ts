@@ -226,6 +226,11 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         title: "Audit history",
         description: "Who changed what, when, and the before and after values.",
       },
+      {
+        href: "/settings/feedback",
+        title: "Feedback triage",
+        description: "Bug reports and suggestions filed by staff, with screenshots.",
+      },
     ],
   },
   {
