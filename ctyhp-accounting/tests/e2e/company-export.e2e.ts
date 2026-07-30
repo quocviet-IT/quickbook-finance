@@ -168,11 +168,9 @@ describe("company data export over HTTPS", () => {
       expect(rejected, "a summary carrying data must be refused").not.toBeNull();
 
       expect(exportFileName("CTYHP", generatedAt)).toMatch(/^ctyhp-company-export-\d{4}-\d{2}-\d{2}\.zip$/);
-      // eslint-disable-next-line no-console
       console.info(
         `export: ${datasets.length} tables, ${totalRows} rows, ${(zip.length / 1024).toFixed(1)} KiB, manifest ${manifestSha256.slice(0, 12)}…`,
       );
-      // eslint-disable-next-line no-console
       console.info(`control totals: ${JSON.stringify(parsed.controlTotals)}`);
     } finally {
       await closeE2eSession(sb);

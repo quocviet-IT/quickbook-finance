@@ -3132,3 +3132,23 @@ body {
 @media print {
   .assistant-launcher { display: none; }
 }
+
+/* System guide steps: numbered, with the control name beside each step. */
+.system-guide__steps {
+  margin: 0;
+  padding-left: 20px;
+}
+.system-guide__steps > li + li {
+  margin-top: 14px;
+}
+.system-guide__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.system-guide__note {
+  margin: 6px 0 0;
+  font-size: 12px;
+}

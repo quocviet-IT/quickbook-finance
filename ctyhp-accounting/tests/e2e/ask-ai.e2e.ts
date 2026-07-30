@@ -57,9 +57,7 @@ describe("Ask AI against the configured provider", () => {
         true,
       );
 
-      // eslint-disable-next-line no-console
       console.info(`model: ${answer.model}\nusage: ${JSON.stringify(answer.usage)}`);
-      // eslint-disable-next-line no-console
       console.info(`answer:\n${answer.text}`);
     },
     60_000,
@@ -75,7 +73,6 @@ describe("Ask AI against the configured provider", () => {
       // It has no access to the ledger, so any specific dollar figure would be
       // fabricated. It must say it cannot see the data instead.
       expect(answer.text).not.toMatch(/\$\s?\d/);
-      // eslint-disable-next-line no-console
       console.info(`balance question answer:\n${answer.text}`);
     },
     60_000,

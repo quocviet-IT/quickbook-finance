@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import { Button, Space, Tooltip } from "antd";
-import { MessageOutlined, QuestionCircleOutlined } from "@ant-design/icons";
+import {
+  BookOutlined,
+  MessageOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
 import AskAiPanel from "@/components/ai/AskAiPanel";
 import ReportDialog from "@/components/feedback/ReportDialog";
+import SystemGuideDrawer from "@/components/guide/SystemGuideDrawer";
 
 /**
  * The floating help controls, present on every page: ask the assistant, or
@@ -14,11 +19,13 @@ import ReportDialog from "@/components/feedback/ReportDialog";
 export default function AssistantLauncher() {
   const [askOpen, setAskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   return (
     <>
       <div className="assistant-launcher" data-feedback-chrome="true">
-        <Space size="small">
+        <Space direction="vertical" size="small" align="end">
+          <Space size="small">
           <Tooltip title="Report a problem or suggest an improvement" placement="top">
             <Button
               shape="round"
@@ -40,6 +47,17 @@ export default function AssistantLauncher() {
               Ask AI
             </Button>
           </Tooltip>
+          </Space>
+          <Tooltip title="How each workflow runs, and which button does what" placement="top">
+            <Button
+              shape="round"
+              icon={<BookOutlined />}
+              onClick={() => setGuideOpen(true)}
+              aria-label="System guide"
+            >
+              Guide
+            </Button>
+          </Tooltip>
         </Space>
       </div>
 
@@ -54,6 +72,7 @@ export default function AssistantLauncher() {
         }}
       />
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
+      <SystemGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
     </>
   );
 }
