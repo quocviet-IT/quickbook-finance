@@ -35,12 +35,29 @@ export type AccountUpdateInput = z.infer<typeof accountUpdateSchema>;
 export const accountStatusSchema = z.enum(ACCOUNT_STATUSES);
 
 // --- Customers ---
+/** Optional free-text contact field: empty string and null both mean "not set". */
+const contactText = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal("")).nullable();
+
 export const customerCreateSchema = z.object({
   name: z.string().trim().min(1, "Customer name is required").max(160),
   email: z.email("Enter a valid email").optional().or(z.literal("")).nullable(),
   currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
+  contact_name: contactText(160),
+  phone: contactText(40),
+  address_line1: contactText(160),
+  address_line2: contactText(160),
+  city: contactText(80),
+  region: contactText(80),
+  postal_code: contactText(20),
+  country: contactText(80),
 });
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
+
+export const customerUpdateSchema = customerCreateSchema
+  .omit({ currency_code: true })
+  .extend({ id: z.uuid("Select a customer") });
+export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
 
 // --- Invoices ---
 export const invoiceLineInputSchema = z.object({

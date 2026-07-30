@@ -33,7 +33,7 @@ export default async function FixedAssetReportPage() {
       <FixedAssetReportClient
         assets={assets}
         depreciation={depreciation}
-        companyName={company?.legal_name ?? company?.dba_name ?? "CTYHP Accounting"}
+        companyName={company?.legal_name ?? company?.dba_name ?? "Company name not set"}
         currencyCode={currency?.code ?? "USD"}
         currencyDecimals={currency?.decimal_places ?? 2}
       />

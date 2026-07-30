@@ -454,16 +454,16 @@ function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <Link
       href="/dashboard"
-      aria-label="CTYHP Accounting dashboard"
+      aria-label="One Book dashboard"
       className={`app-shell__brand${collapsed ? " app-shell__brand--collapsed" : ""}`}
     >
       <span className="app-shell__brand-mark" aria-hidden="true">
-        CT
+        1B
       </span>
       {!collapsed && (
         <span className="app-shell__brand-copy">
           <Typography.Text strong className="app-shell__brand-name">
-            CTYHP Accounting
+            One Book
           </Typography.Text>
           <span className="app-shell__brand-subtitle">Jewelry operations</span>
         </span>

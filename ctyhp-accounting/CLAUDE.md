@@ -1,4 +1,10 @@
-# CTYHP Accounting — AI working rulebook
+# One Book — AI working rulebook
+
+The product is called **One Book** in everything a user sees. `ctyhp-accounting`
+survives as the repository folder, package name and Vercel project — renaming
+those would change the deployment URL, so it was deliberately left alone. CTYHP
+also remains the *company* whose books these are; do not rewrite company or
+customer names.
 
 @AGENTS.md
 
@@ -30,6 +36,7 @@ contract required by its Part 05.
 - Postgres enums: you cannot `ALTER TYPE ... ADD VALUE` and then use the new value in the same transaction/migration. Add the value in one migration, use it in the next.
 - Money is minor units end-to-end; only convert to decimal at the UI edge using the currency's `decimal_places`.
 - US market: purchase-side tax is part of expense cost — no recoverable input tax, no separate tax line on bills/expenses.
+- Running `npm run build` and then `npm run dev` over the same `.next` makes every *nested* route (`/reports/*`, `/settings/*`, `/banking/overview`) return 404 in dev while single-segment routes still work. It looks exactly like a routing regression and is not one. Delete `.next` before starting the dev server for `scripts/smoke-pages.mjs`.
 - Voiding does not post a counter-entry: `acc_void_invoice` flips the entry to `status = 'void'` and reports read `posted` entries only. So a voided document leaves its lines in `acc_journal_line` forever — never assert that a test run returns the journal *row count* to its opening value, only the reported figures.
 - The end-to-end test consumes invoice numbers. Numbers are never reused after posting or voiding, so each run leaves a gap in the sequence. That is correct behaviour, not a defect.
 - A Server Component must not read an Ant Design *sub*-component (`Typography.Title`, `Form.Item`, `Input.TextArea`, …). antd ships `"use client"`, so the server gets client-reference proxies and reading a static property off one throws at render time. Plain components (`Button`, `Card`, `Alert`, `Row`) are fine. Put the markup in a `"use client"` component and keep `page.tsx` a thin server wrapper. Guarded by `tests/unit/rsc-antd.test.ts`.

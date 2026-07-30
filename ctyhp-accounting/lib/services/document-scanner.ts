@@ -106,7 +106,7 @@ export async function scanDocumentAttachment(
         sb,
         attachment.id,
         "blocked",
-        "CTYHP integrity verifier",
+        "One Book integrity verifier",
         "Stored file integrity mismatch",
       );
     }

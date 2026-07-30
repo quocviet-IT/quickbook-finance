@@ -4,8 +4,8 @@ import Providers from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CTYHP Accounting",
-  description: "CTYHP accounting operations webapp",
+  title: "One Book",
+  description: "One Book accounting operations webapp",
 };
 
 export default function RootLayout({
