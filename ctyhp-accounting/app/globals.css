@@ -363,6 +363,9 @@ body {
 .app-shell__content {
   margin: 24px;
   min-width: 0;
+  /* The floating help cluster is fixed over this corner. Without room to scroll
+     past it, the last row of a table, its totals and its pager sit underneath. */
+  padding-bottom: 96px;
 }
 
 .app-shell__content:focus {
@@ -3128,6 +3131,16 @@ body {
 }
 .assistant-launcher .ant-btn {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+}
+/* The collapse handle is chrome for the chrome: visible on hover or focus,
+   faint otherwise, so it never competes with the buttons it hides. */
+.assistant-launcher .ant-btn-sm {
+  opacity: 0.55;
+  transition: opacity 0.15s ease-in-out;
+}
+.assistant-launcher:hover .ant-btn-sm,
+.assistant-launcher .ant-btn-sm:focus-visible {
+  opacity: 1;
 }
 @media print {
   .assistant-launcher { display: none; }

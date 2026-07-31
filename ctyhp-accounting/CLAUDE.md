@@ -24,7 +24,7 @@ contract required by its Part 05.
   ```
   npm run build          # ~47s
   npm start              # serves the build
-  node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000   # 48 pages, ~78s
+  node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000   # 48 pages, ~16s
   ```
   A dev server compiles each route on its first request (30–100s *per page*), which turns this into half an hour. While iterating, check one screen with `--only=invoices,sales-tax` (leading slash optional — Git Bash rewrites `/invoices` into a Windows path); run the full sweep before committing. Against a dev server add `--concurrency=1`.
 - Posting logic: `npm run test:e2e:document-ledger-report` runs over HTTPS as a signed-in administrator, so it works from networks where the Postgres port is blocked. It writes to the real database and asserts every reported figure returns to its opening value; a failure naming a moved figure means the run left residue — clear it with `scripts/cleanup-test-ledger.mjs`.

@@ -323,6 +323,49 @@ has to sign in as a real user to render a page.
 | Renaming the database functions `acc_ar_ageing` / `acc_ap_ageing` | **Left as they are.** Renaming a live SECURITY DEFINER function means dropping and recreating it while reports read from it, for a name no user ever sees. The ten call sites keep the database's spelling; everything above them uses the product's. |
 | The QuickBooks manual in `QUICKBOOK_USER_MANUAL/` | **Left as it is.** It documents QuickBooks, where those screens really are labelled "Ageing" in some locales. Rewriting it would misquote the product it describes. |
 
+### Issue #5 — The floating help buttons cover the numbers
+
+Raised directly by the tester with a screenshot: Report, Ask AI and Guide float
+over the bottom-right corner of every page, which is exactly where a list puts
+its last rows, its record count and its pager. In the screenshot they sit on
+top of "12 records" and the page selector.
+
+#### What was implemented
+
+- **A collapse handle.** A small chevron above the cluster hides it down to one
+  round button; that button brings it back. The handle is faint until the
+  pointer is over the cluster or it takes keyboard focus, so it does not become
+  a fourth thing competing for attention.
+- **The choice sticks.** It is stored in `localStorage` and read through
+  `useSyncExternalStore`, so a collapsed cluster stays collapsed across
+  navigation, reloads and other tabs. A toggle that reset on every page change
+  would not have solved anything. The server renders it expanded and React
+  swaps in the stored state on hydration — no mismatch.
+- **Room to scroll past it.** The page content now reserves 96px at the bottom,
+  so even expanded the cluster no longer overlaps the last row, the totals or
+  the pager; they scroll clear of it.
+- `tests/unit/launcher-preferences.test.ts`: 5 tests, including the two cases
+  that would otherwise bite — no `window` on the server, and a browser where
+  `localStorage` throws (private mode), where the launcher must still work and
+  simply forget.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 49 files, 429 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 48 of 48 pages rendered, in 16s on the built server |
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Hide the cluster automatically while scrolling | **Not built.** A control that disappears on its own is harder to trust than one the user closed on purpose, and it would fight the collapse the user already chose. |
+| Let each page decide where the cluster sits | **Not built.** Help that moves between screens is help nobody can find. One position, one collapse. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
