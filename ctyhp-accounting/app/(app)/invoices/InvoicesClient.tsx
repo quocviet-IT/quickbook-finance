@@ -32,6 +32,8 @@ import AttachmentDrawer, {
 } from "@/components/documents/AttachmentDrawer";
 import type {
   AccountRow,
+  ActorRow,
+  AuditEntryRow,
   CurrencyRow,
   TaxCodeRow,
   CustomerRow,
@@ -43,12 +45,15 @@ import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
+import { documentAttribution, formatAuditTimestamp } from "@/lib/domain/audit";
+import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
 import {
   createInvoiceAction,
   createCustomerAction,
   issueInvoiceAction,
   voidInvoiceAction,
   getInvoiceLinesAction,
+  getInvoiceAuditAction,
   getInvoiceDocumentAction,
 } from "./actions";
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
@@ -85,6 +90,8 @@ export default function InvoicesClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
+  canReadAudit,
+  actors,
   scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
@@ -101,6 +108,9 @@ export default function InvoicesClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
+  /** Gates the change history block; the RPC behind it refuses the call anyway. */
+  canReadAudit: boolean;
+  actors: ActorRow[];
   scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
@@ -122,6 +132,13 @@ export default function InvoicesClient({
   const [linesOpen, setLinesOpen] = useState(false);
   const [viewLines, setViewLines] = useState<InvoiceLineRow[]>([]);
   const [viewInvoice, setViewInvoice] = useState<InvoiceWithCustomer | null>(null);
+  const [viewAudit, setViewAudit] = useState<AuditEntryRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const directory = useMemo(
+    () => new Map(actors.map((a) => [a.id, a.email || a.full_name])),
+    [actors],
+  );
 
   const baseCurrency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
@@ -236,10 +253,17 @@ export default function InvoicesClient({
   async function viewInvoiceLines(inv: InvoiceWithCustomer) {
     setViewInvoice(inv);
     setViewLines([]);
+    setViewAudit([]);
     setLinesOpen(true);
     const res = await getInvoiceLinesAction(inv.id);
     if (res.ok && res.data) setViewLines(res.data);
     else message.error(res.error ?? "Failed to load lines");
+    if (!canReadAudit) return;
+    setAuditLoading(true);
+    const trail = await getInvoiceAuditAction(inv.id);
+    setAuditLoading(false);
+    if (trail.ok && trail.data) setViewAudit(trail.data);
+    else message.error(trail.error ?? "Failed to load the change history");
   }
 
   async function downloadPdf(inv: InvoiceWithCustomer) {
@@ -279,6 +303,25 @@ export default function InvoicesClient({
       dataIndex: "status",
       width: 130,
       render: (s: InvoiceStatus) => <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>,
+    },
+    {
+      // Who made this invoice and when, on the row itself: the first question an
+      // auditor asks of a document, and one it should not take a click to answer.
+      title: "Created",
+      dataIndex: "created_at",
+      width: 180,
+      render: (_: string, r) => {
+        const attribution = documentAttribution(r, directory);
+        return (
+          <div>
+            <div>{formatAuditTimestamp(attribution.createdAt).slice(0, 16)}</div>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {attribution.createdBy}
+              {attribution.modifiedAt ? " · edited" : ""}
+            </Typography.Text>
+          </div>
+        );
+      },
     },
     {
       title: "Actions",
@@ -524,8 +567,18 @@ export default function InvoicesClient({
         open={linesOpen}
         onCancel={() => setLinesOpen(false)}
         footer={null}
-        width={720}
+        width={820}
       >
+        {viewInvoice ? (
+          <DocumentAuditTrail
+            record={viewInvoice}
+            directory={directory}
+            entries={viewAudit}
+            loading={auditLoading}
+            canReadAudit={canReadAudit}
+          />
+        ) : null}
+
         <Table<InvoiceLineRow>
           rowKey="id"
           size="small"

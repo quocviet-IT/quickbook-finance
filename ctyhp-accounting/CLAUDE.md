@@ -30,6 +30,7 @@ contract required by its Part 05.
 - Pure accounting rules: `lib/domain/` (`posting.ts`, `money.ts`, `accounts.ts`, `reports.ts`, `reconciliation.ts`).
 - Financial writes: `lib/services/*` → atomic Postgres RPC (`supabase/migrations/*`). No SQL in components.
 - Input validation: Zod in `lib/domain/schemas.ts`. Server Actions in `app/(app)/*/actions.ts` guard by role.
+- `created_by`/`created_at`/`updated_by`/`updated_at` on a transaction table are written by the `acc_stamp_actor()` trigger (migration 0064). Never set them from application code, and never assume an update can change the creation stamps — the trigger puts them back.
 - DO NOT re-implement a posting/money/tax rule anywhere else (Part 14).
 
 ## 4. Gotchas / past mistakes (append when a bug recurs)

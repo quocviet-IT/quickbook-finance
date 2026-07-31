@@ -4,7 +4,7 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
-import { hasPermission } from "@/lib/services/access";
+import { hasPermission, listActors } from "@/lib/services/access";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
@@ -39,6 +39,8 @@ export default async function InvoicesPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    canReadAudit,
+    actors,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -50,6 +52,8 @@ export default async function InvoicesPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    hasPermission(sb, "audit.read"),
+    listActors(sb),
   ]);
 
   const incomeAccounts = accounts.filter(
@@ -85,6 +89,8 @@ export default async function InvoicesPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
+        canReadAudit={canReadAudit}
+        actors={actors}
         scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>

@@ -92,7 +92,7 @@ export async function listInvoices(sb: SupabaseClient): Promise<InvoiceWithCusto
     .select(
       "id,invoice_number,customer_id,issue_date,due_date,currency_code,subtotal_minor," +
         "tax_total_minor,total_minor,balance_due_minor,status,order_id,journal_entry_id," +
-        "memo,created_at,updated_at,acc_customer(name)",
+        "memo,created_by,updated_by,created_at,updated_at,acc_customer(name)",
     )
     .order("created_at", { ascending: false });
   if (error) throw new InvoicingError(error.message);

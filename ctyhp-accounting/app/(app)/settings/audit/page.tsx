@@ -1,4 +1,6 @@
 import PageHeader from "@/components/PageHeader";
+import { createSupabaseServerClient } from "@/lib/db/server";
+import { listActors } from "@/lib/services/access";
 import AuditClient from "./AuditClient";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +37,15 @@ const AUDITED_TABLES = [
 ];
 
 export default async function AuditPage() {
+  const sb = await createSupabaseServerClient();
+  const actors = await listActors(sb);
   return (
     <div>
       <PageHeader
         title="Audit History"
-        description="Who changed what, when, and what it looked like before and after."
+        description="Who changed what, when, and what it looked like before and after. Filter by user, table, action, and date range, then export the result as one row per changed field."
       />
-      <AuditClient tables={AUDITED_TABLES} />
+      <AuditClient tables={AUDITED_TABLES} actors={actors} />
     </div>
   );
 }

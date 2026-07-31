@@ -11,7 +11,8 @@ import {
   getInvoiceDocumentSource,
   InvoicingError,
 } from "@/lib/services/invoicing";
-import type { InvoiceLineRow } from "@/lib/db/types";
+import { searchAudit } from "@/lib/services/access";
+import type { AuditEntryRow, InvoiceLineRow } from "@/lib/db/types";
 import { invoiceCreateSchema, customerCreateSchema } from "@/lib/domain/schemas";
 import {
   buildInvoiceDocument,
@@ -69,6 +70,29 @@ export async function getInvoiceLinesAction(id: string): Promise<ActionResult<In
     const sb = await createSupabaseServerClient();
     const lines = await getInvoiceLines(sb, id);
     return { ok: true, data: lines };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * The change history of one invoice, newest first. `acc_audit_search` refuses
+ * the call without `audit.read`, so the drawer only asks for it when the page
+ * already established the viewer holds that permission.
+ */
+export async function getInvoiceAuditAction(id: string): Promise<ActionResult<AuditEntryRow[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    const entries = await searchAudit(sb, {
+      table_name: "acc_invoice",
+      record_id: id,
+      actor_id: null,
+      action: null,
+      from: null,
+      to: null,
+      limit: 200,
+    });
+    return { ok: true, data: entries };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

@@ -180,6 +180,8 @@ export interface InvoiceRow {
   order_id: string | null;
   journal_entry_id: string | null;
   memo: string | null;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -851,6 +853,13 @@ export interface ApprovalRequestRow {
   decision_note: string | null;
   result_id: string | null;
   error_message: string | null;
+}
+
+/** One signed-in colleague, for resolving a document's actor id to a name. */
+export interface ActorRow {
+  id: string;
+  email: string;
+  full_name: string;
 }
 
 export interface AuditEntryRow {

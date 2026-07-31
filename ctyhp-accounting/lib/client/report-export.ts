@@ -156,6 +156,15 @@ function download(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Save an already-built CSV. The byte-order mark is what makes Excel read the
+ * file as UTF-8 instead of the local code page, which otherwise mangles any
+ * non-ASCII name in an exported report.
+ */
+export function downloadCsvFile(csv: string, fileName: string): void {
+  download(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }), fileName);
+}
+
 export async function exportReportToExcel(sheet: ReportExportSheet): Promise<void> {
   const bytes = buildReportXlsx(sheet);
   const buffer = new ArrayBuffer(bytes.byteLength);

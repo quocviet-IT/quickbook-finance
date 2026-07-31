@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  ActorRow,
   AppUserRow,
   ApprovalPolicyRow,
   ApprovalRequestRow,
@@ -35,6 +36,21 @@ export async function listUsers(sb: SupabaseClient): Promise<AppUserRow[]> {
     last_sign_in: (r.last_sign_in as string | null) ?? null,
     invited_at: (r.invited_at as string | null) ?? null,
     status_reason: (r.status_reason as string | null) ?? null,
+  }));
+}
+
+/**
+ * Every colleague who could appear as the actor on a document or an audit
+ * entry. Readable by any signed-in role — unlike `listUsers`, which is part of
+ * user administration and carries roles and account status with it.
+ */
+export async function listActors(sb: SupabaseClient): Promise<ActorRow[]> {
+  const { data, error } = await sb.rpc("acc_actor_directory");
+  if (error) throw new AccessError(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: r.id as string,
+    email: (r.email as string) ?? "",
+    full_name: (r.full_name as string) ?? "",
   }));
 }
 
