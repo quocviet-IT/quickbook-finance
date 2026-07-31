@@ -168,6 +168,12 @@ export interface CustomerRow {
   region: string | null;
   postal_code: string | null;
   country: string | null;
+  /** Credit control (migration 0069). A null limit means none is enforced. */
+  credit_limit_minor: number | null;
+  credit_terms_days: number | null;
+  credit_hold: boolean;
+  credit_reviewed_at: string | null;
+  credit_review_note: string | null;
   created_at: string;
   updated_at: string;
 }

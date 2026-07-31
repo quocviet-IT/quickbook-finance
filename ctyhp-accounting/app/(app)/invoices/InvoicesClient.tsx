@@ -43,10 +43,16 @@ import type {
   ItemRow,
 } from "@/lib/db/types";
 import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
+import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
 import { documentAttribution, formatAuditTimestamp } from "@/lib/domain/audit";
+import {
+  checkInvoiceAgainstCredit,
+  creditStateColor,
+  type InvoiceCreditCheck,
+} from "@/lib/domain/credit";
 import {
   defaultTaxCodeForState,
   groupTaxCodesByState,
@@ -99,6 +105,8 @@ export default function InvoicesClient({
   canReadAudit,
   actors,
   usStates,
+  credit,
+  canOverrideCredit,
   sequenceWarning,
   scannerConfigured,
 }: {
@@ -120,6 +128,10 @@ export default function InvoicesClient({
   canReadAudit: boolean;
   actors: ActorRow[];
   usStates: { code: string; name: string }[];
+  /** Credit exposure per customer, read from the open invoices. */
+  credit: CustomerCreditRow[];
+  /** Whether this user may issue past a limit; the RPC checks it again. */
+  canOverrideCredit: boolean;
   /** Set when the invoice sequence has a break nobody has accounted for. */
   sequenceWarning: string | null;
   scannerConfigured: boolean;
@@ -133,6 +145,11 @@ export default function InvoicesClient({
   const [pdfId, setPdfId] = useState<string | null>(null);
   const [writeOffFor, setWriteOffFor] = useState<InvoiceWithCustomer | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+  const [overrideFor, setOverrideFor] = useState<{
+    invoice: InvoiceWithCustomer;
+    check: InvoiceCreditCheck;
+  } | null>(null);
+  const [overrideForm] = Form.useForm();
 
   // Inline customer creation
   const [custOpen, setCustOpen] = useState(false);
@@ -163,6 +180,11 @@ export default function InvoicesClient({
     [taxCodes, usStates],
   );
 
+  const creditByCustomer = useMemo(
+    () => new Map(credit.map((row) => [row.customerId, row])),
+    [credit],
+  );
+
   const baseCurrency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
   const taxRateOf = (id?: string | null) =>
@@ -170,6 +192,7 @@ export default function InvoicesClient({
 
   const currency: string = Form.useWatch("currency_code", form) ?? baseCurrency;
   const watchedLines: LineForm[] = Form.useWatch("lines", form) ?? [];
+  const watchedCustomerId: string | undefined = Form.useWatch("customer_id", form);
 
   const previewTotals = useMemo(() => {
     const dec = decimalsOf(currency);
@@ -185,6 +208,22 @@ export default function InvoicesClient({
     return sumInvoiceTotals(computed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLines, currency]);
+
+  const draftCredit = useMemo(() => {
+    const row = watchedCustomerId ? creditByCustomer.get(watchedCustomerId) : undefined;
+    if (!row) return null;
+    return {
+      row,
+      check: checkInvoiceAgainstCredit({
+        status: row.status,
+        creditLimitMinor: row.creditLimitMinor,
+        creditHold: row.creditHold,
+        openBalanceMinor: row.openBalanceMinor,
+        invoiceTotalMinor: previewTotals.totalMinor,
+        hasBillingAddress: row.hasBillingAddress,
+      }),
+    };
+  }, [watchedCustomerId, creditByCustomer, previewTotals.totalMinor]);
 
   const visibleInvoices = useMemo(() => {
     if (!initialQueue) return invoices;
@@ -238,7 +277,9 @@ export default function InvoicesClient({
         id: res.data.id, name: res.data.name, email: null, currency_code: null,
         is_active: true, contact_name: null, phone: null, address_line1: null,
         address_line2: null, city: null, region: null, postal_code: null,
-        country: null, created_at: "", updated_at: "",
+        country: null, credit_limit_minor: null, credit_terms_days: null,
+        credit_hold: false, credit_reviewed_at: null, credit_review_note: null,
+        created_at: "", updated_at: "",
       };
       setLocalCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
       form.setFieldValue("customer_id", c.id);
@@ -279,12 +320,46 @@ export default function InvoicesClient({
     }
   }
 
-  async function issue(id: string) {
+  async function issue(id: string, overrideReason?: string) {
     setBusyId(id);
-    const res = await issueInvoiceAction(id);
+    const res = await issueInvoiceAction(id, overrideReason);
     setBusyId(null);
     if (res.ok) message.success("Invoice issued and posted to the ledger");
     else message.error(res.error ?? "Failed to issue invoice");
+  }
+
+  /**
+   * Issuing over a limit is refused by the database. Someone who may override
+   * is asked for the reason here; it is stored with the invoice as its own
+   * audit action. Anyone else is told what stands in the way.
+   */
+  function startIssue(invoice: InvoiceWithCustomer) {
+    const row = creditByCustomer.get(invoice.customer_id);
+    const check = row
+      ? checkInvoiceAgainstCredit({
+          status: row.status,
+          creditLimitMinor: row.creditLimitMinor,
+          creditHold: row.creditHold,
+          openBalanceMinor: row.openBalanceMinor,
+          invoiceTotalMinor: invoice.total_minor,
+          hasBillingAddress: row.hasBillingAddress,
+        })
+      : null;
+
+    if (!check?.blocked) {
+      void issue(invoice.id);
+      return;
+    }
+    setOverrideFor({ invoice, check });
+    overrideForm.resetFields();
+  }
+
+  async function submitOverride() {
+    if (!overrideFor) return;
+    const values = await overrideForm.validateFields();
+    const target = overrideFor;
+    setOverrideFor(null);
+    await issue(target.invoice.id, values.reason);
   }
 
   async function voidInv(id: string) {
@@ -419,7 +494,12 @@ export default function InvoicesClient({
             />
           ) : null}
           {canWrite && r.status === "draft" && (
-            <Button size="small" type="primary" loading={busyId === r.id} onClick={() => issue(r.id)}>
+            <Button
+              size="small"
+              type="primary"
+              loading={busyId === r.id}
+              onClick={() => startIssue(r)}
+            >
               Issue
             </Button>
           )}
@@ -543,6 +623,62 @@ export default function InvoicesClient({
               <DatePicker />
             </Form.Item>
           </Space>
+
+          {draftCredit ? (
+            <Alert
+              style={{ marginBottom: 12 }}
+              type={
+                draftCredit.check.blocked
+                  ? "error"
+                  : draftCredit.check.warning
+                    ? "warning"
+                    : "success"
+              }
+              showIcon
+              message={
+                <Space wrap size="middle">
+                  <Tag color={creditStateColor(draftCredit.row.status.state)}>
+                    {draftCredit.row.status.label}
+                  </Tag>
+                  <span>
+                    Owed now{" "}
+                    <b>{formatMoney(draftCredit.row.openBalanceMinor, baseCurrency, 2)}</b>
+                  </span>
+                  <span>
+                    Limit{" "}
+                    <b>
+                      {draftCredit.row.creditLimitMinor === null
+                        ? "not set"
+                        : formatMoney(draftCredit.row.creditLimitMinor, baseCurrency, 2)}
+                    </b>
+                  </span>
+                  <span>
+                    After this invoice{" "}
+                    <b>
+                      {formatMoney(draftCredit.check.projectedBalanceMinor, baseCurrency, 2)}
+                    </b>
+                  </span>
+                  {draftCredit.check.projectedAvailableMinor !== null ? (
+                    <span>
+                      Available{" "}
+                      <b>
+                        {formatMoney(draftCredit.check.projectedAvailableMinor, baseCurrency, 2)}
+                      </b>
+                    </span>
+                  ) : null}
+                  {draftCredit.row.status.daysSalesOutstanding !== null ? (
+                    <span>
+                      DSO <b>{draftCredit.row.status.daysSalesOutstanding} days</b>
+                    </span>
+                  ) : null}
+                </Space>
+              }
+              description={
+                draftCredit.check.message ??
+                "This customer is inside their credit limit with nothing past due."
+              }
+            />
+          ) : null}
 
           <Typography.Text strong>Line items</Typography.Text>
           <Form.List name="lines">
@@ -696,6 +832,40 @@ export default function InvoicesClient({
             },
           ]}
         />
+      </Modal>
+
+      <Modal
+        title="Issue over the credit limit"
+        open={overrideFor !== null}
+        onOk={submitOverride}
+        onCancel={() => setOverrideFor(null)}
+        okText={canOverrideCredit ? "Override and issue" : "Close"}
+        okButtonProps={{ danger: true, disabled: !canOverrideCredit }}
+        cancelText="Cancel"
+        destroyOnHidden
+      >
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={overrideFor?.check.message ?? "This invoice breaks the customer credit limit."}
+          description={
+            canOverrideCredit
+              ? "Issuing anyway is recorded against the invoice as a credit override, with your name and this reason."
+              : "Your role cannot override a credit limit. Ask an administrator, or take a payment first."
+          }
+        />
+        {canOverrideCredit ? (
+          <Form form={overrideForm} layout="vertical" requiredMark={false}>
+            <Form.Item
+              name="reason"
+              label="Why is this invoice being issued anyway?"
+              rules={[{ required: true, min: 10, message: "Give a reason of at least ten characters" }]}
+            >
+              <Input.TextArea rows={3} placeholder="e.g. Payment confirmed by wire, clearing tomorrow" />
+            </Form.Item>
+          </Form>
+        ) : null}
       </Modal>
 
       {writeOffFor && (

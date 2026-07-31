@@ -66,6 +66,7 @@ describe("printable invoice over HTTPS", () => {
         region: "MA",
         postal_code: "02138",
         country: "United States",
+        credit_hold: false,
       });
 
       expect(formatPostalAddress(updated)).toEqual([

@@ -106,6 +106,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "receivables",
   },
   {
+    id: "customer-credit",
+    title: "Customer Credit Exposure",
+    description: "Credit limits, balances owed, overdue exposure, and days sales outstanding.",
+    href: "/reports/customer-credit",
+    group: "receivables",
+  },
+  {
     id: "customer-statements",
     title: "Customer Statements",
     description: "Review customer invoices, payments, credits, and balances.",

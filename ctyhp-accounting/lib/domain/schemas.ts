@@ -52,6 +52,23 @@ export const customerCreateSchema = z.object({
   region: contactText(80),
   postal_code: contactText(20),
   country: contactText(80),
+  // Credit control. Null limit = none enforced; 0 = cash only, which is a
+  // different statement and has to survive the round trip as one.
+  credit_limit_minor: z
+    .number()
+    .int("A credit limit is a whole minor-unit amount")
+    .min(0, "A credit limit cannot be negative")
+    .optional()
+    .nullable(),
+  credit_terms_days: z
+    .number()
+    .int()
+    .min(0, "Terms must be >= 0")
+    .max(365, "Terms longer than a year need a written agreement")
+    .optional()
+    .nullable(),
+  credit_hold: z.boolean().default(false),
+  credit_review_note: z.string().trim().max(500).optional().or(z.literal("")).nullable(),
 });
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 

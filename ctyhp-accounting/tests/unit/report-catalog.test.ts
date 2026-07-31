@@ -8,7 +8,7 @@ import {
 
 describe("report catalog", () => {
   it("contains unique reports and uses every category", () => {
-    expect(REPORT_CATALOG).toHaveLength(17);
+    expect(REPORT_CATALOG).toHaveLength(18);
     expect(new Set(REPORT_CATALOG.map((report) => report.id)).size).toBe(
       REPORT_CATALOG.length,
     );

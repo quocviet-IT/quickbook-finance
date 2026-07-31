@@ -6,6 +6,7 @@ import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
 import { listGapNotes, listSequenceCatalog, listSequenceDocuments } from "@/lib/services/sequence";
+import { listCustomerCredit } from "@/lib/services/credit";
 import { auditSequence, describeSequenceIntegrity } from "@/lib/domain/sequence";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
@@ -47,6 +48,8 @@ export default async function InvoicesPage({
     sequenceDocuments,
     sequenceNotes,
     usStates,
+    credit,
+    canOverrideCredit,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -64,6 +67,8 @@ export default async function InvoicesPage({
     listSequenceDocuments(sb, "invoice"),
     listGapNotes(sb, "invoice"),
     listUsStates(sb),
+    listCustomerCredit(sb),
+    hasPermission(sb, "credit.override"),
   ]);
 
   // A number the sequence issued that no invoice holds is the sign of a removed
@@ -116,6 +121,8 @@ export default async function InvoicesPage({
         canReadAudit={canReadAudit}
         actors={actors}
         usStates={usStates}
+        credit={credit}
+        canOverrideCredit={canOverrideCredit}
         sequenceWarning={sequenceWarning}
         scannerConfigured={isDocumentScannerConfigured()}
       />

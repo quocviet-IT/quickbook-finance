@@ -1,12 +1,28 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Col, Form, Input, Modal, Row, Tag, type TableColumnsType } from "antd";
+import {
+  App,
+  Button,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Row,
+  Switch,
+  Tag,
+  Tooltip,
+  type TableColumnsType,
+} from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { CustomerRow } from "@/lib/db/types";
+import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatPostalAddress } from "@/lib/domain/invoice-document";
+import { creditStateColor } from "@/lib/domain/credit";
+import { formatMoney, toMinorUnits } from "@/lib/format";
 import { createCustomerAction, updateCustomerAction } from "./actions";
 
 const CONTACT_FIELDS = [
@@ -22,14 +38,20 @@ const CONTACT_FIELDS = [
   "country",
 ] as const;
 
+const money = (minor: number) => formatMoney(minor, "USD", 2);
+
 export default function CustomersClient({
   customers,
+  credit,
   canWrite,
 }: {
   customers: CustomerRow[];
+  /** Exposure per customer, read from the open invoices on every request. */
+  credit: CustomerCreditRow[];
   canWrite: boolean;
 }) {
   const { message } = App.useApp();
+  const creditByCustomer = new Map(credit.map((row) => [row.customerId, row]));
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
@@ -43,18 +65,39 @@ export default function CustomersClient({
 
   function openEdit(customer: CustomerRow) {
     setEditing(customer);
-    form.setFieldsValue(
-      Object.fromEntries(CONTACT_FIELDS.map((field) => [field, customer[field] ?? ""])),
-    );
+    form.setFieldsValue({
+      ...Object.fromEntries(CONTACT_FIELDS.map((field) => [field, customer[field] ?? ""])),
+      // The form works in dollars; the record and the ledger work in cents.
+      credit_limit:
+        customer.credit_limit_minor === null ? undefined : customer.credit_limit_minor / 100,
+      credit_terms_days: customer.credit_terms_days ?? undefined,
+      credit_hold: customer.credit_hold,
+      credit_review_note: customer.credit_review_note ?? "",
+    });
     setOpen(true);
   }
 
   async function submit() {
     const values = await form.validateFields();
+    // An empty limit box means "no limit", which is not the same as a limit of
+    // zero — that one means cash only, and both have to reach the server intact.
+    const { credit_limit: creditLimit, ...rest } = values;
+    const payload = {
+      ...rest,
+      credit_limit_minor:
+        creditLimit === undefined || creditLimit === null
+          ? null
+          : toMinorUnits(Number(creditLimit), 2),
+      credit_terms_days:
+        values.credit_terms_days === undefined || values.credit_terms_days === null
+          ? null
+          : Number(values.credit_terms_days),
+      credit_hold: Boolean(values.credit_hold),
+    };
     setSaving(true);
     const res = editing
-      ? await updateCustomerAction({ ...values, id: editing.id })
-      : await createCustomerAction(values);
+      ? await updateCustomerAction({ ...payload, id: editing.id })
+      : await createCustomerAction(payload);
     setSaving(false);
     if (res.ok) {
       message.success(editing ? "Customer updated" : "Customer created");
@@ -76,6 +119,57 @@ export default function CustomersClient({
         // An invoice for a customer without an address prints without a
         // "Bill to" block, so the gap is worth showing here.
         return lines.length ? lines.join(" · ") : <Tag color="orange">Not set</Tag>;
+      },
+    },
+    {
+      title: "Credit limit",
+      key: "credit_limit",
+      width: 120,
+      align: "right",
+      render: (_, row) =>
+        row.credit_limit_minor === null ? (
+          <Tooltip title="No limit is enforced for this customer">
+            <span className="accounting-muted">Not set</span>
+          </Tooltip>
+        ) : (
+          money(row.credit_limit_minor)
+        ),
+    },
+    {
+      title: "Owed now",
+      key: "balance",
+      width: 120,
+      align: "right",
+      render: (_, row) => money(creditByCustomer.get(row.id)?.openBalanceMinor ?? 0),
+    },
+    {
+      title: "Available",
+      key: "available",
+      width: 120,
+      align: "right",
+      render: (_, row) => {
+        const available = creditByCustomer.get(row.id)?.status.availableMinor ?? null;
+        if (available === null) return "\u2014";
+        return (
+          <span className={available < 0 ? "accounting-negative" : undefined}>
+            {money(available)}
+          </span>
+        );
+      },
+    },
+    {
+      title: "Credit status",
+      key: "credit_status",
+      width: 160,
+      render: (_, row) => {
+        const status = creditByCustomer.get(row.id)?.status;
+        if (!status) return "\u2014";
+        const tag = <Tag color={creditStateColor(status.state)}>{status.label}</Tag>;
+        return status.reasons.length ? (
+          <Tooltip title={status.reasons.join(". ")}>{tag}</Tooltip>
+        ) : (
+          tag
+        );
       },
     },
     {
@@ -190,6 +284,48 @@ export default function CustomersClient({
             <Col span={24}>
               <Form.Item name="country" label="Country">
                 <Input />
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Tag color="blue" style={{ marginBottom: 12 }}>
+                Credit control
+              </Tag>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="credit_limit"
+                label="Credit limit"
+                extra="Empty = no limit. 0 = cash only."
+              >
+                <InputNumber min={0} step={100} precision={2} prefix="$" style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="credit_terms_days"
+                label="Terms (days)"
+                extra="Empty = company default."
+              >
+                <InputNumber min={0} max={365} style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="credit_hold"
+                label="Credit hold"
+                valuePropName="checked"
+                extra="Blocks issuing any invoice."
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item name="credit_review_note" label="Credit review note">
+                <Input.TextArea
+                  rows={2}
+                  placeholder="Why this limit, and when it was last reviewed"
+                />
               </Form.Item>
             </Col>
           </Row>

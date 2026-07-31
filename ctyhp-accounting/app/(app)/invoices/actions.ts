@@ -116,12 +116,20 @@ export async function getInvoiceDocumentAction(
   }
 }
 
-export async function issueInvoiceAction(id: string): Promise<ActionResult> {
+/**
+ * `overrideReason` is only accepted when the customer's credit limit or hold
+ * would otherwise refuse the invoice; the database rejects a reason supplied
+ * for an invoice that does not need one, so the two can never drift apart.
+ */
+export async function issueInvoiceAction(
+  id: string,
+  overrideReason?: string,
+): Promise<ActionResult> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    await issueInvoice(sb, id);
+    await issueInvoice(sb, id, overrideReason);
     revalidatePath("/invoices");
     return { ok: true };
   } catch (err) {

@@ -366,6 +366,91 @@ top of "12 records" and the page selector.
 | Hide the cluster automatically while scrolling | **Not built.** A control that disappears on its own is harder to trust than one the user closed on purpose, and it would fight the collapse the user already chose. |
 | Let each page decide where the cluster sits | **Not built.** Help that moves between screens is help nobody can find. One position, one collapse. |
 
+### Issue #6 — No customer credit status before invoicing
+
+Reported severity: CRITICAL, credit risk HIGH. References: NFCC credit policy
+guidance, AICPA CECL.
+
+#### What reproduced, and what did not
+
+**"All 12 customers show 'Not set' for billing address" — no longer true.** The
+columns existed (migration 0060); the records were simply empty when the review
+was written. All twelve were filled in on 2026-07-31 between 10:41 and 10:46
+(the audit log dates the edits), and a page fetched from a built server as
+`admin@ctyhp.vn` now contains real street addresses and zero occurrences of
+"Not set". The blank strips in the screenshot were the width of the Billing
+address column when every value in it was the short "Not set" tag.
+
+**Everything about credit did reproduce.** A search of the codebase found no
+`credit_limit`, no credit terms, no hold, no exposure, and no DSO anywhere. The
+invoice screen showed nothing about the customer beyond their name, and nothing
+stopped an invoice of any size.
+
+#### What was implemented
+
+**Database — `0069_customer_credit_control.sql` (applied to production 2026-07-31)**
+
+- `acc_customer` gains `credit_limit_minor`, `credit_terms_days`, `credit_hold`,
+  `credit_reviewed_at`, `credit_review_note`. A null limit means none is
+  enforced; **0 means cash only**, and the two are kept distinct end to end.
+- Permission `credit.override`, seeded to administrators only — the point of a
+  limit is that the person raising the invoice cannot wave it through.
+- `acc_customer_credit_status(as_of, window_days)`: per customer, the open
+  balance, what is past due, the oldest due date, and what was invoiced over
+  the window — all read from the invoices at call time.
+- **The control itself is inside `acc_issue_invoice`**: an invoice that puts the
+  customer past their limit, or any invoice for an account on hold, is refused
+  unless the caller holds `credit.override` *and* gives a written reason. The
+  reason is written to `acc_audit_log` as its own `credit_override` action with
+  the limit, the balance and the invoice total it was decided on. A reason
+  supplied where none is needed is also refused, so an override always means
+  something.
+
+**Application**
+
+- `lib/domain/credit.ts` (new, pure) + 19 unit tests: limit states (hold, over,
+  near at 80%, within, none set), what an invoice would do to the account, and
+  days sales outstanding.
+- Customers screen: credit limit, owed now, available and a colour-coded status
+  per row; limit, terms, hold and a review note in the edit dialog.
+- Invoice dialog: a credit panel the moment a customer is chosen — status, owed
+  now, limit, the balance *after* this invoice, headroom left, DSO — colour-coded,
+  and it recalculates as lines are typed. Issuing a blocked invoice opens an
+  override dialog that demands a reason; a user without the permission is told
+  what stands in the way instead.
+- **Reports → Customer Credit Exposure**: owed, past due, over-limit exposure,
+  accounts on hold and portfolio DSO across the top; a "needs attention" list
+  first; CSV export. This is the A/R credit dashboard the review asked for.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 50 files, 448 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 49 of 49 pages rendered |
+| `tests/e2e/customer-credit.e2e.ts` (new, HTTPS, live DB) | passed |
+
+The end-to-end test proves the control on the real database: with a $100 limit,
+invoices of $40 and $30 issue normally; a reason offered where none is needed is
+refused; the $100 invoice that would take the balance to $170 is refused even
+for an administrator until a reason is given; with the reason it issues and the
+`credit_override` entry in the audit log carries the limit, the $70 balance and
+the $100 total; the exposure then reads as $170 owed, $70 over; and once the
+account is put on hold even a $1 invoice is refused.
+
+#### Not implemented, and why
+
+| Recommendation | Decision |
+|---|---|
+| A `CUSTOMER_CREDIT_STATUS` table holding `current_balance` and `available_credit` | **Deliberately not stored.** Both follow from the open invoices; a stored copy is a second number that can disagree with the ledger, and the project's rule is that the ledger is the single source of truth. They are computed on read, in one place, by rules that have unit tests. Everything the recommendation asks to see is on screen — none of it is a saved balance. |
+| `last_review_date` as part of that table | **On the customer instead** (`credit_reviewed_at`, set whenever the credit terms are saved, with a free-text `credit_review_note`). |
+| Manager approval for an override | **As a permission, not a workflow.** `credit.override` is held by administrators only, and using it demands a written reason that is audited. Routing it through the existing maker-checker approval queue would stop the invoice until someone signs in — worth doing if the business wants it, but it is a different control from the one asked for. |
+| Blocking an invoice for a customer with no billing address | **Warning only**, as agreed. A missing address makes a poor-looking invoice, not a wrong entry. |
+| Shipping address as a separate field | **Not added.** Nothing in the product ships goods to an address yet; adding a field no screen reads would be a place for stale data to live. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

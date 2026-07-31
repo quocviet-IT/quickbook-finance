@@ -18,7 +18,9 @@ export class InvoicingError extends Error {}
 
 const CUSTOMER_COLS =
   "id,name,email,currency_code,is_active,contact_name,phone,address_line1," +
-  "address_line2,city,region,postal_code,country,created_at,updated_at";
+  "address_line2,city,region,postal_code,country,credit_limit_minor," +
+  "credit_terms_days,credit_hold,credit_reviewed_at,credit_review_note," +
+  "created_at,updated_at";
 
 /** Empty strings from a form mean "not set", which the column stores as null. */
 function contactFields(input: Omit<CustomerUpdateInput, "id">) {
@@ -33,6 +35,13 @@ function contactFields(input: Omit<CustomerUpdateInput, "id">) {
     region: input.region || null,
     postal_code: input.postal_code || null,
     country: input.country || null,
+    // undefined means "the form did not carry credit fields"; null means the
+    // limit was cleared, and the two must not collapse into each other.
+    credit_limit_minor: input.credit_limit_minor ?? null,
+    credit_terms_days: input.credit_terms_days ?? null,
+    credit_hold: input.credit_hold ?? false,
+    credit_review_note: input.credit_review_note || null,
+    credit_reviewed_at: new Date().toISOString(),
   };
 }
 
@@ -195,8 +204,21 @@ export async function getInvoiceDocumentSource(
   };
 }
 
-export async function issueInvoice(sb: SupabaseClient, invoiceId: string): Promise<void> {
-  const { error } = await sb.rpc("acc_issue_invoice", { p_invoice_id: invoiceId });
+/**
+ * Issue and post. The database refuses an invoice that puts the customer past
+ * their credit limit, or any invoice for an account on hold, unless the caller
+ * holds `credit.override` and says why — the reason is written to the audit log
+ * as its own `credit_override` action.
+ */
+export async function issueInvoice(
+  sb: SupabaseClient,
+  invoiceId: string,
+  overrideReason?: string | null,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_issue_invoice", {
+    p_invoice_id: invoiceId,
+    p_override_reason: overrideReason?.trim() || null,
+  });
   if (error) throw new InvoicingError(error.message);
 }
 
