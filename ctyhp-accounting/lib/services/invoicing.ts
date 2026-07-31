@@ -266,6 +266,7 @@ export async function recordPayment(sb: SupabaseClient, input: PaymentCreateInpu
     p_amount_minor: input.amount_minor,
     p_deposit_account_id: input.deposit_account_id,
     p_method: input.method || null,
+    p_reference: input.reference || null,
     p_memo: input.memo || null,
     p_allocations: input.allocations,
   });

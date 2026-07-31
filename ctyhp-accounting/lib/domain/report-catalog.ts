@@ -83,6 +83,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "business-overview",
   },
   {
+    id: "cash-flow-forecast",
+    title: "Cash Flow Forecast",
+    description: "Project receipts and payments over the next 13 weeks from open invoices and bills.",
+    href: "/reports/cash-flow-forecast",
+    group: "business-overview",
+  },
+  {
     id: "statement-of-equity",
     title: "Statement of Equity",
     description: "Track opening equity, period activity, and closing balances.",

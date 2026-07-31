@@ -25,6 +25,8 @@ export async function sweepMarker(
   sb: SupabaseClient,
   marker: string,
 ): Promise<{ invoices: number; customers: number }> {
+  await sweepMarkedPayments(sb, marker);
+
   const { data: invoices, error: findError } = await sb
     .from("acc_invoice")
     .select("id, status, invoice_number")
@@ -105,4 +107,88 @@ async function noteFreedNumbers(
     .from("acc_number_gap_note")
     .upsert(rows, { onConflict: "sequence_key,number_value" });
   if (error) throw new Error(`recording freed invoice numbers failed: ${error.message}`);
+}
+
+/**
+ * Customer payments have no void path in the application — a received payment
+ * is not something a bookkeeper takes back, they refund it — and an invoice
+ * with payments applied cannot be voided. So a test that recorded one has to
+ * be unwound outside the application: drop the allocation, void the journal
+ * entry it posted (reports read posted entries only, so the ledger nets to
+ * zero), then remove the payment row itself.
+ */
+async function sweepMarkedPayments(sb: SupabaseClient, marker: string): Promise<void> {
+  const { data: payments, error } = await sb
+    .from("acc_payment")
+    .select("id, journal_entry_id")
+    .eq("memo", marker);
+  if (error) throw new Error(`finding marked payments failed: ${error.message}`);
+  if (!payments?.length) return;
+
+  const admin = adminClient();
+  if (!admin) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is required to remove a test payment — " +
+        "the application has no path that unwinds one.",
+    );
+  }
+
+  const ids = payments.map((row) => row.id);
+  const entryIds = payments
+    .map((row) => row.journal_entry_id)
+    .filter((id): id is string => Boolean(id));
+
+  // acc_void_invoice refuses an invoice whose balance no longer equals its
+  // total, so the allocations have to be given back to the invoices before the
+  // payment rows go, or the invoice can never be voided or removed.
+  const applied = await admin
+    .from("acc_payment_allocation")
+    .select("invoice_id, amount_minor")
+    .in("payment_id", ids);
+  if (applied.error) {
+    throw new Error(`reading marked payment allocations failed: ${applied.error.message}`);
+  }
+  const restoreByInvoice = new Map<string, number>();
+  for (const row of (applied.data ?? []) as { invoice_id: string; amount_minor: number }[]) {
+    restoreByInvoice.set(
+      row.invoice_id,
+      (restoreByInvoice.get(row.invoice_id) ?? 0) + Number(row.amount_minor),
+    );
+  }
+
+  const allocations = await admin.from("acc_payment_allocation").delete().in("payment_id", ids);
+  if (allocations.error) {
+    throw new Error(`deleting marked payment allocations failed: ${allocations.error.message}`);
+  }
+
+  for (const [invoiceId, amount] of restoreByInvoice) {
+    const current = await admin
+      .from("acc_invoice")
+      .select("balance_due_minor")
+      .eq("id", invoiceId)
+      .maybeSingle();
+    if (current.error || !current.data) continue;
+    const restored = Number((current.data as { balance_due_minor: number }).balance_due_minor) + amount;
+    const update = await admin
+      .from("acc_invoice")
+      .update({ balance_due_minor: restored, status: "issued" })
+      .eq("id", invoiceId);
+    if (update.error) {
+      throw new Error(`restoring invoice balance failed: ${update.error.message}`);
+    }
+  }
+  if (entryIds.length) {
+    const voided = await admin
+      .from("acc_journal_entry")
+      .update({ status: "void" })
+      .in("id", entryIds);
+    if (voided.error) {
+      throw new Error(`voiding marked payment entries failed: ${voided.error.message}`);
+    }
+  }
+  const removed = await admin.from("acc_payment").delete().in("id", ids);
+  if (removed.error) {
+    throw new Error(`deleting marked payments failed: ${removed.error.message}`);
+  }
+  console.info(`sweepMarker removed ${ids.length} test payment(s) with the service role`);
 }

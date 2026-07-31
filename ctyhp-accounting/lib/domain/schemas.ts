@@ -116,6 +116,8 @@ export const paymentCreateSchema = z.object({
   amount_minor: z.number().int().positive("Amount must be greater than 0"),
   deposit_account_id: z.uuid("Select a deposit account"),
   method: z.string().trim().max(60).optional().nullable(),
+  /** Check number, wire reference, ACH trace — what the bank statement shows. */
+  reference: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
   memo: z.string().trim().max(500).optional().nullable(),
   allocations: z.array(paymentAllocationSchema).default([]),
 });
@@ -184,6 +186,7 @@ export const billPaymentCreateSchema = z.object({
   amount_minor: z.number().int().positive("Amount must be greater than 0"),
   payment_account_id: z.uuid("Select a payment account"),
   method: z.string().trim().max(60).optional().nullable(),
+  reference: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
   memo: z.string().trim().max(500).optional().nullable(),
   allocations: z.array(billPaymentAllocationSchema).default([]),
 });

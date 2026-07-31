@@ -59,6 +59,9 @@ import {
   taxCodeLabel,
 } from "@/lib/domain/tax-jurisdiction";
 import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
+import SettlementHistory from "@/components/settlements/SettlementHistory";
+import { outstandingAge } from "@/lib/domain/settlement";
+import type { SettlementEvent } from "@/lib/domain/settlement";
 import {
   createInvoiceAction,
   createCustomerAction,
@@ -67,6 +70,7 @@ import {
   getInvoiceLinesAction,
   getInvoiceAuditAction,
   getInvoiceDocumentAction,
+  getInvoiceSettlementsAction,
 } from "./actions";
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
@@ -162,6 +166,8 @@ export default function InvoicesClient({
   const [viewInvoice, setViewInvoice] = useState<InvoiceWithCustomer | null>(null);
   const [viewAudit, setViewAudit] = useState<AuditEntryRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [viewSettlements, setViewSettlements] = useState<SettlementEvent[]>([]);
+  const [settlementsLoading, setSettlementsLoading] = useState(false);
 
   const directory = useMemo(
     () => new Map(actors.map((a) => [a.id, a.email || a.full_name])),
@@ -179,6 +185,9 @@ export default function InvoicesClient({
       })),
     [taxCodes, usStates],
   );
+
+  // One "today" for every row, so a list cannot show two different ages.
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const creditByCustomer = useMemo(
     () => new Map(credit.map((row) => [row.customerId, row])),
@@ -374,10 +383,18 @@ export default function InvoicesClient({
     setViewInvoice(inv);
     setViewLines([]);
     setViewAudit([]);
+    setViewSettlements([]);
     setLinesOpen(true);
-    const res = await getInvoiceLinesAction(inv.id);
+    setSettlementsLoading(true);
+    const [res, settled] = await Promise.all([
+      getInvoiceLinesAction(inv.id),
+      getInvoiceSettlementsAction(inv.id),
+    ]);
+    setSettlementsLoading(false);
     if (res.ok && res.data) setViewLines(res.data);
     else message.error(res.error ?? "Failed to load lines");
+    if (settled.ok && settled.data) setViewSettlements(settled.data);
+    else message.error(settled.error ?? "Failed to load the payment history");
     if (!canReadAudit) return;
     setAuditLoading(true);
     const trail = await getInvoiceAuditAction(inv.id);
@@ -439,10 +456,40 @@ export default function InvoicesClient({
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
+      title: "Paid",
+      key: "paid",
+      width: 130,
+      align: "right",
+      sorter: (a, b) =>
+        a.total_minor - a.balance_due_minor - (b.total_minor - b.balance_due_minor),
+      render: (_: unknown, r) =>
+        formatMoney(r.total_minor - r.balance_due_minor, r.currency_code, decimalsOf(r.currency_code)),
+    },
+    {
       title: "Status",
       dataIndex: "status",
       width: 130,
       render: (s: InvoiceStatus) => <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>,
+    },
+    {
+      // How long the money has been outstanding, which is the question the
+      // status alone never answers.
+      title: "Age",
+      key: "age",
+      width: 130,
+      render: (_: unknown, r) => {
+        if (r.status === "paid" || r.status === "void" || r.status === "draft") return "—";
+        const age = outstandingAge({
+          issueDate: r.issue_date,
+          dueDate: r.due_date,
+          asOf: today,
+        });
+        return age.isOverdue ? (
+          <Typography.Text type="danger">{age.overdueDays} d overdue</Typography.Text>
+        ) : (
+          <Typography.Text type="secondary">{age.ageDays} d old</Typography.Text>
+        );
+      },
     },
     {
       // Who made this invoice and when, on the row itself: the first question an
@@ -796,6 +843,20 @@ export default function InvoicesClient({
             loading={auditLoading}
             canReadAudit={canReadAudit}
           />
+        ) : null}
+
+        {viewInvoice ? (
+          <div style={{ marginBottom: 16 }}>
+            <SettlementHistory
+              totalMinor={viewInvoice.total_minor}
+              balanceDueMinor={viewInvoice.balance_due_minor}
+              currencyCode={viewInvoice.currency_code}
+              decimals={decimalsOf(viewInvoice.currency_code)}
+              events={viewSettlements}
+              loading={settlementsLoading}
+              emptyText="No payment, credit or write-off has been applied to this invoice yet."
+            />
+          </div>
         ) : null}
 
         <Table<InvoiceLineRow>

@@ -517,6 +517,99 @@ and a client trying to delete an attachment row it filed.
 | Letting a reviewer add files to someone else's report | **Refused by design.** An attachment is part of what the reporter is saying. A reviewer's evidence belongs in the triage note or in a new report. |
 | Removing an attachment after filing | **Not possible, deliberately.** Same rule as the report text and the screenshot: filed is filed. |
 
+### Issue #8 — Payment status and the history behind it
+
+Reported severity: CRITICAL, cash-flow impact HIGH.
+
+#### What reproduced, and what did not
+
+Most of the recommendation was already in place, and the report's own screenshot
+shows it: the invoice list has a **Status** column (Draft / Issued / Partially
+paid / Paid) and a **Balance due** column; `acc_payment_allocation` is the
+payment-to-invoice link table; `acc_record_payment` updates the invoice's status
+and balance in the same transaction as the ledger entry; and the AR aging report
+with Current / 1–30 / 31–60 / 61–90 / 90+ buckets reconciles to the Accounts
+Receivable control account. So "cannot determine which invoices are paid" did
+not reproduce.
+
+Four things genuinely did:
+
+1. **No payment history on the document.** You could see $401.05 outstanding but
+   not how many payments made up the rest, on what dates, by what method. The
+   data sat in three tables — payments, credit memo applications, write-offs —
+   that no screen joined.
+2. **No payment reference.** `method` said "check"; nothing recorded *which*
+   check, which is what a bank statement is reconciled by.
+3. **No days outstanding** on an invoice row.
+4. **No cash flow forecast.** The Cash Flow report is historical. Nothing
+   projected receipts from due dates, and nothing knew how late customers
+   actually pay.
+
+#### What was implemented
+
+**Database — `0071_settlement_history_and_forecast.sql` (applied to production 2026-07-31)**
+
+- `reference` on `acc_payment` and `acc_bill_payment` — the check number, wire
+  reference or ACH trace — and both recording RPCs (`acc_record_payment`,
+  `acc_pay_bills`) redefined to carry it.
+- `acc_invoice_settlements(invoice_id)` and `acc_bill_settlements(bill_id)`:
+  every payment, credit applied and write-off against one document, oldest
+  first, with voided documents left out.
+- `acc_open_items(as_of)` and `acc_settlement_lag(since)`: what is still open by
+  due date, and how late settled documents actually were. Raw rows — the
+  projection is computed in the application, where it is unit tested.
+
+**Application**
+
+- `lib/domain/settlement.ts` (11 tests) — the running balance of a document, and
+  the age/overdue arithmetic — and `lib/domain/forecast.ts` (14 tests) — weekly
+  buckets, median collection lag, cumulative position.
+- Invoice dialog: **Payments & settlements** — date, type, number, method,
+  reference, amount, and the balance after each. It states plainly if the
+  settlements do not add up to the invoice's own balance rather than papering
+  over the difference.
+- Bills screen: the same history behind a **Payments** action, covering vendor
+  credits and write-offs as well as payments.
+- Invoice list: a **Paid** column and an **Age** column reading "N d overdue" or
+  "N d old".
+- Both payment forms take a **Reference**, shown on the payments list and in the
+  history.
+- **Reports → Cash Flow Forecast**: 13 weeks of expected receipts and payments
+  from open invoices and bills, on two bases — the dates the documents say, and
+  those dates shifted by the median lag actually observed. Overdue money is
+  expected in the current week, never in the past; money expected past the
+  horizon is reported separately instead of being crammed into the last week.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 53 files, 490 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| `npm run test:e2e:document-ledger-report` | 12 files, 16 tests passed |
+
+The new end-to-end test invoices $1,000, takes a $400 transfer and a $250 check
+carrying `CHK-10428`, and proves the history reads back both payments with the
+reference intact, that the running balance ends at the $350 the ledger holds,
+and that every open receivable lands somewhere in the projection.
+
+The test also exposed a gap in the cleanup: a customer payment has no void path
+in the application (a received payment is refunded, not un-received) and an
+invoice with payments applied cannot be voided, so the sweep now unwinds a test
+payment with the service role — returning the allocation to the invoice before
+removing the payment — instead of leaving an invoice nothing could clear.
+
+#### Not implemented, and why
+
+| Recommendation | Decision |
+|---|---|
+| `amount_paid` and `payment_date` columns on INVOICES | **Deliberately not added.** Both follow from the allocations; a stored copy is a second number that can disagree with the ledger. `balance_due_minor` stays because the posting RPC maintains it atomically with the journal entry and the end-to-end gate proves it matches. |
+| A new `INVOICE_PAYMENTS` table | **Already exists** as `acc_payment_allocation`, and two more tables settle an invoice besides payments. The new RPC joins all three rather than adding a fourth. |
+| Forecasting from "historical collection patterns" per customer | **Portfolio-wide for now.** The median lag is computed across all settled documents, not per customer: with a dozen customers and a handful of settled invoices each, a per-customer median would be a number computed from two data points and read as if it meant something. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

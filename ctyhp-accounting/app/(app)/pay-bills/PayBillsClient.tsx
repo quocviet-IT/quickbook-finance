@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag, Typography } from "antd";
+import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
@@ -61,6 +61,7 @@ export default function PayBillsClient({
       amount_minor: Math.round((values.amount ?? 0) * 10 ** decimals),
       payment_account_id: values.payment_account_id,
       method: values.method ?? null,
+      reference: values.reference ?? null,
       allocations,
     });
     setSaving(false);
@@ -163,6 +164,21 @@ export default function PayBillsClient({
             </Form.Item>
             <Form.Item name="payment_date" label="Date">
               <DatePicker />
+            </Form.Item>
+            <Form.Item name="method" label="Method" style={{ width: 170 }}>
+              <Select
+                allowClear
+                placeholder="Method"
+                options={["cash", "bank_transfer", "card", "check"].map((m) => ({ value: m, label: m }))}
+              />
+            </Form.Item>
+            <Form.Item
+              name="reference"
+              label="Reference"
+              style={{ width: 190 }}
+              tooltip="Check number, wire reference or ACH trace"
+            >
+              <Input placeholder="Check / wire ref" maxLength={80} />
             </Form.Item>
           </Space>
           <Form.Item name="amount" label="Payment amount" rules={[{ required: true, message: "Enter an amount" }]}>

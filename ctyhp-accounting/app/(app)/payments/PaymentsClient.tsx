@@ -125,6 +125,7 @@ export default function PaymentsClient({
       amount_minor: toMinorUnits(Number(v.amount), dec),
       deposit_account_id: v.deposit_account_id,
       method: v.method ?? null,
+      reference: v.reference ?? null,
       memo: v.memo ?? null,
       allocations,
     });
@@ -142,6 +143,7 @@ export default function PaymentsClient({
     { title: "Customer", dataIndex: "customer_name" },
     { title: "Date", dataIndex: "payment_date", width: 120 },
     { title: "Method", dataIndex: "method", width: 130, render: (m) => m ?? "—" },
+    { title: "Reference", dataIndex: "reference", width: 140, render: (r) => r ?? "—" },
     {
       title: "Amount",
       dataIndex: "amount_minor",
@@ -272,6 +274,14 @@ export default function PaymentsClient({
                 placeholder="Method"
                 options={["cash", "bank_transfer", "card", "check"].map((m) => ({ value: m, label: m }))}
               />
+            </Form.Item>
+            <Form.Item
+              name="reference"
+              label="Reference"
+              style={{ width: 200 }}
+              tooltip="Check number, wire reference or ACH trace — what the bank statement will show"
+            >
+              <Input placeholder="Check / wire ref" maxLength={80} />
             </Form.Item>
           </Space>
 

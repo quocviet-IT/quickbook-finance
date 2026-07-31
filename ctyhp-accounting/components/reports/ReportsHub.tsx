@@ -38,6 +38,7 @@ const REPORT_ICONS: Record<string, ReactNode> = {
   "profit-and-loss": <BarChartOutlined />,
   "balance-sheet": <PieChartOutlined />,
   "cash-flow": <LineChartOutlined />,
+  "cash-flow-forecast": <ClockCircleOutlined />,
   "statement-of-equity": <FileDoneOutlined />,
   "budget-vs-actual": <BarChartOutlined />,
   "accounts-receivable-aging": <TeamOutlined />,

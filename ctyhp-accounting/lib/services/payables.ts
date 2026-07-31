@@ -203,6 +203,7 @@ export async function payBills(sb: SupabaseClient, input: BillPaymentCreateInput
     p_amount_minor: input.amount_minor,
     p_payment_account_id: input.payment_account_id,
     p_method: input.method || null,
+    p_reference: input.reference || null,
     p_memo: input.memo || null,
     p_allocations: input.allocations,
   });

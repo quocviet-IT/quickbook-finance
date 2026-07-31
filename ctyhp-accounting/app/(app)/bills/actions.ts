@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { listBillSettlements } from "@/lib/services/settlements";
+import type { SettlementEvent } from "@/lib/domain/settlement";
 import { getUserRole, canWrite } from "@/lib/auth";
 import {
   createDraftBill,
@@ -26,6 +28,18 @@ async function guard(): Promise<string | null> {
 function msg(err: unknown): string {
   if (err instanceof PayablesError || err instanceof Error) return err.message;
   return "An unexpected error occurred";
+}
+
+/** Payments, vendor credits and write-offs against one bill, oldest first. */
+export async function getBillSettlementsAction(
+  id: string,
+): Promise<ActionResult<SettlementEvent[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listBillSettlements(sb, id) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
 }
 
 export async function createBillAction(raw: unknown): Promise<ActionResult<{ id: string }>> {

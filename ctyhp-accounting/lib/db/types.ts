@@ -223,6 +223,7 @@ export interface PaymentRow {
   amount_minor: number;
   unapplied_minor: number;
   method: string | null;
+  reference: string | null;
   deposit_account_id: string;
   status: PaymentStatus;
   journal_entry_id: string | null;

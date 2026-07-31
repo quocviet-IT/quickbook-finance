@@ -23,8 +23,15 @@ import AttachmentDrawer, {
 import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
-import { createBillAction, postBillAction, voidBillAction } from "./actions";
+import {
+  createBillAction,
+  getBillSettlementsAction,
+  postBillAction,
+  voidBillAction,
+} from "./actions";
 import WriteOffModal from "../settlements/WriteOffModal";
+import SettlementHistory from "@/components/settlements/SettlementHistory";
+import type { SettlementEvent } from "@/lib/domain/settlement";
 
 const STATUS_COLOR: Record<string, string> = {
   draft: "default",
@@ -80,6 +87,9 @@ export default function BillsClient({
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const [writeOffFor, setWriteOffFor] = useState<BillWithVendor | null>(null);
+  const [historyFor, setHistoryFor] = useState<BillWithVendor | null>(null);
+  const [historyEvents, setHistoryEvents] = useState<SettlementEvent[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const decimals = useMemo(
@@ -144,6 +154,17 @@ export default function BillsClient({
     const res = await postBillAction(id);
     if (res.ok) message.success("Bill posted");
     else message.error(res.error ?? "Failed to post bill");
+  }
+
+  /** What has settled this bill: payments made, vendor credits, write-offs. */
+  async function openHistory(bill: BillWithVendor) {
+    setHistoryFor(bill);
+    setHistoryEvents([]);
+    setHistoryLoading(true);
+    const res = await getBillSettlementsAction(bill.id);
+    setHistoryLoading(false);
+    if (res.ok && res.data) setHistoryEvents(res.data);
+    else message.error(res.error ?? "Failed to load the payment history");
   }
 
   function confirmVoid(id: string) {
@@ -238,6 +259,11 @@ export default function BillsClient({
                       Post
                     </Button>
                   )}
+                  {r.status !== "draft" ? (
+                    <Button size="small" type="link" onClick={() => openHistory(r)}>
+                      Payments
+                    </Button>
+                  ) : null}
                   {canWrite && r.status !== "void" && r.status !== "paid" && (
                     <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
                       Void
@@ -376,6 +402,27 @@ export default function BillsClient({
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`Bill ${historyFor?.bill_number ?? ""}`}
+        open={historyFor !== null}
+        onCancel={() => setHistoryFor(null)}
+        footer={null}
+        width={860}
+        destroyOnHidden
+      >
+        {historyFor ? (
+          <SettlementHistory
+            totalMinor={historyFor.total_minor}
+            balanceDueMinor={historyFor.balance_due_minor}
+            currencyCode={historyFor.currency_code}
+            decimals={2}
+            events={historyEvents}
+            loading={historyLoading}
+            emptyText="No payment, vendor credit or write-off has been applied to this bill yet."
+          />
+        ) : null}
       </Modal>
 
       {writeOffFor && (

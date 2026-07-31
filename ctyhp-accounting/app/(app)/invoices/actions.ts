@@ -12,6 +12,8 @@ import {
   InvoicingError,
 } from "@/lib/services/invoicing";
 import { searchAudit } from "@/lib/services/access";
+import { listInvoiceSettlements } from "@/lib/services/settlements";
+import type { SettlementEvent } from "@/lib/domain/settlement";
 import type { AuditEntryRow, InvoiceLineRow } from "@/lib/db/types";
 import { invoiceCreateSchema, customerCreateSchema } from "@/lib/domain/schemas";
 import {
@@ -93,6 +95,18 @@ export async function getInvoiceAuditAction(id: string): Promise<ActionResult<Au
       limit: 200,
     });
     return { ok: true, data: entries };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Payments, credits and write-offs against one invoice, oldest first. */
+export async function getInvoiceSettlementsAction(
+  id: string,
+): Promise<ActionResult<SettlementEvent[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listInvoiceSettlements(sb, id) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
