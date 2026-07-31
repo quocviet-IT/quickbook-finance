@@ -34,6 +34,13 @@ import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
+import {
+  BANK_SETUP_DETAIL_TYPES,
+  bankDetailLabel,
+  selectableBankLedgerAccounts,
+  suggestBankLedgerAccount,
+  type BankDetailType,
+} from "@/lib/domain/bank-account-detail";
 import type { AccountRow, CurrencyRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type {
   BankAccountWithGl,
@@ -842,6 +849,11 @@ function CreateAccountModal({
   glBankAccounts: AccountRow[];
   currencies: CurrencyRow[];
 }) {
+  const chosenDetail: BankDetailType | undefined = Form.useWatch("detail_type", form);
+  const selectableAccounts = selectableBankLedgerAccounts(glBankAccounts, {
+    detail: chosenDetail ?? null,
+  });
+
   return (
     <Modal
       title="Add bank account"
@@ -854,15 +866,42 @@ function CreateAccountModal({
     >
       <Form form={form} layout="vertical" requiredMark={false}>
         <Form.Item
+          name="detail_type"
+          label="What kind of account is this?"
+          rules={[{ required: true, message: "Choose the kind of account" }]}
+          extra="Cash on hand is not offered: physical cash has no bank statement to import."
+        >
+          <Select
+            placeholder="Checking, savings, money market…"
+            onChange={(value: BankDetailType) => {
+              // Suggest the ledger account that matches, when exactly one does.
+              const suggestion = suggestBankLedgerAccount(glBankAccounts, value);
+              form.setFieldValue("account_id", suggestion?.id);
+            }}
+            options={BANK_SETUP_DETAIL_TYPES.map((detail) => ({
+              value: detail,
+              label: bankDetailLabel(detail),
+            }))}
+          />
+        </Form.Item>
+        <Form.Item
           name="account_id"
-          label="General Ledger bank account"
+          label="General Ledger account"
           rules={[{ required: true, message: "Select an account" }]}
+          extra={
+            selectableAccounts.length === 0
+              ? "No ledger account of this kind is free. Create one in Chart of Accounts, then come back."
+              : undefined
+          }
         >
           <Select
             placeholder="Select a Bank-type account"
-            options={glBankAccounts.map((account) => ({
+            notFoundContent="No matching ledger account"
+            options={selectableAccounts.map((account) => ({
               value: account.id,
-              label: `${account.account_code} — ${account.name}`,
+              label: `${account.account_code} — ${account.name}${
+                account.detail_type ? "" : " (unclassified)"
+              }`,
             }))}
           />
         </Form.Item>

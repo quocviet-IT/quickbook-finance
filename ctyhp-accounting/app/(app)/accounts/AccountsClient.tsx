@@ -22,6 +22,7 @@ import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { ACCOUNT_TYPES, normalBalanceOf, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
+import { BANK_DETAIL_TYPES, bankDetailLabel } from "@/lib/domain/bank-account-detail";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
 
@@ -52,6 +53,8 @@ interface FormValues {
   account_code: string;
   name: string;
   account_type: AccountType;
+  /** Only meaningful for Bank-type accounts; see lib/domain/bank-account-detail. */
+  detail_type?: string | null;
   parent_account_id?: string | null;
   currency_code?: string | null;
   default_tax_code_id?: string | null;
@@ -72,6 +75,8 @@ export default function AccountsClient({
 }) {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
+  // The bank detail picker only appears once the type says it is a bank account.
+  const watchedType = Form.useWatch("account_type", form);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AccountRow | null>(null);
   const [saving, setSaving] = useState(false);
@@ -104,6 +109,7 @@ export default function AccountsClient({
       account_code: row.account_code,
       name: row.name,
       account_type: row.account_type,
+      detail_type: row.detail_type,
       parent_account_id: row.parent_account_id,
       currency_code: row.currency_code,
       default_tax_code_id: row.default_tax_code_id,
@@ -155,6 +161,17 @@ export default function AccountsClient({
       render: (t: AccountType) => <Tag>{TYPE_LABELS[t]}</Tag>,
       filters: ACCOUNT_TYPES.map((t) => ({ text: TYPE_LABELS[t], value: t })),
       onFilter: (value, row) => row.account_type === value,
+    },
+    {
+      title: "Detail",
+      dataIndex: "detail_type",
+      width: 160,
+      render: (detail: string | null, row) =>
+        row.account_type === "bank" ? (
+          <Tag color={detail ? "blue" : "orange"}>{bankDetailLabel(detail)}</Tag>
+        ) : (
+          (detail ?? "—")
+        ),
     },
     {
       title: "Normal",
@@ -264,6 +281,22 @@ export default function AccountsClient({
               placeholder="Select an account type"
             />
           </Form.Item>
+          {watchedType === "bank" ? (
+            <Form.Item
+              name="detail_type"
+              label="Bank account detail"
+              rules={[{ required: true, message: "Say which kind of account this is" }]}
+              extra="Cash on hand is physical cash; everything else is held at a financial institution."
+            >
+              <Select
+                placeholder="Checking, savings, money market, cash on hand…"
+                options={BANK_DETAIL_TYPES.map((detail) => ({
+                  value: detail,
+                  label: bankDetailLabel(detail),
+                }))}
+              />
+            </Form.Item>
+          ) : null}
           <Form.Item name="parent_account_id" label="Parent account (optional)">
             <Select
               allowClear

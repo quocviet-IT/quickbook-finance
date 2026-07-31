@@ -42,9 +42,26 @@ export async function listBankAccounts(sb: SupabaseClient): Promise<BankAccountW
   }));
 }
 
+/**
+ * Link a bank account to a ledger account.
+ *
+ * `detail_type` is what kind of account the person setting it up says this is.
+ * When the ledger account carries no classification yet, theirs is written to
+ * it — a chart written before the classifications existed classifies itself as
+ * it gets used. An account that already says what it is is never overwritten
+ * here; that belongs in Chart of Accounts, where the change is deliberate.
+ *
+ * A cash-on-hand ledger account is refused by the database, not by this code.
+ */
 export async function createBankAccount(
   sb: SupabaseClient,
-  input: { account_id: string; bank_name: string; account_number_masked?: string | null; currency_code: string },
+  input: {
+    account_id: string;
+    bank_name: string;
+    account_number_masked?: string | null;
+    currency_code: string;
+    detail_type?: string | null;
+  },
 ): Promise<BankAccountRow> {
   const { data, error } = await sb
     .from("acc_bank_account")
@@ -57,6 +74,17 @@ export async function createBankAccount(
     .select("*")
     .single();
   if (error) throw new BankingError(error.message);
+
+  if (input.detail_type) {
+    const { error: classifyError } = await sb
+      .from("acc_account")
+      .update({ detail_type: input.detail_type })
+      .eq("id", input.account_id)
+      .is("detail_type", null);
+    // A failure here costs the classification, not the bank account.
+    if (classifyError) console.warn("classifying the ledger account failed:", classifyError.message);
+  }
+
   return data as unknown as BankAccountRow;
 }
 

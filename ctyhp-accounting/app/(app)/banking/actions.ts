@@ -48,6 +48,8 @@ export async function createBankAccountAction(input: {
   bank_name: string;
   account_number_masked?: string | null;
   currency_code: string;
+  /** The kind chosen in the dialog; classifies the ledger account if it has none. */
+  detail_type?: string | null;
 }): Promise<ActionResult> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };

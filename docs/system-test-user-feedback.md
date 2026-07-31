@@ -610,6 +610,80 @@ removing the payment — instead of leaving an invoice nothing could clear.
 | A new `INVOICE_PAYMENTS` table | **Already exists** as `acc_payment_allocation`, and two more tables settle an invoice besides payments. The new RPC joins all three rather than adding a fourth. |
 | Forecasting from "historical collection patterns" per customer | **Portfolio-wide for now.** The median lag is computed across all settled documents, not per customer: with a dozen customers and a handful of settled invoices each, a per-customer median would be a number computed from two data points and read as if it meant something. |
 
+### Issue #9 — Bank setup offered Cash on Hand as the ledger account
+
+Reported as Finding 12: adding a bank account offered "1000 — Cash on Hand" as
+the General Ledger account, which risks classifying a bank balance as physical
+cash on the balance sheet.
+
+#### What the cause actually was
+
+The seeded chart types **both** `1000 Cash on Hand` and `1010 Operating Bank
+Account` as `account_type = 'bank'`. That is correct and is what QuickBooks
+does — "Bank" is the type that carries checking, savings, money market *and*
+cash on hand, and all of them belong to Cash and cash equivalents. The balance
+sheet was never misclassified.
+
+What was missing is the **detail under the type**. `acc_account.detail_type`
+existed but was null on every account and no screen used it, so the bank setup
+picker offered every Bank-type account and Cash on Hand — the lowest code —
+came first in the list. Nothing stopped a bank feed or an imported statement
+being attached to the petty cash tin.
+
+#### What was implemented
+
+**Database — `0072_bank_account_detail_types.sql` (applied to production 2026-07-31)**
+
+- A check constraint fixing the classifications a Bank-type account may carry:
+  checking, savings, money market, cash on hand, other bank. Null stays legal —
+  an account written before this is unclassified, not assumed to be checking.
+- Backfill from what the account's own name settles: `1000 Cash on Hand` →
+  cash on hand, `1010 Operating Bank Account` → checking. Nothing else is
+  guessed at.
+- `acc_bank_account_ledger_guard`: attaching a bank account to a cash-on-hand
+  ledger, or to an account that is not Bank-type at all, is refused by the
+  database — not only by the screen.
+
+**Application**
+
+- `lib/domain/bank-account-detail.ts` (new, pure) + 14 unit tests: the
+  classifications, which of them can hold a statement, which ledger accounts a
+  bank account may attach to, and what to suggest.
+- Banking → Add bank account now asks **what kind of account this is** first
+  (checking, savings, money market, other — cash on hand is not offered), then
+  offers only ledger accounts of that kind plus any unclassified ones, and
+  preselects the match when exactly one exists. Two candidates are left to the
+  person; guessing between them is not a suggestion.
+- Choosing a kind **classifies an unclassified ledger account** as a side
+  effect of using it, so an older chart classifies itself as it is used. An
+  account that already says what it is is never overwritten here.
+- Chart of Accounts shows a **Detail** column for bank accounts and requires
+  the classification when creating or editing one.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 54 files, 504 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| `tests/e2e/bank-account-ledger.e2e.ts` (new, HTTPS, live DB) | 2 tests passed |
+
+The end-to-end test proves the refusals on the live database: attaching a bank
+account to the cash-on-hand ledger fails with "physical cash, not a bank
+balance" and creates nothing, and an expense account is refused as "must be
+linked to a Bank-type ledger account".
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Creating the ledger account from inside the bank dialog | **Not built.** A new account in the chart is a deliberate act with a code, a parent and a statement position; making it a side effect of connecting a bank is how charts fill up with near-duplicate accounts. The dialog says what is missing and Chart of Accounts is one click away. |
+| Reclassifying `1000 Cash on Hand` out of the Bank type | **Left as it is.** It is the correct type — the same one QuickBooks uses for a cash-on-hand account — and every report that groups cash already treats them together. The problem was never the type; it was the missing detail under it. |
+| Guessing a classification for accounts whose name says nothing | **Left null.** "Unclassified" is visible in the chart and still usable in the bank dialog. Writing a guess into the ledger is how a balance sheet ends up quietly wrong. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
