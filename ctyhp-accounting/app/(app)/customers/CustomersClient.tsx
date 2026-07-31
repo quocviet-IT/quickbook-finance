@@ -9,6 +9,7 @@ import {
   InputNumber,
   Modal,
   Row,
+  Select,
   Switch,
   Tag,
   Tooltip,
@@ -43,11 +44,13 @@ const money = (minor: number) => formatMoney(minor, "USD", 2);
 export default function CustomersClient({
   customers,
   credit,
+  usStates,
   canWrite,
 }: {
   customers: CustomerRow[];
   /** Exposure per customer, read from the open invoices on every request. */
   credit: CustomerCreditRow[];
+  usStates: { code: string; name: string }[];
   canWrite: boolean;
 }) {
   const { message } = App.useApp();
@@ -273,7 +276,18 @@ export default function CustomersClient({
             </Col>
             <Col span={6}>
               <Form.Item name="region" label="State">
-                <Input />
+                {/* The two-letter code, because that is what an American
+                    invoice prints and what a sales tax rate is filed under. */}
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="State"
+                  options={usStates.map((state) => ({
+                    value: state.code,
+                    label: `${state.code} — ${state.name}`,
+                  }))}
+                />
               </Form.Item>
             </Col>
             <Col span={8}>

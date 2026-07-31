@@ -684,6 +684,95 @@ linked to a Bank-type ledger account".
 | Reclassifying `1000 Cash on Hand` out of the Bank type | **Left as it is.** It is the correct type — the same one QuickBooks uses for a cash-on-hand account — and every report that groups cash already treats them together. The problem was never the type; it was the missing detail under it. |
 | Guessing a classification for accounts whose name says nothing | **Left null.** "Unclassified" is visible in the chart and still usable in the bank dialog. Writing a guess into the ledger is how a balance sheet ends up quietly wrong. |
 
+### Issue #10 — The twelve customer records were incomplete
+
+Raised directly: the customer data is missing pieces, and the test data has to
+be defensible as bookkeeping.
+
+#### What was missing
+
+- **No credit terms at all.** Every one of the twelve had a null credit limit
+  and null terms, so the credit control shipped the same day enforced nothing
+  and the exposure report opened with "12 of 12 customers have no credit limit
+  set".
+- **The state was a name, not a code.** `region` held "Texas", "Illinois",
+  "California". An American invoice prints `Houston, TX 77006`, and the
+  destination-based tax default matches on the two-letter code — so with
+  "Texas" in the field it could never fire.
+
+#### What was done
+
+**`scripts/seed-customer-credit.ts` (new, run against production 2026-07-31)**
+
+- Signs in as a real user rather than using the service role, so the audit log
+  names who set each limit. Idempotent: it only writes a field that is empty or
+  in the wrong form, so a limit an accountant changes later is never
+  overwritten. `--dry-run` prints what it would do.
+- **Limits from trading history, not from thin air.** The rule lives in
+  `lib/domain/credit.ts` as `suggestCreditLimitMinor` with unit tests, and the
+  script imports it — Node runs the TypeScript directly, so there is no second
+  copy of the arithmetic. Twice the largest invoice, at least a quarter above
+  what is currently owed, floor $1,000, rounded up to the nearest $500: enough
+  to cover a repeat order of the biggest thing they have bought while the last
+  one is still unpaid.
+- **Terms by how the account trades**, named explicitly rather than guessed
+  from the customer's name: the four trade accounts (Grand Avenue Jewelers,
+  Maison Luxe Boutique, North Star Bridal, Acme Studio) net 30, the eight
+  retail buyers net 15. A private buyer carrying a piece for a month is a
+  collections problem, not a credit facility.
+- Each record keeps a **review note** stating the basis — invoice count,
+  largest invoice, balance at review, terms — and the review date.
+- **States normalised to USPS codes** from `acc_us_state`: TX, IL, AZ, CA, NY,
+  MN, FL, OR, GA, WA.
+
+Result on the live data:
+
+| Customer | State | Limit | Terms | Basis (largest invoice) |
+|---|---|---|---|---|
+| North Star Bridal | MN | $35,000 | net 30 | $17,320.00 |
+| Maison Luxe Boutique | NY | $21,000 | net 30 | $10,337.88 |
+| Grand Avenue Jewelers | CA | $12,500 | net 30 | $6,191.90 |
+| Sophia Reynolds | FL | $6,000 | net 15 | $2,906.51 |
+| Sophia Bennett | GA | $5,500 | net 15 | $2,744.14 |
+| Elena Brooks / Liam Anderson | IL / TX | $4,000 | net 15 | $1,759.07 / $1,786.13 |
+| Daniel Carter | TX | $3,500 | net 15 | $1,667.05 |
+| Emma Rodriguez | AZ | $3,000 | net 15 | $1,385.60 |
+| Olivia Thompson | FL | $2,500 | net 15 | $1,093.33 |
+| Michael Chen | WA | $2,000 | net 15 | $801.05 |
+| Acme Studio | OR | $1,000 | net 30 | $162.38 (floor) |
+
+Every limit clears the customer's current balance, so nobody was pushed over a
+limit by the act of setting one — the exposure report reads twelve accounts
+within limit, which is what the ledger actually says.
+
+**So the data means something in use**
+
+- The customer dialog's State field is now a **picker of the 52 states**, so
+  "Texas" cannot come back through the front door.
+- Selecting a customer on a new invoice now **sets the due date from their
+  terms** (issue date + net 15 or net 30, falling back to the company default),
+  alongside the destination tax rate it already suggested. Terms that no
+  document uses are decoration.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 54 files, 509 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| Live check | Customer Credit Exposure no longer warns about unset limits; every customer reads "Within limit" with a DSO |
+
+#### Not done, and why
+
+| Idea | Decision |
+|---|---|
+| Putting a customer on credit hold for a livelier test set | **No.** A hold blocks invoicing for a customer who has done nothing to earn it. Test data that lies about an account is worse than test data that is quiet. |
+| Seeding state sales tax rates now that customers carry state codes | **Still no.** Same reason as Issue #3: a rate this product invented would be wrong somewhere and trusted anyway. The destination default will start working the day real rates are entered. |
+| Backdating the review to look like an established policy | **No.** The review date is today, because today is when it was reviewed. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

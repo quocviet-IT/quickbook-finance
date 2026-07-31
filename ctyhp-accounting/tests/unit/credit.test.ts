@@ -5,6 +5,7 @@ import {
   creditStatus,
   daysSalesOutstanding,
   sortByCreditRisk,
+  suggestCreditLimitMinor,
   type CreditStatus,
 } from "@/lib/domain/credit";
 
@@ -203,6 +204,46 @@ describe("checkInvoiceAgainstCredit", () => {
     });
     expect(check.blocked).toBe(false);
     expect(check.message).toContain("$150.00 is already past due");
+  });
+});
+
+describe("suggestCreditLimitMinor", () => {
+  it("covers a repeat order of the largest invoice, rounded to a round number", () => {
+    // $1,667.05 largest → $3,334.10 → rounded up to $3,500.
+    expect(
+      suggestCreditLimitMinor({ largestInvoiceMinor: 1_667_05, openBalanceMinor: 1_752_57 }),
+    ).toBe(3_500_00);
+  });
+
+  it("never suggests a limit an existing balance is already over", () => {
+    const suggested = suggestCreditLimitMinor({
+      largestInvoiceMinor: 100_00,
+      openBalanceMinor: 9_000_00,
+    });
+    expect(suggested).toBeGreaterThan(9_000_00);
+    expect(suggested % 500_00).toBe(0);
+  });
+
+  it("keeps a floor for a customer who has barely traded", () => {
+    expect(
+      suggestCreditLimitMinor({ largestInvoiceMinor: 162_38, openBalanceMinor: 162_38 }),
+    ).toBe(1_000_00);
+  });
+
+  it("takes a different floor when the business sets one", () => {
+    expect(
+      suggestCreditLimitMinor({
+        largestInvoiceMinor: 0,
+        openBalanceMinor: 0,
+        floorMinor: 2_500_00,
+      }),
+    ).toBe(2_500_00);
+  });
+
+  it("lands exactly on a round figure when the arithmetic already does", () => {
+    expect(
+      suggestCreditLimitMinor({ largestInvoiceMinor: 1_750_00, openBalanceMinor: 0 }),
+    ).toBe(3_500_00);
   });
 });
 

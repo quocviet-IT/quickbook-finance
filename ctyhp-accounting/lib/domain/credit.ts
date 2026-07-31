@@ -196,6 +196,33 @@ export function checkInvoiceAgainstCredit(input: {
   };
 }
 
+/**
+ * A first credit limit for a customer, from what they have actually traded.
+ *
+ * Twice their largest invoice covers a repeat order of the same size while one
+ * is still unpaid; a quarter above the current balance keeps an account that
+ * has grown from being immediately over its own limit. Rounded up to the
+ * nearest $500 because a limit is a decision, not a calculation, and $3,334
+ * reads like nobody made one.
+ *
+ * It is a starting point for the person reviewing the account, never applied
+ * on its own — the limit that gets enforced is the one somebody saved.
+ */
+export function suggestCreditLimitMinor(input: {
+  largestInvoiceMinor: number;
+  openBalanceMinor: number;
+  floorMinor?: number;
+}): number {
+  const floor = input.floorMinor ?? 1_000_00;
+  const fromHistory = Math.max(
+    input.largestInvoiceMinor * 2,
+    Math.ceil(input.openBalanceMinor * 1.25),
+    floor,
+  );
+  const step = 500_00;
+  return Math.ceil(fromHistory / step) * step;
+}
+
 export interface CreditExposureRow {
   customerId: string;
   name: string;

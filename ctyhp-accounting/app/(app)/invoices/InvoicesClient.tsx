@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dayjs from "dayjs";
 import {
   Alert,
   App,
@@ -111,6 +112,7 @@ export default function InvoicesClient({
   usStates,
   credit,
   canOverrideCredit,
+  defaultTermsDays,
   sequenceWarning,
   scannerConfigured,
 }: {
@@ -136,6 +138,8 @@ export default function InvoicesClient({
   credit: CustomerCreditRow[];
   /** Whether this user may issue past a limit; the RPC checks it again. */
   canOverrideCredit: boolean;
+  /** Company default payment terms, used when a customer sets none of their own. */
+  defaultTermsDays: number;
   /** Set when the invoice sequence has a break nobody has accounted for. */
   sequenceWarning: string | null;
   scannerConfigured: boolean;
@@ -262,8 +266,16 @@ export default function InvoicesClient({
    * never over a rate somebody chose. Nothing is filled where the company has
    * no rate there, or where its state has more than one: neither is a default.
    */
-  function applyCustomerTaxRate(customerId: string) {
+  function applyCustomerDefaults(customerId: string) {
     const customer = localCustomers.find((c) => c.id === customerId);
+
+    // Terms are a promise about when the money arrives, so they belong on the
+    // invoice the moment the customer is known — net 15 for a retail buyer and
+    // net 30 for a trade account are different due dates, not a preference.
+    const terms = customer?.credit_terms_days ?? defaultTermsDays;
+    const issue = form.getFieldValue("issue_date") ?? dayjs();
+    form.setFieldValue("due_date", issue.add(terms, "day"));
+
     const rate = defaultTaxCodeForState(customer?.region, taxCodes);
     if (!rate) return;
     const lines: LineForm[] = form.getFieldValue("lines") ?? [];
@@ -654,7 +666,7 @@ export default function InvoicesClient({
                 filterOption={(i, o) => String(o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
                 placeholder="Select a customer"
                 options={localCustomers.map((c) => ({ value: c.id, label: c.name }))}
-                onChange={applyCustomerTaxRate}
+                onChange={applyCustomerDefaults}
               />
             </Form.Item>
             <Form.Item label=" ">
