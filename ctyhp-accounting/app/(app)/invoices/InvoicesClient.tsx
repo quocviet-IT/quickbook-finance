@@ -47,6 +47,11 @@ import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
 import { documentAttribution, formatAuditTimestamp } from "@/lib/domain/audit";
+import {
+  defaultTaxCodeForState,
+  groupTaxCodesByState,
+  taxCodeLabel,
+} from "@/lib/domain/tax-jurisdiction";
 import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
 import {
   createInvoiceAction,
@@ -93,6 +98,7 @@ export default function InvoicesClient({
   canGovernDocuments,
   canReadAudit,
   actors,
+  usStates,
   sequenceWarning,
   scannerConfigured,
 }: {
@@ -113,6 +119,7 @@ export default function InvoicesClient({
   /** Gates the change history block; the RPC behind it refuses the call anyway. */
   canReadAudit: boolean;
   actors: ActorRow[];
+  usStates: { code: string; name: string }[];
   /** Set when the invoice sequence has a break nobody has accounted for. */
   sequenceWarning: string | null;
   scannerConfigured: boolean;
@@ -142,6 +149,18 @@ export default function InvoicesClient({
   const directory = useMemo(
     () => new Map(actors.map((a) => [a.id, a.email || a.full_name])),
     [actors],
+  );
+
+  // Rates differ by state, so the picker is grouped by state rather than being
+  // a flat list of codes nobody can tell apart.
+  const taxOptions = useMemo(
+    () =>
+      groupTaxCodesByState(taxCodes, usStates).map((group) => ({
+        label: group.stateName,
+        title: group.stateName,
+        options: group.codes.map((code) => ({ value: code.id, label: taxCodeLabel(code) })),
+      })),
+    [taxCodes, usStates],
   );
 
   const baseCurrency = currencies.find((c) => c.is_base)?.code ?? "USD";
@@ -187,6 +206,28 @@ export default function InvoicesClient({
     form.resetFields();
     form.setFieldsValue({ currency_code: baseCurrency, lines: [{ quantity: 1 }] });
     setOpen(true);
+  }
+
+  /**
+   * Most states tax a sale where it is delivered, so picking a customer fills
+   * the rate registered in that customer's state — on lines that have none yet,
+   * never over a rate somebody chose. Nothing is filled where the company has
+   * no rate there, or where its state has more than one: neither is a default.
+   */
+  function applyCustomerTaxRate(customerId: string) {
+    const customer = localCustomers.find((c) => c.id === customerId);
+    const rate = defaultTaxCodeForState(customer?.region, taxCodes);
+    if (!rate) return;
+    const lines: LineForm[] = form.getFieldValue("lines") ?? [];
+    let filled = 0;
+    lines.forEach((line, index) => {
+      if (line?.tax_code_id) return;
+      form.setFields([{ name: ["lines", index, "tax_code_id"], value: rate.id }]);
+      filled += 1;
+    });
+    if (filled > 0) {
+      message.info(`Applied ${taxCodeLabel(rate)} for ${customer?.region}`);
+    }
   }
 
   async function submitCustomer() {
@@ -486,6 +527,7 @@ export default function InvoicesClient({
                 filterOption={(i, o) => String(o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
                 placeholder="Select a customer"
                 options={localCustomers.map((c) => ({ value: c.id, label: c.name }))}
+                onChange={applyCustomerTaxRate}
               />
             </Form.Item>
             <Form.Item label=" ">
@@ -544,11 +586,13 @@ export default function InvoicesClient({
                         options={incomeAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}
                       />
                     </Form.Item>
-                    <Form.Item name={[field.name, "tax_code_id"]} style={{ marginBottom: 0, width: 160 }}>
+                    <Form.Item name={[field.name, "tax_code_id"]} style={{ marginBottom: 0, width: 190 }}>
                       <Select
                         allowClear
+                        showSearch
                         placeholder="Tax"
-                        options={taxCodes.map((t) => ({ value: t.id, label: `${t.code} (${t.rate_percent}%)` }))}
+                        optionFilterProp="label"
+                        options={taxOptions}
                       />
                     </Form.Item>
                     <IconActionButton

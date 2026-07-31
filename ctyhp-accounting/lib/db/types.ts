@@ -115,6 +115,13 @@ export interface TaxCodeRow {
   direction: TaxDirection;
   tax_account_id: string | null;
   is_active: boolean;
+  /** US state the rate is filed in; null for a code tied to no jurisdiction. */
+  state_code: string | null;
+}
+
+export interface UsStateRow {
+  code: string;
+  name: string;
 }
 
 export interface JournalEntryRow {

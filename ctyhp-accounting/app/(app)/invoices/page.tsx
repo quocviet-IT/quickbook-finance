@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listInvoices, listCustomers } from "@/lib/services/invoicing";
 import { listAccounts } from "@/lib/services/accounts";
-import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
+import { listCurrencies, listTaxCodes, listUsStates } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
@@ -46,6 +46,7 @@ export default async function InvoicesPage({
     sequenceCatalog,
     sequenceDocuments,
     sequenceNotes,
+    usStates,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -62,6 +63,7 @@ export default async function InvoicesPage({
     listSequenceCatalog(sb),
     listSequenceDocuments(sb, "invoice"),
     listGapNotes(sb, "invoice"),
+    listUsStates(sb),
   ]);
 
   // A number the sequence issued that no invoice holds is the sign of a removed
@@ -113,6 +115,7 @@ export default async function InvoicesPage({
         canGovernDocuments={canGovernDocuments}
         canReadAudit={canReadAudit}
         actors={actors}
+        usStates={usStates}
         sequenceWarning={sequenceWarning}
         scannerConfigured={isDocumentScannerConfigured()}
       />

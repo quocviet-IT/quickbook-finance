@@ -5,8 +5,14 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import { PlusOutlined } from "@ant-design/icons";
-import type { AccountRow, CurrencyRow, TaxCodeRow, TaxPaymentRow } from "@/lib/db/types";
+import type { AccountRow, CurrencyRow, TaxCodeRow, TaxPaymentRow, UsStateRow } from "@/lib/db/types";
 import type { SalesTaxLiability } from "@/lib/domain/salestax";
+import {
+  groupTaxCodesByState,
+  liabilityByState,
+  stateName,
+  type StateLiabilityLine,
+} from "@/lib/domain/tax-jurisdiction";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import {
   liabilityAction, recordTaxPaymentAction, voidTaxPaymentAction,
@@ -19,6 +25,7 @@ interface Props {
   initialLiability: SalesTaxLiability;
   payments: TaxPaymentRow[];
   taxCodes: TaxCodeRow[];
+  usStates: UsStateRow[];
   taxPayableAccounts: AccountRow[];
   bankAccounts: AccountRow[];
   postingAccounts: AccountRow[];
@@ -45,6 +52,25 @@ export default function SalesTaxClient(props: Props) {
     if (res.ok && res.data) setLiability(res.data);
     else message.error(res.error ?? "Failed to load liability");
   }
+
+  // --- Jurisdictions ---
+  // The rate list and the liability are read state-first: that is how a return
+  // is filed, and with rates in ten states a flat list of codes is unusable.
+  const byState = liabilityByState(liability.lines, props.taxCodes, props.usStates);
+  const stateOfCode = (taxCodeId: string) =>
+    stateName(props.taxCodes.find((t) => t.id === taxCodeId)?.state_code ?? null, props.usStates);
+  const ratesByState = groupTaxCodesByState(props.taxCodes, props.usStates, {
+    direction: "",
+    activeOnly: false,
+  }).flatMap((group) => group.codes as TaxCodeRow[]);
+  const stateFilters = [
+    ...new Map(
+      props.taxCodes.map((t) => [
+        t.state_code ?? "",
+        { text: stateName(t.state_code, props.usStates), value: t.state_code ?? "" },
+      ]),
+    ).values(),
+  ].sort((a, b) => a.text.localeCompare(b.text));
 
   // --- Record payment ---
   const [payOpen, setPayOpen] = useState(false);
@@ -99,6 +125,7 @@ export default function SalesTaxClient(props: Props) {
     if (tc) tcForm.setFieldsValue({
       code: tc.code, name: tc.name, rate_percent: Number(tc.rate_percent),
       direction: tc.direction, tax_account_id: tc.tax_account_id ?? undefined, is_active: tc.is_active,
+      state_code: tc.state_code ?? undefined,
     });
     else tcForm.setFieldsValue({ direction: "sales", rate_percent: 0, is_active: true });
     setTcOpen(true);
@@ -109,6 +136,7 @@ export default function SalesTaxClient(props: Props) {
     const payload = {
       code: v.code, name: v.name, rate_percent: Number(v.rate_percent),
       direction: v.direction, tax_account_id: v.tax_account_id ?? null, is_active: v.is_active ?? true,
+      state_code: v.state_code ?? null,
     };
     setTcSaving(true);
     const res = tcEditing ? await updateTaxCodeAction(tcEditing.id, payload) : await createTaxCodeAction(payload);
@@ -135,14 +163,42 @@ export default function SalesTaxClient(props: Props) {
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => setPayOpen(true)}>Record payment</Button>
                 )}
               </Space>
+              {/* A return is filed per state, so the state total comes first and
+                  the codes behind it stay below. */}
+              <Table<StateLiabilityLine>
+                rowKey={(row) => row.stateCode ?? "none"}
+                loading={loading}
+                dataSource={byState}
+                pagination={false}
+                scroll={{ x: "max-content" }}
+                style={{ marginBottom: 24 }}
+                title={() => <Typography.Text strong>Owed by state</Typography.Text>}
+                locale={{ emptyText: "No tax collected in this period" }}
+                columns={[
+                  { title: "State", dataIndex: "stateName" },
+                  {
+                    title: "Rates",
+                    key: "codes",
+                    render: (_: unknown, r) => r.codes.map((c) => c.code).join(", "),
+                  },
+                  { title: "Taxable", dataIndex: "taxableMinor", align: "right", render: (v: number) => money(v) },
+                  { title: "Tax collected", dataIndex: "taxMinor", align: "right", render: (v: number) => money(v) },
+                ]}
+              />
               <Table<SalesTaxLiability["lines"][number]>
                 rowKey="taxCodeId"
                 loading={loading}
                 dataSource={liability.lines}
                 pagination={false}
                 scroll={{ x: "max-content" }}
+                title={() => <Typography.Text strong>By rate</Typography.Text>}
                 columns={[
                   { title: "Code", dataIndex: "code" },
+                  {
+                    title: "State",
+                    key: "state",
+                    render: (_: unknown, r) => stateOfCode(r.taxCodeId),
+                  },
                   { title: "Name", dataIndex: "name" },
                   { title: "Rate", dataIndex: "ratePercent", align: "right", render: (v: number) => `${v}%` },
                   { title: "Taxable", dataIndex: "taxableMinor", align: "right", render: (v: number) => money(v) },
@@ -192,10 +248,17 @@ export default function SalesTaxClient(props: Props) {
               </Space>
               <Table<TaxCodeRow>
                 rowKey="id"
-                dataSource={props.taxCodes}
+                dataSource={ratesByState}
                 scroll={{ x: "max-content" }}
                 pagination={false}
                 columns={[
+                  {
+                    title: "State",
+                    dataIndex: "state_code",
+                    filters: stateFilters,
+                    onFilter: (value, record) => (record.state_code ?? "") === value,
+                    render: (v: string | null) => stateName(v, props.usStates),
+                  },
                   { title: "Code", dataIndex: "code" },
                   { title: "Name", dataIndex: "name" },
                   { title: "Rate", dataIndex: "rate_percent", align: "right", render: (v: number) => `${v}%` },
@@ -242,6 +305,19 @@ export default function SalesTaxClient(props: Props) {
           {/* Tax code modal */}
           <Modal title={tcEditing ? "Edit rate" : "New rate"} open={tcOpen} onOk={submitTaxCode} onCancel={() => setTcOpen(false)} confirmLoading={tcSaving} okText={tcEditing ? "Save" : "Create"}>
             <Form form={tcForm} layout="vertical">
+              <Form.Item
+                name="state_code"
+                label="State"
+                extra="Leave empty for a code that is not filed in one state, such as an exemption."
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Select a state"
+                  options={props.usStates.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` }))}
+                />
+              </Form.Item>
               <Form.Item name="code" label="Code" rules={[{ required: true, message: "Code is required" }]}><Input /></Form.Item>
               <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name is required" }]}><Input /></Form.Item>
               <Form.Item name="rate_percent" label="Rate (%)" rules={[{ required: true, message: "Rate is required" }]}>

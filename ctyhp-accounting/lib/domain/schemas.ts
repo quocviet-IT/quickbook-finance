@@ -225,6 +225,16 @@ export const taxCodeCreateSchema = z.object({
   direction: z.enum(TAX_DIRECTIONS),
   tax_account_id: z.uuid().optional().nullable(),
   is_active: z.boolean().default(true),
+  // Two letters, as the states table stores them. Empty means the code is not
+  // tied to one jurisdiction (an exemption, or a rate not yet classified).
+  state_code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{2}$/, "Pick a state")
+    .optional()
+    .or(z.literal(""))
+    .nullable(),
 });
 export type TaxCodeCreateInput = z.infer<typeof taxCodeCreateSchema>;
 

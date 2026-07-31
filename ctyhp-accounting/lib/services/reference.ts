@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CurrencyRow, TaxCodeRow } from "@/lib/db/types";
+import type { CurrencyRow, TaxCodeRow, UsStateRow } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 
 export async function listCurrencies(sb: SupabaseClient): Promise<CurrencyRow[]> {
@@ -15,8 +15,15 @@ export async function listCurrencies(sb: SupabaseClient): Promise<CurrencyRow[]>
 export async function listTaxCodes(sb: SupabaseClient): Promise<TaxCodeRow[]> {
   const { data, error } = await sb
     .from("acc_tax_code")
-    .select("id,code,name,rate_percent,direction,tax_account_id,is_active")
+    .select("id,code,name,rate_percent,direction,tax_account_id,is_active,state_code")
     .order("code");
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as TaxCodeRow[];
+}
+
+/** The states a rate can be filed in, for the tax rate picker. */
+export async function listUsStates(sb: SupabaseClient): Promise<UsStateRow[]> {
+  const { data, error } = await sb.from("acc_us_state").select("code,name").order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as UsStateRow[];
 }

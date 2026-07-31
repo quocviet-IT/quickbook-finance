@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getSalesTaxLiability, listTaxPayments } from "@/lib/services/salestax";
-import { listTaxCodes, listCurrencies } from "@/lib/services/reference";
+import { listTaxCodes, listCurrencies, listUsStates } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
@@ -22,12 +22,13 @@ export default async function SalesTaxPage() {
   const from = monthStart(now);
   const to = today(now);
 
-  const [liability, payments, taxCodes, accounts, currencies, role] = await Promise.all([
+  const [liability, payments, taxCodes, accounts, currencies, usStates, role] = await Promise.all([
     getSalesTaxLiability(sb, from, to),
     listTaxPayments(sb),
     listTaxCodes(sb),
     listAccounts(sb),
     listCurrencies(sb),
+    listUsStates(sb),
     getUserRole(),
   ]);
 
@@ -54,6 +55,7 @@ export default async function SalesTaxPage() {
         initialLiability={liability}
         payments={payments}
         taxCodes={taxCodes}
+        usStates={usStates}
         taxPayableAccounts={taxPayableAccounts}
         bankAccounts={bankAccounts}
         postingAccounts={postingAccounts}

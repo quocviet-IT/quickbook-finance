@@ -202,6 +202,66 @@ they stay an open exception.
 | Monthly reconciliation report | **As an on-demand export.** Reports → Document Number Sequence lists every number in order with breaks flagged and exports to CSV. It is not sliced by month, because a break has to be judged against the whole sequence — filtering by date would hide any gap whose neighbours fall outside the filter. |
 | Blocking deletion for every role | **Application sessions only.** The service role and the database owner can still delete — migrations, seeds, and test cleanup have to be able to correct data. Both are outside the application and outside RLS by design; the control is that nobody signed into One Book can remove a numbered document. |
 
+### Issue #3 — Sales tax rates differ by state
+
+Source: the one in-app report sitting in **Reviewing**
+(`acc_feedback_report`, `/sales-tax`, 2026-07-30 22:42, `admin@ctyhp.vn`):
+"Tax rates are different with each states, could you please create taxes rates,
+like a drop down."
+
+#### What was already there
+
+Sales Tax → Tax rates could already create, edit, activate and deactivate a
+rate, and the invoice line already picked one from a dropdown. What it could
+not do is say **which state a rate belongs to**: the picker read
+`TAX (8.25%)`, the rates list was a flat alphabetical list of codes, and the
+liability could only be read per code — never per state, which is how a return
+is filed. Five codes existed, none tied to a jurisdiction.
+
+#### What was implemented
+
+**Database — `0068_tax_code_jurisdiction.sql` (applied to production 2026-07-31)**
+
+- `acc_us_state`: the 50 states plus DC and Puerto Rico, readable by any
+  signed-in role. It gives the picker its options.
+- `acc_tax_code.state_code`: the jurisdiction a rate is filed in. Null stays
+  valid — an exemption or a use-tax code belongs to no single state, and the
+  rates list groups those under "No state".
+
+**Application**
+
+- `lib/domain/tax-jurisdiction.ts` (new, pure) + 14 unit tests: grouping rates
+  by state, the `CA — CA-SALES (7.25%)` label, rolling the liability up per
+  state, and choosing the rate for a customer's state.
+- Sales Tax → **Tax rates**: a State column with a per-state filter, rates
+  ordered by state, and a searchable state picker in the rate dialog.
+- Sales Tax → **Liability**: an "Owed by state" table above the per-rate
+  detail — one line per state, largest first, listing the codes behind it.
+  Tax collected under a code that no longer carries a state still appears
+  under "No state" rather than vanishing from the total.
+- Invoices: the tax dropdown is now grouped by state and searchable. Selecting
+  a customer fills the rate registered in that customer's state on lines that
+  have none yet — destination sourcing — and fills nothing when the company has
+  no rate there or the state has more than one.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 48 files, 424 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | `/sales-tax` and `/invoices` rendered |
+
+#### Not implemented, and why
+
+| Recommendation | Decision |
+|---|---|
+| Ship the 50 state rates ready to use | **Deliberately not seeded.** A state rate is only half of what is charged — county, city and district add to it — and every rate changes by legislature. A number this product invented would be wrong somewhere and would be trusted anyway. The states are seeded; the rates are the accountant's, entered once per state they are registered in. |
+| Automatic rate lookup by address | **Not built.** Correct rooftop-level rates mean a paid tax service (Avalara, TaxJar) and an address-validation step; that is an integration to scope, not a field to add. |
+| Existing codes classified into states | **Left alone.** `TAX (8.25%)` looks like a Texas combined rate but nothing in the data says so. Guessing a jurisdiction onto a rate already used on issued invoices would be a fabrication; the codes show under "No state" until someone who knows sets them. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -215,7 +275,8 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
 5. `/reports?report=balance` — chart below the numbers, multi-year and
    12-month comparison, variance columns toggleable.
 6. `/reports/cash-flow` — chart below the numbers; accountant vs management view.
-7. `/sales-tax` — tax rates differ by state; offer a rate list.
+7. ~~`/sales-tax` — tax rates differ by state; offer a rate list.~~ Done, see
+   Issue #3 above.
 8. `/settings/feedback` — let a reporter attach images and PDFs.
 9. `/reports`, `/fixed-assets` — separate statements per company (10+ companies).
 10. `/banking/reconcile` — import a bank statement and match it automatically.

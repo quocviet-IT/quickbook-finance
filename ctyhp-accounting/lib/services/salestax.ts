@@ -64,7 +64,7 @@ export async function voidTaxPayment(sb: SupabaseClient, id: string): Promise<vo
   if (error) throw new SalesTaxError(error.message);
 }
 
-const TC_COLS = "id,code,name,rate_percent,direction,tax_account_id,is_active";
+const TC_COLS = "id,code,name,rate_percent,direction,tax_account_id,is_active,state_code";
 
 function taxCodeRow(input: TaxCodeCreateInput | TaxCodeUpdateInput) {
   return {
@@ -74,6 +74,7 @@ function taxCodeRow(input: TaxCodeCreateInput | TaxCodeUpdateInput) {
     direction: input.direction,
     tax_account_id: input.tax_account_id || null,
     is_active: input.is_active,
+    state_code: input.state_code || null,
   };
 }
 
