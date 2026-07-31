@@ -377,3 +377,84 @@ export function computeRunningBalance(
     return { ...r, runningMinor: running };
   });
 }
+
+// --- Multi-period balance sheet ---------------------------------------------
+
+export interface BalanceTrendRow {
+  key: string;
+  label: string;
+  kind: "section" | "line" | "total";
+  /** One amount per period, in the order the periods were given. */
+  amounts: number[];
+}
+
+function trendSection(
+  key: string,
+  sections: ReportSection[],
+  totals: number[],
+  totalLabel: string,
+): BalanceTrendRow[] {
+  const order: string[] = [];
+  const byLabel = new Map<string, number[]>();
+
+  sections.forEach((section, index) => {
+    for (const line of section.lines) {
+      const label = `${line.accountCode} — ${line.name}`;
+      if (!byLabel.has(label)) {
+        // An account that appears only in a later period reads as zero in the
+        // earlier ones, which is what it was.
+        byLabel.set(label, new Array(sections.length).fill(0));
+        order.push(label);
+      }
+      byLabel.get(label)![index] = line.amount;
+    }
+  });
+
+  return [
+    { key, label: sections[0]?.title ?? key, kind: "section", amounts: [] },
+    ...order.map((label) => ({
+      key: `${key}-${label}`,
+      label,
+      kind: "line" as const,
+      amounts: byLabel.get(label)!,
+    })),
+    { key: `${key}-total`, label: totalLabel, kind: "total" as const, amounts: totals },
+  ];
+}
+
+/**
+ * Accounts down the side, one column per period across the top.
+ *
+ * An account is listed if it carried a balance in *any* period shown: a
+ * receivable that cleared in March still has to appear, or the reader sees a
+ * column of numbers with no line for the money that used to be there.
+ */
+export function balanceTrendRows(sheets: readonly BalanceSheet[]): BalanceTrendRow[] {
+  if (sheets.length === 0) return [];
+  return [
+    ...trendSection(
+      "assets",
+      sheets.map((sheet) => sheet.assets),
+      sheets.map((sheet) => sheet.totalAssets),
+      "Total Assets",
+    ),
+    ...trendSection(
+      "liabilities",
+      sheets.map((sheet) => sheet.liabilities),
+      sheets.map((sheet) => sheet.totalLiabilities),
+      "Total Liabilities",
+    ),
+    ...trendSection(
+      "equity",
+      sheets.map((sheet) => sheet.equity),
+      sheets.map((sheet) => sheet.totalEquity),
+      "Total Equity",
+    ),
+    {
+      key: "liabilities-equity",
+      label: "Total Liabilities + Equity",
+      kind: "total",
+      amounts: sheets.map((sheet) => sheet.totalLiabilities + sheet.totalEquity),
+    },
+  ];
+}

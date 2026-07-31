@@ -773,6 +773,66 @@ within limit, which is what the ledger actually says.
 | Seeding state sales tax rates now that customers carry state codes | **Still no.** Same reason as Issue #3: a rate this product invented would be wrong somewhere and trusted anyway. The destination default will start working the day real rates are entered. |
 | Backdating the review to look like an established policy | **No.** The review date is today, because today is when it was reviewed. |
 
+### Issue #11 — Balance Sheet Comparison: chart position, comparison period, variance
+
+From the in-app queue (`/reports?report=balance`, 2026-07-30 20:19): "I would
+suggest that the graph move to the bottom part. second that the report must
+have multiple year comparison not just months, or can we add another filter to
+have 12 months comparison. remove the variances we can get that or can we have
+turn on/off button for the variance report. Overall this report is good."
+
+#### What the screenshot showed
+
+The attached screenshot settles what the words leave open. The chart panel took
+the **left half** of the report and the numbers were squeezed into the right
+half — so the Variance column was cut off at the edge and needed a horizontal
+scroll to read. The comparison was fixed to the prior month end (2026-05-31
+beside 2026-06-30) with no way to ask for anything else.
+
+#### What was implemented
+
+- **The numbers come first.** The comparison table now runs full width with the
+  chart underneath it, on both the Balance Sheet and the Profit & Loss
+  comparison. Nothing is cut off any more.
+- **Comparison period is a choice**: prior month end, prior quarter end, prior
+  year end, or the same date last year.
+- **Multi-period columns**: "Last 12 months" gives twelve month-end columns,
+  "Last 3 years" gives two year ends plus the current position. Accounts run
+  down the side, periods across the top, with a bar per period underneath.
+- **Variance is a switch, off by default** — the reviewer can subtract two
+  columns and said so. Turning it on brings back both the Variance and
+  Variance % columns.
+- `lib/domain/report-periods.ts` (new, pure) + 18 unit tests covering the date
+  arithmetic that always breaks — the prior month end of 31 March is 28
+  February, the prior quarter of a January date is last December, 29 February
+  a year earlier is 28 February — and the multi-period table, including that an
+  account which cleared mid-window still gets a row of zeros rather than
+  disappearing.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 55 files, 527 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| Rendered check | `/reports?report=balance` returns the totals **before** the chart in the HTML, with the period picker and the variance switch present |
+
+A first smoke run failed eight untouched pages with "the client reference
+manifest for route … does not exist". That is a stale `.next` from building over
+a directory a running server still held, not a defect: a clean rebuild passed
+50 of 50. Written into `CLAUDE.md` so the next person does not go hunting.
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Removing the variance columns outright | **Made a switch instead.** The reviewer offered both; a toggle costs nothing and the next reader may want them. Default off, which is what they asked for first. |
+| Variance columns in the 12-month view | **No.** Variance against which of twelve columns? A trend is read across, not against a single base. |
+| A per-account line chart across the 12 periods | **Not built.** The bar under the table is total assets per period, which is the shape of the business. Twelve series of account balances is a chart nobody reads. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -783,8 +843,8 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
 3. `/reports` — add an AP Aging report alongside AR.
 4. `/reports/ar-ageing` — matrix layout: customer × Current/1-30/31-60/61-90/
    Over, with row and column totals.
-5. `/reports?report=balance` — chart below the numbers, multi-year and
-   12-month comparison, variance columns toggleable.
+5. ~~`/reports?report=balance` — chart below the numbers, multi-year and
+   12-month comparison, variance columns toggleable.~~ Done, see Issue #11.
 6. `/reports/cash-flow` — chart below the numbers; accountant vs management view.
 7. ~~`/sales-tax` — tax rates differ by state; offer a rate list.~~ Done, see
    Issue #3 above.

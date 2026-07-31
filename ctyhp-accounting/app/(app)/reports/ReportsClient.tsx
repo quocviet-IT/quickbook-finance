@@ -11,6 +11,7 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -23,6 +24,9 @@ import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts
 import BudgetEditorDrawer from "@/components/reports/BudgetEditorDrawer";
 import BudgetVsActualView from "@/components/reports/BudgetVsActualView";
 import StatementOfEquityView from "@/components/reports/StatementOfEquityView";
+import BalanceSheetTrendView, {
+  type TrendPeriod,
+} from "@/components/reports/BalanceSheetTrendView";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { formatMoney } from "@/lib/format";
 import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
@@ -34,7 +38,6 @@ import {
   buildProfitAndLoss,
   buildTrialBalance,
   compareReportLines,
-  previousMonthEnd,
   previousPeriodRange,
   type BalanceSheet,
   type BudgetVsActual,
@@ -42,6 +45,14 @@ import {
   type ReportSection,
   type StatementOfEquity,
 } from "@/lib/domain/reports";
+import {
+  COMPARISON_BASES,
+  comparisonBasisLabel,
+  comparisonDate,
+  trailingMonthEnds,
+  trailingYearEnds,
+  type ComparisonBasis,
+} from "@/lib/domain/report-periods";
 import {
   getBudgetVsActualAction,
   getLedgerBalancesAction,
@@ -74,6 +85,14 @@ export default function ReportsClient({
   const [range, setRange] = useState<[Dayjs, Dayjs]>([today.startOf("year"), today]);
   const [rows, setRows] = useState<LedgerBalance[]>([]);
   const [priorRows, setPriorRows] = useState<LedgerBalance[]>([]);
+  // Balance sheet presentation: what it is compared with, whether the
+  // variance columns are shown, and whether it runs as a period trend.
+  const [comparisonBasis, setComparisonBasis] = useState<ComparisonBasis>("prior_month");
+  const [balanceColumns, setBalanceColumns] = useState<"comparison" | "months" | "years">(
+    "comparison",
+  );
+  const [showVariance, setShowVariance] = useState(false);
+  const [trendPeriods, setTrendPeriods] = useState<TrendPeriod[]>([]);
   const [budgetReport, setBudgetReport] = useState<BudgetVsActual | null>(null);
   const [equityReport, setEquityReport] = useState<StatementOfEquity | null>(null);
   const [fiscalYear, setFiscalYear] = useState(initialFiscalYear);
@@ -124,6 +143,26 @@ export default function ReportsClient({
         return;
       }
 
+      if (type === "balance" && balanceColumns !== "comparison") {
+        // A trend runs one balance sheet per column; they are independent
+        // reads, so they go out together.
+        const asOfIso = asOf.format("YYYY-MM-DD");
+        const columns =
+          balanceColumns === "months" ? trailingMonthEnds(asOfIso, 12) : trailingYearEnds(asOfIso, 3);
+        const results = await Promise.all(
+          columns.map((column) => getLedgerBalancesAction(null, column.date)),
+        );
+        const failed = results.find((result) => !result.ok || !result.data);
+        if (failed) throw new Error(failed.error ?? "Failed to load the period trend");
+        setTrendPeriods(
+          columns.map((column, index) => ({
+            ...column,
+            sheet: buildBalanceSheet(results[index].data ?? []),
+          })),
+        );
+        return;
+      }
+
       const currentFrom = type === "pnl" ? range[0].format("YYYY-MM-DD") : null;
       const currentTo = type === "pnl" ? range[1].format("YYYY-MM-DD") : asOf.format("YYYY-MM-DD");
       let priorFrom: string | null = null;
@@ -133,7 +172,7 @@ export default function ReportsClient({
         priorFrom = prior.from;
         priorTo = prior.to;
       } else if (type === "balance") {
-        priorTo = previousMonthEnd(currentTo);
+        priorTo = comparisonDate(currentTo, comparisonBasis);
       }
       const [currentResult, priorResult] = await Promise.all([
         getLedgerBalancesAction(currentFrom, currentTo),
@@ -156,6 +195,8 @@ export default function ReportsClient({
     type,
     range,
     asOf,
+    comparisonBasis,
+    balanceColumns,
     fiscalYear,
     budgetFromPeriod,
     budgetToPeriod,
@@ -223,6 +264,44 @@ export default function ReportsClient({
             <DatePicker value={asOf} allowClear={false} onChange={(value) => value && setAsOf(value)} />
           </Space>
         )}
+        {type === "balance" && (
+          <>
+            <Select
+              aria-label="Balance sheet columns"
+              value={balanceColumns}
+              style={{ width: 185 }}
+              onChange={setBalanceColumns}
+              options={[
+                { value: "comparison", label: "Two periods" },
+                { value: "months", label: "Last 12 months" },
+                { value: "years", label: "Last 3 years" },
+              ]}
+            />
+            {balanceColumns === "comparison" && (
+              <>
+                <Select
+                  aria-label="Compared with"
+                  value={comparisonBasis}
+                  style={{ width: 210 }}
+                  onChange={setComparisonBasis}
+                  options={COMPARISON_BASES.map((basis) => ({
+                    value: basis,
+                    label: `vs ${comparisonBasisLabel(basis).toLowerCase()}`,
+                  }))}
+                />
+                <Space>
+                  <Switch
+                    size="small"
+                    checked={showVariance}
+                    onChange={setShowVariance}
+                    aria-label="Show variance columns"
+                  />
+                  <Typography.Text type="secondary">Variance</Typography.Text>
+                </Space>
+              </>
+            )}
+          </>
+        )}
         {type === "budget" && (
           <>
             <Space>
@@ -276,14 +355,24 @@ export default function ReportsClient({
               money={money}
             />
           )}
-          {type === "balance" && (
+          {type === "balance" && balanceColumns === "comparison" && (
             <BalanceSheetComparisonView
               rows={rows}
               priorRows={priorRows}
               asOf={asOf}
+              comparisonBasis={comparisonBasis}
+              showVariance={showVariance}
               companyName={companyName}
               baseCurrency={baseCurrency}
               baseDecimals={baseDecimals}
+              money={money}
+            />
+          )}
+          {type === "balance" && balanceColumns !== "comparison" && (
+            <BalanceSheetTrendView
+              periods={trendPeriods}
+              companyName={companyName}
+              baseCurrency={baseCurrency}
               money={money}
             />
           )}
@@ -530,7 +619,16 @@ function PnlComparisonView({
         subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")} · Prior ${priorRange.from} – ${priorRange.to}`}
         exportSheet={exportSheet}
       />
-      <div className="report-visual-layout">
+      {/* Numbers first, full width; the chart reads underneath them. */}
+      <ComparisonTable
+        rows={comparisonRows}
+        currentLabel="Current"
+        priorLabel="Prior"
+        currentRange={{ from: currentFrom, to: currentTo }}
+        priorRange={priorRange}
+        money={money}
+      />
+      <div style={{ marginTop: 24 }}>
         <ComparisonBars
           title="Period performance"
           description="Current period profitability compared with the immediately preceding period."
@@ -542,14 +640,6 @@ function PnlComparisonView({
             { key: "prior-net", label: "Prior net income", value: prior.netIncome, color: chartColors.neutral },
           ]}
         />
-        <ComparisonTable
-          rows={comparisonRows}
-          currentLabel="Current"
-          priorLabel="Prior"
-          currentRange={{ from: currentFrom, to: currentTo }}
-          priorRange={priorRange}
-          money={money}
-        />
       </div>
     </div>
   );
@@ -560,6 +650,8 @@ function BalanceSheetComparisonView({
   priorRows,
   money,
   asOf,
+  comparisonBasis,
+  showVariance,
   companyName,
   baseCurrency,
   baseDecimals,
@@ -568,6 +660,8 @@ function BalanceSheetComparisonView({
   priorRows: LedgerBalance[];
   money: (value: number) => string;
   asOf: Dayjs;
+  comparisonBasis: ComparisonBasis;
+  showVariance: boolean;
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
@@ -575,7 +669,7 @@ function BalanceSheetComparisonView({
   const current = buildBalanceSheet(rows);
   const prior = buildBalanceSheet(priorRows);
   const currentTo = asOf.format("YYYY-MM-DD");
-  const priorTo = previousMonthEnd(currentTo);
+  const priorTo = comparisonDate(currentTo, comparisonBasis);
   const comparisonRows = balanceComparisonRows(current, prior);
   const exportSheet = comparisonExportSheet({
     fileName: `balance-sheet-comparison-${currentTo}`,
@@ -592,13 +686,26 @@ function BalanceSheetComparisonView({
     <div className="report-result">
       <ReportHeading
         title="Balance Sheet Comparison"
-        subtitle={`As of ${asOf.format("MMM D, YYYY")} · Prior month end ${priorTo}`}
+        subtitle={`As of ${asOf.format("MMM D, YYYY")} · ${comparisonBasisLabel(comparisonBasis)} ${priorTo}`}
         exportSheet={exportSheet}
       />
-      <div className="report-visual-layout">
+      {/* The numbers get the full width; the chart reads underneath them. */}
+      <ComparisonTable
+        rows={comparisonRows}
+        currentLabel={currentTo}
+        priorLabel={priorTo}
+        currentRange={{ from: "", to: currentTo }}
+        priorRange={{ from: "", to: priorTo }}
+        money={money}
+        showVariance={showVariance}
+      />
+      <div className="report-balance-status">
+        <Tag color={current.balanced ? "green" : "red"}>{current.balanced ? "Balanced" : "Out of balance"}</Tag>
+      </div>
+      <div style={{ marginTop: 24 }}>
         <ComparisonBars
           title="Financial position comparison"
-          description="Current assets, liabilities, and equity compared with the prior month end."
+          description={`Current assets, liabilities, and equity compared with ${comparisonBasisLabel(comparisonBasis).toLowerCase()} ${priorTo}.`}
           formatMoney={money}
           data={[
             { key: "assets", label: "Current assets", value: current.totalAssets, color: chartColors.receivable },
@@ -607,19 +714,6 @@ function BalanceSheetComparisonView({
             { key: "equity", label: "Current equity", value: current.totalEquity, color: chartColors.net },
           ]}
         />
-        <div>
-          <ComparisonTable
-            rows={comparisonRows}
-            currentLabel={currentTo}
-            priorLabel={priorTo}
-            currentRange={{ from: "", to: currentTo }}
-            priorRange={{ from: "", to: priorTo }}
-            money={money}
-          />
-          <div className="report-balance-status">
-            <Tag color={current.balanced ? "green" : "red"}>{current.balanced ? "Balanced" : "Out of balance"}</Tag>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -646,6 +740,7 @@ function ComparisonTable({
   currentRange,
   priorRange,
   money,
+  showVariance = true,
 }: {
   rows: ComparisonRow[];
   currentLabel: string;
@@ -653,6 +748,8 @@ function ComparisonTable({
   currentRange: { from: string; to: string };
   priorRange: { from: string; to: string };
   money: (value: number) => string;
+  /** Off by default on the balance sheet: the reader can subtract two columns. */
+  showVariance?: boolean;
 }) {
   return (
     <DataTable
@@ -698,21 +795,26 @@ function ComparisonTable({
                 ? <LedgerAmountLink accountId={row.accountId} range={priorRange} label={money(row.prior)} />
                 : money(row.prior),
         },
-        {
-          title: "Variance",
-          width: 145,
-          align: "right",
-          render: (_, row) => row.kind === "section" ? "" : money(row.variance),
-        },
-        {
-          title: "Variance %",
-          width: 110,
-          align: "right",
-          render: (_, row) =>
-            row.kind === "section" || row.variancePercent === null
-              ? ""
-              : `${row.variancePercent.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`,
-        },
+        ...(showVariance
+          ? [
+              {
+                title: "Variance",
+                width: 145,
+                align: "right" as const,
+                render: (_: unknown, row: ComparisonRow) =>
+                  row.kind === "section" ? "" : money(row.variance),
+              },
+              {
+                title: "Variance %",
+                width: 110,
+                align: "right" as const,
+                render: (_: unknown, row: ComparisonRow) =>
+                  row.kind === "section" || row.variancePercent === null
+                    ? ""
+                    : `${row.variancePercent.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`,
+              },
+            ]
+          : []),
       ]}
       rowClassName={(row) =>
         row.kind === "section"
