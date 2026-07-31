@@ -5,14 +5,22 @@ import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "@/lib/domain/feedback";
 import type { FeedbackKind, FeedbackStatus } from "@/lib/domain/feedback";
 import {
+  attachmentUrl,
   fileFeedbackReport,
+  listFeedbackAttachments,
   listFeedbackReports,
+  recordFeedbackAttachments,
   screenshotUrl,
   setFeedbackStatus,
   FeedbackError,
+  type FeedbackAttachmentView,
   type FeedbackReportView,
 } from "@/lib/services/feedback";
-import { feedbackReportSchema, feedbackStatusChangeSchema } from "@/lib/domain/schemas";
+import {
+  feedbackAttachmentsSchema,
+  feedbackReportSchema,
+  feedbackStatusChangeSchema,
+} from "@/lib/domain/schemas";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -87,6 +95,59 @@ export async function setFeedbackStatusAction(
     );
     revalidatePath("/settings/feedback");
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Record attachments the browser has already uploaded. The type and size are
+ * checked again here: the bucket enforces them too, but a client that lies
+ * about a file must not be able to write a row that says otherwise.
+ */
+export async function recordFeedbackAttachmentsAction(
+  raw: unknown,
+): Promise<ActionResult<FeedbackAttachmentView[]>> {
+  const parsed = feedbackAttachmentsSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid attachment" };
+  }
+  try {
+    const sb = await createSupabaseServerClient();
+    const stored = await recordFeedbackAttachments(
+      sb,
+      parsed.data.files.map((file) => ({
+        reportId: parsed.data.report_id,
+        storagePath: file.storage_path,
+        fileName: file.file_name,
+        mimeType: file.mime_type,
+        sizeBytes: file.size_bytes,
+      })),
+    );
+    revalidatePath("/settings/feedback");
+    return { ok: true, data: stored };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function listFeedbackAttachmentsAction(): Promise<
+  ActionResult<FeedbackAttachmentView[]>
+> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listFeedbackAttachments(sb) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function feedbackAttachmentUrlAction(
+  path: string,
+): Promise<ActionResult<{ url: string }>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: { url: await attachmentUrl(sb, path) } };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

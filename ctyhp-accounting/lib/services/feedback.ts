@@ -180,3 +180,91 @@ export async function screenshotUrl(
   if (error || !data) throw new FeedbackError(error?.message ?? "Screenshot unavailable");
   return data.signedUrl;
 }
+
+// --- Attachments (migration 0070) ---
+
+const ATTACHMENT_BUCKET = "feedback-attachments";
+
+export interface FeedbackAttachmentView {
+  id: string;
+  reportId: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface RecordAttachmentInput {
+  reportId: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+/**
+ * Record files the reporter has already uploaded to the bucket.
+ *
+ * The bytes travel from the browser straight to storage — a server action
+ * carries a 1 MB body by default, and an attachment is allowed ten times that.
+ * What reaches the server is the path, and RLS on both the object and this
+ * table checks the report belongs to the caller.
+ */
+export async function recordFeedbackAttachments(
+  sb: SupabaseClient,
+  inputs: readonly RecordAttachmentInput[],
+): Promise<FeedbackAttachmentView[]> {
+  if (inputs.length === 0) return [];
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) throw new FeedbackError("Your session has expired. Sign in again.");
+
+  const { data, error } = await sb
+    .from("acc_feedback_attachment")
+    .insert(
+      inputs.map((input) => ({
+        report_id: input.reportId,
+        storage_path: input.storagePath,
+        file_name: input.fileName,
+        mime_type: input.mimeType,
+        size_bytes: input.sizeBytes,
+        uploaded_by: user.id,
+      })),
+    )
+    .select("id,report_id,storage_path,file_name,mime_type,size_bytes,created_at");
+  if (error) throw new FeedbackError(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(toAttachmentView);
+}
+
+function toAttachmentView(row: Record<string, unknown>): FeedbackAttachmentView {
+  return {
+    id: row.id as string,
+    reportId: row.report_id as string,
+    storagePath: row.storage_path as string,
+    fileName: row.file_name as string,
+    mimeType: row.mime_type as string,
+    sizeBytes: Number(row.size_bytes),
+    createdAt: row.created_at as string,
+  };
+}
+
+/** Every attachment on the reports the caller may read, newest report first. */
+export async function listFeedbackAttachments(
+  sb: SupabaseClient,
+): Promise<FeedbackAttachmentView[]> {
+  const { data, error } = await sb
+    .from("acc_feedback_attachment")
+    .select("id,report_id,storage_path,file_name,mime_type,size_bytes,created_at")
+    .order("created_at");
+  if (error) throw new FeedbackError(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(toAttachmentView);
+}
+
+/** Short-lived link so a reviewer can open one attachment. */
+export async function attachmentUrl(sb: SupabaseClient, path: string): Promise<string> {
+  const { data, error } = await sb.storage.from(ATTACHMENT_BUCKET).createSignedUrl(path, 300);
+  if (error || !data) throw new FeedbackError(error?.message ?? "Attachment unavailable");
+  return data.signedUrl;
+}

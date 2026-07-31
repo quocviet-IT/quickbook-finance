@@ -11,7 +11,7 @@ import {
   Typography,
   type TableColumnsType,
 } from "antd";
-import { PictureOutlined, ReloadOutlined } from "@ant-design/icons";
+import { FileOutlined, PictureOutlined, ReloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import {
   describeFeedbackStatusChange,
@@ -24,9 +24,12 @@ import {
   summarizePageContext,
   type FeedbackStatus,
 } from "@/lib/domain/feedback";
-import type { FeedbackReportView } from "@/lib/services/feedback";
+import type { FeedbackAttachmentView, FeedbackReportView } from "@/lib/services/feedback";
+import { formatBytes } from "@/lib/domain/feedback-attachment";
 import {
+  feedbackAttachmentUrlAction,
   feedbackScreenshotUrlAction,
+  listFeedbackAttachmentsAction,
   listFeedbackReportsAction,
   setFeedbackStatusAction,
 } from "./actions";
@@ -35,18 +38,30 @@ const KIND_COLOR: Record<string, string> = { broken: "red", suggestion: "blue" }
 
 export default function FeedbackTriageClient({
   initialReports,
+  initialAttachments,
   canTriage,
 }: {
   initialReports: FeedbackReportView[];
+  initialAttachments: FeedbackAttachmentView[];
   canTriage: boolean;
 }) {
   const { message } = App.useApp();
   const [reports, setReports] = useState(initialReports);
+  const [attachments, setAttachments] = useState(initialAttachments);
   const [queue, setQueue] = useState<FeedbackStatus>("new");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const counts = useMemo(() => queueCounts(reports), [reports]);
+  const attachmentsByReport = useMemo(() => {
+    const map = new Map<string, FeedbackAttachmentView[]>();
+    for (const attachment of attachments) {
+      const list = map.get(attachment.reportId);
+      if (list) list.push(attachment);
+      else map.set(attachment.reportId, [attachment]);
+    }
+    return map;
+  }, [attachments]);
   const rows = useMemo(
     () => sortNewestFirst(reports.filter((r) => r.status === queue)),
     [reports, queue],
@@ -54,10 +69,14 @@ export default function FeedbackTriageClient({
 
   async function reload() {
     setLoading(true);
-    const res = await listFeedbackReportsAction();
+    const [res, files] = await Promise.all([
+      listFeedbackReportsAction(),
+      listFeedbackAttachmentsAction(),
+    ]);
     setLoading(false);
     if (res.ok && res.data) setReports(res.data);
     else message.error(res.error ?? "Failed to load reports");
+    if (files.ok && files.data) setAttachments(files.data);
   }
 
   async function move(report: FeedbackReportView, status: FeedbackStatus) {
@@ -76,6 +95,13 @@ export default function FeedbackTriageClient({
     const res = await feedbackScreenshotUrlAction(path);
     if (res.ok && res.data) window.open(res.data.url, "_blank", "noopener");
     else message.error(res.error ?? "Screenshot unavailable");
+  }
+
+  /** Signed on demand and short-lived: an attachment can hold customer data. */
+  async function openAttachment(path: string) {
+    const res = await feedbackAttachmentUrlAction(path);
+    if (res.ok && res.data) window.open(res.data.url, "_blank", "noopener");
+    else message.error(res.error ?? "Attachment unavailable");
   }
 
   const columns: TableColumnsType<FeedbackReportView> = [
@@ -132,6 +158,30 @@ export default function FeedbackTriageClient({
         ) : (
           <Typography.Text type="secondary">—</Typography.Text>
         ),
+    },
+    {
+      title: "Attachments",
+      width: 240,
+      render: (_, row) => {
+        const files = attachmentsByReport.get(row.id) ?? [];
+        if (files.length === 0) return <Typography.Text type="secondary">—</Typography.Text>;
+        return (
+          <Space direction="vertical" size={2}>
+            {files.map((file) => (
+              <Button
+                key={file.id}
+                size="small"
+                type="link"
+                icon={<FileOutlined />}
+                style={{ padding: 0, height: "auto", textAlign: "left" }}
+                onClick={() => openAttachment(file.storagePath)}
+              >
+                {file.fileName} ({formatBytes(file.sizeBytes)})
+              </Button>
+            ))}
+          </Space>
+        );
+      },
     },
     ...(canTriage
       ? [

@@ -451,6 +451,72 @@ account is put on hold even a $1 invoice is refused.
 | Blocking an invoice for a customer with no billing address | **Warning only**, as agreed. A missing address makes a poor-looking invoice, not a wrong entry. |
 | Shipping address as a separate field | **Not added.** Nothing in the product ships goods to an address yet; adding a field no screen reads would be a place for stale data to live. |
 
+### Issue #7 — A report could not carry the file that proves it
+
+From the in-app queue (`/settings/feedback`, 2026-07-30 14:26): "Các suggestion
+và issues trong report a problem, phải cho người sử dụng bổ sung thêm
+attachment, hình ảnh, PDF, v.v."
+
+The dialog captured a screenshot of the page — what the *reporter* was looking
+at. It could not carry the vendor's PDF that disagrees with the bill, a photo of
+a printed invoice, or the spreadsheet the numbers came from, which is usually
+what makes a report actionable.
+
+#### What was implemented
+
+**Database — `0070_feedback_attachments.sql` (applied to production 2026-07-31)**
+
+- `acc_feedback_attachment`: one row per file, with its storage path, name,
+  type and size. Insert is allowed only onto a report the caller filed; reading
+  needs `feedback.read` or ownership of the report. **No update or delete
+  policy** — the same evidence rule the report itself follows: what a report
+  shows cannot change after filing. Audited by the 0058 trigger.
+- Private bucket `feedback-attachments`, 10 MB a file, limited to images, PDF,
+  CSV, plain text and xlsx. The path must be `<report id>/<uuid>.<ext>` **and
+  the report must belong to the caller**, so a file can never be planted on
+  someone else's report.
+
+**Application**
+
+- `lib/domain/feedback-attachment.ts` (new, pure) + 17 unit tests: the accepted
+  types, the 10 MB and five-file limits, human-readable sizes, and the storage
+  path shape.
+- Report a problem: an "Add a file" picker holding up to five files, each shown
+  with its size and removable before sending; the same rules run in the dialog,
+  again in the server action, and again in the bucket.
+- Files go **from the browser straight to storage**, not through the server
+  action: a Next server action carries a 1 MB body by default and an attachment
+  may be ten times that. The action records the paths afterwards.
+- Feedback triage: an Attachments column with a short-lived signed link per
+  file, beside the existing screenshot link.
+- An upload that fails costs its file, not the report — the words are worth
+  more than the attachment, and the reporter is told which files did not make
+  it.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 51 files, 465 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 49 of 49 pages rendered |
+| `tests/e2e/feedback-attachment.e2e.ts` (new, HTTPS, live DB) | passed |
+
+The end-to-end test files a report on the live project, uploads a PDF to it,
+reads it back through a signed link (HTTP 200), and then proves the three
+refusals: a path under a report that does not exist, a `text/javascript` file,
+and a client trying to delete an attachment row it filed.
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Virus scanning the uploads | **Not here.** The product already has a scanning pipeline for accounting documents (migrations 0056–0057). Feedback attachments are read only by staff with `feedback.read`, through short-lived signed links, and never executed; wiring the scanner in is worth doing, but it is its own change with its own failure modes. |
+| Letting a reviewer add files to someone else's report | **Refused by design.** An attachment is part of what the reporter is saying. A reviewer's evidence belongs in the triage note or in a new report. |
+| Removing an attachment after filing | **Not possible, deliberately.** Same rule as the report text and the screenshot: filed is filed. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -466,7 +532,8 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
 6. `/reports/cash-flow` — chart below the numbers; accountant vs management view.
 7. ~~`/sales-tax` — tax rates differ by state; offer a rate list.~~ Done, see
    Issue #3 above.
-8. `/settings/feedback` — let a reporter attach images and PDFs.
+8. ~~`/settings/feedback` — let a reporter attach images and PDFs.~~ Done, see
+   Issue #7 above.
 9. `/reports`, `/fixed-assets` — separate statements per company (10+ companies).
 10. `/banking/reconcile` — import a bank statement and match it automatically.
 11. `/invoices` — bulk invoice import with AI field mapping.

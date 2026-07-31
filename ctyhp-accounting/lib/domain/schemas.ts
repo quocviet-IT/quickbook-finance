@@ -3,6 +3,11 @@ import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { USD_CURRENCY_CODE } from "./currency";
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "./feedback";
+import {
+  FEEDBACK_ATTACHMENT_MAX_BYTES,
+  FEEDBACK_ATTACHMENT_MAX_FILES,
+  isAllowedAttachmentType,
+} from "./feedback-attachment";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
 export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
@@ -686,6 +691,33 @@ export const feedbackReportSchema = z.object({
     .nullable(),
 });
 export type FeedbackReportInput = z.infer<typeof feedbackReportSchema>;
+
+/**
+ * Files the browser has already put in the bucket. The server re-checks type
+ * and size against the same rules the dialog used, so a hand-made call cannot
+ * register something the picker would have refused.
+ */
+export const feedbackAttachmentsSchema = z.object({
+  report_id: z.uuid("Select a report"),
+  files: z
+    .array(
+      z.object({
+        storage_path: z.string().trim().min(1).max(300),
+        file_name: z.string().trim().min(1).max(200),
+        mime_type: z
+          .string()
+          .refine(isAllowedAttachmentType, "That file type cannot be attached"),
+        size_bytes: z
+          .number()
+          .int()
+          .positive("An empty file cannot be attached")
+          .max(FEEDBACK_ATTACHMENT_MAX_BYTES, "That file is larger than the 10 MB limit"),
+      }),
+    )
+    .min(1)
+    .max(FEEDBACK_ATTACHMENT_MAX_FILES, "A report takes at most 5 attachments"),
+});
+export type FeedbackAttachmentsInput = z.infer<typeof feedbackAttachmentsSchema>;
 
 export const feedbackStatusChangeSchema = z.object({
   report_id: z.uuid("Select a report"),

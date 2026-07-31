@@ -2,15 +2,27 @@
 
 import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { App, Button, Input, Modal, Space, Spin, Typography } from "antd";
-import { BugOutlined } from "@ant-design/icons";
+import { App, Button, Input, List, Modal, Space, Spin, Typography, Upload } from "antd";
+import { BugOutlined, DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import {
   FEEDBACK_KINDS,
   feedbackKindLabel,
   type FeedbackKind,
   type FeedbackPageContext,
 } from "@/lib/domain/feedback";
-import { fileFeedbackReportAction } from "@/app/(app)/settings/feedback/actions";
+import {
+  fileFeedbackReportAction,
+  recordFeedbackAttachmentsAction,
+} from "@/app/(app)/settings/feedback/actions";
+import { createSupabaseBrowserClient } from "@/lib/db/client";
+import {
+  attachmentStoragePath,
+  FEEDBACK_ATTACHMENT_ACCEPT,
+  FEEDBACK_ATTACHMENT_MAX_FILES,
+  formatBytes,
+  rejectAdditionalAttachment,
+  safeAttachmentName,
+} from "@/lib/domain/feedback-attachment";
 
 /** Everything a developer needs to find the page again, gathered at open time. */
 function capturePageContext(pathname: string): FeedbackPageContext {
@@ -37,6 +49,7 @@ export default function ReportDialog({
   const [includeShot, setIncludeShot] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const contextRef = useRef<FeedbackPageContext | null>(null);
 
   const capture = useCallback(async () => {
@@ -74,7 +87,56 @@ export default function ReportDialog({
     setKind("broken");
     setDescription("");
     setIncludeShot(true);
+    setFiles([]);
     void capture();
+  }
+
+  /**
+   * Files go from the browser straight into the bucket: a server action carries
+   * a 1 MB body by default and an attachment may be ten times that. Storage
+   * policy checks the path belongs to a report this person filed, so the upload
+   * cannot happen before the report exists.
+   *
+   * Returns what actually landed; an upload that fails costs its file, not the
+   * report — the words are worth more than the attachment.
+   */
+  async function uploadAttachments(reportId: string) {
+    if (files.length === 0) return { stored: 0, failed: 0 };
+    const sb = createSupabaseBrowserClient();
+    const uploaded: {
+      storage_path: string;
+      file_name: string;
+      mime_type: string;
+      size_bytes: number;
+    }[] = [];
+    let failed = 0;
+
+    for (const file of files) {
+      const path = attachmentStoragePath(reportId, crypto.randomUUID(), file.type);
+      const { error } = await sb.storage
+        .from("feedback-attachments")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (error) {
+        failed += 1;
+        continue;
+      }
+      uploaded.push({
+        storage_path: path,
+        file_name: safeAttachmentName(file.name),
+        mime_type: file.type,
+        size_bytes: file.size,
+      });
+    }
+
+    if (uploaded.length === 0) return { stored: 0, failed };
+    const recorded = await recordFeedbackAttachmentsAction({
+      report_id: reportId,
+      files: uploaded,
+    });
+    return {
+      stored: recorded.ok ? uploaded.length : 0,
+      failed: failed + (recorded.ok ? 0 : uploaded.length),
+    };
   }
 
   async function send() {
@@ -87,15 +149,25 @@ export default function ReportDialog({
         screenshot_base64:
           includeShot && shot ? shot.replace(/^data:image\/png;base64,/, "") : null,
       });
-      if (!res.ok) {
+      if (!res.ok || !res.data) {
         message.error(res.error ?? "Failed to send the report");
         return;
       }
-      message.success(
-        res.data?.screenshotStored
-          ? "Report sent with the screenshot. Thank you."
-          : "Report sent. Thank you.",
-      );
+
+      const attachments = await uploadAttachments(res.data.id);
+      const parts = ["Report sent"];
+      if (res.data.screenshotStored) parts.push("with the screenshot");
+      if (attachments.stored > 0) {
+        parts.push(
+          `${attachments.stored} attachment${attachments.stored === 1 ? "" : "s"} included`,
+        );
+      }
+      if (attachments.failed > 0) {
+        message.warning(
+          `${attachments.failed} attachment${attachments.failed === 1 ? "" : "s"} could not be uploaded; the report was still sent.`,
+        );
+      }
+      message.success(`${parts.join(", ")}. Thank you.`);
       onClose();
     } finally {
       setSending(false);
@@ -174,9 +246,71 @@ export default function ReportDialog({
           </div>
         </div>
 
+        <div>
+          <Typography.Text>Attachments (optional)</Typography.Text>
+          <div style={{ marginTop: 6 }}>
+            <Upload
+              multiple
+              accept={FEEDBACK_ATTACHMENT_ACCEPT}
+              fileList={[]}
+              beforeUpload={(file) => {
+                // Held in memory and uploaded with the report; antd must not
+                // post it anywhere itself.
+                const problem = rejectAdditionalAttachment(files, file);
+                if (problem) {
+                  message.warning(problem);
+                } else {
+                  setFiles((current) => [...current, file]);
+                }
+                return false;
+              }}
+            >
+              <Button icon={<PaperClipOutlined />} disabled={files.length >= FEEDBACK_ATTACHMENT_MAX_FILES}>
+                Add a file
+              </Button>
+            </Upload>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Images, PDF, CSV, spreadsheet or text. Up to {FEEDBACK_ATTACHMENT_MAX_FILES} files,
+              10 MB each.
+            </Typography.Text>
+          </div>
+
+          {files.length > 0 ? (
+            <List
+              size="small"
+              style={{ marginTop: 8 }}
+              bordered
+              dataSource={files}
+              renderItem={(file, index) => (
+                <List.Item
+                  actions={[
+                    <Button
+                      key="remove"
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      aria-label={`Remove ${file.name}`}
+                      onClick={() =>
+                        setFiles((current) => current.filter((_, i) => i !== index))
+                      }
+                    />,
+                  ]}
+                >
+                  <Space size="small">
+                    <PaperClipOutlined />
+                    <span>{file.name}</span>
+                    <Typography.Text type="secondary">{formatBytes(file.size)}</Typography.Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          ) : null}
+        </div>
+
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          A screenshot of an accounting page can show customer names and amounts. It is
-          stored privately and only staff with feedback access can open it.
+          A screenshot or an attachment from an accounting page can show customer names and
+          amounts. Both are stored privately and only staff with feedback access can open them.
         </Typography.Text>
 
         <Button
