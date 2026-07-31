@@ -107,8 +107,13 @@ function ReportCard({
   );
 }
 
+/** The catalog groups, plus a view of everything — a report nobody can find is
+ *  a report that gets asked for again. */
+const ALL_REPORTS = "all" as const;
+type HubTab = ReportGroupId | typeof ALL_REPORTS;
+
 export default function ReportsHub() {
-  const [activeGroup, setActiveGroup] = useState<ReportGroupId>("business-overview");
+  const [activeGroup, setActiveGroup] = useState<HubTab>(ALL_REPORTS);
   const [query, setQuery] = useState("");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -123,7 +128,9 @@ export default function ReportsHub() {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const visibleReports = useMemo(() => {
     if (!normalizedQuery) {
-      return REPORT_CATALOG.filter((report) => report.group === activeGroup);
+      return activeGroup === ALL_REPORTS
+        ? REPORT_CATALOG
+        : REPORT_CATALOG.filter((report) => report.group === activeGroup);
     }
 
     return REPORT_CATALOG.filter((report) => {
@@ -138,7 +145,14 @@ export default function ReportsHub() {
   const recentReports = reportsFromIds(recentIds).filter(
     (report) => !favoriteIds.includes(report.id),
   );
-  const currentGroup = REPORT_GROUPS.find((group) => group.id === activeGroup)!;
+  const currentGroup =
+    activeGroup === ALL_REPORTS
+      ? {
+          id: ALL_REPORTS,
+          label: `All reports (${REPORT_CATALOG.length})`,
+          description: "Every report in One Book, whatever workflow it belongs to.",
+        }
+      : REPORT_GROUPS.find((group) => group.id === activeGroup)!;
 
   function handleFavorite(reportId: string) {
     setFavoriteIds(toggleFavoriteReport(reportId));
@@ -223,11 +237,11 @@ export default function ReportsHub() {
             <Tabs
               className="reports-hub__desktop-tabs"
               activeKey={activeGroup}
-              onChange={(key) => setActiveGroup(key as ReportGroupId)}
-              items={REPORT_GROUPS.map((group) => ({
-                key: group.id,
-                label: group.label,
-              }))}
+              onChange={(key) => setActiveGroup(key as HubTab)}
+              items={[
+                { key: ALL_REPORTS, label: `All reports (${REPORT_CATALOG.length})` },
+                ...REPORT_GROUPS.map((group) => ({ key: group.id, label: group.label })),
+              ]}
             />
             <div className="reports-hub__mobile-category">
               <label htmlFor="report-category-select">Report category</label>
@@ -236,10 +250,10 @@ export default function ReportsHub() {
                 aria-label="Report category"
                 value={activeGroup}
                 onChange={(value) => setActiveGroup(value)}
-                options={REPORT_GROUPS.map((group) => ({
-                  value: group.id,
-                  label: group.label,
-                }))}
+                options={[
+                  { value: ALL_REPORTS, label: `All reports (${REPORT_CATALOG.length})` },
+                  ...REPORT_GROUPS.map((group) => ({ value: group.id, label: group.label })),
+                ]}
               />
             </div>
             <div className="reports-hub__category-heading">

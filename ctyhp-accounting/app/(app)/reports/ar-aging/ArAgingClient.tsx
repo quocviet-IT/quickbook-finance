@@ -3,11 +3,13 @@ import { useState } from "react";
 import { App, Alert, Button, DatePicker, Space, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import { AgingComparisonChart } from "@/components/charts/FinancialCharts";
-import DataTable from "@/components/ui/DataTable";
+import AgingByPartyTable, {
+  type AgingGrouping,
+} from "@/components/reports/AgingByPartyTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { arAgingAction } from "./actions";
-import type { AgingReport, AgingReportRow } from "@/lib/services/aging";
+import type { AgingReport } from "@/lib/services/aging";
 
 const BUCKETS = [
   ["current", "Current"],
@@ -22,6 +24,9 @@ export default function ArAgingClient({ baseCurrency, baseDecimals }: { baseCurr
   const [rep, setRep] = useState<AgingReport | null>(null);
   const [asOf, setAsOf] = useState<Dayjs | null>(null);
   const [loading, setLoading] = useState(false);
+  // The party view first: "who is late" is the question this report is
+  // opened with; the document list is one click away.
+  const [grouping, setGrouping] = useState<AgingGrouping>("party");
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
 
   const run = async () => {
@@ -80,13 +85,16 @@ export default function ArAgingClient({ baseCurrency, baseDecimals }: { baseCurr
             ))}
             <b>Total: {fmt(rep.total)}</b>
           </Space>
-          <DataTable<AgingReportRow>
-            rowKey={(r) => `${r.docType}-${r.docNumber}`}
+          <AgingByPartyTable
+            rows={rep.rows}
+            partyLabel="Customer"
+            money={(minor) => fmt(minor)}
+            grouping={grouping}
+            onGroupingChange={setGrouping}
             loading={loading}
-            dataSource={rep.rows}
             emptyTitle="No open receivables"
             emptyDescription="There are no customer balances outstanding as of this date."
-            columns={[
+            documentColumns={[
               { title: "Customer", dataIndex: "entityName" },
               { title: "Type", dataIndex: "docType" },
               { title: "Number", dataIndex: "docNumber" },

@@ -833,6 +833,70 @@ a directory a running server still held, not a defect: a clean rebuild passed
 | Variance columns in the 12-month view | **No.** Variance against which of twelve columns? A trend is read across, not against a single base. |
 | A per-account line chart across the 12 periods | **Not built.** The bar under the table is total assets per period, which is the shape of the business. Twelve series of account balances is a chart nobody reads. |
 
+### Issue #12 — "Could we add an Accounts Payable Aging report?"
+
+From the in-app queue (`/reports`, 2026-07-31 00:39): "Could we add additional
+report? Accounts Payable Aging Report? this report will show which vendor are
+due and over due. same like AR."
+
+#### What the screenshot showed
+
+**The report already existed.** The screenshot is the Report Center sitting on
+the *Business Overview* tab, which shows five of the nineteen reports; AP Aging
+was one click away under *Payables*. Two things hid it:
+
+1. It was called "Accounts Payable **Ageing**" at the time, so searching the
+   report list for "aging" found nothing. Fixed in Issue #4.
+2. The hub opened on a single category. Fourteen reports were behind tabs
+   nobody had a reason to click.
+
+But the sentence after the question is a real gap: "this report will show which
+vendor are due and over due". The report listed **documents** — one row per
+bill, with its bucket. It never said what *Gemstone Partners* owes in total or
+how much of that is late. Answering that meant adding rows up by hand.
+
+#### What was implemented
+
+- **By vendor, and by customer.** Both aging reports now open on a party view:
+  one row per vendor or customer, a column per bucket (Current, 1–30, 31–60,
+  61–90, 90+), an **Overdue** column, a row total, and a totals row along the
+  bottom. Rows are ordered by overdue money first — the accounts that need a
+  call, in the order they need it. The document list is still there behind a
+  toggle. This is also what the AR reviewer asked for in the same round.
+- Each party with anything late is tagged with its **oldest due date**, so the
+  worst item on the account is visible without opening it.
+- `pivotAgingByParty` in `lib/domain/aging.ts` + 9 unit tests, including the
+  cases that matter: a credit on account stays negative rather than being
+  dropped, two parties with the same name stay apart, and a party with nothing
+  late reports no oldest date.
+- **Report Center opens on "All reports (19)"**, with the categories still
+  there as tabs. A report nobody can find is a report that gets asked for
+  again.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 56 files, 536 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| `tests/e2e/aging-by-party.e2e.ts` (new, HTTPS, live DB) | passed |
+| Rendered check | `/reports` lists all 19 reports including Accounts Payable Aging on the default tab |
+
+The end-to-end test runs both aging reports against the live ledger and checks
+the rollup: the party totals equal the report total, every bucket column equals
+the report's own bucket, overdue equals everything outside Current, and any
+party with overdue money has an oldest due date in the past.
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| A separate new "AP Aging" report | **There was nothing to add.** Building a second one would have left two reports with the same name and different numbers. |
+| Statement-style vendor detail inside the party view | **Not built.** The document list already gives it, and Vendor Statements is a report of its own. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -840,9 +904,10 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
 1. ~~`/reports` — spell "Aging", not "Ageing".~~ Done, see Issue #4 above.
 2. `/banking` — Add account should default the ledger to a bank account, not
    Cash on hand.
-3. `/reports` — add an AP Aging report alongside AR.
-4. `/reports/ar-ageing` — matrix layout: customer × Current/1-30/31-60/61-90/
-   Over, with row and column totals.
+3. ~~`/reports` — add an AP Aging report alongside AR.~~ It already existed;
+   see Issue #12 for what was actually missing.
+4. ~~`/reports/ar-ageing` — matrix layout: customer × Current/1-30/31-60/61-90/
+   Over, with row and column totals.~~ Done alongside Issue #12.
 5. ~~`/reports?report=balance` — chart below the numbers, multi-year and
    12-month comparison, variance columns toggleable.~~ Done, see Issue #11.
 6. `/reports/cash-flow` — chart below the numbers; accountant vs management view.
