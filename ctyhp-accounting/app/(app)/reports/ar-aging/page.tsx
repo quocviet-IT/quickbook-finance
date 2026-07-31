@@ -1,20 +1,20 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import PageHeader from "@/components/PageHeader";
-import ApAgeingClient from "./ApAgeingClient";
+import ArAgingClient from "./ArAgingClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ApAgeingPage() {
+export default async function ArAgingPage() {
   const sb = await createSupabaseServerClient();
   const base = (await listCurrencies(sb)).find((c) => c.is_base);
   return (
     <div>
       <PageHeader
-        title="Accounts Payable Ageing"
-        description="Open payables by age, reconciled to the Accounts Payable control account."
+        title="Accounts Receivable Aging"
+        description="Open receivables by age, reconciled to the Accounts Receivable control account."
       />
-      <ApAgeingClient baseCurrency={base?.code ?? "USD"} baseDecimals={base?.decimal_places ?? 2} />
+      <ArAgingClient baseCurrency={base?.code ?? "USD"} baseDecimals={base?.decimal_places ?? 2} />
     </div>
   );
 }

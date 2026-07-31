@@ -6,7 +6,7 @@ import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { vendorStatementAction } from "./actions";
-import type { StatementReport, StatementRow } from "@/lib/services/ageing";
+import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
 interface Vendor {
   id: string;

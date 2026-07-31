@@ -22,7 +22,7 @@ import { Card, Segmented, Tag, Timeline, Typography } from "antd";
 import PageHeader from "@/components/PageHeader";
 import WorkQueueCard from "@/components/dashboard/WorkQueueCard";
 import {
-  AgeingComparisonChart,
+  AgingComparisonChart,
   CashFlowBridgeChart,
   ComparisonBars,
   PerformanceChart,
@@ -104,7 +104,7 @@ export default function DashboardClient({
           <span>
             <strong>Analysis window</strong>
             <small>
-              Trends and activity use the selected period. Balance and ageing
+              Trends and activity use the selected period. Balance and aging
               figures remain as of {analytics.asOf}.
             </small>
           </span>
@@ -244,13 +244,13 @@ export default function DashboardClient({
       </div>
 
       <div className="dashboard-layout dashboard-layout--operations">
-        <AgeingComparisonChart
-          receivables={metrics.arAgeing}
-          payables={metrics.apAgeing}
+        <AgingComparisonChart
+          receivables={metrics.arAging}
+          payables={metrics.apAging}
           formatMoney={formatMoney}
           extra={
-            <Link href="/reports/ar-ageing">
-              Review ageing <ArrowRightOutlined />
+            <Link href="/reports/ar-aging">
+              Review aging <ArrowRightOutlined />
             </Link>
           }
         />

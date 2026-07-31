@@ -887,39 +887,39 @@ body {
   font-size: 12px;
 }
 
-.ageing-chart {
+.aging-chart {
   display: flex;
   flex-direction: column;
   gap: 13px;
 }
 
-.ageing-chart__row {
+.aging-chart__row {
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
 }
 
-.ageing-chart__label {
+.aging-chart__label {
   color: #475569;
   font-size: 12px;
   font-weight: 600;
 }
 
-.ageing-chart__series {
+.aging-chart__series {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
-.ageing-chart__bar-row {
+.aging-chart__bar-row {
   display: grid;
   grid-template-columns: minmax(100px, 1fr) minmax(105px, auto);
   align-items: center;
   gap: 10px;
 }
 
-.ageing-chart__track,
+.aging-chart__track,
 .comparison-bars__track {
   height: 10px;
   overflow: hidden;
@@ -927,13 +927,13 @@ body {
   border-radius: 999px;
 }
 
-.ageing-chart__fill,
+.aging-chart__fill,
 .comparison-bars__fill {
   min-height: 100%;
   border-radius: inherit;
 }
 
-.ageing-chart__value {
+.aging-chart__value {
   text-align: right;
   white-space: nowrap;
 }
@@ -1489,12 +1489,12 @@ body {
     padding-top: 2px;
   }
 
-  .ageing-chart__row {
+  .aging-chart__row {
     grid-template-columns: 48px minmax(0, 1fr);
     gap: 8px;
   }
 
-  .ageing-chart__bar-row {
+  .aging-chart__bar-row {
     grid-template-columns: minmax(70px, 1fr) minmax(92px, auto);
     gap: 8px;
   }
@@ -3066,12 +3066,12 @@ body {
     flex-direction: column;
   }
 
-  .ageing-chart__bar-row {
+  .aging-chart__bar-row {
     grid-template-columns: 1fr;
     gap: 4px;
   }
 
-  .ageing-chart__value {
+  .aging-chart__value {
     text-align: left;
   }
 

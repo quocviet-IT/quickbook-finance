@@ -13,7 +13,7 @@ describe("accounting work queue", () => {
     expect(calendarDayDifference("2026-08-04", "2026-07-28")).toBe(7);
   });
 
-  it("prioritizes ageing and preserves an actionable timing label", () => {
+  it("prioritizes aging and preserves an actionable timing label", () => {
     const sources: WorkQueueSource[] = [
       {
         id: "bill-upcoming",

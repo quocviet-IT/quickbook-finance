@@ -111,13 +111,13 @@ export default function PeriodsClient({
         <p>Review these controls before closing a period:</p>
         <ul>
           <li>
-            <Link href="/reports/ar-ageing">
-              Accounts Receivable ageing reconciles to the Accounts Receivable control account
+            <Link href="/reports/ar-aging">
+              Accounts Receivable aging reconciles to the Accounts Receivable control account
             </Link>
           </li>
           <li>
-            <Link href="/reports/ap-ageing">
-              Accounts Payable ageing reconciles to the Accounts Payable control account
+            <Link href="/reports/ap-aging">
+              Accounts Payable aging reconciles to the Accounts Payable control account
             </Link>
           </li>
           <li><Link href="/banking/reconcile">Bank accounts are reconciled</Link></li>

@@ -39,12 +39,12 @@ export const REPORT_GROUPS: ReportGroupDefinition[] = [
   {
     id: "receivables",
     label: "Receivables",
-    description: "Customer balances, ageing, and collection details.",
+    description: "Customer balances, aging, and collection details.",
   },
   {
     id: "payables",
     label: "Payables",
-    description: "Vendor obligations, ageing, and tax reporting.",
+    description: "Vendor obligations, aging, and tax reporting.",
   },
   {
     id: "accounting",
@@ -99,10 +99,10 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     internalReport: "budget",
   },
   {
-    id: "accounts-receivable-ageing",
-    title: "Accounts Receivable Ageing",
+    id: "accounts-receivable-aging",
+    title: "Accounts Receivable Aging",
     description: "Prioritize collections by customer and overdue age.",
-    href: "/reports/ar-ageing",
+    href: "/reports/ar-aging",
     group: "receivables",
   },
   {
@@ -113,10 +113,10 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "receivables",
   },
   {
-    id: "accounts-payable-ageing",
-    title: "Accounts Payable Ageing",
+    id: "accounts-payable-aging",
+    title: "Accounts Payable Aging",
     description: "Monitor vendor balances by due date and overdue age.",
-    href: "/reports/ap-ageing",
+    href: "/reports/ap-aging",
     group: "payables",
   },
   {

@@ -2,12 +2,12 @@
 import { useState } from "react";
 import { App, Alert, Button, DatePicker, Space, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
-import { AgeingComparisonChart } from "@/components/charts/FinancialCharts";
+import { AgingComparisonChart } from "@/components/charts/FinancialCharts";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
-import { arAgeingAction } from "./actions";
-import type { AgeingReport, AgeingReportRow } from "@/lib/services/ageing";
+import { arAgingAction } from "./actions";
+import type { AgingReport, AgingReportRow } from "@/lib/services/aging";
 
 const BUCKETS = [
   ["current", "Current"],
@@ -17,9 +17,9 @@ const BUCKETS = [
   ["d90_plus", "90+"],
 ] as const;
 
-export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCurrency: string; baseDecimals: number }) {
+export default function ArAgingClient({ baseCurrency, baseDecimals }: { baseCurrency: string; baseDecimals: number }) {
   const { message } = App.useApp();
-  const [rep, setRep] = useState<AgeingReport | null>(null);
+  const [rep, setRep] = useState<AgingReport | null>(null);
   const [asOf, setAsOf] = useState<Dayjs | null>(null);
   const [loading, setLoading] = useState(false);
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
@@ -30,7 +30,7 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
       return;
     }
     setLoading(true);
-    const r = await arAgeingAction(asOf.format("YYYY-MM-DD"));
+    const r = await arAgingAction(asOf.format("YYYY-MM-DD"));
     setLoading(false);
     if (r.ok && r.data) setRep(r.data);
     else message.error(r.error ?? "Failed");
@@ -40,7 +40,7 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <FilterBar
         resultCount={rep?.rows.length}
-        ariaLabel="Accounts Receivable ageing filters"
+        ariaLabel="Accounts Receivable aging filters"
         actions={
           <Button type="primary" loading={loading} onClick={run}>
             Run report
@@ -54,7 +54,7 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
           <Typography.Text type="secondary">
             Current open balances in {baseCurrency} · aged as of {asOf!.format("YYYY-MM-DD")} · Accrual basis
           </Typography.Text>
-          <AgeingComparisonChart
+          <AgingComparisonChart
             receivables={{
               current: rep.buckets.current ?? 0,
               d1_30: rep.buckets.d1_30 ?? 0,
@@ -69,7 +69,7 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
             message={
               rep.reconciled
                 ? `Reconciled to Accounts Receivable control account: ${fmt(rep.total)} ${baseCurrency}.`
-                : `Ageing total ${fmt(rep.total)} does not match Accounts Receivable control ${fmt(rep.controlBalanceMinor)} — investigate.`
+                : `Aging total ${fmt(rep.total)} does not match Accounts Receivable control ${fmt(rep.controlBalanceMinor)} — investigate.`
             }
           />
           <Space size="large">
@@ -80,7 +80,7 @@ export default function ArAgeingClient({ baseCurrency, baseDecimals }: { baseCur
             ))}
             <b>Total: {fmt(rep.total)}</b>
           </Space>
-          <DataTable<AgeingReportRow>
+          <DataTable<AgingReportRow>
             rowKey={(r) => `${r.docType}-${r.docNumber}`}
             loading={loading}
             dataSource={rep.rows}

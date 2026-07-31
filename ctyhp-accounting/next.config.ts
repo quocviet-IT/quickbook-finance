@@ -19,6 +19,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // The two ageing reports were renamed to the US spelling. People bookmark a
+  // report and screenshots of the old address are already out there, so the old
+  // paths keep working permanently rather than turning into a 404.
+  async redirects() {
+    return [
+      { source: "/reports/ar-ageing", destination: "/reports/ar-aging", permanent: true },
+      { source: "/reports/ap-ageing", destination: "/reports/ap-aging", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

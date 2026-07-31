@@ -2,7 +2,7 @@
 
 ## Financial reports
 
-Required reports include Trial Balance, Profit and Loss, Balance Sheet, Cash Flow Statement, General Ledger, Journal, AR ageing, AP ageing, Sales Tax Liability, and Bank Reconciliation.
+Required reports include Trial Balance, Profit and Loss, Balance Sheet, Cash Flow Statement, General Ledger, Journal, AR aging, AP aging, Sales Tax Liability, and Bank Reconciliation.
 
 Reports show active filters, accounting basis, date/time generated, company context, and base currency. Users can drill down to journal entries and source documents. CSV/PDF exports preserve parameters and are auditable.
 

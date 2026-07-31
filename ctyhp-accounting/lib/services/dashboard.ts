@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getLedgerBalances } from "./reports";
-import { getArAgeing, getApAgeing, type AgeingReport } from "./ageing";
+import { getArAging, getApAging, type AgingReport } from "./aging";
 import { searchAudit } from "./access";
 import { getCashFlow } from "./cashflow";
 import { getInventoryValuation } from "./inventory";
@@ -11,7 +11,7 @@ import type { AuditEntryRow } from "@/lib/db/types";
 
 export class DashboardError extends Error {}
 
-export interface AgeingSnapshot {
+export interface AgingSnapshot {
   current: number;
   d1_30: number;
   d31_60: number;
@@ -29,8 +29,8 @@ export interface DashboardMetrics {
   overdueApMinor: number;
   overdueArCount: number;
   overdueApCount: number;
-  arAgeing: AgeingSnapshot;
-  apAgeing: AgeingSnapshot;
+  arAging: AgingSnapshot;
+  apAging: AgingSnapshot;
   unreconciledCount: number;
   unreconciledMinor: number;
   openPastPeriods: number;
@@ -137,10 +137,10 @@ export interface DashboardAnalytics {
   recentActivity: DashboardActivity[];
 }
 
-const AGEING_KEYS = ["current", "d1_30", "d31_60", "d61_90", "d90_plus"] as const;
+const AGING_KEYS = ["current", "d1_30", "d31_60", "d61_90", "d90_plus"] as const;
 
-function ageingSnapshot(report: AgeingReport): AgeingSnapshot {
-  return Object.fromEntries(AGEING_KEYS.map((key) => [key, Number(report.buckets[key] ?? 0)])) as unknown as AgeingSnapshot;
+function agingSnapshot(report: AgingReport): AgingSnapshot {
+  return Object.fromEntries(AGING_KEYS.map((key) => [key, Number(report.buckets[key] ?? 0)])) as unknown as AgingSnapshot;
 }
 
 function monthStart(asOf: string): string {
@@ -246,8 +246,8 @@ export async function getDashboardMetrics(
 ): Promise<DashboardMetrics> {
   const [bal, ar, ap, unrecon, periods, mtdRows, approvals] = await Promise.all([
     ledger?.asOf ?? getLedgerBalances(sb, null, asOf),
-    getArAgeing(sb, asOf),
-    getApAgeing(sb, asOf),
+    getArAging(sb, asOf),
+    getApAging(sb, asOf),
     sb.rpc("acc_unreconciled_bank", { p_as_of: asOf }),
     sb.from("acc_accounting_period").select("id", { count: "exact", head: true }).eq("status", "open").lt("period_end", asOf),
     ledger?.monthToDate ?? getLedgerBalances(sb, monthStart(asOf), asOf),
@@ -267,7 +267,7 @@ export async function getDashboardMetrics(
     .filter((r) => ["accounts_payable", "credit_card", "current_liability"].includes(r.accountType))
     .reduce((s, r) => s + naturalLiability(r), 0);
   // Overdue = total minus the "current" bucket (current = not yet overdue).
-  const overdue = (rep: AgeingReport) =>
+  const overdue = (rep: AgingReport) =>
     Object.entries(rep.buckets).filter(([k]) => k !== "current").reduce((s, [, v]) => s + v, 0);
   const u = (unrecon.data ?? [])[0] as { item_count: number; amount_minor: number } | undefined;
   const pnl = buildProfitAndLoss(mtdRows);
@@ -282,8 +282,8 @@ export async function getDashboardMetrics(
     overdueApMinor: overdue(ap),
     overdueArCount: ar.rows.filter((row) => row.bucket !== "current").length,
     overdueApCount: ap.rows.filter((row) => row.bucket !== "current").length,
-    arAgeing: ageingSnapshot(ar),
-    apAgeing: ageingSnapshot(ap),
+    arAging: agingSnapshot(ar),
+    apAging: agingSnapshot(ap),
     unreconciledCount: Number(u?.item_count ?? 0),
     unreconciledMinor: Number(u?.amount_minor ?? 0),
     openPastPeriods: periods.count ?? 0,

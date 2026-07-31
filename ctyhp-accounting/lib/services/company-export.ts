@@ -53,9 +53,9 @@ export async function readControlTotals(
     throw new CompanyExportError(`Trial balance failed: ${balances.error.message}`);
   }
   const ar = await sb.rpc("acc_ar_ageing", { p_as_of: asOf });
-  if (ar.error) throw new CompanyExportError(`AR ageing failed: ${ar.error.message}`);
+  if (ar.error) throw new CompanyExportError(`AR aging failed: ${ar.error.message}`);
   const ap = await sb.rpc("acc_ap_ageing", { p_as_of: asOf });
-  if (ap.error) throw new CompanyExportError(`AP ageing failed: ${ap.error.message}`);
+  if (ap.error) throw new CompanyExportError(`AP aging failed: ${ap.error.message}`);
 
   const { count, error } = await sb
     .from("acc_journal_line")
@@ -66,14 +66,14 @@ export async function readControlTotals(
     rows: Array<{ debit_base: number; credit_base: number }> | null,
     side: "debit_base" | "credit_base",
   ) => (rows ?? []).reduce((total, row) => total + Number(row[side]), 0);
-  const sumAgeing = (rows: Array<{ balance_minor: number }> | null) =>
+  const sumAging = (rows: Array<{ balance_minor: number }> | null) =>
     (rows ?? []).reduce((total, row) => total + Number(row.balance_minor), 0);
 
   return {
     trialBalanceDebitMinor: sumBalances(balances.data, "debit_base"),
     trialBalanceCreditMinor: sumBalances(balances.data, "credit_base"),
-    arTotalMinor: sumAgeing(ar.data),
-    apTotalMinor: sumAgeing(ap.data),
+    arTotalMinor: sumAging(ar.data),
+    apTotalMinor: sumAging(ap.data),
     journalLineCount: count ?? 0,
   };
 }

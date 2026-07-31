@@ -14,8 +14,8 @@
 - [ ] Company settings and fiscal year are approved.
 - [ ] Accounting periods and close controls are enabled.
 - [ ] Manual journals and opening balances are controlled.
-- [ ] AR ageing reconciles to Accounts Receivable.
-- [ ] AP ageing reconciles to Accounts Payable.
+- [ ] AR aging reconciles to Accounts Receivable.
+- [ ] AP aging reconciles to Accounts Payable.
 - [ ] Every bank account has a completed reconciliation workflow.
 - [ ] Sales-tax liability reconciles to control accounts.
 - [ ] Trial Balance, P&L, Balance Sheet, Cash Flow, GL, and Journal reports are available.

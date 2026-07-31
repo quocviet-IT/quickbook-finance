@@ -44,7 +44,7 @@ describe("work area overview date windows", () => {
   });
 });
 
-describe("work area overview ageing", () => {
+describe("work area overview aging", () => {
   it("excludes the current bucket from overdue balances", () => {
     expect(
       overdueAmount({

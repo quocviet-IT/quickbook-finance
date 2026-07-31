@@ -262,11 +262,72 @@ is filed. Five codes existed, none tied to a jurisdiction.
 | Automatic rate lookup by address | **Not built.** Correct rooftop-level rates mean a paid tax service (Avalara, TaxJar) and an address-validation step; that is an integration to scope, not a field to add. |
 | Existing codes classified into states | **Left alone.** `TAX (8.25%)` looks like a Texas combined rate but nothing in the data says so. Guessing a jurisdiction onto a rate already used on issued invoices would be a fabrication; the codes show under "No state" until someone who knows sets them. |
 
+### Issue #4 — "Ageing" is not how the report is spelled
+
+Source: the in-app report moved to **Reviewing** after Issue #3
+(`acc_feedback_report`, `/reports`, `admin@ctyhp.vn`): "Accounts Receivable
+Aging report not Ageing, change it, Thanks!"
+
+The product is US English (USD, Sales Tax not VAT); `ageing` is the British
+spelling and it had spread from the first AR/AP work into the report titles,
+the URLs, the dashboard, the work areas, the charts, the period close screen,
+and the manual the in-app assistant answers from.
+
+#### What was implemented
+
+- **Report names**: Accounts Receivable Aging, Accounts Payable Aging, and
+  every "ageing" in a description, column header, chart title, tile label or
+  helper text — 27 files.
+- **URLs**: `/reports/ar-ageing` → `/reports/ar-aging`, `/reports/ap-ageing` →
+  `/reports/ap-aging`. The old addresses are kept as permanent redirects in
+  `next.config.ts`: a report gets bookmarked and the old address is already in
+  screenshots, so it redirects rather than 404s.
+- **The manual**: the five chapters of `US_ACCOUNTING_USER_MANUAL` that used
+  the British spelling, with `lib/ai/manual-context.generated.ts` regenerated
+  from them, so the assistant answers in the same spelling as the screens.
+- **The code**: `lib/domain/ageing.ts` → `aging.ts`, `lib/services/ageing.ts` →
+  `aging.ts`, their tests, and every identifier (`AgeingSnapshot`,
+  `getArAgeing`, `AGEING_BUCKETS`, the `ageing-chart` CSS classes). One
+  spelling in the codebase is what stops the old one coming back.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 48 files, 424 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded, `/reports/ar-aging` and `/reports/ap-aging` compiled |
+| `scripts/smoke-pages.mjs` | 48 of 48 pages rendered, on a dev server and again on the built server |
+| Old URLs | `/reports/ar-ageing` and `/reports/ap-ageing` answer 308 to the new paths |
+
+#### Also in this change: the smoke sweep got 20× faster
+
+The sweep was taking 25–40 minutes because it ran against `npm run dev`, which
+compiles each route on its first request — 30–100 seconds per page, for a
+request that takes 200ms. Against the built server (`npm run build` 47s +
+`npm start`) the same 48 pages finish in 78s. `scripts/smoke-pages.mjs` also
+takes `--only=invoices,sales-tax` to check one screen in about 5 seconds, and
+`--concurrency=N` (6 by default, 1 against a dev server, where parallel
+compiles just fight over the CPU). The procedure in `CLAUDE.md` now says to
+use the built server.
+
+It cannot move to CI: the workflow deliberately runs with placeholder Supabase
+keys so the pipeline cannot reach the production database, and the smoke script
+has to sign in as a real user to render a page.
+
+#### Not implemented, and why
+
+| Item | Decision |
+|---|---|
+| Renaming the database functions `acc_ar_ageing` / `acc_ap_ageing` | **Left as they are.** Renaming a live SECURITY DEFINER function means dropping and recreating it while reports read from it, for a name no user ever sees. The ten call sites keep the database's spelling; everything above them uses the product's. |
+| The QuickBooks manual in `QUICKBOOK_USER_MANUAL/` | **Left as it is.** It documents QuickBooks, where those screens really are labelled "Ageing" in some locales. Rewriting it would misquote the product it describes. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
 
-1. `/reports` — spell "Aging", not "Ageing".
+1. ~~`/reports` — spell "Aging", not "Ageing".~~ Done, see Issue #4 above.
 2. `/banking` — Add account should default the ledger to a bank account, not
    Cash on hand.
 3. `/reports` — add an AP Aging report alongside AR.

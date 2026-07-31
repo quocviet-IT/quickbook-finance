@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeAgeing, bucketOf } from "@/lib/domain/ageing";
+import { computeAging, bucketOf } from "@/lib/domain/aging";
 
 describe("bucketOf", () => {
   it("classifies by days past due relative to as-of", () => {
@@ -12,9 +12,9 @@ describe("bucketOf", () => {
   });
 });
 
-describe("computeAgeing", () => {
+describe("computeAging", () => {
   it("sums balances into buckets and totals (credits are negative in current)", () => {
-    const r = computeAgeing([
+    const r = computeAging([
       { dueDate: "2026-07-23", balanceMinor: 100_00 },  // current
       { dueDate: "2026-06-01", balanceMinor: 50_00 },   // 31-60
       { dueDate: "2026-07-24", balanceMinor: -20_00 },  // current credit

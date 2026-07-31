@@ -12,8 +12,8 @@ The legacy QuickBooks material is retained only for general workflow research. I
 |---|---|
 | `01_Company_Users_and_Close.md` | Company settings, access, approvals, audit, and accounting periods |
 | `02_General_Ledger.md` | Chart of Accounts, journals, posting, reversals, and opening balances |
-| `03_Customers_and_Receivables.md` | Customers, estimates, invoices, credits, receipts, collections, and AR ageing |
-| `04_Vendors_Payables_and_1099.md` | Vendors, bills, credits, payments, AP ageing, W-9 status, and 1099 support |
+| `03_Customers_and_Receivables.md` | Customers, estimates, invoices, credits, receipts, collections, and AR aging |
+| `04_Vendors_Payables_and_1099.md` | Vendors, bills, credits, payments, AP aging, W-9 status, and 1099 support |
 | `05_Banking_and_Reconciliation.md` | Statement import, review, bank rules, matching, and statement reconciliation |
 | `06_US_Sales_Tax.md` | Agencies, jurisdictions, rates, taxability, liability, periods, and payments |
 | `07_Products_Purchasing_and_Inventory.md` | Items, purchase orders, receiving, matching, and optional inventory |

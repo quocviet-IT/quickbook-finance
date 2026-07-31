@@ -21,7 +21,7 @@ Payments support preparation and approval separation, partial allocation, multip
 
 ## AP controls and reports
 
-Provide AP ageing, due and overdue bills, unapplied vendor credits, payment exceptions, vendor activity, and reconciliation of AP ageing to the Accounts Payable control account.
+Provide AP aging, due and overdue bills, unapplied vendor credits, payment exceptions, vendor activity, and reconciliation of AP aging to the Accounts Payable control account.
 
 ## Vendor information reporting support
 

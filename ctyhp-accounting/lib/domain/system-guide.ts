@@ -105,8 +105,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check what is still outstanding",
-        control: "AR ageing",
-        route: "/reports/ar-ageing",
+        control: "AR aging",
+        route: "/reports/ar-aging",
         note: "This report ties to the Accounts Receivable control account by design.",
       },
     ],
@@ -187,8 +187,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "See what is due",
-        control: "AP ageing",
-        route: "/reports/ap-ageing",
+        control: "AP aging",
+        route: "/reports/ap-aging",
         note: "Ties to the Accounts Payable control account.",
       },
     ],

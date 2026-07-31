@@ -14,6 +14,14 @@
 //
 // Run (dev or preview server must already be up):
 //   node --env-file=.env.local scripts/smoke-pages.mjs [baseUrl] [extra routes...]
+//
+// Run it against a built server (`npm run build && npm start`), not `npm run
+// dev`: a dev server compiles each route on its first request, which turns a
+// two-minute sweep into half an hour.
+//
+// Flags:
+//   --only=/a,/b     check just these routes (after a change to one screen)
+//   --concurrency=N  requests in flight at once; default 6, use 1 against dev
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +38,16 @@ const password = process.env.SMOKE_PASSWORD ?? "Ctyhp@Ketoan2026";
 const args = process.argv.slice(2);
 const base = args.find((a) => a.startsWith("http")) ?? "http://localhost:3000";
 const extraRoutes = args.filter((a) => a.startsWith("/"));
+const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
+// A leading slash is optional: Git Bash rewrites `/invoices` into a Windows
+// path before the script ever sees it, so `--only=invoices,sales-tax` is the
+// form that works everywhere.
+const onlyRoutes = (flag("only") ?? "")
+  .split(",")
+  .map((route) => route.trim())
+  .filter(Boolean)
+  .map((route) => (route.startsWith("/") ? route : `/${route}`));
+const concurrency = Math.max(1, Number(flag("concurrency") ?? 6));
 
 /** Every static route under app/(app). */
 function discoverRoutes(dir = appDir, prefix = "") {
@@ -77,18 +95,34 @@ async function main() {
   if (error) throw new Error("login: " + error.message);
   const cookie = sessionCookie(data.session, data.user);
 
-  const routes = [...new Set([...discoverRoutes(), ...extraRoutes])].sort();
+  const routes = onlyRoutes.length
+    ? onlyRoutes
+    : [...new Set([...discoverRoutes(), ...extraRoutes])].sort();
   let failed = 0;
 
-  for (const route of routes) {
-    let status = 0;
-    let boundary = false;
+  async function check(route) {
     try {
       const res = await fetch(base + route, { headers: { cookie }, redirect: "manual" });
-      status = res.status;
-      if (status === 200) boundary = (await res.text()).includes("We could not load this page");
+      const boundary =
+        res.status === 200 && (await res.text()).includes("We could not load this page");
+      return { route, status: res.status, boundary };
     } catch (e) {
-      console.log(`FAIL ${route} → ${e.message}`);
+      return { route, status: 0, boundary: false, error: e.message };
+    }
+  }
+
+  // Batched rather than one at a time, but still printed in route order, so two
+  // runs of the same sweep read the same. Against a built server the whole set
+  // finishes in seconds; against a dev server pass --concurrency=1, because
+  // parallel first-request compiles fight over the same CPU.
+  const results = [];
+  for (let start = 0; start < routes.length; start += concurrency) {
+    results.push(...(await Promise.all(routes.slice(start, start + concurrency).map(check))));
+  }
+
+  for (const { route, status, boundary, error } of results) {
+    if (error) {
+      console.log(`FAIL ${route} → ${error}`);
       failed++;
       continue;
     }

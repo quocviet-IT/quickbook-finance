@@ -192,7 +192,7 @@ describe("findActivePage", () => {
   });
 
   it("falls back to the Reports hub for a report with no sidebar entry", () => {
-    expect(findActivePage("/reports/ap-ageing")?.key).toBe("/reports");
+    expect(findActivePage("/reports/ap-aging")?.key).toBe("/reports");
   });
 
   it("returns null for something outside the navigation", () => {

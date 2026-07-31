@@ -24,5 +24,5 @@ The issued document preserves the template version, line details, calculation de
 
 ## Collections and reporting
 
-Provide customer statements, AR ageing, overdue invoice queues, configurable reminders, unapplied-payment reports, credit-balance reports, and reconciliation of AR ageing to the Accounts Receivable control account.
+Provide customer statements, AR aging, overdue invoice queues, configurable reminders, unapplied-payment reports, credit-balance reports, and reconciliation of AR aging to the Accounts Receivable control account.
 

@@ -17,7 +17,7 @@ import {
 import { fiscalYearForDate } from "@/lib/domain/fiscal";
 import { buildTrialBalance } from "@/lib/domain/reports";
 import { listAccounts } from "./accounts";
-import { getArAgeing, getApAgeing } from "./ageing";
+import { getArAging, getApAging } from "./aging";
 import { listBankAccounts, listBankConnections } from "./banking";
 import { getDashboardAnalytics } from "./dashboard";
 import { todayInTimeZone } from "./dashboard";
@@ -88,7 +88,7 @@ function monthTrend(
   }));
 }
 
-const AGEING_BREAKDOWN = [
+const AGING_BREAKDOWN = [
   { key: "current", label: "Current", tone: "positive" },
   { key: "d1_30", label: "1-30 days", tone: "warning" },
   { key: "d31_60", label: "31-60 days", tone: "warning" },
@@ -96,11 +96,11 @@ const AGEING_BREAKDOWN = [
   { key: "d90_plus", label: "90+ days", tone: "negative" },
 ] as const;
 
-function ageingBreakdownPoints(
+function agingBreakdownPoints(
   buckets: Record<string, number>,
   href: string,
 ): WorkAreaBreakdownPoint[] {
-  return AGEING_BREAKDOWN.map((bucket) => ({
+  return AGING_BREAKDOWN.map((bucket) => ({
     key: bucket.key,
     label: bucket.label,
     value: Number(buckets[bucket.key] ?? 0),
@@ -167,11 +167,11 @@ export async function getSalesOverview(
   context: WorkAreaOverviewContext,
 ): Promise<WorkAreaOverviewData> {
   const { asOf, currencyCode, currencyDecimals } = context;
-  const [customers, invoices, payments, ageing] = await Promise.all([
+  const [customers, invoices, payments, aging] = await Promise.all([
     listCustomers(sb),
     listInvoices(sb),
     listPayments(sb),
-    getArAgeing(sb, asOf),
+    getArAging(sb, asOf),
   ]);
   const mtdFrom = monthStart(asOf);
   const issued = invoices.filter((invoice) => !["draft", "void"].includes(invoice.status));
@@ -179,7 +179,7 @@ export async function getSalesOverview(
     (invoice) =>
       ["issued", "partial"].includes(invoice.status) && Number(invoice.balance_due_minor) > 0,
   );
-  const overdueRows = ageing.rows.filter((row) => row.bucket !== "current");
+  const overdueRows = aging.rows.filter((row) => row.bucket !== "current");
   const validPayments = payments.filter((payment) => payment.status !== "void");
   const mtdInvoices = issued.filter((invoice) => within(invoice.issue_date, mtdFrom, asOf));
   const mtdPayments = validPayments.filter((payment) =>
@@ -225,20 +225,20 @@ export async function getSalesOverview(
       {
         key: "open-receivables",
         label: "Open receivables",
-        value: ageing.total,
+        value: aging.total,
         valueType: "money",
         caption: `${open.length} open invoices`,
-        href: "/reports/ar-ageing",
-        tone: ageing.reconciled ? "neutral" : "warning",
+        href: "/reports/ar-aging",
+        tone: aging.reconciled ? "neutral" : "warning",
         icon: "receivable",
       },
       {
         key: "overdue",
         label: "Overdue",
-        value: overdueAmount(ageing.buckets),
+        value: overdueAmount(aging.buckets),
         valueType: "money",
         caption: `${overdueRows.length} invoices past due`,
-        href: "/reports/ar-ageing",
+        href: "/reports/ar-aging",
         tone: overdueRows.length > 0 ? "negative" : "positive",
         icon: "overdue",
       },
@@ -283,11 +283,11 @@ export async function getSalesOverview(
     },
     breakdowns: [
       {
-        key: "receivables-ageing",
-        title: "Receivables ageing",
+        key: "receivables-aging",
+        title: "Receivables aging",
         description: "Open customer balances grouped by due-date risk.",
         valueType: "money",
-        points: ageingBreakdownPoints(ageing.buckets, "/reports/ar-ageing"),
+        points: agingBreakdownPoints(aging.buckets, "/reports/ar-aging"),
       },
       {
         key: "invoice-status",
@@ -365,8 +365,8 @@ export async function getSalesOverview(
         title: "Overdue customer balances",
         detail: "Prioritize collections by due-date risk.",
         count: overdueRows.length,
-        valueMinor: overdueAmount(ageing.buckets),
-        href: "/reports/ar-ageing",
+        valueMinor: overdueAmount(aging.buckets),
+        href: "/reports/ar-aging",
         severity: "high",
       },
       {
@@ -384,13 +384,13 @@ export async function getSalesOverview(
       {
         key: "ar-control",
         title: "Accounts Receivable control",
-        detail: ageing.reconciled
-          ? "Ageing agrees with the Accounts Receivable control account."
-          : "Ageing differs from the Accounts Receivable control account.",
-        count: ageing.reconciled ? 0 : 1,
-        valueMinor: Math.abs(ageing.total - ageing.controlBalanceMinor),
-        href: "/reports/ar-ageing",
-        severity: ageing.reconciled ? "low" : "high",
+        detail: aging.reconciled
+          ? "Aging agrees with the Accounts Receivable control account."
+          : "Aging differs from the Accounts Receivable control account.",
+        count: aging.reconciled ? 0 : 1,
+        valueMinor: Math.abs(aging.total - aging.controlBalanceMinor),
+        href: "/reports/ar-aging",
+        severity: aging.reconciled ? "low" : "high",
       },
     ],
     activities: latestActivities(activities),
@@ -422,15 +422,15 @@ export async function getSalesOverview(
     ],
     control: {
       title: "Accounts Receivable reconciliation",
-      detail: ageing.reconciled
+      detail: aging.reconciled
         ? "Open customer balances reconcile to the ledger control account."
         : `Review a ${moneyLabel(
-            Math.abs(ageing.total - ageing.controlBalanceMinor),
+            Math.abs(aging.total - aging.controlBalanceMinor),
             currencyCode,
             currencyDecimals,
           )} difference.`,
-      href: "/reports/ar-ageing",
-      status: ageing.reconciled ? "healthy" : "attention",
+      href: "/reports/ar-aging",
+      status: aging.reconciled ? "healthy" : "attention",
     },
   };
 }
@@ -440,7 +440,7 @@ export async function getPurchasesOverview(
   context: WorkAreaOverviewContext,
 ): Promise<WorkAreaOverviewData> {
   const { asOf, currencyCode, currencyDecimals } = context;
-  const [vendors, bills, expenses, payments, purchaseOrders, receivedNotBilled, ageing] =
+  const [vendors, bills, expenses, payments, purchaseOrders, receivedNotBilled, aging] =
     await Promise.all([
       listVendors(sb),
       listBills(sb),
@@ -448,7 +448,7 @@ export async function getPurchasesOverview(
       listBillPayments(sb),
       listPurchaseOrders(sb),
       getReceivedNotBilled(sb),
-      getApAgeing(sb, asOf),
+      getApAging(sb, asOf),
     ]);
   const mtdFrom = monthStart(asOf);
   const postedBills = bills.filter((bill) => !["draft", "void"].includes(bill.status));
@@ -459,7 +459,7 @@ export async function getPurchasesOverview(
   const openOrders = purchaseOrders.filter((order) =>
     ["open", "partial", "received"].includes(order.status),
   );
-  const overdueRows = ageing.rows.filter((row) => row.bucket !== "current");
+  const overdueRows = aging.rows.filter((row) => row.bucket !== "current");
   const draftBills = bills.filter((bill) => bill.status === "draft");
   const activities: WorkAreaActivity[] = [
     ...bills.slice(0, 10).map((bill) => ({
@@ -504,20 +504,20 @@ export async function getPurchasesOverview(
       {
         key: "open-payables",
         label: "Open payables",
-        value: ageing.total,
+        value: aging.total,
         valueType: "money",
         caption: `${openBills.length} unpaid bills`,
-        href: "/reports/ap-ageing",
-        tone: ageing.reconciled ? "neutral" : "warning",
+        href: "/reports/ap-aging",
+        tone: aging.reconciled ? "neutral" : "warning",
         icon: "payable",
       },
       {
         key: "overdue",
         label: "Overdue bills",
-        value: overdueAmount(ageing.buckets),
+        value: overdueAmount(aging.buckets),
         valueType: "money",
         caption: `${overdueRows.length} bills past due`,
-        href: "/reports/ap-ageing",
+        href: "/reports/ap-aging",
         tone: overdueRows.length > 0 ? "negative" : "positive",
         icon: "overdue",
       },
@@ -564,11 +564,11 @@ export async function getPurchasesOverview(
     },
     breakdowns: [
       {
-        key: "payables-ageing",
-        title: "Payables ageing",
+        key: "payables-aging",
+        title: "Payables aging",
         description: "Open vendor balances grouped by payment urgency.",
         valueType: "money",
-        points: ageingBreakdownPoints(ageing.buckets, "/reports/ap-ageing"),
+        points: agingBreakdownPoints(aging.buckets, "/reports/ap-aging"),
       },
       {
         key: "purchase-order-status",
@@ -649,8 +649,8 @@ export async function getPurchasesOverview(
         title: "Overdue vendor balances",
         detail: "Review payment timing and available credits.",
         count: overdueRows.length,
-        valueMinor: overdueAmount(ageing.buckets),
-        href: "/reports/ap-ageing",
+        valueMinor: overdueAmount(aging.buckets),
+        href: "/reports/ap-aging",
         severity: "high",
       },
       {
@@ -677,13 +677,13 @@ export async function getPurchasesOverview(
       {
         key: "ap-control",
         title: "Accounts Payable control",
-        detail: ageing.reconciled
-          ? "Ageing agrees with the Accounts Payable control account."
-          : "Ageing differs from the Accounts Payable control account.",
-        count: ageing.reconciled ? 0 : 1,
-        valueMinor: Math.abs(ageing.total - ageing.controlBalanceMinor),
-        href: "/reports/ap-ageing",
-        severity: ageing.reconciled ? "low" : "high",
+        detail: aging.reconciled
+          ? "Aging agrees with the Accounts Payable control account."
+          : "Aging differs from the Accounts Payable control account.",
+        count: aging.reconciled ? 0 : 1,
+        valueMinor: Math.abs(aging.total - aging.controlBalanceMinor),
+        href: "/reports/ap-aging",
+        severity: aging.reconciled ? "low" : "high",
       },
     ],
     activities: latestActivities(activities),
@@ -715,15 +715,15 @@ export async function getPurchasesOverview(
     ],
     control: {
       title: "Accounts Payable reconciliation",
-      detail: ageing.reconciled
+      detail: aging.reconciled
         ? "Open vendor balances reconcile to the ledger control account."
         : `Review a ${moneyLabel(
-            Math.abs(ageing.total - ageing.controlBalanceMinor),
+            Math.abs(aging.total - aging.controlBalanceMinor),
             currencyCode,
             currencyDecimals,
           )} difference.`,
-      href: "/reports/ap-ageing",
-      status: ageing.reconciled ? "healthy" : "attention",
+      href: "/reports/ap-aging",
+      status: aging.reconciled ? "healthy" : "attention",
     },
   };
 }

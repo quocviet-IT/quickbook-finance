@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Card, Empty, Typography } from "antd";
 import type {
-  AgeingSnapshot,
+  AgingSnapshot,
   CashMovementSnapshot,
   MonthlyPerformancePoint,
 } from "@/lib/services/dashboard";
@@ -229,7 +229,7 @@ function Legend({ color, label, line = false }: { color: string; label: string; 
   );
 }
 
-const AGEING_BUCKETS = [
+const AGING_BUCKETS = [
   ["current", "Current"],
   ["d1_30", "1–30"],
   ["d31_60", "31–60"],
@@ -237,18 +237,18 @@ const AGEING_BUCKETS = [
   ["d90_plus", "90+"],
 ] as const;
 
-export function AgeingComparisonChart({
+export function AgingComparisonChart({
   receivables,
   payables,
   formatMoney,
   extra,
 }: {
-  receivables?: AgeingSnapshot;
-  payables?: AgeingSnapshot;
+  receivables?: AgingSnapshot;
+  payables?: AgingSnapshot;
   formatMoney: (value: number) => string;
   extra?: ReactNode;
 }) {
-  const values = AGEING_BUCKETS.flatMap(([key]) => [
+  const values = AGING_BUCKETS.flatMap(([key]) => [
     receivables?.[key] ?? 0,
     payables?.[key] ?? 0,
   ]);
@@ -257,24 +257,24 @@ export function AgeingComparisonChart({
 
   return (
     <ChartCard
-      title={receivables && payables ? "Receivables vs payables ageing" : "Ageing distribution"}
+      title={receivables && payables ? "Receivables vs payables aging" : "Aging distribution"}
       description="Open balances grouped by due-date risk."
       extra={extra}
     >
       {!hasData ? (
         <ChartEmpty description="There are no open balances to age." />
       ) : (
-        <div className="ageing-chart">
+        <div className="aging-chart">
           <div className="financial-chart__legend" aria-hidden="true">
             {receivables && <Legend color={PALETTE.receivable} label="Receivables" />}
             {payables && <Legend color={PALETTE.payable} label="Payables" />}
           </div>
-          {AGEING_BUCKETS.map(([key, label]) => (
-            <div className="ageing-chart__row" key={key}>
-              <Typography.Text className="ageing-chart__label">{label}</Typography.Text>
-              <div className="ageing-chart__series">
+          {AGING_BUCKETS.map(([key, label]) => (
+            <div className="aging-chart__row" key={key}>
+              <Typography.Text className="aging-chart__label">{label}</Typography.Text>
+              <div className="aging-chart__series">
                 {receivables && (
-                  <AgeingBar
+                  <AgingBar
                     label={`${label} receivables`}
                     value={receivables[key]}
                     max={max}
@@ -283,7 +283,7 @@ export function AgeingComparisonChart({
                   />
                 )}
                 {payables && (
-                  <AgeingBar
+                  <AgingBar
                     label={`${label} payables`}
                     value={payables[key]}
                     max={max}
@@ -300,7 +300,7 @@ export function AgeingComparisonChart({
   );
 }
 
-function AgeingBar({
+function AgingBar({
   label,
   value,
   max,
@@ -314,14 +314,14 @@ function AgeingBar({
   formatMoney: (value: number) => string;
 }) {
   return (
-    <div className="ageing-chart__bar-row" aria-label={`${label}: ${formatMoney(value)}`}>
-      <div className="ageing-chart__track">
+    <div className="aging-chart__bar-row" aria-label={`${label}: ${formatMoney(value)}`}>
+      <div className="aging-chart__track">
         <div
-          className="ageing-chart__fill"
+          className="aging-chart__fill"
           style={{ width: `${Math.max(value ? 2 : 0, (Math.abs(value) / max) * 100)}%`, backgroundColor: color }}
         />
       </div>
-      <Typography.Text className="ageing-chart__value">{formatMoney(value)}</Typography.Text>
+      <Typography.Text className="aging-chart__value">{formatMoney(value)}</Typography.Text>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 // scripts/verify-ar-ap.mjs
 // E2E verify of the AR/AP extension (as admin): issue an invoice + a credit
 // memo, apply part of the credit to the invoice, refund the remainder, check
-// AR ageing ties to the AR control account; post a bill + a vendor credit,
-// apply it, check AP ageing ties to the AP control account; write off the
+// AR aging ties to the AR control account; post a bill + a vendor credit,
+// apply it, check AP aging ties to the AP control account; write off the
 // invoice's remaining balance and confirm the Trial Balance stays balanced;
 // confirm voiding a credit memo with a live allocation is rejected. Cleans up
 // after itself (void-before-delete, mirroring scripts/verify-journal.mjs).
@@ -93,10 +93,10 @@ async function main() {
   check("credit memo remaining is 0 after refund", Number(cm2.balance_remaining_minor) === 0, `(=${cm2.balance_remaining_minor})`);
   check("credit memo status is applied", cm2.status === "applied", `(=${cm2.status})`);
 
-  // --- 4) AR ageing ties to the AR control account (as of 2026-05-31). ----
-  const arAgeing = (await db.query("select coalesce(sum(balance_minor),0) s from acc_ar_ageing($1)", [asOf])).rows[0].s;
+  // --- 4) AR aging ties to the AR control account (as of 2026-05-31). ----
+  const arAging = (await db.query("select coalesce(sum(balance_minor),0) s from acc_ar_ageing($1)", [asOf])).rows[0].s;
   const arControlNet = await arNet();
-  check("AR ageing sum ties to AR control-account net", Number(arAgeing) === arControlNet, `(ageing=${arAgeing}, control=${arControlNet})`);
+  check("AR aging sum ties to AR control-account net", Number(arAging) === arControlNet, `(aging=${arAging}, control=${arControlNet})`);
 
   // --- 5) Bill for 300, posted; vendor credit 100, applied. ---------------
   const billId = (await db.query(
@@ -125,9 +125,9 @@ async function main() {
   const billBal1 = Number((await db.query("select balance_due_minor from acc_bill where id=$1", [billId])).rows[0].balance_due_minor);
   check("bill balance dropped by applied vendor credit (300-100=200)", billBal1 === 200_00, `(=${billBal1})`);
 
-  const apAgeing = (await db.query("select coalesce(sum(balance_minor),0) s from acc_ap_ageing($1)", [asOf])).rows[0].s;
+  const apAging = (await db.query("select coalesce(sum(balance_minor),0) s from acc_ap_ageing($1)", [asOf])).rows[0].s;
   const apControlNet = await apNet();
-  check("AP ageing sum ties to AP control-account net", Number(apAgeing) === apControlNet, `(ageing=${apAgeing}, control=${apControlNet})`);
+  check("AP aging sum ties to AP control-account net", Number(apAging) === apControlNet, `(aging=${apAging}, control=${apControlNet})`);
 
   // --- 6) Write off the invoice's remaining 380. --------------------------
   const { error: e9 } = await authed.rpc("acc_write_off", {
