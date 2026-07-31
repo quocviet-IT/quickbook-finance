@@ -5,6 +5,8 @@ import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
+import { listGapNotes, listSequenceCatalog, listSequenceDocuments } from "@/lib/services/sequence";
+import { auditSequence, describeSequenceIntegrity } from "@/lib/domain/sequence";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
@@ -41,6 +43,9 @@ export default async function InvoicesPage({
     canGovernDocuments,
     canReadAudit,
     actors,
+    sequenceCatalog,
+    sequenceDocuments,
+    sequenceNotes,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -54,7 +59,24 @@ export default async function InvoicesPage({
     hasPermission(sb, "documents.govern"),
     hasPermission(sb, "audit.read"),
     listActors(sb),
+    listSequenceCatalog(sb),
+    listSequenceDocuments(sb, "invoice"),
+    listGapNotes(sb, "invoice"),
   ]);
+
+  // A number the sequence issued that no invoice holds is the sign of a removed
+  // sale, so the warning belongs where invoices are worked on — not only in the
+  // report somebody has to remember to open.
+  const invoiceSequence = sequenceCatalog.find((row) => row.sequence_key === "invoice");
+  const sequenceWarning = invoiceSequence
+    ? describeSequenceIntegrity(
+        auditSequence({
+          definition: invoiceSequence,
+          documents: sequenceDocuments,
+          notes: sequenceNotes,
+        }),
+      )
+    : null;
 
   const incomeAccounts = accounts.filter(
     (a) =>
@@ -91,6 +113,7 @@ export default async function InvoicesPage({
         canGovernDocuments={canGovernDocuments}
         canReadAudit={canReadAudit}
         actors={actors}
+        sequenceWarning={sequenceWarning}
         scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>

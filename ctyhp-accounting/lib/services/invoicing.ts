@@ -94,6 +94,9 @@ export async function listInvoices(sb: SupabaseClient): Promise<InvoiceWithCusto
         "tax_total_minor,total_minor,balance_due_minor,status,order_id,journal_entry_id," +
         "memo,created_by,updated_by,created_at,updated_at,acc_customer(name)",
     )
+    // Invoice number order, drafts first: a numbered document list that does
+    // not run in sequence is the one thing a reviewer cannot scan for breaks.
+    .order("invoice_number", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false });
   if (error) throw new InvoicingError(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({

@@ -114,6 +114,94 @@ actor.
 | `system_username` stored on each transaction | **Stored as the user id, resolved to the email for display.** The authentication layer's identity is the email; copying it onto every row would freeze a stale copy when an address changes, and it would put an identifier into tables that today hold none. The directory resolves it at read time, and the audit log keeps the id. |
 | Retroactive attribution for every existing invoice | **Only where evidence exists.** Migration 0065 recovered authorship from the audit log wherever the log recorded it. Six of the thirteen invoices were created before the audit triggers of migration 0058 (2026-07-27) and no record of their author survives anywhere; they read as `system`. Inventing an author for them would be worse than an honest gap. |
 
+### Issue #2 — Invoice sequencing & gap detection
+
+Reported severity: CRITICAL, fraud risk HIGH. References: AICPA AS 1301 (risk
+assessment), IRS Rev. Proc. 86-19.
+
+#### What the review asked for, and what was already there
+
+| # | Recommendation | State before this round |
+|---|---|---|
+| 1 | Auto-incrementing numbers enforced by the database, no manual override | Numbers came from `acc_sequence` inside the SECURITY DEFINER issue/post RPCs, and no screen offers a number field. **But RLS grants staff `for all` on the document tables**, so a direct API call could set or rewrite `invoice_number` — and could delete a numbered invoice outright |
+| 2 | `INVOICE_SEQUENCE` table with last and next expected number | `acc_sequence` already holds prefix and `next_value` per document type. Nothing recorded *where* a sequence's numbers live, so nothing could reconcile them |
+| 3 | Reconciliation of the subledger against the expected sequence | **Nothing.** At review time the invoice counter stood at 28 with fourteen issued numbers on no document, and the product never said so |
+| 4 | Alert when a gap is detected | **Nothing** |
+| 5 | Monthly report listing invoices by number, breaks flagged | **Nothing.** The invoice list was sorted by creation time, which is what made the numbers look shuffled in the screenshot |
+
+#### What was implemented
+
+**Database — `0066_document_number_integrity.sql`, `0067_number_guard_runs_as_caller.sql` (both applied to production 2026-07-31)**
+
+- `acc_guard_document_number()`, a `BEFORE UPDATE OR DELETE` trigger on all
+  thirteen numbered document tables: a number cannot be assigned, changed, or
+  cleared from an application session, and a numbered document cannot be
+  deleted at all — it is voided instead. The guard runs as the *caller*
+  (SECURITY INVOKER), which is what lets it tell a PostgREST session
+  (`authenticated`) from the issuing RPC (runs as the table owner). 0067 exists
+  because 0066 defined it as SECURITY DEFINER and the check never fired; the
+  end-to-end test caught that before it shipped.
+- `acc_number_source`: the registry saying which table, number, date and status
+  column each sequence's numbers live in. Adding a numbered document type later
+  is one insert.
+- `acc_number_gap_note`: why a number is missing, who said so, and when —
+  writable only with `settings.manage`, and itself audited. An undocumented
+  break stays an open exception; a documented one is closed and keeps its
+  reason on the report.
+- `acc_sequence_catalog()` and `acc_sequence_documents(key)` report what the
+  database holds. Which numbers are *missing* is worked out in one place in the
+  application, so unit tests can hold that rule to account.
+
+**Application**
+
+- `lib/domain/sequence.ts` (new, pure) + 13 unit tests: the whole number line of
+  a sequence, gaps split into explained and unexplained, documents numbered
+  *above* the counter reported rather than hidden, the banner sentence, and the
+  CSV listing.
+- **Reports → Document Number Sequence** (new): every document type with issued
+  / on file / explained / unaccounted-for counts, then the number line of the
+  selected type — "breaks only" or every number — with Export CSV. An
+  administrator can record why a number is missing from the same row.
+- Invoices screen: an error banner naming the missing numbers with a link to
+  the report, the list now ordered **by invoice number** (drafts first) instead
+  of by creation time, and every column sortable.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 47 files, 410 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded, `/reports/number-sequence` compiled |
+| `scripts/smoke-pages.mjs` | 48 of 48 pages rendered (200), including the new report |
+| `npm run test:e2e:document-ledger-report` (whole HTTPS suite) | 9 files, 13 tests passed |
+| `tests/e2e/invoice-sequence.e2e.ts` (new, HTTPS, live DB) | 2 tests passed |
+
+The end-to-end test proves the control on the real database: assigning
+`INV-999999` to a draft is refused, the number the sequence hands out at issue
+matches `INV-\d{6}`, rewriting it is refused, deleting the numbered invoice is
+refused and the row is still there afterwards, and the sweep that removes test
+data with the service role leaves a documented reason for the number it frees.
+
+#### State of the live invoice sequence after this round
+
+Counter at `INV-000028`. Numbers 22–27 are documented as removed by end-to-end
+test sweeps. Numbers **7, 8, 15, 16, 17, 18, 19 and 20 remain unexplained** —
+they disappeared before any of this existed and nothing records why. They are
+what the banner and the report now show, which is the point: the product no
+longer hides them. Someone who knows what happened should document them, or
+they stay an open exception.
+
+#### Not implemented, and why
+
+| Recommendation | Decision |
+|---|---|
+| `INVOICE_SEQUENCE` table keyed by year and month, numbering resetting each period | **Not done.** It would renumber a live ledger — invoices already issued to customers cannot change — and a per-month reset makes every month's sequence start at 1, which is harder to reconcile, not easier. The continuous sequence plus `acc_number_source` gives the same two facts the recommendation wants (last issued, next expected) without touching a single existing number. |
+| Daily reconciliation query and alerting | **Partly.** The check runs whenever the invoice screen or the report is opened, and the banner is the alert. Nothing runs it on a schedule or emails the result: the deployment has no job runner and no outbound mail. |
+| Monthly reconciliation report | **As an on-demand export.** Reports → Document Number Sequence lists every number in order with breaks flagged and exports to CSV. It is not sliced by month, because a break has to be judged against the whole sequence — filtering by date would hide any gap whose neighbours fall outside the filter. |
+| Blocking deletion for every role | **Application sessions only.** The service role and the database owner can still delete — migrations, seeds, and test cleanup have to be able to correct data. Both are outside the application and outside RLS by design; the control is that nobody signed into One Book can remove a numbered document. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

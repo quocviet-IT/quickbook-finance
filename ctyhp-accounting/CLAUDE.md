@@ -31,6 +31,7 @@ contract required by its Part 05.
 - Financial writes: `lib/services/*` → atomic Postgres RPC (`supabase/migrations/*`). No SQL in components.
 - Input validation: Zod in `lib/domain/schemas.ts`. Server Actions in `app/(app)/*/actions.ts` guard by role.
 - `created_by`/`created_at`/`updated_by`/`updated_at` on a transaction table are written by the `acc_stamp_actor()` trigger (migration 0064). Never set them from application code, and never assume an update can change the creation stamps — the trigger puts them back.
+- Document numbers come from `acc_sequence` inside the issuing RPC. Since migration 0066 they are write-once and a numbered document cannot be deleted from an application session (`acc_guard_document_number()`); test or maintenance cleanup must use the service role, and a number it frees belongs in `acc_number_gap_note`. Register a new numbered document type in `acc_number_source` so it appears in the sequence report.
 - DO NOT re-implement a posting/money/tax rule anywhere else (Part 14).
 
 ## 4. Gotchas / past mistakes (append when a bug recurs)
@@ -40,6 +41,8 @@ contract required by its Part 05.
 - Running `npm run build` and then `npm run dev` over the same `.next` makes every *nested* route (`/reports/*`, `/settings/*`, `/banking/overview`) return 404 in dev while single-segment routes still work. It looks exactly like a routing regression and is not one. Delete `.next` before starting the dev server for `scripts/smoke-pages.mjs`.
 - Voiding does not post a counter-entry: `acc_void_invoice` flips the entry to `status = 'void'` and reports read `posted` entries only. So a voided document leaves its lines in `acc_journal_line` forever — never assert that a test run returns the journal *row count* to its opening value, only the reported figures.
 - The end-to-end test consumes invoice numbers. Numbers are never reused after posting or voiding, so each run leaves a gap in the sequence. That is correct behaviour, not a defect.
+- Do not run `scripts/smoke-pages.mjs` and the HTTPS end-to-end suite at the same time. Both sign in as the same account, and the sign-ins invalidate the session cookie the smoke script captured once at start: every page after that returns 307 to `/login` and reads as a wall of failures that are nothing to do with the pages.
+- A trigger that has to tell an application session from an RPC must be `security invoker`. Inside a `security definer` function `current_user` is the function's owner, so a check like `current_user = 'authenticated'` never matches and the guard silently passes everything (migration 0066, fixed by 0067).
 - A Server Component must not read an Ant Design *sub*-component (`Typography.Title`, `Form.Item`, `Input.TextArea`, …). antd ships `"use client"`, so the server gets client-reference proxies and reading a static property off one throws at render time. Plain components (`Button`, `Card`, `Alert`, `Row`) are fine. Put the markup in a `"use client"` component and keep `page.tsx` a thin server wrapper. Guarded by `tests/unit/rsc-antd.test.ts`.
 
 ## 5. Things NOT to do

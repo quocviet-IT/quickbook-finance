@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Alert,
   App,
   Button,
   DatePicker,
@@ -92,6 +93,7 @@ export default function InvoicesClient({
   canGovernDocuments,
   canReadAudit,
   actors,
+  sequenceWarning,
   scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
@@ -111,6 +113,8 @@ export default function InvoicesClient({
   /** Gates the change history block; the RPC behind it refuses the call anyway. */
   canReadAudit: boolean;
   actors: ActorRow[];
+  /** Set when the invoice sequence has a break nobody has accounted for. */
+  sequenceWarning: string | null;
   scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
@@ -281,14 +285,33 @@ export default function InvoicesClient({
   }
 
   const columns: TableColumnsType<InvoiceWithCustomer> = [
-    { title: "Number", dataIndex: "invoice_number", width: 120, render: (n) => n ?? <Tag>draft</Tag> },
-    { title: "Customer", dataIndex: "customer_name" },
-    { title: "Issue date", dataIndex: "issue_date", width: 120 },
+    {
+      title: "Number",
+      dataIndex: "invoice_number",
+      width: 120,
+      // Drafts have no number yet and sort to the top; everything else runs in
+      // sequence, which is how a break becomes visible while scrolling.
+      defaultSortOrder: "descend",
+      sorter: (a, b) => (a.invoice_number ?? "￿").localeCompare(b.invoice_number ?? "￿"),
+      render: (n) => n ?? <Tag>draft</Tag>,
+    },
+    {
+      title: "Customer",
+      dataIndex: "customer_name",
+      sorter: (a, b) => a.customer_name.localeCompare(b.customer_name),
+    },
+    {
+      title: "Issue date",
+      dataIndex: "issue_date",
+      width: 120,
+      sorter: (a, b) => a.issue_date.localeCompare(b.issue_date),
+    },
     {
       title: "Total",
       dataIndex: "total_minor",
       width: 130,
       align: "right",
+      sorter: (a, b) => a.total_minor - b.total_minor,
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
@@ -296,6 +319,7 @@ export default function InvoicesClient({
       dataIndex: "balance_due_minor",
       width: 130,
       align: "right",
+      sorter: (a, b) => a.balance_due_minor - b.balance_due_minor,
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
@@ -377,6 +401,21 @@ export default function InvoicesClient({
 
   return (
     <div>
+      {sequenceWarning ? (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Break in the invoice number sequence"
+          description={sequenceWarning}
+          action={
+            <Button size="small" onClick={() => router.push("/reports/number-sequence")}>
+              Open the sequence report
+            </Button>
+          }
+        />
+      ) : null}
+
       <FilterBar
         resultCount={visibleInvoices.length}
         actions={

@@ -163,6 +163,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "number-sequence",
+    title: "Document Number Sequence",
+    description: "Reconcile issued document numbers and flag any break in the sequence.",
+    href: "/reports/number-sequence",
+    group: "accounting",
+  },
+  {
     id: "inventory-valuation",
     title: "Inventory Valuation",
     description: "Analyze jewelry quantities, unit costs, and inventory value.",
