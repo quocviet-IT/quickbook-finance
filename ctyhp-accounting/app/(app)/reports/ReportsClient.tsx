@@ -23,6 +23,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import BudgetEditorDrawer from "@/components/reports/BudgetEditorDrawer";
 import BudgetVsActualView from "@/components/reports/BudgetVsActualView";
+import { ReportAudienceToggle, ReportBody } from "@/components/reports/ReportAudience";
 import StatementOfEquityView from "@/components/reports/StatementOfEquityView";
 import BalanceSheetTrendView, {
   type TrendPeriod,
@@ -237,6 +238,7 @@ export default function ReportsClient({
           </>
         }
       >
+        <ReportAudienceToggle />
         <Select
           aria-label="Report type"
           value={type}
@@ -630,28 +632,31 @@ function PnlComparisonView({
         subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")} · Prior ${priorRange.from} – ${priorRange.to}`}
         exportSheet={exportSheet}
       />
-      {/* Numbers first, full width; the chart reads underneath them. */}
-      <ComparisonTable
-        rows={comparisonRows}
-        currentLabel="Current"
-        priorLabel="Prior"
-        currentRange={{ from: currentFrom, to: currentTo }}
-        priorRange={priorRange}
-        money={money}
+      <ReportBody
+        numbers={
+          <ComparisonTable
+            rows={comparisonRows}
+            currentLabel="Current"
+            priorLabel="Prior"
+            currentRange={{ from: currentFrom, to: currentTo }}
+            priorRange={priorRange}
+            money={money}
+          />
+        }
+        chart={
+          <ComparisonBars
+            title="Period performance"
+            description="Current period profitability compared with the immediately preceding period."
+            formatMoney={money}
+            data={[
+              { key: "current-income", label: "Current income", value: current.income.total + current.otherIncome.total, color: chartColors.income },
+              { key: "prior-income", label: "Prior income", value: prior.income.total + prior.otherIncome.total, color: chartColors.receivable },
+              { key: "current-net", label: "Current net income", value: current.netIncome, color: current.netIncome < 0 ? chartColors.negative : chartColors.net },
+              { key: "prior-net", label: "Prior net income", value: prior.netIncome, color: chartColors.neutral },
+            ]}
+          />
+        }
       />
-      <div style={{ marginTop: 24 }}>
-        <ComparisonBars
-          title="Period performance"
-          description="Current period profitability compared with the immediately preceding period."
-          formatMoney={money}
-          data={[
-            { key: "current-income", label: "Current income", value: current.income.total + current.otherIncome.total, color: chartColors.income },
-            { key: "prior-income", label: "Prior income", value: prior.income.total + prior.otherIncome.total, color: chartColors.receivable },
-            { key: "current-net", label: "Current net income", value: current.netIncome, color: current.netIncome < 0 ? chartColors.negative : chartColors.net },
-            { key: "prior-net", label: "Prior net income", value: prior.netIncome, color: chartColors.neutral },
-          ]}
-        />
-      </div>
     </div>
   );
 }
@@ -701,32 +706,39 @@ function BalanceSheetComparisonView({
         subtitle={`As of ${asOf.format("MMM D, YYYY")} · ${comparisonBasisLabel(comparisonBasis)} ${priorTo}`}
         exportSheet={exportSheet}
       />
-      {/* The numbers get the full width; the chart reads underneath them. */}
-      <ComparisonTable
-        rows={comparisonRows}
-        currentLabel={currentTo}
-        priorLabel={priorTo}
-        currentRange={{ from: "", to: currentTo }}
-        priorRange={{ from: "", to: priorTo }}
-        money={money}
-        showVariance={showVariance}
+      <ReportBody
+        numbers={
+          <>
+            <ComparisonTable
+              rows={comparisonRows}
+              currentLabel={currentTo}
+              priorLabel={priorTo}
+              currentRange={{ from: "", to: currentTo }}
+              priorRange={{ from: "", to: priorTo }}
+              money={money}
+              showVariance={showVariance}
+            />
+            <div className="report-balance-status">
+              <Tag color={current.balanced ? "green" : "red"}>
+                {current.balanced ? "Balanced" : "Out of balance"}
+              </Tag>
+            </div>
+          </>
+        }
+        chart={
+          <ComparisonBars
+            title="Financial position comparison"
+            description={`Current assets, liabilities, and equity compared with ${comparisonBasisLabel(comparisonBasis).toLowerCase()} ${priorTo}.`}
+            formatMoney={money}
+            data={[
+              { key: "assets", label: "Current assets", value: current.totalAssets, color: chartColors.receivable },
+              { key: "prior-assets", label: "Prior assets", value: prior.totalAssets, color: chartColors.income },
+              { key: "liabilities", label: "Current liabilities", value: current.totalLiabilities, color: chartColors.expense },
+              { key: "equity", label: "Current equity", value: current.totalEquity, color: chartColors.net },
+            ]}
+          />
+        }
       />
-      <div className="report-balance-status">
-        <Tag color={current.balanced ? "green" : "red"}>{current.balanced ? "Balanced" : "Out of balance"}</Tag>
-      </div>
-      <div style={{ marginTop: 24 }}>
-        <ComparisonBars
-          title="Financial position comparison"
-          description={`Current assets, liabilities, and equity compared with ${comparisonBasisLabel(comparisonBasis).toLowerCase()} ${priorTo}.`}
-          formatMoney={money}
-          data={[
-            { key: "assets", label: "Current assets", value: current.totalAssets, color: chartColors.receivable },
-            { key: "prior-assets", label: "Prior assets", value: prior.totalAssets, color: chartColors.income },
-            { key: "liabilities", label: "Current liabilities", value: current.totalLiabilities, color: chartColors.expense },
-            { key: "equity", label: "Current equity", value: current.totalEquity, color: chartColors.net },
-          ]}
-        />
-      </div>
     </div>
   );
 }

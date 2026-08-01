@@ -1015,6 +1015,61 @@ migration and an end-to-end test; none of it should be attempted in one pass.
 **This is the one item in the round that cannot be answered by writing code
 today.** It needs the business decision first.
 
+### Issue #15 — An accountant's view and a management view
+
+From the in-app queue (`/reports/cash-flow`, 2026-07-30 20:22): "Same thing
+here, I want the Graphs at the bottom part. We need to see the numbers not the
+graphs, or if the management want the graph report. Create me a different
+interface as an accountant. You can create a toggle button for accountant user
+or management user".
+
+#### How this was read
+
+Two requests, and the second is the interesting one. Moving the chart down is a
+layout fix — the same one made to the balance sheet in Issue #11. But the
+reviewer then says why: **an accountant and a manager open the same statement
+for opposite reasons.** One reads figures and ties them out; the other wants
+the shape of the month. Neither is wrong, so the reader says which they are —
+once — and every report remembers.
+
+#### What was implemented
+
+- **A view toggle, Accountant / Management**, in the chrome above every report
+  and in the filter bar of the internal statements. The choice is stored per
+  browser and followed across every report and every tab, so a bookkeeper sets
+  it once and never scrolls past a chart again.
+- **Accountant (the default)**: figures first, chart underneath. This is an
+  accounting product; the numbers are the report.
+- **Management**: the chart leads, the figures sit below it.
+- Applied to the **Statement of Cash Flows** (the report in question, where the
+  tie-out line now sits with the numbers rather than after the chart),
+  **Balance Sheet Comparison**, **Balance Sheet Trend**, **Profit & Loss
+  Comparison**, and both **aging** reports.
+- One implementation of the ordering (`ReportBody`), so no report can drift
+  into its own idea of it.
+- `lib/client/report-audience.ts` + 6 unit tests, including the two that bite:
+  a browser where `localStorage` throws, and a stored value that is neither of
+  the two — treated as the default rather than trusted.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 57 files, 542 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| Rendered check | the toggle is present on `/reports/cash-flow`, `/reports?report=balance` and `/reports/ap-aging` |
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Tying the view to the user's role instead of a toggle | **No.** The roles in this product are about permission, not preference — an administrator is often the bookkeeper. Making the layout follow the role would give the wrong view to the person who does the work. |
+| A separate "management dashboard" of charts | **Not built.** There is already a Dashboard, and the request was about these reports. Two places showing the same numbers differently is how they start disagreeing. |
+| Hiding the charts entirely in accountant view | **They move, they do not vanish.** The reviewer asked for the graphs at the bottom, not for their removal, and the same person often wants both — in that order. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -1028,7 +1083,8 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
    Over, with row and column totals.~~ Done alongside Issue #12.
 5. ~~`/reports?report=balance` — chart below the numbers, multi-year and
    12-month comparison, variance columns toggleable.~~ Done, see Issue #11.
-6. `/reports/cash-flow` — chart below the numbers; accountant vs management view.
+6. ~~`/reports/cash-flow` — chart below the numbers; accountant vs management
+   view.~~ Done, see Issue #15.
 7. ~~`/sales-tax` — tax rates differ by state; offer a rate list.~~ Done, see
    Issue #3 above.
 8. ~~`/settings/feedback` — let a reporter attach images and PDFs.~~ Done, see

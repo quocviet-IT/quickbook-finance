@@ -3,6 +3,7 @@ import { useState } from "react";
 import { App, Alert, Button, DatePicker, Space, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import { AgingComparisonChart } from "@/components/charts/FinancialCharts";
+import { ReportBody } from "@/components/reports/ReportAudience";
 import AgingByPartyTable, {
   type AgingGrouping,
 } from "@/components/reports/AgingByPartyTable";
@@ -59,16 +60,6 @@ export default function ArAgingClient({ baseCurrency, baseDecimals }: { baseCurr
           <Typography.Text type="secondary">
             Current open balances in {baseCurrency} · aged as of {asOf!.format("YYYY-MM-DD")} · Accrual basis
           </Typography.Text>
-          <AgingComparisonChart
-            receivables={{
-              current: rep.buckets.current ?? 0,
-              d1_30: rep.buckets.d1_30 ?? 0,
-              d31_60: rep.buckets.d31_60 ?? 0,
-              d61_90: rep.buckets.d61_90 ?? 0,
-              d90_plus: rep.buckets.d90_plus ?? 0,
-            }}
-            formatMoney={(value) => `${fmt(value)} ${baseCurrency}`}
-          />
           <Alert
             type={rep.reconciled ? "success" : "warning"}
             message={
@@ -85,23 +76,39 @@ export default function ArAgingClient({ baseCurrency, baseDecimals }: { baseCurr
             ))}
             <b>Total: {fmt(rep.total)}</b>
           </Space>
-          <AgingByPartyTable
-            rows={rep.rows}
-            partyLabel="Customer"
-            money={(minor) => fmt(minor)}
-            grouping={grouping}
-            onGroupingChange={setGrouping}
-            loading={loading}
-            emptyTitle="No open receivables"
-            emptyDescription="There are no customer balances outstanding as of this date."
-            documentColumns={[
-              { title: "Customer", dataIndex: "entityName" },
-              { title: "Type", dataIndex: "docType" },
-              { title: "Number", dataIndex: "docNumber" },
-              { title: "Due", dataIndex: "dueDate" },
-              { title: "Bucket", dataIndex: "bucket" },
-              { title: "Balance", align: "right", render: (_, r) => fmt(r.balanceMinor) },
-            ]}
+          <ReportBody
+            numbers={
+              <AgingByPartyTable
+                rows={rep.rows}
+                partyLabel="Customer"
+                money={(minor) => fmt(minor)}
+                grouping={grouping}
+                onGroupingChange={setGrouping}
+                loading={loading}
+                emptyTitle="No open receivables"
+                emptyDescription="There are no customer balances outstanding as of this date."
+                documentColumns={[
+                  { title: "Customer", dataIndex: "entityName" },
+                  { title: "Type", dataIndex: "docType" },
+                  { title: "Number", dataIndex: "docNumber" },
+                  { title: "Due", dataIndex: "dueDate" },
+                  { title: "Bucket", dataIndex: "bucket" },
+                  { title: "Balance", align: "right", render: (_, r) => fmt(r.balanceMinor) },
+                ]}
+              />
+            }
+            chart={
+              <AgingComparisonChart
+                receivables={{
+                  current: rep.buckets.current ?? 0,
+                  d1_30: rep.buckets.d1_30 ?? 0,
+                  d31_60: rep.buckets.d31_60 ?? 0,
+                  d61_90: rep.buckets.d61_90 ?? 0,
+                  d90_plus: rep.buckets.d90_plus ?? 0,
+                }}
+                formatMoney={(value) => `${fmt(value)} ${baseCurrency}`}
+              />
+            }
           />
         </>
       )}

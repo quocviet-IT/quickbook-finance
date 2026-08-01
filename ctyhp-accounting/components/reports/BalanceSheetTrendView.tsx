@@ -3,6 +3,7 @@ import { Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import { ReportBody } from "@/components/reports/ReportAudience";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
 import { balanceTrendRows, type BalanceSheet, type BalanceTrendRow } from "@/lib/domain/reports";
 import type { TrendColumn } from "@/lib/domain/report-periods";
@@ -62,56 +63,60 @@ export default function BalanceSheetTrendView({
         <ReportExportButtons sheet={exportSheet} />
       </div>
 
-      <DataTable<BalanceTrendRow>
-        rowKey="key"
-        dataSource={rows}
-        pagination={false}
-        scroll={{ x: "max-content" }}
-        columns={[
-          {
-            title: "Account",
-            width: 260,
-            fixed: "left",
-            render: (_: unknown, row) =>
-              row.kind === "section" ? <strong>{row.label}</strong> : row.label,
-          },
-          ...periods.map((period, index) => ({
-            title: period.label,
-            width: 130,
-            align: "right" as const,
-            render: (_: unknown, row: BalanceTrendRow) =>
-              row.kind === "section" ? "" : money(row.amounts[index] ?? 0),
-          })),
-        ]}
-        rowClassName={(row) =>
-          row.kind === "section"
-            ? "report-table-row--section"
-            : row.kind === "total"
-              ? "report-table-row--emphasis"
-              : ""
+      <ReportBody
+        numbers={
+          <>
+          <DataTable<BalanceTrendRow>
+            rowKey="key"
+            dataSource={rows}
+            pagination={false}
+            scroll={{ x: "max-content" }}
+            columns={[
+              {
+                title: "Account",
+                width: 260,
+                fixed: "left",
+                render: (_: unknown, row) =>
+                  row.kind === "section" ? <strong>{row.label}</strong> : row.label,
+              },
+              ...periods.map((period, index) => ({
+                title: period.label,
+                width: 130,
+                align: "right" as const,
+                render: (_: unknown, row: BalanceTrendRow) =>
+                  row.kind === "section" ? "" : money(row.amounts[index] ?? 0),
+              })),
+            ]}
+            rowClassName={(row) =>
+              row.kind === "section"
+                ? "report-table-row--section"
+                : row.kind === "total"
+                  ? "report-table-row--emphasis"
+                  : ""
+            }
+          />
+
+          <div className="report-balance-status">
+            <Tag color={last.sheet.balanced ? "green" : "red"}>
+              {last.sheet.balanced ? "Balanced" : "Out of balance"}
+            </Tag>
+          </div>
+          </>
+        }
+        chart={
+          <ComparisonBars
+            title="Total assets over the periods shown"
+            description="Each bar is the balance sheet total for that period end."
+            formatMoney={money}
+            data={periods.map((period) => ({
+              key: period.date,
+              label: period.label,
+              value: period.sheet.totalAssets,
+              color: chartColors.receivable,
+            }))}
+          />
         }
       />
-
-      <div className="report-balance-status">
-        <Tag color={last.sheet.balanced ? "green" : "red"}>
-          {last.sheet.balanced ? "Balanced" : "Out of balance"}
-        </Tag>
-      </div>
-
-      {/* Under the numbers, not beside them: the figures are the report. */}
-      <div style={{ marginTop: 24 }}>
-        <ComparisonBars
-          title="Total assets over the periods shown"
-          description="Each bar is the balance sheet total for that period end."
-          formatMoney={money}
-          data={periods.map((period) => ({
-            key: period.date,
-            label: period.label,
-            value: period.sheet.totalAssets,
-            color: chartColors.receivable,
-          }))}
-        />
-      </div>
     </div>
   );
 }

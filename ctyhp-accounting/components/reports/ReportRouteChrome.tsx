@@ -9,6 +9,7 @@ import {
   getReportGroup,
 } from "@/lib/domain/report-catalog";
 import { recordRecentReport } from "@/lib/client/report-preferences";
+import { ReportAudienceToggle } from "@/components/reports/ReportAudience";
 
 export default function ReportRouteChrome() {
   const pathname = usePathname();
@@ -32,6 +33,7 @@ export default function ReportRouteChrome() {
       <span className="report-route-chrome__context">
         {group?.label} · {report.title}
       </span>
+      <ReportAudienceToggle />
     </nav>
   );
 }
