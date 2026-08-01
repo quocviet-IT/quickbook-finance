@@ -9,11 +9,15 @@
 // Run: node --env-file=.env.local scripts/verify-cashflow.mjs
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const { databaseUrl, supabaseUrl, anonKey, email, password } =
+  requireDestructiveE2eEnvironment();
+
+const url = supabaseUrl;
+const key = anonKey;
 const sb = createClient(url, key, { auth: { persistSession: false } });
-const db = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } });
+const db = new pg.Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
 
 let pass = 0, fail = 0;
 const check = (n, ok, d = "") => { ok ? pass++ : fail++; console.log(`  ${ok ? "PASS" : "FAIL"}  ${n}${d ? " " + d : ""}`); };
@@ -33,7 +37,7 @@ async function main() {
   );
   check("2026-09 has no accounting-period row (guard inert)", periodRow.rowCount === 0, periodRow.rowCount ? `(found status=${periodRow.rows[0].status})` : "");
 
-  const { data: auth, error: e1 } = await sb.auth.signInWithPassword({ email: "admin@ctyhp.vn", password: "Ctyhp@Ketoan2026" });
+  const { data: auth, error: e1 } = await sb.auth.signInWithPassword({ email, password });
   if (e1) throw new Error("login: " + e1.message);
   const authed = createClient(url, key, { global: { headers: { Authorization: "Bearer " + auth.session.access_token } }, auth: { persistSession: false } });
 

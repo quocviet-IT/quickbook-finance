@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createE2eServiceClient } from "./session";
 
 /** Invoice statuses whose journal entry must be reversed before the row can go. */
 const POSTED_STATUSES = new Set(["issued", "partial", "paid"]);
@@ -10,10 +11,8 @@ const POSTED_STATUSES = new Set(["issued", "partial", "paid"]);
  * it leaves a documented note behind for the number it frees.
  */
 function adminClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!process.env.E2E_SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createE2eServiceClient();
 }
 
 /**

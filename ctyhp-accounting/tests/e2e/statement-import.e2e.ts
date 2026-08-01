@@ -1,15 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import { parseCsv } from "@/lib/csv";
 import { parseStatementRows } from "@/lib/domain/statement-import";
 import { importStatement, listBankTransactions } from "@/lib/services/banking";
-import { closeE2eSession, openE2eSession } from "./support/session";
+import {
+  closeE2eSession,
+  createE2eServiceClient,
+  openE2eSession,
+} from "./support/session";
 
 function serviceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Service-role credentials are required for cleanup");
-  return createClient(url, key, { auth: { persistSession: false } });
+  return createE2eServiceClient();
 }
 
 /**
