@@ -27,6 +27,7 @@ contract required by its Part 05.
   node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000   # 48 pages, ~16s
   ```
   A dev server compiles each route on its first request (30–100s *per page*), which turns this into half an hour. While iterating, check one screen with `--only=invoices,sales-tax` (leading slash optional — Git Bash rewrites `/invoices` into a Windows path); run the full sweep before committing. Against a dev server add `--concurrency=1`.
+- Ledger integrity: `node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts tests/e2e/gl-posting.e2e.ts` is read-only and asserts that no live document is missing its journal entry and that all six control accounts tie to their subledger. Run it after anything that changes how a document posts.
 - Posting logic: `npm run test:e2e:document-ledger-report` runs over HTTPS as a signed-in administrator, so it works from networks where the Postgres port is blocked. It writes to the real database and asserts every reported figure returns to its opening value; a failure naming a moved figure means the run left residue — clear it with `scripts/cleanup-test-ledger.mjs`.
 - Money logic: add/adjust a unit test with concrete input/output in `tests/unit/`; never verify by "looks right in the UI".
 - Posting builders must assert `debit == credit` (`assertBalanced`).
@@ -38,6 +39,8 @@ contract required by its Part 05.
 - Input validation: Zod in `lib/domain/schemas.ts`. Server Actions in `app/(app)/*/actions.ts` guard by role.
 - `created_by`/`created_at`/`updated_by`/`updated_at` on a transaction table are written by the `acc_stamp_actor()` trigger (migration 0064). Never set them from application code, and never assume an update can change the creation stamps — the trigger puts them back.
 - Document numbers come from `acc_sequence` inside the issuing RPC. Since migration 0066 they are write-once and a numbered document cannot be deleted from an application session (`acc_guard_document_number()`); test or maintenance cleanup must use the service role, and a number it frees belongs in `acc_number_gap_note`. Register a new numbered document type in `acc_number_source` so it appears in the sequence report.
+- Every subledger is reconciled to its control account by `acc_control_reconciliation` (migration 0073), and `acc_close_period` refuses to close a period over a variance it reports. **Adding a new subledger means adding a row to that function** — otherwise the new balances are outside the only check that runs at month end, and the close gate will pass a period it has not actually verified.
+- `acc_close_period` takes **three** arguments since migration 0074 (`p_period_id, p_reason, p_variance_note`); the two-argument form was dropped on purpose so an out-of-date caller fails loudly instead of closing without the gate.
 - DO NOT re-implement a posting/money/tax rule anywhere else (Part 14).
 
 ## 4. Gotchas / past mistakes (append when a bug recurs)

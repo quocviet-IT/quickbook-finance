@@ -1,6 +1,6 @@
 # One Book — questions that need an answer from you
 
-Eight decisions came up while working through the test round; **seven are still
+Nine decisions came up while working through the test round; **eight are still
 open** (Q4 is answered and closed, at the bottom). None can be settled by
 reading the code: each one is about how this business actually works, or what it
 wants. Guessing at any of them means building the wrong thing.
@@ -12,7 +12,9 @@ question with the date and who gave it — that record is what closes the item.
 now and need nothing from you: bulk invoice import, and the customer/vendor half
 of the QuickBooks and Wave import. Three are waiting: both multi-company
 requests need **Q2**, the AI request needs **Q8**, and the QuickBooks import
-needs **Q7** before the rest of it can be scoped.
+needs **Q7** before the rest of it can be scoped. **Q9** was found while
+building — nothing is blocked on it, but it should be settled before the sales
+tax rates in Q3 are entered.
 
 Working detail for each item — what was already built, what was deliberately not
 built — is in [system-test-user-feedback.md](system-test-user-feedback.md).
@@ -97,6 +99,46 @@ history. If you need the second, say so early — it changes the plan.
 
 ---
 
+### Q9 — Three things in the chart of accounts that need an accountant's call
+
+Found while building the posting report, not reported by anyone. None of them
+misstates a figure today. All three are the kind of thing an accountant notices
+immediately and a program never will.
+
+**1. `1590 Accumulated Depreciation` shows a normal balance of *Debit*.** It is
+a contra-asset and carries a *credit* balance. The cause is that the system has
+no contra-account type: normal balance is worked out from the account type, and
+1590 is typed as a fixed asset like 1500. The balance sheet total is unaffected
+— assets are summed as debits minus credits either way — and the account is at
+zero, so nothing is wrong yet. The first depreciation run is when it starts
+reading oddly.
+
+*The question:* is it worth adding a contra-account type to the chart, so
+accumulated depreciation, allowance for doubtful accounts and sales returns all
+present correctly? It is a schema change plus a pass over every report that
+prints a normal balance.
+
+**2. `2110 Sales Tax Receivable` is a current asset numbered in the 2000
+liability block.** Nothing computes wrongly; it breaks the convention the rest
+of the chart follows, and anyone scanning the 2000s expects liabilities.
+
+*The question:* renumber it — 1220, say — or leave it? Renumbering a live
+account means every past report reprints under the new code. That is normal and
+harmless, but it is a decision to take deliberately, not one to slip in.
+
+**3. A sales tax code points at 2110.** The new control-account report resolves
+"Sales Tax Payable" to **two** accounts, 2100 *and* 2110, because a tax code
+has 2110 as its tax account. The two net correctly today so the reconciliation
+ties out, but a receivable answering to a payable control is not what anyone
+means.
+
+*The question:* which tax codes should point at which accounts? This one is
+worth settling before the state rates in **Q3** are entered, because those will
+be attached to the same tax codes.
+
+**Answer:**
+
+---
 ## For the business owner
 
 ### Q2 — Ten companies: separate books, or one system holding all of them?
