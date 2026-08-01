@@ -13,6 +13,13 @@ Environment: production database (Supabase project of `ctyhp-accounting`), app a
 Ask these at the next review. Each one changes what gets built, so none of them
 should be guessed at. Answers go straight under the question, dated.
 
+**State of the queue, 2026-08-01.** Five reports are still open. Two can be
+built without waiting for anyone: bulk invoice import (`/invoices`) and the
+master-data half of the QuickBooks/Wave import (`/settings`). Three cannot:
+both multi-company reports (`/fixed-assets`, `/reports`) wait on **Q2**, and
+the Claude AI request waits on **Q8**. The QuickBooks import also needs **Q7**
+before its second half can be scoped.
+
 ### Q1 — Should Cash on Hand be reachable from Banking? (Issue #17)
 
 Today Banking is a statement-matching screen: a bank account is something a
@@ -77,6 +84,48 @@ Accounting documents already go through a scanning pipeline (migrations
 
 **The question:** does the business want the same scanning applied to them? It
 is worth doing, and it is its own change with its own failure modes.
+
+### Q7 — Which QuickBooks and Wave files does the business actually have?
+
+The request asks to "Upload BACKUP file CSV từ QuickBooks và Wave". Those are
+two different things and only one of them is importable. A QuickBooks **backup**
+(`.QBB`) is a proprietary binary that only QuickBooks Desktop can open — nothing
+else can read it, and no import can be written against it. What both products
+*export* is CSV: one file per list (customers, vendors, chart of accounts,
+items) or per transaction report.
+
+**The question, in two parts:**
+
+1. **Which files are in hand?** A `.QBB`/`.QBO` backup, or CSV exports? If it is
+   a backup, it has to be restored in QuickBooks first and the lists exported
+   from there — that part cannot be done here.
+2. **How much history should come across?** Master data only (customers,
+   vendors, chart of accounts, items) plus opening balances at a chosen
+   cut-over date, or every historical transaction?
+
+Master data plus opening balances is the normal migration and is a contained
+piece of work. Replaying years of posted transactions into a double-entry ledger
+is a different job: it means recreating journal entries dated into closed
+periods, reconciling document numbers against sequences this system owns, and
+mapping tax codes that do not exist here. Sample files answer most of this
+faster than a conversation.
+
+### Q8 — "Can we add Claude AI" — to do what, specifically?
+
+The application already has an AI assistant: the **Ask AI** panel, grounded in
+the product's own manual, answering questions about how the system works and the
+accounting behind it. It runs on Google Gemini 2.5 Flash. So "add AI" is already
+half true, and the question is what is missing.
+
+**The question:** what should it do that it does not do today? The answers are
+very different pieces of work:
+
+| What they might mean | What it would take |
+|---|---|
+| Same assistant, Claude instead of Gemini | Small. Swap the provider for the Anthropic SDK; the assistant behaves the same, likely answers better. |
+| Answer questions **about the company's own numbers** ("why is the bank out by 162.38?") | Substantial. The assistant would need read access to the ledger, with permissions and an audit trail — and a rule that it never states a figure it did not read from the books. |
+| Read a supplier invoice PDF and fill in the bill | Substantial, and the highest-value of the three. A person still confirms every field before it posts. |
+| Propose journal entries or post on its own behalf | **Would be declined as asked.** Proposing a draft for a person to approve is fine; an AI posting to the ledger unattended is not, whatever the model. |
 
 ---
 
