@@ -95,7 +95,7 @@ expect(report.tiesOut).toBe(true);
 - Create: `ctyhp-accounting/supabase/migrations/0081_cash_flow_indirect.sql`
 
 **Interfaces:**
-- Adds `acc_account.cash_flow_role text not null` with a constrained value set.
+- Adds `acc_account.cash_flow_role text not null default 'unclassified'` with a constrained value set.
 - Adds `acc_cash_flow_indirect_detail(date,date)` returning `section`, `line_code`, `label`, journal identity, signed `amount_minor`, and classification evidence.
 - Adds `acc_cash_flow_indirect(date,date)` returning ordered grouped rows plus opening and closing scoped cash.
 - Adds `acc_cash_flow_close_snapshot` and extends the existing three-argument period-close gate.
@@ -105,29 +105,29 @@ expect(report.tiesOut).toBe(true);
 The completely classified fixture must assert these literal outputs:
 
 ```text
-net_income                         40000
+net_income                         30000
 depreciation                      10000
 asset_disposal_gain_loss         -10000
 change_accounts_receivable            0
 change_inventory                 -20000
 change_accounts_payable               0
-net operating activities          20000
-capital_purchases                -10000
+net operating activities          10000
+capital_purchases                -20000
 asset_sale_proceeds               50000
-net investing activities          40000
+net investing activities          30000
 loan_proceeds                     40000
 owner_distributions               -5000
 net financing activities          35000
-net cash change                    95000
+net cash change                    75000
 reconciliation difference             0
 unclassified count                    0
 ```
 
-The fixture consists of a credit sale and collection, depreciation, inventory purchase/payment, cash capital purchase, fixed-asset disposal with gain, loan proceeds, owner distribution, and a bank transfer.
+The fixture consists of a credit sale and collection, depreciation, inventory purchase/payment, cash capital purchase, a capital purchase through A/P and its later payment, fixed-asset disposal with gain, loan proceeds, owner distribution, and a bank transfer.
 
 - [ ] **Step 2: Run the isolated E2E test with the existing `.env.local`; observe failure because migration 0081 does not exist.**
 
-- [ ] **Step 3: Add the role column/check, conservative backfill, deterministic new-account default trigger, RLS-safe snapshot table, and indexes.**
+- [ ] **Step 3: Add the role column/check, conservative backfill, database fail-safe default `unclassified`, RLS-safe snapshot table, and indexes. Keep account-type defaulting in the shared TypeScript domain rule rather than duplicating it in a trigger.**
 
 - [ ] **Step 4: Add the detail RPC. Implement indirect operating rows from P&L and balance-sheet movements, full cash proceeds for `asset_disposal`, signed investing/financing cash rows from explicit account roles, exclusion of cash transfers, and explicit unclassified rows.**
 

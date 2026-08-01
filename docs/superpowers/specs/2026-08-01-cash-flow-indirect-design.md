@@ -55,9 +55,11 @@ Existing accounts are backfilled conservatively:
 - other current assets/liabilities -> unclassified until an accountant chooses
   operating asset, operating liability, investing, financing, or exclude.
 
-The Accounts screen exposes the role. A new account receives a deterministic
-default from its account type; ambiguous current assets and liabilities default
-to unclassified. The report never silently guesses those accounts.
+The Accounts screen exposes the role. The shared TypeScript domain rule gives a
+new account its deterministic default from its account type; the database's
+fail-safe default is always unclassified for write paths that bypass that
+service. Ambiguous current assets and liabilities remain unclassified. The
+report never silently guesses those accounts.
 
 Transaction context overrides the account fallback where the account alone is
 not sufficient. Asset disposals use the full cash proceeds as investing and
