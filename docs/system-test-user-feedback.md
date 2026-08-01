@@ -1070,6 +1070,64 @@ once — and every report remembers.
 | A separate "management dashboard" of charts | **Not built.** There is already a Dashboard, and the request was about these reports. Two places showing the same numbers differently is how they start disagreeing. |
 | Hiding the charts entirely in accountant view | **They move, they do not vanish.** The reviewer asked for the graphs at the bottom, not for their removal, and the same person often wants both — in that order. |
 
+### Issue #16 — The aging report, in the layout an accountant prints
+
+From the in-app queue (`/reports/ar-ageing`, 2026-07-30 20:15): "Header will be
+the company name, there would be 7 rows, 1st row Customer Name, 2nd Row
+current 3rd row 1-30days, 4th row 31-60 days, 5th 61-90 days, 6th row over days
+and 7th row would be total of each customer. then at the bottom part would be
+total of each row (2-7)."
+
+#### What the words and the screenshot together settle
+
+Issue #12 gave the aging report a by-customer view: customers down the side,
+buckets across. Reading this description again against the screenshot, that is
+the **transpose** of what was asked for. "1st row Customer Name" means the
+customer names are the *header row* — customers are columns — with the five
+buckets and a total as the rows beneath, a total column on the right, and the
+company name above the whole thing. That is the classic one-page aging summary,
+and it is what gets printed and handed round.
+
+#### What was implemented
+
+- A **Summary grid** view, now the one both aging reports open on: company name
+  and "As of" date as the heading, customer (or vendor) names across the top,
+  rows for Current, 1–30, 31–60, 61–90, 90+ and **Total**, a **Total** column on
+  the right, and the total row picked out in bold.
+- The other two views stay one click away: **By customer/vendor** (Issue #12)
+  and **By document** (the original detail).
+- The grid **exports to Excel and PDF** through the same buttons the other
+  reports use — this layout exists to be handed to someone.
+- `agingSummaryGrid` is the transpose of `pivotAgingByParty`, built from the
+  same numbers, so the three views cannot disagree. 6 more unit tests, one of
+  which walks every column of the grid and checks it against the party view it
+  came from, to the cent.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 57 files, 548 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+
+Also checked while here: the screenshot showed "Ageing total 8,343.10 does not
+match Accounts Receivable control 8,505.48 — investigate". **Both aging reports
+reconcile to their control accounts today** — asserted against the live ledger
+— so that warning was a moment-in-time state, not a standing break.
+
+The grid itself renders after **Run report**, so a server-side fetch of the page
+cannot show it; its arithmetic is what the unit tests cover.
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Making the grid the only view | **No.** It is the right shape for a dozen customers and the wrong one for two hundred — at that point the columns run off the page and the by-customer view is the readable one. The reader picks. |
+| Freezing the customer columns as well as the age column | **The age column is fixed; the customers scroll.** Freezing both leaves nothing to scroll, and with twelve customers the grid fits the 1680px page anyway. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

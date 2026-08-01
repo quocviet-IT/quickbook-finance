@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pivotAgingByParty } from "@/lib/domain/aging";
+import { agingSummaryGrid, pivotAgingByParty } from "@/lib/domain/aging";
 
 const row = (
   entityName: string,
@@ -98,5 +98,71 @@ describe("pivotAgingByParty", () => {
     expect(pivot.rows).toEqual([]);
     expect(pivot.totalMinor).toBe(0);
     expect(pivot.bucketTotals.current).toBe(0);
+  });
+});
+
+describe("agingSummaryGrid", () => {
+  const grid = () =>
+    agingSummaryGrid(
+      pivotAgingByParty([
+        row("Elena Brooks", "d61_90", 759_07, "2026-04-21"),
+        row("Daniel Carter", "d1_30", 1_667_05, "2026-06-08"),
+        row("Grand Avenue Jewelers", "current", 3_191_90, "2026-07-14"),
+        row("Daniel Carter", "current", 85_52, "2026-08-01"),
+      ]),
+    );
+
+  it("puts the parties across the top, worst first", () => {
+    expect(grid().columns.map((column) => column.entityName)).toEqual([
+      "Daniel Carter",
+      "Elena Brooks",
+      "Grand Avenue Jewelers",
+    ]);
+  });
+
+  it("gives one row per bucket plus a total row, in report order", () => {
+    expect(grid().rows.map((r) => r.label)).toEqual([
+      "Current",
+      "1–30",
+      "31–60",
+      "61–90",
+      "90+",
+      "Total",
+    ]);
+  });
+
+  it("totals each row across the parties", () => {
+    const current = grid().rows.find((r) => r.key === "current")!;
+    expect(current.amounts).toEqual([85_52, 0, 3_191_90]);
+    expect(current.totalMinor).toBe(3_277_42);
+  });
+
+  it("totals each party down its column", () => {
+    const total = grid().rows.find((r) => r.key === "total")!;
+    expect(total.amounts).toEqual([1_752_57, 759_07, 3_191_90]);
+    expect(total.totalMinor).toBe(5_703_54);
+    expect(grid().grandTotalMinor).toBe(5_703_54);
+  });
+
+  it("agrees with the party view it was transposed from, to the cent", () => {
+    const pivot = pivotAgingByParty([
+      row("A", "current", 100_00),
+      row("A", "d31_60", 50_00, "2026-05-01"),
+      row("B", "d90_plus", 25_00, "2026-01-01"),
+    ]);
+    const g = agingSummaryGrid(pivot);
+    expect(g.grandTotalMinor).toBe(pivot.totalMinor);
+    for (const [index, party] of pivot.rows.entries()) {
+      const columnTotal = g.rows
+        .filter((r) => r.kind === "bucket")
+        .reduce((sum, r) => sum + r.amounts[index], 0);
+      expect(columnTotal).toBe(party.totalMinor);
+    }
+  });
+
+  it("has columns but no data when nothing is open", () => {
+    const g = agingSummaryGrid(pivotAgingByParty([]));
+    expect(g.columns).toEqual([]);
+    expect(g.rows.every((r) => r.totalMinor === 0)).toBe(true);
   });
 });

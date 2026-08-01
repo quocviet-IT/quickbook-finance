@@ -20,14 +20,22 @@ const BUCKETS = [
   ["d90_plus", "90+"],
 ] as const;
 
-export default function ApAgingClient({ baseCurrency, baseDecimals }: { baseCurrency: string; baseDecimals: number }) {
+export default function ApAgingClient({
+  baseCurrency,
+  baseDecimals,
+  companyName,
+}: {
+  baseCurrency: string;
+  baseDecimals: number;
+  companyName: string;
+}) {
   const { message } = App.useApp();
   const [rep, setRep] = useState<AgingReport | null>(null);
   const [asOf, setAsOf] = useState<Dayjs | null>(null);
   const [loading, setLoading] = useState(false);
   // The party view first: "who is late" is the question this report is
   // opened with; the document list is one click away.
-  const [grouping, setGrouping] = useState<AgingGrouping>("party");
+  const [grouping, setGrouping] = useState<AgingGrouping>("grid");
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
 
   const run = async () => {
@@ -85,6 +93,9 @@ export default function ApAgingClient({ baseCurrency, baseDecimals }: { baseCurr
                 grouping={grouping}
                 onGroupingChange={setGrouping}
                 loading={loading}
+                companyName={companyName}
+                asOf={asOf!.format("YYYY-MM-DD")}
+                currencyCode={baseCurrency}
                 emptyTitle="No open payables"
                 emptyDescription="There are no vendor balances outstanding as of this date."
                 documentColumns={[

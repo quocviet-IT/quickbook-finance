@@ -3178,3 +3178,14 @@ body {
   color: #475569;
   margin-bottom: 2px;
 }
+
+/* The aging summary grid: parties across, buckets down — the layout an
+   accountant prints. Its own heading, because the grid is the statement. */
+.aging-grid__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}

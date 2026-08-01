@@ -136,3 +136,60 @@ export function pivotAgingByParty(rows: readonly PivotInput[]): PartyAgingPivot 
 
   return { rows: list, bucketTotals, totalMinor, overdueMinor };
 }
+
+// --- The summary grid: parties across, buckets down ------------------------
+
+export interface AgingGridColumn {
+  entityId: string;
+  entityName: string;
+}
+
+export interface AgingGridRow {
+  key: string;
+  label: string;
+  /** One amount per column, in column order. */
+  amounts: number[];
+  /** The row summed across every party. */
+  totalMinor: number;
+  kind: "bucket" | "total";
+}
+
+export interface AgingGrid {
+  columns: AgingGridColumn[];
+  rows: AgingGridRow[];
+  grandTotalMinor: number;
+}
+
+/**
+ * The aging summary the way it is printed on one page: customer names across
+ * the top, the buckets down the side, a total column on the right and a total
+ * row along the bottom.
+ *
+ * It is the transpose of `pivotAgingByParty`, built from the same numbers, so
+ * the two views of the report can never disagree. Columns keep that function's
+ * order — the accounts that need a call first.
+ */
+export function agingSummaryGrid(pivot: PartyAgingPivot): AgingGrid {
+  const columns: AgingGridColumn[] = pivot.rows.map((party) => ({
+    entityId: party.entityId,
+    entityName: party.entityName,
+  }));
+
+  const rows: AgingGridRow[] = AGING_BUCKETS.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    amounts: pivot.rows.map((party) => party.buckets[bucket.key] ?? 0),
+    totalMinor: pivot.bucketTotals[bucket.key] ?? 0,
+    kind: "bucket" as const,
+  }));
+
+  rows.push({
+    key: "total",
+    label: "Total",
+    amounts: pivot.rows.map((party) => party.totalMinor),
+    totalMinor: pivot.totalMinor,
+    kind: "total",
+  });
+
+  return { columns, rows, grandTotalMinor: pivot.totalMinor };
+}
