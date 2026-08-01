@@ -24,6 +24,165 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
+## Multi-company and the QuickBooks import — assessment and sequencing
+
+Two features asked for on 2026-08-01: switching between companies, and
+importing a QuickBooks or Wave CSV. Assessment only; nothing built yet.
+
+### The reviewer just answered the biggest open question
+
+**Q2** has been open since 2026-07-31: ten companies as separate workspaces, or
+one system holding all of them? Today's note settles it, in the reviewer's own
+words:
+
+> *Accountants should be able to switch between companies **without leaving
+> their current workflow**.*
+
+A workspace per company cannot do that. It means ten installations, ten logins
+and ten URLs — the accountant leaves their workflow every time. The rest of the
+note points the same way: one login, a selector in the header, each company
+showing only its own data.
+
+So the answer to Q2 is **one system, many companies**. That closes the question
+and decides the architecture. What it does not decide is *how* the separation
+is enforced, and that choice is the whole assessment.
+
+### Two ways to hold ten companies in one system
+
+**Option A — a `company_id` column on everything.** The conventional answer:
+every table gets the column, every query filters on it, every security policy
+gains a predicate. Here is what "everything" means in this codebase:
+
+| | Count |
+|---|---:|
+| Tables | 72 |
+| Database functions | 174 |
+| Row-level security policies | 121 |
+| Migrations to date | 79 |
+| Application routes | 55 |
+| Places a document number is issued | 35 |
+
+Every one of those 121 policies has to gain a company predicate. **A single one
+missed is a leak** — one company's invoices appearing in another's ledger, which
+is precisely what the reviewer wants prevented. And document numbering has to
+become per-company (each entity needs its own INV-000001), which means reworking
+all 35 issuing sites.
+
+**Option B — a database schema per company.** One database, one schema per
+entity, and the application chooses the schema per request. The 72 tables, 174
+functions and 121 policies are **created once per schema and otherwise
+unchanged**. Isolation is not a predicate anyone can forget to write: a query
+running in one schema cannot see another's rows, because they are not there.
+
+The decisive detail: **the application creates a database client in exactly four
+places** (`lib/db/server.ts`, `client.ts`, `admin.ts`, `automation.ts`). Under
+Option B the company switch is a change to those four factories — read the
+selected company, connect to its schema. Under Option A it is a change to all
+72 tables and everything that touches them.
+
+| | Option A — `company_id` | Option B — schema per company |
+|---|---|---|
+| Isolation | Correct if all 121 policies are right | Structural; a wrong query returns nothing, not someone else's data |
+| Code to change | 72 tables, 174 functions, 121 policies, most queries | 4 client factories |
+| Document numbering per company | Rework all 35 issuing sites | Free — each schema has its own sequences |
+| Chart of accounts per company | Filter everywhere | Free |
+| Period close, control accounts, policy per company | Filter everywhere | Free |
+| Adding company eleven | Nothing | Run the migrations against a new schema |
+| Consolidated group reporting | Easy — one query | Needs union views across schemas, built later |
+| Operational cost | One schema to migrate | Migrations run per schema; the runner loops |
+
+**Recommendation: Option B.** The reviewer's stated goal is separation — *"help
+prevent transactions or financial statements from being mixed between separate
+entities"* — and consolidation is not asked for anywhere in the note. Option B
+makes mixing impossible rather than merely forbidden, and costs a fraction of
+the work. If a group balance sheet is wanted later it is a union view over the
+schemas, which is additive and can wait until someone asks.
+
+### What is genuinely deliverable today, and what is not
+
+Even on Option B, ten production companies today is not honest. The company list
+is not confirmed — the reviewer says so — and provisioning, per-company
+permissions and an isolation test all have to exist before real books go into
+them.
+
+**Deliverable today:**
+
+| | Why it is safe to ship today |
+|---|---|
+| A company register — the list of entities, each with legal name, EIN, fiscal year, base currency, status | Additive; nothing depends on it yet |
+| Schema routing in the four client factories, driven by the selected company | The current books become the first schema and behave exactly as now |
+| A company switcher in the header, visible to users with access to more than one | With one company it is inert, which is the correct behaviour |
+| **The company name on every financial report** | The reviewer's explicit ask. Four reports name it today; the seven they listed mostly do not |
+| An end-to-end test that creates a second schema and proves a query in one cannot see the other | This is what makes the claim of isolation worth anything |
+
+**Not today:**
+
+| | Why |
+|---|---|
+| Provisioning the ten real companies | The list is unconfirmed. The tooling can be built; the entities cannot be created from nothing |
+| Per-company permissions | An accountant may have access to some entities and not others. That is a permissions model, not a filter, and it deserves its own day |
+| Consolidated group reporting | Not asked for, and it is the one thing Option B defers |
+| The QuickBooks/Wave import | See below |
+
+**Would not be shipped at all:** a company switcher that switches the label but
+not the data. A control that looks like isolation without being isolation is
+more dangerous than no control, because people will trust it.
+
+### Which of the two to do first, and why it is not a matter of taste
+
+**Multi-company first. The import writes *into* a company.**
+
+Import first would mean loading data into a single-company system and then
+migrating all of it once the company dimension arrives — the same work twice,
+with a data migration in between that nobody needs. Multi-company first means
+each import has a target: *this company's* customers, *this company's* opening
+balances.
+
+Three further reasons, in order of weight:
+
+1. **The import is still blocked on Q7.** Which files does the business actually
+   have — a QuickBooks `.QBB` backup (which no import can read; it has to be
+   restored in QuickBooks first) or CSV exports? And how much history: master
+   data plus opening balances, or every past transaction? That answer changes
+   the work by an order of magnitude and it has not come back yet.
+2. **Nothing in today's note asks for the import.** All three of the reviewer's
+   recommendations are company switching, view separation and report headers.
+3. **The import is what makes multi-company useful, not the other way round.**
+   It is the tool that loads each entity once the entities exist.
+
+### The third thing in the note, which is half built already
+
+The reviewer asks for a **Management View / Accountant View** toggle. A version
+of this shipped on 2026-08-01: a toggle that decides whether a report leads with
+its chart or its numbers. What they are describing is broader — navigation,
+dashboards and working density across the whole application, not report
+ordering.
+
+That is a real gap, and it is **cheap next to the company work and independent
+of it**. It belongs in the same day as the report headers: both are visible,
+neither can break the ledger.
+
+### Proposed order
+
+| When | What | Depends on |
+|---|---|---|
+| **Today** | Company register · schema routing · switcher · company name on all seven named reports · isolation proven with a second schema | Nothing |
+| **Today, if the above lands early** | The view toggle raised from report ordering to an application mode | Nothing |
+| Next | Provisioning tooling and per-company permissions | The confirmed company list |
+| Then | QuickBooks / Wave import, per company | **Q7**, and the company dimension |
+| Later, if asked | Consolidated group reporting | A request for it |
+
+### What is needed from management before the next step
+
+1. **The company list** — names, legal names, EINs, fiscal year ends. Nothing
+   can be provisioned without it, and it is the reviewer's own outstanding item.
+2. **Who sees which company.** All accountants see all ten, or does access vary?
+   This decides the permissions model, and retrofitting it later is expensive.
+3. **Q7** — which QuickBooks and Wave files exist, and how much history should
+   come across.
+
+---
+
 ## Issue #7 — Inventory valuation method: assessed, then built
 
 Filed as **HIGH / GAAP compliance CRITICAL**: *"Costs shown for jewelry items

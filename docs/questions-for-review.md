@@ -180,7 +180,21 @@ and disclosed. That part is being built now regardless.
 ---
 ## For the business owner
 
-### Q2 — Ten companies: separate books, or one system holding all of them?
+### Q2 — Ten companies: separate books, or one system holding all of them? *(answered 2026-08-01)*
+
+**Answered by the reviewer's own note:** *"accountants should be able to switch
+between companies without leaving their current workflow"* — which a separate
+installation per company cannot do. One system, many companies. The build plan
+is in [system-test-user-feedback.md](system-test-user-feedback.md).
+
+**Two things still needed from management before anything can be provisioned:**
+
+1. **The confirmed company list** — names, legal names, EINs, fiscal year ends.
+2. **Who sees which company.** Do all accountants see all ten, or does access
+   vary by person? This decides the permissions model, and adding it after the
+   fact is far more expensive than building it in.
+
+The original question, for the record:
 
 Two reports asked for clean per-company reporting — fixed assets by company, and
 financial statements that are not mixed together. Both come down to one
