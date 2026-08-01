@@ -8,124 +8,19 @@ Environment: production database (Supabase project of `ctyhp-accounting`), app a
 
 ---
 
-## Open questions for the reviewer
+## Open questions — see the separate sheet
 
-Ask these at the next review. Each one changes what gets built, so none of them
-should be guessed at. Answers go straight under the question, dated.
+Eight decisions need an answer from the reviewer or the accountant before the
+work they block can be built. They are written up for a non-engineer, grouped by
+who should answer, with a space for the answer, in
+**[questions-for-review.md](questions-for-review.md)** — one file to hand over
+rather than a section buried in this log.
 
-**State of the queue, 2026-08-01.** Five reports are still open. Two can be
-built without waiting for anyone: bulk invoice import (`/invoices`) and the
-master-data half of the QuickBooks/Wave import (`/settings`). Three cannot:
-both multi-company reports (`/fixed-assets`, `/reports`) wait on **Q2**, and
-the Claude AI request waits on **Q8**. The QuickBooks import also needs **Q7**
-before its second half can be scoped.
-
-### Q1 — Should Cash on Hand be reachable from Banking? (Issue #17)
-
-Today Banking is a statement-matching screen: a bank account is something a
-statement comes from, so cash on hand is excluded from it entirely and the
-database refuses the link. That is the stricter reading of the reviewer's own
-point.
-
-**The question:** does the business count a till or petty cash on a schedule and
-want to do it in Banking? If so, that is a different flow — a cash count and a
-variance posting, not a statement import — and it needs designing as one rather
-than by loosening the rule that was just added.
-
-*Asked because the reviewer wrote "ask me if you need some explanation".*
-
-### Q2 — Ten companies: separate workspaces, or one multi-tenant database? (Issue #14)
-
-The trade-offs, costs and risks are written out in Issue #14. The
-recommendation is a workspace per company unless consolidated reporting is
-actually needed.
-
-**The question:** does anyone need a group balance sheet across the companies,
-one login for all of them, or shared customers and items? If yes, it is the
-multi-tenant retrofit — weeks of work touching every posting path. If no, ten
-workspaces give absolute separation for the cost of configuration.
-
-### Q3 — Who supplies the state sales tax rates? (Issue #3)
-
-Rates were deliberately not seeded: a state rate is only part of what is
-charged (county, city and district add to it) and every one of them changes.
-Customers now carry state codes and the invoice screen will suggest a rate as
-soon as one exists for their state.
-
-**The question:** which states is the business registered to collect in, and at
-what combined rate? Someone has to state them; the product should not invent
-them.
-
-### Q4 — Why are invoice numbers 7, 8 and 15–20 missing? (Issue #2)
-
-The sequence report flags eight numbers the system issued that no invoice
-holds. Numbers 22–27 are accounted for (removed by end-to-end test sweeps).
-These eight disappeared before the numbering controls existed, and nothing in
-the database records why.
-
-**The question:** does anyone remember what happened to them — a data import, a
-clean-up, a cancelled batch? Any answer can be recorded against the numbers and
-the exception closes. Without one they stay flagged, which is correct.
-
-### Q5 — Should an over-limit invoice need approval, or just permission? (Issue #6)
-
-Issuing past a credit limit currently needs the `credit.override` permission,
-held by administrators, plus a written reason that is audited.
-
-**The question:** should it instead go through the existing maker-checker
-approval queue, so the invoice waits for a second person to sign off? That is a
-stronger control and a slower one; it is a policy choice, not a technical one.
-
-### Q6 — Should feedback attachments be virus-scanned? (Issue #7)
-
-Accounting documents already go through a scanning pipeline (migrations
-0056–0057). Feedback attachments do not: they are read only by staff with
-`feedback.read`, through short-lived signed links, and never executed.
-
-**The question:** does the business want the same scanning applied to them? It
-is worth doing, and it is its own change with its own failure modes.
-
-### Q7 — Which QuickBooks and Wave files does the business actually have?
-
-The request asks to "Upload BACKUP file CSV từ QuickBooks và Wave". Those are
-two different things and only one of them is importable. A QuickBooks **backup**
-(`.QBB`) is a proprietary binary that only QuickBooks Desktop can open — nothing
-else can read it, and no import can be written against it. What both products
-*export* is CSV: one file per list (customers, vendors, chart of accounts,
-items) or per transaction report.
-
-**The question, in two parts:**
-
-1. **Which files are in hand?** A `.QBB`/`.QBO` backup, or CSV exports? If it is
-   a backup, it has to be restored in QuickBooks first and the lists exported
-   from there — that part cannot be done here.
-2. **How much history should come across?** Master data only (customers,
-   vendors, chart of accounts, items) plus opening balances at a chosen
-   cut-over date, or every historical transaction?
-
-Master data plus opening balances is the normal migration and is a contained
-piece of work. Replaying years of posted transactions into a double-entry ledger
-is a different job: it means recreating journal entries dated into closed
-periods, reconciling document numbers against sequences this system owns, and
-mapping tax codes that do not exist here. Sample files answer most of this
-faster than a conversation.
-
-### Q8 — "Can we add Claude AI" — to do what, specifically?
-
-The application already has an AI assistant: the **Ask AI** panel, grounded in
-the product's own manual, answering questions about how the system works and the
-accounting behind it. It runs on Google Gemini 2.5 Flash. So "add AI" is already
-half true, and the question is what is missing.
-
-**The question:** what should it do that it does not do today? The answers are
-very different pieces of work:
-
-| What they might mean | What it would take |
-|---|---|
-| Same assistant, Claude instead of Gemini | Small. Swap the provider for the Anthropic SDK; the assistant behaves the same, likely answers better. |
-| Answer questions **about the company's own numbers** ("why is the bank out by 162.38?") | Substantial. The assistant would need read access to the ledger, with permissions and an audit trail — and a rule that it never states a figure it did not read from the books. |
-| Read a supplier invoice PDF and fill in the bill | Substantial, and the highest-value of the three. A person still confirms every field before it posts. |
-| Propose journal entries or post on its own behalf | **Would be declined as asked.** Proposing a draft for a person to approve is fine; an AI posting to the ledger unattended is not, whatever the model. |
+**State of the queue, 2026-08-01.** Five reports still open. Two are buildable
+today: bulk invoice import (`/invoices`) and the master-data half of the
+QuickBooks/Wave import (`/settings`). Three are blocked: both multi-company
+reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
+**Q8**; the QuickBooks import needs **Q7** before its second half is scoped.
 
 ---
 
@@ -1302,8 +1197,8 @@ this: the account is named, coded, classified and confirmed on screen.
 
 They offered an explanation ("ask me if you need some explanation"), and there
 is one question worth putting back to them: should cash on hand be reachable
-from Banking at all? It is written up as **Q1** in "Open questions for the
-reviewer" at the top of this file.
+from Banking at all? It is **Q1** in
+[questions-for-review.md](questions-for-review.md).
 
 ### Issue #18 — Import the statement from inside the reconciliation
 
