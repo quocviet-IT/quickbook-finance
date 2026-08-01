@@ -3168,3 +3168,13 @@ body {
   margin: 6px 0 0;
   font-size: 12px;
 }
+
+/* The entity a statement belongs to, above its title. One Book holds one
+   company's books; naming it on the page is what stops a printout being filed
+   against the wrong company. */
+.report-result__entity {
+  display: block;
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 2px;
+}

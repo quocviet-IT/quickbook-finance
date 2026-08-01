@@ -950,6 +950,71 @@ fits without scrolling even on a 1280px laptop.
 | Removing the address from the list entirely | **No.** "No address" still needs to be visible — an invoice for a customer without one prints with no Bill to block. It is now a short cell that says the city, or an orange tag when there is nothing. |
 | Making every table full-bleed | **No.** 1680px keeps a readable measure for the report and settings pages that are mostly text; unlimited width would make those worse to read, not better. |
 
+### Issue #14 — "More than 10 companies, each with its own financial statements"
+
+From the in-app queue (`/reports`, 2026-07-31 01:05, and the same point again on
+`/fixed-assets`): "There would be more than 10 companies I need to have clear
+financial statement of the companies each not mixed FS."
+
+#### What the code says today
+
+This is not a defect to fix. **One Book is single-entity by construction**, and
+the evidence is unambiguous:
+
+- No `company_id` column exists anywhere: 72 migrations, 65 tables, zero hits.
+- `acc_company_setting_version` is *settings*, not a tenant — one legal name,
+  fiscal year and accounting basis, versioned over time. The live database
+  holds one: Aurora Fine Jewelry LLC.
+- Every statement reads `acc_journal_line` with no entity dimension, and the
+  120 RLS policies scope by *role*, never by company.
+
+So if a second company's invoices were entered here today, **every report would
+mix them silently**. The reviewer's fear is exactly right; the product simply
+does not have the concept yet.
+
+#### What was done now
+
+Two honest changes that are right whichever way the architecture goes, and one
+that was deliberately not made.
+
+- **Every statement names its entity.** The Trial Balance, Profit & Loss,
+  Balance Sheet and the balance sheet trend now print "Aurora Fine Jewelry LLC"
+  above the title on screen, as the exports already did. A statement that does
+  not say whose books it is gets filed against the wrong company.
+- **Settings → Company states the scope**: "This workspace holds one company's
+  books — a second company needs its own workspace, so its statements can never
+  mix with these."
+- **No company filter was added.** A dropdown that filters reports while the
+  ledger stays shared is worse than nothing: it looks like separation and is
+  not, and the first path that forgets the filter mixes two companies' numbers
+  in a signed statement.
+
+#### The decision that has to be made
+
+| | A. A workspace per company | B. Multi-tenant in one database |
+|---|---|---|
+| What it is | One Supabase project + one deployment per company, as today's is | `acc_company`, a `company_id` on every table, RLS by company membership, a company switcher |
+| Separation | Absolute — different databases cannot mix | By policy — correct only if every one of ~153 SECURITY DEFINER functions and 120 policies is company-scoped, and stays that way |
+| Effort | Hours per company, mostly configuration | Weeks: a retrofit of every table, every RPC, every sequence, every period lock, plus a data migration of the existing books |
+| Consolidated reporting | Not possible without a separate roll-up | Natural once it exists |
+| Users | Invited per workspace | One account, many companies |
+| Risk to the books that exist | None | Real: the retrofit touches every posting path |
+
+**Recommendation: A now, B only if consolidation is actually needed.** Ten
+companies that never consolidate are ten sets of books, and ten workspaces give
+that with no chance of leakage and no rewrite. B earns its cost when somebody
+needs a group balance sheet, one login across all ten, or shared master data —
+none of which has been asked for yet.
+
+If B is chosen, the order of work is: `acc_company` and membership → `company_id`
+on the ledger and every document table, backfilled to the existing company →
+company scoping inside every RPC → RLS by membership → per-company sequences,
+periods and settings → the switcher → a consolidation report. Each step is a
+migration and an end-to-end test; none of it should be attempted in one pass.
+
+**This is the one item in the round that cannot be answered by writing code
+today.** It needs the business decision first.
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -968,7 +1033,9 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
    Issue #3 above.
 8. ~~`/settings/feedback` — let a reporter attach images and PDFs.~~ Done, see
    Issue #7 above.
-9. `/reports`, `/fixed-assets` — separate statements per company (10+ companies).
+9. ~~`/reports`, `/fixed-assets` — separate statements per company (10+
+   companies).~~ Assessed in Issue #14 — needs an architecture decision, not a
+   code change.
 10. `/banking/reconcile` — import a bank statement and match it automatically.
 11. `/invoices` — bulk invoice import with AI field mapping.
 12. `/settings` — import a QuickBooks or Wave CSV backup.

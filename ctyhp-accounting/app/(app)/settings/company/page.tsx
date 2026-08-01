@@ -12,7 +12,10 @@ export default async function CompanySettingsPage() {
   const current = await getCurrentCompanySettings(sb);
   return (
     <div>
-      <PageHeader title="Company Settings" description="Legal profile, fiscal year, and accounting basis. Changes are versioned." />
+      <PageHeader
+        title="Company Settings"
+        description="Legal profile, fiscal year, and accounting basis. Changes are versioned. This workspace holds one company's books — a second company needs its own workspace, so its statements can never mix with these."
+      />
       <CompanySettingsClient canEdit={isAdmin(role)} current={current} />
     </div>
   );

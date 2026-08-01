@@ -424,17 +424,26 @@ export default function ReportsClient({
 function ReportHeading({
   title,
   subtitle,
+  companyName,
   exportSheet,
   disabled = false,
 }: {
   title: string;
   subtitle: string;
+  /** Whose books these are. A statement that does not name its entity is one
+   *  somebody will eventually file against the wrong company. */
+  companyName?: string;
   exportSheet: ReportExportSheet;
   disabled?: boolean;
 }) {
   return (
     <div className="report-result__heading">
       <div>
+        {companyName ? (
+          <Typography.Text strong className="report-result__entity">
+            {companyName}
+          </Typography.Text>
+        ) : null}
         <Typography.Title level={4}>{title}</Typography.Title>
         <Typography.Text type="secondary">{subtitle}</Typography.Text>
       </div>
@@ -480,6 +489,7 @@ function TrialBalanceView({
   return (
     <div className="report-result">
       <ReportHeading
+        companyName={companyName}
         title="Trial Balance"
         subtitle={`As of ${asOf.format("MMM D, YYYY")}`}
         exportSheet={exportSheet}
@@ -615,6 +625,7 @@ function PnlComparisonView({
   return (
     <div className="report-result">
       <ReportHeading
+        companyName={companyName}
         title="Profit & Loss Comparison"
         subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")} · Prior ${priorRange.from} – ${priorRange.to}`}
         exportSheet={exportSheet}
@@ -685,6 +696,7 @@ function BalanceSheetComparisonView({
   return (
     <div className="report-result">
       <ReportHeading
+        companyName={companyName}
         title="Balance Sheet Comparison"
         subtitle={`As of ${asOf.format("MMM D, YYYY")} · ${comparisonBasisLabel(comparisonBasis)} ${priorTo}`}
         exportSheet={exportSheet}

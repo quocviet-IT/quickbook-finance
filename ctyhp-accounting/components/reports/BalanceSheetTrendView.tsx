@@ -53,6 +53,7 @@ export default function BalanceSheetTrendView({
     <div className="report-result">
       <div className="report-heading">
         <div>
+          <div className="report-result__entity">{companyName}</div>
           <h3>Balance Sheet Trend</h3>
           <p>
             {periods.length} periods, {periods[0].label} to {last.label}
