@@ -41,6 +41,8 @@ contract required by its Part 05.
 - Document numbers come from `acc_sequence` inside the issuing RPC. Since migration 0066 they are write-once and a numbered document cannot be deleted from an application session (`acc_guard_document_number()`); test or maintenance cleanup must use the service role, and a number it frees belongs in `acc_number_gap_note`. Register a new numbered document type in `acc_number_source` so it appears in the sequence report.
 - Every subledger is reconciled to its control account by `acc_control_reconciliation` (migration 0073), and `acc_close_period` refuses to close a period over a variance it reports. **Adding a new subledger means adding a row to that function** — otherwise the new balances are outside the only check that runs at month end, and the close gate will pass a period it has not actually verified.
 - `acc_close_period` takes **three** arguments since migration 0074 (`p_period_id, p_reason, p_variance_note`); the two-argument form was dropped on purpose so an out-of-date caller fails loudly instead of closing without the gate.
+- A bill snapshots its vendor's payment terms when it posts (`acc_apply_vendor_terms`, migration 0075): due date, discount date, discount amount. Never re-read the vendor's current terms to judge an existing bill — terms change, and the bill keeps the ones it was raised under. The same rule governs customer credit terms.
+- An early payment discount posts a third leg to `7010 Purchase Discounts Taken`; every rule about when it may be taken is in `acc_pay_bills`, not in the screen. A discount claimed after its window is money the vendor will still ask for.
 - DO NOT re-implement a posting/money/tax rule anywhere else (Part 14).
 
 ## 4. Gotchas / past mistakes (append when a bug recurs)

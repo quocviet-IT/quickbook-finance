@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { getPayRun } from "@/lib/services/pay-run";
+import type { PayRun } from "@/lib/domain/payment-terms";
 import { listBillSettlements } from "@/lib/services/settlements";
 import type { SettlementEvent } from "@/lib/domain/settlement";
 import { getUserRole, canWrite } from "@/lib/auth";
@@ -87,6 +89,22 @@ export async function voidBillAction(id: string): Promise<ActionResult> {
     await voidBill(sb, id);
     revalidatePath("/bills");
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Every open bill, ranked by what should be paid next.
+ *
+ * Read-only: it decides nothing and pays nothing, it only puts the argument in
+ * order — overdue first, then a discount about to lapse, then what falls due.
+ */
+export async function payRunAction(asOf?: string): Promise<ActionResult<PayRun>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    const today = asOf ?? new Date().toISOString().slice(0, 10);
+    return { ok: true, data: await getPayRun(sb, today) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

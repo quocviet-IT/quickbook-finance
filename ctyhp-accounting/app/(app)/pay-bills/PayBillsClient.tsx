@@ -1,9 +1,24 @@
 "use client";
 import { useMemo, useState } from "react";
-import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography } from "antd";
+import {
+  App,
+  Button,
+  Checkbox,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
+import PayRunPanel from "@/components/payables/PayRunPanel";
 
 export default function PayBillsClient({
   payments,
@@ -24,6 +39,8 @@ export default function PayBillsClient({
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const [openBills, setOpenBills] = useState<BillRow[]>([]);
+  /** Bills whose early payment discount is being taken, by bill id. */
+  const [discounts, setDiscounts] = useState<Record<string, number>>({});
   const [alloc, setAlloc] = useState<Record<string, number>>({}); // bill_id -> decimal amount
 
   const decimals = useMemo(
@@ -38,9 +55,23 @@ export default function PayBillsClient({
 
   async function onVendorChange(vendorId: string) {
     setAlloc({});
+    setDiscounts({});
     const res = await openBillsForVendorAction(vendorId);
     if (res.ok) setOpenBills(res.data ?? []);
     else message.error(res.error ?? "Failed to load open bills");
+  }
+
+  /**
+   * What this bill still offers for paying early, today. Zero once the window
+   * has closed or the discount has already been taken — the database enforces
+   * the same rule, this only decides what to put on screen.
+   */
+  function discountOffered(bill: BillRow): number {
+    const remaining = (bill.discount_amount_minor ?? 0) - (bill.discount_taken_minor ?? 0);
+    if (remaining <= 0 || !bill.discount_due_date) return 0;
+    const today = new Date().toISOString().slice(0, 10);
+    if (today > bill.discount_due_date) return 0;
+    return Math.min(remaining, bill.balance_due_minor);
   }
 
   const allocTotalMinor = useMemo(
@@ -51,7 +82,11 @@ export default function PayBillsClient({
   async function submit() {
     const values = await form.validateFields();
     const allocations = openBills
-      .map((b) => ({ bill_id: b.id, amount_minor: Math.round((alloc[b.id] ?? 0) * 10 ** decimals) }))
+      .map((b) => ({
+        bill_id: b.id,
+        amount_minor: Math.round((alloc[b.id] ?? 0) * 10 ** decimals),
+        discount_minor: discounts[b.id] ?? 0,
+      }))
       .filter((a) => a.amount_minor > 0);
     setSaving(true);
     const res = await payBillsAction({
@@ -71,6 +106,7 @@ export default function PayBillsClient({
       form.resetFields();
       setOpenBills([]);
       setAlloc({});
+      setDiscounts({});
     } else {
       message.error(res.error ?? "Failed to record payment");
     }
@@ -91,7 +127,21 @@ export default function PayBillsClient({
 
   return (
     <>
-      <Space style={{ marginBottom: 16 }}>
+      {/* What to pay, before how to pay it. */}
+      <PayRunPanel
+        baseDecimals={decimals}
+        onPayVendor={
+          canWrite
+            ? (vendorId) => {
+                form.setFieldValue("vendor_id", vendorId);
+                void onVendorChange(vendorId);
+                setOpen(true);
+              }
+            : undefined
+        }
+      />
+
+      <Space style={{ marginTop: 24, marginBottom: 16 }}>
         {canWrite && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
             Pay bills
@@ -169,7 +219,10 @@ export default function PayBillsClient({
               <Select
                 allowClear
                 placeholder="Method"
-                options={["cash", "bank_transfer", "card", "check"].map((m) => ({ value: m, label: m }))}
+                options={["ACH", "check", "wire", "bank_transfer", "card", "cash"].map((m) => ({
+                  value: m,
+                  label: m,
+                }))}
               />
             </Form.Item>
             <Form.Item
@@ -197,6 +250,32 @@ export default function PayBillsClient({
               { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? "—" },
               { title: "Date", dataIndex: "bill_date" },
               { title: "Balance", dataIndex: "balance_due_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+              {
+                title: "Discount",
+                key: "discount",
+                render: (_, r) => {
+                  const available = discountOffered(r);
+                  if (available <= 0) return <Typography.Text type="secondary">—</Typography.Text>;
+                  const taking = (discounts[r.id] ?? 0) > 0;
+                  return (
+                    <Checkbox
+                      checked={taking}
+                      onChange={(e) => {
+                        // Taking it settles the bill in full for less cash, so
+                        // the allocation is the balance less the discount.
+                        const next = e.target.checked ? available : 0;
+                        setDiscounts((prev) => ({ ...prev, [r.id]: next }));
+                        setAlloc((prev) => ({
+                          ...prev,
+                          [r.id]: (r.balance_due_minor - next) / 10 ** decimals,
+                        }));
+                      }}
+                    >
+                      {fmt(available, r.currency_code)} by {r.discount_due_date}
+                    </Checkbox>
+                  );
+                },
+              },
               {
                 title: "Payment",
                 key: "pay",

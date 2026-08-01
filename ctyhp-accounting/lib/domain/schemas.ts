@@ -132,6 +132,12 @@ export const vendorCreateSchema = z.object({
   ap_account_id: z.uuid().optional().nullable(),
   default_expense_account_id: z.uuid().optional().nullable(),
   payment_terms: z.string().trim().max(80).optional().or(z.literal("")).nullable(),
+  /** Days until the full amount is due. The label above is what people read. */
+  payment_terms_days: z.number().int().min(0).max(365).optional().nullable(),
+  /** Early payment discount, e.g. 1 for the 1 in 1/10 net 30. */
+  discount_percent: z.number().min(0).max(100).optional().nullable(),
+  /** Days from the bill date within which that discount can be taken. */
+  discount_days: z.number().int().min(0).max(365).optional().nullable(),
 });
 export type VendorCreateInput = z.infer<typeof vendorCreateSchema>;
 
@@ -177,6 +183,12 @@ export type ExpenseCreateInput = z.infer<typeof expenseCreateSchema>;
 export const billPaymentAllocationSchema = z.object({
   bill_id: z.uuid(),
   amount_minor: z.number().int().positive(),
+  /**
+   * Early payment discount taken on this bill. The cash paid is
+   * `amount_minor`; the bill is settled for `amount_minor + discount_minor`.
+   * The database refuses a discount outside the bill's own window.
+   */
+  discount_minor: z.number().int().nonnegative().optional(),
 });
 
 export const billPaymentCreateSchema = z.object({

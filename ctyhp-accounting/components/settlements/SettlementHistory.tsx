@@ -81,6 +81,12 @@ export default function SettlementHistory({
           { title: "Number", dataIndex: "documentNumber", width: 140, render: (v: string | null) => v ?? "—" },
           { title: "Method", dataIndex: "method", width: 110, render: (v: string | null) => v ?? "—" },
           {
+            title: "Journal entry",
+            dataIndex: "entryNumber",
+            width: 140,
+            render: (v: string | null) => v ?? "—",
+          },
+          {
             title: "Reference",
             dataIndex: "reference",
             width: 130,

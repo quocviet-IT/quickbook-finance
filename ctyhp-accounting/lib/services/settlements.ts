@@ -12,6 +12,7 @@ function toEvent(row: Record<string, unknown>): SettlementEvent {
     reference: (row.reference as string | null) ?? null,
     memo: (row.memo as string | null) ?? null,
     amountMinor: Number(row.amount_minor),
+    entryNumber: (row.entry_number as string | null) ?? null,
   };
 }
 

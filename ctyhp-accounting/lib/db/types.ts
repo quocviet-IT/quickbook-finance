@@ -295,6 +295,9 @@ export interface VendorRow {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  payment_terms_days: number | null;
+  discount_percent: number | null;
+  discount_days: number | null;
 }
 
 export type BillStatus = "draft" | "open" | "partial" | "paid" | "void";
@@ -314,6 +317,11 @@ export interface BillRow {
   memo: string | null;
   created_at: string;
   updated_at: string;
+  /** Terms the bill was raised under — a snapshot, not the vendor's current terms. */
+  terms_label: string | null;
+  discount_due_date: string | null;
+  discount_amount_minor: number;
+  discount_taken_minor: number;
 }
 
 export interface BillLineRow {

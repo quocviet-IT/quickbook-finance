@@ -16,6 +16,8 @@ export interface SettlementEvent {
   reference: string | null;
   memo: string | null;
   amountMinor: number;
+  /** The journal entry this settlement produced, when it has one. */
+  entryNumber?: string | null;
 }
 
 export interface SettlementLine extends SettlementEvent {

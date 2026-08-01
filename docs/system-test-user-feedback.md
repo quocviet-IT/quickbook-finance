@@ -24,7 +24,7 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
-## Issue #6 — Vendor bill payment status: assessment and proposal
+## Issue #6 — Vendor bill payment status: assessed, then built
 
 Filed as **HIGH / cash outflow impact HIGH**: *"Bills shown ($15.8K overdue)
 but no detail on which bills, payment terms, or priority."*
@@ -116,6 +116,122 @@ none of it.
 | An `amount_paid` column | **No.** It is total less balance. Storing it creates a third number that can disagree with the other two and with the allocations. |
 | Rebuilding the A/P aging report | **No.** It exists, in three views, reconciled to its control account. |
 
+### What was built (2026-08-01)
+
+All five, in the order agreed. Migrations 0075, 0076 and 0077 are live.
+
+**1. Terms the system can compute with.** `payment_terms_days`,
+`discount_percent` and `discount_days` on the vendor, beside the free-text
+label. The eleven existing vendors were backfilled from **their own words** —
+the migration reads `Net 30` → 30 days, `Due on receipt` → 0 — rather than
+applying a default and overwriting what someone had already agreed:
+
+| Terms on file | Vendors | Read as |
+|---|---:|---|
+| Net 30 | 6 | 30 days |
+| Net 15 | 2 | 15 days |
+| Due on receipt | 3 | 0 days |
+
+The vendor form now takes the numbers, and **fills them in from what you
+type**: enter `1/10 net 30` in the label and the three fields populate
+themselves. Nobody types the same thing twice, and a bill cannot end up with
+terms that disagree with their own label.
+
+**2. The bill snapshots its terms when it posts.** Due date, discount date and
+discount amount are written onto the bill from the vendor's terms at posting —
+after the total is known, because the discount is a percentage of it — and
+never re-read. Terms change; a bill keeps what it was raised under.
+
+A hand-typed due date is still honoured: someone may have agreed something
+special. But a bill can no longer arrive on the books **with no due date at
+all** and fall silently out of every ageing bucket.
+
+**3. A pay run, on the screen where bills get paid.** `/pay-bills` opens with
+the ranking, not the form:
+
+| Band | Ordered by |
+|---|---|
+| Overdue | Most days late first |
+| Discount expiring | Soonest deadline first |
+| Due soon (14 days) | Nearest due date |
+| Scheduled | Everything else |
+
+Every row says **why** it is where it is — "171 day(s) overdue", "Discount of
+20.00 until 2026-08-11 (4 day(s))" — and a **Pay today** column showing what
+the bank would actually send, discount included. Ties break on the larger
+balance: if two bills are equally late, the bigger one moves the relationship
+more.
+
+Against the live books it opens on exactly the thing that matters:
+
+> 3 bill(s) overdue, 15820.00 in total — the oldest is Aurora Gemstone Supply
+> Inc. at 171 days.
+
+**4. Taking the discount, posted properly.** `7010 Purchase Discounts Taken`
+was created (the chart had no such account), and paying inside the window now
+posts three legs:
+
+```
+Dr  Accounts Payable      1,000.00   the bill, settled in full
+  Cr  Bank                    980.00   cash actually paid
+  Cr  Purchase Discounts       20.00   the difference, as income
+```
+
+Every rule about when a discount may be taken is enforced **in the database**,
+not in the screen: a discount the vendor never offered, one claimed after the
+window closed, or one larger than the bill offers, are each refused by name. A
+discount claimed late is money the vendor will still ask for.
+
+**5. The journal entry beside each settlement.** The bill's payment history
+already existed — payments, vendor credits and write-offs, with method and
+reference. It now carries the **journal entry** each produced, finishing what
+Issue #5 started. A second settlement reader was written during this work and
+then deleted: the existing one was already right, and two implementations of
+the same history would eventually disagree.
+
+**Also:** the payment method list gained **ACH** and **wire**. ACH is how a US
+business pays a supplier and it was missing from the dropdown — which is
+exactly why older payments carry `"ACH"` as free text that the list could not
+produce.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 60 files, 612 tests passed (24 new for terms and ranking) |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 51 of 51 pages rendered |
+| `tests/e2e/early-payment-discount.e2e.ts` (new, HTTPS, live DB) | 2 passed |
+| `tests/e2e/gl-posting.e2e.ts` | 4 passed — the ledger still ties out after the new posting path |
+| Migrations 0075–0077 | applied to production |
+
+The end-to-end test does the whole thing on the real schema: creates a vendor
+on 2/10 net 30, posts a 1,000.00 bill, checks the terms landed (2% = 20.00,
+discount date set), pays 980.00 taking the 20.00, then reads the **journal
+entry back** and asserts payables were relieved by 1,000.00, the bank by
+980.00, and 20.00 reached account 7010. Then it asserts a discount on a bill
+that never offered one is refused. Everything it created is removed afterwards.
+
+That the three legs balance proves little on its own — the database refuses an
+unbalanced entry anyway. What the test proves is that they are the **right**
+three legs.
+
+### Not implemented, and why
+
+| Recommendation | Decision |
+|---|---|
+| `payment_date` / `payment_method` columns on the bill | **No.** A bill can be settled by several payments on different dates by different methods. They stay on the payment, and the bill now shows them. |
+| An `amount_paid` column | **No.** Total less balance. A stored third number can disagree with the other two. |
+| Rebuilding the A/P aging report | **No.** It already exists in three views, reconciled to its control account. |
+| Discount terms on the *customer* side | **Not now.** Offering settlement discounts to customers is a pricing decision, not a mirror of this one. |
+
+### The thing this does not fix
+
+BILL-000008 is **171 days overdue at 14,900.00**. The pay run now puts it at
+the top of the screen with the reason spelled out, which is all software can
+do. Somebody still has to pay it, dispute it, or write it down.
 ### One thing to fix while in here
 
 Payment methods are recorded as free text and already disagree with themselves:
