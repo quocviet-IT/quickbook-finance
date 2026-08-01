@@ -3,13 +3,17 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { requireDestructiveE2eEnvironment } from "../../scripts/e2e-environment.mjs";
+import {
+  requireDestructiveE2eEnvironment,
+  requireDestructiveE2eServiceRoleEnvironment,
+} from "../../scripts/e2e-environment.mjs";
 
 const isolatedEnvironment = {
   ALLOW_DESTRUCTIVE_E2E: "ONEBOOK_TEST_DATABASE_ONLY",
   E2E_DATABASE_URL: "postgresql://e2e_user:e2e_secret@test-db.example.com:5432/onebook_e2e",
   E2E_SUPABASE_URL: "https://onebook-e2e.supabase.co/",
   E2E_SUPABASE_ANON_KEY: "e2e-anon-key",
+  E2E_SUPABASE_SERVICE_ROLE_KEY: "e2e-service-role-key",
   E2E_EMAIL: "e2e-admin@example.com",
   E2E_PASSWORD: "e2e-admin-secret",
   E2E_SECONDARY_EMAIL: "e2e-clerk@example.com",
@@ -84,6 +88,26 @@ describe("requireDestructiveE2eEnvironment", () => {
       password: isolatedEnvironment.E2E_PASSWORD,
       secondaryEmail: isolatedEnvironment.E2E_SECONDARY_EMAIL,
       secondaryPassword: isolatedEnvironment.E2E_SECONDARY_PASSWORD,
+    });
+  });
+});
+
+describe("requireDestructiveE2eServiceRoleEnvironment", () => {
+  it("requires a dedicated E2E service-role key", () => {
+    expect(() =>
+      requireDestructiveE2eServiceRoleEnvironment({
+        ...isolatedEnvironment,
+        E2E_SUPABASE_SERVICE_ROLE_KEY: "",
+      }),
+    ).toThrow("E2E_SUPABASE_SERVICE_ROLE_KEY");
+  });
+
+  it("returns the isolated target with its dedicated service-role key", () => {
+    expect(
+      requireDestructiveE2eServiceRoleEnvironment(isolatedEnvironment),
+    ).toMatchObject({
+      supabaseUrl: isolatedEnvironment.E2E_SUPABASE_URL,
+      serviceRoleKey: isolatedEnvironment.E2E_SUPABASE_SERVICE_ROLE_KEY,
     });
   });
 });

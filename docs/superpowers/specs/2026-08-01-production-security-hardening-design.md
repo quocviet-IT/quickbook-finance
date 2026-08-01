@@ -29,7 +29,7 @@ Use a least-privilege database migration plus a fail-closed test-script boundary
 ### Verification-script isolation
 
 - Add one shared script guard that requires explicit test-only environment variables.
-- Destructive scripts must use `E2E_DATABASE_URL`, `E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`, `E2E_EMAIL`, and `E2E_PASSWORD`; they must not fall back to production variables or embedded credentials.
+- Destructive scripts must use `E2E_DATABASE_URL`, `E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`, `E2E_SUPABASE_SERVICE_ROLE_KEY`, `E2E_EMAIL`, `E2E_PASSWORD`, and dedicated secondary-user credentials; they must not fall back to production variables or embedded credentials.
 - Require an additional opt-in flag for destructive database tests.
 - Reject execution when required test values are absent, URLs match the normal application Supabase values, or the opt-in flag is not exact.
 - Keep existing test logic initially, but make it unreachable against the ordinary `.env.local` production configuration.

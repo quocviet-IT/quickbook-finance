@@ -1,15 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(
-      `${name} is required for the HTTPS end-to-end test. Run it through ` +
-        "npm run test:e2e:document-ledger-report so .env.local is loaded.",
-    );
-  }
-  return value;
-}
+import {
+  requireDestructiveE2eEnvironment,
+  requireDestructiveE2eServiceRoleEnvironment,
+} from "../../../scripts/e2e-environment.mjs";
 
 /** A run-unique marker written into every row the test creates. */
 export function newMarker(): string {
@@ -22,10 +15,8 @@ export async function openE2eSession(): Promise<{
   marker: string;
   today: string;
 }> {
-  const url = required("E2E_SUPABASE_URL");
-  const anonKey = required("E2E_SUPABASE_ANON_KEY");
-  const email = required("E2E_EMAIL");
-  const password = required("E2E_PASSWORD");
+  const { supabaseUrl: url, anonKey, email, password } =
+    requireDestructiveE2eEnvironment();
 
   const sb = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -52,6 +43,14 @@ export async function openE2eSession(): Promise<{
     marker: newMarker(),
     today: new Date().toISOString().slice(0, 10),
   };
+}
+
+export function createE2eServiceClient(): SupabaseClient {
+  const { supabaseUrl, serviceRoleKey } =
+    requireDestructiveE2eServiceRoleEnvironment();
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 export async function closeE2eSession(sb: SupabaseClient): Promise<void> {

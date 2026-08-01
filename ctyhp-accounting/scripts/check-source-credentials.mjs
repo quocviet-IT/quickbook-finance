@@ -4,12 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scriptRoot = join(projectRoot, "scripts");
+const e2eRoot = join(projectRoot, "tests", "e2e");
 
-function scriptFiles(directory) {
+function sourceFiles(directory, extensions) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) return scriptFiles(path);
-    return [".js", ".mjs", ".cjs"].includes(extname(entry.name)) ? [path] : [];
+    if (entry.isDirectory()) return sourceFiles(path, extensions);
+    return extensions.includes(extname(entry.name)) ? [path] : [];
   });
 }
 
@@ -24,8 +25,8 @@ const requestedFiles = process.argv.slice(2);
 const files = requestedFiles.length
   ? requestedFiles.map((file) => resolve(file))
   : [
-      ...scriptFiles(scriptRoot),
-      join(projectRoot, "tests", "e2e", "support", "session.ts"),
+      ...sourceFiles(scriptRoot, [".js", ".mjs", ".cjs"]),
+      ...sourceFiles(e2eRoot, [".ts"]),
     ];
 
 const offenders = files.filter((file) => {

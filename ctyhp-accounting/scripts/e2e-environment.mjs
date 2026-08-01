@@ -70,3 +70,13 @@ export function requireDestructiveE2eEnvironment(env = process.env) {
 
   return result;
 }
+
+/**
+ * @param {Record<string, string | undefined>} env
+ */
+export function requireDestructiveE2eServiceRoleEnvironment(env = process.env) {
+  return {
+    ...requireDestructiveE2eEnvironment(env),
+    serviceRoleKey: required(env, "E2E_SUPABASE_SERVICE_ROLE_KEY"),
+  };
+}

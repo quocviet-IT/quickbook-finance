@@ -27,7 +27,7 @@
 
 **Interfaces:**
 - Consumes: a plain environment object, defaulting to `process.env`.
-- Produces: `requireDestructiveE2eEnvironment(env)` returning `{ databaseUrl, supabaseUrl, anonKey, email, password, secondaryEmail, secondaryPassword }`.
+- Produces: `requireDestructiveE2eEnvironment(env)` returning `{ databaseUrl, supabaseUrl, anonKey, email, password, secondaryEmail, secondaryPassword }`, plus `requireDestructiveE2eServiceRoleEnvironment(env)` for the dedicated `E2E_SUPABASE_SERVICE_ROLE_KEY`.
 
 - [ ] **Step 1: Write the failing guard tests**
 
@@ -36,7 +36,8 @@
   - missing any required `E2E_*` value throws and names only the variable, never a supplied secret;
   - `E2E_DATABASE_URL === SUPABASE_DB_URL` throws;
   - `E2E_SUPABASE_URL === NEXT_PUBLIC_SUPABASE_URL` throws;
-  - an isolated configuration returns the seven normalized values.
+  - an isolated configuration returns the seven normalized values;
+  - service-role E2E access requires its own `E2E_SUPABASE_SERVICE_ROLE_KEY`.
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
@@ -120,11 +121,17 @@
 - Modify: `ctyhp-accounting/scripts/verify-search.mjs`
 - Modify: `ctyhp-accounting/scripts/verify-vendor-tax.mjs`
 - Modify: `ctyhp-accounting/tests/e2e/support/session.ts`
+- Modify: `ctyhp-accounting/tests/e2e/support/cleanup.ts`
+- Modify: `ctyhp-accounting/tests/e2e/early-payment-discount.e2e.ts`
+- Modify: `ctyhp-accounting/tests/e2e/feedback-attachment.e2e.ts`
+- Modify: `ctyhp-accounting/tests/e2e/feedback.e2e.ts`
+- Modify: `ctyhp-accounting/tests/e2e/inventory-costing.e2e.ts`
+- Modify: `ctyhp-accounting/tests/e2e/statement-import.e2e.ts`
 - Modify: `ctyhp-accounting/.env.local.example`
 
 **Interfaces:**
 - Consumes: `requireDestructiveE2eEnvironment()` from Task 1.
-- Produces: destructive scripts that cannot obtain a client or sign in from ordinary production variables.
+- Produces: destructive scripts and E2E service-role helpers that cannot obtain a client or sign in from ordinary production variables.
 
 - [ ] **Step 1: Add a subprocess behavior test**
 
@@ -167,7 +174,7 @@
 
 - [ ] **Step 4: Remove fallback credentials from E2E support**
 
-  Make `tests/e2e/support/session.ts` require `E2E_EMAIL` and `E2E_PASSWORD` with no demo defaults. Update `.env.local.example` with empty `E2E_*` placeholders and explicit warnings that destructive suites require a separate project plus the exact opt-in value.
+  Make `tests/e2e/support/session.ts` call the shared guard and require `E2E_EMAIL` and `E2E_PASSWORD` with no demo defaults. Route every E2E service-role client through `E2E_SUPABASE_SERVICE_ROLE_KEY`, never `SUPABASE_SERVICE_ROLE_KEY`. Update `.env.local.example` with empty `E2E_*` placeholders and explicit warnings that destructive suites require a separate project plus the exact opt-in value.
 
 - [ ] **Step 5: Verify fail-closed behavior**
 
@@ -191,7 +198,7 @@
 - Modify: `.github/workflows/ci.yml`
 
 **Interfaces:**
-- Consumes: tracked operational scripts beneath `ctyhp-accounting/scripts` plus `ctyhp-accounting/tests/e2e/support/session.ts`; ordinary unit-test password fixtures are out of scope.
+- Consumes: tracked operational scripts beneath `ctyhp-accounting/scripts` plus all `ctyhp-accounting/tests/e2e/**/*.ts`; ordinary unit-test password fixtures are out of scope.
 - Produces: command `npm run security:check-source`, exit 0 when no literal password assignment/sign-in value exists and exit 1 with file paths only when a violation exists.
 
 - [ ] **Step 1: Create the scanner with a deliberate fixture mode**
