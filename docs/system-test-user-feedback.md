@@ -203,11 +203,17 @@ data with the service role leaves a documented reason for the number it frees.
 #### State of the live invoice sequence after this round
 
 Counter at `INV-000028`. Numbers 22–27 are documented as removed by end-to-end
-test sweeps. Numbers **7, 8, 15, 16, 17, 18, 19 and 20 remain unexplained** —
-they disappeared before any of this existed and nothing records why. They are
-what the banner and the report now show, which is the point: the product no
-longer hides them. Someone who knows what happened should document them, or
-they stay an open exception.
+test sweeps. Numbers **7, 8, 15, 16, 17, 18, 19 and 20 were unexplained** — they
+disappeared before any of this existed and nothing recorded why. They were what
+the banner and the report showed, which was the point: the product no longer
+hides them.
+
+**Closed on 2026-08-01.** The reviewer confirmed those eight were test data from
+the pre-launch trial round — no real invoice ever held them. Each now carries a
+note saying so, written through `acc_record_number_gap_note` as the
+administrator, so the note is attributed and audited like any other governance
+act. The live sequence reads: 45 allocated, 13 present, 32 missing, **32
+explained, 0 unexplained.** The banner is clear.
 
 #### Not implemented, and why
 

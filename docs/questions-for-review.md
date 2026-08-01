@@ -1,8 +1,9 @@
 # One Book — questions that need an answer from you
 
-Eight decisions have come up while working through the test round. None of them
-can be settled by reading the code: each one is about how this business actually
-works, or what it wants. Guessing at any of them means building the wrong thing.
+Eight decisions came up while working through the test round; **seven are still
+open** (Q4 is answered and closed, at the bottom). None can be settled by
+reading the code: each one is about how this business actually works, or what it
+wants. Guessing at any of them means building the wrong thing.
 
 They are grouped by who is best placed to answer. Write the answer under the
 question with the date and who gave it — that record is what closes the item.
@@ -60,24 +61,6 @@ what combined rate applies in each? A list is enough:
 | State | Combined rate | Notes (county/city included?) |
 |---|---|---|
 | | | |
-
-**Answer:**
-
----
-
-### Q4 — What happened to invoice numbers 7, 8 and 15–20?
-
-The sequence report flags eight numbers that were issued by the system but that
-no invoice holds. Numbers 22–27 are accounted for — end-to-end test runs used
-and released them, and that is recorded. These eight went missing before the
-numbering controls existed, and nothing in the database says why.
-
-This is the kind of gap an auditor asks about, so it stays flagged until there
-is an explanation on file.
-
-**The question:** does anyone remember — a data import, a clean-up, a batch that
-was cancelled, invoices printed and voided? Any answer, even "we were testing in
-January", gets recorded against those numbers and closes the exception.
 
 **Answer:**
 
@@ -204,5 +187,16 @@ So the useful question is what is missing.
 
 ## Answered
 
-Move a question here once it is settled, with the answer, the date, and who gave
-it. Nothing has been answered yet.
+### Q4 — What happened to invoice numbers 7, 8 and 15–20? *(closed)*
+
+**Answer — 2026-08-01, the reviewer:** test data. Those numbers were issued
+during the pre-launch trial round and no real invoice ever held them.
+
+**Done:** each of the eight now carries a note saying exactly that, recorded
+through the numbering-gap control as the administrator, so it is attributed and
+audited like any other governance act. The invoice sequence now reads 45
+allocated, 13 present, 32 missing, **32 explained and 0 unexplained** — the
+exception banner on the sequence report is clear.
+
+Nothing was deleted and no number was reused: a number the sequence has handed
+out never comes back, and the note is what closes the question about it.
