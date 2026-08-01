@@ -10,6 +10,41 @@ describe("accountCreateSchema", () => {
     });
     expect(parsed.is_posting_account).toBe(true);
     expect(parsed.status).toBe("active");
+    expect(parsed.cash_flow_role).toBe("operating");
+  });
+
+  it("uses conservative cash-flow defaults and accepts an explicit policy", () => {
+    const bank = accountCreateSchema.parse({
+      account_code: "1015",
+      name: "Savings",
+      account_type: "bank",
+    });
+    const ambiguousLiability = accountCreateSchema.parse({
+      account_code: "2300",
+      name: "Other current liability",
+      account_type: "current_liability",
+    });
+    const loan = accountCreateSchema.parse({
+      account_code: "2310",
+      name: "Working capital loan",
+      account_type: "current_liability",
+      cash_flow_role: "financing",
+    });
+
+    expect(bank.cash_flow_role).toBe("cash");
+    expect(ambiguousLiability.cash_flow_role).toBe("unclassified");
+    expect(loan.cash_flow_role).toBe("financing");
+  });
+
+  it("rejects an unknown cash-flow role", () => {
+    expect(() =>
+      accountCreateSchema.parse({
+        account_code: "2311",
+        name: "Bad policy",
+        account_type: "current_liability",
+        cash_flow_role: "cash-ish",
+      }),
+    ).toThrow();
   });
 
   it("rejects an empty code", () => {

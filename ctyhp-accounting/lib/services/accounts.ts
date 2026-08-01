@@ -9,7 +9,7 @@ import {
 
 const TABLE = "acc_account";
 const COLUMNS =
-  "id,account_code,name,account_type,detail_type,parent_account_id,description," +
+  "id,account_code,name,account_type,cash_flow_role,detail_type,parent_account_id,description," +
   "default_tax_code_id,currency_code,is_posting_account,status,effective_from," +
   "effective_to,created_by,approved_by,created_at,updated_at";
 

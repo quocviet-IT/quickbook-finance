@@ -3,6 +3,7 @@
  * once the DB is linked these can be regenerated with `supabase gen types`.
  */
 import type { AccountType } from "@/lib/domain/accounts";
+import type { CashFlowRole } from "@/lib/domain/cashflow";
 
 export type AccountStatus = "draft" | "active" | "inactive" | "archived";
 export type TaxDirection = "sales" | "purchase" | "none";
@@ -84,6 +85,7 @@ export interface AccountRow {
   account_code: string;
   name: string;
   account_type: AccountType;
+  cash_flow_role: CashFlowRole;
   detail_type: string | null;
   parent_account_id: string | null;
   description: string | null;

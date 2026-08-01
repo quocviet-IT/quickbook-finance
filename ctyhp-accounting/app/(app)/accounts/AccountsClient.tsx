@@ -23,6 +23,11 @@ import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { ACCOUNT_TYPES, normalBalanceOf, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import { BANK_DETAIL_TYPES, bankDetailLabel } from "@/lib/domain/bank-account-detail";
+import {
+  CASH_FLOW_ROLES,
+  defaultCashFlowRole,
+  type CashFlowRole,
+} from "@/lib/domain/cashflow";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
 
@@ -49,10 +54,27 @@ const STATUS_LABELS: Record<AccountStatus, { text: string; color: string }> = {
   archived: { text: "Archived", color: "default" },
 };
 
+const CASH_FLOW_ROLE_LABELS: Record<CashFlowRole, string> = {
+  cash: "Cash",
+  cash_equivalent: "Cash equivalent",
+  restricted_cash: "Restricted cash",
+  operating: "Operating",
+  operating_receivable: "Operating — receivable",
+  operating_inventory: "Operating — inventory",
+  operating_payable: "Operating — payable",
+  operating_asset: "Operating — other asset",
+  operating_liability: "Operating — other liability",
+  investing: "Investing",
+  financing: "Financing",
+  exclude: "Exclude",
+  unclassified: "Unclassified",
+};
+
 interface FormValues {
   account_code: string;
   name: string;
   account_type: AccountType;
+  cash_flow_role?: CashFlowRole;
   /** Only meaningful for Bank-type accounts; see lib/domain/bank-account-detail. */
   detail_type?: string | null;
   parent_account_id?: string | null;
@@ -109,6 +131,7 @@ export default function AccountsClient({
       account_code: row.account_code,
       name: row.name,
       account_type: row.account_type,
+      cash_flow_role: row.cash_flow_role,
       detail_type: row.detail_type,
       parent_account_id: row.parent_account_id,
       currency_code: row.currency_code,
@@ -172,6 +195,21 @@ export default function AccountsClient({
         ) : (
           (detail ?? "—")
         ),
+    },
+    {
+      title: "Cash flow",
+      dataIndex: "cash_flow_role",
+      width: 190,
+      render: (role: CashFlowRole) => (
+        <Tag color={role === "unclassified" ? "orange" : "blue"}>
+          {CASH_FLOW_ROLE_LABELS[role]}
+        </Tag>
+      ),
+      filters: CASH_FLOW_ROLES.map((role) => ({
+        text: CASH_FLOW_ROLE_LABELS[role],
+        value: role,
+      })),
+      onFilter: (value, row) => row.cash_flow_role === value,
     },
     {
       title: "Normal",
@@ -279,6 +317,24 @@ export default function AccountsClient({
             <Select
               options={ACCOUNT_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
               placeholder="Select an account type"
+              onChange={(type: AccountType) => {
+                form.setFieldValue("cash_flow_role", defaultCashFlowRole(type));
+                if (type !== "bank") form.setFieldValue("detail_type", null);
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            name="cash_flow_role"
+            label="Cash flow role"
+            rules={[{ required: true, message: "Select a cash flow role" }]}
+            extra="Unclassified accounts keep the Cash Flow Statement in review status until an accountant assigns a policy."
+          >
+            <Select
+              options={CASH_FLOW_ROLES.map((role) => ({
+                value: role,
+                label: CASH_FLOW_ROLE_LABELS[role],
+              }))}
+              placeholder="Select a cash flow role"
             />
           </Form.Item>
           {watchedType === "bank" ? (

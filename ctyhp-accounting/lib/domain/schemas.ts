@@ -1,6 +1,7 @@
 /** Zod validation schemas for the accounting domain (input boundary). */
 import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
+import { CASH_FLOW_ROLES, defaultCashFlowRole } from "./cashflow";
 import { USD_CURRENCY_CODE } from "./currency";
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "./feedback";
 import {
@@ -14,7 +15,7 @@ export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
   error: "Only USD is supported",
 });
 
-export const accountCreateSchema = z.object({
+const accountInputSchema = z.object({
   account_code: z
     .string()
     .trim()
@@ -23,6 +24,7 @@ export const accountCreateSchema = z.object({
     .regex(/^[A-Za-z0-9.\-]+$/, "Account code may only contain letters, digits, '.' and '-'"),
   name: z.string().trim().min(1, "Account name is required").max(120),
   account_type: z.enum(ACCOUNT_TYPES),
+  cash_flow_role: z.enum(CASH_FLOW_ROLES).optional(),
   detail_type: z.string().trim().max(80).optional().nullable(),
   parent_account_id: z.uuid().optional().nullable(),
   description: z.string().trim().max(500).optional().nullable(),
@@ -32,10 +34,15 @@ export const accountCreateSchema = z.object({
   status: z.enum(ACCOUNT_STATUSES).default("active"),
 });
 
+export const accountCreateSchema = accountInputSchema.transform((value) => ({
+  ...value,
+  cash_flow_role: value.cash_flow_role ?? defaultCashFlowRole(value.account_type),
+}));
+
 export type AccountCreateInput = z.infer<typeof accountCreateSchema>;
 
 /** Update allows partial fields but never changes the code via this path. */
-export const accountUpdateSchema = accountCreateSchema.partial().omit({ account_code: true });
+export const accountUpdateSchema = accountInputSchema.partial().omit({ account_code: true });
 export type AccountUpdateInput = z.infer<typeof accountUpdateSchema>;
 
 export const accountStatusSchema = z.enum(ACCOUNT_STATUSES);
