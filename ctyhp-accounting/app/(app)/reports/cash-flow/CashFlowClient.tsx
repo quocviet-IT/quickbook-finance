@@ -125,9 +125,13 @@ function reportRows(report: CashFlowReport): DisplayRow[] {
 export default function CashFlowClient({
   baseCurrency,
   baseDecimals,
+  companyName,
 }: {
   baseCurrency: string;
   baseDecimals: number;
+  /** Whose books these are. A statement that does not name its entity is one
+   *  somebody will eventually file against the wrong company. */
+  companyName: string;
 }) {
   const { message } = App.useApp();
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
@@ -217,9 +221,17 @@ export default function CashFlowClient({
 
       {report && (
         <>
-          <Typography.Text type="secondary">
-            Base currency {baseCurrency} · Indirect method · Accrual basis
-          </Typography.Text>
+          {/* The statement names its entity, and says which method produced
+              it — both belong at the top of anything that gets filed. */}
+          <div className="report-result__heading">
+            <div className="report-result__entity">{companyName}</div>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              Statement of Cash Flows
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              Base currency {baseCurrency} · Indirect method · Accrual basis
+            </Typography.Text>
+          </div>
           <Alert
             type={report.tiesOut ? "success" : "warning"}
             showIcon

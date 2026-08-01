@@ -3195,3 +3195,13 @@ body {
 .report-table-row--exception > td {
   background: rgba(207, 19, 34, 0.06);
 }
+
+/* Which company's books are open. First thing in the header, because on a
+   system holding several sets of books it is the most important fact on the
+   screen. */
+.app-shell__header-company {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  min-width: 0;
+}

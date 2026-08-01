@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { resolveActiveCompany } from "@/lib/db/company";
 import { countPendingApprovals } from "@/lib/services/access";
 import type { AppRole } from "@/lib/db/types";
 import AppShell from "@/components/AppShell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Which company is open decides which schema everything below reads, so it is
+  // resolved before anything else.
+  const { active, options } = await resolveActiveCompany();
   const sb = await createSupabaseServerClient();
   const {
     data: { user },
@@ -32,6 +36,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       email={user.email ?? ""}
       role={role}
+      activeCompany={
+        active
+          ? {
+              slug: active.slug,
+              legalName: active.legalName,
+              dbaName: active.dbaName,
+              isSample: active.isSample,
+            }
+          : null
+      }
+      companyOptions={options.map((company) => ({
+        slug: company.slug,
+        legalName: company.legalName,
+        dbaName: company.dbaName,
+        isSample: company.isSample,
+      }))}
       permissionKeys={permissionKeys}
       pendingApprovals={pendingApprovals}
     >

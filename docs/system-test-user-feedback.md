@@ -129,10 +129,120 @@ decision are still outstanding.
 
 ---
 
-## Multi-company and the QuickBooks import — assessment and sequencing
+## Multi-company — assessed, then built
 
 Two features asked for on 2026-08-01: switching between companies, and
 importing a QuickBooks or Wave CSV. Assessment only; nothing built yet.
+
+### Built on 2026-08-01
+
+Schema per company, as assessed. Migration 0081 and three sample companies are
+live.
+
+| | |
+|---|---|
+| Register | `onebook.company` — the entities, and `onebook.company_member` for who may open each one |
+| Isolation | One Postgres schema per company. A query in one cannot see another's rows because they are not in it |
+| Provisioning | `scripts/provision-company.ts` — builds a schema and **verifies it against the live books** before reporting success |
+| Switching | A selector in the header of every screen, so nobody leaves their workflow to change company |
+| Keeping in step | `scripts/migrate.mjs` now applies every migration to every company |
+
+**The companies now on the system:**
+
+| Company | Schema | |
+|---|---|---|
+| Aurora Fine Jewelry LLC | `public` | the live books, untouched |
+| North Star Bridal LLC | `co_north_star` | sample |
+| Harbor Gems Trading Co. | `co_harbor_gems` | sample |
+| Cascade Precious Metals Inc. | `co_cascade_metals` | sample |
+
+Each sample was built with **73 tables, 176 functions and 132 policies —
+exactly matching the live books** — and each opens on a complete, empty
+accounting system: its own chart of accounts, its own numbering starting at
+INV-000001, no transactions.
+
+The live books did not move. Renaming a schema to make the layout symmetrical
+would have risked real accounting data to satisfy a preference, so the register
+records where they already are instead.
+
+### The three things that would have leaked, and what caught them
+
+Replaying 80 migrations into a new schema is not a copy-paste job. Three
+problems would each have produced a company quietly reading another's data, and
+none of them is visible by inspection:
+
+| Problem | What would have happened |
+|---|---|
+| **168 functions carry `set search_path = public`** | Created in another company's schema with that line intact, every one of them would read *the first company's* tables. The company would look fine and report someone else's numbers. |
+| **Catalog lookups name the schema as a string** — `table_schema = 'public'`, `nspname = 'public'` | No qualifier rewrite touches a string. One of them re-applies permission grants, so provisioning company B would have hardened company A and left B unguarded. |
+| **A type guard asks whether `acc_feedback_kind` exists *anywhere*** | It finds the first company's copy, concludes the work is done, and leaves the new company without the type. This one surfaced as a table that could not be created, 742 statements later. |
+
+All three are handled in `lib/domain/schema-template.ts`, which is pure and has
+**27 unit tests** — including two that run the transformation over the real
+migration set and assert that **nothing** is left pointing at `public`. That
+assertion is the one that matters; the rest is detail.
+
+A fourth class is handled by refusing to copy it at all. Storage policies,
+roles and extensions belong to the database, not to a company: replaying them
+per company would not give each its own, it would keep rewriting the single
+shared copy to point at whichever company was provisioned last. 24 statements
+are held back, each reported with the reason rather than silently dropped.
+
+### What was proved, and how
+
+`tests/e2e/company-isolation.e2e.ts` — four tests, all passing, **run entirely
+as a real signed-in user**. A test that proved isolation using the service role
+would prove nothing, because the service role bypasses the very rules under
+test.
+
+| Test | What it establishes |
+|---|---|
+| Every company has a schema of its own | Two companies sharing one would make the whole arrangement a fiction |
+| Each company shows only its own ledger | The live books have 95 entries; every sample has 0 and a full chart of accounts |
+| **A customer written in one company is invisible in every other** | Written to a sample, then looked for from another sample *and from the live books*. Not found in either |
+| Numbering is per company | The live books are past INV-000028; every sample starts at 1 |
+
+The write in the third test is the only write in the suite, and it carries its
+own guarantee rather than an environment flag: it asserts the target company is
+marked `is_sample` before touching it. Real books cannot be written by that
+test on any database.
+
+Beyond the suite, every page was rendered in all four companies — **52 of 52,
+four times** — and switching was checked to change the *books* and not just the
+label: `/invoices` shows real invoice numbers under the live company and an
+empty state under each sample.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 63 files, 669 tests passed (27 new for the schema template) |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| Page sweep, all four companies | 52 of 52 each |
+| `tests/e2e/company-isolation.e2e.ts` | 4 passed |
+| Control accounts, live books | all six still tie out, unchanged |
+| Migration 0081 + three schemas | applied to production |
+
+**One gate could not be run, and it is worth stating plainly.** The security
+hardening merged earlier today routes `scripts/smoke-pages.mjs` and every HTTPS
+end-to-end suite through an isolated test project, which does not exist yet.
+They now refuse to run against production by design. The page sweep above is
+the same read-only check performed directly, and the control-account figures
+were read the same way — but `gl-posting.e2e.ts` and the document-ledger suite
+were **not** executed, and will not be until a test project exists.
+
+### What is deliberately not done yet
+
+| | Why |
+|---|---|
+| The ten real companies | The list is still unconfirmed. Provisioning one takes a single command; there is nothing to provision *into* until management names them. |
+| Per-company permissions beyond membership | Membership decides whether a company can be opened; the role inside it is that company's own `acc_app_user` row. So access already varies by company — what is missing is a screen to manage it, rather than the model. |
+| Document and attachment storage per company | Storage policies are global and were held back on purpose. Files still live in one place; separating them needs a company-prefixed path scheme, which is its own change. |
+| Consolidated group reporting | Not asked for. It is the one thing this layout defers, and it becomes a union view over the schemas when someone wants it. |
+
+---
 
 ### The reviewer just answered the biggest open question
 

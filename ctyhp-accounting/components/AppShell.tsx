@@ -40,6 +40,7 @@ import {
   navigationForAccess,
   type NavItem,
 } from "@/lib/domain/navigation";
+import CompanySwitcher, { type CompanyChoice } from "./CompanySwitcher";
 import GlobalSearch from "./GlobalSearch";
 import NewMenu from "./NewMenu";
 import AssistantLauncher from "./assistant/AssistantLauncher";
@@ -224,12 +225,17 @@ function NavigationMenu({
 export default function AppShell({
   email,
   role,
+  activeCompany,
+  companyOptions,
   permissionKeys,
   pendingApprovals,
   children,
 }: {
   email: string;
   role: AppRole | null;
+  /** The company whose books are open, and everything this user may switch to. */
+  activeCompany: CompanyChoice | null;
+  companyOptions: CompanyChoice[];
   /** Null means the permission lookup failed; menu filtering then degrades open. */
   permissionKeys: string[] | null;
   /** Badge count, so the approvals queue is visible without a sidebar slot. */
@@ -409,6 +415,10 @@ export default function AppShell({
               </Tooltip>
             </div>
           )}
+
+          <div className="app-shell__header-company">
+            <CompanySwitcher active={activeCompany} options={companyOptions} />
+          </div>
 
           <div className="app-shell__header-search">
             <GlobalSearch />
