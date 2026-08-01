@@ -8,6 +8,78 @@ Environment: production database (Supabase project of `ctyhp-accounting`), app a
 
 ---
 
+## Open questions for the reviewer
+
+Ask these at the next review. Each one changes what gets built, so none of them
+should be guessed at. Answers go straight under the question, dated.
+
+### Q1 — Should Cash on Hand be reachable from Banking? (Issue #17)
+
+Today Banking is a statement-matching screen: a bank account is something a
+statement comes from, so cash on hand is excluded from it entirely and the
+database refuses the link. That is the stricter reading of the reviewer's own
+point.
+
+**The question:** does the business count a till or petty cash on a schedule and
+want to do it in Banking? If so, that is a different flow — a cash count and a
+variance posting, not a statement import — and it needs designing as one rather
+than by loosening the rule that was just added.
+
+*Asked because the reviewer wrote "ask me if you need some explanation".*
+
+### Q2 — Ten companies: separate workspaces, or one multi-tenant database? (Issue #14)
+
+The trade-offs, costs and risks are written out in Issue #14. The
+recommendation is a workspace per company unless consolidated reporting is
+actually needed.
+
+**The question:** does anyone need a group balance sheet across the companies,
+one login for all of them, or shared customers and items? If yes, it is the
+multi-tenant retrofit — weeks of work touching every posting path. If no, ten
+workspaces give absolute separation for the cost of configuration.
+
+### Q3 — Who supplies the state sales tax rates? (Issue #3)
+
+Rates were deliberately not seeded: a state rate is only part of what is
+charged (county, city and district add to it) and every one of them changes.
+Customers now carry state codes and the invoice screen will suggest a rate as
+soon as one exists for their state.
+
+**The question:** which states is the business registered to collect in, and at
+what combined rate? Someone has to state them; the product should not invent
+them.
+
+### Q4 — Why are invoice numbers 7, 8 and 15–20 missing? (Issue #2)
+
+The sequence report flags eight numbers the system issued that no invoice
+holds. Numbers 22–27 are accounted for (removed by end-to-end test sweeps).
+These eight disappeared before the numbering controls existed, and nothing in
+the database records why.
+
+**The question:** does anyone remember what happened to them — a data import, a
+clean-up, a cancelled batch? Any answer can be recorded against the numbers and
+the exception closes. Without one they stay flagged, which is correct.
+
+### Q5 — Should an over-limit invoice need approval, or just permission? (Issue #6)
+
+Issuing past a credit limit currently needs the `credit.override` permission,
+held by administrators, plus a written reason that is audited.
+
+**The question:** should it instead go through the existing maker-checker
+approval queue, so the invoice waits for a second person to sign off? That is a
+stronger control and a slower one; it is a policy choice, not a technical one.
+
+### Q6 — Should feedback attachments be virus-scanned? (Issue #7)
+
+Accounting documents already go through a scanning pipeline (migrations
+0056–0057). Feedback attachments do not: they are read only by staff with
+`feedback.read`, through short-lived signed links, and never executed.
+
+**The question:** does the business want the same scanning applied to them? It
+is worth doing, and it is its own change with its own failure modes.
+
+---
+
 ## Round 2 — accounting review, 2026-07-31
 
 Source: written review supplied by the accountant, item by item. Round 2 covers
@@ -1179,11 +1251,10 @@ this: the account is named, coded, classified and confirmed on screen.
 
 #### Still open with the reviewer
 
-They offered an explanation ("ask me if you need some explanation"). One
-question worth putting back to them: **should cash on hand be reachable from
-Banking at all** — for a till count or a petty cash reconciliation — or does it
-belong only in the journal? Today Banking is a statement-matching screen and
-cash on hand is excluded from it entirely, which is the stricter reading.
+They offered an explanation ("ask me if you need some explanation"), and there
+is one question worth putting back to them: should cash on hand be reachable
+from Banking at all? It is written up as **Q1** in "Open questions for the
+reviewer" at the top of this file.
 
 ### Backlog from the same round (not started)
 
