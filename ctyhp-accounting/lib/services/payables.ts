@@ -53,6 +53,8 @@ export async function createVendor(sb: SupabaseClient, input: VendorCreateInput)
 // --- Bills ---
 export interface BillWithVendor extends BillRow {
   vendor_name: string;
+  /** The journal entry this bill produced, so the list can point at it. */
+  entry_number: string | null;
 }
 
 export async function listBills(sb: SupabaseClient): Promise<BillWithVendor[]> {
@@ -60,13 +62,15 @@ export async function listBills(sb: SupabaseClient): Promise<BillWithVendor[]> {
     .from("acc_bill")
     .select(
       "id,bill_number,vendor_ref,vendor_id,bill_date,due_date,currency_code,total_minor," +
-        "balance_due_minor,status,journal_entry_id,memo,created_at,updated_at,acc_vendor(name)",
+        "balance_due_minor,status,journal_entry_id,memo,created_at,updated_at," +
+        "acc_vendor(name),acc_journal_entry(entry_number)",
     )
     .order("created_at", { ascending: false });
   if (error) throw new PayablesError(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     ...(r as unknown as BillRow),
     vendor_name: (r.acc_vendor as { name?: string } | null)?.name ?? "—",
+    entry_number: (r.acc_journal_entry as { entry_number?: string } | null)?.entry_number ?? null,
   }));
 }
 

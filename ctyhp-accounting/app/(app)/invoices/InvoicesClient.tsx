@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dayjs from "dayjs";
 import {
   Alert,
@@ -507,6 +508,17 @@ export default function InvoicesClient({
     {
       // Who made this invoice and when, on the row itself: the first question an
       // auditor asks of a document, and one it should not take a click to answer.
+      title: "Journal entry",
+      key: "entry",
+      width: 140,
+      render: (_: unknown, r: InvoiceWithCustomer) =>
+        r.entry_number ? (
+          <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
+        ) : (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ),
+    },
+    {
       title: "Created",
       dataIndex: "created_at",
       width: 120,

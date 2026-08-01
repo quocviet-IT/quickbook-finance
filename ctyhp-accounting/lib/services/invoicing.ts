@@ -93,6 +93,8 @@ export async function updateCustomer(
 // --- Invoices ---
 export interface InvoiceWithCustomer extends InvoiceRow {
   customer_name: string;
+  /** The journal entry this invoice produced, so the list can point at it. */
+  entry_number: string | null;
 }
 
 export async function listInvoices(sb: SupabaseClient): Promise<InvoiceWithCustomer[]> {
@@ -101,7 +103,8 @@ export async function listInvoices(sb: SupabaseClient): Promise<InvoiceWithCusto
     .select(
       "id,invoice_number,customer_id,issue_date,due_date,currency_code,subtotal_minor," +
         "tax_total_minor,total_minor,balance_due_minor,status,order_id,journal_entry_id," +
-        "memo,created_by,updated_by,created_at,updated_at,acc_customer(name)",
+        "memo,created_by,updated_by,created_at,updated_at,acc_customer(name)," +
+        "acc_journal_entry(entry_number)",
     )
     // Invoice number order, drafts first: a numbered document list that does
     // not run in sequence is the one thing a reviewer cannot scan for breaks.
@@ -111,6 +114,7 @@ export async function listInvoices(sb: SupabaseClient): Promise<InvoiceWithCusto
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     ...(r as unknown as InvoiceRow),
     customer_name: (r.acc_customer as { name?: string } | null)?.name ?? "—",
+    entry_number: (r.acc_journal_entry as { entry_number?: string } | null)?.entry_number ?? null,
   }));
 }
 
@@ -240,6 +244,7 @@ export async function listPayments(sb: SupabaseClient): Promise<(PaymentRow & { 
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     ...(r as unknown as PaymentRow),
     customer_name: (r.acc_customer as { name?: string } | null)?.name ?? "—",
+    entry_number: (r.acc_journal_entry as { entry_number?: string } | null)?.entry_number ?? null,
   }));
 }
 

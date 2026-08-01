@@ -3,7 +3,14 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { closePeriodSchema, reopenPeriodSchema } from "@/lib/domain/schemas";
-import { generatePeriods, closePeriod, reopenPeriod, listPeriods, PeriodsError } from "@/lib/services/periods";
+import {
+  generatePeriods,
+  closePeriod,
+  reopenPeriod,
+  listPeriods,
+  periodCloseBlockers,
+  PeriodsError,
+} from "@/lib/services/periods";
 import {
   executeOrSubmitForApproval,
   toControlledActionResponse,
@@ -27,9 +34,16 @@ export async function closePeriodAction(id: string, raw: unknown): Promise<Actio
   const denied = await adminGuard(); if (denied) return { ok: false, error: denied };
   const parsed = closePeriodSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  try { const sb = await createSupabaseServerClient(); await closePeriod(sb, id, parsed.data.reason); revalidatePath("/settings/periods"); return { ok: true }; }
+  try { const sb = await createSupabaseServerClient(); await closePeriod(sb, id, parsed.data.reason, parsed.data.variance_note ?? null); revalidatePath("/settings/periods"); return { ok: true }; }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
+/** What would stop this period closing — asked before the button is pressed. */
+export async function periodCloseBlockersAction(id: string): Promise<ActionResult<string | null>> {
+  const denied = await adminGuard(); if (denied) return { ok: false, error: denied };
+  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await periodCloseBlockers(sb, id) }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
 export async function reopenPeriodAction(
   id: string,
   raw: unknown,

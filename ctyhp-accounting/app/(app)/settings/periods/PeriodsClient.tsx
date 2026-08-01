@@ -1,8 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { App, Button, Card, Input, InputNumber, Space, Table, Tag } from "antd";
-import { listPeriodsAction, generatePeriodsAction, closePeriodAction, reopenPeriodAction } from "./actions";
+import { Alert, App, Button, Card, Input, InputNumber, Space, Table, Tag } from "antd";
+import {
+  listPeriodsAction,
+  generatePeriodsAction,
+  closePeriodAction,
+  reopenPeriodAction,
+  periodCloseBlockersAction,
+} from "./actions";
 import type { AccountingPeriodRow } from "@/lib/db/types";
 
 export default function PeriodsClient({
@@ -40,22 +46,110 @@ export default function PeriodsClient({
     }
   };
 
+  /**
+   * Closing asks the database what stands in the way first, so the person sees
+   * the variance before they commit rather than as a refusal afterwards. A
+   * period that does not tie out can still be closed — with the difference
+   * written down, which is then kept with the period.
+   */
+  const close = async (row: AccountingPeriodRow) => {
+    const blockers = await periodCloseBlockersAction(row.id);
+    if (!blockers.ok) {
+      message.error(blockers.error ?? "Could not check the control accounts");
+      return;
+    }
+    const problem = blockers.data ?? null;
+    let reason = "";
+    let varianceNote = "";
+
+    modal.confirm({
+      title: `Close ${row.label}?`,
+      width: problem ? 560 : undefined,
+      okText: problem ? "Close over the variance" : "Close",
+      okButtonProps: problem ? { danger: true } : undefined,
+      content: (
+        <Space direction="vertical" style={{ width: "100%" }} size="small">
+          {problem ? (
+            <Alert
+              type="error"
+              showIcon
+              message="The books do not tie out at this period end"
+              description={
+                <>
+                  <div>{problem}</div>
+                  <div style={{ marginTop: 8 }}>
+                    Closing now seals that difference behind a closed period. Explain it, or
+                    fix it first — the <Link href="/reports/gl-posting">posting report</Link> shows
+                    where it is.
+                  </div>
+                </>
+              }
+            />
+          ) : (
+            <Alert
+              type="success"
+              showIcon
+              message="Every control account ties to its subledger at this period end."
+            />
+          )}
+          <Input
+            placeholder="Reason for closing"
+            onChange={(e) => {
+              reason = e.target.value;
+            }}
+          />
+          {problem ? (
+            <Input.TextArea
+              rows={3}
+              placeholder="Explain the difference — what it is, and why closing over it is acceptable"
+              onChange={(e) => {
+                varianceNote = e.target.value;
+              }}
+            />
+          ) : null}
+        </Space>
+      ),
+      onOk: async () => {
+        const r = await closePeriodAction(row.id, {
+          reason,
+          ...(problem ? { variance_note: varianceNote } : {}),
+        });
+        if (r.ok) {
+          message.success(problem ? "Period closed over a recorded variance" : "Period closed");
+          void load(year);
+        } else {
+          message.error(r.error ?? "Failed");
+          throw new Error(r.error);
+        }
+      },
+    });
+  };
+
   const act = (row: AccountingPeriodRow, kind: "close" | "reopen") => {
+    if (kind === "close") {
+      void close(row);
+      return;
+    }
     let reason = "";
     modal.confirm({
-      title: `${kind === "close" ? "Close" : "Reopen"} ${row.label}?`,
-      content: <Input placeholder="Reason" onChange={(e) => { reason = e.target.value; }} />,
+      title: `Reopen ${row.label}?`,
+      content: (
+        <Input
+          placeholder="Reason"
+          onChange={(e) => {
+            reason = e.target.value;
+          }}
+        />
+      ),
       onOk: async () => {
-        const r = kind === "close" ? await closePeriodAction(row.id, { reason }) : await reopenPeriodAction(row.id, { reason });
+        const r = await reopenPeriodAction(row.id, { reason });
         if (r.ok) {
           message.success(
-            kind === "close"
-              ? "Period closed"
-              : r.data?.submittedForApproval
-                ? "Period reopen submitted for approval"
-                : "Period reopened",
+            r.data?.submittedForApproval
+              ? "Period reopen submitted for approval"
+              : "Period reopened",
           );
-          if (kind === "close" || !r.data?.submittedForApproval) void load(year);
+          if (!r.data?.submittedForApproval) void load(year);
         } else {
           message.error(r.error ?? "Failed");
           throw new Error(r.error);

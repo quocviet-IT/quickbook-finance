@@ -440,7 +440,11 @@ export const companySettingsSchema = z.object({
 });
 export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 
-export const closePeriodSchema = z.object({ reason: z.string().trim().min(1, "A reason is required").max(300) });
+export const closePeriodSchema = z.object({
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+  /** Required only when a control account does not tie out at the period end. */
+  variance_note: z.string().trim().min(10, "Explain the difference in at least ten characters").optional(),
+});
 export const reopenPeriodSchema = z.object({ reason: z.string().trim().min(1, "A reason is required").max(300) });
 
 // --- Cash flow ---

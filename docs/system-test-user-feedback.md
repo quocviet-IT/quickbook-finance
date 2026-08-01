@@ -24,7 +24,7 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
-## Issue #5 — GL posting verification: assessment before building
+## Issue #5 — GL posting verification: assessed, then built
 
 Filed as **CRITICAL / financial reporting risk HIGH**: *"Transactions in
 subledgers shown but no indication of GL posting status. Financial statements
@@ -116,6 +116,102 @@ What will **not** be built: a `posting_status` column, and a second postings
 table. Both create a record that can disagree with the ledger. The review's
 underlying goal — that nobody has to take posting on trust — is met by showing
 the ledger, not by copying it.
+
+### What was built (2026-08-01)
+
+All four, in the order agreed.
+
+**1. The posting report** — `/reports/gl-posting`, "Documents → ledger".
+Every document in a date range beside the journal entry it produced: type,
+number, date, name, status, amount, the entry as a **link into the journal**,
+and a verdict. A banner across the top answers the question without reading a
+row. Six verdicts, each meaning something different:
+
+| Verdict | What it means |
+|---|---|
+| Posted | Live document, posted entry, entry carries the document total |
+| No journal entry | Live document that never reached the ledger — the serious one |
+| Entry not posted | The entry exists but is not posted |
+| Amount differs | The entry does not carry the document's own total |
+| Not on the ledger | Draft or void, correctly absent |
+| Posted in error | Draft or void that nonetheless has a posted entry |
+
+An entry **larger** than its document is not an exception: tax, splits and
+multi-line postings ride on the same entry. Only a shortfall is.
+
+**2. The control account screen** — same page, "Control accounts". Six
+accounts, each with the subledger total, the ledger balance, and the variance:
+
+| Control account | Subledger it is checked against |
+|---|---|
+| Accounts Receivable | Open invoices less unapplied credit memos |
+| Accounts Payable | Open bills less unapplied vendor credits |
+| Inventory | Quantity on hand at weighted average cost |
+| Goods Received Not Invoiced | Received on a purchase order, not yet billed |
+| Sales Tax Payable | Tax charged on live documents, less tax remitted |
+| Undeposited Funds | *No subledger* — see below |
+
+Undeposited Funds has nothing feeding it. Rather than invent a total so the row
+could show a comforting zero variance, it reports the ledger balance and says
+there is no subledger: anything sitting there arrived by manual journal and
+deserves an explanation. A fake tie-out is worse than an honest gap.
+
+**3. The close gate** — `acc_close_period` now runs that reconciliation at the
+period's own end date and **refuses to close** over a variance. Refusal alone
+would be a wall rather than a control, so there is an override: it demands the
+difference be written down, stores that on the period, and records it in the
+period event and the audit log. A month closed over a known variance says so
+forever. The screen asks the database *before* the button is pressed, so the
+person sees the problem instead of hitting a refusal.
+
+**4. The entry number on the document** — the invoice and bill lists now carry
+a **Journal entry** column that links straight into the journal. `journal_entry_id`
+was stored on every document and displayed on none; it is the first thing an
+auditor asks for.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 59 files, 588 tests passed (23 new for the posting and control rules) |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 51 of 51 pages rendered |
+| `tests/e2e/gl-posting.e2e.ts` (new, HTTPS, live DB) | 4 passed |
+| Migrations 0073, 0074 | applied to production |
+
+The end-to-end test is the standing proof, and it asserts more than the screen
+shows. Beyond "no document is missing its entry" and "every control account
+ties out", it checks the A/R and A/P control balances against the **ageing
+reports**, which compute the same figures by a different route. Two
+implementations agreeing is worth more than one implementation asserting.
+
+Against the live books today, every control account ties **to the cent**:
+
+| Control account | Subledger | Ledger | Variance |
+|---|---:|---:|---:|
+| Accounts Receivable [1100] | 8,591.00 | 8,591.00 | 0.00 |
+| Accounts Payable [2000] | 15,865.00 | 15,865.00 | 0.00 |
+| Inventory [1200] | 19,765.00 | 19,765.00 | 0.00 |
+| Goods Received Not Invoiced [2150] | 800.00 | 800.00 | 0.00 |
+| Sales Tax Payable [2100, 2110] | 3,266.66 | 3,266.66 | 0.00 |
+| Undeposited Funds [1210] | (none) | 0.00 | 0.00 |
+
+46 documents, 45 posted, 1 correctly unposted (a draft bill), 0 exceptions.
+
+One thing that table shows in passing: **Sales Tax Payable resolves to two
+accounts, 2100 and 2110** — a tax code points at `2110 Sales Tax Receivable`,
+which is an asset. The two net correctly today so nothing is misstated, but it
+is the same chart-of-accounts untidiness noted below, now visible in a report.
+
+### Not implemented, and why
+
+| Recommendation | Decision |
+|---|---|
+| `posting_status` column (PENDING/POSTED/REJECTED) | **No.** It would invent a failure mode that cannot occur here and create a second record that can disagree with the ledger. The report reads the ledger directly instead. |
+| A separate `GL_POSTINGS` table | **No.** `acc_journal_entry` + `acc_journal_line` already are it, and are the source of truth. A copy can drift. |
+| A scheduled *daily* reconciliation job | **Not built.** The check runs on demand and at every period close, which is when it matters. A nightly job that emails a green tick trains people to ignore it; a close that will not proceed does not. |
 
 ### Two things the review did not mention, found while assessing
 

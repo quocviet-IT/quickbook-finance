@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   App,
   Button,
@@ -234,6 +235,17 @@ export default function BillsClient({
             title: "Status",
             dataIndex: "status",
             render: (s: string) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+          },
+          {
+            title: "Journal entry",
+            key: "entry",
+            width: 140,
+            render: (_, r) =>
+              r.entry_number ? (
+                <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
+              ) : (
+                "—"
+              ),
           },
           {
             title: "Actions",

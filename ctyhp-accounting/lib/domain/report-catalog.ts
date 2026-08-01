@@ -106,6 +106,14 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     internalReport: "budget",
   },
   {
+    id: "gl-posting",
+    title: "General Ledger Posting",
+    description:
+      "Prove every document reached the ledger, and every control account still ties to its subledger.",
+    href: "/reports/gl-posting",
+    group: "accounting",
+  },
+  {
     id: "accounts-receivable-aging",
     title: "Accounts Receivable Aging",
     description: "Prioritize collections by customer and overdue age.",

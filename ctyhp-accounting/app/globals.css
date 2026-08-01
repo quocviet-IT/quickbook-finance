@@ -3189,3 +3189,9 @@ body {
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
+
+/* A control account that does not tie out, or a document that never reached
+   the ledger. Loud on purpose: these are the rows the report exists for. */
+.report-table-row--exception > td {
+  background: rgba(207, 19, 34, 0.06);
+}

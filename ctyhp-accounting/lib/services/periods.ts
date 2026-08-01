@@ -8,8 +8,37 @@ export async function generatePeriods(sb: SupabaseClient, fiscalYear: number): P
   if (error) throw new PeriodsError(error.message);
   return Number(data ?? 0);
 }
-export async function closePeriod(sb: SupabaseClient, id: string, reason: string): Promise<void> {
-  const { error } = await sb.rpc("acc_close_period", { p_period_id: id, p_reason: reason });
+/**
+ * What stands in the way of closing this period, or null if nothing does.
+ *
+ * The same sentence `acc_close_period` would refuse with, so the screen can
+ * show it before anyone presses the button rather than after.
+ */
+export async function periodCloseBlockers(
+  sb: SupabaseClient,
+  id: string,
+): Promise<string | null> {
+  const { data, error } = await sb.rpc("acc_period_close_blockers", { p_period_id: id });
+  if (error) throw new PeriodsError(error.message);
+  return (data as string | null) ?? null;
+}
+
+/**
+ * Close a period. The database refuses if a control account does not tie out at
+ * the period end, unless `varianceNote` explains the difference — in which case
+ * the explanation is stored on the period and audited.
+ */
+export async function closePeriod(
+  sb: SupabaseClient,
+  id: string,
+  reason: string,
+  varianceNote?: string | null,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_close_period", {
+    p_period_id: id,
+    p_reason: reason,
+    p_variance_note: varianceNote ?? null,
+  });
   if (error) throw new PeriodsError(error.message);
 }
 export async function reopenPeriod(sb: SupabaseClient, id: string, reason: string): Promise<void> {
