@@ -24,6 +24,107 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
+## Issue #6 — Vendor bill payment status: assessment and proposal
+
+Filed as **HIGH / cash outflow impact HIGH**: *"Bills shown ($15.8K overdue)
+but no detail on which bills, payment terms, or priority."*
+
+### The number is right, and it is worse than the summary suggests
+
+Checked against the live books:
+
+| | Amount | |
+|---|---:|---|
+| **Overdue** | **15,820.00** | 99.7% of everything owed |
+| Due within 14 days | 0.00 | |
+| Not yet due | 45.00 | |
+| **Total open** | **15,865.00** | 4 bills |
+
+And it is almost entirely one bill:
+
+| Bill | Vendor | Due | Balance | Days overdue |
+|---|---|---|---:|---:|
+| BILL-000008 | Aurora Gemstone Supply Inc. | 2026-02-11 | 14,900.00 | **171** |
+| BILL-000004 | Luxe Packaging Co. | 2026-06-27 | 360.00 | 35 |
+| BILL-000003 | Gemstone Partners Inc. | 2026-07-05 | 560.00 | 27 |
+| BILL-000001 | Sample Vendor | 2026-08-23 | 45.00 | not yet due |
+
+A supplier unpaid for **171 days** is not a reporting problem. Whatever gets
+built, that bill needs an answer today — paid, disputed, or written down.
+
+**One correction to the report's framing.** It says *"collection efficiency
+reduced due to lack of vendor follow-up"* — collection is the receivables side,
+money coming in. This is payables, money going out, and the risk runs the other
+way: a supplier left unpaid stops shipping, moves you to prepayment terms or
+charges late fees, and early payment discounts expire in silence. Same urgency,
+opposite mechanism.
+
+### What the four recommendations meet already
+
+| # | Recommendation | State |
+|---|---|---|
+| 1 | Payment tracking on bills: `payment_status`, `payment_date`, `amount_paid`, `balance_due`, `payment_method` | **Mostly there, one part should stay where it is.** `status` (draft/open/partial/paid/void) is the payment status and is maintained by the payment RPC, not by hand; `balance_due_minor` is live; amount paid is total less balance — derived on purpose, because a stored copy can drift from the allocations behind it. `payment_date` and `payment_method` are on `acc_bill_payment`, which is the right place: **a bill can be settled by several payments on different dates by different methods**, so a single date and method on the bill would be wrong the first time anyone part-pays. What is missing is that none of it is *shown* on the bill. |
+| 2 | Payment terms: `due_date`, `discount_date`, `early_payment_discount_percent` | **Half there.** `due_date` exists and every open bill has one. All 11 vendors carry payment terms — but as **free text**: `"Net 30"`, `"Net 15"`, `"Due on receipt"`. A string cannot compute a due date, so the date is typed by hand on every bill, and it cannot express a discount at all. Nothing anywhere holds a discount date or percent. |
+| 3 | A/P Aging Report: overdue bills by due date, vendor, number, amount, days overdue | **Already built.** `/reports/ap-aging` shows exactly that, in three views — summary grid, by vendor, by document — reconciled to the Accounts Payable control account. This one needs nothing. |
+| 4 | Payment priority: flag bills 14 days out and overdue for immediate payment | **Missing.** The bills screen can filter to a due-through date when the dashboard sends it there, but nothing ranks bills, and nothing says *why* one should be paid before another. |
+
+### What is proposed, in order
+
+**1. Structured vendor payment terms.** `payment_terms_days`, plus
+`discount_percent` and `discount_days`, on the vendor — with the free-text label
+kept for display. The eleven existing vendors get backfilled from what their
+text already says (`Net 30` → 30 days, `Due on receipt` → 0). This is what makes
+1/10 net 30 expressible at all, and it makes the due date something the system
+computes rather than something a person remembers.
+
+**2. The bill snapshots its terms when it is entered.** Due date, discount date
+and discount amount are written onto the bill from the vendor's terms at entry,
+and never re-read afterwards. Terms change; a bill keeps the terms it was raised
+under. This is the same rule the customer credit work already follows.
+
+**3. A pay-run view — what to pay next, and why.** Bills ranked rather than
+listed:
+
+| Priority | Why |
+|---|---|
+| Overdue | Worst first. 171 days should be impossible to miss. |
+| Discount expiring within N days | Real money with a deadline: 1% for paying 20 days early is roughly 18% annualised. |
+| Due within 14 days | The reviewer's own threshold. |
+| Later | Everything else. |
+
+Each row carries days overdue or days remaining, the discount at stake, and the
+deadline to earn it.
+
+**4. Taking the discount, posted properly.** Paying inside the discount window
+settles the bill in full while paying less cash; the difference is income and
+has to land somewhere. There is **no purchase-discount account in the chart**
+today (checked: 28 accounts, none), so this needs one — `7010 Purchase Discounts
+Taken` as other income is the conventional choice — and a posting rule that uses
+it. Without this, item 3 tells people about a discount they cannot actually
+take without a manual journal.
+
+**5. Payment history on the bill.** Which payments settled it, when, by what
+method, and the journal entry each produced — using the entry link built for
+Issue #5. Today `acc_bill_payment` holds all of it and the bill screen shows
+none of it.
+
+### What is not proposed, and why
+
+| Idea | Decision |
+|---|---|
+| `payment_date` and `payment_method` columns on the bill | **No.** A bill can be paid by several payments on different dates by different methods; one date and one method on the bill is wrong as soon as anyone part-pays. Show them from the payment records instead. |
+| An `amount_paid` column | **No.** It is total less balance. Storing it creates a third number that can disagree with the other two and with the allocations. |
+| Rebuilding the A/P aging report | **No.** It exists, in three views, reconciled to its control account. |
+
+### One thing to fix while in here
+
+Payment methods are recorded as free text and already disagree with themselves:
+the four vendor payments on file use `"ACH"` and `"bank_transfer"` — two
+spellings for related things. Worth settling to a fixed list while the payment
+screen is being touched, so the payment history reads consistently.
+
+---
+
 ## Issue #5 — GL posting verification: assessed, then built
 
 Filed as **CRITICAL / financial reporting risk HIGH**: *"Transactions in
