@@ -3,9 +3,12 @@
 // no real ledger data.
 // Run: node --env-file=.env.local scripts/cleanup-test-ledger.mjs
 import pg from "pg";
+import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
+
+const { databaseUrl } = requireDestructiveE2eEnvironment();
 
 const client = new pg.Client({
-  connectionString: process.env.SUPABASE_DB_URL,
+  connectionString: databaseUrl,
   ssl: { rejectUnauthorized: false },
 });
 

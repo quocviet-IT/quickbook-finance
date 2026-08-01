@@ -286,7 +286,7 @@
 ### Task 5: Add the least-privilege migration
 
 **Files:**
-- Create: `ctyhp-accounting/supabase/migrations/0073_production_security_hardening.sql`
+- Create: `ctyhp-accounting/supabase/migrations/0080_production_security_hardening.sql`
 
 **Interfaces:**
 - Consumes: PostgreSQL roles `anon`, `authenticated`, `service_role` and the existing `acc_*` function catalog.
@@ -355,14 +355,14 @@
 - No additional source files.
 
 **Interfaces:**
-- Consumes: `scripts/migrate.mjs` and migration 0073.
+- Consumes: `scripts/migrate.mjs` and migration 0080.
 - Produces: migrated Supabase deployment plus read-only verification evidence.
 
-- [ ] **Step 1: Apply migration 0073**
+- [ ] **Step 1: Apply migration 0080**
 
   Run: `node --env-file=.env.local scripts/migrate.mjs`
 
-  Expected: migrations 0001-0072 skipped and 0073 applied once. This is the only live database write in the rollout.
+  Expected: migrations 0001-0079 skipped and 0080 applied once. This is the only live database write in the rollout.
 
 - [ ] **Step 2: Re-run deployment security verification**
 
@@ -378,7 +378,7 @@
 
   Re-run `scripts/migrate.mjs`.
 
-  Expected: every migration including 0073 is skipped; application roles remain unable to access `acc_schema_migrations`.
+  Expected: every migration including 0080 is skipped; application roles remain unable to access `acc_schema_migrations`.
 
 ---
 
@@ -407,7 +407,7 @@
 
 - [ ] **Step 3: Security review checklist**
 
-  Confirm no secret values appear in diffs or logs, the verifier never writes data, destructive scripts refuse the ordinary `.env.local`, and migration 0073 contains only privilege/RLS/default-privilege statements.
+  Confirm no secret values appear in diffs or logs, the verifier never writes data, destructive scripts refuse the ordinary `.env.local`, and migration 0080 contains only privilege/RLS/default-privilege statements.
 
 - [ ] **Step 4: Handoff**
 

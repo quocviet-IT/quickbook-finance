@@ -9,11 +9,15 @@
 // Run: node --env-file=.env.local scripts/verify-vendor-tax.mjs
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const { databaseUrl, supabaseUrl, anonKey, email, password } =
+  requireDestructiveE2eEnvironment();
+
+const url = supabaseUrl;
+const key = anonKey;
 const sb = createClient(url, key, { auth: { persistSession: false } });
-const db = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } });
+const db = new pg.Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
 
 let pass = 0, fail = 0;
 const check = (n, ok, d = "") => { if (ok) { pass++; } else { fail++; } console.log(`  ${ok ? "PASS" : "FAIL"}  ${n}${d ? " " + d : ""}`); };
@@ -57,7 +61,7 @@ async function summaryRow(authed, year, vendorId) {
 async function main() {
   await db.connect();
   const { data: auth, error: eLogin } = await sb.auth.signInWithPassword({
-    email: "admin@ctyhp.vn", password: "Ctyhp@Ketoan2026",
+    email, password,
   });
   if (eLogin) throw new Error("login: " + eLogin.message);
   const authed = createClient(url, key, {

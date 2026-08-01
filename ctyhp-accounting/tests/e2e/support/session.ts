@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-function required(name: string, fallback?: string): string {
-  const value = process.env[name] ?? fallback;
+function required(name: string): string {
+  const value = process.env[name];
   if (!value) {
     throw new Error(
       `${name} is required for the HTTPS end-to-end test. Run it through ` +
@@ -22,15 +22,10 @@ export async function openE2eSession(): Promise<{
   marker: string;
   today: string;
 }> {
-  const url = required("NEXT_PUBLIC_SUPABASE_URL");
-  const anonKey = required("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  // Same fallback pair as scripts/smoke-pages.mjs, so the test runs out of the
-  // box against the demo company and an override stays a one-line env change.
-  const email = required("E2E_EMAIL", process.env.SMOKE_EMAIL ?? "admin@ctyhp.vn");
-  const password = required(
-    "E2E_PASSWORD",
-    process.env.SMOKE_PASSWORD ?? "Ctyhp@Ketoan2026",
-  );
+  const url = required("E2E_SUPABASE_URL");
+  const anonKey = required("E2E_SUPABASE_ANON_KEY");
+  const email = required("E2E_EMAIL");
+  const password = required("E2E_PASSWORD");
 
   const sb = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },

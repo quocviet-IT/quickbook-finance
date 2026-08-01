@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "security:check-source": "node scripts/check-source-credentials.mjs",
+    "security:verify-deployment": "node --env-file=.env.local scripts/verify-production-security-readonly.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e:document-ledger-report": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts",

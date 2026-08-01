@@ -11,19 +11,30 @@
 // Run: node --env-file=.env.local scripts/verify-access.mjs
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
+import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const {
+  databaseUrl,
+  supabaseUrl,
+  anonKey,
+  email,
+  password,
+  secondaryEmail,
+  secondaryPassword,
+} = requireDestructiveE2eEnvironment();
+
+const url = supabaseUrl;
+const anon = anonKey;
 const sb = createClient(url, anon, { auth: { persistSession: false } });
-const db = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } });
+const db = new pg.Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
 
 let pass = 0, fail = 0;
 const check = (n, ok, d = "") => { if (ok) { pass++; } else { fail++; } console.log(`  ${ok ? "PASS" : "FAIL"}  ${n}${d ? " " + d : ""}`); };
 const num = (v) => Number(v);
 const acctId = async (code) => (await db.query("select id from acc_account where account_code=$1", [code])).rows[0].id;
 
-const CLERK_EMAIL = "e2e-clerk@ctyhp.vn";
-const CLERK_PASSWORD = "Ctyhp@E2eClerk2026";
+const CLERK_EMAIL = secondaryEmail;
+const CLERK_PASSWORD = secondaryPassword;
 
 function authedClient(token) {
   return createClient(url, anon, {
@@ -46,7 +57,7 @@ async function main() {
 
   // The admin who runs the rest of the suite.
   const { data: adminAuth, error: eLogin } = await sb.auth.signInWithPassword({
-    email: "admin@ctyhp.vn", password: "Ctyhp@Ketoan2026",
+    email, password,
   });
   if (eLogin) throw new Error("admin login: " + eLogin.message);
   const asAdmin = authedClient(adminAuth.session.access_token);

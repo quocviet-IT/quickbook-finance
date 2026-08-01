@@ -26,14 +26,16 @@ import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
+
+const { supabaseUrl, anonKey, email, password } =
+  requireDestructiveE2eEnvironment();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appDir = join(here, "..", "app", "(app)");
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const email = process.env.SMOKE_EMAIL ?? "admin@ctyhp.vn";
-const password = process.env.SMOKE_PASSWORD ?? "Ctyhp@Ketoan2026";
+const url = supabaseUrl;
+const key = anonKey;
 
 const args = process.argv.slice(2);
 const base = args.find((a) => a.startsWith("http")) ?? "http://localhost:3000";

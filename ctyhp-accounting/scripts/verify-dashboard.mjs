@@ -2,9 +2,13 @@
 // Signs in, reconstructs the @supabase/ssr auth cookie, and fetches /dashboard.
 // Run: node --env-file=.env.local scripts/verify-dashboard.mjs
 import { createClient } from "@supabase/supabase-js";
+import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const { supabaseUrl, anonKey, email, password } =
+  requireDestructiveE2eEnvironment();
+
+const url = supabaseUrl;
+const key = anonKey;
 const ref = new URL(url).hostname.split(".")[0];
 const base = `sb-${ref}-auth-token`;
 const MAX = 3180;
@@ -21,8 +25,8 @@ function cookieHeader(session) {
 
 async function main() {
   const { data, error } = await sb.auth.signInWithPassword({
-    email: "admin@ctyhp.vn",
-    password: "Ctyhp@Ketoan2026",
+    email,
+    password,
   });
   if (error) throw new Error(`sign-in: ${error.message}`);
 

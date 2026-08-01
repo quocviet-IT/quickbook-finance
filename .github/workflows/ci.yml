@@ -41,6 +41,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Source credential safety
+        run: npm run security:check-source
+
       - name: Typecheck
         run: npm run typecheck
 
