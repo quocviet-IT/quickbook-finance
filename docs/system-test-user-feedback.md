@@ -24,6 +24,111 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
+## Test data for the QuickBooks and Wave import — where to get it, and where it must land
+
+Management suggests finding QuickBooks and Wave test data online to import.
+That is a good idea and it unblocks real work — with one condition that has to
+be settled first, because getting it wrong is not recoverable.
+
+### It must not be imported into the live books
+
+The books currently tie exactly: A/R 8,591.00, A/P 15,865.00, inventory
+19,765.00, six control accounts at zero variance, 46 documents all posted. Test
+data loaded into that would destroy it, and **there is no clean undo**:
+
+- A numbered document cannot be deleted from an application session (migration
+  0066). Cleaning up needs the service role and leaves numbering gaps.
+- Voiding does not remove anything — the journal lines stay on the ledger for
+  good.
+- An inventory write-down cannot be reversed at all (ASC 330-10-35-14).
+
+So test data needs **its own company**, and dropping it afterwards has to be as
+simple as deleting it. That is the schema-per-company design in the section
+below: a sandbox company is a schema, and disposing of it is one statement.
+
+**This changes one thing in the plan:** the sandbox company moves from a nice
+idea to a **day-one deliverable** of the multi-company work. It is what makes
+the import buildable at all.
+
+### Where to get data that matches what the client will actually send
+
+In order of how closely it resembles the real thing:
+
+| Source | Fidelity | Cost |
+|---|---|---|
+| **An export from a free QuickBooks Online trial**, which ships with a populated sample company | Highest — byte-identical in shape to the client's own export | Free trial |
+| **An export from a free Wave account.** Business settings → Data Export gives four CSV files for accounting, plus chart of accounts, customers, products, invoices and transactions | Highest, same reason | Free |
+| **Intuit's official import templates** (`Excel Import templates.zip`, chart of accounts by industry) | High — they define the columns the real export matches | Free |
+| A CSV found on a blog or forum | **Low — do not build against it.** Wrong columns produce an importer that fits nothing | — |
+
+Take the first two. Exporting from the vendors' own products is the only way to
+be sure the header rows are the real ones, and both are free. Use only vendor
+sample data — never a real third party's books found online.
+
+### What the samples will tell us, and it is more than column names
+
+A few things about these formats are already known and they shape the design:
+
+- QuickBooks writes a subaccount as **`Main account: subaccount`** in a single
+  cell. The parent chain has to be created in order — One Book already
+  validates those chains for cycles, so the pieces exist.
+- QuickBooks Online imports lists in three separate passes — chart of accounts,
+  customers, vendors — not one file. The importer should expect several files,
+  not one.
+- Contact imports there are capped at 1,000 rows and 2 MB per file, so a real
+  client export may arrive split.
+- Wave requires each contact to carry at least one of company name, first name
+  or last name — so blank-name rows are normal and must be skipped, not error.
+
+### Build it mapping-first, not column-first
+
+Even with perfect samples, the client's own export will differ — a different
+QuickBooks edition, a different locale, custom fields, columns reordered. An
+importer with the column names compiled into it fits exactly one file and
+breaks on the second.
+
+So: read the header row, **propose a mapping**, let a person confirm it, and
+save that mapping per source. A new format then becomes a mapping someone
+picks, not a code change. This is the same shape the reviewer asked for on
+`/invoices` — *"the AI would generally map it to its corresponding fields"* —
+and it makes both features one mechanism instead of two.
+
+### The hard parts are accounting, not parsing
+
+Reading a CSV is the easy half. What the samples will expose:
+
+| Problem | Why it is not trivial |
+|---|---|
+| **Mapping the chart of accounts** | QuickBooks has dozens of account detail types; One Book has thirteen account types. There is no 1:1. Unmapped accounts need a person to decide, not a default — this is the single biggest hidden cost in the whole feature. |
+| **Opening balances have to balance** | Import customer balances, vendor balances and account balances and the double entry must close. The plug belongs in `3900 Opening Balance Equity`, which is already in the chart. Anything else silently unbalances the books. |
+| **Everything must post through the existing RPCs** | Direct inserts would bypass numbering, the actor stamps, the period gate and the control accounts. The reconciliation built for Issue #5 would stop tying, and it is the thing that would tell us. |
+| **Re-running must not duplicate** | Each imported row needs a source key, so a second run updates rather than doubles. Imports get re-run; that is normal. |
+| **Dry run before anything posts** | Show what will be created and what will be posted, and let it be abandoned. An import that posts on the first click is one mis-mapped column away from a bad ledger. |
+
+### What this does not answer
+
+Sample data settles *how the files look*. It does not settle **Q7's second
+half**: whether the business wants master data plus opening balances at a
+cut-over date, or every historical transaction. That is a business decision and
+it changes the size of the work by an order of magnitude.
+
+There is a trap here worth naming. Importing full history from a clean sample
+file will look like full history import works. Then the real files arrive with
+five years of transactions, closed periods and document numbers that collide
+with sequences this system owns, and it does not. **Build master data and
+opening balances first, prove it on the samples, and treat historical
+transactions as a separate decision** with its own assessment.
+
+### What this changes in the plan
+
+Nothing about the order — multi-company still comes first, because the import
+writes into a company and now the *test* import needs a disposable one. What it
+changes is that the import is no longer waiting on the client: it can be built
+and proven against vendor sample data while the real files and the history
+decision are still outstanding.
+
+---
+
 ## Multi-company and the QuickBooks import — assessment and sequencing
 
 Two features asked for on 2026-08-01: switching between companies, and

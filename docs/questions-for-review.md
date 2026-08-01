@@ -82,6 +82,13 @@ are two different kinds of file and only one can be imported:
 **Question 1: which do you have?** If it is CSV, a sample file of each kind
 answers more than a conversation would.
 
+*Update 2026-08-01:* management suggested using QuickBooks and Wave sample data
+found online, which is a good idea — the importer can be built and proven
+against exports from a free QuickBooks Online trial and a free Wave account
+without waiting. **So this half no longer blocks the build.** It still matters
+for the real cut-over, because the client's own export may carry custom fields
+the samples do not.
+
 **Question 2: how much should come across?**
 
 - **Master data plus opening balances** — customers, vendors, chart of accounts,
@@ -95,6 +102,11 @@ answers more than a conversation would.
 
 Most migrations take the first option and keep the old system read-only for
 history. If you need the second, say so early — it changes the plan.
+
+**This half still blocks**, and sample data cannot answer it. Importing full
+history means recreating past transactions as journal entries, some dated into
+periods that are now closed, with document numbers that collide with the
+sequences this system owns.
 
 **Answer:**
 
