@@ -897,6 +897,59 @@ party with overdue money has an oldest due date in the past.
 | A separate new "AP Aging" report | **There was nothing to add.** Building a second one would have left two reports with the same name and different numbers. |
 | Statement-style vendor detail inside the party view | **Not built.** The document list already gives it, and Vendor Statements is a report of its own. |
 
+### Issue #13 — The customers table did not fit on the screen
+
+From the in-app queue (`/customers`, 2026-08-01 07:36): "i need this table to
+see in glance. rather than moving horizontally. make necessary changes here".
+
+#### What the screenshot showed
+
+Two things, and the second is the one that mattered.
+
+1. The table was cut off after **Owed now** — Available, Credit status, Status
+   and Actions were all behind a horizontal scrollbar. The **Billing address**
+   column was the culprit: a full one-line address ("1250 Westheimer Road ·
+   Suite 420 · Houston, TX 77006 · United States") took roughly a third of the
+   table on its own.
+2. The reporter's viewport was **2160px wide**, and the page was using 1280 of
+   them. `.app-shell__content-inner` capped every page at 1280px, so on a wide
+   monitor **the table scrolled sideways while 40% of the screen sat empty**.
+
+#### What was implemented
+
+- **The page uses the monitor**: the content cap is now 1680px. Prose does not
+  stretch with it — the page description caps itself at 760px and forms live in
+  modals — so only the tables gained the room.
+- **Customers reads in eight columns instead of nine**: the name and email
+  share one cell, and the address column became **Location** (`Houston, TX`)
+  with the full address in a tooltip. Nobody scans a table by street address;
+  they scan it by who and how much.
+- **Invoices**, the other table that had grown past the screen, keeps its
+  Created column to a date, with the author and the edit history in the tooltip
+  (both are already spelled out in the invoice dialog).
+
+Together the customers table now needs about 850px plus the name column, so it
+fits without scrolling even on a 1280px laptop.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 56 files, 536 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| Rendered check | `/customers` shows Customer, Location, Credit limit, Owed now, Available and Credit status; "Billing address" is gone and the city reads `Houston, TX` with the full address in the tooltip |
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| A user-configurable column picker | **Not built.** It is the right answer for a table nobody agrees on, but it is a feature with its own storage and defaults. The eight columns here are the ones the screen is for; if the next round still wants columns hidden, that is the time to build it. |
+| Removing the address from the list entirely | **No.** "No address" still needs to be visible — an invoice for a customer without one prints with no Bill to block. It is now a short cell that says the city, or an orange tag when there is nothing. |
+| Making every table full-bleed | **No.** 1680px keeps a readable measure for the report and settings pages that are mostly text; unlimited width would make those worse to read, not better. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

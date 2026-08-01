@@ -13,6 +13,7 @@ import {
   Switch,
   Tag,
   Tooltip,
+  Typography,
   type TableColumnsType,
 } from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
@@ -113,15 +114,36 @@ export default function CustomersClient({
   }
 
   const columns: TableColumnsType<CustomerRow> = [
-    { title: "Name", dataIndex: "name" },
-    { title: "Email", dataIndex: "email", render: (e) => e ?? "—" },
     {
-      title: "Billing address",
+      // Name and email in one cell: two columns of text pushed the credit
+      // figures off the right-hand edge, and nobody sorts on an address.
+      title: "Customer",
+      dataIndex: "name",
+      render: (name: string, row) => (
+        <div>
+          <div>{name}</div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {row.email ?? "No email"}
+          </Typography.Text>
+        </div>
+      ),
+    },
+    {
+      title: "Location",
+      width: 150,
       render: (_, row) => {
         const lines = formatPostalAddress(row);
-        // An invoice for a customer without an address prints without a
-        // "Bill to" block, so the gap is worth showing here.
-        return lines.length ? lines.join(" · ") : <Tag color="orange">Not set</Tag>;
+        if (lines.length === 0) {
+          // An invoice for a customer without an address prints without a
+          // "Bill to" block, so the gap is worth showing here.
+          return <Tag color="orange">No address</Tag>;
+        }
+        const city = [row.city, row.region].filter(Boolean).join(", ");
+        return (
+          <Tooltip title={lines.join(" · ")}>
+            <span>{city || lines[0]}</span>
+          </Tooltip>
+        );
       },
     },
     {

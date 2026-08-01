@@ -16,6 +16,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   type TableColumnsType,
 } from "antd";
@@ -508,17 +509,24 @@ export default function InvoicesClient({
       // auditor asks of a document, and one it should not take a click to answer.
       title: "Created",
       dataIndex: "created_at",
-      width: 180,
+      width: 120,
       render: (_: string, r) => {
         const attribution = documentAttribution(r, directory);
+        // The author reads in the tooltip and in the invoice dialog; the column
+        // keeps to a date so the table fits on one screen.
         return (
-          <div>
-            <div>{formatAuditTimestamp(attribution.createdAt).slice(0, 16)}</div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {attribution.createdBy}
-              {attribution.modifiedAt ? " · edited" : ""}
-            </Typography.Text>
-          </div>
+          <Tooltip
+            title={`Created by ${attribution.createdBy} at ${formatAuditTimestamp(attribution.createdAt)}${
+              attribution.modifiedAt
+                ? ` · last edited by ${attribution.modifiedBy} at ${formatAuditTimestamp(attribution.modifiedAt)}`
+                : ""
+            }`}
+          >
+            <span>
+              {attribution.createdAt.slice(0, 10)}
+              {attribution.modifiedAt ? " ·" : ""}
+            </span>
+          </Tooltip>
         );
       },
     },

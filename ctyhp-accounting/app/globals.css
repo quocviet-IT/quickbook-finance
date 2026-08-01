@@ -374,7 +374,10 @@ body {
 
 .app-shell__content-inner {
   width: 100%;
-  max-width: 1280px;
+  /* Wide enough for a nine-column ledger table to be read at a glance on a
+     desktop monitor. Prose does not stretch with it: the page description caps
+     itself at 760px, and forms live in modals. */
+  max-width: 1680px;
   margin: 0 auto;
 }
 
