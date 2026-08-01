@@ -2,14 +2,21 @@
 
 import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { App, Button, Input, List, Modal, Space, Spin, Typography, Upload } from "antd";
+import { App, Alert, Button, Input, List, Modal, Radio, Space, Spin, Typography, Upload } from "antd";
 import { BugOutlined, DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import {
+  FEEDBACK_FREQUENCIES,
+  FEEDBACK_IMPACTS,
   FEEDBACK_KINDS,
+  feedbackFrequencyLabel,
+  feedbackImpactLabel,
   feedbackKindLabel,
+  type FeedbackFrequency,
+  type FeedbackImpact,
   type FeedbackKind,
   type FeedbackPageContext,
 } from "@/lib/domain/feedback";
+import { screenContextFor } from "@/lib/domain/screen-context";
 import {
   fileFeedbackReportAction,
   recordFeedbackAttachmentsAction,
@@ -45,12 +52,18 @@ export default function ReportDialog({
   const pathname = usePathname();
   const [kind, setKind] = useState<FeedbackKind>("broken");
   const [description, setDescription] = useState("");
+  // The improvement argument, asked for only when somebody is proposing one.
+  const [difficulty, setDifficulty] = useState("");
+  const [outcome, setOutcome] = useState("");
+  const [impact, setImpact] = useState<FeedbackImpact | null>(null);
+  const [frequency, setFrequency] = useState<FeedbackFrequency | null>(null);
   const [shot, setShot] = useState<string | null>(null);
   const [includeShot, setIncludeShot] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const contextRef = useRef<FeedbackPageContext | null>(null);
+  const screen = screenContextFor(pathname);
 
   const capture = useCallback(async () => {
     setCapturing(true);
@@ -86,6 +99,10 @@ export default function ReportDialog({
     contextRef.current = capturePageContext(pathname);
     setKind("broken");
     setDescription("");
+    setDifficulty("");
+    setOutcome("");
+    setImpact(null);
+    setFrequency(null);
     setIncludeShot(true);
     setFiles([]);
     void capture();
@@ -148,6 +165,14 @@ export default function ReportDialog({
         page: contextRef.current ?? capturePageContext(pathname),
         screenshot_base64:
           includeShot && shot ? shot.replace(/^data:image\/png;base64,/, "") : null,
+        current_difficulty: difficulty,
+        desired_outcome: outcome,
+        impact,
+        frequency,
+        // What this screen is for, from the guide. Recorded so whoever reads the
+        // queue knows which part of the system an idea belongs to without
+        // opening it — and so a route that gets renamed later still reads.
+        page_purpose: screen.summary ?? null,
       });
       if (!res.ok || !res.data) {
         message.error(res.error ?? "Failed to send the report");
@@ -155,7 +180,7 @@ export default function ReportDialog({
       }
 
       const attachments = await uploadAttachments(res.data.id);
-      const parts = ["Report sent"];
+      const parts = [kind === "broken" ? "Report sent" : "Suggestion sent"];
       if (res.data.screenshotStored) parts.push("with the screenshot");
       if (attachments.stored > 0) {
         parts.push(
@@ -176,7 +201,7 @@ export default function ReportDialog({
 
   return (
     <Modal
-      title="Report a problem"
+      title={kind === "broken" ? "Report a problem" : "Suggest an improvement"}
       open={open}
       onCancel={onClose}
       footer={null}
@@ -198,17 +223,103 @@ export default function ReportDialog({
           ))}
         </Space.Compact>
 
-        <div>
-          <Typography.Text>What happened? (optional)</Typography.Text>
-          <Input.TextArea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Tell us what you expected and what you saw instead…"
-            rows={4}
-            maxLength={4000}
-            style={{ marginTop: 6 }}
-          />
-        </div>
+        {/* Say which screen this is about, so nobody has to describe it. */}
+        {screen.summary ? (
+          <Alert type="info" showIcon message={`About this screen: ${screen.summary}`} />
+        ) : null}
+
+        {kind === "broken" ? (
+          <div>
+            <Typography.Text>What happened? (optional)</Typography.Text>
+            <Input.TextArea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Tell us what you expected and what you saw instead…"
+              rows={4}
+              maxLength={4000}
+              style={{ marginTop: 6 }}
+            />
+          </div>
+        ) : (
+          <>
+            {/*
+              A suggestion is an argument, not a fault report. Asked as three
+              separate questions because the third — what it costs to leave
+              alone — is the one that decides whether it gets built, and in a
+              single box it is the one that goes missing.
+            */}
+            <div>
+              <Typography.Text>What is difficult today?</Typography.Text>
+              <Input.TextArea
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                placeholder="e.g. I have to open every bill to see which ones are already paid."
+                rows={3}
+                maxLength={2000}
+                style={{ marginTop: 6 }}
+              />
+            </div>
+
+            <div>
+              <Typography.Text>What would you like instead?</Typography.Text>
+              <Input.TextArea
+                value={outcome}
+                onChange={(e) => setOutcome(e.target.value)}
+                placeholder="e.g. Show the paid amount and the balance in the bills list."
+                rows={3}
+                maxLength={2000}
+                style={{ marginTop: 6 }}
+              />
+            </div>
+
+            <div>
+              <Typography.Text>How much does it cost you today?</Typography.Text>
+              <Radio.Group
+                value={impact}
+                onChange={(e) => setImpact(e.target.value as FeedbackImpact)}
+                style={{ display: "block", marginTop: 6 }}
+              >
+                <Space direction="vertical" size={2}>
+                  {FEEDBACK_IMPACTS.map((option) => (
+                    <Radio key={option} value={option}>
+                      {feedbackImpactLabel(option)}
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
+            </div>
+
+            <div>
+              <Typography.Text>How often does it come up?</Typography.Text>
+              <Radio.Group
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value as FeedbackFrequency)}
+                optionType="button"
+                buttonStyle="solid"
+                style={{ display: "block", marginTop: 6 }}
+                options={FEEDBACK_FREQUENCIES.map((option) => ({
+                  label: feedbackFrequencyLabel(option),
+                  value: option,
+                }))}
+              />
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                These two decide the order suggestions get looked at. Neither is required.
+              </Typography.Text>
+            </div>
+
+            <div>
+              <Typography.Text>Anything else? (optional)</Typography.Text>
+              <Input.TextArea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Background, an example, or how you work round it today…"
+                rows={3}
+                maxLength={4000}
+                style={{ marginTop: 6 }}
+              />
+            </div>
+          </>
+        )}
 
         <div>
           <Typography.Text type="secondary">
@@ -320,7 +431,7 @@ export default function ReportDialog({
           loading={sending}
           onClick={send}
         >
-          Send report
+          {kind === "broken" ? "Send report" : "Send suggestion"}
         </Button>
       </Space>
     </Modal>

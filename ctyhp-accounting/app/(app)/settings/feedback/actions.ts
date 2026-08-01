@@ -8,12 +8,14 @@ import {
   attachmentUrl,
   fileFeedbackReport,
   listFeedbackAttachments,
+  listFeedbackImprovements,
   listFeedbackReports,
   recordFeedbackAttachments,
   screenshotUrl,
   setFeedbackStatus,
   FeedbackError,
   type FeedbackAttachmentView,
+  type FeedbackImprovementView,
   type FeedbackReportView,
 } from "@/lib/services/feedback";
 import {
@@ -55,6 +57,17 @@ export async function fileFeedbackReportAction(
         description: parsed.data.description || null,
         page: parsed.data.page,
         screenshotBase64: parsed.data.screenshot_base64 || null,
+        // A fault report carries none of these; the dialog only asks for them
+        // when the reporter is proposing something, and the answer is dropped
+        // here if they then switch back, so a "broken" row cannot arrive
+        // ranked.
+        current_difficulty:
+          parsed.data.kind === "suggestion" ? parsed.data.current_difficulty || null : null,
+        desired_outcome:
+          parsed.data.kind === "suggestion" ? parsed.data.desired_outcome || null : null,
+        impact: parsed.data.kind === "suggestion" ? parsed.data.impact ?? null : null,
+        frequency: parsed.data.kind === "suggestion" ? parsed.data.frequency ?? null : null,
+        page_purpose: parsed.data.page_purpose || null,
       },
       parsed.data.screenshot_base64 ? createSupabaseAutomationClient() : undefined,
     );
@@ -71,6 +84,17 @@ export async function listFeedbackReportsAction(): Promise<
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: await listFeedbackReports(sb) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function listFeedbackImprovementsAction(): Promise<
+  ActionResult<FeedbackImprovementView[]>
+> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listFeedbackImprovements(sb) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

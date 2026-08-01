@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   canTransition,
   describeFeedbackStatusChange,
+  FEEDBACK_FREQUENCIES,
+  FEEDBACK_IMPACTS,
   FEEDBACK_KINDS,
   FEEDBACK_STATUSES,
   feedbackExportFileName,
+  feedbackFrequencyLabel,
+  feedbackImpactLabel,
   feedbackKindLabel,
   newFeedbackReport,
   nextStatuses,
@@ -158,5 +162,33 @@ describe("summarizePageContext", () => {
 describe("feedbackExportFileName", () => {
   it("names the archive after the kind and date", () => {
     expect(feedbackExportFileName(report())).toBe("feedback-broken-2026-07-30-fb_1.zip");
+  });
+});
+
+describe("the improvement vocabulary", () => {
+  it("matches the values the database will accept (migration 0086)", () => {
+    // A value the check constraint rejects would only fail on send, after the
+    // reporter has typed everything out.
+    expect(FEEDBACK_IMPACTS).toEqual(["blocking", "slows_work", "nice_to_have"]);
+    expect(FEEDBACK_FREQUENCIES).toEqual(["every_time", "often", "sometimes", "rarely"]);
+  });
+
+  it("reads worst first, which is the order the buttons appear in", () => {
+    expect(FEEDBACK_IMPACTS[0]).toBe("blocking");
+    expect(FEEDBACK_FREQUENCIES[0]).toBe("every_time");
+  });
+
+  it("describes the cost as a working day, not as a backlog label", () => {
+    // "Blocking" invites everybody to pick it; a sentence about their own work
+    // does not.
+    expect(feedbackImpactLabel("blocking")).toBe("I cannot finish the work");
+    expect(feedbackImpactLabel("nice_to_have")).toBe("It works — this would just be better");
+  });
+
+  it("labels every value, so no option can render blank", () => {
+    for (const impact of FEEDBACK_IMPACTS) expect(feedbackImpactLabel(impact)).toBeTruthy();
+    for (const frequency of FEEDBACK_FREQUENCIES) {
+      expect(feedbackFrequencyLabel(frequency)).toBeTruthy();
+    }
   });
 });

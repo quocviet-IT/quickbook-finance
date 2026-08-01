@@ -16,6 +16,8 @@ import DataTable from "@/components/ui/DataTable";
 import {
   describeFeedbackStatusChange,
   FEEDBACK_STATUSES,
+  feedbackFrequencyLabel,
+  feedbackImpactLabel,
   feedbackKindLabel,
   feedbackStatusLabel,
   nextStatuses,
@@ -24,30 +26,49 @@ import {
   summarizePageContext,
   type FeedbackStatus,
 } from "@/lib/domain/feedback";
-import type { FeedbackAttachmentView, FeedbackReportView } from "@/lib/services/feedback";
+import type {
+  FeedbackAttachmentView,
+  FeedbackImprovementView,
+  FeedbackReportView,
+} from "@/lib/services/feedback";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
 import {
   feedbackAttachmentUrlAction,
   feedbackScreenshotUrlAction,
   listFeedbackAttachmentsAction,
+  listFeedbackImprovementsAction,
   listFeedbackReportsAction,
   setFeedbackStatusAction,
 } from "./actions";
 
 const KIND_COLOR: Record<string, string> = { broken: "red", suggestion: "blue" };
 
+/**
+ * The colour follows the reporter's own answer, not the score: "I cannot finish
+ * the work" should look different from "this would just be nicer" at a glance.
+ */
+const IMPACT_COLOR: Record<string, string> = {
+  blocking: "red",
+  slows_work: "orange",
+  nice_to_have: "default",
+};
+
 export default function FeedbackTriageClient({
   initialReports,
   initialAttachments,
+  initialImprovements,
   canTriage,
 }: {
   initialReports: FeedbackReportView[];
   initialAttachments: FeedbackAttachmentView[];
+  /** Priority and the argument behind each suggestion, computed by the database. */
+  initialImprovements: FeedbackImprovementView[];
   canTriage: boolean;
 }) {
   const { message } = App.useApp();
   const [reports, setReports] = useState(initialReports);
   const [attachments, setAttachments] = useState(initialAttachments);
+  const [improvements, setImprovements] = useState(initialImprovements);
   const [queue, setQueue] = useState<FeedbackStatus>("new");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,6 +83,10 @@ export default function FeedbackTriageClient({
     }
     return map;
   }, [attachments]);
+  const improvementById = useMemo(
+    () => new Map(improvements.map((entry) => [entry.id, entry])),
+    [improvements],
+  );
   const rows = useMemo(
     () => sortNewestFirst(reports.filter((r) => r.status === queue)),
     [reports, queue],
@@ -69,14 +94,16 @@ export default function FeedbackTriageClient({
 
   async function reload() {
     setLoading(true);
-    const [res, files] = await Promise.all([
+    const [res, files, ranked] = await Promise.all([
       listFeedbackReportsAction(),
       listFeedbackAttachmentsAction(),
+      listFeedbackImprovementsAction(),
     ]);
     setLoading(false);
     if (res.ok && res.data) setReports(res.data);
     else message.error(res.error ?? "Failed to load reports");
     if (files.ok && files.data) setAttachments(files.data);
+    if (ranked.ok && ranked.data) setImprovements(ranked.data);
   }
 
   async function move(report: FeedbackReportView, status: FeedbackStatus) {
@@ -120,22 +147,84 @@ export default function FeedbackTriageClient({
       ),
     },
     {
+      title: "Urgency",
+      width: 210,
+      // Sorted by the score the database computed, never one recomputed here.
+      sorter: (a: FeedbackReportView, b: FeedbackReportView) =>
+        (improvementById.get(a.id)?.priority ?? 0) - (improvementById.get(b.id)?.priority ?? 0),
+      render: (_: unknown, row: FeedbackReportView) => {
+        const entry = improvementById.get(row.id);
+        if (!entry?.impact && !entry?.frequency) {
+          return <Typography.Text type="secondary">Not rated</Typography.Text>;
+        }
+        return (
+          <Space direction="vertical" size={2}>
+            {entry.impact ? (
+              <Tag color={IMPACT_COLOR[entry.impact]}>{feedbackImpactLabel(entry.impact)}</Tag>
+            ) : null}
+            {entry.frequency ? (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {feedbackFrequencyLabel(entry.frequency)} · score {entry.priority}
+              </Typography.Text>
+            ) : null}
+          </Space>
+        );
+      },
+    },
+    {
       title: "What happened",
       dataIndex: "description",
-      render: (text: string | null) =>
-        text ? (
+      render: (text: string | null, row: FeedbackReportView) => {
+        const entry = improvementById.get(row.id);
+        // A suggestion reads as an argument: the difficulty first, then what
+        // was asked for. The free-text note is background and comes last.
+        if (entry?.currentDifficulty || entry?.desiredOutcome) {
+          return (
+            <Space direction="vertical" size={2}>
+              {entry.currentDifficulty ? (
+                <Typography.Text>
+                  <Typography.Text type="secondary">Today: </Typography.Text>
+                  {entry.currentDifficulty}
+                </Typography.Text>
+              ) : null}
+              {entry.desiredOutcome ? (
+                <Typography.Text>
+                  <Typography.Text type="secondary">Wants: </Typography.Text>
+                  {entry.desiredOutcome}
+                </Typography.Text>
+              ) : null}
+              {text ? (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {text}
+                </Typography.Text>
+              ) : null}
+            </Space>
+          );
+        }
+        return text ? (
           <Typography.Text>{text}</Typography.Text>
         ) : (
           <Typography.Text type="secondary">No description</Typography.Text>
-        ),
+        );
+      },
     },
     {
       title: "Where",
       width: 280,
       render: (_, row) => (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {summarizePageContext(row.page)}
-        </Typography.Text>
+        <Space direction="vertical" size={0}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {summarizePageContext(row.page)}
+          </Typography.Text>
+          {/* What that screen is for, as the guide describes it — so a reader
+              knows which part of the system an idea belongs to without opening
+              the route. */}
+          {improvementById.get(row.id)?.pagePurpose ? (
+            <Typography.Text type="secondary" style={{ fontSize: 12, fontStyle: "italic" }}>
+              {improvementById.get(row.id)?.pagePurpose}
+            </Typography.Text>
+          ) : null}
+        </Space>
       ),
     },
     {

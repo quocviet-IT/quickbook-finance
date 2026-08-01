@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  FeedbackFrequency,
+  FeedbackImpact,
   FeedbackKind,
   FeedbackPageContext,
   FeedbackReport,
@@ -69,6 +71,16 @@ export interface FileFeedbackInput {
   page: FeedbackPageContext;
   /** Base64 PNG (no data-URL prefix), or null when the reporter excluded it. */
   screenshotBase64: string | null;
+  /**
+   * The improvement argument. Null on a fault report — a broken screen needs
+   * reproducing, not ranking.
+   */
+  current_difficulty?: string | null;
+  desired_outcome?: string | null;
+  impact?: FeedbackImpact | null;
+  frequency?: FeedbackFrequency | null;
+  /** What the screen is for, taken from the guide when the report was filed. */
+  page_purpose?: string | null;
 }
 
 /**
@@ -106,6 +118,13 @@ export async function fileFeedbackReport(
       viewport_width: input.page.viewport.width,
       viewport_height: input.page.viewport.height,
       reporter_id: user.id,
+      // What is hard now, what better looks like, and what it costs to leave
+      // alone. Null on a fault report — those fields belong to a suggestion.
+      current_difficulty: input.current_difficulty || null,
+      desired_outcome: input.desired_outcome || null,
+      impact: input.impact ?? null,
+      frequency: input.frequency ?? null,
+      page_purpose: input.page_purpose || null,
     })
     .select("id")
     .single();
@@ -153,6 +172,52 @@ export async function listFeedbackReports(
   // reporter_email is stamped onto the row by a trigger at insert time, so the
   // queue names the reporter without needing auth.users or an admin-only RPC.
   return ((data ?? []) as unknown as FeedbackRow[]).map(toView);
+}
+
+/**
+ * The improvement argument behind each suggestion, with the priority the
+ * database computed for it.
+ *
+ * Read through `acc_feedback_queue` rather than the table so the score comes
+ * from `acc_feedback_priority` (migration 0086) and nowhere else — a second
+ * copy of the ranking in TypeScript would drift from the one every other reader
+ * sees. The screen still gets page, screenshot and triage detail from
+ * `listFeedbackReports`; the two are joined by id.
+ */
+export interface FeedbackImprovementView {
+  id: string;
+  priority: number;
+  currentDifficulty: string | null;
+  desiredOutcome: string | null;
+  impact: FeedbackImpact | null;
+  frequency: FeedbackFrequency | null;
+  pagePurpose: string | null;
+}
+
+interface FeedbackQueueRow {
+  id: string;
+  priority: number;
+  current_difficulty: string | null;
+  desired_outcome: string | null;
+  impact: FeedbackImpact | null;
+  frequency: FeedbackFrequency | null;
+  page_purpose: string | null;
+}
+
+export async function listFeedbackImprovements(
+  sb: SupabaseClient,
+): Promise<FeedbackImprovementView[]> {
+  const { data, error } = await sb.rpc("acc_feedback_queue", { p_status: null });
+  if (error) throw new FeedbackError(error.message);
+  return ((data ?? []) as FeedbackQueueRow[]).map((row) => ({
+    id: row.id,
+    priority: row.priority,
+    currentDifficulty: row.current_difficulty,
+    desiredOutcome: row.desired_outcome,
+    impact: row.impact,
+    frequency: row.frequency,
+    pagePurpose: row.page_purpose,
+  }));
 }
 
 export async function setFeedbackStatus(

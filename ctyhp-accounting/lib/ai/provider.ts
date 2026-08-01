@@ -64,9 +64,19 @@ export interface AiAnswer {
  * carries its own system prompt, so an answer can never be shaped by another
  * user's earlier question.
  */
+export interface AiTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export async function askProvider(input: {
   system: string;
   question: string;
+  /**
+   * What was said before, oldest first. Without it every follow-up starts
+   * again from nothing, and "why?" is unanswerable.
+   */
+  history?: readonly AiTurn[];
   maxOutputTokens?: number;
   signal?: AbortSignal;
 }): Promise<AiAnswer> {
@@ -92,6 +102,7 @@ export async function askProvider(input: {
         max_tokens: input.maxOutputTokens ?? 1200,
         messages: [
           { role: "system", content: input.system },
+          ...(input.history ?? []).map((turn) => ({ role: turn.role, content: turn.content })),
           { role: "user", content: input.question },
         ],
       }),

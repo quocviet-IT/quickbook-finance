@@ -13,6 +13,21 @@ export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
 export const FEEDBACK_STATUSES = ["new", "reviewing", "resolved", "declined"] as const;
 export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
 
+/**
+ * How much a suggestion costs to leave alone, and how often it bites. Ordered
+ * worst first, which is the order the buttons read in.
+ *
+ * The two are kept apart because either one alone ranks badly: impact alone
+ * puts a rare catastrophe level with a daily nuisance, frequency alone does the
+ * reverse. The score itself lives in `acc_feedback_priority` (migration 0086) —
+ * it is not recomputed here, so every reader sees the same ordering.
+ */
+export const FEEDBACK_IMPACTS = ["blocking", "slows_work", "nice_to_have"] as const;
+export type FeedbackImpact = (typeof FEEDBACK_IMPACTS)[number];
+
+export const FEEDBACK_FREQUENCIES = ["every_time", "often", "sometimes", "rarely"] as const;
+export type FeedbackFrequency = (typeof FEEDBACK_FREQUENCIES)[number];
+
 export interface FeedbackPageContext {
   /** Full location, so a report filed from a filtered view can be reproduced. */
   url: string;
@@ -57,6 +72,32 @@ const STATUS_LABELS: Record<FeedbackStatus, string> = {
 
 export function feedbackStatusLabel(status: FeedbackStatus): string {
   return STATUS_LABELS[status];
+}
+
+/**
+ * Said the way somebody describes their own working day, not the way a backlog
+ * describes a ticket. "Blocking" as a word invites everyone to pick it; "I
+ * cannot finish the work at all" does not.
+ */
+const IMPACT_LABELS: Record<FeedbackImpact, string> = {
+  blocking: "I cannot finish the work",
+  slows_work: "There is a way round, but it costs time",
+  nice_to_have: "It works — this would just be better",
+};
+
+export function feedbackImpactLabel(impact: FeedbackImpact): string {
+  return IMPACT_LABELS[impact];
+}
+
+const FREQUENCY_LABELS: Record<FeedbackFrequency, string> = {
+  every_time: "Every time",
+  often: "Often",
+  sometimes: "Sometimes",
+  rarely: "Rarely",
+};
+
+export function feedbackFrequencyLabel(frequency: FeedbackFrequency): string {
+  return FREQUENCY_LABELS[frequency];
 }
 
 export function newFeedbackReport(input: {

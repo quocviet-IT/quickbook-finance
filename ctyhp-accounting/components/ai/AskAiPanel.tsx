@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { Alert, Button, Drawer, Empty, Input, Space, Typography } from "antd";
-import { HistoryOutlined } from "@ant-design/icons";
+import { Fragment, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Alert, Button, Drawer, Empty, Input, Space, Tag, Typography } from "antd";
+import { HistoryOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ASK_AI_GROUNDING_NOTE, ASK_AI_MAX_QUESTION_LENGTH } from "@/lib/ai/ask-prompt";
+import {
+  screenContextFor,
+  splitAnswerRoutes,
+  suggestedQuestions,
+} from "@/lib/domain/screen-context";
 
 export interface AskAiExchange {
   question: string;
   answer: string;
   askedAt: string;
+  /** The screen it was asked from, so history reads back in context. */
+  route?: string;
 }
 
 /**
@@ -18,6 +27,8 @@ export interface AskAiExchange {
  */
 const HISTORY_KEY = "one-book.ask-ai.history";
 const HISTORY_LIMIT = 20;
+/** How many past exchanges are sent back, so a follow-up has something to follow. */
+const CONTEXT_EXCHANGES = 3;
 
 function readHistory(): AskAiExchange[] {
   if (typeof window === "undefined") return [];
@@ -37,6 +48,32 @@ function writeHistory(entries: AskAiExchange[]) {
   }
 }
 
+/** Render an answer, turning the routes it names into links you can follow. */
+function Answer({ text, onNavigate }: { text: string; onNavigate: () => void }) {
+  return (
+    <Typography.Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
+      {splitAnswerRoutes(text).map((segment, index) =>
+        segment.kind === "route" ? (
+          <Link key={index} href={segment.route} onClick={onNavigate}>
+            {segment.route}
+          </Link>
+        ) : (
+          <Fragment key={index}>{segment.text}</Fragment>
+        ),
+      )}
+    </Typography.Paragraph>
+  );
+}
+
+/**
+ * The in-app assistant.
+ *
+ * It now knows three things it did not: which screen the question came from,
+ * what that screen is for, and what was already said. Between them they turn
+ * "go to the invoices page" — said to somebody already standing on it — into an
+ * answer about the control in front of them, and make "why?" a question that
+ * can be answered at all.
+ */
 export default function AskAiPanel({
   open,
   onClose,
@@ -46,32 +83,49 @@ export default function AskAiPanel({
   onClose: () => void;
   onReportProblem: () => void;
 }) {
+  const pathname = usePathname() ?? "/";
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<string | null>(null);
+  const [thread, setThread] = useState<AskAiExchange[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [history, setHistory] = useState<AskAiExchange[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const endRef = useRef<HTMLDivElement | null>(null);
+
+  const screen = screenContextFor(pathname);
+  const suggestions = suggestedQuestions(pathname);
+
+  useEffect(() => {
+    if (thread.length > 0) endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [thread]);
 
   function openHistory() {
     setHistory(readHistory());
     setShowHistory((visible) => !visible);
   }
 
-  async function ask() {
-    const trimmed = question.trim();
+  async function ask(raw?: string) {
+    const trimmed = (raw ?? question).trim();
     if (!trimmed) {
       setError("Type a question first.");
       return;
     }
     setAsking(true);
     setError(null);
-    setAnswer(null);
     try {
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({
+          question: trimmed,
+          route: pathname,
+          history: thread
+            .slice(-CONTEXT_EXCHANGES)
+            .flatMap((exchange) => [
+              { role: "user" as const, content: exchange.question },
+              { role: "assistant" as const, content: exchange.answer },
+            ]),
+        }),
       });
       const body = (await response.json().catch(() => null)) as
         | { answer?: string; error?: string }
@@ -80,12 +134,14 @@ export default function AskAiPanel({
         setError(body?.error ?? "The assistant failed to answer.");
         return;
       }
-      setAnswer(body.answer);
       const entry: AskAiExchange = {
         question: trimmed,
         answer: body.answer,
         askedAt: new Date().toISOString(),
+        route: pathname,
       };
+      setThread((current) => [...current, entry]);
+      setQuestion("");
       const next = [entry, ...readHistory()];
       writeHistory(next);
       setHistory(next.slice(0, HISTORY_LIMIT));
@@ -107,32 +163,74 @@ export default function AskAiPanel({
         </Space>
       }
       placement="right"
-      width={460}
+      width={480}
       open={open}
       onClose={onClose}
       destroyOnHidden
       classNames={{ wrapper: "ask-ai-drawer" }}
+      extra={
+        <Space size="small">
+          {thread.length > 0 ? (
+            <Button type="text" size="small" icon={<ReloadOutlined />} onClick={() => setThread([])}>
+              New
+            </Button>
+          ) : null}
+          <Button type="text" size="small" icon={<HistoryOutlined />} onClick={openHistory}>
+            History
+          </Button>
+        </Space>
+      }
     >
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-        <Space style={{ width: "100%", justifyContent: "space-between" }}>
-          <Typography.Text strong style={{ letterSpacing: 1, fontSize: 12 }}>
-            ASK AI
+        {/* Say what it is answering about, so nobody has to guess whether it knows. */}
+        <Space size={6} wrap>
+          <Tag color="blue">{screen.route}</Tag>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {screen.summary
+              ? "Answering about this screen"
+              : "No guide chapter covers this screen yet"}
           </Typography.Text>
-          <Space size="middle">
-            <Button type="text" size="small" icon={<HistoryOutlined />} onClick={openHistory}>
-              History
-            </Button>
-            <Button type="link" size="small" onClick={onReportProblem}>
-              Report a problem
-            </Button>
-          </Space>
         </Space>
+
+        {thread.length === 0 && suggestions.length > 0 ? (
+          <Space direction="vertical" size={4} style={{ width: "100%" }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Things people ask here
+            </Typography.Text>
+            {suggestions.map((suggestion) => (
+              <Button
+                key={suggestion}
+                size="small"
+                block
+                style={{ textAlign: "left", height: "auto", whiteSpace: "normal" }}
+                onClick={() => void ask(suggestion)}
+              >
+                {suggestion}
+              </Button>
+            ))}
+          </Space>
+        ) : null}
+
+        {thread.map((exchange) => (
+          <Space key={exchange.askedAt} direction="vertical" size={6} style={{ width: "100%" }}>
+            <Typography.Text strong>{exchange.question}</Typography.Text>
+            <Alert
+              type="info"
+              description={<Answer text={exchange.answer} onNavigate={onClose} />}
+            />
+          </Space>
+        ))}
+        <div ref={endRef} />
 
         <Input.TextArea
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="e.g. Why can't I post to a closed period?"
-          rows={4}
+          placeholder={
+            thread.length > 0
+              ? "Ask a follow-up — it remembers what was just said"
+              : "e.g. Why can't I post to a closed period?"
+          }
+          rows={3}
           maxLength={ASK_AI_MAX_QUESTION_LENGTH}
           onPressEnter={(event) => {
             if (!event.shiftKey) {
@@ -143,27 +241,20 @@ export default function AskAiPanel({
         />
 
         <Space style={{ width: "100%", justifyContent: "space-between" }} align="start">
-          <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 260 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 240 }}>
             {ASK_AI_GROUNDING_NOTE}
           </Typography.Text>
-          <Button type="primary" loading={asking} onClick={ask}>
-            Ask
-          </Button>
+          <Space size="small">
+            <Button type="link" size="small" onClick={onReportProblem}>
+              Report a problem
+            </Button>
+            <Button type="primary" loading={asking} onClick={() => void ask()}>
+              Ask
+            </Button>
+          </Space>
         </Space>
 
         {error ? <Alert type="warning" showIcon message={error} /> : null}
-
-        {answer ? (
-          <Alert
-            type="info"
-            message="Answer"
-            description={
-              <Typography.Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
-                {answer}
-              </Typography.Paragraph>
-            }
-          />
-        ) : null}
 
         {showHistory ? (
           <div>
@@ -176,14 +267,14 @@ export default function AskAiPanel({
                     block
                     style={{ textAlign: "left", height: "auto", whiteSpace: "normal" }}
                     onClick={() => {
-                      setQuestion(entry.question);
-                      setAnswer(entry.answer);
+                      setThread([entry]);
                       setShowHistory(false);
                     }}
                   >
                     <Typography.Text>{entry.question}</Typography.Text>
                     <br />
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {entry.route ? `${entry.route} · ` : ""}
                       {new Date(entry.askedAt).toLocaleString("en-US")}
                     </Typography.Text>
                   </Button>

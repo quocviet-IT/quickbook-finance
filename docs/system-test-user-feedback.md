@@ -24,6 +24,119 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
+## Ask AI, Report and Guide — upgraded, 2026-08-01
+
+Asked for: "Ask AI smarter so it actually helps the user, Report able to carry
+the user's direction for improvement, Guide more professional and better
+organised." All three are the parts of the product a new user meets first, and
+all three had the same fault: they knew nothing about where the person asking
+was standing.
+
+### 1. Ask AI — it now knows the screen, the company and what was just said
+
+Before: every question was answered from the manual alone. Somebody standing on
+`/banking/reconcile` asking "what do I do here?" was told to go to the
+reconciliation page — the page they were already on.
+
+| Added | |
+|---|---|
+| **Screen awareness** | The question carries the route it was asked from. The server turns that into a briefing: which workflows start here, which pass through, and the named controls on this screen. Derived from the guide, so the assistant and the guide can never disagree. |
+| **Company and role** | Resolved **server-side** from the signed-in user's membership, never from the browser. A crafted request cannot claim to be another company or an administrator. A sample company is stated as "sample company, not real books" so advice about test data is never mistaken for advice about the books. |
+| **Follow-up questions** | The last three exchanges are sent back with the next question. "And what if it does not balance?" is now a question that can be answered. |
+| **Clickable answers** | An answer names a screen as `[/reports/ar-aging]` and the panel renders it as a link. A route the guide has never heard of stays as plain text — a hallucinated path cannot become a link to nowhere. |
+| **Suggested questions** | Three per screen, drawn from what the guide says happens there. They are what makes the panel useful before anyone knows what to type. |
+
+`lib/domain/screen-context.ts` (new, pure, 26 unit tests) holds all of it:
+`normaliseRoute`, `screenContextFor`, `searchGuide`,
+`describeContextForAssistant`, `splitAnswerRoutes`, `suggestedQuestions`. A
+record page (`/banking/reconcile/<uuid>`) resolves to its list screen, because
+the guide describes screens, not rows.
+
+### 2. Report — a suggestion is an argument, not a fault report
+
+Before: one free-text box for both "this is broken" and "this could be better".
+Squeezed together, the part that decides whether an idea gets built — what it
+costs to leave alone — was the part that went missing. Every suggestion in the
+queue read as equally urgent, which is another way of saying none of them were
+ranked at all.
+
+- **Picking "Suggestion for improvement" now asks three questions**: what is
+  difficult today, what you would like instead, and how much it costs you —
+  plus how often it comes up. The problem is captured separately from the
+  proposed answer, because a good problem statement outlives whichever solution
+  is chosen.
+- **The cost is asked in the reporter's own words**, not in backlog language:
+  "I cannot finish the work" / "There is a way round, but it costs time" /
+  "It works — this would just be better". *Blocking* as a word invites everyone
+  to pick it; a sentence about their own working day does not.
+- **A fault report is not asked to rank itself.** The extra fields only appear
+  for a suggestion, and the server drops them if the kind is `broken`, so a bug
+  report cannot arrive pre-ranked.
+- **The screen's purpose is recorded with the report** (from the guide, at the
+  moment of filing), so whoever reads the queue knows which part of the system
+  an idea belongs to without opening the route.
+- **Triage (`/settings/feedback`) shows the argument and can sort by urgency.**
+  A suggestion reads "Today: … / Wants: …" with the free-text note as
+  background. The Urgency column shows the reporter's own answer as a coloured
+  tag and the score behind it.
+
+The score is `acc_feedback_priority(impact, frequency)` — **in the database, not
+in the screen**, so every reader sees the same ordering. Impact and frequency
+are kept apart on purpose: impact alone ranks a rare catastrophe level with a
+daily nuisance, frequency alone does the reverse.
+
+Migration **0086** adds the five columns, the scoring function and
+`acc_feedback_queue(status)`, which returns the queue in priority order behind
+the existing `feedback.read` permission.
+
+### 3. Guide — searchable, and it knows where you are
+
+Before: thirteen workflows in one accordion, always in the same order, with two
+notices at the top that everybody scrolls past.
+
+- **Search across everything** — workflow titles, what each is for, the named
+  controls and the individual steps, weighted so a title match outranks a
+  passing mention. People search for the button in front of them, not the name
+  of the workflow, so `void` finds the step whose control is "Void".
+- **"This screen (n)" / "Everything (13)"** — it opens on the workflows that
+  touch the screen you are on. A one-line summary above says what that screen
+  is for.
+- **"starts here" and "you are here"** tags, so a long workflow reads as a
+  position rather than a list.
+- The two caveats moved to the **bottom**. They matter, but they are not what
+  anybody opened the guide to read.
+- An empty state that offers "Show every workflow" instead of a blank panel.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 67 files, 738 tests passed (10 new: report schema + improvement vocabulary) |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, 11 pre-existing warnings |
+| `npm run build` | compiled successfully |
+| Page sweep (read-only, built server) | 53 of 53 pages rendered |
+| Migration 0086 live | `public`, `co_north_star`, `co_harbor_gems`, `co_cascade_metals` — columns present and `acc_feedback_queue` answers in all four |
+| Ranking, live | blocking+every time **42**, blocking+rarely **31**, slows work+often **23**, unrated **13**, nice to have+rarely **6** |
+| `/api/ask`, live, signed in | "What can I do on this screen?" from `/banking/reconcile` answered about reconciliation sessions and linked `[/banking/reconcile]`; the follow-up "And what if it does not balance?" answered without the question being restated |
+
+The permission gate was checked too: `acc_feedback_queue` called with the
+service role returns nothing, because the role holds no `feedback.read`
+permission. The queue is readable by people, not by keys.
+
+### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Ask AI reading the figures on the screen | **No.** It answers how the system works and says *where* to read a number — it does not compute one. An assistant that quotes a balance it derived itself is a second source of truth beside the ledger, and the ledger has to be the only one. |
+| Ask AI doing the work (raising an invoice, posting an entry) | **No.** Approval and posting rules live in the database. An assistant that writes is a second path into the ledger, outside the guards every other path goes through. |
+| Letting staff vote on each other's suggestions | **Not built.** It would mean showing the queue to everyone, and a report can quote customer names and amounts — reading it is a permission (`feedback.read`) on purpose. Ranking by impact and frequency gives the ordering a vote was wanted for, without opening the queue. |
+| Telling the reporter when their suggestion is resolved | **Not built.** There is no outbound mail in the product yet; adding it for this alone is the wrong first use of it. The status is visible in triage today. |
+| Turning the priority score into a roadmap automatically | **No.** The score orders the conversation; it does not decide. A blocking-every-time suggestion that needs a quarter of work should still lose to three cheap ones, and only a person can make that call. |
+| A Vietnamese guide | **Not built.** The product's interface is US English by decision; a second language is a product decision, not a guide change. |
+
+---
+
 ## QuickBooks and Wave import — assessed, then built
 
 Management suggests finding QuickBooks and Wave test data online to import.

@@ -3,7 +3,12 @@ import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { CASH_FLOW_ROLES, defaultCashFlowRole } from "./cashflow";
 import { USD_CURRENCY_CODE } from "./currency";
-import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "./feedback";
+import {
+  FEEDBACK_FREQUENCIES,
+  FEEDBACK_IMPACTS,
+  FEEDBACK_KINDS,
+  FEEDBACK_STATUSES,
+} from "./feedback";
 import {
   FEEDBACK_ATTACHMENT_MAX_BYTES,
   FEEDBACK_ATTACHMENT_MAX_FILES,
@@ -725,6 +730,18 @@ export const feedbackReportSchema = z.object({
   kind: z.enum(FEEDBACK_KINDS),
   description: z.string().trim().max(4000).optional().or(z.literal("")).nullable(),
   page: feedbackPageContextSchema,
+  /**
+   * A suggestion is an argument, not a fault report: what is hard now, what
+   * would be better, and how much it costs to leave alone. Kept as separate
+   * fields because the third is the one that decides whether it gets built,
+   * and in a single box it is the one that goes missing.
+   */
+  current_difficulty: z.string().trim().max(2000).optional().or(z.literal("")).nullable(),
+  desired_outcome: z.string().trim().max(2000).optional().or(z.literal("")).nullable(),
+  impact: z.enum(FEEDBACK_IMPACTS).optional().nullable(),
+  frequency: z.enum(FEEDBACK_FREQUENCIES).optional().nullable(),
+  /** What the screen is for, from the guide, at the moment of reporting. */
+  page_purpose: z.string().trim().max(500).optional().or(z.literal("")).nullable(),
   /** Base64 PNG without the data-URL prefix; ~5 MB cap matches the bucket. */
   screenshot_base64: z
     .string()
