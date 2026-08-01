@@ -16,8 +16,14 @@ import { planCompanySchema } from "../lib/domain/schema-template.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(here, "..", "supabase", "migrations");
 
-/** The register builds the control plane; a company schema never contains it. */
-const REGISTER_MIGRATION = "0081_";
+/**
+ * The register builds the control plane; a company schema never contains it.
+ *
+ * Matched by full name, not by number: migrations are numbered by whoever
+ * writes them next, two branches can land on the same number, and a prefix
+ * match would silently exclude an unrelated migration from every company.
+ */
+const REGISTER_MIGRATION = "0081_company_register.sql";
 
 const url = process.env.SUPABASE_DB_URL;
 if (!url) {
@@ -76,7 +82,7 @@ async function migrateCompany(schema) {
 
   let count = 0;
   for (const file of files()) {
-    if (file.startsWith(REGISTER_MIGRATION) || applied.has(file)) continue;
+    if (file === REGISTER_MIGRATION || applied.has(file)) continue;
     const sql = readFileSync(join(migrationsDir, file), "utf8");
     const plan = planCompanySchema([{ file, sql }], schema);
     process.stdout.write(`${schema.padEnd(14)} apply ${file} ... `);

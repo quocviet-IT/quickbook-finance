@@ -127,7 +127,7 @@ describe("retargetToSchema", () => {
 
 describe("planCompanySchema against the real migrations", () => {
   const files = readdirSync(MIGRATIONS)
-    .filter((f) => f.endsWith(".sql") && !f.startsWith("0081_"))
+    .filter((f) => f.endsWith(".sql") && f !== "0081_company_register.sql")
     .sort();
   const sources = files.map((file) => ({
     file,

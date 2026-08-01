@@ -233,6 +233,21 @@ the same read-only check performed directly, and the control-account figures
 were read the same way — but `gl-posting.e2e.ts` and the document-ledger suite
 were **not** executed, and will not be until a test project exists.
 
+### A collision caught on the way in
+
+The indirect cash flow work landed on `main` while this was being built, and it
+numbered its migration **`0081_`** — the same number as the company register.
+The multi-schema runner excluded the register by *number prefix*, so it would
+have quietly excluded the cash flow migration from every company as well: the
+live books would have gained the indirect statement and the three samples would
+not, with nothing to say so.
+
+The register is now matched by its full filename. Two branches landing on the
+same migration number is normal; a company silently missing a feature because
+of it is not. All four companies are level again — 82 migrations in the live
+books, 81 in each sample, the difference being the register itself, which a
+company never contains.
+
 ### What is deliberately not done yet
 
 | | Why |

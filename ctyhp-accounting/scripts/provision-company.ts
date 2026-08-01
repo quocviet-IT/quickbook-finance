@@ -22,8 +22,11 @@ import { planCompanySchema } from "../lib/domain/schema-template.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(here, "..", "supabase", "migrations");
 
-/** The migration that builds the register itself; a company never contains it. */
-const REGISTER_MIGRATION = "0081_";
+/**
+ * The migration that builds the register itself; a company never contains it.
+ * Matched by full name — two branches can land on the same number.
+ */
+const REGISTER_MIGRATION = "0081_company_register.sql";
 
 interface Args {
   slug: string;
@@ -96,7 +99,7 @@ async function grantAccess(
 
 function migrationSources() {
   return readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql") && !f.startsWith(REGISTER_MIGRATION))
+    .filter((f) => f.endsWith(".sql") && f !== REGISTER_MIGRATION)
     .sort()
     .map((file) => ({ file, sql: readFileSync(join(migrationsDir, file), "utf8") }));
 }
