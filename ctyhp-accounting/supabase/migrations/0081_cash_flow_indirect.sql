@@ -85,7 +85,11 @@ revoke all on table acc_cash_flow_close_snapshot from public, anon, authenticate
 grant select on table acc_cash_flow_close_snapshot to authenticated, service_role;
 
 -- Every row is one auditable contribution to an indirect-statement line.
-create or replace function acc_cash_flow_indirect_detail(p_from date, p_to date)
+create or replace function acc_cash_flow_indirect_detail(
+  p_from date,
+  p_to date,
+  p_line_code text default null
+)
 returns table (
   section text,
   line_code text,
@@ -373,7 +377,8 @@ language sql stable security invoker set search_path = public as $$
     c.contribution_minor::bigint as amount_minor,
     c.classification_basis
   from contributions c
-  where c.contribution_minor <> 0;
+  where c.contribution_minor <> 0
+    and (p_line_code is null or c.line_code = p_line_code);
 $$;
 
 create or replace function acc_cash_flow_indirect(p_from date, p_to date)
@@ -621,13 +626,13 @@ begin
 end;
 $$;
 
-revoke all on function acc_cash_flow_indirect_detail(date, date) from public, anon;
+revoke all on function acc_cash_flow_indirect_detail(date, date, text) from public, anon;
 revoke all on function acc_cash_flow_indirect(date, date) from public, anon;
 revoke all on function acc_cash_flow_reconciliation(date, date) from public, anon;
 revoke all on function acc_period_close_blockers(uuid) from public;
 revoke all on function acc_close_period(uuid, text, text) from public;
 
-grant execute on function acc_cash_flow_indirect_detail(date, date) to authenticated, service_role;
+grant execute on function acc_cash_flow_indirect_detail(date, date, text) to authenticated, service_role;
 grant execute on function acc_cash_flow_indirect(date, date) to authenticated, service_role;
 grant execute on function acc_cash_flow_reconciliation(date, date) to authenticated, service_role;
 grant execute on function acc_period_close_blockers(uuid) to authenticated, service_role;

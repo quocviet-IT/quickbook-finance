@@ -5,6 +5,7 @@ import {
   cashFlowCategoryOf,
   defaultCashFlowRole,
 } from "@/lib/domain/cashflow";
+import { cashFlowDetailSchema } from "@/lib/domain/schemas";
 
 describe("cashFlowCategoryOf", () => {
   it("classifies by account type", () => {
@@ -89,5 +90,24 @@ describe("assembleIndirectCashFlow", () => {
     expect(report.differenceMinor).toBe(25_00);
     expect(report.classificationComplete).toBe(false);
     expect(report.tiesOut).toBe(false);
+  });
+});
+
+describe("cash-flow detail input", () => {
+  it("accepts a known-shaped line code and rejects unsafe values", () => {
+    expect(
+      cashFlowDetailSchema.safeParse({
+        from: "2026-07-01",
+        to: "2026-07-31",
+        lineCode: "asset_sale_proceeds",
+      }).success,
+    ).toBe(true);
+    expect(
+      cashFlowDetailSchema.safeParse({
+        from: "2026-07-01",
+        to: "2026-07-31",
+        lineCode: "asset_sale_proceeds; drop table acc_account",
+      }).success,
+    ).toBe(false);
   });
 });

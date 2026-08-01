@@ -481,6 +481,14 @@ export const cashFlowRangeSchema = z.object({
   to: z.string().min(1, "To date is required"),
 });
 export type CashFlowRangeInput = z.infer<typeof cashFlowRangeSchema>;
+export const cashFlowDetailSchema = cashFlowRangeSchema.extend({
+  lineCode: z
+    .string()
+    .min(1, "Cash-flow line is required")
+    .max(80)
+    .regex(/^[a-z][a-z_]*$/, "Invalid cash-flow line"),
+});
+export type CashFlowDetailInput = z.infer<typeof cashFlowDetailSchema>;
 
 // --- Budgets and management reporting ---
 export const budgetLineInputSchema = z.object({

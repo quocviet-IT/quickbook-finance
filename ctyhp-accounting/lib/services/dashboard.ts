@@ -537,9 +537,7 @@ export async function getDashboardAnalytics(
     getDashboardWorkQueue(sb, asOf),
     getMonthlyPerformance(sb, asOf, ledger.monthToDate),
     getPeriodComparison(sb, asOf, ledger.monthToDate, ledger.priorComparable),
-    getCashFlow(sb, monthStart(asOf), asOf, {
-      closingMinor: ledger.asOf.then(cashFromLedger),
-    }),
+    getCashFlow(sb, monthStart(asOf), asOf),
     getInventoryDashboard(sb, asOf),
     getOperatingPulse(sb, asOf),
     getRecentActivity(sb),

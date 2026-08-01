@@ -303,6 +303,13 @@ describe("indirect cash flow ledger contract", () => {
           classified.find((row) => row.line_code === "unclassified")?.detail_count ?? 0,
         ),
       ).toBe(0);
+      const disposalDetails = await db.query<{ line_code: string; amount_minor: string | number }>(
+        "select line_code, amount_minor from acc_cash_flow_indirect_detail($1::date, $2::date, $3)",
+        [FROM, TO, "asset_sale_proceeds"],
+      );
+      expect(disposalDetails.rows).toHaveLength(1);
+      expect(disposalDetails.rows[0].line_code).toBe("asset_sale_proceeds");
+      expect(Number(disposalDetails.rows[0].amount_minor)).toBe(500_00);
 
       await post("2199-11-14", "manual", [
         { accountId: cash, debit: 25_00, credit: 0 },
