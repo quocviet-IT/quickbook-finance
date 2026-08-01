@@ -24,12 +24,117 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
-## Test data for the QuickBooks and Wave import — where to get it, and where it must land
+## QuickBooks and Wave import — assessed, then built
 
 Management suggests finding QuickBooks and Wave test data online to import.
 That is a good idea and it unblocks real work — with one condition that has to
 be settled first, because getting it wrong is not recoverable.
 
+### Built on 2026-08-01
+
+Mapping-first, dry run before anything posts, into a sample company, master
+data and opening balances — exactly the shape agreed. Migrations 0082–0085 are
+live in all four companies, and the screen is `/settings/import`.
+
+| Step | |
+|---|---|
+| 1. Choose and upload | Chart of accounts, customers, vendors, or products, from a CSV |
+| 2. Agree the columns | The mapping is **proposed** from the file's own headings and every field can be changed |
+| 3. See what will happen | Creates, updates, rows with problems, opening balances found — **nothing has been written yet** |
+
+Only then is there an Import button, and it says which company it is about to
+write to and whether that company is a sample.
+
+**Nothing is hard-coded to a column name.** A QuickBooks Online chart export
+(`Account Number`, `Account Name`, `Type`, `Detail Type`, `Balance`) and a Wave
+customer export (`Customer name`, `Province/State`, `Outstanding balance`) both
+map with no help. A client's own file with columns neither product produces is
+a mapping somebody picks, not a change to the code.
+
+**Account types are translated, and refused when they cannot be.** QuickBooks
+carries dozens of detail types; One Book has thirteen account types. Every rule
+is written down and tested — a credit card becomes a liability rather than a
+bank account, `Cost of Goods Sold` becomes its own type rather than an expense
+— and anything unrecognised stops that row with its spreadsheet row number
+rather than being filed somewhere plausible.
+
+### The one rule that shaped the whole design
+
+**Receivables and payables opening balances become documents, not journal
+lines.** A lump posted straight to the A/R control account would leave the
+reconciliation built for Issue #5 permanently out — the subledger is the
+invoices, and there would be none. So each customer's opening balance becomes
+an invoice and each vendor's a bill, and the ageing works from the first day.
+
+An opening balance on a control account is refused by name, and the message
+says where it belongs.
+
+### Three faults the end-to-end test found, and one of them was a design fault
+
+| Found | |
+|---|---|
+| An opening invoice was rejected as having no value | The invoice's own totals are what the issuing rule checks; inserting lines does not fill them in |
+| The vendor import failed on its first row | `acc_vendor` has no address columns and never had any. Address columns in the file are now read and discarded rather than crashing |
+| **An import silently repurposed a live account** | This one is the design fault |
+
+In the test file, QuickBooks account **2100 is a Visa card**. Here, **2100 is
+Sales Tax Payable**, and the sales tax codes point at it. The import cheerfully
+renamed it, changed its type, and posted the card's balance to it — and the
+sales tax control account went out by 1,850.25 with nothing to say why. The
+same account number meaning different things in different charts is not an edge
+case; it is what always happens.
+
+So an import no longer changes what an existing account **is**. It may correct
+a name; it may not turn a payable into a credit card. The collision is reported
+for a person to resolve, because only they know whether the two 2100s are the
+same account. And the same rule now guards the money: a balance carries the
+type the file believed the account to be, and if that is not what the account
+actually is, **nothing posts at all** — not most of it.
+
+### And a fourth, found by running the suite twice
+
+Master data is idempotent — import the customer list twice and there is still
+one of each customer. **Opening balances are not, and cannot be.** They create
+documents. A second run left receivables at exactly twice the file's total, and
+the control account *agreed* with the inflated figure, because the invoices
+behind it were perfectly real. Nothing looked broken.
+
+Opening balances are now brought across once. The account-level posting refuses
+a second run outright; the customer and vendor postings skip contacts that
+already carry an opening document, because the rest of the file may be new and
+should still go in. Proved by running the whole suite on a fresh company and
+then again on the same one: **5 passed, then 9 passed, and the books did not
+move.**
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 65 files, 702 tests passed (25 new for the mapping engine) |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, 11 pre-existing warnings |
+| `npm run build` | succeeded |
+| Page sweep, all four companies | **53 of 53 each** |
+| `tests/e2e/data-import.e2e.ts` (new) | 5 passed on a fresh company, 9 with the isolation suite on a re-run |
+| Control accounts | live books tie out unchanged; the sample ties out after importing |
+| Migrations 0082–0085 | applied to all four companies |
+
+The end-to-end test refuses to run anywhere but a company marked `is_sample`.
+That guard is a property of the test rather than an environment variable,
+because loading another product's data into live books cannot be undone.
+
+After importing into the sample company, its books read: **A/R 4,330.00, A/P
+2,120.00, every control account tying to its subledger** — which is the whole
+point of raising documents instead of posting a lump.
+
+### What is deliberately not built
+
+| | Why |
+|---|---|
+| Historical transactions | The decision in **Q7** — master data and opening balances, or every past transaction — has not come back. Replaying years of postings means entries dated into closed periods and document numbers colliding with sequences this system owns. It needs its own assessment. |
+| `.QBB` and other QuickBooks backups | A sealed binary only QuickBooks Desktop can open. It has to be restored there and the lists exported; no import can read it. |
+| Inventory quantities on hand | An item can be imported; its stock cannot. Quantities have to arrive as movements with costs, or the valuation would state a figure the ledger never recorded. |
+| Turning inventory tracking on during an update | Same reason, on an item that already has history. |
 ### It must not be imported into the live books
 
 The books currently tie exactly: A/R 8,591.00, A/P 15,865.00, inventory

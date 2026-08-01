@@ -87,16 +87,25 @@ describe("company isolation over HTTPS", () => {
       expect(accounts.count ?? 0, `${company.slug} has no chart of accounts`).toBeGreaterThan(0);
     }
 
-    // The live books have history; a freshly provisioned sample has none. If a
-    // sample reported the same entries as the live company, the schemas would
-    // not be separating anything.
     const live = counts.get("ctyhp")!;
     expect(live.entries, "the live books have history").toBeGreaterThan(0);
 
-    for (const [slug, count] of counts) {
-      if (slug === "ctyhp") continue;
-      expect(count.entries, `${slug} must start with an empty ledger`).toBe(0);
-      expect(count.invoices, `${slug} must start with no invoices`).toBe(0);
+    // Not "the samples are empty" — they may well have data of their own once
+    // something has been imported into one. The claim is stronger and narrower:
+    // no document belonging to the live books appears in any other company.
+    // By identity, not by number. Numbers legitimately repeat across companies
+    // — every entity is entitled to its own INV-000001, which is the point of
+    // numbering them separately. Identity is what must never be shared.
+    const liveInvoices = await signedInTo("public");
+    const { data: liveRows } = await liveInvoices.from("acc_invoice").select("id").limit(5);
+    const ids = ((liveRows ?? []) as { id: string }[]).map((r) => r.id);
+    expect(ids.length, "the live books have invoices to look for").toBeGreaterThan(0);
+
+    for (const company of companies) {
+      if (company.slug === "ctyhp") continue;
+      const sb = await signedInTo(company.schema_name);
+      const { data: found } = await sb.from("acc_invoice").select("id").in("id", ids);
+      expect(found ?? [], `a live invoice is visible from ${company.slug}`).toHaveLength(0);
     }
   });
 
@@ -160,9 +169,16 @@ describe("company isolation over HTTPS", () => {
     };
 
     const schemas = ((data ?? []) as { schema_name: string }[]).map((s) => s.schema_name);
-    expect(await nextInvoiceIn("public"), "the live books have issued invoices").toBeGreaterThan(1);
+    const live = await nextInvoiceIn("public");
+    expect(live, "the live books have issued invoices").toBeGreaterThan(1);
+
+    // Each company counts on its own. A sample that has issued a few opening
+    // invoices is still nowhere near the live books' sequence, and two
+    // companies sharing a counter would show up here immediately.
     for (const schema of schemas.filter((s) => s !== "public")) {
-      expect(await nextInvoiceIn(schema), `${schema} must start its own numbering at one`).toBe(1);
+      const next = await nextInvoiceIn(schema);
+      expect(next, `${schema} must number independently of the live books`).toBeLessThan(live);
+      expect(next, `${schema} must have its own counter`).toBeGreaterThanOrEqual(1);
     }
   });
 });

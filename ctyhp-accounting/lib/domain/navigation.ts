@@ -200,6 +200,12 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",
       },
+      {
+        href: "/settings/import",
+        title: "Import from QuickBooks or Wave",
+        description:
+          "Bring a chart of accounts, contacts, products and opening balances across from a CSV export.",
+      },
     ],
   },
   {
