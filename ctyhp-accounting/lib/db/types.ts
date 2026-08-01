@@ -538,6 +538,8 @@ export interface CompanySettingRow {
   accounting_basis: AccountingBasis;
   default_payment_terms_days: number;
   created_at: string;
+  inventory_valuation_method: string;
+  inventory_policy_memo: string | null;
 }
 
 // --- Budgets and management reporting ---

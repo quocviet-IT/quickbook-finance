@@ -24,7 +24,7 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
-## Issue #7 — Inventory valuation method: assessment and proposal
+## Issue #7 — Inventory valuation method: assessed, then built
 
 Filed as **HIGH / GAAP compliance CRITICAL**: *"Costs shown for jewelry items
 but no indication of valuation method (FIFO/LIFO/Average Cost). GAAP requires
@@ -135,6 +135,109 @@ will receive the same item at two different prices, sell some, and check the
 cost relieved is the weighted average — not the first price, not the last.
 That is the difference between claiming a method and demonstrating one.
 
+### What was built (2026-08-01)
+
+All five, in the order agreed. Migrations 0078 and 0079 are live.
+
+**1. The policy, written down and versioned.** `inventory_valuation_method`
+and `inventory_policy_memo` on the company settings — which already version
+themselves with effective dates, so the memorandum is retained with its history
+and the policy in force on a past date can still be shown. The memorandum was
+written and recorded: weighted average under ASC 330-10-30-9, measured
+subsequently at the lower of cost and net realisable value under ASC
+330-10-35-1B.
+
+**Choosing a method the engine does not implement is refused**, by name:
+
+> Inventory is costed at weighted average; the fifo method is not implemented,
+> so recording it as the policy would state something the ledger contradicts.
+
+LIFO is not in the list at all. It is permitted in US GAAP, but the conformity
+rule (IRC §472(c)) forces it into the financial statements once it is used on
+the tax return, it is prohibited under IFRS, and it needs a layer engine and a
+reserve. That is a decision, not a dropdown value.
+
+**2. The method, stated where costs are shown.** The valuation report now reads
+the policy rather than printing a hardcoded string — it names the basis, states
+the LCNRV measurement, and shows the memorandum itself, expandable. Company
+settings display both, and warn when no policy is recorded.
+
+And the Items screen no longer has two different costs under one heading:
+
+| Before | After |
+|---|---|
+| **Cost** — a static figure typed on the card | **Purchase cost (card)** — the same figure, now labelled for what it is |
+| *(the ledger's cost was nowhere)* | **Ledger cost (average)** — what the books actually carry, highlighted when it has parted company with the card |
+
+**3. The obsolescence review.** `/reports/inventory-review`: per item, quantity,
+value, unit cost, realisable value, **days since last movement**, and an
+assessment. Ranked worst first — anything carried above realisable value, then
+stale, then slow moving, largest value first within each. It opens on what is
+wrong rather than on an alphabetical list.
+
+Net realisable value is the selling price **less the cost of selling** (ASC
+330-10-20, 10% assumed) — the ticket price unadjusted would overstate what the
+goods fetch. An item with no selling price reports no realisable value rather
+than a guess.
+
+**4. LCNRV write-downs, posted and one-way.** `5090 Inventory Write-down` was
+created in cost of sales — the loss belongs with the goods, not below the line.
+Writing an item down posts:
+
+```
+Dr  Inventory Write-down (cost of sales)   the shortfall
+  Cr  Inventory                              the shortfall
+```
+
+Quantity is untouched: the goods are still there, carried at less. The movement
+is recorded as an inventory adjustment so the subledger and the control account
+move together and the reconciliation from Issue #5 still ties.
+
+**ASC 330-10-35-14 forbids writing inventory back up, and the database enforces
+it** rather than trusting anyone to remember:
+
+> Net realisable value (X) is not below the carrying value (Y); inventory is
+> never written up.
+
+Every write-down is kept in `acc_inventory_writedown` with the quantity, the
+carrying value before, the realisable value, a required reason of at least ten
+characters, and the journal entry — audited like any other governance act.
+
+**5. A test that demonstrates the method instead of asserting it.** The policy
+claims weighted average. `tests/e2e/inventory-costing.e2e.ts` buys the same item
+**twice at different prices** — 10 at 100.00, then 10 at 200.00 — and checks
+what the ledger carries:
+
+| | |
+|---|---:|
+| FIFO would say | 100.00 |
+| LIFO would say | 200.00 |
+| **The ledger says** | **150.00** |
+
+It then sells 5, confirms 15 remain at 225,000 with no rounding crumbs, that
+selling does not move the average, and that the review screen reads the same
+item back with the same numbers. A policy is worth what it can be shown to do.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 61 files, 628 tests passed (16 new for the review rules) |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 52 of 52 pages rendered |
+| `tests/e2e/inventory-costing.e2e.ts` (new, HTTPS, live DB) | 2 passed |
+| `tests/e2e/gl-posting.e2e.ts` | 4 passed — inventory still ties to its control account |
+| Migrations 0078, 0079 | applied to production |
+
+### What the review says about the live books
+
+Nothing is carried above realisable value, so **no write-down is due**. One
+item is flagged: **Diamond Stud Earrings, 5,600.00, no movement in 108 days** —
+the largest single holding, and invisible before this report existed. That is a
+question for the business, not a defect: it may be a display piece, or it may
+be stock that is not going to sell.
 ### What is not proposed
 
 | Idea | Decision |

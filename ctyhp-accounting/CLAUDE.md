@@ -43,6 +43,8 @@ contract required by its Part 05.
 - `acc_close_period` takes **three** arguments since migration 0074 (`p_period_id, p_reason, p_variance_note`); the two-argument form was dropped on purpose so an out-of-date caller fails loudly instead of closing without the gate.
 - A bill snapshots its vendor's payment terms when it posts (`acc_apply_vendor_terms`, migration 0075): due date, discount date, discount amount. Never re-read the vendor's current terms to judge an existing bill — terms change, and the bill keeps the ones it was raised under. The same rule governs customer credit terms.
 - An early payment discount posts a third leg to `7010 Purchase Discounts Taken`; every rule about when it may be taken is in `acc_pay_bills`, not in the screen. A discount claimed after its window is money the vendor will still ask for.
+- Inventory is weighted average cost, and the company's accounting policy says so (`acc_company_setting_version.inventory_valuation_method`, migration 0078). `acc_save_company_settings` refuses a method `acc_implemented_valuation_methods()` does not list — never widen that list without building the engine first, or the policy becomes a claim the ledger contradicts.
+- An inventory write-down is one-way: `acc_write_down_inventory` refuses when net realisable value is not below carrying value (ASC 330-10-35-14). Value falls, quantity does not, and the movement posts as an `adjustment` so the subledger and control account stay tied.
 - DO NOT re-implement a posting/money/tax rule anywhere else (Part 14).
 
 ## 4. Gotchas / past mistakes (append when a bug recurs)

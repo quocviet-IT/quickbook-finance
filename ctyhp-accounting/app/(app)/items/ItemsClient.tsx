@@ -1,7 +1,21 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { App, Button, Divider, Form, Input, InputNumber, Modal, Select, Space, Switch, Tag, Typography } from "antd";
+import {
+  App,
+  Button,
+  Divider,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Switch,
+  Tag,
+  Tooltip,
+  Typography,
+} from "antd";
 import {
   BarChartOutlined,
   CheckOutlined,
@@ -156,10 +170,32 @@ export default function ItemsClient({
             render: (v: number, r) => (r.is_sold ? `$${(v / 100).toFixed(2)}` : "—"),
           },
           {
-            title: "Cost",
+            // Two different costs used to share one heading. This one is typed
+            // on the card; the accounts use the weighted average beside it, and
+            // they part company the first time an item is bought at a new price.
+            title: "Purchase cost (card)",
             dataIndex: "purchase_cost_minor",
             align: "right",
             render: (v: number, r) => (r.is_purchased ? `$${(v / 100).toFixed(2)}` : "—"),
+          },
+          {
+            title: "Ledger cost (average)",
+            key: "ledger_cost",
+            align: "right",
+            render: (_, r) => {
+              if (!r.is_inventory) return "—";
+              const unit = Number(onHandById.get(r.id)?.unit_cost_minor ?? 0);
+              const card = Number(r.purchase_cost_minor ?? 0);
+              const differs = card > 0 && unit > 0 && unit !== card;
+              const text = `$${(unit / 100).toFixed(2)}`;
+              return differs ? (
+                <Tooltip title="The books carry this item at the weighted average of what was actually paid, which is no longer the figure on the card.">
+                  <Typography.Text type="warning">{text}</Typography.Text>
+                </Tooltip>
+              ) : (
+                text
+              );
+            },
           },
           {
             title: "On hand",

@@ -7,14 +7,20 @@ import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import type { InventoryValuationRow } from "@/lib/db/types";
 import type { InventoryValuation } from "@/lib/services/inventory";
+import { METHOD_LABEL } from "@/lib/domain/inventory-review";
 import { inventoryValuationAction } from "./actions";
 
 export default function InventoryValuationClient({
   baseCurrency,
   baseDecimals,
+  valuationMethod,
+  policyMemo,
 }: {
   baseCurrency: string;
   baseDecimals: number;
+  /** Read from the company's accounting policy, never hardcoded here. */
+  valuationMethod: string;
+  policyMemo: string | null;
 }) {
   const { message } = App.useApp();
   const [asOf, setAsOf] = useState<Dayjs>(dayjs());
@@ -48,9 +54,32 @@ export default function InventoryValuationClient({
 
       {rep && (
         <>
-          <Typography.Text type="secondary">
-            Base currency {baseCurrency} · Weighted average cost · As of {rep.asOf}
-          </Typography.Text>
+          <Alert
+            type="info"
+            showIcon
+            message={
+              <>
+                Measured at <b>{METHOD_LABEL[valuationMethod] ?? valuationMethod}</b>, at the lower
+                of cost and net realisable value (ASC 330-10-35-1B). Base currency {baseCurrency},
+                as of {rep.asOf}.
+              </>
+            }
+            description={
+              policyMemo ? (
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ marginBottom: 0, whiteSpace: "pre-line" }}
+                  ellipsis={{ rows: 2, expandable: true, symbol: "the full policy" }}
+                >
+                  {policyMemo}
+                </Typography.Paragraph>
+              ) : (
+                <Typography.Text type="warning">
+                  No inventory accounting policy has been recorded. Settings → Company.
+                </Typography.Text>
+              )
+            }
+          />
           <DataTable<InventoryValuationRow>
             rowKey="item_id"
             pagination={false}

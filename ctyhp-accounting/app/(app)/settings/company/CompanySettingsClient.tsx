@@ -1,9 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
-import { App, Button, Card, Descriptions, Form, Input, InputNumber, Select, Space, Table } from "antd";
+import {
+  App,
+  Button,
+  Card,
+  Descriptions,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  Space,
+  Table,
+  Typography,
+} from "antd";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
 import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
+import { METHOD_LABEL } from "@/lib/domain/inventory-review";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 function maskEin(s: string | null | undefined): string {
@@ -38,6 +51,8 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
       time_zone: current?.time_zone ?? "America/New_York",
       accounting_basis: current?.accounting_basis ?? "accrual",
       default_payment_terms_days: current?.default_payment_terms_days ?? 30,
+      inventory_valuation_method: current?.inventory_valuation_method ?? "average_cost",
+      inventory_policy_memo: current?.inventory_policy_memo ?? "",
     });
     setEditing(true);
   };
@@ -66,6 +81,18 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
               <Descriptions.Item label="Base currency">{current.base_currency_code}</Descriptions.Item>
               <Descriptions.Item label="Time zone">{current.time_zone}</Descriptions.Item>
               <Descriptions.Item label="Default terms (days)">{current.default_payment_terms_days}</Descriptions.Item>
+              <Descriptions.Item label="Inventory cost basis">
+                {METHOD_LABEL[current.inventory_valuation_method] ?? current.inventory_valuation_method}
+              </Descriptions.Item>
+              <Descriptions.Item label="Inventory policy" span={3}>
+                {current.inventory_policy_memo ? (
+                  <span style={{ whiteSpace: "pre-line" }}>{current.inventory_policy_memo}</span>
+                ) : (
+                  <Typography.Text type="warning">
+                    Not recorded. GAAP asks for the cost basis to be disclosed.
+                  </Typography.Text>
+                )}
+              </Descriptions.Item>
             </Descriptions>
           ) : (
             <p>No company settings yet.{canEdit ? " Click Edit to create them." : ""}</p>
@@ -98,6 +125,31 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
               </Form.Item>
               <Form.Item name="time_zone" label="Time zone"><Input /></Form.Item>
               <Form.Item name="default_payment_terms_days" label="Default terms (days)"><InputNumber min={0} /></Form.Item>
+              <Form.Item
+                name="inventory_valuation_method"
+                label="Inventory cost basis"
+                tooltip="Only a method the costing engine implements can be recorded. Choosing another is refused rather than accepted and ignored."
+              >
+                <Select
+                  style={{ width: 260 }}
+                  options={[
+                    { value: "average_cost", label: "Weighted average cost" },
+                    { value: "fifo", label: "First in, first out (not implemented)" },
+                    {
+                      value: "specific_identification",
+                      label: "Specific identification (not implemented)",
+                    },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                name="inventory_policy_memo"
+                label="Inventory accounting policy"
+                tooltip="Why this basis was chosen and when it was adopted. Kept with this version of the settings, so the policy in force on a past date can still be shown."
+                style={{ width: "100%" }}
+              >
+                <Input.TextArea rows={5} maxLength={4000} showCount />
+              </Form.Item>
             </Space>
             <Space>
               <Button type="primary" onClick={submit}>Save new version</Button>

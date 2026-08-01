@@ -106,6 +106,14 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     internalReport: "budget",
   },
   {
+    id: "inventory-review",
+    title: "Inventory Review",
+    description:
+      "Slow-moving and obsolete stock, and anything carried above net realisable value.",
+    href: "/reports/inventory-review",
+    group: "inventory-tax",
+  },
+  {
     id: "gl-posting",
     title: "General Ledger Posting",
     description:

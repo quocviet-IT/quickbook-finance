@@ -449,6 +449,15 @@ export const companySettingsSchema = z.object({
   time_zone: z.string().trim().min(1).max(60).default("America/New_York"),
   accounting_basis: z.enum(["accrual", "cash"]),
   default_payment_terms_days: z.number().int().min(0, "Terms must be >= 0"),
+  /**
+   * The inventory cost basis, disclosed under ASC 330-10-50-1. Only a method
+   * the costing engine implements is accepted; the database refuses the rest
+   * rather than recording a policy the ledger would contradict.
+   */
+  inventory_valuation_method: z
+    .enum(["average_cost", "fifo", "specific_identification"])
+    .optional(),
+  inventory_policy_memo: z.string().trim().max(4000).optional().or(z.literal("")).nullable(),
 });
 export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 
