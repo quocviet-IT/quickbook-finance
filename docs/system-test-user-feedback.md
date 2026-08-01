@@ -24,6 +24,147 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
+## Issue #7 — Inventory valuation method: assessment and proposal
+
+Filed as **HIGH / GAAP compliance CRITICAL**: *"Costs shown for jewelry items
+but no indication of valuation method (FIFO/LIFO/Average Cost). GAAP requires
+disclosure of inventory cost basis method."*
+
+### The system has a method. It just never says so.
+
+Inventory is carried at **weighted average cost**, and it is implemented once:
+`acc_item_wac` computes the average from `acc_inventory_txn` under a lock on
+the item row, so two postings landing at the same moment cannot read the same
+stale average. Cost of goods sold uses the same function on the way out. There
+is no second cost path and no place where a different method could creep in.
+
+So the accounting is consistent. What the reviewer is right about is that
+**nothing anywhere says which method it is** — not the valuation report, not
+the item screen, not a company policy record. A method nobody has written down
+is not a disclosed method, and ASC 330-10-50-1 asks for exactly that
+disclosure.
+
+### The live position (2026-08-01)
+
+| | |
+|---|---:|
+| Inventory items | 7 |
+| Movements on record | 19 (receipts and sales only) |
+| Inventory value | 19,765.00 — ties to the control account exactly |
+
+| Item | On hand | Unit cost | Value | Idle |
+|---|---:|---:|---:|---:|
+| Diamond Stud Earrings | 8 | 700.00 | 5,600.00 | **108 days** |
+| 18K Gold Diamond Ring | 4 | 1,200.00 | 4,800.00 | 22 days |
+| Classic Gold Bracelet | 7 | 420.00 | 2,940.00 | 48 days |
+| Blue Sapphire Pendant | 5 | 550.00 | 2,750.00 | 84 days |
+| Sterling Silver Necklace | 17 | 95.00 | 1,615.00 | 84 days |
+| Pearl Drop Earrings | 9 | 140.00 | 1,260.00 | 48 days |
+| Premium Jewelry Gift Box | 100 | 8.00 | 800.00 | 37 days |
+
+Two things fall out of that table. The **largest single holding has not moved
+in 108 days** — that is what an obsolescence review exists to catch. And
+**nothing is priced below its cost**, so no write-down is due today; that is
+worth knowing rather than assuming.
+
+### The recommendations, one at a time
+
+| # | Recommendation | Assessment |
+|---|---|---|
+| 1 | `valuation_method` on the items table: FIFO / LIFO / AVERAGE_COST / SPECIFIC_IDENTIFICATION | **Should not be built as described.** Two reasons. First, the engine computes one method; a field on an item saying `FIFO` while `acc_item_wac` computes an average is not a disclosure, it is a **false statement the ledger contradicts** — worse than saying nothing. Second, GAAP does not work per item: a method is chosen for the entity or for a class of inventory and applied **consistently** (ASC 330-10-30). The disclosure belongs in the company's accounting policy, and that is where it should live. |
+| 2 | Document the method in company accounting policies, retain a supporting memorandum | **Genuinely missing, and the heart of the issue.** There is no policy record at all. Note that company settings are already **versioned with effective dates** — so a policy written there is retained with its history for free, which is precisely what "retain supporting memorandum" means. |
+| 3 | Calculate COGS using the selected method consistently; track layers by acquisition date for FIFO | **Already consistent — and layer tracking should not be added.** Every sale relieves inventory at the weighted average through the same function. FIFO layers are a different engine, not a setting; see the question below before anyone builds one. |
+| 4 | Inventory valuation report: quantity, unit cost, total value, and valuation method | **Three of the four exist.** `/reports/inventory-valuation` already shows quantity, unit cost and value, and reconciles the total to the inventory control account. The **method** is the missing column, and it is the one the issue is about. |
+| 5 | Quarterly review: obsolescence, slow-moving, lower of cost/market | **Missing entirely.** Nothing measures how long stock has sat, and nothing compares cost to what the item would actually fetch. The 108-day item above is invisible today. |
+
+### Two things in the citations, said plainly
+
+**LOCOM is the wrong test for this company.** Since ASU 2015-11, an entity on
+FIFO or average cost measures inventory at the **lower of cost and net
+realisable value** (ASC 330-10-35-1B) — a single ceiling, no market floor. The
+older lower-of-cost-*or*-market rule, with its ceiling and floor, survives only
+for LIFO and the retail inventory method. This company is on average cost, so
+what should be built is **LCNRV**, and building LOCOM would implement a test
+that does not apply.
+
+**ASU 2018-08 is not about inventory.** It is *Not-for-Profit Entities:
+Clarifying the Scope and the Accounting Guidance for Contributions Received and
+Contributions Made*. ASC 330-10 is the right reference and is cited correctly;
+ASC 360-10 covers property, plant and equipment, which is the fixed-asset
+module, not this one. Flagging it so the same reference does not end up in a
+policy memorandum where an auditor will read it.
+
+### One thing found while assessing, visible in the screenshot
+
+The Items screen has a column headed **Cost** — `purchase_cost_minor`, a static
+figure typed on the item card. It is **not** the cost the accounts use; the
+books use the weighted average computed from actual movements. Today they agree
+to the cent on all seven items, but only because each item has been received at
+a single price. The first receipt at a different price makes the screen and the
+ledger disagree, under a column labelled simply "Cost".
+
+### What is proposed
+
+**1. An inventory accounting policy on the company record.** The valuation
+method and a memorandum explaining the choice and when it was adopted, on the
+existing versioned company settings — so the history is retained automatically
+and a past period can be shown under the policy that applied at the time.
+Selecting a method the engine does not implement will be **refused with the
+reason**, rather than accepted and quietly ignored.
+
+**2. Say the method wherever a cost is shown.** The valuation report header and
+its Excel and PDF exports, and the item screen. Also rename the Items column
+from *Cost* to **Purchase cost (card)** and put the ledger's own average beside
+it, so the two numbers are never mistaken for each other.
+
+**3. A slow-moving and obsolescence report.** Per item: quantity, value, **days
+since last movement**, units sold in the last 90 days, months of cover at that
+rate, and cost against net realisable value. This is what a quarterly review
+reads, and it is what would have surfaced the 108-day item.
+
+**4. LCNRV write-downs, posted properly.** Where net realisable value is below
+cost, write the difference off: `Dr Inventory Write-down (cost of sales) / Cr
+Inventory`, at item level, with a reason and an audit trail. ASC 330-10-35-14
+prohibits reversing the write-down in a later period, so the posting must be
+one-way and the system should enforce that rather than trust a person to
+remember.
+
+**5. A test that proves the consistency claim.** The recommendation asks for
+COGS to be computed consistently. Rather than assert it, an end-to-end test
+will receive the same item at two different prices, sell some, and check the
+cost relieved is the weighted average — not the first price, not the last.
+That is the difference between claiming a method and demonstrating one.
+
+### What is not proposed
+
+| Idea | Decision |
+|---|---|
+| A per-item `valuation_method` field | **No.** It would let the item card contradict the ledger. The policy belongs to the company. |
+| A FIFO or LIFO engine | **Not without an accountant's decision** — see the question below. Adding either as a dropdown value that changes no arithmetic would be the worst of both worlds. |
+| LOCOM with market ceiling and floor | **No** — LCNRV is the applicable measurement on average cost. |
+
+### The question this raises for the accountant
+
+**Is weighted average the right method for jewelry?** ASC 330-10-30-9
+contemplates **specific identification** for items that are not ordinarily
+interchangeable — and a 4,800.00 holding of diamond rings is a much better fit
+for that than for an average, while a box of 100 gift boxes at 8.00 each is
+clearly fungible. Three possible answers, and they are not the same amount of
+work:
+
+- **Average cost throughout** — nothing to build beyond the disclosure. What is
+  in place today.
+- **Specific identification for the pieces, average for consumables** — two
+  classes, each disclosed. A real build: serial-level tracking on the pieces.
+- **FIFO** — a different engine, with layers. And if the business uses **LIFO**
+  for tax, the conformity rule (IRC §472(c)) requires LIFO for financial
+  reporting too, which is a much larger decision than a dropdown.
+
+This is **Q10** on the question sheet. The disclosure work above is worth doing
+under any answer; the engine work is not, until it is answered.
+
+---
+
 ## Issue #6 — Vendor bill payment status: assessed, then built
 
 Filed as **HIGH / cash outflow impact HIGH**: *"Bills shown ($15.8K overdue)

@@ -1,6 +1,6 @@
 # One Book — questions that need an answer from you
 
-Nine decisions came up while working through the test round; **eight are still
+Ten decisions came up while working through the test round; **nine are still
 open** (Q4 is answered and closed, at the bottom). None can be settled by
 reading the code: each one is about how this business actually works, or what it
 wants. Guessing at any of them means building the wrong thing.
@@ -12,9 +12,10 @@ question with the date and who gave it — that record is what closes the item.
 now and need nothing from you: bulk invoice import, and the customer/vendor half
 of the QuickBooks and Wave import. Three are waiting: both multi-company
 requests need **Q2**, the AI request needs **Q8**, and the QuickBooks import
-needs **Q7** before the rest of it can be scoped. **Q9** was found while
-building — nothing is blocked on it, but it should be settled before the sales
-tax rates in Q3 are entered.
+needs **Q7** before the rest of it can be scoped. **Q9** and **Q10** were found while
+building. Q9 should be settled before the sales tax rates in Q3 are entered;
+Q10 decides whether an inventory costing engine ever needs writing, though the
+disclosure work is worth doing under any answer.
 
 Working detail for each item — what was already built, what was deliberately not
 built — is in [system-test-user-feedback.md](system-test-user-feedback.md).
@@ -135,6 +136,44 @@ means.
 *The question:* which tax codes should point at which accounts? This one is
 worth settling before the state rates in **Q3** are entered, because those will
 be attached to the same tax codes.
+
+**Answer:**
+
+---
+### Q10 — Is weighted average the right inventory method for jewelry?
+
+Inventory is carried at **weighted average cost** today, and it is applied
+consistently everywhere. Nothing is wrong with it. But nobody has ever recorded
+a decision that it is what the business wants, and for jewelry it is not the
+obvious choice.
+
+Accounting standards allow **specific identification** where items are not
+ordinarily interchangeable, and the stock list makes the point:
+
+| Item | On hand | Unit cost | Interchangeable? |
+|---|---:|---:|---|
+| 18K Gold Diamond Ring | 4 | 1,200.00 | Arguably not — each stone differs |
+| Diamond Stud Earrings | 8 | 700.00 | Arguably not |
+| Premium Jewelry Gift Box | 100 | 8.00 | Yes, plainly |
+
+**The question:** which method should the business use, and is it the same for
+everything?
+
+- **Average cost throughout.** What happens today. Nothing to build beyond
+  writing the policy down. Simple, defensible, and it treats a diamond ring as
+  interchangeable with the next one.
+- **Specific identification for the pieces, average for consumables.** Two
+  classes of inventory, each disclosed. The truest answer for jewelry, and a
+  real build: each piece has to be tracked individually from purchase to sale.
+- **FIFO.** A different costing engine with dated layers.
+
+**One thing to check before answering:** what method does the business use on
+its **tax return**? If it is LIFO, the conformity rule requires LIFO in the
+financial statements as well — that is a legal requirement, not a preference,
+and it would decide this question outright.
+
+Whatever the answer, the method has to be written into the accounting policy
+and disclosed. That part is being built now regardless.
 
 **Answer:**
 
