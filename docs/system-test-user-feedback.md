@@ -24,6 +24,118 @@ reports (`/fixed-assets`, `/reports`) on **Q2**, the Claude AI request on
 
 ---
 
+## Issue #5 — GL posting verification: assessment before building
+
+Filed as **CRITICAL / financial reporting risk HIGH**: *"Transactions in
+subledgers shown but no indication of GL posting status. Financial statements
+could include unposted or incorrectly posted transactions. No reconciliation
+between subledger totals and GL control accounts."*
+
+The recommendation asks for six things. Assessed one at a time against what is
+actually in the database, because two of them describe a system this is not, and
+building them as written would make the books **less** safe, not more.
+
+### The architectural difference that decides most of this
+
+The review assumes the common design: subledgers are the working records, and a
+posting routine copies them into the general ledger later — so a document can
+sit unposted, post wrongly, or post twice, and you need a status column and a
+daily reconciliation to catch it.
+
+**This system has no posting step to fail.** The ledger is the only record of a
+number. Issuing an invoice *is* writing the journal entry — the same database
+transaction does both, inside one RPC. There is no window in which a document
+exists and its entry does not, and no code path that creates one without the
+other. Every reported figure is derived from `acc_journal_line` at read time; no
+balance is stored anywhere to drift.
+
+Two guards enforce it below the application, where no code can get around them:
+
+- `acc_post_entry` refuses an unbalanced entry: *"Unbalanced posting: debit X <>
+  credit Y"*.
+- A row-level trigger, `acc_check_entry_balanced`, re-checks every line as it
+  lands — so even a direct `INSERT` cannot leave a lopsided entry behind.
+
+### What the live books actually show (2026-08-01)
+
+Every document that should be on the ledger, is:
+
+| Subledger | Live documents | Without a journal entry |
+|---|---:|---:|
+| Invoices | 13 | **0** |
+| Bills | 6 | **0** |
+| Customer payments | 8 | **0** |
+| Vendor payments | 4 | **0** |
+| Expenses | 11 | **0** |
+| Credit memos | 1 | **0** |
+| Vendor credits | 1 | **0** |
+| Draft invoices/bills (must **not** be posted) | 1 | 0 wrongly posted |
+
+And the ledger itself: **95 entries** (57 posted, 38 void), **0 unbalanced**, 0
+entries without lines, 0 lines without an entry.
+
+So the stated risk — *"financial statements could include unposted or incorrectly
+posted transactions"* — is not present in these books, and the structure makes it
+hard to create. That does not make the report wrong. What it gets right is the
+second half: **none of this is visible.** A reviewer cannot tell any of the above
+from the screens, and an assurance you cannot see is not one you can rely on.
+
+### The six recommendations, one at a time
+
+| # | Recommendation | Assessment |
+|---|---|---|
+| 1 | `posting_status` column (PENDING/POSTED/REJECTED) + `posting_date` + `GL_journal_entry_id` on transaction tables | **Half already there, half should not be built.** Every document table already carries `journal_entry_id`. A PENDING/REJECTED state should *not* be added: it would invent a failure mode that cannot currently occur, and a status column can disagree with the ledger — a second version of the truth. What the review is reaching for is **visibility**, and that is worth building. |
+| 2 | Create a `GL_POSTINGS` table | **Already exists, and is the source of truth.** `acc_journal_entry` + `acc_journal_line` hold exactly the proposed fields (entry, account, debit, credit, date, source document). A second postings table would be a copy that can drift. |
+| 3 | Automatic posting on approval/payment — zero-touch | **Already how it works.** Posting is inside the issuing RPC, atomic with the document. There is no manual post button to forget. |
+| 4 | Daily reconciliation: subledger totals vs GL control accounts | **Partly built, and scattered.** A/R and A/P reconcile to their control accounts inside the ageing reports; inventory valuation reconciles to the inventory control accounts. Three checks, three screens, and **nothing at all for sales tax payable, goods received not invoiced, or undeposited funds**. There is no one place that answers "is everything tied out today?" |
+| 5 | GL posting report: every transaction with its posting status, account and entry reference | **Genuinely missing, and the most useful item on the list.** `journal_entry_id` is stored on every document and shown on none of them — the bills screen uses it as a condition and never displays it. No screen walks from a document to the entry it produced. |
+| 6 | Month-end close checklist: verify zero variance before finalising | **Partly built.** Periods can be closed and closing is enforced in the database — a posting into a closed period is refused by `acc_post_entry` itself, not merely hidden in the UI. But closing checks **nothing**: an administrator can close a period while a control account is out. |
+
+### What is worth building
+
+In the order the value falls out:
+
+1. **A GL posting report** (#5). Every document, its status, the entry it
+   produced, that entry's date and amount, and a link to it — plus, prominently,
+   any document that should have an entry and does not. Today the answer to "did
+   this post, and where?" requires database access.
+2. **One reconciliation screen** (#4) covering *every* control account, not the
+   three that have one each today: A/R, A/P, inventory, sales tax payable, goods
+   received not invoiced, undeposited funds. Subledger total, control balance,
+   variance, and when it was checked. This is also what the month-end checklist
+   reads.
+3. **A close gate** (#6): closing a period runs those checks and refuses — or
+   demands a written reason, like every other override in this system — if a
+   control account is out. A checklist nobody is forced to complete is
+   decoration.
+4. **The entry reference on the document itself**: invoice, bill and payment
+   screens showing the entry number they produced, as a link. Small, and it is
+   the first thing an auditor asks for.
+
+What will **not** be built: a `posting_status` column, and a second postings
+table. Both create a record that can disagree with the ledger. The review's
+underlying goal — that nobody has to take posting on trust — is met by showing
+the ledger, not by copying it.
+
+### Two things the review did not mention, found while assessing
+
+- **`1590 Accumulated Depreciation` is typed as a fixed asset, so the chart of
+  accounts prints its normal balance as *Debit*.** It is a contra-asset and
+  carries a *credit* balance. The balance sheet total is unaffected — assets are
+  summed as debits minus credits either way — but the label is wrong to anyone
+  who reads it, and there is no contra-account concept in the system to type it
+  correctly. The account is at zero today, so nothing is misstated **yet**; the
+  first depreciation run is when it starts to read oddly.
+- **`2110 Sales Tax Receivable` is a current asset numbered in the 2000
+  liability block.** Nothing computes wrongly; it breaks the convention the rest
+  of the chart follows, and an accountant scanning the 2000s expects
+  liabilities.
+
+Both are small and neither is the reported issue. Flagged rather than silently
+fixed: renumbering an account in a live chart is not a decision to take alone.
+
+---
+
 ## Round 2 — accounting review, 2026-07-31
 
 Source: written review supplied by the accountant, item by item. Round 2 covers
