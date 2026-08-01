@@ -1256,6 +1256,71 @@ is one question worth putting back to them: should cash on hand be reachable
 from Banking at all? It is written up as **Q1** in "Open questions for the
 reviewer" at the top of this file.
 
+### Issue #18 — Import the statement from inside the reconciliation
+
+From the in-app queue (`/banking/reconcile`, 2026-07-31 07:52): "I would say
+this is a perfect example of the reconciliation page. I would recommend to add
+an import bank statement option where in the system would recognized each
+transaction from the statement and add those transaction under reconciliations.
+ask me if you have a questions."
+
+#### What was already there, and what the screenshot shows
+
+Statement import existed — on the **Banking** screen, with CSV parsing, a
+duplicate rule and a matcher that suggests which ledger entry each line belongs
+to. The screenshot is the **Reconcile** screen: a list of sessions with
+beginning and ending balances. The two halves of one job sat on two screens,
+and the reconciliation assumed somebody had already loaded the statement
+somewhere else.
+
+#### What was implemented
+
+- **Import bank statement, inside the reconciliation.** The workspace takes the
+  CSV directly: it imports into the account that reconciliation belongs to,
+  runs the matcher, and reports what happened — "12 transaction(s) imported, 3
+  already on file, 9 matched to a ledger entry". It refuses if the
+  reconciliation is completed; reopen it first.
+- **A Statement lines panel** in the reconciliation, listing every imported
+  line up to the statement date with its date, description, reference, amount
+  and what the matcher paired it with. A line dated after the period belongs to
+  the next reconciliation and is left out of this one.
+- The ledger table underneath is now labelled for what it is — "Ledger lines in
+  this reconciliation" — so the two lists cannot be confused.
+- **`lib/domain/statement-import.ts` (new, pure) + 17 unit tests.** The parsing
+  rules were inline in the Banking screen and now live in one tested place, and
+  they got better in the move: `7/31/2026`, `31/07/2026` and `2026-07-31`; a
+  first number over 12 read as a day whatever the setting says; `(1,234.56)`
+  as negative; `1.234,56` as a European decimal; separate **debit and credit
+  columns** as well as a single signed amount; and the column headings banks
+  actually use (`posting date`, `narrative`, `check number`, `money in`…).
+  A row it cannot read is skipped **and counted**, never guessed at.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 58 files, 565 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| `tests/e2e/statement-import.e2e.ts` (new, HTTPS, live DB) | passed |
+| Rendered check | the in-progress reconciliation shows "Import bank statement", "Statement lines" and "Ledger lines in this reconciliation" |
+
+The end-to-end test imports a two-line statement in the shape a US bank exports
+— US dates, thousands separators, separate debit and credit columns — checks
+the amounts land as +2,806.51 and −3,200.00 with the check number intact, then
+imports the identical file again and asserts **nothing is added**: a
+re-uploaded statement must not double the reconciliation.
+
+#### Not implemented, and why
+
+| Idea | Decision |
+|---|---|
+| Clearing the matched lines automatically | **Not yet.** The matcher suggests; a person approves. Auto-clearing a suggested match would let a wrong match complete a reconciliation, which is the one thing a reconciliation exists to prevent. The next step worth taking is a "clear all approved matches" action — approved, not suggested. |
+| Creating ledger entries for statement lines that match nothing | **No.** A bank line with no entry behind it is either a missing document or a bank error; both need a person. Inventing an entry to make the reconciliation balance is how a difference gets buried. |
+| OFX/QFX/QBO import | **Not built.** CSV is what every bank offers and what the reviewer had. The parser is a pure module with tests, so another format is a new reader beside it, not a rewrite. |
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
@@ -1278,7 +1343,8 @@ Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):
 9. ~~`/reports`, `/fixed-assets` — separate statements per company (10+
    companies).~~ Assessed in Issue #14 — needs an architecture decision, not a
    code change.
-10. `/banking/reconcile` — import a bank statement and match it automatically.
+10. ~~`/banking/reconcile` — import a bank statement and match it
+    automatically.~~ Done, see Issue #18.
 11. `/invoices` — bulk invoice import with AI field mapping.
 12. `/settings` — import a QuickBooks or Wave CSV backup.
 

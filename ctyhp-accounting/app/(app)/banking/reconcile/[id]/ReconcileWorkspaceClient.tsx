@@ -1,7 +1,27 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { App, Alert, Button, Form, Input, Modal, Select, Space, Statistic, Table, Tag } from "antd";
+import {
+  App,
+  Alert,
+  Button,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+  Upload,
+} from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import { parseCsv } from "@/lib/csv";
+import {
+  describeStatementParse,
+  parseStatementRows,
+} from "@/lib/domain/statement-import";
 import { fromMinor } from "@/lib/domain/money";
 import {
   reconciliationLinesAction,
@@ -10,6 +30,9 @@ import {
   recordAdjustmentAction,
   completeReconciliationAction,
   reopenReconciliationAction,
+  importStatementIntoReconciliationAction,
+  reconciliationStatementLinesAction,
+  type StatementLineView,
 } from "../actions";
 import type { ReconLineView, ReconDetail } from "@/lib/services/bankrec";
 
@@ -38,6 +61,8 @@ export default function ReconcileWorkspaceClient({
   const [lines, setLines] = useState<ReconLineView[]>([]);
   const [detail, setDetail] = useState<ReconDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [statementLines, setStatementLines] = useState<StatementLineView[]>([]);
+  const [importing, setImporting] = useState(false);
   const [adjOpen, setAdjOpen] = useState(false);
   const [form] = Form.useForm();
 
@@ -53,10 +78,16 @@ export default function ReconcileWorkspaceClient({
     if (d.ok && d.data) setDetail(d.data);
     else message.error(d.error ?? "Failed");
   }, [reconciliationId, message]);
+  const loadStatement = useCallback(async () => {
+    const res = await reconciliationStatementLinesAction(reconciliationId);
+    if (res.ok && res.data) setStatementLines(res.data);
+  }, [reconciliationId]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+    void loadStatement();
+  }, [load, loadStatement]);
 
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
   const completed = detail?.status === "completed";
@@ -119,6 +150,43 @@ export default function ReconcileWorkspaceClient({
     });
   };
 
+  /**
+   * Load the statement into the account this reconciliation belongs to, match
+   * it, and show what landed — without leaving the page the statement is being
+   * worked from.
+   */
+  function importStatementFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const parsed = parseStatementRows(parseCsv(String(reader.result)), {
+        decimals: baseDecimals,
+      });
+      if (parsed.rows.length === 0) {
+        message.warning(describeStatementParse(parsed));
+        return;
+      }
+      setImporting(true);
+      const res = await importStatementIntoReconciliationAction(
+        reconciliationId,
+        file.name,
+        parsed.rows,
+      );
+      setImporting(false);
+      if (!res.ok || !res.data) {
+        message.error(res.error ?? "Failed to import the statement");
+        return;
+      }
+      message.success(
+        `${res.data.inserted} transaction(s) imported, ${res.data.duplicates} already on file, ` +
+          `${res.data.matched} matched to a ledger entry.`,
+      );
+      void loadStatement();
+      void load();
+    };
+    reader.readAsText(file);
+    return false;
+  }
+
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       {detail && (
@@ -143,7 +211,12 @@ export default function ReconcileWorkspaceClient({
         />
       )}
       {canWrite && !completed && (
-        <Space>
+        <Space wrap>
+          <Upload accept=".csv,text/csv" showUploadList={false} beforeUpload={importStatementFile}>
+            <Button icon={<UploadOutlined />} loading={importing}>
+              Import bank statement
+            </Button>
+          </Upload>
           <Button type="primary" disabled={!detail || detail.differenceMinor !== 0} onClick={complete}>
             Complete
           </Button>
@@ -157,6 +230,56 @@ export default function ReconcileWorkspaceClient({
           Reopen
         </Button>
       )}
+      <div>
+        <Space size="small" style={{ marginBottom: 8 }} wrap>
+          <Typography.Text strong>Statement lines</Typography.Text>
+          <Typography.Text type="secondary">
+            {statementLines.length === 0
+              ? "None imported for this period yet — load the statement above."
+              : `${statementLines.length} line(s) up to the statement date · ` +
+                `${statementLines.filter((line) => line.matchedEntry).length} matched to a ledger entry`}
+          </Typography.Text>
+        </Space>
+        <Table<StatementLineView>
+          rowKey="id"
+          size="small"
+          pagination={statementLines.length > 10 ? { pageSize: 10 } : false}
+          dataSource={statementLines}
+          locale={{ emptyText: "No statement lines imported for this period" }}
+          columns={[
+            { title: "Date", dataIndex: "txnDate", width: 110 },
+            { title: "Description", dataIndex: "description" },
+            {
+              title: "Reference",
+              dataIndex: "reference",
+              width: 130,
+              render: (value: string | null) => value ?? "—",
+            },
+            {
+              title: "Amount",
+              dataIndex: "amountMinor",
+              width: 130,
+              align: "right",
+              render: (value: number) => fmt(value),
+            },
+            {
+              title: "Matched to",
+              key: "match",
+              width: 220,
+              render: (_: unknown, line) =>
+                line.matchedEntry ? (
+                  <Tag color="green">{line.matchedEntry}</Tag>
+                ) : (
+                  <Tag color={line.status === "matched" ? "blue" : "orange"}>
+                    {line.status === "matched" ? "matched" : "no match yet"}
+                  </Tag>
+                ),
+            },
+          ]}
+        />
+      </div>
+
+      <Typography.Text strong>Ledger lines in this reconciliation</Typography.Text>
       <Table
         rowKey="journalLineId"
         loading={loading}

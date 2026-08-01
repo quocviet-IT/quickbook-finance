@@ -50,7 +50,11 @@ import type {
   SuggestionView,
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
-import { formatMoney, toMinorUnits } from "@/lib/format";
+import {
+  describeStatementParse,
+  parseStatementRows,
+} from "@/lib/domain/statement-import";
+import { formatMoney } from "@/lib/format";
 import {
   approveReconciliationAction,
   connectPlaidBankAction,
@@ -100,14 +104,6 @@ const TXN_STATUS: Record<BankTxnStatus, { text: string; color: string }> = {
   matched: { text: "Matched", color: "green" },
   ignored: { text: "Excluded", color: "default" },
 };
-
-function normalizeDate(raw: string): string | null {
-  const value = raw.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (match) return `${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
-  return null;
-}
 
 function formatSyncTime(value: string | null): string {
   if (!value) return "Not synchronized yet";
@@ -359,30 +355,14 @@ export default function BankingClient({
   function handleFile(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
-      const records = parseCsv(String(reader.result));
-      const rows: ParsedRow[] = [];
-      let invalidRows = 0;
-      for (const record of records) {
-        const date = normalizeDate(record.date ?? record["transaction date"] ?? "");
-        const amountValue = (record.amount ?? "").replace(/[^0-9.-]/g, "");
-        if (!date || amountValue === "") {
-          invalidRows++;
-          continue;
-        }
-        rows.push({
-          txn_date: date,
-          description: record.description ?? record.memo ?? "",
-          reference: record.reference ?? record.ref ?? null,
-          amount_minor: toMinorUnits(parseFloat(amountValue), decimalPlaces),
-          running_balance_minor: record.balance
-            ? toMinorUnits(parseFloat(record.balance.replace(/[^0-9.-]/g, "")), decimalPlaces)
-            : null,
-          raw_line: Object.values(record).join(","),
-        });
-      }
-      setParsed(rows);
+      // Parsing rules live in lib/domain/statement-import.ts, where the shapes
+      // real banks export are covered by tests.
+      const result = parseStatementRows(parseCsv(String(reader.result)), {
+        decimals: decimalPlaces,
+      });
+      setParsed(result.rows);
       setFileName(file.name);
-      if (invalidRows) message.warning(`${invalidRows} row(s) skipped because date or amount was missing`);
+      message.info(describeStatementParse(result));
     };
     reader.readAsText(file);
     return false;

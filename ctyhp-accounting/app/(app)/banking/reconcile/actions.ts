@@ -10,6 +10,13 @@ import {
 } from "@/lib/services/bankrec";
 import type { StatementReconciliationRow } from "@/lib/db/types";
 import {
+  generateSuggestions,
+  importStatement,
+  listBankTransactions,
+  listSuggestions,
+  type ImportRow,
+} from "@/lib/services/banking";
+import {
   executeOrSubmitForApproval,
   toControlledActionResponse,
   type ControlledActionResponse,
@@ -96,4 +103,121 @@ export async function reconciliationDetailAction(id: string): Promise<ActionResu
 export async function discrepanciesAction(bankAccountId: string): Promise<ActionResult<DiscrepancyRow[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getDiscrepancies(sb, bankAccountId) }; }
   catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+// --- Importing a statement from inside the reconciliation -------------------
+
+export interface StatementImportSummary {
+  inserted: number;
+  duplicates: number;
+  matched: number;
+  unmatched: number;
+}
+
+/**
+ * Import a statement into the account this reconciliation belongs to, then run
+ * the matcher over it.
+ *
+ * The reconciliation is where someone is already standing with the statement in
+ * hand; making them go to another screen to load it is the gap the reviewer
+ * pointed at. The import itself is the same path the Banking screen uses — the
+ * same RPC, the same duplicate rule — so a statement loaded here and one loaded
+ * there produce identical rows.
+ */
+export async function importStatementIntoReconciliationAction(
+  reconciliationId: string,
+  fileName: string,
+  rows: ImportRow[],
+): Promise<ActionResult<StatementImportSummary>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const { data: session, error } = await sb
+      .from("acc_statement_reconciliation")
+      .select("bank_account_id, status")
+      .eq("id", reconciliationId)
+      .single();
+    if (error) return { ok: false, error: error.message };
+    const row = session as { bank_account_id: string; status: string };
+    if (row.status !== "in_progress") {
+      return { ok: false, error: "This reconciliation is completed; reopen it before importing." };
+    }
+
+    const imported = await importStatement(sb, row.bank_account_id, fileName, rows);
+    // Matching runs over the whole account, which is what the Banking screen
+    // does too: a statement line can match an entry from any period.
+    await generateSuggestions(sb, row.bank_account_id);
+    const suggestions = await listSuggestions(sb, row.bank_account_id);
+
+    revalidatePath(`/banking/reconcile/${reconciliationId}`);
+    return {
+      ok: true,
+      data: {
+        inserted: imported.inserted,
+        duplicates: imported.skipped,
+        matched: suggestions.length,
+        unmatched: Math.max(0, imported.inserted - suggestions.length),
+      },
+    };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
+}
+
+export interface StatementLineView {
+  id: string;
+  txnDate: string;
+  description: string;
+  reference: string | null;
+  amountMinor: number;
+  status: string;
+  /** The ledger entry the matcher paired it with, when it found one. */
+  matchedEntry: string | null;
+  matchedJournalLineId: string | null;
+}
+
+/** The statement lines behind this reconciliation, newest first. */
+export async function reconciliationStatementLinesAction(
+  reconciliationId: string,
+): Promise<ActionResult<StatementLineView[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    const { data: session, error } = await sb
+      .from("acc_statement_reconciliation")
+      .select("bank_account_id, statement_ending_date")
+      .eq("id", reconciliationId)
+      .single();
+    if (error) return { ok: false, error: error.message };
+    const row = session as { bank_account_id: string; statement_ending_date: string };
+
+    const [transactions, suggestions] = await Promise.all([
+      listBankTransactions(sb, row.bank_account_id),
+      listSuggestions(sb, row.bank_account_id),
+    ]);
+    const byTransaction = new Map(suggestions.map((s) => [s.bank_transaction_id, s]));
+
+    // Everything up to the statement date: a line dated after the period
+    // belongs to the next reconciliation, not this one.
+    const inPeriod = transactions.filter((txn) => txn.txn_date <= row.statement_ending_date);
+
+    return {
+      ok: true,
+      data: inPeriod.map((txn) => {
+        const match = byTransaction.get(txn.id);
+        return {
+          id: txn.id,
+          txnDate: txn.txn_date,
+          description: txn.description,
+          reference: txn.reference,
+          amountMinor: txn.amount_minor,
+          status: txn.status,
+          matchedEntry: match?.target_number ?? null,
+          matchedJournalLineId: match?.journal_line_id ?? null,
+        };
+      }),
+    };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
 }
