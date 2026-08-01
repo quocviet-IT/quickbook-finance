@@ -1128,6 +1128,63 @@ cannot show it; its arithmetic is what the unit tests cover.
 | Making the grid the only view | **No.** It is the right shape for a dozen customers and the wrong one for two hundred — at that point the columns run off the page and the by-customer view is the readable one. The reader picks. |
 | Freezing the customer columns as well as the age column | **The age column is fixed; the customers scroll.** Freezing both leaves nothing to scroll, and with twelve customers the grid fits the 1680px page anyway. |
 
+### Issue #17 — "The ledger should be the bank account, not cash on hand"
+
+From the in-app queue (`/banking`, 2026-07-31 07:41 local): "under add account,
+the ledger would not be the cash on hand, it should be the bank account. ask me
+if you need some explanation."
+
+#### This one was already fixed, and it is live
+
+The report was filed at 07:41; the fix went out at 15:55 the same day as
+Issue #9. Verified against **production**, not just locally: signed in against
+`ctyhp-accounting.vercel.app`, fetched `/banking`, and read the deployed
+JavaScript — it carries both "What kind of account is this?" and the note that
+cash on hand is not offered because "physical cash has no bank statement". The
+database guard behind it is the same one the end-to-end test exercises.
+
+So: the dialog now asks what kind of account it is (checking, savings, money
+market, other), offers only ledger accounts that could be one, **never offers
+cash on hand**, and the database refuses the link even if something tried it
+another way.
+
+#### What was added today, because the fix left a dead end
+
+The chart has one usable bank ledger account (1010 Operating Bank Account) and
+it is already linked. So the very next thing the reviewer does — adding a
+second bank account — met "No ledger account of this kind is free. Create one
+in Chart of Accounts, then come back."
+
+The dialog now offers **"+ New ledger account for a savings account"** (or
+whichever kind was chosen). It proposes the first free code in the 1000 block
+and a name built from the bank's name — `1020 — First National Bank savings
+account` — creates it with the right type and classification, and selects it.
+Still a deliberate act, with the code and name in front of the person; just not
+a detour through another screen and back.
+
+Issue #9 declined inline creation on the grounds that a chart account should be
+deliberate. That reasoning was right about *silent* creation and wrong about
+this: the account is named, coded, classified and confirmed on screen.
+
+#### Evidence
+
+| Gate | Result |
+|---|---|
+| `npm test` | 57 files, 548 tests passed |
+| `npm run typecheck` | clean |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings |
+| `npm run build` | succeeded |
+| `scripts/smoke-pages.mjs` | 50 of 50 pages rendered |
+| Production check | the deployed `/banking` bundle contains the account-kind question and the cash-on-hand exclusion |
+
+#### Still open with the reviewer
+
+They offered an explanation ("ask me if you need some explanation"). One
+question worth putting back to them: **should cash on hand be reachable from
+Banking at all** — for a till count or a petty cash reconciliation — or does it
+belong only in the journal? Today Banking is a statement-matching screen and
+cash on hand is excluded from it entirely, which is the stricter reading.
+
 ### Backlog from the same round (not started)
 
 Recorded from the 14 in-app reports of 2026-07-30/31 (`acc_feedback_report`):

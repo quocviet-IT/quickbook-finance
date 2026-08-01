@@ -14,9 +14,10 @@ import {
   accountStatusSchema,
 } from "@/lib/domain/schemas";
 
-export interface ActionResult {
+export interface ActionResult<T = undefined> {
   ok: boolean;
   error?: string;
+  data?: T;
 }
 
 async function guardWrite(): Promise<string | null> {
@@ -30,16 +31,23 @@ function messageFrom(err: unknown): string {
   return "An unexpected error occurred";
 }
 
-export async function createAccountAction(raw: unknown): Promise<ActionResult> {
+/** Returns the new account's id so a caller can select what it just created. */
+export async function createAccountAction(
+  raw: unknown,
+): Promise<ActionResult<{ id: string; account_code: string; name: string }>> {
   const denied = await guardWrite();
   if (denied) return { ok: false, error: denied };
   const parsed = accountCreateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    await createAccount(sb, parsed.data);
+    const account = await createAccount(sb, parsed.data);
     revalidatePath("/accounts");
-    return { ok: true };
+    revalidatePath("/banking");
+    return {
+      ok: true,
+      data: { id: account.id, account_code: account.account_code, name: account.name },
+    };
   } catch (err) {
     return { ok: false, error: messageFrom(err) };
   }

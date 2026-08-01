@@ -39,8 +39,10 @@ import {
   bankDetailLabel,
   selectableBankLedgerAccounts,
   suggestBankLedgerAccount,
+  suggestNewLedgerAccount,
   type BankDetailType,
 } from "@/lib/domain/bank-account-detail";
+import { createAccountAction } from "@/app/(app)/accounts/actions";
 import type { AccountRow, CurrencyRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type {
   BankAccountWithGl,
@@ -849,10 +851,59 @@ function CreateAccountModal({
   glBankAccounts: AccountRow[];
   currencies: CurrencyRow[];
 }) {
+  const { message } = App.useApp();
   const chosenDetail: BankDetailType | undefined = Form.useWatch("detail_type", form);
-  const selectableAccounts = selectableBankLedgerAccounts(glBankAccounts, {
+  const bankName: string | undefined = Form.useWatch("bank_name", form);
+  const [created, setCreated] = useState<AccountRow[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  // Accounts created from inside this dialog join the picker without a reload;
+  // the page reloads anyway once the bank account itself is saved.
+  const available = [...glBankAccounts, ...created];
+  const selectableAccounts = selectableBankLedgerAccounts(available, {
     detail: chosenDetail ?? null,
   });
+
+  /**
+   * A bank account needs a ledger account of its own, and a chart rarely has a
+   * spare one waiting. Rather than sending someone to another screen and back,
+   * the code and name are proposed here and they confirm them — still a
+   * deliberate act, just not a detour.
+   */
+  async function createLedgerAccount() {
+    if (!chosenDetail) {
+      message.warning("Choose the kind of account first");
+      return;
+    }
+    const proposal = suggestNewLedgerAccount(available, chosenDetail, bankName);
+    setCreating(true);
+    const res = await createAccountAction({
+      account_code: proposal.account_code,
+      name: proposal.name,
+      account_type: "bank",
+      detail_type: proposal.detail_type,
+      currency_code: "USD",
+      is_posting_account: true,
+      status: "active",
+    });
+    setCreating(false);
+    if (!res.ok || !res.data) {
+      message.error(res.error ?? "Failed to create the ledger account");
+      return;
+    }
+    const account = {
+      id: res.data.id,
+      account_code: res.data.account_code,
+      name: res.data.name,
+      account_type: "bank",
+      detail_type: proposal.detail_type,
+      is_posting_account: true,
+      status: "active",
+    } as AccountRow;
+    setCreated((current) => [...current, account]);
+    form.setFieldValue("account_id", account.id);
+    message.success(`Created ${account.account_code} — ${account.name}`);
+  }
 
   return (
     <Modal
@@ -889,8 +940,8 @@ function CreateAccountModal({
           label="General Ledger account"
           rules={[{ required: true, message: "Select an account" }]}
           extra={
-            selectableAccounts.length === 0
-              ? "No ledger account of this kind is free. Create one in Chart of Accounts, then come back."
+            selectableAccounts.length === 0 && chosenDetail
+              ? "No ledger account of this kind is free — create one below."
               : undefined
           }
         >
@@ -905,6 +956,16 @@ function CreateAccountModal({
             }))}
           />
         </Form.Item>
+        {chosenDetail ? (
+          <Button
+            size="small"
+            loading={creating}
+            style={{ marginBottom: 16 }}
+            onClick={createLedgerAccount}
+          >
+            + New ledger account for a {bankDetailLabel(chosenDetail).toLowerCase()}
+          </Button>
+        ) : null}
         <Form.Item name="bank_name" label="Bank name" rules={[{ required: true, message: "Enter the bank name" }]}>
           <Input placeholder="e.g. First National Bank" />
         </Form.Item>
