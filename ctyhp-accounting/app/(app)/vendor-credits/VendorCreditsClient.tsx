@@ -4,6 +4,8 @@ import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select,
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { withVendor } from "@/lib/domain/vendors";
+import NewVendorButton from "@/components/NewVendorButton";
 import {
   createVendorCreditAction,
   listVendorCreditsAction,
@@ -51,6 +53,14 @@ export default function VendorCreditsClient({
   const [applyBusy, setApplyBusy] = useState(false);
   const [openBills, setOpenBills] = useState<{ id: string; bill_number: string; balance_due_minor: number }[]>([]);
   const [allocs, setAllocs] = useState<Record<string, number>>({});
+
+  // A vendor created from inside this dialog has to appear in the picker now;
+  // the page's own list will not refresh until the credit is saved.
+  const [localVendors, setLocalVendors] = useState<VendorRow[]>(vendors);
+  function addVendor(vendor: VendorRow) {
+    setLocalVendors((prev) => withVendor(prev, vendor));
+    form.setFieldValue("vendor_id", vendor.id);
+  }
 
   const load = async () => {
     setLoading(true);
@@ -204,8 +214,11 @@ export default function VendorCreditsClient({
                 style={{ width: 280 }}
                 showSearch
                 optionFilterProp="label"
-                options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                options={localVendors.map((v) => ({ value: v.id, label: v.name }))}
               />
+            </Form.Item>
+            <Form.Item label=" ">
+              <NewVendorButton onCreated={addVendor} />
             </Form.Item>
             <Form.Item name="credit_date" label="Date">
               <DatePicker />

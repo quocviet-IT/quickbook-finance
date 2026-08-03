@@ -7,6 +7,8 @@ import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, CurrencyRow, ItemRow, PurchaseOrderLineRow, PurchaseOrderRow, VendorRow } from "@/lib/db/types";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { poLineTotalMinor } from "@/lib/domain/purchasing";
+import { withVendor } from "@/lib/domain/vendors";
+import NewVendorButton from "@/components/NewVendorButton";
 import { savePurchaseOrderAction } from "./actions";
 
 interface LineForm {
@@ -55,6 +57,14 @@ function PurchaseOrderFormModalBody({
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const currency = order?.currency_code ?? currencies.find((c) => c.is_base)?.code ?? "USD";
+
+  // A vendor created from inside this dialog has to appear in the picker now;
+  // the page's own list will not refresh until the order is saved.
+  const [localVendors, setLocalVendors] = useState<VendorRow[]>(vendors);
+  function addVendor(vendor: VendorRow) {
+    setLocalVendors((prev) => withVendor(prev, vendor));
+    form.setFieldValue("vendor_id", vendor.id);
+  }
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -134,9 +144,23 @@ function PurchaseOrderFormModalBody({
         initialValues={initialValues}
         onValuesChange={(_, all) => setWatchedLines(all.lines ?? [])}
       >
-        <Form.Item name="vendor_id" label="Vendor" rules={[{ required: true, message: "Select a vendor" }]}>
-          <Select showSearch optionFilterProp="label" options={vendors.map((v) => ({ value: v.id, label: v.name }))} />
-        </Form.Item>
+        <Space align="end" wrap style={{ display: "flex" }}>
+          <Form.Item
+            name="vendor_id"
+            label="Vendor"
+            rules={[{ required: true, message: "Select a vendor" }]}
+            style={{ minWidth: 320 }}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={localVendors.map((v) => ({ value: v.id, label: v.name }))}
+            />
+          </Form.Item>
+          <Form.Item label=" ">
+            <NewVendorButton onCreated={addVendor} />
+          </Form.Item>
+        </Space>
         <Space size="middle" wrap style={{ display: "flex" }}>
           <Form.Item name="order_date" label="Order date" rules={[{ required: true, message: "Order date" }]}>
             <DatePicker />

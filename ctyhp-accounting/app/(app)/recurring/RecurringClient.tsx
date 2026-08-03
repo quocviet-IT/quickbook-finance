@@ -55,6 +55,8 @@ import {
   type RecurringTemplateCreateInput,
 } from "@/lib/domain/recurring";
 import { formatMoney, toMinorUnits } from "@/lib/format";
+import { withVendor } from "@/lib/domain/vendors";
+import NewVendorButton from "@/components/NewVendorButton";
 import {
   createRecurringTemplateAction,
   generateRecurringTemplateAction,
@@ -174,6 +176,15 @@ export default function RecurringClient({
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<RecurringDocumentType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<RecurringTemplateStatus | "all">("all");
+
+  // A vendor created from inside this dialog has to appear in the picker now;
+  // the page's own list will not refresh until the template is saved. The page
+  // hands this screen only active vendors, and a new one is active.
+  const [localVendors, setLocalVendors] = useState<VendorRow[]>(vendors);
+  function addVendor(vendor: VendorRow) {
+    setLocalVendors((prev) => withVendor(prev, vendor));
+    form.setFieldValue("vendor_id", vendor.id);
+  }
 
   const today = dayjs().format("YYYY-MM-DD");
   const activeCount = templates.filter((template) => template.status === "active").length;
@@ -740,18 +751,24 @@ export default function RecurringClient({
           {documentType === "bill" || documentType === "expense" ? (
             <Row gutter={16}>
               <Col xs={24} md={documentType === "bill" ? 12 : 24}>
-                <Form.Item
-                  name="vendor_id"
-                  label="Vendor"
-                  rules={documentType === "bill" ? [{ required: true }] : undefined}
-                >
-                  <Select
-                    allowClear={documentType === "expense"}
-                    showSearch
-                    optionFilterProp="label"
-                    options={vendors.map((vendor) => ({ value: vendor.id, label: vendor.name }))}
-                  />
-                </Form.Item>
+                <Space align="end" wrap style={{ display: "flex" }}>
+                  <Form.Item
+                    name="vendor_id"
+                    label="Vendor"
+                    rules={documentType === "bill" ? [{ required: true }] : undefined}
+                    style={{ minWidth: 260, flex: 1 }}
+                  >
+                    <Select
+                      allowClear={documentType === "expense"}
+                      showSearch
+                      optionFilterProp="label"
+                      options={localVendors.map((vendor) => ({ value: vendor.id, label: vendor.name }))}
+                    />
+                  </Form.Item>
+                  <Form.Item label=" ">
+                    <NewVendorButton onCreated={addVendor} />
+                  </Form.Item>
+                </Space>
               </Col>
               {documentType === "bill" ? (
                 <Col xs={24} md={12}>

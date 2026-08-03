@@ -24,7 +24,9 @@ import AttachmentDrawer, {
 import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
+import { withVendor } from "@/lib/domain/vendors";
 import EmptyCatalogHint from "@/components/EmptyCatalogHint";
+import NewVendorButton from "@/components/NewVendorButton";
 import {
   createBillAction,
   getBillSettlementsAction,
@@ -96,6 +98,14 @@ export default function BillsClient({
   const [historyEvents, setHistoryEvents] = useState<SettlementEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+
+  // A vendor created from inside the bill dialog has to appear in the picker
+  // now; the page's own list will not refresh until the bill is saved.
+  const [localVendors, setLocalVendors] = useState<VendorRow[]>(vendors);
+  function addVendor(vendor: VendorRow) {
+    setLocalVendors((prev) => withVendor(prev, vendor));
+    form.setFieldValue("vendor_id", vendor.id);
+  }
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -324,13 +334,23 @@ export default function BillsClient({
         width={720}
       >
         <Form form={form} layout="vertical" initialValues={{ lines: [{}] }}>
-          <Form.Item name="vendor_id" label="Vendor" rules={[{ required: true, message: "Select a vendor" }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              options={vendors.map((v) => ({ value: v.id, label: v.name }))}
-            />
-          </Form.Item>
+          <Space align="end" wrap style={{ display: "flex" }}>
+            <Form.Item
+              name="vendor_id"
+              label="Vendor"
+              rules={[{ required: true, message: "Select a vendor" }]}
+              style={{ minWidth: 320 }}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={localVendors.map((v) => ({ value: v.id, label: v.name }))}
+              />
+            </Form.Item>
+            <Form.Item label=" ">
+              <NewVendorButton onCreated={addVendor} />
+            </Form.Item>
+          </Space>
           <Space size="middle" style={{ display: "flex" }}>
             <Form.Item name="vendor_ref" label="Vendor Reference Number">
               <Input placeholder="Vendor invoice number" />

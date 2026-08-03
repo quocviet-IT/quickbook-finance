@@ -10,6 +10,8 @@ import AttachmentDrawer, {
 } from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import type { ExpenseWithVendor } from "@/lib/services/payables";
+import { withVendor } from "@/lib/domain/vendors";
+import NewVendorButton from "@/components/NewVendorButton";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
 
 interface LineForm {
@@ -50,6 +52,14 @@ export default function ExpensesClient({
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+
+  // A vendor created from inside this dialog has to appear in the picker now;
+  // the page's own list will not refresh until the expense is saved.
+  const [localVendors, setLocalVendors] = useState<VendorRow[]>(vendors);
+  function addVendor(vendor: VendorRow) {
+    setLocalVendors((prev) => withVendor(prev, vendor));
+    form.setFieldValue("vendor_id", vendor.id);
+  }
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -176,8 +186,11 @@ export default function ExpensesClient({
                 showSearch
                 optionFilterProp="label"
                 style={{ width: 220 }}
-                options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                options={localVendors.map((v) => ({ value: v.id, label: v.name }))}
               />
+            </Form.Item>
+            <Form.Item label=" ">
+              <NewVendorButton onCreated={addVendor} />
             </Form.Item>
             <Form.Item
               name="payment_account_id"
