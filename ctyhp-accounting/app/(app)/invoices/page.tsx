@@ -53,6 +53,7 @@ export default async function InvoicesPage({
     credit,
     canOverrideCredit,
     companySettings,
+    canManageItems,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -73,6 +74,7 @@ export default async function InvoicesPage({
     listCustomerCredit(sb),
     hasPermission(sb, "credit.override"),
     getCurrentCompanySettings(sb),
+    hasPermission(sb, "items.manage"),
   ]);
 
   // A number the sequence issued that no invoice holds is the sign of a removed
@@ -114,6 +116,7 @@ export default async function InvoicesPage({
         taxCodes={taxCodes}
         currencies={currencies}
         items={salesItems}
+        canManageItems={canManageItems}
         canWrite={canWrite(role)}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}

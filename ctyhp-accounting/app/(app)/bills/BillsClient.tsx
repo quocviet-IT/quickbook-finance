@@ -24,6 +24,7 @@ import AttachmentDrawer, {
 import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
+import EmptyCatalogHint from "@/components/EmptyCatalogHint";
 import {
   createBillAction,
   getBillSettlementsAction,
@@ -58,6 +59,7 @@ export default function BillsClient({
   incomeAccounts,
   currencies,
   items,
+  canManageItems,
   canWrite,
   canRegisterAsset,
   canReadDocuments,
@@ -74,6 +76,8 @@ export default function BillsClient({
   incomeAccounts: AccountRow[];
   currencies: CurrencyRow[];
   items: ItemRow[];
+  /** Holds `items.manage`, so the empty-catalog hint can link to the catalog. */
+  canManageItems: boolean;
   canWrite: boolean;
   canRegisterAsset: boolean;
   canReadDocuments: boolean;
@@ -358,6 +362,7 @@ export default function BillsClient({
                         placeholder="Item (optional)"
                         style={{ width: 180 }}
                         optionFilterProp="label"
+                        notFoundContent={items.length === 0 ? "No purchasable products yet" : undefined}
                         options={items.map((i) => ({ value: i.id, label: i.name }))}
                         onChange={(itemId) => {
                           const it = items.find((i) => i.id === itemId);
@@ -410,6 +415,13 @@ export default function BillsClient({
               </>
             )}
           </Form.List>
+          {items.length === 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <EmptyCatalogHint canManage={canManageItems}>
+                No purchasable products yet, so every line must be typed in full. Save the cost once in
+              </EmptyCatalogHint>
+            </div>
+          ) : null}
           <Form.Item name="memo" label="Memo" style={{ marginTop: 16 }}>
             <Input.TextArea rows={2} />
           </Form.Item>

@@ -39,6 +39,7 @@ export default async function BillsPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    canManageItems,
   ] = await Promise.all([
     listBills(sb),
     listVendors(sb),
@@ -50,6 +51,7 @@ export default async function BillsPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    hasPermission(sb, "items.manage"),
   ]);
 
   const billDebitAccounts = accounts.filter(
@@ -83,6 +85,7 @@ export default async function BillsPage({
         incomeAccounts={incomeAccounts}
         currencies={currencies}
         items={purchaseItems}
+        canManageItems={canManageItems}
         canWrite={canWrite(role)}
         canRegisterAsset={!fixedAssetPermission.error && fixedAssetPermission.data === true}
         canReadDocuments={canReadDocuments}
