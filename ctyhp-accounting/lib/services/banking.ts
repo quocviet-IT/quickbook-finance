@@ -592,3 +592,109 @@ export async function rejectReconciliation(sb: SupabaseClient, id: string): Prom
   });
   if (error) throw new BankingError(error.message);
 }
+
+// --- Settling a document straight from a bank line ---------------------------
+
+/** An open invoice or bill that a bank line could be settling. */
+export interface SettlementCandidateRow {
+  documentId: string;
+  documentNumber: string | null;
+  documentDate: string;
+  balanceDueMinor: number;
+  currencyCode: string;
+  partyName: string;
+}
+
+/**
+ * Documents on the side of the ledger this bank line moves money on.
+ *
+ * The sign decides: money in can only settle invoices, money out only bills.
+ * Ranking happens in `lib/domain/bank-settlement.ts`; this only fetches.
+ */
+export async function listSettlementCandidates(
+  sb: SupabaseClient,
+  bankTransactionId: string,
+): Promise<{ direction: "receivable" | "payable"; currencyCode: string; amountMinor: number; candidates: SettlementCandidateRow[] }> {
+  const { data: txn, error: txnError } = await sb
+    .from("acc_bank_transaction")
+    .select("id,amount_minor,txn_date,bank_account_id")
+    .eq("id", bankTransactionId)
+    .single();
+  if (txnError) throw new BankingError(txnError.message);
+
+  const { data: bank, error: bankError } = await sb
+    .from("acc_bank_account")
+    .select("currency_code")
+    .eq("id", (txn as { bank_account_id: string }).bank_account_id)
+    .single();
+  if (bankError) throw new BankingError(bankError.message);
+
+  const amountMinor = Number((txn as { amount_minor: number }).amount_minor);
+  const currencyCode = (bank as { currency_code: string }).currency_code;
+  const direction = amountMinor > 0 ? "receivable" : "payable";
+
+  if (direction === "receivable") {
+    const { data, error } = await sb
+      .from("acc_invoice")
+      .select("id,invoice_number,issue_date,balance_due_minor,currency_code,acc_customer(name)")
+      .in("status", ["issued", "partial"])
+      .gt("balance_due_minor", 0);
+    if (error) throw new BankingError(error.message);
+    return {
+      direction,
+      currencyCode,
+      amountMinor,
+      candidates: ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+        documentId: row.id as string,
+        documentNumber: (row.invoice_number as string) ?? null,
+        documentDate: row.issue_date as string,
+        balanceDueMinor: Number(row.balance_due_minor),
+        currencyCode: row.currency_code as string,
+        partyName: (row.acc_customer as { name?: string } | null)?.name ?? "—",
+      })),
+    };
+  }
+
+  const { data, error } = await sb
+    .from("acc_bill")
+    .select("id,bill_number,bill_date,balance_due_minor,currency_code,acc_vendor(name)")
+    .in("status", ["open", "partial"])
+    .gt("balance_due_minor", 0);
+  if (error) throw new BankingError(error.message);
+  return {
+    direction,
+    currencyCode,
+    amountMinor,
+    candidates: ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+      documentId: row.id as string,
+      documentNumber: (row.bill_number as string) ?? null,
+      documentDate: row.bill_date as string,
+      balanceDueMinor: Number(row.balance_due_minor),
+      currencyCode: row.currency_code as string,
+      partyName: (row.acc_vendor as { name?: string } | null)?.name ?? "—",
+    })),
+  };
+}
+
+/**
+ * Post the settlement and close the bank line off, in one database call.
+ * Every ledger rule lives in the RPC; nothing is decided here.
+ */
+export async function settleFromBankTransaction(
+  sb: SupabaseClient,
+  input: {
+    bankTransactionId: string;
+    allocations: { document_id: string; amount_minor: number }[];
+    method: string | null;
+    memo: string | null;
+  },
+): Promise<string> {
+  const { data, error } = await sb.rpc("acc_settle_from_bank_transaction", {
+    p_bank_transaction_id: input.bankTransactionId,
+    p_allocations: input.allocations,
+    p_method: input.method,
+    p_memo: input.memo,
+  });
+  if (error) throw new BankingError(error.message);
+  return data as string;
+}

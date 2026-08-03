@@ -50,6 +50,7 @@ import type {
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
+import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import {
   describeStatementParse,
   parseStatementRows,
@@ -179,6 +180,7 @@ export default function BankingClient({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+  const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
@@ -434,6 +436,17 @@ export default function BankingClient({
     else message.error(result.error ?? "Failed to reject the match");
   }
 
+  function openSettle(row: ReviewRow) {
+    setSettleTarget({
+      id: row.transaction.id,
+      txnDate: row.transaction.txn_date,
+      description: row.transaction.description,
+      amountMinor: row.transaction.amount_minor,
+      currencyCode: row.currencyCode,
+      decimals: row.currencyCode ? decimalsOf(row.currencyCode) : 2,
+    });
+  }
+
   const transactionColumns: TableColumnsType<ReviewRow> = [
     { title: "Date", dataIndex: ["transaction", "txn_date"], width: 115 },
     {
@@ -484,11 +497,24 @@ export default function BankingClient({
       key: "match",
       width: 300,
       render: (_value: unknown, row: ReviewRow) => {
+        // Offered on any line still awaiting review, with or without a
+        // suggestion: a suggestion says "this is already in the books", and
+        // settling says "it is not, and it pays this invoice".
+        const settleButton =
+          canWrite && row.transaction.status === "unmatched" ? (
+            <Button size="small" onClick={() => openSettle(row)}>
+              {row.transaction.amount_minor > 0 ? "Settle invoice" : "Settle bill"}
+            </Button>
+          ) : null;
+
         if (!row.suggestion) {
           return (
-            <Typography.Text type="secondary">
-              {row.transaction.status === "matched" ? "Matched" : "No suggestion"}
-            </Typography.Text>
+            <Space direction="vertical" size={4}>
+              <Typography.Text type="secondary">
+                {row.transaction.status === "matched" ? "Matched" : "No suggestion"}
+              </Typography.Text>
+              {settleButton}
+            </Space>
           );
         }
         const match = row.suggestion;
@@ -506,13 +532,14 @@ export default function BankingClient({
               </Typography.Text>
             ) : null}
             {canWrite ? (
-              <Space size={4}>
+              <Space size={4} wrap>
                 <Button size="small" type="primary" loading={busy === match.id} onClick={() => approve(match.id)}>
                   Approve
                 </Button>
                 <Button size="small" loading={busy === match.id} onClick={() => reject(match.id)}>
                   Reject
                 </Button>
+                {settleButton}
               </Space>
             ) : null}
           </Space>
@@ -765,6 +792,20 @@ export default function BankingClient({
         scannerConfigured={scannerConfigured}
         onClose={() => setAttachmentTarget(null)}
       />
+
+      {/* Keyed so each bank line gets a fresh dialog rather than one that has
+          to remember to forget the previous line's allocations. */}
+      {settleTarget ? (
+        <SettleFromBankModal
+          key={settleTarget.id}
+          target={settleTarget}
+          onClose={() => setSettleTarget(null)}
+          onDone={() => {
+            setSettleTarget(null);
+            reload();
+          }}
+        />
+      ) : null}
 
       <Modal
         title="Import bank statement"

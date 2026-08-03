@@ -15,7 +15,10 @@ import {
   BankingError,
   connectPlaidBank,
   syncBankConnection,
+  listSettlementCandidates,
+  settleFromBankTransaction,
   type PlaidAccountMappingInput,
+  type SettlementCandidateRow,
 } from "@/lib/services/banking";
 import { createPlaidLinkToken } from "@/lib/services/plaid";
 import type { BankTransactionRow } from "@/lib/db/types";
@@ -193,6 +196,55 @@ export async function syncBankConnectionAction(
     const result = await syncBankConnection(sb, connectionId);
     revalidatePath("/banking");
     return { ok: true, data: result };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export interface SettlementCandidatesView {
+  direction: "receivable" | "payable";
+  currencyCode: string;
+  amountMinor: number;
+  candidates: SettlementCandidateRow[];
+}
+
+/** Open documents this bank line could be settling, unranked. */
+export async function getSettlementCandidatesAction(
+  bankTransactionId: string,
+): Promise<ActionResult<SettlementCandidatesView>> {
+  const denied = await guardPermission("banking.match");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listSettlementCandidates(sb, bankTransactionId) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Post the receipt or bill payment this bank line represents and close the line
+ * off. Every rule is in `acc_settle_from_bank_transaction`; this only carries
+ * the call and revalidates the screens whose figures just moved.
+ */
+export async function settleFromBankTransactionAction(input: {
+  bankTransactionId: string;
+  allocations: { document_id: string; amount_minor: number }[];
+  method: string | null;
+  memo: string | null;
+}): Promise<ActionResult<{ settlementId: string }>> {
+  const denied = await guardPermission("banking.match");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const settlementId = await settleFromBankTransaction(sb, input);
+    revalidatePath("/banking");
+    revalidatePath("/invoices");
+    revalidatePath("/bills");
+    revalidatePath("/payments");
+    revalidatePath("/pay-bills");
+    revalidatePath("/dashboard");
+    return { ok: true, data: { settlementId } };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
