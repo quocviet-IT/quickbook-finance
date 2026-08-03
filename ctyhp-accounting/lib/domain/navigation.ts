@@ -44,6 +44,9 @@ export const NAV: NavItem[] = [
     children: [
       { key: "/sales", label: "Overview" },
       { key: "/customers", label: "Customers" },
+      // The catalog belongs where prices are set on documents, not with the
+      // stock it happens to also describe.
+      { key: "/items", label: "Products & Services" },
       { key: "/invoices", label: "Invoices" },
       { key: "/payments", label: "Payments" },
       { key: "/credit-memos", label: "Credit Memos" },
@@ -77,7 +80,6 @@ export const NAV: NavItem[] = [
     label: "Inventory & Assets",
     children: [
       { key: "/inventory", label: "Overview" },
-      { key: "/items", label: "Products & Services" },
       { key: "/fixed-assets", label: "Fixed Assets" },
     ],
   },
