@@ -1,1 +1,10 @@
 .worktrees/
+
+# Tool caches that collect at the repo root. There is no package.json here --
+# the application lives in ctyhp-accounting/, which ignores its own -- so
+# anything appearing here is a stray from a tool run, not a dependency.
+node_modules/
+
+# Shared Claude Code configuration is committed; the .local override is
+# per-machine by convention and conflicts the moment two people share it.
+.claude/settings.local.json

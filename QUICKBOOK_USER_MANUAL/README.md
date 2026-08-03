@@ -1,74 +1,42 @@
-# QuickBooks Online Business User Manual - Markdown Knowledge Base
+# Legacy QuickBooks Australia Reference
 
-## Overview
+## Status
 
-This knowledge base reorganizes the **QuickBooks Online Business User Manual, Version 4 (July 2022)** into smaller Markdown chapters that are easier to:
+This directory is an archived research source derived from a July 2022 QuickBooks Online manual published for Australia.
 
-- read in GitHub or a code editor;
-- search with Claude Code, Codex, Cursor, or another AI assistant;
-- use as reference material for accounting-system analysis;
-- index in a RAG or internal knowledge-base workflow.
+It is **not** the product specification or canonical implementation manual for CTYHP Accounting.
 
-> **Source scope:** The source manual was published by Intuit Australia in July 2022. Product screens, plan limits, pricing, regional availability, tax rules, payroll services, and support processes may have changed. Treat time-sensitive details as historical guidance and verify them against current official documentation before implementation.
+Use these canonical US documents instead:
 
-## Source Information
+1. `../PRD/PRD_US_Accounting_Web_App.md`
+2. `../US_ACCOUNTING_USER_MANUAL/README.md`
+3. `../docs/AI_ACCOUNTING_INTEGRITY_EXECUTION.md` for the current integrity-hardening task
 
-| Field | Value |
-|---|---|
-| Document | QuickBooks Online Business User Manual |
-| Publisher | Intuit Australia Pty Ltd |
-| Version | Version 4 |
-| Publication date | July 2022 |
-| Primary market | Australia |
-| Intended use | Training guide |
-| Source length | 132 pages |
+## Prohibited use
 
-## Knowledge Base Structure
+Do not implement the following from this legacy directory:
 
-| File | Topic | Status |
-|---|---|---|
-| `README.md` | Knowledge-base guide and chapter index | Complete |
-| `01_Getting_Started.md` | Technology requirements, introduction, plans, benefits, mobile use, and business case study | Complete |
-| `02_Navigation.md` | Login, home page, search, recent transactions, menus, and create actions | Complete |
-| `03_Company_Setup.md` | Account and settings configuration | Complete |
-| `04_GST_Setup.md` | GST Centre, tax settings, GST and BAS reports | Complete |
-| `05_Audit_Log.md` | Audit history, filtering, and transaction-level audit trails | Complete |
-| `06_Chart_of_Accounts.md` | Account structure, types, subaccounts, GST codes, and batch actions | Complete |
-| `07_TPARS.md` | Taxable Payments Annual Report setup and workflow | Complete |
-| `08_Managing_Users.md` | User limits, access types, and accountant users | Complete |
-| `09_Multi_Currency.md` | Foreign currencies, exchange rates, customers, and suppliers | Complete |
-| `10_Importing_Data.md` | Data conversion, imports, mapping, and opening balances | Complete |
-| `11_Products_and_Services.md` | Products, services, categories, pricing, inventory, and FIFO | Complete |
-| `12_Banking_Centre.md` | Bank feeds, uploads, review, matching, categorization, rules, and receipts | Complete |
-| `13_Quotes_and_Invoices.md` | Quotes, invoices, payments, and quote-to-cash controls | Complete |
-| `14_Customising_Invoices_and_Attachments.md` | Invoice templates, branding, attachments, batch actions, and document controls | Complete |
-| `15_Expenses_and_Bills.md` | Expense entry, bills, bill payments, approvals, and Accounts Payable controls | Complete |
-| `16_Recurring_Transactions.md` | Scheduled, reminder, and unscheduled templates | Complete |
-| `17_Class_and_Location.md` | Class tracking, location tracking, and reporting dimensions | Complete |
-| `18_Purchase_Orders.md` | Purchase orders, partial receipt, bills, and open-order reports | Complete |
-| `19_Payroll.md` | Payroll setup, employee setup, accounts, pay runs, reports, and superannuation | Complete |
-| `20_Cash_Flow.md` | Cash-flow overview, planning, forecasting, scenarios, and liquidity controls | Complete |
-| `21_Bank_Reconciliation.md` | Reconciliation workflow, discrepancy reports, controls, and adjustments | Complete |
-| `22_GST_and_BAS.md` | GST management, BAS review, lodgement, amendments, IAS, and tax-payment controls | Complete |
-| `23_Reports.md` | Profit and Loss, Balance Sheet, customization, groups, exports, and automated delivery | Complete |
-| `24_Mobile_App.md` | Mobile setup, quotes, signatures, invoices, expenses, reports, and device controls | Complete |
-| `25_Help_and_Support.md` | In-product support, QB Assistant, customer care, knowledge management, and support controls | Complete |
-| `assets/` | Optional supporting images and diagrams | Available |
+- Australian GST, BAS, IAS, TPAR, PAYG, ATO, ABN, or superannuation workflows.
+- Australia-specific payroll, tax, filing, support, product-plan, pricing, or regulatory assumptions.
+- Historical QuickBooks UI behavior as a requirement for the custom application.
+- Any country-specific rule without confirmation in the canonical US PRD or US manual.
 
-## Recommended Use with AI Coding Tools
+## Permitted use
 
-Add this folder to the project context and instruct the AI to:
+The chapters may still be consulted for country-neutral workflow ideas, including:
 
-1. cite the relevant Markdown chapter before proposing a workflow;
-2. separate historical QuickBooks behavior from current product facts;
-3. avoid treating Australia-specific GST, BAS, PAYG, TPARS, payroll, or superannuation guidance as applicable to another country;
-4. use the manual as a workflow benchmark, not as the sole source for current pricing, availability, API behavior, or legal compliance;
-5. preserve accounting controls such as audit history, account mapping, reconciliation, permissions, and period close when designing an internal system.
+- Navigation and usability patterns.
+- Chart of Accounts concepts.
+- Immutable audit history.
+- Customer, invoice, vendor, bill, and payment workflows.
+- Products, services, purchasing, inventory, and recurring transactions.
+- Bank review and statement reconciliation concepts.
+- Multi-currency controls.
+- Report customization and operational support patterns.
 
-## Suggested Search Terms
+When a general idea is adopted, restate it in the canonical US documentation before implementing it.
 
-`QuickBooks Online`, `Chart of Accounts`, `GST`, `BAS`, `bank reconciliation`, `bank feeds`, `invoice`, `quote`, `expense`, `bill`, `inventory`, `payroll`, `audit log`, `class tracking`, `location tracking`, `recurring transaction`, `purchase order`, `multi-currency`.
+## Legacy chapter index
 
-## Copyright Notice
+All numbered files in this directory retain their original historical content for traceability. Country-specific chapters such as `04_GST_Setup.md`, `07_TPARS.md`, `19_Payroll.md`, and `22_GST_and_BAS.md` are excluded from implementation scope.
 
-The source document states that it remains the property of Intuit Australia Pty Ltd. This Markdown conversion is intended as an internal structured reference derived from a user-provided document. It does not replace the original manual or current official QuickBooks documentation.
