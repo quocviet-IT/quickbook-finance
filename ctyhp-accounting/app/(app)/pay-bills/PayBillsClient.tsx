@@ -17,6 +17,8 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
+import { allocateAcrossBills } from "@/lib/domain/payables";
+import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
 import PayRunPanel from "@/components/payables/PayRunPanel";
 
@@ -78,6 +80,31 @@ export default function PayBillsClient({
     () => Object.values(alloc).reduce((s, v) => s + Math.round((v ?? 0) * 10 ** decimals), 0),
     [alloc, decimals],
   );
+
+  const selectedVendorId: string | undefined = Form.useWatch("vendor_id", form);
+  const selectedVendorName = vendors.find((v) => v.id === selectedVendorId)?.name ?? null;
+
+  /**
+   * Spread the payment amount across the open bills, oldest first. The rule is
+   * in the domain so the awkward part — a discounted bill is all or nothing —
+   * is written down and tested rather than living in this handler.
+   */
+  function autoApply() {
+    const paymentMinor = Math.round((form.getFieldValue("amount") ?? 0) * 10 ** decimals);
+    const planned = allocateAcrossBills(
+      paymentMinor,
+      openBills.map((b) => ({
+        billId: b.id,
+        balanceDueMinor: b.balance_due_minor,
+        discountMinor: discounts[b.id] ?? 0,
+      })),
+    );
+    setAlloc(
+      Object.fromEntries(
+        Object.entries(planned).map(([billId, minor]) => [billId, minor / 10 ** decimals]),
+      ),
+    );
+  }
 
   async function submit() {
     const values = await form.validateFields();
@@ -238,10 +265,16 @@ export default function PayBillsClient({
             <InputNumber min={0} precision={decimals} style={{ width: 200 }} />
           </Form.Item>
 
-          <Typography.Text strong>Open bills</Typography.Text>
+          <Space style={{ justifyContent: "space-between", width: "100%" }}>
+            <Typography.Text strong>Open bills</Typography.Text>
+            <Button size="small" onClick={autoApply} disabled={!openBills.length}>
+              Auto apply
+            </Button>
+          </Space>
           <Table<BillRow>
             rowKey="id"
             dataSource={openBills}
+            locale={{ emptyText: describeNoOpenBills(selectedVendorId ? (selectedVendorName ?? "This vendor") : null) }}
             size="small"
             pagination={false}
             scroll={{ x: "max-content" }}

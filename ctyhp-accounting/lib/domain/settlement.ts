@@ -142,3 +142,15 @@ export function describeNoOpenInvoices(customerName: string | null): string {
     "on their account until there is an invoice to apply it to."
   );
 }
+
+/**
+ * The payables twin. Same two states, and the same reason for telling them
+ * apart — "No data" over an empty table reads as a screen that failed to load.
+ */
+export function describeNoOpenBills(vendorName: string | null): string {
+  if (!vendorName) return "Select a vendor to see their open bills";
+  return (
+    `${vendorName} has no open bills. There is nothing here to pay — check the ` +
+    "bill was posted, not left as a draft."
+  );
+}

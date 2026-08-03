@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSettlementHistory,
   daysBetween,
+  describeNoOpenBills,
   describeNoOpenInvoices,
   lastSettlementDate,
   outstandingAge,
@@ -171,5 +172,19 @@ describe("describeNoOpenInvoices", () => {
     const text = describeNoOpenInvoices("Cormorant Gallery");
     expect(text).toContain("Cormorant Gallery has no open invoices");
     expect(text).toContain("credit");
+  });
+});
+
+describe("describeNoOpenBills", () => {
+  it("asks for a vendor before blaming the ledger", () => {
+    expect(describeNoOpenBills(null)).toBe("Select a vendor to see their open bills");
+  });
+
+  it("names the vendor and points at the likeliest cause", () => {
+    // A bill left in draft is the usual reason a vendor looks like it owes
+    // nothing, and it is not something the Pay Bills screen can show.
+    const text = describeNoOpenBills("Kiln & Anvil Co.");
+    expect(text).toContain("Kiln & Anvil Co. has no open bills");
+    expect(text).toContain("draft");
   });
 });
