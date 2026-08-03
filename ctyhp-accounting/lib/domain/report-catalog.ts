@@ -186,6 +186,14 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "transaction-list",
+    title: "Transaction List by Date",
+    description:
+      "Every posted transaction in a date range, one row each, with counterparty, account, bank or card, and reconciled status.",
+    href: "/reports/transactions",
+    group: "accounting",
+  },
+  {
     id: "fixed-assets",
     title: "Fixed Asset Register & Depreciation",
     description: "Review asset cost, book value, depreciation schedules, and disposal results.",
