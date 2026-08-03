@@ -1,0 +1,13 @@
+-- A fourth application role: sales staff who maintain the product catalog but
+-- never touch the ledger.
+--
+-- The value lands alone in this migration on purpose. Postgres refuses to use a
+-- value added by ALTER TYPE ... ADD VALUE later in the same transaction, so
+-- everything that references 'sales' waits for 0088.
+--
+-- Nothing else changes here, and nothing needs to. Every write gate in the
+-- system is an allow-list -- canWrite() and acc_is_staff() name their roles,
+-- acc_is_admin() compares to one, and acc_has_permission() coalesces a missing
+-- grant to false. A role nobody has listed can read what any signed-in user
+-- reads and write nothing at all.
+alter type acc_app_role add value if not exists 'sales';

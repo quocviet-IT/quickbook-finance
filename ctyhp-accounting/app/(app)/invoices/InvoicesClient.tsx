@@ -50,6 +50,7 @@ import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
+import EmptyCatalogHint from "@/components/EmptyCatalogHint";
 import { documentAttribution, formatAuditTimestamp } from "@/lib/domain/audit";
 import {
   checkInvoiceAgainstCredit,
@@ -105,6 +106,7 @@ export default function InvoicesClient({
   taxCodes,
   currencies,
   items,
+  canManageItems,
   canWrite,
   canReadDocuments,
   canManageDocuments,
@@ -128,6 +130,8 @@ export default function InvoicesClient({
   taxCodes: TaxCodeRow[];
   currencies: CurrencyRow[];
   items: ItemRow[];
+  /** Holds `items.manage`, so the empty-catalog hint can link to the catalog. */
+  canManageItems: boolean;
   canWrite: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
@@ -771,6 +775,7 @@ export default function InvoicesClient({
                         showSearch
                         placeholder="Item (optional)"
                         optionFilterProp="label"
+                        notFoundContent={items.length === 0 ? "No products or services yet" : undefined}
                         options={items.map((i) => ({ value: i.id, label: i.name }))}
                         onChange={(itemId) => {
                           const it = items.find((i) => i.id === itemId);
@@ -824,6 +829,14 @@ export default function InvoicesClient({
               </div>
             )}
           </Form.List>
+
+          {items.length === 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <EmptyCatalogHint canManage={canManageItems}>
+                No products or services yet, so every line must be typed in full. Save the price once in
+              </EmptyCatalogHint>
+            </div>
+          ) : null}
 
           <Form.Item name="memo" label="Memo" style={{ marginTop: 12 }}>
             <Input.TextArea rows={2} />

@@ -601,7 +601,7 @@ export const inventoryValuationSchema = z.object({
 });
 
 // --- Access control: users, permissions, approvals, audit ---
-export const APP_ROLES = ["admin", "accountant", "viewer"] as const;
+export const APP_ROLES = ["admin", "accountant", "sales", "viewer"] as const;
 export const USER_STATUSES = ["invited", "active", "suspended", "offboarded"] as const;
 
 export const userCreateSchema = z.object({

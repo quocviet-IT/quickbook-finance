@@ -10,6 +10,7 @@ import {
   navLeaves,
   findActivePage,
   navigationForAccess,
+  findActiveGroup,
   searchKindLabel,
 } from "@/lib/domain/navigation";
 import {
@@ -121,6 +122,7 @@ describe("NAV tree", () => {
     expect(isNavGroup(sales!) ? sales.children.map((item) => item.key) : []).toEqual([
       "/sales",
       "/customers",
+      "/items",
       "/invoices",
       "/payments",
       "/credit-memos",
@@ -128,9 +130,19 @@ describe("NAV tree", () => {
     ]);
     expect(isNavGroup(inventory!) ? inventory.children.map((item) => item.key) : []).toEqual([
       "/inventory",
-      "/items",
       "/fixed-assets",
     ]);
+  });
+
+  it("gives every route exactly one home in the sidebar", () => {
+    // findActiveGroup returns the first group containing a route, so a leaf
+    // listed twice makes sidebar highlighting depend on declaration order.
+    const keys = navLeaves().map((page) => page.key);
+    expect(keys).toEqual([...new Set(keys)]);
+  });
+
+  it("files the product catalog under Sales", () => {
+    expect(findActiveGroup("/items")).toBe("sales");
   });
 
   it("starts every operational group with its overview", () => {

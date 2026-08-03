@@ -3,9 +3,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import type { AppRole, PermissionRow, RolePermissionRow } from "@/lib/db/types";
+import { emptyGrants } from "@/lib/domain/access";
+import { APP_ROLES } from "@/lib/domain/schemas";
 import { setRolePermissionAction } from "./actions";
 
-const ROLES: AppRole[] = ["admin", "accountant", "viewer"];
+// Columns follow the one ordered role list, so a role added later cannot be
+// missing a column here while being present everywhere else.
+const ROLES: AppRole[] = [...APP_ROLES];
 
 interface Row extends PermissionRow {
   allowed: Record<AppRole, boolean>;
@@ -27,7 +31,7 @@ export default function PermissionMatrixClient({
   const rows = useMemo<Row[]>(() => {
     const byKey = new Map<string, Record<AppRole, boolean>>();
     for (const p of permissions) {
-      byKey.set(p.key, { admin: false, accountant: false, viewer: false });
+      byKey.set(p.key, emptyGrants());
     }
     for (const a of assignments) {
       const entry = byKey.get(a.permission_key);
