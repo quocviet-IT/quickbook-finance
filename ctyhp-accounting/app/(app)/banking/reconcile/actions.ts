@@ -172,9 +172,15 @@ export interface StatementLineView {
   reference: string | null;
   amountMinor: number;
   status: string;
-  /** The ledger entry the matcher paired it with, when it found one. */
-  matchedEntry: string | null;
-  matchedJournalLineId: string | null;
+  /**
+   * The ledger entry the matcher *proposed*, when it found one. A proposal is
+   * not a match: `listSuggestions` returns only rows still awaiting a decision,
+   * so this being set means someone has to look, not that the line is settled.
+   */
+  suggestedEntry: string | null;
+  suggestedJournalLineId: string | null;
+  /** True when a suggestion is waiting on a decision for this line. */
+  hasSuggestion: boolean;
 }
 
 /** The statement lines behind this reconciliation, newest first. */
@@ -212,8 +218,9 @@ export async function reconciliationStatementLinesAction(
           reference: txn.reference,
           amountMinor: txn.amount_minor,
           status: txn.status,
-          matchedEntry: match?.target_number ?? null,
-          matchedJournalLineId: match?.journal_line_id ?? null,
+          suggestedEntry: match?.target_number ?? null,
+          suggestedJournalLineId: match?.journal_line_id ?? null,
+          hasSuggestion: Boolean(match),
         };
       }),
     };

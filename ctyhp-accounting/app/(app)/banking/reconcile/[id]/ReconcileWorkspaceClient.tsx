@@ -35,6 +35,11 @@ import {
   type StatementLineView,
 } from "../actions";
 import type { ReconLineView, ReconDetail } from "@/lib/services/bankrec";
+import {
+  statementLineState,
+  summariseStatementLines,
+  STATEMENT_LINE_STATES,
+} from "@/lib/domain/bankrec";
 
 interface Offset {
   id: string;
@@ -62,6 +67,9 @@ export default function ReconcileWorkspaceClient({
   const [detail, setDetail] = useState<ReconDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [statementLines, setStatementLines] = useState<StatementLineView[]>([]);
+  // How much of the statement is settled, and how much is still an exception
+  // the reconciler has to clear. Derived, never stored.
+  const summary = summariseStatementLines(statementLines);
   const [importing, setImporting] = useState(false);
   const [adjOpen, setAdjOpen] = useState(false);
   const [form] = Form.useForm();
@@ -236,9 +244,18 @@ export default function ReconcileWorkspaceClient({
           <Typography.Text type="secondary">
             {statementLines.length === 0
               ? "None imported for this period yet — load the statement above."
-              : `${statementLines.length} line(s) up to the statement date · ` +
-                `${statementLines.filter((line) => line.matchedEntry).length} matched to a ledger entry`}
+              : `${summary.total} line(s) up to the statement date`}
           </Typography.Text>
+          {statementLines.length > 0 ? (
+            <Space size={4} wrap>
+              <Tag color="green">{summary.matched} matched</Tag>
+              {summary.requiresReview > 0 ? (
+                <Tag color="gold">{summary.requiresReview} requires review</Tag>
+              ) : null}
+              {summary.unmatched > 0 ? <Tag color="orange">{summary.unmatched} unmatched</Tag> : null}
+              {summary.excluded > 0 ? <Tag>{summary.excluded} excluded</Tag> : null}
+            </Space>
+          ) : null}
         </Space>
         <Table<StatementLineView>
           rowKey="id"
@@ -263,17 +280,26 @@ export default function ReconcileWorkspaceClient({
               render: (value: number) => fmt(value),
             },
             {
-              title: "Matched to",
-              key: "match",
-              width: 220,
-              render: (_: unknown, line) =>
-                line.matchedEntry ? (
-                  <Tag color="green">{line.matchedEntry}</Tag>
-                ) : (
-                  <Tag color={line.status === "matched" ? "blue" : "orange"}>
-                    {line.status === "matched" ? "matched" : "no match yet"}
-                  </Tag>
-                ),
+              // A proposal used to be painted the same green as an approved
+              // link, which told the reconciler a line was settled when a
+              // machine had only guessed. The state is now explicit.
+              title: "Status",
+              key: "state",
+              width: 240,
+              render: (_: unknown, line) => {
+                const state = statementLineState(line.status, line.hasSuggestion);
+                const meta = STATEMENT_LINE_STATES[state];
+                return (
+                  <Space size={4} direction="vertical">
+                    <Tag color={meta.color}>{meta.label}</Tag>
+                    {line.suggestedEntry ? (
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {state === "matched" ? "linked to" : "suggested"} {line.suggestedEntry}
+                      </Typography.Text>
+                    ) : null}
+                  </Space>
+                );
+              },
             },
           ]}
         />

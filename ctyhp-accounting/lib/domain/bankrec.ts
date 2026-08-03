@@ -51,3 +51,76 @@ export function buildAdjustmentPosting(input: {
   assertBalanced(lines);
   return lines;
 }
+
+// --- Statement line review state ---------------------------------------------
+
+export type StatementLineState = "matched" | "requires_review" | "unmatched" | "excluded";
+
+export const STATEMENT_LINE_STATES: Record<StatementLineState, { label: string; color: string }> = {
+  matched: { label: "Matched", color: "green" },
+  requires_review: { label: "Requires review", color: "gold" },
+  unmatched: { label: "Unmatched", color: "orange" },
+  excluded: { label: "Excluded", color: "default" },
+};
+
+/**
+ * Where a statement line stands in the reconciliation.
+ *
+ * The distinction that matters is between an approved link and a suggestion
+ * nobody has accepted. `acc_reconciliation` holds both — `approved` sets the
+ * bank line to `matched`, while `suggested` leaves it `unmatched` — and showing
+ * them the same way tells an accountant a line is settled when a machine has
+ * only guessed at it. In a reconciliation that is the one confusion that must
+ * not happen.
+ *
+ * An unrecognised status falls to `unmatched`, so a state added later surfaces
+ * as something to look at rather than quietly counting as done.
+ */
+export function statementLineState(status: string, hasSuggestion: boolean): StatementLineState {
+  if (status === "matched") return "matched";
+  if (status === "ignored") return "excluded";
+  return hasSuggestion ? "requires_review" : "unmatched";
+}
+
+export interface StatementLineSummary {
+  total: number;
+  matched: number;
+  requiresReview: number;
+  unmatched: number;
+  excluded: number;
+  /** Lines neither settled nor deliberately excluded — the work still to do. */
+  outstanding: number;
+}
+
+/** How much of the statement is done, and how much is still an exception. */
+export function summariseStatementLines(
+  lines: readonly { status: string; hasSuggestion: boolean }[],
+): StatementLineSummary {
+  const summary: StatementLineSummary = {
+    total: lines.length,
+    matched: 0,
+    requiresReview: 0,
+    unmatched: 0,
+    excluded: 0,
+    outstanding: 0,
+  };
+  for (const line of lines) {
+    switch (statementLineState(line.status, line.hasSuggestion)) {
+      case "matched":
+        summary.matched += 1;
+        break;
+      case "requires_review":
+        summary.requiresReview += 1;
+        summary.outstanding += 1;
+        break;
+      case "unmatched":
+        summary.unmatched += 1;
+        summary.outstanding += 1;
+        break;
+      case "excluded":
+        summary.excluded += 1;
+        break;
+    }
+  }
+  return summary;
+}
