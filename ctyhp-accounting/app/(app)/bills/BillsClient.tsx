@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  Alert,
   App,
   Button,
   DatePicker,
@@ -25,6 +26,7 @@ import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { withVendor } from "@/lib/domain/vendors";
+import type { BillablePurchaseOrder } from "@/lib/domain/purchasing";
 import EmptyCatalogHint from "@/components/EmptyCatalogHint";
 import NewVendorButton from "@/components/NewVendorButton";
 import {
@@ -61,6 +63,7 @@ export default function BillsClient({
   incomeAccounts,
   currencies,
   items,
+  billableOrders,
   canManageItems,
   canWrite,
   canRegisterAsset,
@@ -78,6 +81,8 @@ export default function BillsClient({
   incomeAccounts: AccountRow[];
   currencies: CurrencyRow[];
   items: ItemRow[];
+  /** Purchase orders with goods received and not yet billed, any vendor. */
+  billableOrders: BillablePurchaseOrder[];
   /** Holds `items.manage`, so the empty-catalog hint can link to the catalog. */
   canManageItems: boolean;
   canWrite: boolean;
@@ -106,6 +111,16 @@ export default function BillsClient({
     setLocalVendors((prev) => withVendor(prev, vendor));
     form.setFieldValue("vendor_id", vendor.id);
   }
+
+  // Which purchase orders this vendor still owes a bill for. A bill raised
+  // against one has to be matched against what actually arrived, and this form
+  // does not do that -- so it hands over to the purchase order, where the
+  // three-way match lives, rather than copying lines across unchecked.
+  const selectedVendorId: string | undefined = Form.useWatch("vendor_id", form);
+  const vendorOrders = useMemo(
+    () => billableOrders.filter((order) => order.vendorId === selectedVendorId),
+    [billableOrders, selectedVendorId],
+  );
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -351,6 +366,33 @@ export default function BillsClient({
               <NewVendorButton onCreated={addVendor} />
             </Form.Item>
           </Space>
+          {vendorOrders.length > 0 ? (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={`${vendorOrders.length} purchase order${vendorOrders.length > 1 ? "s" : ""} from this vendor received and not yet billed`}
+              description={
+                <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                  <span>
+                    Billing an order there checks what you are billed against what actually arrived, and
+                    against the price you ordered at. Typing the lines here instead skips that check and
+                    leaves the order still showing as unbilled.
+                  </span>
+                  <Select
+                    placeholder="Bill a purchase order"
+                    style={{ minWidth: 340 }}
+                    value={null}
+                    onChange={(id: string) => router.push(`/purchase-orders/${id}?bill=1`)}
+                    options={vendorOrders.map((order) => ({
+                      value: order.purchaseOrderId,
+                      label: `${order.poNumber ?? "Draft order"} · ${order.lineCount} line${order.lineCount > 1 ? "s" : ""} · ${fmt(order.valueMinor, order.currencyCode)}`,
+                    }))}
+                  />
+                </Space>
+              }
+            />
+          ) : null}
           <Space size="middle" style={{ display: "flex" }}>
             <Form.Item name="vendor_ref" label="Vendor Reference Number">
               <Input placeholder="Vendor invoice number" />

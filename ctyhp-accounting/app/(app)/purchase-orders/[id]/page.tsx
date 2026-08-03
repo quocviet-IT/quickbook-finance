@@ -10,8 +10,16 @@ import PurchaseOrderDetailClient from "./PurchaseOrderDetailClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function PurchaseOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PurchaseOrderDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  /** `?bill=1` arrives from the New bill form, which sends people here to be matched. */
+  searchParams: Promise<{ bill?: string }>;
+}) {
   const { id } = await params;
+  const initialBillOpen = (await searchParams).bill === "1";
   const sb = await createSupabaseServerClient();
   const [detail, config, vendors, accounts, currencies, items, role] = await Promise.all([
     getPurchaseOrder(sb, id),
@@ -45,6 +53,7 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
         ]}
       />
       <PurchaseOrderDetailClient
+        initialBillOpen={initialBillOpen}
         detail={detail}
         config={config}
         vendors={vendors}

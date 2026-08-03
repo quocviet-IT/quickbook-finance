@@ -130,3 +130,72 @@ export function threeWayMatchLine(
 
   return { priceOk, qtyOk, requiresApproval: !priceOk || !qtyOk, exceptions };
 }
+
+/** What a picker needs to offer one purchase order that is waiting to be billed. */
+export interface BillablePurchaseOrder {
+  purchaseOrderId: string;
+  poNumber: string | null;
+  vendorId: string;
+  currencyCode: string;
+  orderDate: string;
+  /** Outstanding lines on this order — received, not yet billed. */
+  lineCount: number;
+  /** Their total value, in whole minor units. */
+  valueMinor: Minor;
+}
+
+/** The two row shapes this join needs, named so callers are not tied to db types. */
+interface ReceivedNotBilledLike {
+  purchase_order_id: string;
+  po_number: string | null;
+  order_date: string;
+  value_minor: number;
+  currency_code: string;
+}
+interface PurchaseOrderLike {
+  id: string;
+  vendor_id: string;
+}
+
+/**
+ * The purchase orders a vendor still owes a bill for, one entry per order.
+ *
+ * `acc_received_not_billed` answers "what arrived and has not been billed" a
+ * line at a time, and reports the vendor by *name* — which is not an identity,
+ * because two vendors may share one. So the vendor id comes from the purchase
+ * order itself, and a billable line whose order is not in the list is dropped
+ * rather than guessed at: offering a choice that opens the wrong document is
+ * worse than offering none.
+ *
+ * Newest order first, because the one someone is about to bill is almost always
+ * the one that just arrived.
+ */
+export function billablePurchaseOrders(
+  receivedNotBilled: readonly ReceivedNotBilledLike[],
+  purchaseOrders: readonly PurchaseOrderLike[],
+): BillablePurchaseOrder[] {
+  const vendorOf = new Map(purchaseOrders.map((po) => [po.id, po.vendor_id]));
+  const byOrder = new Map<string, BillablePurchaseOrder>();
+
+  for (const row of receivedNotBilled) {
+    const vendorId = vendorOf.get(row.purchase_order_id);
+    if (!vendorId) continue;
+    const found = byOrder.get(row.purchase_order_id);
+    if (found) {
+      found.lineCount += 1;
+      found.valueMinor += row.value_minor;
+      continue;
+    }
+    byOrder.set(row.purchase_order_id, {
+      purchaseOrderId: row.purchase_order_id,
+      poNumber: row.po_number,
+      vendorId,
+      currencyCode: row.currency_code,
+      orderDate: row.order_date,
+      lineCount: 1,
+      valueMinor: row.value_minor,
+    });
+  }
+
+  return [...byOrder.values()].sort((a, b) => b.orderDate.localeCompare(a.orderDate));
+}

@@ -5,6 +5,8 @@ import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
+import { getReceivedNotBilled, listPurchaseOrders } from "@/lib/services/purchasing";
+import { billablePurchaseOrders } from "@/lib/domain/purchasing";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import BillsClient from "./BillsClient";
@@ -40,6 +42,8 @@ export default async function BillsPage({
     canManageDocuments,
     canGovernDocuments,
     canManageItems,
+    receivedNotBilled,
+    purchaseOrders,
   ] = await Promise.all([
     listBills(sb),
     listVendors(sb),
@@ -52,7 +56,14 @@ export default async function BillsPage({
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
     hasPermission(sb, "items.manage"),
+    getReceivedNotBilled(sb),
+    listPurchaseOrders(sb),
   ]);
+
+  // A bill raised against a purchase order has to go through three-way matching,
+  // which this form does not do. So the form offers the order and hands over to
+  // the flow that does, rather than copying its lines across unchecked.
+  const billableOrders = billablePurchaseOrders(receivedNotBilled, purchaseOrders);
 
   const billDebitAccounts = accounts.filter(
     (a) =>
@@ -85,6 +96,7 @@ export default async function BillsPage({
         incomeAccounts={incomeAccounts}
         currencies={currencies}
         items={purchaseItems}
+        billableOrders={billableOrders}
         canManageItems={canManageItems}
         canWrite={canWrite(role)}
         canRegisterAsset={!fixedAssetPermission.error && fixedAssetPermission.data === true}

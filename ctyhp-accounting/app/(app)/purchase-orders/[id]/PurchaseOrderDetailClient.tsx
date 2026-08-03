@@ -27,6 +27,7 @@ const STATUS_COLOR: Record<PoStatus, string> = {
 };
 
 export default function PurchaseOrderDetailClient({
+  initialBillOpen,
   detail,
   config,
   vendors,
@@ -35,6 +36,12 @@ export default function PurchaseOrderDetailClient({
   items,
   canWrite,
 }: {
+  /**
+   * Seeded by `?bill=1`. The New bill form sends people here when the vendor
+   * they picked has an order waiting, so the bill goes through three-way
+   * matching instead of being typed in by hand.
+   */
+  initialBillOpen: boolean;
   detail: PurchaseOrderDetail;
   config: PurchasingConfigRow;
   vendors: VendorRow[];
@@ -48,7 +55,7 @@ export default function PurchaseOrderDetailClient({
   const { order, lines, receipts, bills, exceptions } = detail;
   const [editOpen, setEditOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [billOpen, setBillOpen] = useState(false);
+  const [billOpen, setBillOpen] = useState(initialBillOpen);
   const [busy, setBusy] = useState(false);
 
   const decimals = useMemo(
@@ -362,8 +369,10 @@ export default function PurchaseOrderDetailClient({
         lines={lines}
       />
 
+      {/* canBill guards the link too: a hand-typed ?bill=1 on an order with
+          nothing outstanding opens nothing rather than an empty dialog. */}
       <BillFromPoModal
-        open={billOpen}
+        open={billOpen && canBill}
         onClose={() => setBillOpen(false)}
         onDone={() => {
           setBillOpen(false);
