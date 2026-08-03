@@ -19,6 +19,16 @@
  *
  * Re-running is safe: an asset whose name is already registered is skipped.
  *
+ * A company NOT flagged is_sample can still be seeded, but only by naming its
+ * schema outright:
+ *
+ *   node --env-file=.env.local scripts/seed-sample-fixed-assets.mjs --company=public
+ *
+ * That is deliberately awkward. The flag exists so nobody fills real books with
+ * invented property by running the script without thinking; naming the schema is
+ * how you say you meant it. Registering still posts nothing, so it stays
+ * removable either way.
+ *
  * Run: node --env-file=.env.local scripts/seed-sample-fixed-assets.mjs
  */
 import pg from "pg";
@@ -28,6 +38,22 @@ import pg from "pg";
  * two, furniture and display fixtures seven, plant and leasehold work ten.
  */
 const REGISTERS = {
+  public: [
+    ["Showroom fit-out and cabinetry", "Leasehold Improvements", "2024-02-01", 6_240_000, 0, 120, "Showroom"],
+    ["Showroom air conditioning", "Plant and Equipment", "2024-02-20", 1_480_000, 0, 120, "Showroom"],
+    ["Lockable display cabinets (set of 10)", "Fixtures and Fittings", "2024-03-04", 918_000, 0, 84, "Showroom"],
+    ["Client lounge sofa and armchairs", "Furniture", "2024-03-04", 486_000, 30_000, 84, "Client lounge"],
+    ["Vault safe — TL30x6", "Plant and Equipment", "2024-04-08", 2_640_000, 250_000, 120, "Vault"],
+    ["Jeweller's bench fit-out (4 stations)", "Jewelry Production Equipment", "2024-05-02", 1_320_000, 0, 120, "Workshop"],
+    ["Laser welder", "Jewelry Production Equipment", "2024-06-17", 2_180_000, 150_000, 120, "Workshop"],
+    ["Ultrasonic and steam cleaning station", "Jewelry Production Equipment", "2024-07-01", 412_000, 0, 60, "Workshop"],
+    ["GIA gemscope and lighting", "Jewelry Production Equipment", "2025-01-13", 1_060_000, 60_000, 60, "Grading room"],
+    ["MacBook Pro 14 — showroom", "Computer Equipment", "2025-02-03", 249_900, 0, 36, "Showroom"],
+    ["Dell OptiPlex — back office", "Computer Equipment", "2025-02-03", 132_000, 0, 36, "Office"],
+    ["iPhone 15 — showroom line", "Computer Equipment", "2025-02-03", 89_900, 0, 24, "Showroom"],
+    ["Security camera and alarm system", "Plant and Equipment", "2025-03-19", 764_000, 0, 84, "Whole premises"],
+    ["Delivery van — 2025 Transit Connect", "Motor Vehicles", "2025-08-11", 3_420_000, 400_000, 60, "Off site"],
+  ],
   co_north_star: [
     ["Bridal fitting room build-out", "Leasehold Improvements", "2024-03-01", 4_850_000, 0, 120, "Showroom"],
     ["Showroom air conditioning unit", "Plant and Equipment", "2024-04-15", 1_240_000, 0, 120, "Showroom"],
@@ -76,6 +102,14 @@ if (!ADMIN) {
   process.exit(1);
 }
 
+/** Schemas named on the command line may be seeded even when not is_sample. */
+const NAMED = new Set(
+  process.argv
+    .filter((arg) => arg.startsWith("--company="))
+    .map((arg) => arg.slice("--company=".length).trim())
+    .filter(Boolean),
+);
+
 const { rows: companies } = await client.query(
   `select schema_name, legal_name, is_sample from onebook.company order by display_order`,
 );
@@ -87,14 +121,22 @@ for (const company of companies) {
   const plan = REGISTERS[company.schema_name];
   if (!plan) continue;
 
-  // The guard that matters. A company that is not flagged as a sample holds
-  // books somebody reports from, and invented property does not belong there.
-  if (!company.is_sample) {
-    console.log(`\n[${company.schema_name}] SKIPPED — not flagged is_sample`);
+  // The guard that matters. A company not flagged as a sample holds books
+  // somebody reports from, so it is skipped unless its schema was named on the
+  // command line, which is how someone says they meant it.
+  if (!company.is_sample && !NAMED.has(company.schema_name)) {
+    console.log(
+      `
+[${company.schema_name}] SKIPPED - not flagged is_sample.` +
+        ` Pass --company=${company.schema_name} to seed it anyway.`,
+    );
     continue;
   }
 
   console.log(`\n[${company.schema_name}] ${company.legal_name}`);
+  if (!company.is_sample) {
+    console.log("  NOTE: not flagged is_sample - seeding real books by explicit request.");
+  }
   await client.query("begin");
   try {
     await client.query(`set local search_path to ${JSON.stringify(company.schema_name).replaceAll('"', '"')}`);
