@@ -85,7 +85,10 @@ export async function importStatementAction(
   }
 }
 
-export async function getTransactionsAction(bankAccountId: string): Promise<ActionResult<BankTransactionRow[]>> {
+/** `null` asks for every bank account, which is how the review queue spans them. */
+export async function getTransactionsAction(
+  bankAccountId: string | null,
+): Promise<ActionResult<BankTransactionRow[]>> {
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: await listBankTransactions(sb, bankAccountId) };
@@ -106,7 +109,9 @@ export async function generateSuggestionsAction(bankAccountId: string): Promise<
   }
 }
 
-export async function getSuggestionsAction(bankAccountId: string): Promise<ActionResult<SuggestionView[]>> {
+export async function getSuggestionsAction(
+  bankAccountId: string | null,
+): Promise<ActionResult<SuggestionView[]>> {
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: await listSuggestions(sb, bankAccountId) };

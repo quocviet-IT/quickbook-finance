@@ -10,7 +10,6 @@ import {
   Form,
   Input,
   Modal,
-  Segmented,
   Select,
   Space,
   Tag,
@@ -50,6 +49,7 @@ import type {
   SuggestionView,
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
+import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
 import {
   describeStatementParse,
   parseStatementRows,
@@ -98,6 +98,11 @@ declare global {
     };
   }
 }
+
+/** Sentinel account id for the queue that spans every connected account. */
+const ALL_ACCOUNTS = "__all__";
+
+type ReviewRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
 const TXN_STATUS: Record<BankTxnStatus, { text: string; color: string }> = {
   unmatched: { text: "For review", color: "orange" },
@@ -166,7 +171,6 @@ export default function BankingClient({
       ? initialAccountId!
       : bankAccounts[0]?.id,
   );
-  const [tab, setTab] = useState<"transactions" | "reconcile">("transactions");
   const [transactionStatus, setTransactionStatus] = useState<"all" | BankTxnStatus>(
     initialQueueStatus ?? "all",
   );
@@ -186,7 +190,10 @@ export default function BankingClient({
   const [mappingSelections, setMappingSelections] = useState<Record<string, string | undefined>>({});
   const oauthResumeStarted = useRef(false);
 
+  // Undefined in the all-accounts view, which is why anything account-specific
+  // — importing a statement, running the matcher, the feed panel — checks it.
   const selected = bankAccounts.find((account) => account.id === selectedId);
+  const allAccounts = selectedId === ALL_ACCOUNTS;
   const selectedConnection = bankConnections.find((connection) =>
     connection.accounts.some((account) => account.bank_account_id === selectedId),
   );
@@ -196,15 +203,24 @@ export default function BankingClient({
   );
   const decimalsOf = (code: string) => currencies.find((currency) => currency.code === code)?.decimal_places ?? 2;
   const decimalPlaces = selected ? decimalsOf(selected.currency_code) : 2;
-  const money = (value: number) =>
-    selected ? formatMoney(value, selected.currency_code, decimalPlaces) : String(value);
+  /**
+   * A row's own currency, not the screen's. The all-accounts queue holds several
+   * at once, and a card line formatted as dollars is a wrong number on screen.
+   */
+  const rowMoney = (row: ReviewRow) =>
+    row.currencyCode
+      ? formatMoney(row.transaction.amount_minor, row.currencyCode, decimalsOf(row.currencyCode))
+      : String(row.transaction.amount_minor);
 
   const reload = useCallback(async () => {
     if (!selectedId) return;
     setLoading(true);
+    // ALL_ACCOUNTS asks the server for every account at once; the review queue
+    // is one list, and which bank a line came from is a column, not a mode.
+    const accountFilter = selectedId === ALL_ACCOUNTS ? null : selectedId;
     const [transactions, matches] = await Promise.all([
-      getTransactionsAction(selectedId),
-      getSuggestionsAction(selectedId),
+      getTransactionsAction(accountFilter),
+      getSuggestionsAction(accountFilter),
     ]);
     setLoading(false);
     if (transactions.ok && transactions.data) setTxns(transactions.data);
@@ -392,7 +408,6 @@ export default function BankingClient({
     setBusy(null);
     if (result.ok && result.data) {
       message.success(`${result.data.count} new ledger match suggestion(s)`);
-      setTab("reconcile");
       reload();
     } else {
       message.error(result.error ?? "Failed to find ledger matches");
@@ -419,38 +434,101 @@ export default function BankingClient({
     else message.error(result.error ?? "Failed to reject the match");
   }
 
-  const transactionColumns: TableColumnsType<BankTransactionRow> = [
-    { title: "Date", dataIndex: "txn_date", width: 115 },
+  const transactionColumns: TableColumnsType<ReviewRow> = [
+    { title: "Date", dataIndex: ["transaction", "txn_date"], width: 115 },
     {
       title: "Description",
-      dataIndex: "description",
-      render: (description: string, row) => (
+      key: "description",
+      render: (_value: unknown, row: ReviewRow) => (
         <Space direction="vertical" size={0}>
-          <span>{description}</span>
+          <span>{row.transaction.description}</span>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {row.category ? row.category.replaceAll("_", " ") : row.source === "bank_feed" ? "Direct bank feed" : "File upload"}
+            {row.transaction.category
+              ? row.transaction.category.replaceAll("_", " ")
+              : row.transaction.source === "bank_feed"
+                ? "Direct bank feed"
+                : "File upload"}
           </Typography.Text>
         </Space>
       ),
     },
-    { title: "Reference", dataIndex: "reference", width: 135, render: (reference) => reference ?? "—" },
     {
-      title: "Amount",
-      dataIndex: "amount_minor",
-      width: 140,
-      align: "right",
-      render: (value: number) => (
-        <span style={{ color: value < 0 ? "#b91c1c" : "#15803d" }}>{money(value)}</span>
+      title: "Account source",
+      key: "account",
+      width: 200,
+      render: (_value: unknown, row: ReviewRow) => (
+        <Typography.Text type="secondary">{row.accountName}</Typography.Text>
       ),
     },
     {
+      title: "Reference",
+      dataIndex: ["transaction", "reference"],
+      width: 135,
+      render: (reference: string | null) => reference ?? "—",
+    },
+    {
+      title: "Amount",
+      key: "amount",
+      width: 140,
+      align: "right",
+      render: (_value: unknown, row: ReviewRow) => (
+        <span style={{ color: row.transaction.amount_minor < 0 ? "#b91c1c" : "#15803d" }}>
+          {rowMoney(row)}
+        </span>
+      ),
+    },
+    {
+      // What the line looks like it is, and the decision, in the same place the
+      // line is read. This used to be a separate tab.
+      title: "Match",
+      key: "match",
+      width: 300,
+      render: (_value: unknown, row: ReviewRow) => {
+        if (!row.suggestion) {
+          return (
+            <Typography.Text type="secondary">
+              {row.transaction.status === "matched" ? "Matched" : "No suggestion"}
+            </Typography.Text>
+          );
+        }
+        const match = row.suggestion;
+        return (
+          <Space direction="vertical" size={2}>
+            <Space size={6} wrap>
+              <Tag color="blue">{match.target_number ?? "Ledger entry"}</Tag>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {match.target_type.replaceAll("_", " ")} · {Math.round(match.confidence * 100)}%
+              </Typography.Text>
+            </Space>
+            {match.target_description ? (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {match.target_description}
+              </Typography.Text>
+            ) : null}
+            {canWrite ? (
+              <Space size={4}>
+                <Button size="small" type="primary" loading={busy === match.id} onClick={() => approve(match.id)}>
+                  Approve
+                </Button>
+                <Button size="small" loading={busy === match.id} onClick={() => reject(match.id)}>
+                  Reject
+                </Button>
+              </Space>
+            ) : null}
+          </Space>
+        );
+      },
+    },
+    {
       title: "Status",
-      dataIndex: "status",
+      key: "status",
       width: 130,
-      render: (status: BankTxnStatus, row) => (
+      render: (_value: unknown, row: ReviewRow) => (
         <Space size={4}>
-          <Tag color={TXN_STATUS[status].color}>{TXN_STATUS[status].text}</Tag>
-          {row.pending ? <Tag>Pending</Tag> : null}
+          <Tag color={TXN_STATUS[row.transaction.status].color}>
+            {TXN_STATUS[row.transaction.status].text}
+          </Tag>
+          {row.transaction.pending ? <Tag>Pending</Tag> : null}
         </Space>
       ),
     },
@@ -461,68 +539,20 @@ export default function BankingClient({
             key: "attachments",
             width: 56,
             fixed: "right" as const,
-            render: (_value: unknown, row: BankTransactionRow) => (
+            render: (_value: unknown, row: ReviewRow) => (
               <IconActionButton
                 label="View bank transaction attachments"
                 icon={<PaperClipOutlined />}
                 onClick={() =>
                   setAttachmentTarget({
                     entityType: "bank_transaction",
-                    entityId: row.id,
-                    label: `${row.txn_date} · ${row.description}`,
+                    entityId: row.transaction.id,
+                    label: `${row.transaction.txn_date} · ${row.transaction.description}`,
                   })
                 }
               />
             ),
-          } as TableColumnsType<BankTransactionRow>[number],
-        ]
-      : []),
-  ];
-
-  const suggestionColumns: TableColumnsType<SuggestionView> = [
-    { title: "Bank date", dataIndex: "txn_date", width: 110 },
-    { title: "Bank description", dataIndex: "txn_description" },
-    {
-      title: "Ledger match",
-      key: "target",
-      width: 260,
-      render: (_value, row) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>{row.target_number ?? "Posted journal"}</Typography.Text>
-          <Typography.Text type="secondary" ellipsis style={{ maxWidth: 240 }}>
-            {row.target_type.replaceAll("_", " ")}
-            {row.target_description ? ` · ${row.target_description}` : ""}
-          </Typography.Text>
-        </Space>
-      ),
-    },
-    { title: "Amount", dataIndex: "amount_minor", width: 130, align: "right", render: money },
-    {
-      title: "Confidence",
-      dataIndex: "confidence",
-      width: 115,
-      render: (confidence: number) => {
-        const percentage = Math.round(confidence * 100);
-        return <Tag color={percentage >= 90 ? "green" : percentage >= 75 ? "gold" : "orange"}>{percentage}%</Tag>;
-      },
-    },
-    ...(canWrite
-      ? [
-          {
-            title: "Action",
-            key: "action",
-            width: 170,
-            render: (_value: unknown, row: SuggestionView) => (
-              <Space>
-                <Button size="small" type="primary" loading={busy === row.id} onClick={() => approve(row.id)}>
-                  Approve
-                </Button>
-                <Button size="small" loading={busy === row.id} onClick={() => reject(row.id)}>
-                  Reject
-                </Button>
-              </Space>
-            ),
-          } as TableColumnsType<SuggestionView>[number],
+          } as TableColumnsType<ReviewRow>[number],
         ]
       : []),
   ];
@@ -571,6 +601,19 @@ export default function BankingClient({
       ? txns
       : txns.filter((transaction) => transaction.status === transactionStatus);
 
+  // Each row carries the account it came from, that account's currency, and its
+  // best suggested match — so one table can answer what a line is and where it
+  // came from without sending anyone to a second screen.
+  const reviewRows = buildBankReviewRows(
+    visibleTransactions,
+    suggestions,
+    bankAccounts.map((account) => ({
+      id: account.id,
+      name: `${account.bank_name || account.account_name} · ${account.account_code}`,
+      currency_code: account.currency_code,
+    })),
+  );
+
   return (
     <div>
       <Script
@@ -615,7 +658,7 @@ export default function BankingClient({
       </Card>
 
       <FilterBar
-        resultCount={tab === "transactions" ? visibleTransactions.length : suggestions.length}
+        resultCount={reviewRows.length}
         actions={
           canWrite ? (
             <Space wrap>
@@ -644,20 +687,26 @@ export default function BankingClient({
                   Sync now
                 </Button>
               )}
-              {tab === "transactions" ? (
-                <Button type="primary" icon={<InboxOutlined />} onClick={() => setImportOpen(true)}>
-                  Import statement
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  icon={<ThunderboltOutlined />}
-                  loading={busy === "match"}
-                  onClick={findMatches}
-                >
-                  Find ledger matches
-                </Button>
-              )}
+              {/* Both act on one account's statement, so neither is offered
+                  while the queue is showing every account at once. */}
+              <Button
+                icon={<ThunderboltOutlined />}
+                loading={busy === "match"}
+                disabled={allAccounts}
+                title={allAccounts ? "Choose a single account to run matching" : undefined}
+                onClick={findMatches}
+              >
+                Find ledger matches
+              </Button>
+              <Button
+                type="primary"
+                icon={<InboxOutlined />}
+                disabled={allAccounts}
+                title={allAccounts ? "Choose a single account to import into" : undefined}
+                onClick={() => setImportOpen(true)}
+              >
+                Import statement
+              </Button>
             </Space>
           ) : null
         }
@@ -667,62 +716,47 @@ export default function BankingClient({
             style={{ minWidth: 280 }}
             value={selectedId}
             onChange={setSelectedId}
-            options={bankAccounts.map((account) => ({
-              value: account.id,
-              label: `${account.bank_name || account.account_name} · ${account.account_code} (${account.currency_code})`,
-            }))}
-          />
-          <Segmented
-            value={tab}
-            onChange={(value) => setTab(value as "transactions" | "reconcile")}
             options={[
-              { label: `Transactions${unmatchedCount ? ` (${unmatchedCount} for review)` : ""}`, value: "transactions" },
-              { label: `Suggested matches${suggestions.length ? ` (${suggestions.length})` : ""}`, value: "reconcile" },
+              { value: ALL_ACCOUNTS, label: `All accounts (${bankAccounts.length})` },
+              ...bankAccounts.map((account) => ({
+                value: account.id,
+                label: `${account.bank_name || account.account_name} · ${account.account_code} (${account.currency_code})`,
+              })),
             ]}
           />
-          {tab === "transactions" ? (
-            <Select
-              aria-label="Filter bank transactions by status"
-              value={transactionStatus}
-              onChange={(value) => setTransactionStatus(value)}
-              style={{ minWidth: 150 }}
-              options={[
-                { value: "all", label: "All statuses" },
-                { value: "unmatched", label: "For review" },
-                { value: "matched", label: "Matched" },
-                { value: "ignored", label: "Excluded" },
-              ]}
-            />
+          <Select
+            aria-label="Filter bank transactions by status"
+            value={transactionStatus}
+            onChange={(value) => setTransactionStatus(value)}
+            style={{ minWidth: 150 }}
+            options={[
+              { value: "all", label: "All statuses" },
+              { value: "unmatched", label: `For review${unmatchedCount ? ` (${unmatchedCount})` : ""}` },
+              { value: "matched", label: "Matched" },
+              { value: "ignored", label: "Excluded" },
+            ]}
+          />
+          {suggestions.length ? (
+            <Typography.Text type="secondary">
+              {suggestions.length} suggested match{suggestions.length > 1 ? "es" : ""} in the Match column
+            </Typography.Text>
           ) : null}
         </Space>
       </FilterBar>
 
-      {tab === "transactions" ? (
-        <DataTable
-          rowKey="id"
-          columns={transactionColumns}
-          dataSource={visibleTransactions}
-          rowClassName={(transaction) =>
-            transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
-          }
-          pagination={{ pageSize: 25 }}
-          sticky
-          loading={loading}
-          emptyTitle="No bank transactions"
-          emptyDescription="Synchronize a bank feed or import a statement to start the review workflow."
-        />
-      ) : (
-        <DataTable
-          rowKey="id"
-          columns={suggestionColumns}
-          dataSource={suggestions}
-          pagination={{ pageSize: 25 }}
-          sticky
-          loading={loading}
-          emptyTitle="No ledger match suggestions"
-          emptyDescription="Run matching to compare bank activity with posted General Ledger bank lines."
-        />
-      )}
+      <DataTable
+        rowKey={(row: ReviewRow) => row.transaction.id}
+        columns={transactionColumns}
+        dataSource={reviewRows}
+        rowClassName={(row: ReviewRow) =>
+          row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
+        }
+        pagination={{ pageSize: 25 }}
+        sticky
+        loading={loading}
+        emptyTitle="No bank transactions"
+        emptyDescription="Synchronize a bank feed or import a statement to start the review workflow."
+      />
 
       <AttachmentDrawer
         target={attachmentTarget}

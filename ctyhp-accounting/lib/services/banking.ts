@@ -131,16 +131,17 @@ export async function importStatement(
   };
 }
 
+/** Null means every bank account, for the review queue that spans them all. */
 export async function listBankTransactions(
   sb: SupabaseClient,
-  bankAccountId: string,
+  bankAccountId: string | null,
 ): Promise<BankTransactionRow[]> {
-  const { data, error } = await sb
+  let query = sb
     .from("acc_bank_transaction")
     .select("*")
-    .eq("bank_account_id", bankAccountId)
-    .is("provider_removed_at", null)
-    .order("txn_date", { ascending: false });
+    .is("provider_removed_at", null);
+  if (bankAccountId) query = query.eq("bank_account_id", bankAccountId);
+  const { data, error } = await query.order("txn_date", { ascending: false });
   if (error) throw new BankingError(error.message);
   return (data ?? []) as unknown as BankTransactionRow[];
 }
@@ -532,8 +533,12 @@ export interface SuggestionView {
   target_description: string | null;
 }
 
-export async function listSuggestions(sb: SupabaseClient, bankAccountId: string): Promise<SuggestionView[]> {
-  const { data, error } = await sb
+/** Null means every bank account, matching `listBankTransactions`. */
+export async function listSuggestions(
+  sb: SupabaseClient,
+  bankAccountId: string | null,
+): Promise<SuggestionView[]> {
+  let query = sb
     .from("acc_reconciliation")
     .select(
       "id,confidence,rule_applied,status,bank_transaction_id,payment_id,journal_line_id," +
@@ -541,9 +546,9 @@ export async function listSuggestions(sb: SupabaseClient, bankAccountId: string)
         "acc_payment(payment_number)," +
         "acc_journal_line(id,journal_entry_id,acc_journal_entry(entry_number,description,source_type))",
     )
-    .eq("status", "suggested")
-    .eq("acc_bank_transaction.bank_account_id", bankAccountId)
-    .order("confidence", { ascending: false });
+    .eq("status", "suggested");
+  if (bankAccountId) query = query.eq("acc_bank_transaction.bank_account_id", bankAccountId);
+  const { data, error } = await query.order("confidence", { ascending: false });
   if (error) throw new BankingError(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => {
     const txn = row.acc_bank_transaction as { txn_date: string; description: string; amount_minor: number };
