@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildSettlementHistory,
   daysBetween,
+  describeNoOpenInvoices,
   lastSettlementDate,
   outstandingAge,
   settlementTypeLabel,
+  unappliedRemainderMinor,
   type SettlementEvent,
 } from "@/lib/domain/settlement";
 
@@ -137,5 +139,37 @@ describe("outstandingAge", () => {
     expect(
       outstandingAge({ issueDate: "2026-01-01", dueDate: null, asOf: "2026-07-31" }),
     ).toEqual({ ageDays: 211, overdueDays: 0, isOverdue: false });
+  });
+});
+
+describe("unappliedRemainderMinor", () => {
+  it("reports the part of a receipt that lands on no invoice", () => {
+    expect(unappliedRemainderMinor(50_000, 30_000)).toBe(20_000);
+  });
+
+  it("is silent when the receipt is fully applied", () => {
+    expect(unappliedRemainderMinor(50_000, 50_000)).toBeNull();
+  });
+
+  it("is silent when nothing has been entered yet", () => {
+    expect(unappliedRemainderMinor(0, 0)).toBeNull();
+  });
+
+  it("does not report a negative remainder as unapplied cash", () => {
+    // Over-allocating is its own error, already shown in red. It must not also
+    // claim a credit is waiting on the customer's account.
+    expect(unappliedRemainderMinor(30_000, 50_000)).toBeNull();
+  });
+});
+
+describe("describeNoOpenInvoices", () => {
+  it("asks for a customer before blaming the ledger", () => {
+    expect(describeNoOpenInvoices(null)).toBe("Select a customer to see their open invoices");
+  });
+
+  it("names the customer and says what recording anyway would do", () => {
+    const text = describeNoOpenInvoices("Cormorant Gallery");
+    expect(text).toContain("Cormorant Gallery has no open invoices");
+    expect(text).toContain("credit");
   });
 });

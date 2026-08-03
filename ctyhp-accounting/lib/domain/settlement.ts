@@ -115,3 +115,30 @@ export function outstandingAge(input: {
     : 0;
   return { ageDays, overdueDays, isOverdue: overdueDays > 0 };
 }
+
+/**
+ * What a receipt does with the part of itself nobody applied to an invoice.
+ *
+ * Money received but not applied is legitimate — a deposit, a prepayment, a
+ * customer who rounded up — and `acc_refund_payment` refuses to refund anything
+ * that is not sitting here. It should still never be a surprise: a receipt form
+ * that silently turns cash into a credit reads as a screen doing more than it
+ * was asked to. Returns null when there is nothing to warn about.
+ */
+export function unappliedRemainderMinor(amountMinor: number, allocatedMinor: number): number | null {
+  const remainder = amountMinor - allocatedMinor;
+  return remainder > 0 ? remainder : null;
+}
+
+/**
+ * Why the open-invoice list is empty: no customer chosen yet, or a customer
+ * with nothing outstanding. The two look identical and mean opposite things —
+ * the second one is the state that got reported as a missing feature.
+ */
+export function describeNoOpenInvoices(customerName: string | null): string {
+  if (!customerName) return "Select a customer to see their open invoices";
+  return (
+    `${customerName} has no open invoices. A payment recorded now sits as a credit ` +
+    "on their account until there is an invoice to apply it to."
+  );
+}

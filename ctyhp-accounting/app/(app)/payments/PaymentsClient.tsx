@@ -23,6 +23,7 @@ import AttachmentDrawer, {
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow, PaymentStatus } from "@/lib/db/types";
 import { formatMoney, toMinorUnits } from "@/lib/format";
+import { describeNoOpenInvoices, unappliedRemainderMinor } from "@/lib/domain/settlement";
 import { recordPaymentAction, getOpenInvoicesAction } from "./actions";
 import RefundModal from "../settlements/RefundModal";
 
@@ -104,6 +105,22 @@ export default function PaymentsClient({
   }
 
   const allocTotal = Object.values(alloc).reduce((s, v) => s + (v || 0), 0);
+
+  const selectedCustomerId: string | undefined = Form.useWatch("customer_id", form);
+  const selectedCustomerName = customers.find((c) => c.id === selectedCustomerId)?.name ?? null;
+
+  // "No open invoices" reads as a broken screen when it is really an empty
+  // ledger. Say which of the two it is, and what recording anyway would do.
+  const openInvoicesEmptyText = describeNoOpenInvoices(
+    selectedCustomerId ? (selectedCustomerName ?? "This customer") : null,
+  );
+
+  // Compared in minor units, so a cent of float drift cannot invent a credit.
+  const paymentDecimals = decimalsOf(currency);
+  const unallocatedMinor = unappliedRemainderMinor(
+    toMinorUnits(amount, paymentDecimals),
+    toMinorUnits(allocTotal, paymentDecimals),
+  );
 
   async function submit() {
     const v = await form.validateFields();
@@ -262,7 +279,13 @@ export default function PaymentsClient({
             </Form.Item>
           </Space>
           <Space wrap>
-            <Form.Item name="deposit_account_id" label="Deposit to" rules={[{ required: true, message: "Select an account" }]} style={{ minWidth: 280 }}>
+            <Form.Item
+              name="deposit_account_id"
+              label="Deposit to"
+              rules={[{ required: true, message: "Select an account" }]}
+              style={{ minWidth: 280 }}
+              tooltip="Where the money landed. For a card or marketplace settlement — Stripe, Square, a storefront — choose 1210 Undeposited Funds: each receipt clears its invoice into that holding account, and the merchant's later payout is what reconciles against the bank, net of fees. Recording the receipt here is what closes the receivable; the merchant's own dashboard never does."
+            >
               <Select
                 placeholder="Bank / cash account"
                 options={depositAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}
@@ -297,7 +320,7 @@ export default function PaymentsClient({
             pagination={false}
             style={{ marginTop: 8 }}
             dataSource={openInvoices}
-            locale={{ emptyText: "No open invoices for this customer" }}
+            locale={{ emptyText: openInvoicesEmptyText }}
             columns={[
               { title: "Invoice", dataIndex: "invoice_number", render: (n) => n ?? "—" },
               {
@@ -331,6 +354,15 @@ export default function PaymentsClient({
               Allocated {formatMoney(toMinorUnits(allocTotal, decimalsOf(currency)), currency, decimalsOf(currency))} of{" "}
               {formatMoney(toMinorUnits(amount, decimalsOf(currency)), currency, decimalsOf(currency))}
             </Typography.Text>
+            {unallocatedMinor !== null ? (
+              <div style={{ marginTop: 2 }}>
+                <Typography.Text type="warning" style={{ fontSize: 12 }}>
+                  {formatMoney(unallocatedMinor, currency, paymentDecimals)} stays unapplied as a credit on{" "}
+                  {selectedCustomerName ? `${selectedCustomerName}'s` : "the customer's"} account — apply or refund it
+                  later.
+                </Typography.Text>
+              </div>
+            ) : null}
           </div>
 
           <Form.Item name="memo" label="Memo" style={{ marginTop: 8 }}>
