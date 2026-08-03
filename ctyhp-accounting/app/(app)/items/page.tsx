@@ -5,6 +5,7 @@ import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { listTaxCodes } from "@/lib/services/reference";
 import { getInventoryValuation } from "@/lib/services/inventory";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import ItemsClient from "./ItemsClient";
 
@@ -13,12 +14,13 @@ export const dynamic = "force-dynamic";
 export default async function ItemsPage() {
   const sb = await createSupabaseServerClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [items, accounts, taxCodes, valuation, role] = await Promise.all([
+  const [items, accounts, taxCodes, valuation, role, canManageItems] = await Promise.all([
     listItems(sb),
     listAccounts(sb),
     listTaxCodes(sb),
     getInventoryValuation(sb, today),
     getUserRole(),
+    hasPermission(sb, "items.manage"),
   ]);
 
   // An item's income account is what its invoice lines default to.
@@ -59,7 +61,8 @@ export default async function ItemsPage() {
         adjustmentAccounts={adjustmentAccounts}
         taxCodes={taxCodes}
         onHand={valuation.rows}
-        canWrite={canWrite(role)}
+        canManageItems={canManageItems}
+        canAdjustInventory={canWrite(role)}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission } from "@/lib/services/access";
 import { createItem, updateItem, setItemActive, ItemsError } from "@/lib/services/items";
 import { itemCreateSchema, itemUpdateSchema } from "@/lib/domain/schemas";
 
@@ -11,9 +11,17 @@ export interface ActionResult<T = undefined> {
   data?: T;
 }
 
+/**
+ * Catalog writes are gated by the grant matrix, not by role, so an admin can
+ * hand price maintenance to sales without handing over the ledger. RLS enforces
+ * the same permission on acc_item; this check is the one that produces a
+ * readable message instead of a policy violation.
+ */
 async function guard(): Promise<string | null> {
-  const role = await getUserRole();
-  return canWrite(role) ? null : "You do not have permission to perform this action";
+  const sb = await createSupabaseServerClient();
+  return (await hasPermission(sb, "items.manage"))
+    ? null
+    : "You do not have permission to manage products and services";
 }
 
 function msg(err: unknown): string {

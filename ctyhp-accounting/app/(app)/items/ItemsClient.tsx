@@ -43,7 +43,14 @@ interface Props {
   taxCodes: TaxCodeRow[];
   /** Quantity and value per inventory item, as of today. */
   onHand: InventoryValuationRow[];
-  canWrite: boolean;
+  /** Maintain the catalog: create, edit, activate and deactivate. */
+  canManageItems: boolean;
+  /**
+   * Post an inventory adjustment. Separate from canManageItems because an
+   * adjustment writes to the ledger and the catalog does not -- a sales user
+   * holds the first and not the second.
+   */
+  canAdjustInventory: boolean;
 }
 
 export default function ItemsClient({
@@ -55,7 +62,8 @@ export default function ItemsClient({
   adjustmentAccounts,
   taxCodes,
   onHand,
-  canWrite,
+  canManageItems,
+  canAdjustInventory,
 }: Props) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
@@ -147,7 +155,7 @@ export default function ItemsClient({
               <BarChartOutlined aria-hidden="true" />
               <span>Inventory valuation</span>
             </Link>
-            {canWrite ? (
+            {canManageItems ? (
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
                 New item
               </Button>
@@ -231,7 +239,7 @@ export default function ItemsClient({
             key: "actions",
             width: 160,
             render: (_, r) =>
-              canWrite ? (
+              canManageItems ? (
                 <Space size={4}>
                   <IconActionButton
                     label="Edit item"
@@ -245,11 +253,13 @@ export default function ItemsClient({
                   />
                   {r.is_inventory && (
                     <>
-                      <IconActionButton
-                        label="Adjust inventory"
-                        icon={<ToolOutlined />}
-                        onClick={() => setAdjusting(r)}
-                      />
+                      {canAdjustInventory && (
+                        <IconActionButton
+                          label="Adjust inventory"
+                          icon={<ToolOutlined />}
+                          onClick={() => setAdjusting(r)}
+                        />
+                      )}
                       <IconActionButton
                         label="View inventory movements"
                         icon={<HistoryOutlined />}
