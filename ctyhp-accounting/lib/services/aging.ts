@@ -86,3 +86,65 @@ function shiftBack(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 }
+
+// --- Allowance for doubtful accounts -----------------------------------------
+
+export interface AfdaBucket {
+  bucketKey: string;
+  balanceMinor: number;
+  rateBps: number;
+  requiredMinor: number;
+}
+
+export interface AfdaEvaluation {
+  asOf: string;
+  buckets: AfdaBucket[];
+  /** What the aging says the reserve should be. */
+  requiredMinor: number;
+  /** What is already carried in 1190. */
+  carriedMinor: number;
+  /** The entry that would post: positive tops up, negative releases. */
+  adjustmentMinor: number;
+}
+
+/**
+ * The reserve the aging implies, beside the reserve already carried.
+ *
+ * Both numbers come from the database — the buckets from `acc_afda_evaluation`,
+ * which cuts them exactly as this report does, and the carried balance from the
+ * ledger — so the screen cannot quote a figure the posting would disagree with.
+ */
+export async function getAfdaEvaluation(sb: SupabaseClient, asOf: string): Promise<AfdaEvaluation> {
+  const [{ data: rows, error }, { data: carried, error: carriedError }] = await Promise.all([
+    sb.rpc("acc_afda_evaluation", { p_as_of: asOf }),
+    sb.rpc("acc_afda_balance", { p_as_of: asOf }),
+  ]);
+  if (error) throw new AgingError(error.message);
+  if (carriedError) throw new AgingError(carriedError.message);
+
+  const buckets: AfdaBucket[] = ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
+    bucketKey: r.bucket_key as string,
+    balanceMinor: Number(r.balance_minor),
+    rateBps: Number(r.rate_bps),
+    requiredMinor: Number(r.required_minor),
+  }));
+  const requiredMinor = buckets.reduce((sum, b) => sum + b.requiredMinor, 0);
+  const carriedMinor = Number(carried ?? 0);
+  return { asOf, buckets, requiredMinor, carriedMinor, adjustmentMinor: requiredMinor - carriedMinor };
+}
+
+/** Post the difference between the carried allowance and the computed one. */
+export async function postAfdaAdjustment(
+  sb: SupabaseClient,
+  asOf: string,
+  memo: string | null,
+): Promise<{ entryId: string; requiredMinor: number; adjustmentMinor: number }> {
+  const { data, error } = await sb.rpc("acc_post_afda_adjustment", { p_as_of: asOf, p_memo: memo });
+  if (error) throw new AgingError(error.message);
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+  return {
+    entryId: row.journal_entry_id as string,
+    requiredMinor: Number(row.required_minor),
+    adjustmentMinor: Number(row.adjustment_minor),
+  };
+}

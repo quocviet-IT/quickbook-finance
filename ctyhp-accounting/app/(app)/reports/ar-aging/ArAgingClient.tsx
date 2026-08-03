@@ -8,6 +8,7 @@ import AgingByPartyTable, {
   type AgingGrouping,
 } from "@/components/reports/AgingByPartyTable";
 import FilterBar from "@/components/ui/FilterBar";
+import AllowanceForDoubtfulAccounts from "@/components/reports/AllowanceForDoubtfulAccounts";
 import { fromMinor } from "@/lib/domain/money";
 import { arAgingAction } from "./actions";
 import type { AgingReport } from "@/lib/services/aging";
@@ -24,10 +25,12 @@ export default function ArAgingClient({
   baseCurrency,
   baseDecimals,
   companyName,
+  canPostAllowance,
 }: {
   baseCurrency: string;
   baseDecimals: number;
   companyName: string;
+  canPostAllowance: boolean;
 }) {
   const { message } = App.useApp();
   const [rep, setRep] = useState<AgingReport | null>(null);
@@ -84,6 +87,13 @@ export default function ArAgingClient({
             ))}
             <b>Total: {fmt(rep.total)}</b>
           </Space>
+          {/* The valuation belongs beside the control it is derived from. */}
+          <AllowanceForDoubtfulAccounts
+            asOf={asOf!.format("YYYY-MM-DD")}
+            money={(minor) => `${fmt(minor)} ${baseCurrency}`}
+            currencyCode={baseCurrency}
+            canPost={canPostAllowance}
+          />
           <ReportBody
             numbers={
               <AgingByPartyTable
