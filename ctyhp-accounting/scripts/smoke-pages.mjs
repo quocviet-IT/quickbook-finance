@@ -12,6 +12,11 @@
 // Routes are discovered from app/(app), so a new page is covered automatically.
 // Dynamic segments are skipped — they need a real record id.
 //
+// This sweep only reads: one sign-in, then a GET per route. It therefore does
+// NOT require ALLOW_DESTRUCTIVE_E2E, which gates the suites that write and
+// which demands a second Supabase project. Sign-in comes from
+// `smoke-environment.mjs` and needs no secret beyond what the app already has.
+//
 // Run (dev or preview server must already be up):
 //   node --env-file=.env.local scripts/smoke-pages.mjs [baseUrl] [extra routes...]
 //
@@ -25,17 +30,10 @@
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
-import { requireDestructiveE2eEnvironment } from "./e2e-environment.mjs";
-
-const { supabaseUrl, anonKey, email, password } =
-  requireDestructiveE2eEnvironment();
+import { smokeSession } from "./smoke-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appDir = join(here, "..", "app", "(app)");
-
-const url = supabaseUrl;
-const key = anonKey;
 
 const args = process.argv.slice(2);
 const base = args.find((a) => a.startsWith("http")) ?? "http://localhost:3000";
@@ -70,8 +68,8 @@ function discoverRoutes(dir = appDir, prefix = "") {
  * Build the session cookie the way @supabase/ssr reads it: base64-prefixed JSON,
  * split into numbered chunks past the cookie size limit.
  */
-function sessionCookie(session, user) {
-  const ref = new URL(url).hostname.split(".")[0];
+function sessionCookie(session, user, supabaseUrl) {
+  const ref = new URL(supabaseUrl).hostname.split(".")[0];
   const payload = {
     access_token: session.access_token,
     refresh_token: session.refresh_token,
@@ -92,10 +90,8 @@ function sessionCookie(session, user) {
 }
 
 async function main() {
-  const sb = createClient(url, key, { auth: { persistSession: false } });
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) throw new Error("login: " + error.message);
-  const cookie = sessionCookie(data.session, data.user);
+  const { session, user, supabaseUrl } = await smokeSession();
+  const cookie = sessionCookie(session, user, supabaseUrl);
 
   const routes = onlyRoutes.length
     ? onlyRoutes
