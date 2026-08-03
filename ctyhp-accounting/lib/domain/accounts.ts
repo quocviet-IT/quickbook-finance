@@ -71,6 +71,43 @@ export function naturalBalance(
   return normalBalanceOf(type) === "debit" ? raw : -raw;
 }
 
+/** The part of an account row any picker rule needs to judge it. */
+export interface AccountSelectionFields {
+  account_type: AccountType;
+  is_posting_account: boolean;
+  status: "draft" | "active" | "inactive" | "archived";
+}
+
+/**
+ * May a customer sales document credit this account?
+ *
+ * Only operating revenue — plain `income` — is a sale. `other_income` is the
+ * non-operating bucket: it holds windfalls the business did not sell (7000
+ * Other Income) and accounts the system posts to on its own and nobody should
+ * hand-pick (7010 Purchase Discounts Taken, 7990 Gain on Asset Disposal).
+ * Offering them on an invoice line is offering a misclassification, and it
+ * lands in the wrong half of the Profit & Loss.
+ *
+ * Contra-revenue — sales discounts, refunds, disputes — belongs on the chart
+ * as `income` too, so this rule already covers it.
+ *
+ * Not a rule about *gains*: writing off a payable, disposing of an asset and
+ * crediting bank interest are all `other_income` and all correct. Those
+ * pickers ask their own question.
+ */
+export function isSalesRevenueAccount(account: AccountSelectionFields): boolean {
+  return (
+    account.account_type === "income" &&
+    account.is_posting_account &&
+    account.status === "active"
+  );
+}
+
+/** The chart narrowed to what a sales document may bill to, order preserved. */
+export function salesRevenueAccounts<T extends AccountSelectionFields>(accounts: readonly T[]): T[] {
+  return accounts.filter(isSalesRevenueAccount);
+}
+
 /**
  * Validate a proposed parent chain for cycles.
  * `parentOf` returns the parent id of an account, or null at the root.

@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listItems } from "@/lib/services/items";
 import { listAccounts } from "@/lib/services/accounts";
+import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { listTaxCodes } from "@/lib/services/reference";
 import { getInventoryValuation } from "@/lib/services/inventory";
 import { getUserRole, canWrite } from "@/lib/auth";
@@ -20,9 +21,8 @@ export default async function ItemsPage() {
     getUserRole(),
   ]);
 
-  const incomeAccounts = accounts.filter(
-    (a) => (a.account_type === "income" || a.account_type === "other_income") && a.is_posting_account && a.status === "active",
-  );
+  // An item's income account is what its invoice lines default to.
+  const incomeAccounts = salesRevenueAccounts(accounts);
   const expenseAccounts = accounts.filter(
     (a) =>
       (a.account_type === "expense" || a.account_type === "cost_of_goods_sold" || a.account_type === "other_expense") &&

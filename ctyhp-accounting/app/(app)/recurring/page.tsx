@@ -1,6 +1,7 @@
 import PageHeader from "@/components/PageHeader";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listAccounts } from "@/lib/services/accounts";
+import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { listCustomers } from "@/lib/services/invoicing";
 import { listVendors } from "@/lib/services/payables";
 import { listTaxCodes } from "@/lib/services/reference";
@@ -25,6 +26,8 @@ export default async function RecurringTransactionsPage() {
   const activePostingAccounts = accounts.filter(
     (account) => account.status === "active" && account.is_posting_account,
   );
+  // A recurring invoice raises real invoices, so it bills the same accounts.
+  const incomeAccounts = salesRevenueAccounts(activePostingAccounts);
 
   return (
     <div>
@@ -37,10 +40,7 @@ export default async function RecurringTransactionsPage() {
         runs={runs}
         customers={customers.filter((customer) => customer.is_active)}
         vendors={vendors.filter((vendor) => vendor.is_active)}
-        incomeAccounts={activePostingAccounts.filter(
-          (account) =>
-            account.account_type === "income" || account.account_type === "other_income",
-        )}
+        incomeAccounts={incomeAccounts}
         expenseAccounts={activePostingAccounts.filter(
           (account) =>
             account.account_type === "expense" ||

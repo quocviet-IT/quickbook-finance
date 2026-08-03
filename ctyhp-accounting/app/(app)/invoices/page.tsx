@@ -9,6 +9,7 @@ import { listGapNotes, listSequenceCatalog, listSequenceDocuments } from "@/lib/
 import { listCustomerCredit } from "@/lib/services/credit";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { auditSequence, describeSequenceIntegrity } from "@/lib/domain/sequence";
+import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
@@ -88,12 +89,8 @@ export default async function InvoicesPage({
       )
     : null;
 
-  const incomeAccounts = accounts.filter(
-    (a) =>
-      (a.account_type === "income" || a.account_type === "other_income") &&
-      a.is_posting_account &&
-      a.status === "active",
-  );
+  // An invoice line is a sale, so it may only credit operating revenue.
+  const incomeAccounts = salesRevenueAccounts(accounts);
 
   const expenseAccounts = accounts.filter(
     (a) =>

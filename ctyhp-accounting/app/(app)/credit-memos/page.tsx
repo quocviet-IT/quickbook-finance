@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
+import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { listCustomers } from "@/lib/services/invoicing";
 import PageHeader from "@/components/PageHeader";
 import CreditMemosClient from "./CreditMemosClient";
@@ -18,9 +19,8 @@ export default async function CreditMemosPage() {
     getUserRole(),
   ]);
   const base = currencies.find((c) => c.is_base);
-  const incomeAccounts = accounts.filter(
-    (a) => a.account_type === "income" && a.is_posting_account && a.status === "active",
-  );
+  // A credit memo reverses a sale, so it credits back the same revenue.
+  const incomeAccounts = salesRevenueAccounts(accounts);
 
   return (
     <div>

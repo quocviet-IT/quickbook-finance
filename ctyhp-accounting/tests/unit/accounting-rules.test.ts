@@ -4,6 +4,8 @@ import {
   statementSectionOf,
   naturalBalance,
   assertNoCycle,
+  isSalesRevenueAccount,
+  salesRevenueAccounts,
 } from "@/lib/domain/accounts";
 import { computeInvoiceLine, sumInvoiceTotals, toMinor, fromMinor } from "@/lib/domain/money";
 import {
@@ -44,6 +46,50 @@ describe("account rules", () => {
     expect(() => assertNoCycle("a", "c", parentOf)).toThrow();
     // Attaching a fresh node under c is fine.
     expect(() => assertNoCycle("d", "c", parentOf)).not.toThrow();
+  });
+});
+
+describe("sales revenue accounts", () => {
+  const account = (over: Partial<Parameters<typeof isSalesRevenueAccount>[0]>) => ({
+    account_type: "income" as const,
+    is_posting_account: true,
+    status: "active" as const,
+    ...over,
+  });
+
+  it("accepts operating revenue a sale can be billed to", () => {
+    // 4000 Sales Revenue and 4100 Service Revenue are both plain `income`;
+    // what the company renames them to does not change the rule.
+    expect(isSalesRevenueAccount(account({}))).toBe(true);
+  });
+
+  it("rejects non-operating income", () => {
+    // 7000 Other Income, 7010 Purchase Discounts Taken, 7990 Gain on Asset
+    // Disposal. A customer invoice never earns any of them, and the last two
+    // are posted by the system alone.
+    expect(isSalesRevenueAccount(account({ account_type: "other_income" }))).toBe(false);
+  });
+
+  it("rejects anything else on the chart", () => {
+    for (const type of ["bank", "accounts_receivable", "equity", "expense", "cost_of_goods_sold", "other_expense"] as const) {
+      expect(isSalesRevenueAccount(account({ account_type: type }))).toBe(false);
+    }
+  });
+
+  it("rejects a header account and an account not open for posting", () => {
+    expect(isSalesRevenueAccount(account({ is_posting_account: false }))).toBe(false);
+    for (const status of ["draft", "inactive", "archived"] as const) {
+      expect(isSalesRevenueAccount(account({ status }))).toBe(false);
+    }
+  });
+
+  it("keeps the caller's own row type when filtering a chart", () => {
+    const chart = [
+      { code: "4000", account_type: "income" as const, is_posting_account: true, status: "active" as const },
+      { code: "7010", account_type: "other_income" as const, is_posting_account: true, status: "active" as const },
+      { code: "5000", account_type: "cost_of_goods_sold" as const, is_posting_account: true, status: "active" as const },
+    ];
+    expect(salesRevenueAccounts(chart).map((a) => a.code)).toEqual(["4000"]);
   });
 });
 
