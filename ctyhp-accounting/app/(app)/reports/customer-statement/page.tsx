@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { listCustomers } from "@/lib/services/invoicing";
+import { resolveActiveCompany } from "@/lib/db/company";
+import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import CustomerStatementClient from "./CustomerStatementClient";
 
@@ -8,11 +10,18 @@ export const dynamic = "force-dynamic";
 
 export default async function CustomerStatementPage() {
   const sb = await createSupabaseServerClient();
+  const entity = await resolveActiveCompany();
   const [currencies, customers] = await Promise.all([listCurrencies(sb), listCustomers(sb)]);
   const base = currencies.find((c) => c.is_base);
   return (
     <div>
       <PageHeader
+        meta={
+          <ReportEntityBadge
+            companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"}
+            isSample={entity.active?.isSample ?? false}
+          />
+        }
         title="Customer Statement"
         description="Opening balance, activity, and closing balance for a customer over a date range."
       />

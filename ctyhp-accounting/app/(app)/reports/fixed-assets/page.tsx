@@ -1,3 +1,5 @@
+import { resolveActiveCompany } from "@/lib/db/company";
+import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getCurrentCompanySettings } from "@/lib/services/company";
@@ -12,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function FixedAssetReportPage() {
   const sb = await createSupabaseServerClient();
+  const entity = await resolveActiveCompany();
   const [assets, depreciation, currencies, company] = await Promise.all([
     listFixedAssets(sb),
     listAssetDepreciationDetail(sb),
@@ -23,6 +26,12 @@ export default async function FixedAssetReportPage() {
   return (
     <div>
       <PageHeader
+        meta={
+          <ReportEntityBadge
+            companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"}
+            isSample={entity.active?.isSample ?? false}
+          />
+        }
         title="Fixed Asset Register & Depreciation"
         description="Reconcile asset cost, accumulated depreciation, net book value, monthly schedules, and disposals."
         breadcrumbItems={[

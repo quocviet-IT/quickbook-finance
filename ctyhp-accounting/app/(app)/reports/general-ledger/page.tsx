@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
+import { resolveActiveCompany } from "@/lib/db/company";
+import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import GeneralLedgerClient from "./GeneralLedgerClient";
 
@@ -12,6 +14,7 @@ export default async function GeneralLedgerPage({
   searchParams: Promise<{ account?: string; from?: string; to?: string }>;
 }) {
   const sb = await createSupabaseServerClient();
+  const entity = await resolveActiveCompany();
   const filters = await searchParams;
   const [currencies, accounts] = await Promise.all([listCurrencies(sb), listAccounts(sb)]);
   const base = currencies.find((c) => c.is_base);
@@ -19,6 +22,12 @@ export default async function GeneralLedgerPage({
   return (
     <div>
       <PageHeader
+        meta={
+          <ReportEntityBadge
+            companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"}
+            isSample={entity.active?.isSample ?? false}
+          />
+        }
         title="General Ledger"
         description="Account activity with opening, per-line running balance, and closing balance."
       />

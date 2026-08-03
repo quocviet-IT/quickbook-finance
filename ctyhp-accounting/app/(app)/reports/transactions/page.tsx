@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { getTransactionList } from "@/lib/services/reports";
 import { getCurrentCompanySettings } from "@/lib/services/company";
+import { resolveActiveCompany } from "@/lib/db/company";
+import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import TransactionListClient from "./TransactionListClient";
 
@@ -28,6 +30,8 @@ export default async function TransactionListPage({
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : fallback.to;
 
   const sb = await createSupabaseServerClient();
+
+  const entity = await resolveActiveCompany();
   const [rows, currencies, settings] = await Promise.all([
     getTransactionList(sb, from, to),
     listCurrencies(sb),
@@ -38,6 +42,12 @@ export default async function TransactionListPage({
   return (
     <div>
       <PageHeader
+        meta={
+          <ReportEntityBadge
+            companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"}
+            isSample={entity.active?.isSample ?? false}
+          />
+        }
         title="Transaction List by Date"
         description="Every posted transaction in a date range, one row each, with who it was with, what it was for, and whether it has been reconciled."
         breadcrumbItems={[{ title: "Reports", href: "/reports" }, { title: "Transaction List by Date" }]}

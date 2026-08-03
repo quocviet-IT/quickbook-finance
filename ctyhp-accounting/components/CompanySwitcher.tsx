@@ -81,8 +81,17 @@ export default function CompanySwitcher({
       popupMatchSelectWidth={320}
       aria-label="Company"
       prefix={<BankOutlined />}
+      // Beyond a handful of companies a plain dropdown is a scroll. Search on
+      // the name people actually use, and on the legal name they file under.
+      showSearch
+      optionFilterProp="searchText"
+      filterOption={(input, option) =>
+        String(option?.searchText ?? "").toLowerCase().includes(input.toLowerCase())
+      }
+      notFoundContent="No company matches that name"
       options={options.map((company) => ({
         value: company.slug,
+        searchText: `${company.dbaName ?? ""} ${company.legalName}`.trim(),
         label: (
           <Space size={6}>
             <span>{company.dbaName || company.legalName}</span>
