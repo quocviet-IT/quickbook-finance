@@ -4,6 +4,7 @@ import { Alert, App, Button, Card, Col, InputNumber, Row, Space, Statistic, Tabl
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
 import { toCsv } from "@/lib/csv";
+import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import type { Report1099, Vendor1099Assessed } from "@/lib/services/vendorTax";
 import { report1099Action } from "../../vendors/tax-actions";
 
@@ -13,10 +14,13 @@ export default function Report1099Client({
   defaultYear,
   baseCurrency,
   baseDecimals,
+  companyName,
 }: {
   defaultYear: number;
   baseCurrency: string;
   baseDecimals: number;
+  /** Whose books the exported file belongs to. */
+  companyName: string;
 }) {
   const { message } = App.useApp();
   const [year, setYear] = useState(defaultYear);
@@ -62,7 +66,13 @@ export default function Report1099Client({
         { key: "exceptions", header: "Exceptions" },
       ],
     );
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const identified = csvWithReportIdentity(csv, {
+      companyName,
+      title: "1099 Review",
+      subtitle: `Tax year ${rep.year} · cash basis`,
+      currencyCode: baseCurrency,
+    });
+    const blob = new Blob([identified], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `1099-review-${rep.year}.csv`;

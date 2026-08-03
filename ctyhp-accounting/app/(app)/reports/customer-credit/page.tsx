@@ -24,7 +24,7 @@ export default async function CustomerCreditPage() {
         title="Customer Credit Exposure"
         description="Who is on hold, who is over their limit, what is past due, and how long invoices are taking to collect."
       />
-      <CustomerCreditClient rows={rows} salesWindowDays={CREDIT_SALES_WINDOW_DAYS} />
+      <CustomerCreditClient rows={rows} salesWindowDays={CREDIT_SALES_WINDOW_DAYS} companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"} />
     </div>
   );
 }

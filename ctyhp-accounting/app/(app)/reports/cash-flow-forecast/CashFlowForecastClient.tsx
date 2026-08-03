@@ -1,11 +1,21 @@
 "use client";
 import { useState } from "react";
-import { Alert, Button, Segmented, Space, Statistic, Table, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Segmented,
+  Space,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { downloadCsvFile } from "@/lib/client/report-export";
 import { toCsv } from "@/lib/csv";
+import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import { formatMoney } from "@/lib/format";
 import {
   describeForecastBasis,
@@ -22,43 +32,65 @@ type View = "weeks" | "items";
 export default function CashFlowForecastClient({
   forecast,
   openItems,
+  companyName,
 }: {
   forecast: CashFlowForecast;
   openItems: OpenItem[];
+  /** Whose books the exported file belongs to. */
+  companyName: string;
 }) {
   const [view, setView] = useState<View>("weeks");
 
-  const expectedIn = forecast.buckets.reduce((sum, b) => sum + b.expectedInMinor, 0);
-  const expectedOut = forecast.buckets.reduce((sum, b) => sum + b.expectedOutMinor, 0);
-  const overdueIn = forecast.buckets.reduce((sum, b) => sum + b.overdueInMinor, 0);
+  const expectedIn = forecast.buckets.reduce(
+    (sum, b) => sum + b.expectedInMinor,
+    0,
+  );
+  const expectedOut = forecast.buckets.reduce(
+    (sum, b) => sum + b.expectedOutMinor,
+    0,
+  );
+  const overdueIn = forecast.buckets.reduce(
+    (sum, b) => sum + b.overdueInMinor,
+    0,
+  );
   const closing = forecast.buckets.at(-1)?.cumulativeMinor ?? 0;
   const worstWeek = forecast.buckets.reduce<ForecastBucket | null>(
     (worst, bucket) =>
-      worst === null || bucket.cumulativeMinor < worst.cumulativeMinor ? bucket : worst,
+      worst === null || bucket.cumulativeMinor < worst.cumulativeMinor
+        ? bucket
+        : worst,
     null,
   );
 
   function exportCsv() {
     downloadCsvFile(
-      toCsv(
-        forecast.buckets.map((bucket) => ({
-          week: bucket.weekStart,
-          scheduled_in: (bucket.scheduledInMinor / 100).toFixed(2),
-          scheduled_out: (bucket.scheduledOutMinor / 100).toFixed(2),
-          expected_in: (bucket.expectedInMinor / 100).toFixed(2),
-          expected_out: (bucket.expectedOutMinor / 100).toFixed(2),
-          net: (bucket.expectedNetMinor / 100).toFixed(2),
-          cumulative: (bucket.cumulativeMinor / 100).toFixed(2),
-        })),
-        [
-          { key: "week", header: "Week beginning" },
-          { key: "scheduled_in", header: "Scheduled in" },
-          { key: "scheduled_out", header: "Scheduled out" },
-          { key: "expected_in", header: "Expected in" },
-          { key: "expected_out", header: "Expected out" },
-          { key: "net", header: "Net" },
-          { key: "cumulative", header: "Cumulative" },
-        ],
+      csvWithReportIdentity(
+        toCsv(
+          forecast.buckets.map((bucket) => ({
+            week: bucket.weekStart,
+            scheduled_in: (bucket.scheduledInMinor / 100).toFixed(2),
+            scheduled_out: (bucket.scheduledOutMinor / 100).toFixed(2),
+            expected_in: (bucket.expectedInMinor / 100).toFixed(2),
+            expected_out: (bucket.expectedOutMinor / 100).toFixed(2),
+            net: (bucket.expectedNetMinor / 100).toFixed(2),
+            cumulative: (bucket.cumulativeMinor / 100).toFixed(2),
+          })),
+          [
+            { key: "week", header: "Week beginning" },
+            { key: "scheduled_in", header: "Scheduled in" },
+            { key: "scheduled_out", header: "Scheduled out" },
+            { key: "expected_in", header: "Expected in" },
+            { key: "expected_out", header: "Expected out" },
+            { key: "net", header: "Net" },
+            { key: "cumulative", header: "Cumulative" },
+          ],
+        ),
+        {
+          companyName,
+          title: "Cash Flow Forecast",
+          subtitle: `As of ${forecast.asOf} · ${forecast.weeks} weeks`,
+          currencyCode: "USD",
+        },
       ),
       `cash-flow-forecast-${forecast.asOf}.csv`,
     );
@@ -67,7 +99,10 @@ export default function CashFlowForecastClient({
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
       <Space size="large" wrap>
-        <Statistic title={`Expected in (${forecast.weeks} weeks)`} value={money(expectedIn)} />
+        <Statistic
+          title={`Expected in (${forecast.weeks} weeks)`}
+          value={money(expectedIn)}
+        />
         <Statistic title="Expected out" value={money(expectedOut)} />
         <Statistic
           title="Net over the horizon"
@@ -100,15 +135,19 @@ export default function CashFlowForecastClient({
         />
       ) : null}
 
-      {forecast.beyondHorizonInMinor > 0 || forecast.beyondHorizonOutMinor > 0 ? (
+      {forecast.beyondHorizonInMinor > 0 ||
+      forecast.beyondHorizonOutMinor > 0 ? (
         <Typography.Text type="secondary">
-          Beyond the {forecast.weeks}-week horizon: {money(forecast.beyondHorizonInMinor)} in,{" "}
+          Beyond the {forecast.weeks}-week horizon:{" "}
+          {money(forecast.beyondHorizonInMinor)} in,{" "}
           {money(forecast.beyondHorizonOutMinor)} out.
         </Typography.Text>
       ) : null}
 
       <FilterBar
-        resultCount={view === "weeks" ? forecast.buckets.length : openItems.length}
+        resultCount={
+          view === "weeks" ? forecast.buckets.length : openItems.length
+        }
         ariaLabel="Cash flow forecast views"
         actions={
           <Button icon={<DownloadOutlined />} onClick={exportCsv}>
@@ -182,7 +221,9 @@ export default function CashFlowForecastClient({
               width: 130,
               align: "right",
               render: (v: number) => (
-                <Typography.Text type={v < 0 ? "danger" : undefined}>{money(v)}</Typography.Text>
+                <Typography.Text type={v < 0 ? "danger" : undefined}>
+                  {money(v)}
+                </Typography.Text>
               ),
             },
             {
@@ -229,9 +270,13 @@ export default function CashFlowForecastClient({
                   asOf: forecast.asOf,
                 });
                 return age.isOverdue ? (
-                  <Typography.Text type="danger">{age.overdueDays} d overdue</Typography.Text>
+                  <Typography.Text type="danger">
+                    {age.overdueDays} d overdue
+                  </Typography.Text>
                 ) : (
-                  <Typography.Text type="secondary">Not yet due</Typography.Text>
+                  <Typography.Text type="secondary">
+                    Not yet due
+                  </Typography.Text>
                 );
               },
             },

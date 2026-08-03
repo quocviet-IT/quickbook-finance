@@ -28,7 +28,7 @@ export default async function NumberSequencePage() {
         title="Document Number Sequence"
         description="Every number the system has issued, in order, with any that no document holds flagged as a break."
       />
-      <NumberSequenceClient catalog={catalog} canDocumentGaps={canDocumentGaps} />
+      <NumberSequenceClient catalog={catalog} canDocumentGaps={canDocumentGaps} companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"} />
     </div>
   );
 }

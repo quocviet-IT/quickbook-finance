@@ -1,11 +1,21 @@
 "use client";
 import { useState } from "react";
-import { Alert, Button, Segmented, Space, Statistic, Tag, Tooltip, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Segmented,
+  Space,
+  Statistic,
+  Tag,
+  Tooltip,
+  Typography,
+} from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { downloadCsvFile } from "@/lib/client/report-export";
 import { toCsv } from "@/lib/csv";
+import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import { formatMoney } from "@/lib/format";
 import { creditStateColor, sortByCreditRisk } from "@/lib/domain/credit";
 import type { CustomerCreditRow } from "@/lib/services/credit";
@@ -17,15 +27,21 @@ const money = (minor: number) => formatMoney(minor, "USD", 2);
 export default function CustomerCreditClient({
   rows,
   salesWindowDays,
+  companyName,
 }: {
   rows: CustomerCreditRow[];
   salesWindowDays: number;
+  /** Whose books the exported file belongs to. */
+  companyName: string;
 }) {
   const [view, setView] = useState<View>("attention");
 
   const ranked = sortByCreditRisk(rows);
   const needsAttention = ranked.filter(
-    (row) => row.status.state === "hold" || row.status.state === "over_limit" || row.overdueMinor > 0,
+    (row) =>
+      row.status.state === "hold" ||
+      row.status.state === "over_limit" ||
+      row.overdueMinor > 0,
   );
   const shown = view === "attention" ? needsAttention : ranked;
 
@@ -44,36 +60,52 @@ export default function CustomerCreditClient({
   // window. Averaging each customer's own DSO would weight a $50 account the
   // same as a $50,000 one.
   const windowSales = rows.reduce((sum, row) => sum + row.salesWindowMinor, 0);
-  const portfolioDso = windowSales > 0 ? Math.round((totalOwed / windowSales) * salesWindowDays) : null;
+  const portfolioDso =
+    windowSales > 0
+      ? Math.round((totalOwed / windowSales) * salesWindowDays)
+      : null;
 
   function exportCsv() {
     downloadCsvFile(
-      toCsv(
-        ranked.map((row) => ({
-          customer: row.name,
-          credit_limit: row.creditLimitMinor === null ? "" : (row.creditLimitMinor / 100).toFixed(2),
-          owed: (row.openBalanceMinor / 100).toFixed(2),
-          available:
-            row.status.availableMinor === null ? "" : (row.status.availableMinor / 100).toFixed(2),
-          overdue: (row.overdueMinor / 100).toFixed(2),
-          oldest_due: row.oldestDueDate ?? "",
-          dso: row.status.daysSalesOutstanding ?? "",
-          state: row.status.label,
-          terms_days: row.creditTermsDays ?? "",
-          billing_address: row.hasBillingAddress ? "yes" : "no",
-        })),
-        [
-          { key: "customer", header: "Customer" },
-          { key: "credit_limit", header: "Credit limit" },
-          { key: "owed", header: "Owed now" },
-          { key: "available", header: "Available" },
-          { key: "overdue", header: "Past due" },
-          { key: "oldest_due", header: "Oldest due date" },
-          { key: "dso", header: "DSO (days)" },
-          { key: "state", header: "Credit status" },
-          { key: "terms_days", header: "Terms (days)" },
-          { key: "billing_address", header: "Billing address on file" },
-        ],
+      csvWithReportIdentity(
+        toCsv(
+          ranked.map((row) => ({
+            customer: row.name,
+            credit_limit:
+              row.creditLimitMinor === null
+                ? ""
+                : (row.creditLimitMinor / 100).toFixed(2),
+            owed: (row.openBalanceMinor / 100).toFixed(2),
+            available:
+              row.status.availableMinor === null
+                ? ""
+                : (row.status.availableMinor / 100).toFixed(2),
+            overdue: (row.overdueMinor / 100).toFixed(2),
+            oldest_due: row.oldestDueDate ?? "",
+            dso: row.status.daysSalesOutstanding ?? "",
+            state: row.status.label,
+            terms_days: row.creditTermsDays ?? "",
+            billing_address: row.hasBillingAddress ? "yes" : "no",
+          })),
+          [
+            { key: "customer", header: "Customer" },
+            { key: "credit_limit", header: "Credit limit" },
+            { key: "owed", header: "Owed now" },
+            { key: "available", header: "Available" },
+            { key: "overdue", header: "Past due" },
+            { key: "oldest_due", header: "Oldest due date" },
+            { key: "dso", header: "DSO (days)" },
+            { key: "state", header: "Credit status" },
+            { key: "terms_days", header: "Terms (days)" },
+            { key: "billing_address", header: "Billing address on file" },
+          ],
+        ),
+        {
+          companyName,
+          title: "Customer Credit Exposure",
+          subtitle: `Sales window ${salesWindowDays} days`,
+          currencyCode: "USD",
+        },
       ),
       "customer-credit-exposure.csv",
     );
@@ -113,7 +145,11 @@ export default function CustomerCreditClient({
         resultCount={shown.length}
         ariaLabel="Customer credit filters"
         actions={
-          <Button icon={<DownloadOutlined />} disabled={rows.length === 0} onClick={exportCsv}>
+          <Button
+            icon={<DownloadOutlined />}
+            disabled={rows.length === 0}
+            onClick={exportCsv}
+          >
             Export CSV
           </Button>
         }
@@ -122,7 +158,10 @@ export default function CustomerCreditClient({
           value={view}
           onChange={(value) => setView(value as View)}
           options={[
-            { label: `Needs attention (${needsAttention.length})`, value: "attention" },
+            {
+              label: `Needs attention (${needsAttention.length})`,
+              value: "attention",
+            },
             { label: `All customers (${rows.length})`, value: "all" },
           ]}
         />
@@ -131,7 +170,9 @@ export default function CustomerCreditClient({
       <DataTable<CustomerCreditRow>
         rowKey="customerId"
         dataSource={shown}
-        emptyTitle={view === "attention" ? "Nothing needs attention" : "No customers yet"}
+        emptyTitle={
+          view === "attention" ? "Nothing needs attention" : "No customers yet"
+        }
         emptyDescription={
           view === "attention"
             ? "No customer is on hold, over their limit, or carrying an overdue balance."
@@ -158,7 +199,9 @@ export default function CustomerCreditClient({
             width: 160,
             render: (_: unknown, row) => {
               const tag = (
-                <Tag color={creditStateColor(row.status.state)}>{row.status.label}</Tag>
+                <Tag color={creditStateColor(row.status.state)}>
+                  {row.status.label}
+                </Tag>
               );
               return row.status.reasons.length ? (
                 <Tooltip title={row.status.reasons.join(". ")}>{tag}</Tooltip>
@@ -195,7 +238,9 @@ export default function CustomerCreditClient({
               row.status.availableMinor === null ? (
                 "—"
               ) : (
-                <Typography.Text type={row.status.availableMinor < 0 ? "danger" : undefined}>
+                <Typography.Text
+                  type={row.status.availableMinor < 0 ? "danger" : undefined}
+                >
                   {money(row.status.availableMinor)}
                 </Typography.Text>
               ),
@@ -207,8 +252,16 @@ export default function CustomerCreditClient({
             align: "right",
             render: (value: number, row) =>
               value > 0 ? (
-                <Tooltip title={row.oldestDueDate ? `Oldest due ${row.oldestDueDate}` : undefined}>
-                  <Typography.Text type="danger">{money(value)}</Typography.Text>
+                <Tooltip
+                  title={
+                    row.oldestDueDate
+                      ? `Oldest due ${row.oldestDueDate}`
+                      : undefined
+                  }
+                >
+                  <Typography.Text type="danger">
+                    {money(value)}
+                  </Typography.Text>
                 </Tooltip>
               ) : (
                 money(0)
@@ -229,7 +282,8 @@ export default function CustomerCreditClient({
             dataIndex: "creditTermsDays",
             width: 100,
             align: "right",
-            render: (value: number | null) => (value === null ? "Default" : `${value} d`),
+            render: (value: number | null) =>
+              value === null ? "Default" : `${value} d`,
           },
         ]}
       />

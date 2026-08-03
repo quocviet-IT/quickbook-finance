@@ -20,6 +20,7 @@ import { DownloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { downloadCsvFile } from "@/lib/client/report-export";
+import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import {
   describeSequenceIntegrity,
   sequenceCsv,
@@ -47,9 +48,12 @@ const STATE_COLOR: Record<SequenceRow["state"], string> = {
 export default function NumberSequenceClient({
   catalog,
   canDocumentGaps,
+  companyName,
 }: {
   catalog: SequenceDefinition[];
   canDocumentGaps: boolean;
+  /** Whose books the exported file belongs to. */
+  companyName: string;
 }) {
   const { message } = App.useApp();
   const [sequenceKey, setSequenceKey] = useState<string>(
@@ -221,7 +225,15 @@ export default function NumberSequenceClient({
             disabled={!audit || audit.rows.length === 0}
             onClick={() => {
               if (!audit) return;
-              downloadCsvFile(sequenceCsv(audit), sequenceCsvFileName(audit));
+              downloadCsvFile(
+                csvWithReportIdentity(sequenceCsv(audit), {
+                  companyName,
+                  title: "Document Number Sequence",
+                  subtitle: audit.definition.label,
+                  currencyCode: "USD",
+                }),
+                sequenceCsvFileName(audit),
+              );
             }}
           >
             Export CSV

@@ -28,7 +28,7 @@ export default async function CashFlowForecastPage() {
         title="Cash Flow Forecast"
         description="Money still owed to you and by you, projected onto the weeks ahead — on the dates the documents say, and on the dates people actually pay."
       />
-      <CashFlowForecastClient forecast={forecast} openItems={openItems} />
+      <CashFlowForecastClient forecast={forecast} openItems={openItems} companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"} />
     </div>
   );
 }

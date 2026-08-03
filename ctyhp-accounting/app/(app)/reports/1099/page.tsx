@@ -28,6 +28,7 @@ export default async function Report1099Page() {
         description="What each vendor was paid in a tax year, whether it is reportable, and what is missing before anything can be filed."
       />
       <Report1099Client
+        companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"}
         defaultYear={defaultYear}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
