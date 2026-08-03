@@ -10,6 +10,18 @@
  */
 import type { AppRole, UserStatus } from "@/lib/db/types";
 import type { Minor } from "./money";
+import { APP_ROLES } from "./schemas";
+
+/**
+ * A grant record with every role present and switched off.
+ *
+ * Derived from APP_ROLES rather than written out, because the permission matrix
+ * renders one cell per key: a role missing here shows an undefined cell instead
+ * of an off switch, and nobody notices until that role exists.
+ */
+export function emptyGrants(): Record<AppRole, boolean> {
+  return Object.fromEntries(APP_ROLES.map((role) => [role, false])) as Record<AppRole, boolean>;
+}
 
 export interface ApprovalPolicyLike {
   enabled: boolean;

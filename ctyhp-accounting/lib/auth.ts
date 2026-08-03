@@ -31,11 +31,7 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
-export function canWrite(role: AppRole | null): boolean {
-  return role === "admin" || role === "accountant";
-}
-
-/** Config that only admins may change (tax rates, currencies, COA approval). */
-export function isAdmin(role: AppRole | null): boolean {
-  return role === "admin";
-}
+// The predicates themselves are pure and live in `lib/domain/roles.ts` so unit
+// tests can reach them; this module is server-only. Re-exported here because 44
+// call sites already import them from `@/lib/auth`.
+export { canWrite, isAdmin } from "./domain/roles";

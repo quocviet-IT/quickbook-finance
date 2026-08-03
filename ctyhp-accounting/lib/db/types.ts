@@ -24,7 +24,7 @@ export type JournalSource =
   | "depreciation"
   | "asset_disposal";
 export type JournalStatus = "posted" | "void";
-export type AppRole = "admin" | "accountant" | "viewer";
+export type AppRole = "admin" | "accountant" | "sales" | "viewer";
 
 export type DocumentEntityType =
   | "invoice"

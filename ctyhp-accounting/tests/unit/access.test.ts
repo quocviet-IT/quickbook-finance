@@ -3,15 +3,18 @@ import {
   approvalRequired,
   canDecide,
   describeStatusChange,
+  emptyGrants,
   isLastActiveAdmin,
   CONTROLLED_ACTIONS,
   PERMISSION_CATEGORIES,
 } from "@/lib/domain/access";
+import { canWrite } from "@/lib/domain/roles";
 import {
   approvalDecisionSchema,
   approvalPolicySchema,
   userCreateSchema,
   userStatusSchema,
+  APP_ROLES,
 } from "@/lib/domain/schemas";
 
 describe("approvalRequired", () => {
@@ -175,5 +178,28 @@ describe("access schemas", () => {
   it("requires a note when rejecting", () => {
     expect(approvalDecisionSchema.safeParse({ note: "" }).success).toBe(false);
     expect(approvalDecisionSchema.safeParse({ note: "Not supported by evidence" }).success).toBe(true);
+  });
+});
+
+describe("application roles", () => {
+  it("carries a sales role between accountant and viewer", () => {
+    expect(APP_ROLES).toEqual(["admin", "accountant", "sales", "viewer"]);
+  });
+
+  it("keeps sales out of every ledger write", () => {
+    // canWrite is the allow-list 44 call sites rely on. If someone ever widens
+    // it, sales silently gains invoice, payment and journal posting -- so this
+    // assertion is the one that matters most in this file.
+    expect(canWrite("sales")).toBe(false);
+    expect(canWrite("admin")).toBe(true);
+    expect(canWrite("accountant")).toBe(true);
+    expect(canWrite("viewer")).toBe(false);
+  });
+
+  it("gives the permission matrix a cell for every role", () => {
+    // A missing key renders an undefined cell rather than an off switch.
+    const grants = emptyGrants();
+    for (const role of APP_ROLES) expect(grants[role]).toBe(false);
+    expect(Object.keys(grants).sort()).toEqual([...APP_ROLES].sort());
   });
 });
