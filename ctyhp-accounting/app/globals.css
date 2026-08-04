@@ -2,7 +2,10 @@ html,
 body {
   padding: 0;
   margin: 0;
-  max-width: 100vw;
+  /* 100% and not 100vw: vw counts the scrollbar gutter, and a modal removes the
+     scrollbar while padding the body to compensate. Measured against vw the page
+     then shifts sideways for as long as the dialog is open. */
+  max-width: 100%;
   min-height: 100%;
   overflow-x: clip;
 }
@@ -87,20 +90,35 @@ body {
   min-height: 100dvh;
 }
 
+/*
+ * The column stretches with the layout; only the frame inside it follows the
+ * viewport.
+ *
+ * It used to be the other way round -- the column itself was `position: sticky`
+ * and `height: 100dvh` -- and that broke the moment any modal opened. Ant Design
+ * locks the page with `body { overflow: hidden }`, a sticky element stops
+ * sticking once its scroll container cannot scroll, and the column snapped back
+ * to its static position at the top of the page. Anyone who had scrolled down
+ * first saw the sidebar end halfway down the screen with the layout's own grey
+ * showing beneath it.
+ *
+ * Sized this way the column cannot leave a gap whatever sticky does, because it
+ * is as tall as the page by construction.
+ */
 .app-shell__sider {
-  position: sticky !important;
-  top: 0;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
+  align-self: stretch;
   border-inline-end: 1px solid #1e293b;
 }
 
 .app-shell__sidebar-frame {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  overflow: hidden;
 }
 
 .app-shell__navigation-scroll {
@@ -414,7 +432,10 @@ body {
   border-bottom: 0;
 }
 
+/* Inside the mobile drawer there is no page to stick to, and the drawer body
+   already gives the frame its height. */
 .app-shell__sidebar-frame--mobile {
+  position: static;
   height: 100%;
 }
 
