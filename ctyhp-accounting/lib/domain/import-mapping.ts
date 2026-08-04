@@ -20,7 +20,7 @@
 import { parseStatementAmount } from "./statement-import";
 import { ACCOUNT_TYPES, type AccountType } from "./accounts";
 
-export type ImportTarget = "chart_of_accounts" | "customers" | "vendors" | "items";
+export type ImportTarget = "chart_of_accounts" | "customers" | "vendors" | "items" | "invoices";
 
 export interface FieldSpec {
   key: string;
@@ -28,7 +28,7 @@ export interface FieldSpec {
   required: boolean;
   /** How other products spell it. Matched case- and punctuation-insensitively. */
   aliases: readonly string[];
-  kind: "text" | "money" | "boolean" | "account_type";
+  kind: "text" | "money" | "boolean" | "account_type" | "number" | "date";
   hint?: string;
 }
 
@@ -192,6 +192,87 @@ const ITEM_FIELDS: readonly FieldSpec[] = [
   },
 ];
 
+
+/**
+ * Invoices are the one target where several rows make one record. The number is
+ * what groups them; `groupInvoiceRows` does the grouping after this mapping runs.
+ */
+const INVOICE_FIELDS: readonly FieldSpec[] = [
+  {
+    key: "invoice_number",
+    label: "Invoice number",
+    required: true,
+    kind: "text",
+    aliases: ["invoice number", "invoice no", "invoice #", "invoice", "number", "doc number", "reference"],
+    hint: "Rows sharing this become one invoice. Kept as a reference — issuing assigns our own number.",
+  },
+  {
+    key: "customer",
+    label: "Customer",
+    required: true,
+    kind: "text",
+    aliases: ["customer", "customer name", "client", "client name", "bill to", "account name"],
+    hint: "Must already exist. An unknown name is reported, never created.",
+  },
+  {
+    key: "issue_date",
+    label: "Issue date",
+    required: true,
+    kind: "date",
+    aliases: ["issue date", "invoice date", "date", "created", "transaction date"],
+  },
+  {
+    key: "due_date",
+    label: "Due date",
+    required: false,
+    kind: "date",
+    aliases: ["due date", "due", "payment due", "terms date"],
+  },
+  {
+    key: "description",
+    label: "Line description",
+    required: false,
+    kind: "text",
+    aliases: ["description", "item", "product", "service", "line description", "details", "memo line"],
+  },
+  {
+    key: "quantity",
+    label: "Quantity",
+    required: true,
+    kind: "number",
+    aliases: ["quantity", "qty", "units", "hours"],
+  },
+  {
+    key: "unit_price_minor",
+    label: "Unit price",
+    required: true,
+    kind: "money",
+    aliases: ["unit price", "price", "rate", "unit cost", "amount per unit"],
+  },
+  {
+    key: "income_account",
+    label: "Income account",
+    required: true,
+    kind: "text",
+    aliases: ["income account", "revenue account", "account", "account code", "sales account", "category"],
+    hint: "Code or name of an active operating income account.",
+  },
+  {
+    key: "tax_code",
+    label: "Sales tax code",
+    required: false,
+    kind: "text",
+    aliases: ["tax code", "sales tax", "tax", "tax rate", "vat code"],
+  },
+  {
+    key: "memo",
+    label: "Invoice memo",
+    required: false,
+    kind: "text",
+    aliases: ["invoice memo", "note", "notes", "comment", "message"],
+  },
+];
+
 export function fieldsFor(target: ImportTarget): readonly FieldSpec[] {
   switch (target) {
     case "chart_of_accounts":
@@ -202,6 +283,8 @@ export function fieldsFor(target: ImportTarget): readonly FieldSpec[] {
       return CONTACT_FIELDS("Vendor");
     case "items":
       return ITEM_FIELDS;
+    case "invoices":
+      return INVOICE_FIELDS;
   }
 }
 
@@ -210,6 +293,7 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
   customers: "Customers",
   vendors: "Vendors",
   items: "Products and services",
+  invoices: "Invoices (drafts)",
 };
 
 // --- Proposing a mapping ----------------------------------------------------
@@ -363,6 +447,26 @@ export interface ParsedImport {
   blankRows: number;
 }
 
+/**
+ * Accepts what a spreadsheet exports: ISO, and the two slash orders. A
+ * two-digit year is refused rather than guessed — 01/02/26 is three dates.
+ */
+function coerceDate(raw: string): string | null {
+  const text = raw.trim();
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const slash = text.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+  if (slash) {
+    const [, a, b, year] = slash;
+    // Month first when it cannot be a month the other way round; otherwise the
+    // file is ambiguous and the mapping screen is where a person resolves it.
+    const month = Number(a) > 12 ? b : a;
+    const day = Number(a) > 12 ? a : b;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  return null;
+}
+
 function coerceBoolean(raw: string): boolean {
   const text = raw.trim().toLowerCase();
   return ["yes", "y", "true", "1", "inventory", "inventory part", "stock"].includes(text);
@@ -409,7 +513,12 @@ export function applyMapping(
       }
 
       if (raw === "") {
-        record[field.key] = field.kind === "money" ? 0 : field.kind === "boolean" ? false : null;
+        record[field.key] =
+          field.kind === "money" || field.kind === "number"
+            ? 0
+            : field.kind === "boolean"
+              ? false
+              : null;
         continue;
       }
 
@@ -424,6 +533,36 @@ export function applyMapping(
             });
           } else {
             record[field.key] = minor;
+          }
+          break;
+        }
+        case "number": {
+          // Quantities are counts, not money: 2.5 hours is a quantity, and
+          // parsing it as minor units would turn it into 250.
+          const value = Number(raw.replace(/[\s,]/g, ""));
+          if (!Number.isFinite(value)) {
+            rowProblems.push({
+              row: rowNumber,
+              field: field.key,
+              message: `${field.label}: "${raw}" is not a number`,
+            });
+          } else {
+            record[field.key] = value;
+          }
+          break;
+        }
+        case "date": {
+          // Normalised to YYYY-MM-DD here; whether it is a real calendar date is
+          // checked where the document is assembled, with the rest of its group.
+          const iso = coerceDate(raw);
+          if (iso === null) {
+            rowProblems.push({
+              row: rowNumber,
+              field: field.key,
+              message: `${field.label}: "${raw}" is not a date`,
+            });
+          } else {
+            record[field.key] = iso;
           }
           break;
         }

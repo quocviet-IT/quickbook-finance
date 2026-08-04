@@ -27,9 +27,9 @@ import {
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
 import type { ImportPreview } from "@/lib/services/data-import";
-import { previewImportAction, runImportAction } from "./actions";
+import { previewImportAction, runImportAction, suggestMappingAction } from "./actions";
 
-const TARGETS: ImportTarget[] = ["chart_of_accounts", "customers", "vendors", "items"];
+const TARGETS: ImportTarget[] = ["chart_of_accounts", "customers", "vendors", "items", "invoices"];
 
 /**
  * Bringing a company's lists across from QuickBooks or Wave.
@@ -60,6 +60,9 @@ export default function ImportClient({
   const [withBalances, setWithBalances] = useState(false);
   const [asOf, setAsOf] = useState<Dayjs>(dayjs().startOf("year"));
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiFields, setAiFields] = useState<string[]>([]);
 
   const fields = fieldsFor(target);
   const money = useCallback(
@@ -86,11 +89,15 @@ export default function ImportClient({
         return;
       }
       const columns = Object.keys(records[0]);
+      // Match by name first and show that straight away: the screen is usable
+      // before the model answers, and stays usable if it never does.
       const proposed = proposeMapping(columns, target);
       setHeaders(columns);
       setRows(records.map((record) => columns.map((column) => record[column] ?? "")));
       setMapping(proposed.columns);
       setUnmapped(proposed.unmapped);
+      setAiNote(null);
+      setAiFields([]);
       setPreview(null);
       setFileName(file.name);
       message.info(
@@ -98,6 +105,20 @@ export default function ImportClient({
           ? `Read ${records.length} row(s). Check the columns below.`
           : `Read ${records.length} row(s), but some required columns need choosing.`,
       );
+
+      // Then ask the model to fill what the names could not, in the background.
+      // Only the headers go out; the rows never leave this browser until import.
+      setAiBusy(true);
+      void suggestMappingAction(columns, target)
+        .then((result) => {
+          if (!result.ok || !result.data) return;
+          if (result.data.aiFields.length === 0 && !result.data.note) return;
+          setMapping(result.data.columns);
+          setUnmapped(result.data.unmapped);
+          setAiFields(result.data.aiFields);
+          setAiNote(result.data.note);
+        })
+        .finally(() => setAiBusy(false));
     };
     reader.readAsText(file);
     return false;
@@ -262,9 +283,26 @@ export default function ImportClient({
                   />
                 ),
               },
+              {
+                // Marks what the alias matcher could not place. These are the
+                // columns worth a second look before importing.
+                title: "",
+                key: "source",
+                width: 130,
+                render: (_: unknown, field) =>
+                  aiFields.includes(field.key) ? <Tag color="purple">matched by AI</Tag> : null,
+              },
               { title: "", dataIndex: "hint", render: (hint: string | undefined) => hint ?? "" },
             ]}
           />
+
+          {aiBusy ? (
+            <Typography.Text type="secondary">
+              Asking the model about the columns it could not place by name…
+            </Typography.Text>
+          ) : null}
+
+          {aiNote ? <Alert type="info" showIcon message={aiNote} /> : null}
 
           {unmapped.length > 0 ? (
             <Alert
@@ -297,7 +335,7 @@ export default function ImportClient({
               value={preview.problems.length}
               valueStyle={preview.problems.length ? { color: "#cf1322" } : undefined}
             />
-            {preview.openingTotalMinor !== 0 ? (
+            {preview.openingTotalMinor !== 0 && target !== "invoices" ? (
               <Statistic title="Opening balances in the file" value={money(preview.openingTotalMinor)} />
             ) : null}
           </Space>
@@ -356,7 +394,7 @@ export default function ImportClient({
               { title: "Name", dataIndex: "name" },
               { title: "Matched on", dataIndex: "key", width: 200 },
               {
-                title: "Opening balance",
+                title: target === "invoices" ? "Invoice subtotal" : "Opening balance",
                 dataIndex: "openingBalanceMinor",
                 width: 150,
                 align: "right",

@@ -10,6 +10,7 @@ import {
   type ImportPreview,
 } from "@/lib/services/data-import";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
+import { suggestMapping } from "@/lib/ai/suggest-mapping";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -68,6 +69,36 @@ export async function runImportAction(
       revalidatePath(path);
     }
     return { ok: true, data: outcome };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export interface MappingSuggestion {
+  columns: Record<string, number | null>;
+  unmapped: string[];
+  missingRequired: string[];
+  /** Fields the model filled that name-matching had left empty. */
+  aiFields: string[];
+  note: string | null;
+}
+
+/**
+ * Which column is which. Reads nothing from the database and writes nothing.
+ *
+ * Only the headers are sent to the model — never a row of the file — and its
+ * answer is filtered and merged under the deterministic match before it comes
+ * back. A model that is unconfigured or unreachable yields exactly the mapping
+ * this screen has always produced.
+ */
+export async function suggestMappingAction(
+  headers: string[],
+  target: ImportTarget,
+): Promise<ActionResult<MappingSuggestion>> {
+  const denied = await guard(target);
+  if (denied) return { ok: false, error: denied };
+  try {
+    return { ok: true, data: await suggestMapping(headers, target) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

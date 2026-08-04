@@ -5,6 +5,10 @@ import {
   type ImportProblem,
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
+import {
+  groupInvoiceRows,
+  type InvoiceImportRecord,
+} from "@/lib/domain/invoice-import";
 
 export class DataImportError extends Error {}
 
@@ -79,6 +83,37 @@ export async function previewImport(
   mapping: Record<string, number | null>,
 ): Promise<ImportPreview> {
   const parsed = applyMapping(rows, mapping, target);
+
+  // Invoices are the one target where rows do not map one-to-one onto records:
+  // several lines make a document. The preview therefore counts documents, and
+  // every one of them is a create — an import raises drafts and never matches
+  // an existing invoice, because "the same invoice again" is not a thing a file
+  // can assert.
+  if (target === "invoices") {
+    const grouped = groupInvoiceRows(parsed.records as unknown as InvoiceImportRecord[]);
+    return {
+      target,
+      rows: grouped.invoices.map((invoice) => ({
+        key: invoice.customer,
+        name: `${invoice.externalReference} · ${invoice.customer} · ${invoice.lines.length} line${invoice.lines.length === 1 ? "" : "s"}`,
+        action: "create" as const,
+        openingBalanceMinor: invoice.subtotalMinor,
+        values: {},
+      })),
+      problems: [
+        ...parsed.problems,
+        ...grouped.problems.map((problem) => ({
+          row: 0,
+          message: `${problem.reference || "(no invoice number)"}: ${problem.message}`,
+        })),
+      ],
+      blankRows: parsed.blankRows,
+      creates: grouped.invoices.length,
+      updates: 0,
+      openingTotalMinor: grouped.invoices.reduce((sum, i) => sum + i.subtotalMinor, 0),
+    };
+  }
+
   const existing = await existingKeys(sb, target);
 
   const preview: ImportPreviewRow[] = parsed.records.map((record) => {
@@ -129,6 +164,38 @@ export async function runImport(
   const parsed = applyMapping(rows, mapping, target);
   if (parsed.records.length === 0) {
     throw new DataImportError("Nothing in this file could be imported");
+  }
+
+  if (target === "invoices") {
+    const grouped = groupInvoiceRows(parsed.records as unknown as InvoiceImportRecord[]);
+    if (grouped.invoices.length === 0) {
+      throw new DataImportError("No invoice in this file could be assembled from its lines");
+    }
+    const { data, error } = await sb.rpc("acc_import_invoices", {
+      p_rows: grouped.invoices.map((invoice) => ({
+        external_reference: invoice.externalReference,
+        customer: invoice.customer,
+        issue_date: invoice.issueDate,
+        due_date: invoice.dueDate,
+        memo: invoice.memo,
+        lines: invoice.lines.map((line) => ({
+          description: line.description,
+          quantity: line.quantity,
+          unit_price_minor: line.unitPriceMinor,
+          income_account: line.incomeAccount,
+          tax_code: line.taxCode,
+        })),
+      })),
+    });
+    if (error) throw new DataImportError(error.message);
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { created?: number; skipped?: number }
+      | null;
+    return {
+      created: Number(row?.created ?? 0),
+      updated: 0,
+      skipped: Number(row?.skipped ?? 0) + grouped.problems.length,
+    };
   }
 
   const payload = parsed.records;
