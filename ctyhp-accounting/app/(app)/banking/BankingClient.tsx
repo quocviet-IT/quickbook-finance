@@ -39,7 +39,13 @@ import {
   type BankDetailType,
 } from "@/lib/domain/bank-account-detail";
 import { createAccountAction } from "@/app/(app)/accounts/actions";
-import type { AccountRow, CurrencyRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
+import type {
+  AccountRow,
+  BankCategoryRow,
+  BankTransactionRow,
+  BankTxnStatus,
+  CurrencyRow,
+} from "@/lib/db/types";
 import type {
   BankAccountWithGl,
   BankConnectionView,
@@ -128,6 +134,7 @@ interface PendingPlaidLink {
 
 export default function BankingClient({
   bankAccounts,
+  bankCategories,
   initialAccountId,
   initialQueueStatus,
   initialFocusId,
@@ -143,6 +150,8 @@ export default function BankingClient({
   scannerConfigured,
 }: {
   bankAccounts: BankAccountWithGl[];
+  /** The labels a bank line may carry; a new one is appended as it is created. */
+  bankCategories: BankCategoryRow[];
   initialAccountId: string | null;
   initialQueueStatus: "unmatched" | null;
   initialFocusId: string | null;
@@ -167,6 +176,8 @@ export default function BankingClient({
     initialQueueStatus ?? "all",
   );
   const [txns, setTxns] = useState<BankTransactionRow[]>([]);
+  const [categories, setCategories] = useState<BankCategoryRow[]>(bankCategories);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -483,11 +494,21 @@ export default function BankingClient({
       ? txns
       : txns.filter((transaction) => transaction.status === transactionStatus);
 
+  // "Uncategorized" is the option that makes labels worth having: it is how you
+  // find the lines nobody has looked at yet.
+  const categorized = visibleTransactions.filter((transaction) =>
+    categoryFilter === "all"
+      ? true
+      : categoryFilter === "none"
+        ? transaction.bank_category_id === null
+        : transaction.bank_category_id === categoryFilter,
+  );
+
   // Each row carries the account it came from, that account's currency, and its
   // best suggested match — so one table can answer what a line is and where it
   // came from without sending anyone to a second screen.
   const reviewRows = buildBankReviewRows(
-    visibleTransactions,
+    categorized,
     suggestions,
     bankAccounts.map((account) => ({
       id: account.id,
@@ -618,6 +639,17 @@ export default function BankingClient({
               { value: "ignored", label: "Excluded" },
             ]}
           />
+          <Select
+            aria-label="Filter bank transactions by category"
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            style={{ minWidth: 180 }}
+            options={[
+              { value: "all", label: "All categories" },
+              { value: "none", label: "Uncategorized" },
+              ...categories.map((category) => ({ value: category.id, label: category.name })),
+            ]}
+          />
           {suggestions.length ? (
             <Typography.Text type="secondary">
               {suggestions.length} suggested match{suggestions.length > 1 ? "es" : ""} in the Match column
@@ -634,6 +666,30 @@ export default function BankingClient({
         canReadDocuments={canReadDocuments}
         busy={busy}
         formatRowMoney={rowMoney}
+        categories={categories}
+        onCategoryCreated={(category) =>
+          setCategories((current) =>
+            current.some((existing) => existing.id === category.id)
+              ? current
+              : [...current, category].sort((a, b) => a.name.localeCompare(b.name)),
+          )
+        }
+        onCategoryAssigned={(transactionId, categoryId) =>
+          // Kept in step locally so the row shows the label at once, rather than
+          // waiting for the list to be fetched again.
+          setTxns((current) =>
+            current.map((transaction) =>
+              transaction.id === transactionId
+                ? {
+                    ...transaction,
+                    bank_category_id: categoryId,
+                    bank_category_name:
+                      categories.find((category) => category.id === categoryId)?.name ?? null,
+                  }
+                : transaction,
+            ),
+          )
+        }
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}

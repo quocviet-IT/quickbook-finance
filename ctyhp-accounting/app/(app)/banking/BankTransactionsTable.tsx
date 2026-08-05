@@ -4,8 +4,9 @@ import { PaperClipOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
-import type { BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
+import type { BankCategoryRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
+import BankCategoryCell from "./BankCategoryCell";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -24,6 +25,10 @@ export interface BankTransactionsTableProps {
   /** The suggestion currently being approved or rejected, if any. */
   busy: string | null;
   formatRowMoney: (row: BankReviewTableRow) => string;
+  /** The labels on offer, and how the screen learns about a change. */
+  categories: BankCategoryRow[];
+  onCategoryCreated: (category: BankCategoryRow) => void;
+  onCategoryAssigned: (transactionId: string, categoryId: string | null) => void;
   onSettle: (row: BankReviewTableRow) => void;
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
@@ -45,6 +50,9 @@ export default function BankTransactionsTable({
   canReadDocuments,
   busy,
   formatRowMoney,
+  categories,
+  onCategoryCreated,
+  onCategoryAssigned,
   onSettle,
   onApprove,
   onReject,
@@ -91,6 +99,24 @@ export default function BankTransactionsTable({
         <span style={{ color: row.transaction.amount_minor < 0 ? "#b91c1c" : "#15803d" }}>
           {formatRowMoney(row)}
         </span>
+      ),
+    },
+    {
+      // After the money, before the accounting: what this line is *to you*,
+      // which is a different question from which document it settles.
+      title: "Category",
+      key: "category",
+      width: 190,
+      render: (_value: unknown, row: BankReviewTableRow) => (
+        <BankCategoryCell
+          transactionId={row.transaction.id}
+          value={row.transaction.bank_category_id}
+          valueName={row.transaction.bank_category_name}
+          categories={categories}
+          canWrite={canWrite}
+          onCreated={onCategoryCreated}
+          onAssigned={onCategoryAssigned}
+        />
       ),
     },
     {

@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { listBankAccounts, listBankConnections } from "@/lib/services/banking";
+import { listBankAccounts, listBankCategories, listBankConnections } from "@/lib/services/banking";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
@@ -25,6 +25,7 @@ export default async function BankingPage({
   const sb = await createSupabaseServerClient();
   const [
     bankAccounts,
+    bankCategories,
     bankConnections,
     accounts,
     currencies,
@@ -34,6 +35,7 @@ export default async function BankingPage({
     canGovernDocuments,
   ] = await Promise.all([
     listBankAccounts(sb),
+    listBankCategories(sb),
     listBankConnections(sb),
     listAccounts(sb),
     listCurrencies(sb),
@@ -57,6 +59,7 @@ export default async function BankingPage({
       />
       <BankingClient
         bankAccounts={bankAccounts}
+        bankCategories={bankCategories}
         initialAccountId={params.account ?? null}
         initialQueueStatus={params.queue === "unmatched" ? "unmatched" : null}
         initialFocusId={params.focus ?? null}
