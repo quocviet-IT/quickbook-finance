@@ -26,6 +26,7 @@ export default async function PaymentsPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    canReadAudit,
     actors,
   ] = await Promise.all([
     listPayments(sb),
@@ -36,6 +37,7 @@ export default async function PaymentsPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    hasPermission(sb, "audit.read"),
     listActors(sb),
   ]);
 
@@ -54,6 +56,7 @@ export default async function PaymentsPage({
         currencies={currencies}
         actors={actors}
         canWrite={canWrite(role)}
+        canReadAudit={canReadAudit}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}

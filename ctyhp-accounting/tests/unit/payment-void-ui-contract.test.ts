@@ -29,8 +29,35 @@ describe("payment void UI contract", () => {
     expect(read("ReceivePaymentModal.tsx")).toContain("recordPaymentAction");
   });
 
+  it("keeps the detail view and the description edit in their own components", () => {
+    expect(read("PaymentsClient.tsx")).toContain("<PaymentDetailDrawer");
+    expect(read("PaymentsClient.tsx")).toContain("<EditPaymentDetailsModal");
+    expect(read("PaymentDetailDrawer.tsx")).toContain("getPaymentDetailAction");
+    expect(read("PaymentDetailDrawer.tsx")).toContain("DocumentAuditTrail");
+    expect(read("EditPaymentDetailsModal.tsx")).toContain("updatePaymentDetailsAction");
+    expect(read("ReceivePaymentModal.tsx")).toContain("correctPaymentAction");
+  });
+
+  it("offers every action from one menu", () => {
+    const client = read("PaymentsClient.tsx");
+    for (const label of ["View", "Edit details", "Correct payment", "Refund", "Void payment"]) {
+      expect(client, label).toContain(label);
+    }
+    expect(read("page.tsx")).toContain('hasPermission(sb, "audit.read")');
+  });
+
+  it("never offers to edit or correct a void receipt", () => {
+    expect(read("PaymentsClient.tsx")).toMatch(/status !== "void"/);
+  });
+
   it("keeps every touched payment UI file below the 400-line ceiling", () => {
-    for (const file of ["PaymentsClient.tsx", "ReceivePaymentModal.tsx", "VoidPaymentModal.tsx"]) {
+    for (const file of [
+      "PaymentsClient.tsx",
+      "ReceivePaymentModal.tsx",
+      "VoidPaymentModal.tsx",
+      "PaymentDetailDrawer.tsx",
+      "EditPaymentDetailsModal.tsx",
+    ]) {
       expect(read(file).split(/\r?\n/).length, file).toBeLessThanOrEqual(400);
     }
   });

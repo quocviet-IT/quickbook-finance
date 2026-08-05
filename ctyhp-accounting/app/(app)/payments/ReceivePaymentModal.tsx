@@ -19,16 +19,24 @@ import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow } fro
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { describeNoOpenInvoices, unappliedRemainderMinor } from "@/lib/domain/settlement";
 import { paymentReplacementDraft } from "@/lib/domain/payment-void";
-import { getOpenInvoicesAction, recordPaymentAction } from "./actions";
+import { correctPaymentAction, getOpenInvoicesAction, recordPaymentAction } from "./actions";
+
+/**
+ * Why this form was opened on top of an existing receipt.
+ *
+ * `replacement` follows a void that already happened: the old receipt is gone
+ * from the books and this is its successor. `correction` is the one-step form —
+ * the original is still live, and submitting voids it and records this receipt
+ * in a single transaction. Neither ever revives a void payment.
+ */
+export type ReceivePaymentBasis =
+  | { mode: "replacement"; payment: PaymentRow & { customer_name: string } }
+  | { mode: "correction"; payment: PaymentRow & { customer_name: string } };
 
 export interface ReceivePaymentModalProps {
   open: boolean;
-  /**
-   * The void payment this receipt is replacing, if any. A void payment is never
-   * revived; a replacement is an ordinary new receipt that starts from the old
-   * one's facts and has its allocations chosen again.
-   */
-  replacement: (PaymentRow & { customer_name: string }) | null;
+  /** Null for an ordinary receipt. */
+  basis: ReceivePaymentBasis | null;
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
   currencies: CurrencyRow[];
@@ -38,7 +46,7 @@ export interface ReceivePaymentModalProps {
 
 export default function ReceivePaymentModal({
   open,
-  replacement,
+  basis,
   customers,
   depositAccounts,
   currencies,
@@ -67,14 +75,14 @@ export default function ReceivePaymentModal({
 
   // The modal is mounted per session (see PaymentsClient's `key`), so the form
   // starts from these values and nothing has to be reset on the way in.
-  const draft = replacement
-    ? paymentReplacementDraft(replacement, decimalsOf(replacement.currency_code))
-    : null;
+  const source = basis?.payment ?? null;
+  const correcting = basis?.mode === "correction";
+  const draft = source ? paymentReplacementDraft(source, decimalsOf(source.currency_code)) : null;
   const initialValues = draft
     ? { ...draft, payment_date: dayjs(draft.payment_date) }
     : { currency_code: baseCurrency };
 
-  // Prefilled, never pre-submitted: a replacement shows the same customer's open
+  // Prefilled, never pre-submitted: the form shows the same customer's open
   // invoices, and which of them it settles is chosen again on purpose.
   useEffect(() => {
     if (!draft) return;
@@ -138,27 +146,38 @@ export default function ReceivePaymentModal({
       return;
     }
 
+    const receipt = {
+      customer_id: v.customer_id,
+      payment_date: v.payment_date ? v.payment_date.format("YYYY-MM-DD") : undefined,
+      currency_code: v.currency_code,
+      amount_minor: toMinorUnits(Number(v.amount), dec),
+      deposit_account_id: v.deposit_account_id,
+      method: v.method ?? null,
+      reference: v.reference ?? null,
+      memo: v.memo ?? null,
+      allocations,
+    };
+
     setSaving(true);
     try {
-      const res = await recordPaymentAction({
-        customer_id: v.customer_id,
-        payment_date: v.payment_date ? v.payment_date.format("YYYY-MM-DD") : undefined,
-        currency_code: v.currency_code,
-        amount_minor: toMinorUnits(Number(v.amount), dec),
-        deposit_account_id: v.deposit_account_id,
-        method: v.method ?? null,
-        reference: v.reference ?? null,
-        memo: v.memo ?? null,
-        allocations,
-      });
+      // One call either way: correcting voids the original and posts this
+      // receipt in the same transaction, so a refusal changes nothing at all.
+      const res =
+        correcting && source
+          ? await correctPaymentAction({ ...receipt, payment_id: source.id, reason: v.reason })
+          : await recordPaymentAction(receipt);
       if (!res.ok) {
-        message.error(res.error ?? "Failed to record payment");
+        message.error(
+          res.error ?? (correcting ? "Failed to correct payment" : "Failed to record payment"),
+        );
         return;
       }
       message.success(
-        replacement
-          ? "Replacement payment recorded and posted to the ledger"
-          : "Payment recorded and posted to the ledger",
+        correcting
+          ? "Payment corrected; the original is void and a new receipt was posted"
+          : basis
+            ? "Replacement payment recorded and posted to the ledger"
+            : "Payment recorded and posted to the ledger",
       );
       onDone();
       onClose();
@@ -169,28 +188,55 @@ export default function ReceivePaymentModal({
 
   return (
     <Modal
-      title={replacement ? "Create replacement payment" : "Receive payment"}
+      title={
+        correcting ? "Correct payment" : basis ? "Create replacement payment" : "Receive payment"
+      }
       open={open}
       onOk={submit}
       onCancel={onClose}
       confirmLoading={saving}
-      okText="Record payment"
+      okText={correcting ? "Correct payment" : "Record payment"}
       cancelText="Cancel"
       width={760}
       destroyOnHidden
     >
-      {replacement ? (
+      {source ? (
         <Alert
-          type="info"
+          type={correcting ? "warning" : "info"}
           showIcon
           style={{ marginBottom: 12 }}
-          message={`Replacing ${replacement.payment_number ?? "a void payment"}`}
-          description="The void payment and its number stay on record. This is a new receipt — check the amount and choose the invoices it settles."
+          message={
+            correcting
+              ? `Correcting ${source.payment_number ?? "this payment"}`
+              : `Replacing ${source.payment_number ?? "a void payment"}`
+          }
+          description={
+            correcting
+              ? "The original keeps its number and will read as void, with your reason recorded against it. This posts a new receipt in one step — if anything refuses, nothing changes."
+              : "The void payment and its number stay on record. This is a new receipt — check the amount and choose the invoices it settles."
+          }
         />
       ) : null}
       {/* Same defaults the New payment button applies, so the top-bar New menu
           can open this modal directly. */}
       <Form form={form} layout="vertical" requiredMark={false} initialValues={initialValues}>
+        {correcting ? (
+          <Form.Item
+            name="reason"
+            label="What was wrong?"
+            rules={[
+              { required: true, message: "Explain what was wrong with this payment" },
+              { max: 500, message: "A reason cannot exceed 500 characters" },
+            ]}
+          >
+            <Input.TextArea
+              rows={2}
+              maxLength={500}
+              showCount
+              placeholder="Amount was 319.19, not 3,191.90"
+            />
+          </Form.Item>
+        ) : null}
         <Space wrap align="end">
           <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>
             <Select

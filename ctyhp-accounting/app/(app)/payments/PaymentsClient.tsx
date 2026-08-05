@@ -1,8 +1,17 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Space, Table, Tag, Tooltip, type TableColumnsType } from "antd";
-import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Dropdown,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  type MenuProps,
+  type TableColumnsType,
+} from "antd";
+import { MoreOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
@@ -16,7 +25,9 @@ import type {
   PaymentStatus,
 } from "@/lib/db/types";
 import { formatMoney } from "@/lib/format";
-import ReceivePaymentModal from "./ReceivePaymentModal";
+import EditPaymentDetailsModal from "./EditPaymentDetailsModal";
+import PaymentDetailDrawer from "./PaymentDetailDrawer";
+import ReceivePaymentModal, { type ReceivePaymentBasis } from "./ReceivePaymentModal";
 import VoidPaymentModal from "./VoidPaymentModal";
 import RefundModal from "../settlements/RefundModal";
 
@@ -37,6 +48,7 @@ export default function PaymentsClient({
   currencies,
   actors,
   canWrite,
+  canReadAudit,
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
@@ -50,6 +62,7 @@ export default function PaymentsClient({
   currencies: CurrencyRow[];
   actors: ActorRow[];
   canWrite: boolean;
+  canReadAudit: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
@@ -60,7 +73,9 @@ export default function PaymentsClient({
   // Bumped on every open, so the form is a fresh mount rather than a reset:
   // yesterday's allocations must never survive into the next receipt.
   const [receiveSession, setReceiveSession] = useState(0);
-  const [replacementFor, setReplacementFor] = useState<PaymentListRow | null>(null);
+  const [basis, setBasis] = useState<ReceivePaymentBasis | null>(null);
+  const [detailFor, setDetailFor] = useState<PaymentListRow | null>(null);
+  const [editFor, setEditFor] = useState<PaymentListRow | null>(null);
   const [voidFor, setVoidFor] = useState<PaymentListRow | null>(null);
   const [refundFor, setRefundFor] = useState<PaymentListRow | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
@@ -80,16 +95,46 @@ export default function PaymentsClient({
     return `Voided by ${who} on ${when}.${row.void_reason ? ` ${row.void_reason}` : ""}`;
   }
 
-  function openReceive() {
-    setReplacementFor(null);
+  function openReceive(next: ReceivePaymentBasis | null) {
+    setBasis(next);
     setReceiveSession((n) => n + 1);
     setReceiveOpen(true);
   }
 
-  function openReplacement(row: PaymentListRow) {
-    setReplacementFor(row);
-    setReceiveSession((n) => n + 1);
-    setReceiveOpen(true);
+  /**
+   * Everything that can be done to one receipt. A void row offers only View and
+   * a replacement — it is history, and history is not edited.
+   */
+  function actionsFor(row: PaymentListRow): MenuProps["items"] {
+    const live = row.status !== "void";
+    return [
+      { key: "view", label: "View", onClick: () => setDetailFor(row) },
+      ...(canWrite && live
+        ? [
+            { key: "edit", label: "Edit details", onClick: () => setEditFor(row) },
+            {
+              key: "correct",
+              label: "Correct payment",
+              onClick: () => openReceive({ mode: "correction", payment: row }),
+            },
+          ]
+        : []),
+      ...(canWrite && live && row.unapplied_minor > 0
+        ? [{ key: "refund", label: "Refund", onClick: () => setRefundFor(row) }]
+        : []),
+      ...(canWrite && live
+        ? [{ key: "void", label: "Void payment", danger: true, onClick: () => setVoidFor(row) }]
+        : []),
+      ...(canWrite && !live
+        ? [
+            {
+              key: "replace",
+              label: "Create replacement",
+              onClick: () => openReceive({ mode: "replacement", payment: row }),
+            },
+          ]
+        : []),
+    ];
   }
 
   const columns: TableColumnsType<PaymentListRow> = [
@@ -125,7 +170,7 @@ export default function PaymentsClient({
     {
       title: "Actions",
       key: "actions",
-      width: 260,
+      width: 120,
       render: (_: unknown, r) => (
         <Space size={4}>
           {canReadDocuments ? (
@@ -141,21 +186,13 @@ export default function PaymentsClient({
               }
             />
           ) : null}
-          {canWrite && r.status !== "void" && r.unapplied_minor > 0 ? (
-            <Button size="small" onClick={() => setRefundFor(r)}>
-              Refund
-            </Button>
-          ) : null}
-          {canWrite && r.status !== "void" ? (
-            <Button size="small" danger onClick={() => setVoidFor(r)}>
-              Void payment
-            </Button>
-          ) : null}
-          {canWrite && r.status === "void" ? (
-            <Button size="small" onClick={() => openReplacement(r)}>
-              Create replacement
-            </Button>
-          ) : null}
+          <Dropdown menu={{ items: actionsFor(r) }} trigger={["click"]}>
+            <Button
+              size="small"
+              icon={<MoreOutlined />}
+              aria-label={`Actions for ${r.payment_number ?? "payment"}`}
+            />
+          </Dropdown>
         </Space>
       ),
     },
@@ -165,7 +202,7 @@ export default function PaymentsClient({
     <div>
       {canWrite && (
         <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openReceive}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openReceive(null)}>
             Receive payment
           </Button>
         </Space>
@@ -189,17 +226,31 @@ export default function PaymentsClient({
         onClose={() => setAttachmentTarget(null)}
       />
 
+      <PaymentDetailDrawer
+        payment={detailFor}
+        directory={directory}
+        canReadAudit={canReadAudit}
+        decimalsOf={decimalsOf}
+        onClose={() => setDetailFor(null)}
+      />
+
+      <EditPaymentDetailsModal
+        payment={editFor}
+        onClose={() => setEditFor(null)}
+        onDone={() => router.refresh()}
+      />
+
       {receiveOpen && (
         <ReceivePaymentModal
           key={`receive-${receiveSession}`}
           open={receiveOpen}
-          replacement={replacementFor}
+          basis={basis}
           customers={customers}
           depositAccounts={depositAccounts}
           currencies={currencies}
           onClose={() => {
             setReceiveOpen(false);
-            setReplacementFor(null);
+            setBasis(null);
           }}
           onDone={() => router.refresh()}
         />
