@@ -3,13 +3,17 @@ import type {
   CustomerRow,
   InvoiceRow,
   InvoiceLineRow,
+  PaymentAllocationView,
+  PaymentDetail,
   PaymentRow,
 } from "@/lib/db/types";
 import type {
   CustomerCreateInput,
   CustomerUpdateInput,
   InvoiceCreateInput,
+  PaymentCorrectionInput,
   PaymentCreateInput,
+  PaymentDetailsInput,
 } from "@/lib/domain/schemas";
 import type { InvoiceDocumentSource } from "@/lib/domain/invoice-document";
 import { getCurrentCompanySettings } from "@/lib/services/company";
@@ -264,6 +268,115 @@ export async function voidPayment(
     p_reason: reason,
   });
   if (error) throw new InvoicingError(error.message);
+}
+
+/** Rewrite only what a receipt says about itself; the RPC is the whitelist. */
+export async function updatePaymentDetails(
+  sb: SupabaseClient,
+  input: PaymentDetailsInput,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_update_payment_details", {
+    p_payment_id: input.payment_id,
+    p_method: input.method,
+    p_reference: input.reference,
+    p_memo: input.memo,
+  });
+  if (error) throw new InvoicingError(error.message);
+}
+
+/**
+ * Void a receipt and record its corrected self in one transaction. Returns the
+ * new payment's id; the old one keeps its number and reads as void.
+ */
+export async function correctPayment(
+  sb: SupabaseClient,
+  input: PaymentCorrectionInput,
+): Promise<string> {
+  const { data, error } = await sb.rpc("acc_correct_payment", {
+    p_payment_id: input.payment_id,
+    p_reason: input.reason,
+    p_customer_id: input.customer_id,
+    p_payment_date: input.payment_date || undefined,
+    p_currency: input.currency_code,
+    p_amount_minor: input.amount_minor,
+    p_deposit_account_id: input.deposit_account_id,
+    p_method: input.method || null,
+    p_reference: input.reference || null,
+    p_memo: input.memo || null,
+    p_allocations: input.allocations,
+  });
+  if (error) throw new InvoicingError(error.message);
+  return data as string;
+}
+
+/** What a receipt actually did: which invoices it settled, and how it posted. */
+export async function getPaymentDetail(
+  sb: SupabaseClient,
+  payment: { id: string; journal_entry_id: string | null },
+): Promise<PaymentDetail> {
+  const { data: allocationData, error: allocationError } = await sb
+    .from("acc_payment_allocation")
+    .select(
+      "id,amount_minor,invoice_id," +
+        "acc_invoice(invoice_number,total_minor,balance_due_minor,status,currency_code)",
+    )
+    .eq("payment_id", payment.id)
+    .order("id");
+  if (allocationError) throw new InvoicingError(allocationError.message);
+
+  const allocations: PaymentAllocationView[] = (
+    (allocationData ?? []) as unknown as Record<string, unknown>[]
+  ).map((row) => {
+    const invoice = (row.acc_invoice ?? {}) as Record<string, unknown>;
+    return {
+      invoiceId: row.invoice_id as string,
+      invoiceNumber: (invoice.invoice_number as string | null) ?? null,
+      amountMinor: Number(row.amount_minor),
+      invoiceTotalMinor: Number(invoice.total_minor ?? 0),
+      invoiceBalanceMinor: Number(invoice.balance_due_minor ?? 0),
+      invoiceStatus: (invoice.status as string) ?? "unknown",
+      currencyCode: (invoice.currency_code as string) ?? "USD",
+    };
+  });
+
+  if (!payment.journal_entry_id) return { allocations, journal: null };
+
+  const { data: entryData, error: entryError } = await sb
+    .from("acc_journal_entry")
+    .select(
+      "id,entry_number,entry_date,status," +
+        "acc_journal_line(line_order,debit_minor,credit_minor,memo,acc_account(account_code,name))",
+    )
+    .eq("id", payment.journal_entry_id)
+    .maybeSingle();
+  if (entryError) throw new InvoicingError(entryError.message);
+  if (!entryData) return { allocations, journal: null };
+
+  const entry = entryData as unknown as Record<string, unknown>;
+  const lines = ((entry.acc_journal_line ?? []) as Record<string, unknown>[])
+    .slice()
+    .sort((a, b) => Number(a.line_order) - Number(b.line_order))
+    .map((line) => {
+      const account = (line.acc_account ?? {}) as Record<string, unknown>;
+      return {
+        accountCode: (account.account_code as string) ?? "",
+        accountName: (account.name as string) ?? "",
+        debitMinor: Number(line.debit_minor),
+        creditMinor: Number(line.credit_minor),
+        memo: (line.memo as string | null) ?? null,
+      };
+    });
+
+  return {
+    allocations,
+    journal: {
+      entryId: entry.id as string,
+      entryNumber: entry.entry_number as string,
+      entryDate: entry.entry_date as string,
+      status: entry.status as string,
+      lines,
+    },
+  };
 }
 
 export async function listOpenInvoicesForCustomer(

@@ -238,6 +238,39 @@ export interface PaymentRow {
   updated_at: string;
 }
 
+/** One invoice a receipt settled, with that invoice's position afterwards. */
+export interface PaymentAllocationView {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  amountMinor: number;
+  invoiceTotalMinor: number;
+  invoiceBalanceMinor: number;
+  invoiceStatus: string;
+  currencyCode: string;
+}
+
+export interface PaymentJournalLine {
+  accountCode: string;
+  accountName: string;
+  debitMinor: number;
+  creditMinor: number;
+  memo: string | null;
+}
+
+export interface PaymentJournalView {
+  entryId: string;
+  entryNumber: string;
+  entryDate: string;
+  status: string;
+  lines: PaymentJournalLine[];
+}
+
+export interface PaymentDetail {
+  allocations: PaymentAllocationView[];
+  /** Null for a receipt that never posted an entry. */
+  journal: PaymentJournalView | null;
+}
+
 export type BankTxnStatus = "unmatched" | "matched" | "ignored";
 export type ReconciliationStatus = "suggested" | "approved" | "rejected";
 
