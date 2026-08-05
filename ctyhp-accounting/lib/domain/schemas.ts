@@ -147,6 +147,35 @@ export const paymentVoidSchema = z.object({
 });
 export type PaymentVoidInput = z.infer<typeof paymentVoidSchema>;
 
+/** An empty description field means "cleared", not "unchanged". */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullish()
+    .transform((value) => (value && value.length > 0 ? value : null));
+
+/**
+ * The only fields of a posted receipt that may be rewritten in place: they
+ * describe the payment, they do not post. Anything that moves money goes
+ * through a correction so the original stays readable.
+ */
+export const paymentDetailsSchema = z.object({
+  payment_id: z.uuid("Select a payment"),
+  method: optionalText(60),
+  reference: optionalText(80),
+  memo: optionalText(500),
+});
+export type PaymentDetailsInput = z.infer<typeof paymentDetailsSchema>;
+
+/** A replacement receipt plus the payment it replaces, validated as one thing. */
+export const paymentCorrectionSchema = paymentCreateSchema.extend({
+  payment_id: z.uuid("Select a payment"),
+  reason: z.string().trim().min(1, "Explain what was wrong with this payment").max(500),
+});
+export type PaymentCorrectionInput = z.infer<typeof paymentCorrectionSchema>;
+
 // --- Vendors ---
 export const vendorCreateSchema = z.object({
   name: z.string().trim().min(1, "Vendor name is required").max(160),
