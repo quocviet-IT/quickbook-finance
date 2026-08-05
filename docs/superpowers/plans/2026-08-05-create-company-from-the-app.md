@@ -69,7 +69,7 @@
 - Consumes: `onebook.company`, `onebook.company_member`, `public.acc_app_user`, `auth.users`.
 - Produces: `onebook.platform_admin`, `onebook.company_request`, and the functions `onebook.is_platform_admin()`, `onebook.request_company(text, text, boolean, int) returns uuid`, `onebook.claim_company_request()`, `onebook.complete_company_request(uuid, uuid)`, `onebook.fail_company_request(uuid, text)`, `onebook.retry_company_request(uuid)`.
 
-- [ ] **Step 1: Write the failing migration contract test**
+- [x] **Step 1: Write the failing migration contract test**
 
 Create `ctyhp-accounting/tests/unit/company-provisioning-migration.test.ts`:
 
@@ -124,13 +124,13 @@ describe("company provisioning request migration", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-provisioning-migration.test.ts`
 
 Expected: FAIL with `ENOENT` because migration 0097 does not exist.
 
-- [ ] **Step 3: Write migration 0097**
+- [x] **Step 3: Write migration 0097**
 
 Create `ctyhp-accounting/supabase/migrations/0097_company_provisioning_requests.sql`:
 
@@ -325,13 +325,13 @@ revoke all on function onebook.retry_company_request(uuid) from public, anon;
 grant execute on function onebook.retry_company_request(uuid) to authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run the tests and verify GREEN**
+- [x] **Step 4: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/company-provisioning-migration.test.ts tests/unit/schema-template.test.ts`
 
 Expected: PASS, both files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/supabase/migrations/0097_company_provisioning_requests.sql ctyhp-accounting/tests/unit/company-provisioning-migration.test.ts
@@ -350,7 +350,7 @@ git commit -m "Let the register hold a queue of companies waiting to be built"
 **Interfaces:**
 - Produces: `companySlugFromName(name: string): string`, `companyCreateSchema`, `CompanyCreateInput`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ctyhp-accounting/tests/unit/company-provisioning-schema.test.ts`:
 
@@ -405,13 +405,13 @@ describe("companyCreateSchema", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-provisioning-schema.test.ts`
 
 Expected: FAIL because `@/lib/domain/company-slug` does not exist.
 
-- [ ] **Step 3: Write the pure helper**
+- [x] **Step 3: Write the pure helper**
 
 Create `ctyhp-accounting/lib/domain/company-slug.ts`:
 
@@ -440,7 +440,7 @@ export function companySlugFromName(name: string): string {
 }
 ```
 
-- [ ] **Step 4: Add the Zod contract**
+- [x] **Step 4: Add the Zod contract**
 
 In `ctyhp-accounting/lib/domain/schemas.ts`, at the end of the file:
 
@@ -461,13 +461,13 @@ export const companyCreateSchema = z.object({
 export type CompanyCreateInput = z.infer<typeof companyCreateSchema>;
 ```
 
-- [ ] **Step 5: Run the tests and verify GREEN**
+- [x] **Step 5: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/company-provisioning-schema.test.ts`
 
 Expected: PASS, 6 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/domain/company-slug.ts ctyhp-accounting/lib/domain/schemas.ts ctyhp-accounting/tests/unit/company-provisioning-schema.test.ts
@@ -489,7 +489,7 @@ git commit -m "Suggest a company key the register will actually accept"
 - Produces: `MigrationSource`, `ProvisionCompanyInput`, `ProvisionCompanyResult`, `PROVISION_BATCH_SIZE`, `provisionCompany(client, input, sources)`, `refreshExposedSchemas(client)`, `companyInventory(client, schema)`, and `loadMigrationSources()` / `REGISTER_MIGRATION`.
 - The module has **no** `server-only` import: `scripts/provision-company.ts` imports it under plain Node, where that package does not resolve.
 
-- [ ] **Step 1: Write the failing core tests**
+- [x] **Step 1: Write the failing core tests**
 
 Create `ctyhp-accounting/tests/unit/company-provisioning-core.test.ts`:
 
@@ -614,13 +614,13 @@ describe("provisionCompany", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-provisioning-core.test.ts`
 
 Expected: FAIL because `@/lib/services/company-provisioning` does not exist.
 
-- [ ] **Step 3: Write the migration source loader**
+- [x] **Step 3: Write the migration source loader**
 
 Create `ctyhp-accounting/lib/db/migration-sources.ts`:
 
@@ -659,7 +659,7 @@ export function loadMigrationSources(root = process.cwd()): MigrationSource[] {
 }
 ```
 
-- [ ] **Step 4: Write the provisioning core**
+- [x] **Step 4: Write the provisioning core**
 
 Create `ctyhp-accounting/lib/services/company-provisioning.ts`:
 
@@ -882,13 +882,13 @@ export async function provisionCompany(
 }
 ```
 
-- [ ] **Step 5: Run the tests and verify GREEN**
+- [x] **Step 5: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/company-provisioning-core.test.ts`
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 6: Point the CLI at the shared core**
+- [x] **Step 6: Point the CLI at the shared core**
 
 In `ctyhp-accounting/scripts/provision-company.ts`, delete its private `migrationSources`, `inventory`, `grantAccess` and `refreshExposedSchemas`, and the inline build in `main()`. Keep argument parsing, the `--drop` path, the console reporting and the "already registered" guard. The build becomes:
 
@@ -934,7 +934,7 @@ console.log(`\nRegistered ${args.name} as ${args.slug}${args.sample ? " (sample)
 
 The `--drop` path keeps calling `refreshExposedSchemas(client)` after removing the schema.
 
-- [ ] **Step 7: Prove the CLI still parses and typechecks**
+- [x] **Step 7: Prove the CLI still parses and typechecks**
 
 Run: `npm run typecheck`
 
@@ -944,7 +944,7 @@ Run: `node --experimental-strip-types scripts/provision-company.ts --slug=probe 
 
 Expected: it fails on the missing `--name` or on `SUPABASE_DB_URL`, not on an import or syntax error. Do **not** run it with a real slug.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/services/company-provisioning.ts ctyhp-accounting/lib/db/migration-sources.ts ctyhp-accounting/scripts/provision-company.ts ctyhp-accounting/tests/unit/company-provisioning-core.test.ts
@@ -964,7 +964,7 @@ git commit -m "Give the CLI and the app one way to build a company, not two"
 - Consumes: `provisionCompany`, `loadMigrationSources`, and the Task 1 RPCs.
 - Produces: `createProvisioningClient(): Promise<pg.Client>`, `runPendingCompanyProvisioning(deps?): Promise<CompanyQueueRun>`, `CompanyQueueRun = { processed: number; migrationFileCount: number; results: Array<{ requestId: string; slug: string; ok: boolean; error?: string }> }`.
 
-- [ ] **Step 1: Write the failing queue tests**
+- [x] **Step 1: Write the failing queue tests**
 
 Create `ctyhp-accounting/tests/unit/company-queue.test.ts`:
 
@@ -1097,13 +1097,13 @@ describe("runPendingCompanyProvisioning", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-queue.test.ts`
 
 Expected: FAIL because `@/lib/services/company-queue` does not exist.
 
-- [ ] **Step 3: Write the connection factory**
+- [x] **Step 3: Write the connection factory**
 
 Create `ctyhp-accounting/lib/db/provisioning-client.ts`:
 
@@ -1137,7 +1137,7 @@ export async function createProvisioningClient(): Promise<pg.Client> {
 }
 ```
 
-- [ ] **Step 4: Write the queue runner**
+- [x] **Step 4: Write the queue runner**
 
 Create `ctyhp-accounting/lib/services/company-queue.ts`:
 
@@ -1238,7 +1238,7 @@ export async function runPendingCompanyProvisioning(
 }
 ```
 
-- [ ] **Step 5: Run the tests and typecheck**
+- [x] **Step 5: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/company-queue.test.ts`
 
@@ -1248,7 +1248,7 @@ Run: `npm run typecheck`
 
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/db/provisioning-client.ts ctyhp-accounting/lib/services/company-queue.ts ctyhp-accounting/tests/unit/company-queue.test.ts
@@ -1268,7 +1268,7 @@ git commit -m "Work the company queue one transaction at a time"
 - Consumes: `companyCreateSchema`, `runPendingCompanyProvisioning`, `after` from `next/server`.
 - Produces: `isPlatformAdmin(): Promise<boolean>`, `requestCompanyAction(raw): Promise<ActionResult<{ requestId: string }>>`, `getCompanyRequestAction(id)`, `retryCompanyRequestAction(id)`, `listCompanyRequestsAction()`.
 
-- [ ] **Step 1: Write the failing action tests**
+- [x] **Step 1: Write the failing action tests**
 
 Create `ctyhp-accounting/tests/unit/company-provisioning-action.test.ts`:
 
@@ -1396,13 +1396,13 @@ describe("retryCompanyRequestAction", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-provisioning-action.test.ts`
 
 Expected: FAIL because the actions module does not exist.
 
-- [ ] **Step 3: Resolve platform administrators**
+- [x] **Step 3: Resolve platform administrators**
 
 In `ctyhp-accounting/lib/db/company.ts`, at the end of the file:
 
@@ -1422,7 +1422,7 @@ export async function isPlatformAdmin(): Promise<boolean> {
 }
 ```
 
-- [ ] **Step 4: Write the actions**
+- [x] **Step 4: Write the actions**
 
 Create `ctyhp-accounting/app/(app)/settings/companies/actions.ts`:
 
@@ -1533,7 +1533,7 @@ export async function retryCompanyRequestAction(id: string): Promise<ActionResul
 }
 ```
 
-- [ ] **Step 5: Run the tests and typecheck**
+- [x] **Step 5: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/company-provisioning-action.test.ts`
 
@@ -1543,7 +1543,7 @@ Run: `npm run typecheck`
 
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/db/company.ts 'ctyhp-accounting/app/(app)/settings/companies/actions.ts' ctyhp-accounting/tests/unit/company-provisioning-action.test.ts
@@ -1564,7 +1564,7 @@ git commit -m "Let a platform administrator ask for a company"
 - Consumes: `runPendingCompanyProvisioning`.
 - Produces: `POST /api/companies/provision` returning `{ processedAt, processed, migrationFileCount, results }`.
 
-- [ ] **Step 1: Write the failing route contract test**
+- [x] **Step 1: Write the failing route contract test**
 
 Create `ctyhp-accounting/tests/unit/company-provisioning-ui-contract.test.ts`:
 
@@ -1606,13 +1606,13 @@ describe("deployment carries the migration files", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-provisioning-ui-contract.test.ts`
 
 Expected: FAIL with `ENOENT` for the route file.
 
-- [ ] **Step 3: Write the route**
+- [x] **Step 3: Write the route**
 
 Create `ctyhp-accounting/app/api/companies/provision/route.ts`:
 
@@ -1663,7 +1663,7 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Trace the migrations into the function and schedule the sweep**
+- [x] **Step 4: Trace the migrations into the function and schedule the sweep**
 
 In `ctyhp-accounting/next.config.ts`, add to `nextConfig`:
 
@@ -1685,7 +1685,7 @@ In `ctyhp-accounting/vercel.json`, add to `crons`:
     }
 ```
 
-- [ ] **Step 5: Run the tests and build**
+- [x] **Step 5: Run the tests and build**
 
 Run: `npm test -- tests/unit/company-provisioning-ui-contract.test.ts`
 
@@ -1695,7 +1695,7 @@ Run: `npm run build`
 
 Expected: exit 0, and `/api/companies/provision` appears in the route list.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/api/companies/provision/route.ts' ctyhp-accounting/next.config.ts ctyhp-accounting/vercel.json ctyhp-accounting/tests/unit/company-provisioning-ui-contract.test.ts
@@ -1720,7 +1720,7 @@ git commit -m "Give provisioning a way in that does not depend on a browser"
 - Consumes: `requestCompanyAction`, `getCompanyRequestAction`, `retryCompanyRequestAction`, `companySlugFromName`, `isPlatformAdmin`, `switchCompanyAction`.
 - Produces: the `/settings/companies` route; `CompanySwitcher` gains `canCreateCompany: boolean`; `AppShell` passes it through.
 
-- [ ] **Step 1: Extend the UI contract test**
+- [x] **Step 1: Extend the UI contract test**
 
 Add to `ctyhp-accounting/tests/unit/company-provisioning-ui-contract.test.ts`:
 
@@ -1757,13 +1757,13 @@ describe("the companies screen", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/company-provisioning-ui-contract.test.ts`
 
 Expected: FAIL because the three files do not exist.
 
-- [ ] **Step 3: Add the hub card**
+- [x] **Step 3: Add the hub card**
 
 In `ctyhp-accounting/lib/domain/navigation.ts`, inside the `company` group of `SETTINGS_HUB`, after the Company profile entry:
 
@@ -1780,7 +1780,7 @@ In `ctyhp-accounting/lib/domain/navigation.ts`, inside the `company` group of `S
 every `/settings/*` route has a card, so this keeps that test green once the page
 in Step 4 exists.
 
-- [ ] **Step 4: Write the server page**
+- [x] **Step 4: Write the server page**
 
 Create `ctyhp-accounting/app/(app)/settings/companies/page.tsx`:
 
@@ -1834,7 +1834,7 @@ export default async function CompaniesPage({
 }
 ```
 
-- [ ] **Step 5: Write the client**
+- [x] **Step 5: Write the client**
 
 Create `ctyhp-accounting/app/(app)/settings/companies/CompaniesClient.tsx`:
 
@@ -2037,7 +2037,7 @@ export default function CompaniesClient({
 }
 ```
 
-- [ ] **Step 6: Write the form**
+- [x] **Step 6: Write the form**
 
 Create `ctyhp-accounting/app/(app)/settings/companies/NewCompanyModal.tsx`:
 
@@ -2167,7 +2167,7 @@ export default function NewCompanyModal({
 }
 ```
 
-- [ ] **Step 7: Offer the button from the switcher**
+- [x] **Step 7: Offer the button from the switcher**
 
 In `ctyhp-accounting/components/CompanySwitcher.tsx`:
 
@@ -2197,7 +2197,7 @@ In `ctyhp-accounting/components/CompanySwitcher.tsx`:
 
 Import `Divider` from `antd` alongside the existing imports.
 
-- [ ] **Step 8: Pass the flag down**
+- [x] **Step 8: Pass the flag down**
 
 In `ctyhp-accounting/components/AppShell.tsx`, add `canCreateCompany: boolean` to the
 props and forward it:
@@ -2215,7 +2215,7 @@ In `ctyhp-accounting/app/(app)/layout.tsx`, import `isPlatformAdmin` alongside
 `await` beside the others), and pass `canCreateCompany={canCreateCompany}` to
 `AppShell`.
 
-- [ ] **Step 9: Run the tests, typecheck and targeted lint**
+- [x] **Step 9: Run the tests, typecheck and targeted lint**
 
 Run:
 
@@ -2229,7 +2229,7 @@ Expected: all pass with zero errors. If eslint reports
 `react-hooks/set-state-in-effect`, move the `setState` into the async callback
 inside the effect rather than adding a disable comment.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/settings/companies' ctyhp-accounting/lib/domain/navigation.ts ctyhp-accounting/components/CompanySwitcher.tsx ctyhp-accounting/components/AppShell.tsx 'ctyhp-accounting/app/(app)/layout.tsx' ctyhp-accounting/tests/unit/company-provisioning-ui-contract.test.ts
@@ -2248,7 +2248,7 @@ git commit -m "Put New company where a company is chosen, and show what it is do
 - Consumes: migration 0097 and the provisioning core.
 - Produces: `npm run verify:company-provisioning`, which builds a real company inside a transaction and rolls it back.
 
-- [ ] **Step 1: Add the package script**
+- [x] **Step 1: Add the package script**
 
 In `ctyhp-accounting/package.json`, beside the other verifiers:
 
@@ -2256,7 +2256,7 @@ In `ctyhp-accounting/package.json`, beside the other verifiers:
 "verify:company-provisioning": "node --env-file=.env.local scripts/verify-company-provisioning.mjs",
 ```
 
-- [ ] **Step 2: Write the rollback-only harness**
+- [x] **Step 2: Write the rollback-only harness**
 
 Create `ctyhp-accounting/scripts/verify-company-provisioning.mjs`:
 
@@ -2383,7 +2383,7 @@ console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 ```
 
-- [ ] **Step 3: Static safety check, then run it**
+- [x] **Step 3: Static safety check, then run it**
 
 Run:
 
@@ -2397,7 +2397,7 @@ Expected: the grep prints nothing, the credential check passes, every assertion
 prints PASS, the final line confirms `ROLLBACK`, and `0 failed`. If the script
 cannot connect, stop and report it rather than skipping the verification.
 
-- [ ] **Step 4: Run every project gate**
+- [x] **Step 4: Run every project gate**
 
 Run, recording real output:
 
@@ -2413,7 +2413,7 @@ Expected: all tests pass, typecheck and the credential check clean, lint zero
 errors with only the pre-existing `scripts/verify-*.mjs` warnings, build exits 0
 with `/settings/companies` and `/api/companies/provision` in the route list.
 
-- [ ] **Step 5: Smoke the built server**
+- [x] **Step 5: Smoke the built server**
 
 Start the built server, then run:
 
@@ -2428,7 +2428,7 @@ POST returns 401; the authorized POST returns `{"processed":0,"migrationFileCoun
 — which proves the route can read the migration files without creating anything.
 Stop the server afterwards.
 
-- [ ] **Step 6: Apply the migration to every company**
+- [x] **Step 6: Apply the migration to every company**
 
 Run: `node --env-file=.env.local scripts/migrate.mjs`
 
@@ -2450,7 +2450,7 @@ import('pg').then(async ({default: pg}) => {
 Expected: `admins` is at least 1, `requests` is 0, and `copies` is exactly 2 —
 the register objects exist once, not once per company schema.
 
-- [ ] **Step 7: Review the diff and commit**
+- [x] **Step 7: Review the diff and commit**
 
 Run:
 
@@ -2467,7 +2467,7 @@ git add ctyhp-accounting/scripts/verify-company-provisioning.mjs ctyhp-accountin
 git commit -m "Build a real company, check it, and roll it back"
 ```
 
-- [ ] **Step 8: Report what the deployment still needs**
+- [x] **Step 8: Report what the deployment still needs**
 
 The feature is not usable in production until `SUPABASE_DB_URL` exists in the
 Vercel project's environment. State this explicitly in the completion report,
