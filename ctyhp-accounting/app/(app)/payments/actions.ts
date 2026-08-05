@@ -2,14 +2,23 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { hasPermission, searchAudit } from "@/lib/services/access";
 import {
   recordPayment,
   listOpenInvoicesForCustomer,
   voidPayment,
+  updatePaymentDetails,
+  correctPayment,
+  getPaymentDetail,
   InvoicingError,
 } from "@/lib/services/invoicing";
-import { paymentCreateSchema, paymentVoidSchema } from "@/lib/domain/schemas";
-import type { InvoiceRow } from "@/lib/db/types";
+import {
+  paymentCreateSchema,
+  paymentVoidSchema,
+  paymentCorrectionSchema,
+  paymentDetailsSchema,
+} from "@/lib/domain/schemas";
+import type { AuditEntryRow, InvoiceRow, PaymentDetail } from "@/lib/db/types";
 
 /**
  * Every cached view a receipt shows up in. Voiding one moves an invoice back to
@@ -82,6 +91,78 @@ export async function voidPaymentAction(paymentId: string, reason: string): Prom
     await voidPayment(sb, parsed.data.payment_id, parsed.data.reason);
     for (const path of PAYMENT_VOID_REVALIDATION_PATHS) revalidatePath(path);
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** What a receipt settled and how it posted. Read-only, so the session is the gate. */
+export async function getPaymentDetailAction(payment: {
+  id: string;
+  journal_entry_id: string | null;
+}): Promise<ActionResult<PaymentDetail>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getPaymentDetail(sb, payment) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** The change history of one receipt, for whoever may read the audit log. */
+export async function getPaymentAuditAction(
+  paymentId: string,
+): Promise<ActionResult<AuditEntryRow[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    if (!(await hasPermission(sb, "audit.read"))) {
+      return { ok: false, error: "You do not have permission to perform this action" };
+    }
+    const entries = await searchAudit(sb, {
+      table_name: "acc_payment",
+      record_id: paymentId,
+      actor_id: null,
+      action: null,
+      from: null,
+      to: null,
+      limit: 200,
+    });
+    return { ok: true, data: entries };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Fix what a receipt says about itself. Only `/payments` is revalidated: none of
+ * these fields reaches a balance, so no report can have changed.
+ */
+export async function updatePaymentDetailsAction(raw: unknown): Promise<ActionResult> {
+  const role = await getUserRole();
+  if (!canWrite(role)) return { ok: false, error: "You do not have permission to perform this action" };
+  const parsed = paymentDetailsSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    await updatePaymentDetails(sb, parsed.data);
+    revalidatePath("/payments");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Void a receipt and record its corrected self; one call, one transaction. */
+export async function correctPaymentAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
+  const role = await getUserRole();
+  if (!canWrite(role)) return { ok: false, error: "You do not have permission to perform this action" };
+  const parsed = paymentCorrectionSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const id = await correctPayment(sb, parsed.data);
+    for (const path of PAYMENT_VOID_REVALIDATION_PATHS) revalidatePath(path);
+    return { ok: true, data: { id } };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
