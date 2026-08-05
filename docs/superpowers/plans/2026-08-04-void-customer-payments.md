@@ -57,7 +57,7 @@
 - Produces: `paymentReplacementDraft(payment, decimalPlaces): PaymentReplacementDraft`.
 - Consumes: `PaymentRow` and integer currency precision.
 
-- [ ] **Step 1: Write the failing schema and pure-helper tests**
+- [x] **Step 1: Write the failing schema and pure-helper tests**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -104,13 +104,13 @@ describe("paymentReplacementDraft", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify the expected RED state**
+- [x] **Step 2: Run the test and verify the expected RED state**
 
 Run: `npm test -- tests/unit/payment-void-schema.test.ts`
 
 Expected: FAIL because `paymentVoidSchema` and `paymentReplacementDraft` do not exist.
 
-- [ ] **Step 3: Add the validation and pure replacement mapper**
+- [x] **Step 3: Add the validation and pure replacement mapper**
 
 Add to `lib/domain/schemas.ts`:
 
@@ -167,13 +167,13 @@ export function paymentReplacementDraft(
 }
 ```
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `npm test -- tests/unit/payment-void-schema.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the pure contract**
+- [x] **Step 5: Commit the pure contract**
 
 ```powershell
 git add ctyhp-accounting/lib/domain/payment-void.ts ctyhp-accounting/lib/domain/schemas.ts ctyhp-accounting/tests/unit/payment-void-schema.test.ts
@@ -194,7 +194,7 @@ git commit -m "test: define customer payment void contract"
 - Produces: `acc_void_payment(p_payment_id uuid, p_reason text) returns void`.
 - Produces: nullable `voided_at`, `voided_by`, `void_reason` on `acc_payment`.
 
-- [ ] **Step 1: Write the failing migration contract test**
+- [x] **Step 1: Write the failing migration contract test**
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -240,13 +240,13 @@ describe("customer payment void migration", () => {
 });
 ```
 
-- [ ] **Step 2: Run the migration tests and verify RED**
+- [x] **Step 2: Run the migration tests and verify RED**
 
 Run: `npm test -- tests/unit/payment-void-migration.test.ts tests/unit/schema-template.test.ts`
 
 Expected: FAIL because migration 0095 does not exist.
 
-- [ ] **Step 3: Create migration 0095 with backfill and metadata constraint**
+- [x] **Step 3: Create migration 0095 with backfill and metadata constraint**
 
 Use this schema contract:
 
@@ -271,7 +271,7 @@ alter table acc_payment add constraint acc_payment_void_metadata_ck check (
 );
 ```
 
-- [ ] **Step 4: Add the complete atomic RPC and grants**
+- [x] **Step 4: Add the complete atomic RPC and grants**
 
 ```sql
 create or replace function acc_void_payment(
@@ -373,13 +373,13 @@ grant execute on function acc_void_payment(uuid, text) to authenticated, service
 The journal update deliberately relies on `acc_journal_entry_closed_period_void`.
 If it rejects the void, PostgreSQL rolls back the earlier invoice restorations.
 
-- [ ] **Step 5: Run migration and schema-template tests**
+- [x] **Step 5: Run migration and schema-template tests**
 
 Run: `npm test -- tests/unit/payment-void-migration.test.ts tests/unit/schema-template.test.ts`
 
 Expected: PASS, including no statement pinned to `public` in a company plan.
 
-- [ ] **Step 6: Commit the database boundary**
+- [x] **Step 6: Commit the database boundary**
 
 ```powershell
 git add ctyhp-accounting/supabase/migrations/0095_void_customer_payments.sql ctyhp-accounting/tests/unit/payment-void-migration.test.ts
@@ -400,7 +400,7 @@ git commit -m "feat: add atomic customer payment void"
 - Produces: `voidPayment(sb: SupabaseClient, paymentId: string, reason: string): Promise<void>`.
 - Produces: `PaymentRow.voided_at`, `.voided_by`, `.void_reason`.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 ```ts
 import { describe, expect, it, vi } from "vitest";
@@ -433,13 +433,13 @@ describe("voidPayment", () => {
 });
 ```
 
-- [ ] **Step 2: Run the service test and verify RED**
+- [x] **Step 2: Run the service test and verify RED**
 
 Run: `npm test -- tests/unit/payment-void-service.test.ts`
 
 Expected: FAIL because `voidPayment` is not exported.
 
-- [ ] **Step 3: Extend the row type and list query**
+- [x] **Step 3: Extend the row type and list query**
 
 Add to `PaymentRow`:
 
@@ -451,7 +451,7 @@ void_reason: string | null;
 
 Add `voided_at,voided_by,void_reason` to the `listPayments` select string.
 
-- [ ] **Step 4: Implement the thin service adapter**
+- [x] **Step 4: Implement the thin service adapter**
 
 ```ts
 export async function voidPayment(
@@ -467,13 +467,13 @@ export async function voidPayment(
 }
 ```
 
-- [ ] **Step 5: Run focused tests and typecheck**
+- [x] **Step 5: Run focused tests and typecheck**
 
 Run: `npm test -- tests/unit/payment-void-service.test.ts && npm run typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the adapter**
+- [x] **Step 6: Commit the adapter**
 
 ```powershell
 git add ctyhp-accounting/lib/db/types.ts ctyhp-accounting/lib/services/invoicing.ts ctyhp-accounting/tests/unit/payment-void-service.test.ts
@@ -492,7 +492,7 @@ git commit -m "feat: expose customer payment void service"
 - Consumes: `paymentVoidSchema` from Task 1 and `voidPayment` from Task 3.
 - Produces: `voidPaymentAction(paymentId: string, reason: string): Promise<ActionResult>`.
 
-- [ ] **Step 1: Write failing action tests with hoisted mocks**
+- [x] **Step 1: Write failing action tests with hoisted mocks**
 
 ```ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -564,13 +564,13 @@ describe("voidPaymentAction", () => {
 });
 ```
 
-- [ ] **Step 2: Run the action test and verify RED**
+- [x] **Step 2: Run the action test and verify RED**
 
 Run: `npm test -- tests/unit/payment-void-action.test.ts`
 
 Expected: FAIL because `voidPaymentAction` does not exist.
 
-- [ ] **Step 3: Implement the authorized action**
+- [x] **Step 3: Implement the authorized action**
 
 ```ts
 export async function voidPaymentAction(
@@ -599,13 +599,13 @@ export async function voidPaymentAction(
 Define `PAYMENT_VOID_REVALIDATION_PATHS` in the same file with the exact eight
 literal paths used by the test.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 Run: `npm test -- tests/unit/payment-void-action.test.ts && npm run typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the action**
+- [x] **Step 5: Commit the action**
 
 ```powershell
 git add 'ctyhp-accounting/app/(app)/payments/actions.ts' ctyhp-accounting/tests/unit/payment-void-action.test.ts
@@ -628,7 +628,7 @@ git commit -m "feat: authorize customer payment voids"
 - Consumes: `paymentReplacementDraft`, `ActorRow[]`, extended `PaymentRow`.
 - Produces: no new route; preserves `/payments` props and existing workflows.
 
-- [ ] **Step 1: Write the failing UI structure contract**
+- [x] **Step 1: Write the failing UI structure contract**
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -663,19 +663,19 @@ describe("payment void UI contract", () => {
 });
 ```
 
-- [ ] **Step 2: Run the UI contract and verify RED**
+- [x] **Step 2: Run the UI contract and verify RED**
 
 Run: `npm test -- tests/unit/payment-void-ui-contract.test.ts`
 
 Expected: FAIL because the two modal components and approved actions do not exist.
 
-- [ ] **Step 3: Load the actor directory on the server**
+- [x] **Step 3: Load the actor directory on the server**
 
 In `page.tsx`, add `listActors(sb)` to the existing `Promise.all`, then pass
 `actors={actors}` to `PaymentsClient`. Keep the schema-bound `sb` and every
 existing permission call unchanged.
 
-- [ ] **Step 4: Extract the existing receive form into `ReceivePaymentModal`**
+- [x] **Step 4: Extract the existing receive form into `ReceivePaymentModal`**
 
 Use this public prop contract:
 
@@ -722,7 +722,7 @@ Use `try/finally` around submission so `saving` always resets. A successful
 replacement says `Replacement payment recorded and posted to the ledger`; a
 normal receipt retains `Payment recorded and posted to the ledger`.
 
-- [ ] **Step 5: Create `VoidPaymentModal`**
+- [x] **Step 5: Create `VoidPaymentModal`**
 
 Use this prop contract and action flow:
 
@@ -753,7 +753,7 @@ try {
 }
 ```
 
-- [ ] **Step 6: Recompose `PaymentsClient`**
+- [x] **Step 6: Recompose `PaymentsClient`**
 
 Keep the table, Refund modal, and Attachment drawer in the façade. Add:
 
@@ -768,7 +768,7 @@ Keep the table, Refund modal, and Attachment drawer in the façade. Add:
 Do not hide attachments on void rows. Keep Refund restricted to active payments
 with `unapplied_minor > 0`.
 
-- [ ] **Step 7: Run focused tests, typecheck, and targeted lint**
+- [x] **Step 7: Run focused tests, typecheck, and targeted lint**
 
 Run:
 
@@ -780,7 +780,7 @@ npx eslint 'app/(app)/payments/*.tsx' 'app/(app)/payments/actions.ts' lib/domain
 
 Expected: all pass with zero errors and no new warnings.
 
-- [ ] **Step 8: Commit the UI**
+- [x] **Step 8: Commit the UI**
 
 ```powershell
 git add 'ctyhp-accounting/app/(app)/payments' ctyhp-accounting/tests/unit/payment-void-ui-contract.test.ts
@@ -800,13 +800,13 @@ git commit -m "feat: add payment void and replacement controls"
 - Produces: `npm run verify:void-payment`, which applies migration 0095 and every
   scenario inside one transaction and always rolls it back.
 
-- [ ] **Step 1: Add the package command**
+- [x] **Step 1: Add the package command**
 
 ```json
 "verify:void-payment": "node --env-file=.env.local scripts/verify-void-payment.mjs"
 ```
 
-- [ ] **Step 2: Implement a transaction-owned harness**
+- [x] **Step 2: Implement a transaction-owned harness**
 
 The script must:
 
@@ -836,7 +836,7 @@ try {
 Use savepoints between cases. Never call `COMMIT`, and fail source review if the
 file contains `commit` as an executable SQL statement.
 
-- [ ] **Step 3: Verify successful void and preservation**
+- [x] **Step 3: Verify successful void and preservation**
 
 Inside the transaction:
 
@@ -850,7 +850,7 @@ Inside the transaction:
    posted ledger contribution from that journal.
 6. Call the RPC again and assert an `already void` refusal.
 
-- [ ] **Step 4: Verify every blocker rolls back atomically**
+- [x] **Step 4: Verify every blocker rolls back atomically**
 
 Use a fresh payment per savepoint and assert unchanged payment, invoice, and
 journal state after each refused call:
@@ -864,7 +864,7 @@ journal state after each refused call:
 
 Print one `PASS` line per assertion and exit nonzero if any assertion fails.
 
-- [ ] **Step 5: Run static safety checks before any database connection**
+- [x] **Step 5: Run static safety checks before any database connection**
 
 Run:
 
@@ -877,7 +877,7 @@ Expected: no executable commit/delete statement and security check PASS. A
 comment explaining that the script never commits is acceptable only if the
 static check is scoped to executable query strings.
 
-- [ ] **Step 6: Run rollback verification only against the configured database**
+- [x] **Step 6: Run rollback verification only against the configured database**
 
 Run: `npm run verify:void-payment`
 
@@ -885,7 +885,7 @@ Expected: every scenario prints PASS, the final line confirms `ROLLBACK`, and no
 fixture remains. Do not run if `SUPABASE_DB_URL` is missing. Do not run
 `scripts/migrate.mjs` as part of this task.
 
-- [ ] **Step 7: Commit the verification harness**
+- [x] **Step 7: Commit the verification harness**
 
 ```powershell
 git add ctyhp-accounting/scripts/verify-void-payment.mjs ctyhp-accounting/package.json
@@ -903,7 +903,7 @@ git commit -m "test: verify payment void ledger behavior"
 - Consumes: completed Tasks 1-6.
 - Produces: a clean, reviewed feature branch with reproducible verification evidence.
 
-- [ ] **Step 1: Run all focused tests together**
+- [x] **Step 1: Run all focused tests together**
 
 Run:
 
@@ -913,7 +913,7 @@ npm test -- tests/unit/payment-void-schema.test.ts tests/unit/payment-void-migra
 
 Expected: PASS.
 
-- [ ] **Step 2: Run mandatory project gates**
+- [x] **Step 2: Run mandatory project gates**
 
 Run, recording real output:
 
@@ -928,7 +928,7 @@ npm run build
 Expected: zero failures/errors and no new warnings. Existing lint warnings must
 be compared with the baseline rather than silently attributed to this change.
 
-- [ ] **Step 3: Run the built-server smoke sweep**
+- [x] **Step 3: Run the built-server smoke sweep**
 
 Start `npm start` against the successful build using the existing `.env.local`,
 then run:
@@ -940,7 +940,7 @@ node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000
 Expected: every discovered page, including `/payments`, returns 200 with no error
 boundary.
 
-- [ ] **Step 4: Verify `/payments` visually without mutating production**
+- [x] **Step 4: Verify `/payments` visually without mutating production**
 
 At approximately 1600×879, confirm:
 
@@ -954,7 +954,14 @@ Do not click the final Void or Record payment confirmation against production.
 If the integrated browser is unavailable, verify the built local page through the
 authenticated smoke session and record that fallback explicitly.
 
-- [ ] **Step 5: Review the complete diff**
+**Fallback used.** No integrated browser was available, so verification ran
+through `scripts/smoke-payments-void.mjs`: an authenticated GET of the built
+`/payments`, then the client chunks the page itself requests, asserting the Void
+action, the replacement action, the consequence copy, the required reason, and
+the absence of any un-void affordance. Nothing was clicked and nothing was
+written.
+
+- [x] **Step 5: Review the complete diff**
 
 Run:
 
@@ -967,13 +974,13 @@ git log --oneline --decorate -8
 Confirm only planned files changed, every migration and test is committed, and no
 user-owned `.claude/settings.json` or unrelated plan file entered the branch.
 
-- [ ] **Step 6: Request code review and address findings**
+- [x] **Step 6: Request code review and address findings**
 
 Review from the branch base through `HEAD`, specifically checking tenant schema
 retargeting, rollback behavior, closed-period protection, reconciliation/refund
 guards, authorization, accessibility, and replacement non-submission.
 
-- [ ] **Step 7: Run final verification after the last review fix**
+- [x] **Step 7: Run final verification after the last review fix**
 
 Repeat full tests, typecheck, lint, security check, build, and smoke after the
 last code modification. The final completion report must cite these fresh results.
