@@ -826,3 +826,18 @@ export const feedbackStatusChangeSchema = z.object({
   note: z.string().trim().max(2000).optional().or(z.literal("")).nullable(),
 });
 export type FeedbackStatusChangeInput = z.infer<typeof feedbackStatusChangeSchema>;
+
+// --- Companies (the register, not a company's own settings) ---
+export const companyCreateSchema = z.object({
+  legal_name: z.string().trim().min(1, "A legal name is required").max(160),
+  slug: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z][a-z0-9_]{1,40}$/,
+      "A company key is lower case letters, digits and underscores, starting with a letter",
+    ),
+  is_sample: z.boolean().default(false),
+  display_order: z.number().int().min(0).max(1000).default(100),
+});
+export type CompanyCreateInput = z.infer<typeof companyCreateSchema>;
