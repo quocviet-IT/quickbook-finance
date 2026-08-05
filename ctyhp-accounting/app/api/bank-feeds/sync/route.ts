@@ -1,6 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { createSupabaseAutomationClient } from "@/lib/db/automation";
-import { listBankConnections, syncBankConnection } from "@/lib/services/banking";
+import { runBankFeedAutomationJob } from "@/lib/services/automation-jobs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -18,46 +17,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const sb = createSupabaseAutomationClient();
-    const connections = (await listBankConnections(sb))
-      .filter((connection) => connection.status !== "disconnected")
-      .slice(0, 20);
-    const results: Array<{
-      connectionId: string;
-      institution: string;
-      ok: boolean;
-      added?: number;
-      modified?: number;
-      removed?: number;
-      suggestions?: number;
-      error?: string;
-    }> = [];
-
-    // Sequential by design: it avoids provider bursts and keeps one connection's
-    // cursor update isolated from every other institution.
-    for (const connection of connections) {
-      try {
-        const result = await syncBankConnection(sb, connection.id);
-        results.push({
-          connectionId: connection.id,
-          institution: connection.institution_name,
-          ok: true,
-          ...result,
-        });
-      } catch (error) {
-        results.push({
-          connectionId: connection.id,
-          institution: connection.institution_name,
-          ok: false,
-          error: error instanceof Error ? error.message : "Synchronization failed",
-        });
-      }
-    }
-
+    // Every active company, its own quota, two at a time — all of that belongs
+    // to the job. A company that fails is reported inside `companies`; only an
+    // unreadable register reaches the catch below, because then we do not know
+    // who the companies are and a partial run would read as a success.
+    const job = await runBankFeedAutomationJob();
     return Response.json({
       synchronizedAt: new Date().toISOString(),
-      connectionCount: connections.length,
-      results,
+      ...job,
     });
   } catch (error) {
     return Response.json(

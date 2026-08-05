@@ -1,10 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { createSupabaseAutomationClient } from "@/lib/db/automation";
-import {
-  generateRecurringTemplate,
-  listDueRecurringTemplates,
-} from "@/lib/services/recurring";
-import { nextRecurringDate } from "@/lib/domain/recurring";
+import { runRecurringAutomationJob } from "@/lib/services/automation-jobs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -23,65 +18,12 @@ export async function GET(request: Request) {
 
   const asOf = new Date().toISOString().slice(0, 10);
   try {
-    const sb = createSupabaseAutomationClient();
-    const templates = await listDueRecurringTemplates(sb, asOf, 50);
-    const results: Array<{
-      templateId: string;
-      name: string;
-      scheduledDate: string;
-      ok: boolean;
-      status?: string;
-      documentId?: string | null;
-      error?: string;
-    }> = [];
-
-    let occurrenceCount = 0;
-    for (const template of templates) {
-      let scheduledDate = template.next_run_date;
-      let scheduleOccurrences = 0;
-      while (
-        scheduledDate <= asOf &&
-        (!template.end_date || scheduledDate <= template.end_date) &&
-        scheduleOccurrences < 12 &&
-        occurrenceCount < 100
-      ) {
-        try {
-          const result = await generateRecurringTemplate(sb, template.id);
-          results.push({
-            templateId: template.id,
-            name: template.name,
-            scheduledDate,
-            ok: true,
-            status: result.status,
-            documentId: result.documentId,
-          });
-          if (!result.claimed) break;
-          scheduledDate = nextRecurringDate(
-            scheduledDate,
-            template.start_date,
-            template.frequency,
-            template.interval_count,
-          );
-          scheduleOccurrences += 1;
-          occurrenceCount += 1;
-        } catch (error) {
-          results.push({
-            templateId: template.id,
-            name: template.name,
-            scheduledDate,
-            ok: false,
-            error: error instanceof Error ? error.message : "Generation failed",
-          });
-          break;
-        }
-      }
-    }
-
+    // The occurrence budget resets for every company, so one busy schedule
+    // cannot spend the next company's allowance. The job owns those rules.
+    const job = await runRecurringAutomationJob(asOf);
     return Response.json({
       processedAt: new Date().toISOString(),
-      asOf,
-      scheduleCount: templates.length,
-      results,
+      ...job,
     });
   } catch (error) {
     return Response.json(
