@@ -16,6 +16,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Provisioning a company reads the migration files at runtime. Nothing
+  // imports them, so the tracer cannot see them and the deployed function would
+  // try to build a company out of nothing. The route reports how many it found.
+  outputFileTracingIncludes: {
+    "/api/companies/provision": ["./supabase/migrations/**"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
