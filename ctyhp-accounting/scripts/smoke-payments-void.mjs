@@ -74,6 +74,9 @@ check("replacement mode has its own title", shipped.includes("Create replacement
 check("the receipt flow is untouched", shipped.includes("Receive payment"));
 check("attribution is shown, not just stored", shipped.includes("Voided by "));
 check("nothing offers to revive a void payment", !/unvoid|reinstate/i.test(shipped));
+check("the detail view is offered", shipped.includes("Invoices settled"));
+check("the description edit is offered", shipped.includes("Edit details"));
+check("the one-step correction is offered", shipped.includes("Correct payment"));
 
 console.log(`\n${failed} failed`);
 if (failed > 0) process.exit(1);

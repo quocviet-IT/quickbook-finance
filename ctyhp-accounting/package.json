@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:void-payment": "node --env-file=.env.local scripts/verify-void-payment.mjs",
+    "verify:payment-correction": "node --env-file=.env.local scripts/verify-payment-correction.mjs",
     "smoke:payments-void": "node --env-file=.env.local scripts/smoke-payments-void.mjs",
     "test:e2e:document-ledger-report": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts",
     "test:watch": "vitest"
