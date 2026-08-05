@@ -1,31 +1,26 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  App,
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  type TableColumnsType,
-} from "antd";
+import { Button, Space, Table, Tag, Tooltip, type TableColumnsType } from "antd";
 import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
 import IconActionButton from "@/components/ui/IconActionButton";
-import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow, PaymentStatus } from "@/lib/db/types";
-import { formatMoney, toMinorUnits } from "@/lib/format";
-import { describeNoOpenInvoices, unappliedRemainderMinor } from "@/lib/domain/settlement";
-import { recordPaymentAction, getOpenInvoicesAction } from "./actions";
+import type {
+  AccountRow,
+  ActorRow,
+  CurrencyRow,
+  CustomerRow,
+  PaymentRow,
+  PaymentStatus,
+} from "@/lib/db/types";
+import { formatMoney } from "@/lib/format";
+import ReceivePaymentModal from "./ReceivePaymentModal";
+import VoidPaymentModal from "./VoidPaymentModal";
 import RefundModal from "../settlements/RefundModal";
+
+type PaymentListRow = PaymentRow & { customer_name: string };
 
 const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
   unapplied: { text: "Unapplied", color: "orange" },
@@ -40,6 +35,7 @@ export default function PaymentsClient({
   customers,
   depositAccounts,
   currencies,
+  actors,
   canWrite,
   canReadDocuments,
   canManageDocuments,
@@ -48,114 +44,55 @@ export default function PaymentsClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
-  payments: (PaymentRow & { customer_name: string })[];
+  payments: PaymentListRow[];
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
   currencies: CurrencyRow[];
+  actors: ActorRow[];
   canWrite: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
   scannerConfigured: boolean;
 }) {
-  const { message } = App.useApp();
   const router = useRouter();
-  const [form] = Form.useForm();
-  const [open, setOpen] = useState(initialCreateOpen);
-  const [saving, setSaving] = useState(false);
-  const [openInvoices, setOpenInvoices] = useState<InvoiceRow[]>([]);
-  const [alloc, setAlloc] = useState<Record<string, number>>({}); // invoiceId -> major units
-  const [refundFor, setRefundFor] = useState<(PaymentRow & { customer_name: string }) | null>(null);
+  const [receiveOpen, setReceiveOpen] = useState(initialCreateOpen);
+  // Bumped on every open, so the form is a fresh mount rather than a reset:
+  // yesterday's allocations must never survive into the next receipt.
+  const [receiveSession, setReceiveSession] = useState(0);
+  const [replacementFor, setReplacementFor] = useState<PaymentListRow | null>(null);
+  const [voidFor, setVoidFor] = useState<PaymentListRow | null>(null);
+  const [refundFor, setRefundFor] = useState<PaymentListRow | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
-  const baseCurrency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
-  const currency: string = Form.useWatch("currency_code", form) ?? baseCurrency;
-  const amount: number = Form.useWatch("amount", form) ?? 0;
 
-  function openCreate() {
-    form.resetFields();
-    form.setFieldsValue({ currency_code: baseCurrency });
-    setOpenInvoices([]);
-    setAlloc({});
-    setOpen(true);
-  }
-
-  async function onCustomerChange(customerId: string) {
-    setAlloc({});
-    const res = await getOpenInvoicesAction(customerId);
-    if (res.ok && res.data) setOpenInvoices(res.data);
-    else {
-      setOpenInvoices([]);
-      message.error(res.error ?? "Failed to load open invoices");
-    }
-  }
-
-  function autoApply() {
-    let remaining = amount;
-    const next: Record<string, number> = {};
-    for (const inv of openInvoices) {
-      if (remaining <= 0) break;
-      const dueMajor = inv.balance_due_minor / 10 ** decimalsOf(inv.currency_code);
-      const take = Math.min(dueMajor, remaining);
-      next[inv.id] = Number(take.toFixed(decimalsOf(inv.currency_code)));
-      remaining -= take;
-    }
-    setAlloc(next);
-  }
-
-  const allocTotal = Object.values(alloc).reduce((s, v) => s + (v || 0), 0);
-
-  const selectedCustomerId: string | undefined = Form.useWatch("customer_id", form);
-  const selectedCustomerName = customers.find((c) => c.id === selectedCustomerId)?.name ?? null;
-
-  // "No open invoices" reads as a broken screen when it is really an empty
-  // ledger. Say which of the two it is, and what recording anyway would do.
-  const openInvoicesEmptyText = describeNoOpenInvoices(
-    selectedCustomerId ? (selectedCustomerName ?? "This customer") : null,
+  // A void is only accountable if the person behind it has a name on screen.
+  const directory = useMemo(
+    () => new Map(actors.map((a) => [a.id, a.email || a.full_name])),
+    [actors],
   );
 
-  // Compared in minor units, so a cent of float drift cannot invent a credit.
-  const paymentDecimals = decimalsOf(currency);
-  const unallocatedMinor = unappliedRemainderMinor(
-    toMinorUnits(amount, paymentDecimals),
-    toMinorUnits(allocTotal, paymentDecimals),
-  );
-
-  async function submit() {
-    const v = await form.validateFields();
-    const dec = decimalsOf(v.currency_code);
-    const allocations = Object.entries(alloc)
-      .filter(([, amt]) => (amt || 0) > 0)
-      .map(([invoice_id, amt]) => ({ invoice_id, amount_minor: toMinorUnits(amt, dec) }));
-
-    if (allocTotal > (v.amount ?? 0) + 1e-9) {
-      message.error("Allocations exceed the payment amount");
-      return;
-    }
-
-    setSaving(true);
-    const res = await recordPaymentAction({
-      customer_id: v.customer_id,
-      payment_date: v.payment_date ? v.payment_date.format("YYYY-MM-DD") : undefined,
-      currency_code: v.currency_code,
-      amount_minor: toMinorUnits(Number(v.amount), dec),
-      deposit_account_id: v.deposit_account_id,
-      method: v.method ?? null,
-      reference: v.reference ?? null,
-      memo: v.memo ?? null,
-      allocations,
-    });
-    setSaving(false);
-    if (res.ok) {
-      message.success("Payment recorded and posted to the ledger");
-      setOpen(false);
-    } else {
-      message.error(res.error ?? "Failed to record payment");
-    }
+  function describeVoid(row: PaymentListRow): string | null {
+    if (row.status !== "void") return null;
+    const who = row.voided_by ? (directory.get(row.voided_by) ?? "another user") : "the system";
+    const when = row.voided_at ? new Date(row.voided_at).toLocaleString() : "an earlier date";
+    return `Voided by ${who} on ${when}.${row.void_reason ? ` ${row.void_reason}` : ""}`;
   }
 
-  const columns: TableColumnsType<PaymentRow & { customer_name: string }> = [
+  function openReceive() {
+    setReplacementFor(null);
+    setReceiveSession((n) => n + 1);
+    setReceiveOpen(true);
+  }
+
+  function openReplacement(row: PaymentListRow) {
+    setReplacementFor(row);
+    setReceiveSession((n) => n + 1);
+    setReceiveOpen(true);
+  }
+
+  const columns: TableColumnsType<PaymentListRow> = [
     { title: "Number", dataIndex: "payment_number", width: 120, render: (n) => n ?? "—" },
     { title: "Customer", dataIndex: "customer_name" },
     { title: "Date", dataIndex: "payment_date", width: 120 },
@@ -179,35 +116,48 @@ export default function PaymentsClient({
       title: "Status",
       dataIndex: "status",
       width: 150,
-      render: (s: PaymentStatus) => <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>,
+      render: (s: PaymentStatus, r) => {
+        const tag = <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>;
+        const detail = describeVoid(r);
+        return detail ? <Tooltip title={detail}>{tag}</Tooltip> : tag;
+      },
     },
     {
       title: "Actions",
       key: "actions",
-      width: 145,
-      render: (_: unknown, r) =>
-        canReadDocuments || (canWrite && r.unapplied_minor > 0) ? (
-          <Space size={4}>
-            {canReadDocuments ? (
-              <IconActionButton
-                label="View payment attachments"
-                icon={<PaperClipOutlined />}
-                onClick={() =>
-                  setAttachmentTarget({
-                    entityType: "payment",
-                    entityId: r.id,
-                    label: `${r.payment_number ?? "Payment"} · ${r.customer_name}`,
-                  })
-                }
-              />
-            ) : null}
-            {canWrite && r.unapplied_minor > 0 ? (
-              <Button size="small" onClick={() => setRefundFor(r)}>
-                Refund
-              </Button>
-            ) : null}
-          </Space>
-        ) : null,
+      width: 260,
+      render: (_: unknown, r) => (
+        <Space size={4}>
+          {canReadDocuments ? (
+            <IconActionButton
+              label="View payment attachments"
+              icon={<PaperClipOutlined />}
+              onClick={() =>
+                setAttachmentTarget({
+                  entityType: "payment",
+                  entityId: r.id,
+                  label: `${r.payment_number ?? "Payment"} · ${r.customer_name}`,
+                })
+              }
+            />
+          ) : null}
+          {canWrite && r.status !== "void" && r.unapplied_minor > 0 ? (
+            <Button size="small" onClick={() => setRefundFor(r)}>
+              Refund
+            </Button>
+          ) : null}
+          {canWrite && r.status !== "void" ? (
+            <Button size="small" danger onClick={() => setVoidFor(r)}>
+              Void payment
+            </Button>
+          ) : null}
+          {canWrite && r.status === "void" ? (
+            <Button size="small" onClick={() => openReplacement(r)}>
+              Create replacement
+            </Button>
+          ) : null}
+        </Space>
+      ),
     },
   ];
 
@@ -215,7 +165,7 @@ export default function PaymentsClient({
     <div>
       {canWrite && (
         <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openReceive}>
             Receive payment
           </Button>
         </Space>
@@ -239,137 +189,28 @@ export default function PaymentsClient({
         onClose={() => setAttachmentTarget(null)}
       />
 
-      <Modal
-        title="Receive payment"
-        open={open}
-        onOk={submit}
-        onCancel={() => setOpen(false)}
-        confirmLoading={saving}
-        okText="Record payment"
-        cancelText="Cancel"
-        width={760}
-        destroyOnHidden
-      >
-        {/* Same defaults the New payment button applies, so the top-bar New menu
-            can open this modal directly. */}
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={false}
-          initialValues={{ currency_code: baseCurrency }}
-        >
-          <Space wrap align="end">
-            <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>
-              <Select
-                showSearch
-                filterOption={(i, o) => String(o?.label ?? "").toLowerCase().includes(i.toLowerCase())}
-                placeholder="Select a customer"
-                options={customers.map((c) => ({ value: c.id, label: c.name }))}
-                onChange={onCustomerChange}
-              />
-            </Form.Item>
-            <Form.Item name="currency_code" label="Currency" rules={[{ required: true }]} style={{ width: 120 }}>
-              <Select disabled options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
-            </Form.Item>
-            <Form.Item name="amount" label="Amount" rules={[{ required: true, message: "Enter amount" }]}>
-              <InputNumber min={0} step={0.01} prefix="$" style={{ width: 160 }} />
-            </Form.Item>
-            <Form.Item name="payment_date" label="Date">
-              <DatePicker />
-            </Form.Item>
-          </Space>
-          <Space wrap>
-            <Form.Item
-              name="deposit_account_id"
-              label="Deposit to"
-              rules={[{ required: true, message: "Select an account" }]}
-              style={{ minWidth: 280 }}
-              tooltip="Where the money landed. For a card or marketplace settlement — Stripe, Square, a storefront — choose 1210 Undeposited Funds: each receipt clears its invoice into that holding account, and the merchant's later payout is what reconciles against the bank, net of fees. Recording the receipt here is what closes the receivable; the merchant's own dashboard never does."
-            >
-              <Select
-                placeholder="Bank / cash account"
-                options={depositAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}
-              />
-            </Form.Item>
-            <Form.Item name="method" label="Method" style={{ width: 180 }}>
-              <Select
-                allowClear
-                placeholder="Method"
-                options={["cash", "bank_transfer", "card", "check"].map((m) => ({ value: m, label: m }))}
-              />
-            </Form.Item>
-            <Form.Item
-              name="reference"
-              label="Reference"
-              style={{ width: 200 }}
-              tooltip="Check number, wire reference or ACH trace — what the bank statement will show"
-            >
-              <Input placeholder="Check / wire ref" maxLength={80} />
-            </Form.Item>
-          </Space>
+      {receiveOpen && (
+        <ReceivePaymentModal
+          key={`receive-${receiveSession}`}
+          open={receiveOpen}
+          replacement={replacementFor}
+          customers={customers}
+          depositAccounts={depositAccounts}
+          currencies={currencies}
+          onClose={() => {
+            setReceiveOpen(false);
+            setReplacementFor(null);
+          }}
+          onDone={() => router.refresh()}
+        />
+      )}
 
-          <Space style={{ justifyContent: "space-between", width: "100%" }}>
-            <Typography.Text strong>Apply to open invoices</Typography.Text>
-            <Button size="small" onClick={autoApply} disabled={!openInvoices.length}>
-              Auto apply
-            </Button>
-          </Space>
-          <Table<InvoiceRow>
-            rowKey="id"
-            size="small"
-            pagination={false}
-            style={{ marginTop: 8 }}
-            dataSource={openInvoices}
-            locale={{ emptyText: openInvoicesEmptyText }}
-            columns={[
-              { title: "Invoice", dataIndex: "invoice_number", render: (n) => n ?? "—" },
-              {
-                title: "Balance due",
-                dataIndex: "balance_due_minor",
-                width: 140,
-                align: "right",
-                render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
-              },
-              {
-                title: "Apply",
-                key: "apply",
-                width: 160,
-                render: (_: unknown, r) => (
-                  <InputNumber
-                    min={0}
-                    step={0.01}
-                    prefix="$"
-                    style={{ width: 140 }}
-                    value={alloc[r.id]}
-                    max={r.balance_due_minor / 10 ** decimalsOf(r.currency_code)}
-                    onChange={(val) => setAlloc((prev) => ({ ...prev, [r.id]: Number(val ?? 0) }))}
-                  />
-                ),
-              },
-            ]}
-          />
-
-          <div style={{ textAlign: "right", marginTop: 8 }}>
-            <Typography.Text type={allocTotal > amount + 1e-9 ? "danger" : "secondary"}>
-              Allocated {formatMoney(toMinorUnits(allocTotal, decimalsOf(currency)), currency, decimalsOf(currency))} of{" "}
-              {formatMoney(toMinorUnits(amount, decimalsOf(currency)), currency, decimalsOf(currency))}
-            </Typography.Text>
-            {unallocatedMinor !== null ? (
-              <div style={{ marginTop: 2 }}>
-                <Typography.Text type="warning" style={{ fontSize: 12 }}>
-                  {formatMoney(unallocatedMinor, currency, paymentDecimals)} stays unapplied as a credit on{" "}
-                  {selectedCustomerName ? `${selectedCustomerName}'s` : "the customer's"} account — apply or refund it
-                  later.
-                </Typography.Text>
-              </div>
-            ) : null}
-          </div>
-
-          <Form.Item name="memo" label="Memo" style={{ marginTop: 8 }}>
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <VoidPaymentModal
+        payment={voidFor}
+        decimalsOf={decimalsOf}
+        onClose={() => setVoidFor(null)}
+        onDone={() => router.refresh()}
+      />
 
       {refundFor && (
         <RefundModal

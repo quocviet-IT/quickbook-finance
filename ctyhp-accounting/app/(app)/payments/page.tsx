@@ -3,7 +3,7 @@ import { listPayments, listCustomers } from "@/lib/services/invoicing";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
-import { hasPermission } from "@/lib/services/access";
+import { hasPermission, listActors } from "@/lib/services/access";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import PaymentsClient from "./PaymentsClient";
@@ -26,6 +26,7 @@ export default async function PaymentsPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    actors,
   ] = await Promise.all([
     listPayments(sb),
     listCustomers(sb),
@@ -35,6 +36,7 @@ export default async function PaymentsPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    listActors(sb),
   ]);
 
   const depositAccounts = accounts.filter(
@@ -50,6 +52,7 @@ export default async function PaymentsPage({
         customers={customers}
         depositAccounts={depositAccounts}
         currencies={currencies}
+        actors={actors}
         canWrite={canWrite(role)}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
