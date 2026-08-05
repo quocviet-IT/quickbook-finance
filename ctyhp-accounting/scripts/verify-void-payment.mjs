@@ -276,6 +276,38 @@ async function main() {
       );
     });
 
+    // --- 4b. A match named by journal line blocks it too --------------------
+    await scenario("a bank match on the payment's journal line blocks the void", async () => {
+      const bankAccount = await one(`select id, account_id from acc_bank_account limit 1`);
+      if (!bankAccount) {
+        console.log("  SKIP  no bank account configured to attach a transaction to");
+        return;
+      }
+      const { payment } = await recordPaymentOnOpenInvoice(TODAY, bankAccount.account_id);
+      const txn = await one(
+        `insert into acc_bank_transaction (bank_account_id, txn_date, description, amount_minor, raw_hash)
+         values ($1, current_date, 'void verification line match', $2, $3)
+         returning id`,
+        [bankAccount.id, payment.amount_minor, `void-verify-line-${payment.id}`],
+      );
+      const line = await one(
+        `select id from acc_journal_line where journal_entry_id = $1 order by line_order limit 1`,
+        [payment.journal_entry_id],
+      );
+      // payment_id deliberately left null: this is the shape 0045 introduced.
+      await client.query(
+        `insert into acc_reconciliation (bank_transaction_id, journal_line_id, status)
+         values ($1, $2, 'approved')`,
+        [txn.id, line.id],
+      );
+
+      await client.query("savepoint before_void");
+      const refusal = await attemptVoid(payment.id, "Rollback verification");
+      check("the void is refused", /bank match/i.test(refusal ?? ""), refusal ?? "none");
+      const state = await one(`select status from acc_payment where id = $1`, [payment.id]);
+      check("the payment is untouched", state.status !== "void");
+    });
+
     // --- 5. A cleared statement line blocks it ------------------------------
     await scenario("a cleared statement line blocks the void", async () => {
       // Deposited into the account a statement is actually reconciled against,

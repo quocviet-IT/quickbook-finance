@@ -25,6 +25,13 @@ describe("customer payment void migration", () => {
     expect(sql).toContain("acc_payment_allocation");
   });
 
+  it("catches a bank match named by journal line, not only by payment", () => {
+    // acc_reconciliation.journal_line_id arrived in 0045; a guard that reads
+    // payment_id alone leaves a line-level match tied to a retired entry.
+    expect(sql).toMatch(/r\.payment_id = p_payment_id/);
+    expect(sql).toMatch(/jl\.journal_entry_id = v_payment\.journal_entry_id/);
+  });
+
   it("restores invoices and voids history without deleting it", () => {
     expect(sql).toMatch(/balance_due_minor\s*=\s*v_restored/i);
     expect(sql).toMatch(/update acc_journal_entry\s+set status = 'void'/i);

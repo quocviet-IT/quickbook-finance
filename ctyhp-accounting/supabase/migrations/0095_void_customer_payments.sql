@@ -79,10 +79,19 @@ begin
   end if;
 
   -- A bank line still pointing at this payment would keep it "matched" to cash
-  -- that the void says never arrived.
+  -- that the void says never arrived. Since migration 0045 a match may name the
+  -- payment directly OR one of its journal lines, so both have to be checked —
+  -- looking only at payment_id would let a line-level match survive the void.
   if exists (
-    select 1 from acc_reconciliation
-     where payment_id = p_payment_id and status in ('suggested', 'approved')
+    select 1
+      from acc_reconciliation r
+      left join acc_journal_line jl on jl.id = r.journal_line_id
+     where r.status in ('suggested', 'approved')
+       and (
+         r.payment_id = p_payment_id
+         or (v_payment.journal_entry_id is not null
+             and jl.journal_entry_id = v_payment.journal_entry_id)
+       )
   ) then
     raise exception 'Reject or undo the bank match before voiding this payment';
   end if;
