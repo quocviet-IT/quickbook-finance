@@ -198,6 +198,11 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         description: "Legal name, addresses, fiscal year, base currency, and accounting basis.",
       },
       {
+        href: "/settings/companies",
+        title: "Companies",
+        description: "Every set of books this system holds, and how to start another one.",
+      },
+      {
         href: "/settings/periods",
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",

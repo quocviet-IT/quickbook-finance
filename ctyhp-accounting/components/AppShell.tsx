@@ -227,6 +227,7 @@ export default function AppShell({
   role,
   activeCompany,
   companyOptions,
+  canCreateCompany,
   permissionKeys,
   pendingApprovals,
   children,
@@ -236,6 +237,8 @@ export default function AppShell({
   /** The company whose books are open, and everything this user may switch to. */
   activeCompany: CompanyChoice | null;
   companyOptions: CompanyChoice[];
+  /** Whether this session may create another company at all. */
+  canCreateCompany: boolean;
   /** Null means the permission lookup failed; menu filtering then degrades open. */
   permissionKeys: string[] | null;
   /** Badge count, so the approvals queue is visible without a sidebar slot. */
@@ -417,7 +420,11 @@ export default function AppShell({
           )}
 
           <div className="app-shell__header-company">
-            <CompanySwitcher active={activeCompany} options={companyOptions} />
+            <CompanySwitcher
+              active={activeCompany}
+              options={companyOptions}
+              canCreateCompany={canCreateCompany}
+            />
           </div>
 
           <div className="app-shell__header-search">

@@ -1,8 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { App, Select, Space, Tag, Tooltip, Typography } from "antd";
-import { BankOutlined } from "@ant-design/icons";
+import Link from "next/link";
+import { App, Divider, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { BankOutlined, PlusOutlined } from "@ant-design/icons";
 import { switchCompanyAction } from "@/app/(app)/company-actions";
 
 export interface CompanyChoice {
@@ -26,9 +27,12 @@ export interface CompanyChoice {
 export default function CompanySwitcher({
   active,
   options,
+  canCreateCompany,
 }: {
   active: CompanyChoice | null;
   options: CompanyChoice[];
+  /** Only a platform administrator is offered a new set of books. */
+  canCreateCompany: boolean;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -51,6 +55,14 @@ export default function CompanySwitcher({
           {active.legalName}
         </Typography.Text>
         {active.isSample ? <Tag color="orange">sample</Tag> : null}
+        {/* With one company there is no dropdown to hang the offer off, so it
+            sits beside the name — otherwise the second company can never be
+            created from here at all. */}
+        {canCreateCompany ? (
+          <Link href="/settings/companies?new=1" aria-label="New company">
+            <PlusOutlined />
+          </Link>
+        ) : null}
       </Space>
     );
   }
@@ -89,6 +101,21 @@ export default function CompanySwitcher({
         String(option?.searchText ?? "").toLowerCase().includes(input.toLowerCase())
       }
       notFoundContent="No company matches that name"
+      popupRender={(menu) => (
+        <>
+          {menu}
+          {canCreateCompany ? (
+            <>
+              <Divider style={{ margin: "4px 0" }} />
+              <div style={{ padding: "4px 8px 8px" }}>
+                <Link href="/settings/companies?new=1">
+                  <PlusOutlined /> New company
+                </Link>
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
       options={options.map((company) => ({
         value: company.slug,
         searchText: `${company.dbaName ?? ""} ${company.legalName}`.trim(),

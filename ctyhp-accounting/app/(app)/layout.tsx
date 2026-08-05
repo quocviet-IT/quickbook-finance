@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { resolveActiveCompany } from "@/lib/db/company";
+import { isPlatformAdmin, resolveActiveCompany } from "@/lib/db/company";
 import { countPendingApprovals } from "@/lib/services/access";
 import type { AppRole } from "@/lib/db/types";
 import AppShell from "@/components/AppShell";
@@ -9,6 +9,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Which company is open decides which schema everything below reads, so it is
   // resolved before anything else.
   const { active, options } = await resolveActiveCompany();
+  // Answered here so every screen's header can offer a new company, or not.
+  const canCreateCompany = await isPlatformAdmin();
   const sb = await createSupabaseServerClient();
   const {
     data: { user },
@@ -36,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       email={user.email ?? ""}
       role={role}
+      canCreateCompany={canCreateCompany}
       activeCompany={
         active
           ? {

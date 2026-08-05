@@ -33,3 +33,34 @@ describe("deployment carries the migration files", () => {
     expect(vercel.crons.some((cron) => cron.path === "/api/companies/provision")).toBe(true);
   });
 });
+
+describe("the companies screen", () => {
+  const route = ["app", "(app)", "settings", "companies"];
+
+  it("keeps the form and the list in their own components", () => {
+    const page = read(...route, "page.tsx");
+    expect(page).toContain("isPlatformAdmin");
+    expect(page).toContain("export const maxDuration = 300");
+    const client = read(...route, "CompaniesClient.tsx");
+    expect(client).toContain("<NewCompanyModal");
+    expect(client).toContain("getCompanyRequestAction");
+    expect(client).toContain("retryCompanyRequestAction");
+    expect(read(...route, "NewCompanyModal.tsx")).toContain("requestCompanyAction");
+    expect(read(...route, "NewCompanyModal.tsx")).toContain("companySlugFromName");
+  });
+
+  it("offers the button where a company is chosen, and only to those who may", () => {
+    const switcher = read("components", "CompanySwitcher.tsx");
+    expect(switcher).toContain("canCreateCompany");
+    expect(switcher).toContain("New company");
+    expect(switcher).toContain("/settings/companies?new=1");
+    expect(read("components", "AppShell.tsx")).toContain("canCreateCompany");
+    expect(read("app", "(app)", "layout.tsx")).toContain("isPlatformAdmin");
+  });
+
+  it("keeps every new file below the 400-line ceiling", () => {
+    for (const file of ["page.tsx", "CompaniesClient.tsx", "NewCompanyModal.tsx"]) {
+      expect(read(...route, file).split(/\r?\n/).length, file).toBeLessThanOrEqual(400);
+    }
+  });
+});
