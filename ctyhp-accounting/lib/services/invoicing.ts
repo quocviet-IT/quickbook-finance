@@ -237,7 +237,8 @@ export async function listPayments(sb: SupabaseClient): Promise<(PaymentRow & { 
     .from("acc_payment")
     .select(
       "id,payment_number,customer_id,payment_date,currency_code,amount_minor,unapplied_minor," +
-        "method,deposit_account_id,status,journal_entry_id,memo,created_at,updated_at,acc_customer(name)",
+        "method,reference,deposit_account_id,status,journal_entry_id,memo," +
+        "voided_at,voided_by,void_reason,created_at,updated_at,acc_customer(name)",
     )
     .order("created_at", { ascending: false });
   if (error) throw new InvoicingError(error.message);
@@ -246,6 +247,23 @@ export async function listPayments(sb: SupabaseClient): Promise<(PaymentRow & { 
     customer_name: (r.acc_customer as { name?: string } | null)?.name ?? "—",
     entry_number: (r.acc_journal_entry as { entry_number?: string } | null)?.entry_number ?? null,
   }));
+}
+
+/**
+ * Void a posted receipt. Every rule — authorization, the refund and bank-match
+ * guards, restoring invoice balances, retiring the journal entry — belongs to
+ * `acc_void_payment`, because all of it has to happen or none of it does.
+ */
+export async function voidPayment(
+  sb: SupabaseClient,
+  paymentId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_void_payment", {
+    p_payment_id: paymentId,
+    p_reason: reason,
+  });
+  if (error) throw new InvoicingError(error.message);
 }
 
 export async function listOpenInvoicesForCustomer(

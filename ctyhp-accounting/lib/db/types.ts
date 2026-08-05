@@ -230,6 +230,10 @@ export interface PaymentRow {
   status: PaymentStatus;
   journal_entry_id: string | null;
   memo: string | null;
+  /** Set together, and only on a void payment — see `acc_payment_void_metadata_ck`. */
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
   created_at: string;
   updated_at: string;
 }
