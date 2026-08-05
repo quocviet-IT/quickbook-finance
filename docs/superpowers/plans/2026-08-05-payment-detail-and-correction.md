@@ -59,7 +59,7 @@
 - Consumes: `paymentCreateSchema`, `PaymentCreateInput` (existing).
 - Produces: `paymentDetailsSchema`, `PaymentDetailsInput`, `paymentCorrectionSchema`, `PaymentCorrectionInput`.
 
-- [ ] **Step 1: Write the failing schema tests**
+- [x] **Step 1: Write the failing schema tests**
 
 Create `ctyhp-accounting/tests/unit/payment-correction-schema.test.ts`:
 
@@ -129,13 +129,13 @@ describe("paymentCorrectionSchema", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/payment-correction-schema.test.ts`
 
 Expected: FAIL because `paymentDetailsSchema` and `paymentCorrectionSchema` do not exist.
 
-- [ ] **Step 3: Add both schemas**
+- [x] **Step 3: Add both schemas**
 
 In `ctyhp-accounting/lib/domain/schemas.ts`, immediately after `paymentVoidSchema` / `PaymentVoidInput`:
 
@@ -170,13 +170,13 @@ export const paymentCorrectionSchema = paymentCreateSchema.extend({
 export type PaymentCorrectionInput = z.infer<typeof paymentCorrectionSchema>;
 ```
 
-- [ ] **Step 4: Run the test and verify GREEN**
+- [x] **Step 4: Run the test and verify GREEN**
 
 Run: `npm test -- tests/unit/payment-correction-schema.test.ts`
 
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/domain/schemas.ts ctyhp-accounting/tests/unit/payment-correction-schema.test.ts
@@ -195,7 +195,7 @@ git commit -m "Say which parts of a receipt may be rewritten and which must be c
 - Consumes: `acc_is_staff()`, `acc_void_payment(uuid, text)` (migration 0095), `acc_record_payment(uuid, date, text, bigint, uuid, text, text, jsonb, text)` (migration 0071 — note `p_memo` comes before `p_allocations`, and `p_reference` is last).
 - Produces: `acc_update_payment_details(uuid, text, text, text) returns void` and `acc_correct_payment(uuid, text, uuid, date, text, bigint, uuid, text, text, text, jsonb) returns uuid`.
 
-- [ ] **Step 1: Write the failing migration contract test**
+- [x] **Step 1: Write the failing migration contract test**
 
 Create `ctyhp-accounting/tests/unit/payment-correction-migration.test.ts`:
 
@@ -256,13 +256,13 @@ describe("payment details and correction migration", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/payment-correction-migration.test.ts`
 
 Expected: FAIL with `ENOENT` because migration 0096 does not exist.
 
-- [ ] **Step 3: Write migration 0096**
+- [x] **Step 3: Write migration 0096**
 
 Create `ctyhp-accounting/supabase/migrations/0096_payment_details_and_correction.sql`:
 
@@ -376,13 +376,13 @@ grant execute on function acc_correct_payment(uuid, text, uuid, date, text, bigi
   to authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run the test and verify GREEN**
+- [x] **Step 4: Run the test and verify GREEN**
 
 Run: `npm test -- tests/unit/payment-correction-migration.test.ts tests/unit/schema-template.test.ts`
 
 Expected: PASS, both files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/supabase/migrations/0096_payment_details_and_correction.sql ctyhp-accounting/tests/unit/payment-correction-migration.test.ts
@@ -402,7 +402,7 @@ git commit -m "Correct a receipt in one transaction, and let a typo stay a typo 
 - Consumes: the two RPCs from Task 2 and `PaymentDetailsInput` / `PaymentCorrectionInput` from Task 1.
 - Produces: `getPaymentDetail(sb, payment): Promise<PaymentDetail>`, `updatePaymentDetails(sb, input): Promise<void>`, `correctPayment(sb, input): Promise<string>`, and the three view types.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 Create `ctyhp-accounting/tests/unit/payment-correction-service.test.ts`:
 
@@ -616,13 +616,13 @@ describe("getPaymentDetail", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/payment-correction-service.test.ts`
 
 Expected: FAIL because the three functions are not exported.
 
-- [ ] **Step 3: Add the view types**
+- [x] **Step 3: Add the view types**
 
 In `ctyhp-accounting/lib/db/types.ts`, after the `PaymentRow` interface:
 
@@ -661,7 +661,7 @@ export interface PaymentDetail {
 }
 ```
 
-- [ ] **Step 4: Implement the three service functions**
+- [x] **Step 4: Implement the three service functions**
 
 In `ctyhp-accounting/lib/services/invoicing.ts`, directly below `voidPayment`:
 
@@ -786,7 +786,7 @@ import type { PaymentAllocationView, PaymentDetail } from "@/lib/db/types";
 import type { PaymentCorrectionInput, PaymentDetailsInput } from "@/lib/domain/schemas";
 ```
 
-- [ ] **Step 5: Run the tests and typecheck**
+- [x] **Step 5: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/payment-correction-service.test.ts`
 
@@ -796,7 +796,7 @@ Run: `npm run typecheck`
 
 Expected: no output beyond the two npm banner lines.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/db/types.ts ctyhp-accounting/lib/services/invoicing.ts ctyhp-accounting/tests/unit/payment-correction-service.test.ts
@@ -815,7 +815,7 @@ git commit -m "Read what a receipt settled, and expose the two ways to change on
 - Consumes: Task 1 schemas, Task 3 services, `searchAudit` from `@/lib/services/access`, `hasPermission` from `@/lib/services/access`.
 - Produces: `getPaymentDetailAction(payment)`, `getPaymentAuditAction(paymentId)`, `updatePaymentDetailsAction(raw)`, `correctPaymentAction(raw)`.
 
-- [ ] **Step 1: Write the failing action tests**
+- [x] **Step 1: Write the failing action tests**
 
 Create `ctyhp-accounting/tests/unit/payment-correction-action.test.ts`:
 
@@ -973,13 +973,13 @@ describe("payment detail and correction actions", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/payment-correction-action.test.ts`
 
 Expected: FAIL because none of the four actions exist.
 
-- [ ] **Step 3: Implement the four actions**
+- [x] **Step 3: Implement the four actions**
 
 In `ctyhp-accounting/app/(app)/payments/actions.ts`, extend the imports:
 
@@ -1072,7 +1072,7 @@ export async function correctPaymentAction(raw: unknown): Promise<ActionResult<{
 }
 ```
 
-- [ ] **Step 4: Run the tests and typecheck**
+- [x] **Step 4: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/payment-correction-action.test.ts tests/unit/payment-void-action.test.ts`
 
@@ -1082,7 +1082,7 @@ Run: `npm run typecheck`
 
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/payments/actions.ts' ctyhp-accounting/tests/unit/payment-correction-action.test.ts
@@ -1105,7 +1105,7 @@ git commit -m "Authorize reading a receipt's history and changing it two ways"
 - Consumes: `getPaymentDetailAction`, `getPaymentAuditAction`, `updatePaymentDetailsAction`, `correctPaymentAction`, `voidPaymentAction`, `recordPaymentAction`, `paymentReplacementDraft`, `DocumentAuditTrail`.
 - Produces: no new route; `/payments` keeps every existing prop and gains `canReadAudit: boolean`.
 
-- [ ] **Step 1: Extend the UI contract test**
+- [x] **Step 1: Extend the UI contract test**
 
 In `ctyhp-accounting/tests/unit/payment-void-ui-contract.test.ts`, add these cases inside the existing `describe`:
 
@@ -1145,17 +1145,17 @@ And extend the ceiling loop to the two new files:
     ]) {
 ```
 
-- [ ] **Step 2: Run the contract test and verify RED**
+- [x] **Step 2: Run the contract test and verify RED**
 
 Run: `npm test -- tests/unit/payment-void-ui-contract.test.ts`
 
 Expected: FAIL because the two components do not exist.
 
-- [ ] **Step 3: Resolve `audit.read` on the server**
+- [x] **Step 3: Resolve `audit.read` on the server**
 
 In `ctyhp-accounting/app/(app)/payments/page.tsx`, add `canReadAudit` to the destructured array, `hasPermission(sb, "audit.read")` to the `Promise.all` in the same position, and pass `canReadAudit={canReadAudit}` to `PaymentsClient`. Keep every existing call unchanged.
 
-- [ ] **Step 4: Create `PaymentDetailDrawer.tsx`**
+- [x] **Step 4: Create `PaymentDetailDrawer.tsx`**
 
 ```tsx
 "use client";
@@ -1345,7 +1345,7 @@ export default function PaymentDetailDrawer({
 }
 ```
 
-- [ ] **Step 5: Create `EditPaymentDetailsModal.tsx`**
+- [x] **Step 5: Create `EditPaymentDetailsModal.tsx`**
 
 ```tsx
 "use client";
@@ -1450,7 +1450,7 @@ export default function EditPaymentDetailsModal({
 }
 ```
 
-- [ ] **Step 6: Add correction mode to `ReceivePaymentModal.tsx`**
+- [x] **Step 6: Add correction mode to `ReceivePaymentModal.tsx`**
 
 Replace the `replacement` prop with a discriminated basis, keeping every existing
 behaviour for a plain receipt:
@@ -1536,7 +1536,7 @@ description={correcting
   : "The void payment and its number stay on record. This is a new receipt — check the amount and choose the invoices it settles."}
 ```
 
-- [ ] **Step 7: Recompose `PaymentsClient.tsx`**
+- [x] **Step 7: Recompose `PaymentsClient.tsx`**
 
 Replace the inline action buttons with a `···` menu, and add the two new pieces
 of state. Keep the paperclip icon outside the menu — it is the one action people
@@ -1677,7 +1677,7 @@ Compose the two new components beside the existing ones, passing
       />
 ```
 
-- [ ] **Step 8: Run focused tests, typecheck and targeted lint**
+- [x] **Step 8: Run focused tests, typecheck and targeted lint**
 
 Run:
 
@@ -1691,7 +1691,7 @@ Expected: tests pass, typecheck clean, eslint reports nothing. If eslint reports
 `react-hooks/set-state-in-effect`, move the `setState` call into the async
 callback inside the effect — never add a disable comment for that rule.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/payments' ctyhp-accounting/tests/unit/payment-void-ui-contract.test.ts
@@ -1711,7 +1711,7 @@ git commit -m "Open a receipt, fix its description, or correct it in one step"
 - Consumes: migrations 0095 and 0096 and the live database shape through `SUPABASE_DB_URL`.
 - Produces: `npm run verify:payment-correction`, which proves the correction inside one rolled-back transaction.
 
-- [ ] **Step 1: Add the package script**
+- [x] **Step 1: Add the package script**
 
 In `ctyhp-accounting/package.json`, beside `verify:void-payment`:
 
@@ -1719,7 +1719,7 @@ In `ctyhp-accounting/package.json`, beside `verify:void-payment`:
 "verify:payment-correction": "node --env-file=.env.local scripts/verify-payment-correction.mjs",
 ```
 
-- [ ] **Step 2: Write the rollback-only harness**
+- [x] **Step 2: Write the rollback-only harness**
 
 Create `ctyhp-accounting/scripts/verify-payment-correction.mjs`. Copy the header
 comment, `client`, `TODAY`, `check`, `one`, `all`, `scenario`, and
@@ -1967,7 +1967,7 @@ async function main() {
 await main();
 ```
 
-- [ ] **Step 3: Static safety check before connecting**
+- [x] **Step 3: Static safety check before connecting**
 
 Run:
 
@@ -1978,7 +1978,7 @@ npm run security:check-source
 
 Expected: the grep prints nothing, and the credential check passes.
 
-- [ ] **Step 4: Run the harness**
+- [x] **Step 4: Run the harness**
 
 Run: `npm run verify:payment-correction`
 
@@ -1986,7 +1986,7 @@ Expected: every scenario prints PASS, the final line confirms `ROLLBACK`, and th
 summary reads `0 failed`. Do not run if `SUPABASE_DB_URL` is missing, and do not
 run `scripts/migrate.mjs` as part of this task.
 
-- [ ] **Step 5: Extend the built-page smoke check**
+- [x] **Step 5: Extend the built-page smoke check**
 
 In `ctyhp-accounting/scripts/smoke-payments-void.mjs`, add these assertions
 beside the existing ones:
@@ -1997,7 +1997,7 @@ check("the description edit is offered", shipped.includes("Edit details"));
 check("the one-step correction is offered", shipped.includes("Correct payment"));
 ```
 
-- [ ] **Step 6: Run every project gate**
+- [x] **Step 6: Run every project gate**
 
 Run, recording real output:
 
@@ -2013,7 +2013,7 @@ Expected: all tests pass, typecheck and the credential check are clean, lint has
 zero errors and only the eleven pre-existing `scripts/verify-*.mjs` warnings, and
 the build exits 0 with `/payments` present.
 
-- [ ] **Step 7: Run the smoke sweep against the built server**
+- [x] **Step 7: Run the smoke sweep against the built server**
 
 Start the built server, then run:
 
@@ -2025,7 +2025,7 @@ node --env-file=.env.local scripts/smoke-payments-void.mjs http://127.0.0.1:3000
 Expected: every page returns 200, and every payments control assertion passes.
 Stop the server afterwards; port 3000 must be free for the next run.
 
-- [ ] **Step 8: Review the diff and commit**
+- [x] **Step 8: Review the diff and commit**
 
 Run:
 
@@ -2043,7 +2043,7 @@ git add ctyhp-accounting/scripts/verify-payment-correction.mjs ctyhp-accounting/
 git commit -m "Prove a correction is one transaction, against real books"
 ```
 
-- [ ] **Step 9: Apply the migration and report**
+- [x] **Step 9: Apply the migration and report**
 
 Migration 0096 must reach every company before the screen can use it:
 
