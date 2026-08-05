@@ -2,9 +2,9 @@
 -- 0097  Asking for a company, and who may ask
 --
 -- Creating a company is not an accounting entry: it is a new Postgres schema
--- holding a hundred tables, four hundred functions and its own row-level
--- security. That is the system owner's act, not an accountant's, and it takes
--- long enough that the browser must not be the thing holding it open.
+-- holding 75 tables, 196 functions and 135 row-level security policies, built
+-- from 1053 statements. That is the system owner's act, not an accountant's,
+-- and it takes long enough that the browser must not be holding it open.
 --
 -- So the register gains two things: a list of people who may ask, and a queue
 -- of asks with their outcome. The work itself happens outside the database,

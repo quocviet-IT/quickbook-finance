@@ -28,10 +28,10 @@ const REQUEST_STATUS: Record<CompanyRequestView["status"], { text: string; color
 };
 
 /**
- * Creating a company takes about a minute — a hundred tables, four hundred
- * functions and its own security. So the request is shown as a row with a
- * state, not as a spinner: closing the tab does not lose it, and a failure
- * leaves its reason where somebody can read it.
+ * Creating a company takes about twenty seconds — 75 tables, 196 functions and
+ * 135 security policies. So the request is shown as a row with a state, not as
+ * a spinner: closing the tab does not lose it, and a failure leaves its reason
+ * where somebody can read it.
  */
 export default function CompaniesClient({
   initialCreateOpen,

@@ -47,7 +47,7 @@ export default function NewCompanyModal({
         message.error(res.error ?? "Could not create the company");
         return;
       }
-      message.success("Building the books — this takes about a minute");
+      message.success("Building the books — this takes about half a minute");
       onQueued(res.data.requestId);
       form.resetFields();
       onClose();
@@ -73,7 +73,7 @@ export default function NewCompanyModal({
         showIcon
         style={{ marginBottom: 12 }}
         message="What this does"
-        description="A company gets its own set of books — its own chart of accounts, documents and ledger, separate from every other company here. Building it takes about a minute; you can leave this page while it runs."
+        description="A company gets its own set of books — its own chart of accounts, documents and ledger, separate from every other company here. Building it takes about half a minute; you can leave this page while it runs."
       />
       <Form
         form={form}

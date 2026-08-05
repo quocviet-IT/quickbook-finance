@@ -32,7 +32,7 @@ function msg(err: unknown): string {
  * Work the queue once the response has gone out.
  *
  * `after` keeps the invocation alive past the response, so the browser is not
- * holding a connection open for the minute it takes to build a hundred tables.
+ * holding a connection open for the twenty seconds it takes to build 75 tables.
  * A failure here is recorded on the request row by the worker itself — it must
  * never turn a successfully queued ask into an error the user sees.
  */
