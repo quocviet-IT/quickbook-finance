@@ -80,3 +80,17 @@ export async function activeSchema(): Promise<string> {
   const { active } = await resolveActiveCompany();
   return active?.schemaName ?? "public";
 }
+
+/**
+ * May this session create a company?
+ *
+ * Kept apart from `resolveActiveCompany` because it answers a different
+ * question: not "whose books may I open" but "may I make new ones". A refusal
+ * here only hides a button; `onebook.request_company` refuses again regardless.
+ */
+export async function isPlatformAdmin(): Promise<boolean> {
+  const control = await createSupabaseServerClientForSchema("onebook");
+  const { data, error } = await control.rpc("is_platform_admin");
+  if (error) return false;
+  return Boolean(data);
+}
