@@ -57,7 +57,7 @@
 - Consumes: `acc_bank_transaction`, `acc_is_staff()`, `acc_current_role()`, `acc_stamp_actor()`.
 - Produces: table `acc_bank_category`; column `acc_bank_transaction.bank_category_id`; `acc_upsert_bank_category(text) returns uuid`; `acc_set_bank_transaction_category(uuid, uuid) returns void`.
 
-- [ ] **Step 1: Write the failing migration contract test**
+- [x] **Step 1: Write the failing migration contract test**
 
 Create `ctyhp-accounting/tests/unit/bank-categories-migration.test.ts`:
 
@@ -122,13 +122,13 @@ describe("bank transaction category migration", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/bank-categories-migration.test.ts`
 
 Expected: FAIL with `ENOENT` because migration 0098 does not exist.
 
-- [ ] **Step 3: Write migration 0098**
+- [x] **Step 3: Write migration 0098**
 
 Create `ctyhp-accounting/supabase/migrations/0098_bank_transaction_categories.sql`:
 
@@ -261,13 +261,13 @@ grant execute on function acc_set_bank_transaction_category(uuid, uuid)
   to authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run the tests and verify GREEN**
+- [x] **Step 4: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/bank-categories-migration.test.ts tests/unit/schema-template.test.ts`
 
 Expected: PASS, both files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/supabase/migrations/0098_bank_transaction_categories.sql ctyhp-accounting/tests/unit/bank-categories-migration.test.ts
@@ -287,7 +287,7 @@ git commit -m "Let a bank line carry a label of the bookkeeper's own"
 - Consumes: the two RPCs from Task 1.
 - Produces: `BankCategoryRow { id: string; name: string; is_active: boolean }`; `BankTransactionRow` gains `bank_category_id: string | null` and `bank_category_name: string | null`; `listBankCategories(sb): Promise<BankCategoryRow[]>`; `createBankCategory(sb, name: string): Promise<string>`; `setBankTransactionCategory(sb, txnId: string, categoryId: string | null): Promise<void>`.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 Create `ctyhp-accounting/tests/unit/bank-categories-service.test.ts`:
 
@@ -415,13 +415,13 @@ describe("listBankTransactions", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/bank-categories-service.test.ts`
 
 Expected: FAIL because the three functions are not exported.
 
-- [ ] **Step 3: Extend the row types**
+- [x] **Step 3: Extend the row types**
 
 In `ctyhp-accounting/lib/db/types.ts`, inside `BankTransactionRow`, directly below
 `category: string | null;`:
@@ -446,7 +446,7 @@ export interface BankCategoryRow {
 }
 ```
 
-- [ ] **Step 4: Implement the service functions**
+- [x] **Step 4: Implement the service functions**
 
 In `ctyhp-accounting/lib/services/banking.ts`, replace the body of
 `listBankTransactions` so the label's name arrives with the row, and add the
@@ -510,7 +510,7 @@ export async function setBankTransactionCategory(
 Add `BankCategoryRow` to the existing `import type { … } from "@/lib/db/types"` at
 the top of the file.
 
-- [ ] **Step 5: Run the tests and typecheck**
+- [x] **Step 5: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/bank-categories-service.test.ts tests/unit/banking-import.test.ts`
 
@@ -522,7 +522,7 @@ Expected: clean. If any test fixture builds a `BankTransactionRow` literal and
 now fails to compile, add `bank_category_id: null, bank_category_name: null` to
 that fixture rather than loosening the type.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/db/types.ts ctyhp-accounting/lib/services/banking.ts ctyhp-accounting/tests/unit/bank-categories-service.test.ts
@@ -541,7 +541,7 @@ git commit -m "Read a bank line's label with the line, and write it through one 
 - Consumes: `createBankCategory`, `setBankTransactionCategory`, `listBankCategories`, and the file's existing `guard()` helper.
 - Produces: `createBankCategoryAction(name: string): Promise<ActionResult<{ id: string; name: string }>>` and `setBankTransactionCategoryAction(txnId: string, categoryId: string | null): Promise<ActionResult>`. Task 5 is what makes `/banking` load and pass the labels.
 
-- [ ] **Step 1: Write the failing action tests**
+- [x] **Step 1: Write the failing action tests**
 
 Create `ctyhp-accounting/tests/unit/bank-categories-action.test.ts`:
 
@@ -651,13 +651,13 @@ describe("bank category actions", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/bank-categories-action.test.ts`
 
 Expected: FAIL because neither action exists.
 
-- [ ] **Step 3: Write the actions**
+- [x] **Step 3: Write the actions**
 
 In `ctyhp-accounting/app/(app)/banking/actions.ts`, add `createBankCategory` and
 `setBankTransactionCategory` to the existing import from
@@ -708,7 +708,7 @@ export async function setBankTransactionCategoryAction(
 }
 ```
 
-- [ ] **Step 4: Run the tests and typecheck**
+- [x] **Step 4: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/bank-categories-action.test.ts`
 
@@ -720,7 +720,7 @@ Expected: clean. `page.tsx` is deliberately left alone until Task 5 — loading 
 labels before `BankingClient` accepts them would make this commit's typecheck
 red, and no commit here may be red.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/banking/actions.ts' ctyhp-accounting/tests/unit/bank-categories-action.test.ts
@@ -739,13 +739,13 @@ git commit -m "Authorize labelling a bank line"
 - Produces: `BankTransactionsTable` with props `{ rows, loading, initialFocusId, canWrite, canReadDocuments, currencyDecimals, onSettle, onApprove, onReject, onAttachments, busyId }` — the exact set the moved columns already use.
 - No behaviour changes. This task exists so the reviewer of Task 5 can see one diff that adds a feature, not one that also moves 300 lines.
 
-- [ ] **Step 1: Record the starting line counts**
+- [x] **Step 1: Record the starting line counts**
 
 Run: `wc -l 'app/(app)/banking/BankingClient.tsx'`
 
 Expected: `1042`. Write the number down; Step 5 compares against it.
 
-- [ ] **Step 2: Create the component with the moved code**
+- [x] **Step 2: Create the component with the moved code**
 
 Create `ctyhp-accounting/app/(app)/banking/BankTransactionsTable.tsx` as a
 `"use client"` component. Move into it, unchanged:
@@ -785,7 +785,7 @@ export interface BankTransactionsTableProps {
 Keep every string, colour, width and `Tag` exactly as it was. This step must not
 improve anything.
 
-- [ ] **Step 3: Use it from `BankingClient`**
+- [x] **Step 3: Use it from `BankingClient`**
 
 In `BankingClient.tsx`, delete the moved code and render:
 
@@ -816,7 +816,7 @@ or signature, adapt the prop at the call site rather than renaming the handler.
 Import the component and drop any imports `BankingClient` no longer uses — lint
 will name them.
 
-- [ ] **Step 4: Prove nothing changed**
+- [x] **Step 4: Prove nothing changed**
 
 Run:
 
@@ -838,14 +838,14 @@ node --env-file=.env.local scripts/smoke-pages.mjs http://127.0.0.1:3000 --only=
 
 Expected: `/banking` returns 200. Stop the server afterwards.
 
-- [ ] **Step 5: Check the file shrank**
+- [x] **Step 5: Check the file shrank**
 
 Run: `wc -l 'app/(app)/banking/BankingClient.tsx' 'app/(app)/banking/BankTransactionsTable.tsx'`
 
 Expected: `BankingClient.tsx` is at least 250 lines shorter than the 1042 it
 started at, and `BankTransactionsTable.tsx` is under 400.
 
-- [ ] **Step 6: Commit the move on its own**
+- [x] **Step 6: Commit the move on its own**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/banking/BankTransactionsTable.tsx' 'ctyhp-accounting/app/(app)/banking/BankingClient.tsx'
@@ -867,7 +867,7 @@ git commit -m "Move the bank transactions table into its own component"
 - Consumes: `createBankCategoryAction`, `setBankTransactionCategoryAction`, `BankCategoryRow`.
 - Produces: `BankCategoryCell`; `BankTransactionsTable` gains `categories`, `onCategoryCreated`, `onCategoryAssigned`; `BankingClient` gains the `bankCategories` prop and a category filter.
 
-- [ ] **Step 1: Write the failing UI contract test**
+- [x] **Step 1: Write the failing UI contract test**
 
 Create `ctyhp-accounting/tests/unit/bank-categories-ui-contract.test.ts`:
 
@@ -921,13 +921,13 @@ describe("the banking category column", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/bank-categories-ui-contract.test.ts`
 
 Expected: FAIL with `ENOENT` for `BankCategoryCell.tsx`.
 
-- [ ] **Step 3: Write the cell**
+- [x] **Step 3: Write the cell**
 
 Create `ctyhp-accounting/app/(app)/banking/BankCategoryCell.tsx`:
 
@@ -1050,7 +1050,7 @@ export default function BankCategoryCell({
 }
 ```
 
-- [ ] **Step 4: Add the column**
+- [x] **Step 4: Add the column**
 
 In `BankTransactionsTable.tsx`, extend the props with
 
@@ -1081,14 +1081,14 @@ and insert this column immediately after the Amount column and before Match:
     },
 ```
 
-- [ ] **Step 5: Load the labels on the server**
+- [x] **Step 5: Load the labels on the server**
 
 In `ctyhp-accounting/app/(app)/banking/page.tsx`: import `listBankCategories`
 alongside `listBankAccounts`, add `bankCategories` to the destructured array and
 `listBankCategories(sb)` at the same position in the `Promise.all`, then pass
 `bankCategories={bankCategories}` to `BankingClient`.
 
-- [ ] **Step 6: Wire the filter and the state**
+- [x] **Step 6: Wire the filter and the state**
 
 In `BankingClient.tsx`:
 
@@ -1156,7 +1156,7 @@ In `BankingClient.tsx`:
 Use the existing state setter for the transactions list; it is `setTxns` if the
 list is held in `txns`.
 
-- [ ] **Step 7: Run the tests, typecheck and lint**
+- [x] **Step 7: Run the tests, typecheck and lint**
 
 Run:
 
@@ -1170,7 +1170,7 @@ Expected: all pass with zero errors. If eslint reports
 `react-hooks/set-state-in-effect`, move the `setState` into an async callback
 rather than adding a disable comment.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/banking' ctyhp-accounting/tests/unit/bank-categories-ui-contract.test.ts
@@ -1189,7 +1189,7 @@ git commit -m "Let a bookkeeper label a bank line, and find the ones with no lab
 - Consumes: migration 0098 and the live database through `SUPABASE_DB_URL`.
 - Produces: `npm run verify:bank-categories`, rollback-only.
 
-- [ ] **Step 1: Add the package script**
+- [x] **Step 1: Add the package script**
 
 In `ctyhp-accounting/package.json`, beside the other verifiers:
 
@@ -1197,7 +1197,7 @@ In `ctyhp-accounting/package.json`, beside the other verifiers:
 "verify:bank-categories": "node --env-file=.env.local scripts/verify-bank-categories.mjs",
 ```
 
-- [ ] **Step 2: Write the rollback-only harness**
+- [x] **Step 2: Write the rollback-only harness**
 
 Create `ctyhp-accounting/scripts/verify-bank-categories.mjs`. Copy the header
 comment style, `client`, `check`, `one`, `scenario` and `attempt` helpers from
@@ -1307,7 +1307,7 @@ console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 ```
 
-- [ ] **Step 3: Static safety check, then run it**
+- [x] **Step 3: Static safety check, then run it**
 
 Run:
 
@@ -1320,7 +1320,7 @@ npm run verify:bank-categories
 Expected: the grep prints nothing, the credential check passes, every assertion
 prints PASS, the final line confirms `ROLLBACK`, and `0 failed`.
 
-- [ ] **Step 4: Run every project gate**
+- [x] **Step 4: Run every project gate**
 
 Run, recording real output:
 
@@ -1335,7 +1335,7 @@ npm run build
 Expected: all tests pass, typecheck and the credential check clean, lint zero
 errors with only the pre-existing `scripts/verify-*.mjs` warnings, build exits 0.
 
-- [ ] **Step 5: Smoke the built server**
+- [x] **Step 5: Smoke the built server**
 
 Start the built server, then run:
 
@@ -1345,7 +1345,7 @@ node --env-file=.env.local scripts/smoke-pages.mjs http://127.0.0.1:3000
 
 Expected: every page 200, `/banking` among them. Stop the server afterwards.
 
-- [ ] **Step 6: Apply the migration to every company**
+- [x] **Step 6: Apply the migration to every company**
 
 Run: `node --env-file=.env.local scripts/migrate.mjs`
 
@@ -1353,7 +1353,7 @@ Expected: `0098_bank_transaction_categories.sql ... ok` for `public` and each
 company schema, with no statements held back — every object here belongs to a
 company. Then confirm the column and both functions exist in all four schemas.
 
-- [ ] **Step 7: Review the diff and commit**
+- [x] **Step 7: Review the diff and commit**
 
 Run:
 
@@ -1370,7 +1370,7 @@ git add ctyhp-accounting/scripts/verify-bank-categories.mjs ctyhp-accounting/pac
 git commit -m "Prove a bank label sticks, comes off, and changes nothing else"
 ```
 
-- [ ] **Step 8: Close the feedback loop**
+- [x] **Step 8: Close the feedback loop**
 
 The report that asked for this is `773843b7-8daf-493b-b7a6-da60ba0be639`, still
 `reviewing`. Do **not** change its status from a script: move it to `resolved`
