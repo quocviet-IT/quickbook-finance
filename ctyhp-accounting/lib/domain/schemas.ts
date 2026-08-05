@@ -135,6 +135,18 @@ export const paymentCreateSchema = z.object({
 });
 export type PaymentCreateInput = z.infer<typeof paymentCreateSchema>;
 
+/**
+ * Voiding a receipt is not a correction anyone should be able to make silently:
+ * the money it recorded goes back onto the customer's invoices. The reason is
+ * required because the payment, its number and its history all survive, and
+ * the only thing that explains why they read as void is what was typed here.
+ */
+export const paymentVoidSchema = z.object({
+  payment_id: z.uuid("Select a payment"),
+  reason: z.string().trim().min(1, "Explain why this payment is being voided").max(500),
+});
+export type PaymentVoidInput = z.infer<typeof paymentVoidSchema>;
+
 // --- Vendors ---
 export const vendorCreateSchema = z.object({
   name: z.string().trim().min(1, "Vendor name is required").max(160),
