@@ -17,6 +17,8 @@ import {
   syncBankConnection,
   listSettlementCandidates,
   settleFromBankTransaction,
+  createBankCategory,
+  setBankTransactionCategory,
   type PlaidAccountMappingInput,
   type SettlementCandidateRow,
 } from "@/lib/services/banking";
@@ -247,5 +249,56 @@ export async function settleFromBankTransactionAction(input: {
     return { ok: true, data: { settlementId } };
   } catch (err) {
     return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Create a label, or reuse the one that already has this name.
+ *
+ * The name is trimmed here so the screen and the database agree on what was
+ * typed; everything else about uniqueness belongs to `acc_upsert_bank_category`.
+ */
+export async function createBankCategoryAction(
+  name: string,
+): Promise<ActionResult<{ id: string; name: string }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "A category name is required" };
+  if (trimmed.length > 60) {
+    return { ok: false, error: "A category name cannot exceed 60 characters" };
+  }
+  try {
+    const sb = await createSupabaseServerClient();
+    const id = await createBankCategory(sb, trimmed);
+    revalidatePath("/banking");
+    return { ok: true, data: { id, name: trimmed } };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not create the category",
+    };
+  }
+}
+
+/**
+ * Attach a label to a bank line, or pass null to take it off.
+ *
+ * A label is metadata, not a posting — nothing here reaches the ledger, and the
+ * RPC behind it can only write the one column.
+ */
+export async function setBankTransactionCategoryAction(
+  txnId: string,
+  categoryId: string | null,
+): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    await setBankTransactionCategory(sb, txnId, categoryId);
+    revalidatePath("/banking");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not save the category" };
   }
 }
