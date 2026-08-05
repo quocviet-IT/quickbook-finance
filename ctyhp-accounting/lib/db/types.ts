@@ -303,9 +303,23 @@ export interface BankTransactionRow {
   authorized_date: string | null;
   merchant_name: string | null;
   category: string | null;
+  /**
+   * The bookkeeper's own label. Distinct from `category` above, which is what
+   * the bank feed said — see migration 0098.
+   */
+  bank_category_id: string | null;
+  /** Joined for the list; never written through this field. */
+  bank_category_name: string | null;
   provider_removed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** A label a bookkeeper may put on a bank line. */
+export interface BankCategoryRow {
+  id: string;
+  name: string;
+  is_active: boolean;
 }
 
 export interface ReconciliationRow {

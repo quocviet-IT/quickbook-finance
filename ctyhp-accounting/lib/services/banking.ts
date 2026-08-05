@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import type {
   BankAccountRow,
+  BankCategoryRow,
   BankConnectionRow,
   BankFeedAccountRow,
   BankTransactionRow,
@@ -138,12 +139,56 @@ export async function listBankTransactions(
 ): Promise<BankTransactionRow[]> {
   let query = sb
     .from("acc_bank_transaction")
-    .select("*")
+    // The label's name comes along, so the list does not ask once per row.
+    .select("*,acc_bank_category(name)")
     .is("provider_removed_at", null);
   if (bankAccountId) query = query.eq("bank_account_id", bankAccountId);
   const { data, error } = await query.order("txn_date", { ascending: false });
   if (error) throw new BankingError(error.message);
-  return (data ?? []) as unknown as BankTransactionRow[];
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+    ...(row as unknown as BankTransactionRow),
+    bank_category_name: (row.acc_bank_category as { name?: string } | null)?.name ?? null,
+  }));
+}
+
+/** The labels a bookkeeper may choose from, in the order they read them. */
+export async function listBankCategories(sb: SupabaseClient): Promise<BankCategoryRow[]> {
+  const { data, error } = await sb
+    .from("acc_bank_category")
+    .select("id,name,is_active")
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw new BankingError(error.message);
+  return (data ?? []) as unknown as BankCategoryRow[];
+}
+
+/**
+ * Create a label, or hand back the one that already carries this name. The
+ * decision is the database's, so two people typing "Inventory" at once cannot
+ * produce two labels.
+ */
+export async function createBankCategory(sb: SupabaseClient, name: string): Promise<string> {
+  const { data, error } = await sb.rpc("acc_upsert_bank_category", { p_name: name });
+  if (error) throw new BankingError(error.message);
+  return data as string;
+}
+
+/**
+ * Attach a label to a bank line, or pass null to take it off.
+ *
+ * Everything a label may and may not touch belongs to
+ * `acc_set_bank_transaction_category`; this is only the adapter.
+ */
+export async function setBankTransactionCategory(
+  sb: SupabaseClient,
+  txnId: string,
+  categoryId: string | null,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_set_bank_transaction_category", {
+    p_txn_id: txnId,
+    p_category_id: categoryId,
+  });
+  if (error) throw new BankingError(error.message);
 }
 
 export interface BankConnectionView extends BankConnectionRow {
