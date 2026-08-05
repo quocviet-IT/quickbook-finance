@@ -15,21 +15,18 @@ import {
   Tag,
   Typography,
   Upload,
-  type TableColumnsType,
 } from "antd";
 import {
   BankOutlined,
   CloudSyncOutlined,
   InboxOutlined,
   LinkOutlined,
-  PaperClipOutlined,
   PlusOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { EmptyState } from "@/components/ui/PageStates";
-import IconActionButton from "@/components/ui/IconActionButton";
+import BankTransactionsTable from "./BankTransactionsTable";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
@@ -104,12 +101,6 @@ declare global {
 const ALL_ACCOUNTS = "__all__";
 
 type ReviewRow = BankReviewRow<BankTransactionRow, SuggestionView>;
-
-const TXN_STATUS: Record<BankTxnStatus, { text: string; color: string }> = {
-  unmatched: { text: "For review", color: "orange" },
-  matched: { text: "Matched", color: "green" },
-  ignored: { text: "Excluded", color: "default" },
-};
 
 function formatSyncTime(value: string | null): string {
   if (!value) return "Not synchronized yet";
@@ -447,142 +438,6 @@ export default function BankingClient({
     });
   }
 
-  const transactionColumns: TableColumnsType<ReviewRow> = [
-    { title: "Date", dataIndex: ["transaction", "txn_date"], width: 115 },
-    {
-      title: "Description",
-      key: "description",
-      render: (_value: unknown, row: ReviewRow) => (
-        <Space direction="vertical" size={0}>
-          <span>{row.transaction.description}</span>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {row.transaction.category
-              ? row.transaction.category.replaceAll("_", " ")
-              : row.transaction.source === "bank_feed"
-                ? "Direct bank feed"
-                : "File upload"}
-          </Typography.Text>
-        </Space>
-      ),
-    },
-    {
-      title: "Account source",
-      key: "account",
-      width: 200,
-      render: (_value: unknown, row: ReviewRow) => (
-        <Typography.Text type="secondary">{row.accountName}</Typography.Text>
-      ),
-    },
-    {
-      title: "Reference",
-      dataIndex: ["transaction", "reference"],
-      width: 135,
-      render: (reference: string | null) => reference ?? "—",
-    },
-    {
-      title: "Amount",
-      key: "amount",
-      width: 140,
-      align: "right",
-      render: (_value: unknown, row: ReviewRow) => (
-        <span style={{ color: row.transaction.amount_minor < 0 ? "#b91c1c" : "#15803d" }}>
-          {rowMoney(row)}
-        </span>
-      ),
-    },
-    {
-      // What the line looks like it is, and the decision, in the same place the
-      // line is read. This used to be a separate tab.
-      title: "Match",
-      key: "match",
-      width: 300,
-      render: (_value: unknown, row: ReviewRow) => {
-        // Offered on any line still awaiting review, with or without a
-        // suggestion: a suggestion says "this is already in the books", and
-        // settling says "it is not, and it pays this invoice".
-        const settleButton =
-          canWrite && row.transaction.status === "unmatched" ? (
-            <Button size="small" onClick={() => openSettle(row)}>
-              {row.transaction.amount_minor > 0 ? "Settle invoice" : "Settle bill"}
-            </Button>
-          ) : null;
-
-        if (!row.suggestion) {
-          return (
-            <Space direction="vertical" size={4}>
-              <Typography.Text type="secondary">
-                {row.transaction.status === "matched" ? "Matched" : "No suggestion"}
-              </Typography.Text>
-              {settleButton}
-            </Space>
-          );
-        }
-        const match = row.suggestion;
-        return (
-          <Space direction="vertical" size={2}>
-            <Space size={6} wrap>
-              <Tag color="blue">{match.target_number ?? "Ledger entry"}</Tag>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {match.target_type.replaceAll("_", " ")} · {Math.round(match.confidence * 100)}%
-              </Typography.Text>
-            </Space>
-            {match.target_description ? (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {match.target_description}
-              </Typography.Text>
-            ) : null}
-            {canWrite ? (
-              <Space size={4} wrap>
-                <Button size="small" type="primary" loading={busy === match.id} onClick={() => approve(match.id)}>
-                  Approve
-                </Button>
-                <Button size="small" loading={busy === match.id} onClick={() => reject(match.id)}>
-                  Reject
-                </Button>
-                {settleButton}
-              </Space>
-            ) : null}
-          </Space>
-        );
-      },
-    },
-    {
-      title: "Status",
-      key: "status",
-      width: 130,
-      render: (_value: unknown, row: ReviewRow) => (
-        <Space size={4}>
-          <Tag color={TXN_STATUS[row.transaction.status].color}>
-            {TXN_STATUS[row.transaction.status].text}
-          </Tag>
-          {row.transaction.pending ? <Tag>Pending</Tag> : null}
-        </Space>
-      ),
-    },
-    ...(canReadDocuments
-      ? [
-          {
-            title: "",
-            key: "attachments",
-            width: 56,
-            fixed: "right" as const,
-            render: (_value: unknown, row: ReviewRow) => (
-              <IconActionButton
-                label="View bank transaction attachments"
-                icon={<PaperClipOutlined />}
-                onClick={() =>
-                  setAttachmentTarget({
-                    entityType: "bank_transaction",
-                    entityId: row.transaction.id,
-                    label: `${row.transaction.txn_date} · ${row.transaction.description}`,
-                  })
-                }
-              />
-            ),
-          } as TableColumnsType<ReviewRow>[number],
-        ]
-      : []),
-  ];
 
   if (!bankAccounts.length) {
     return (
@@ -771,18 +626,24 @@ export default function BankingClient({
         </Space>
       </FilterBar>
 
-      <DataTable
-        rowKey={(row: ReviewRow) => row.transaction.id}
-        columns={transactionColumns}
-        dataSource={reviewRows}
-        rowClassName={(row: ReviewRow) =>
-          row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
-        }
-        pagination={{ pageSize: 25 }}
-        sticky
+      <BankTransactionsTable
+        rows={reviewRows}
         loading={loading}
-        emptyTitle="No bank transactions"
-        emptyDescription="Synchronize a bank feed or import a statement to start the review workflow."
+        initialFocusId={initialFocusId}
+        canWrite={canWrite}
+        canReadDocuments={canReadDocuments}
+        busy={busy}
+        formatRowMoney={rowMoney}
+        onSettle={openSettle}
+        onApprove={approve}
+        onReject={reject}
+        onAttachments={(row) =>
+          setAttachmentTarget({
+            entityType: "bank_transaction",
+            entityId: row.transaction.id,
+            label: `${row.transaction.txn_date} · ${row.transaction.description}`,
+          })
+        }
       />
 
       <AttachmentDrawer
