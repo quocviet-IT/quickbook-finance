@@ -1,0 +1,27 @@
+ACCOUNT NUMBER,DATE,DESCRIPTION,DEBIT (In Business Currency),CREDIT (In Business Currency),BALANCE (In Business Currency)
+121 - Checking,,,,,
+,,,,,$0.00
+,1/2/2023,Beginning Balance,"$1,200.00",,"$1,200.00"
+,1/3/2023,Card payment,,$300.00,$900.00
+,1/4/2023,Fee waiver,$0.00,,$900.00
+,2/1/2023,Refund received,$50.00,,$950.00
+Totals and Ending Balance,,,"$1,250.00",$300.00,$950.00
+Balance Change,,,$950.00,,
+,,,,,
+,Opening Balance Equity,,,,
+Starting Balance,,,,,$0.00
+,1/2/2023,Beginning Balance,,"$1,200.00","$1,200.00"
+Totals and Ending Balance,,,$0.00,"$1,200.00","$1,200.00"
+Balance Change,,,"$1,200.00",,
+,,,,,
+,Taxes – Corporate Tax,,,,
+Starting Balance,,,,,$0.00
+,1/3/2023,Quarterly filing,$300.00,,$300.00
+Totals and Ending Balance,,,$300.00,$0.00,$300.00
+Balance Change,,,$300.00,,
+,,,,,
+,Sales,,,,
+Starting Balance,,,,,$0.00
+Sales,2/1/2023,Product refund,,$50.00,$50.00
+Totals and Ending Balance,,,$0.00,$50.00,$50.00
+Balance Change,,,$50.00,,
