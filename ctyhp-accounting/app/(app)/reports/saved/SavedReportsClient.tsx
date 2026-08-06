@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { App, Button, Card, Empty, Input, Modal, Space, Table, Tag } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { SAVED_REPORT_SOURCE_LABEL, type SavedReportSource } from "@/lib/domain/saved-reports";
 import type { SavedReportRow } from "@/lib/services/saved-reports";
 import { archiveSavedReportAction } from "./actions";
+import SaveReportModal from "./SaveReportModal";
 
 export interface SavedReportsClientProps {
   reports: SavedReportRow[];
@@ -31,6 +33,8 @@ function formatPeriod(row: SavedReportRow): string {
  */
 export default function SavedReportsClient({ reports, canManage }: SavedReportsClientProps) {
   const { message } = App.useApp();
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState<SavedReportRow | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,7 +54,15 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
   };
 
   return (
-    <Card>
+    <Card
+      extra={
+        canManage ? (
+          <Button type="primary" onClick={() => setSaving(true)}>
+            Save a report
+          </Button>
+        ) : null
+      }
+    >
       <Table<SavedReportRow>
         size="small"
         rowKey="id"
@@ -132,6 +144,15 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
           onChange={(event) => setReason(event.target.value)}
         />
       </Modal>
+
+      <SaveReportModal
+        open={saving}
+        onClose={() => setSaving(false)}
+        onSaved={() => {
+          setSaving(false);
+          router.refresh();
+        }}
+      />
     </Card>
   );
 }
