@@ -12,6 +12,7 @@ const TARGETS: ImportTarget[] = [
   "vendors",
   "items",
   "invoices",
+  "transactions",
 ];
 
 /** The headers of the file attached to feedback report 428ca4db. */

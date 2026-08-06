@@ -20,7 +20,13 @@
 import { parseStatementAmount } from "./statement-import";
 import { ACCOUNT_TYPES, type AccountType } from "./accounts";
 
-export type ImportTarget = "chart_of_accounts" | "customers" | "vendors" | "items" | "invoices";
+export type ImportTarget =
+  | "chart_of_accounts"
+  | "customers"
+  | "vendors"
+  | "items"
+  | "invoices"
+  | "transactions";
 
 export interface FieldSpec {
   key: string;
@@ -273,8 +279,79 @@ const INVOICE_FIELDS: readonly FieldSpec[] = [
   },
 ];
 
+/**
+ * A categorized transaction from another product: both sides of the entry on
+ * one row. Which columns carry the money differs by product, so the target
+ * accepts either a signed Amount or a Debit/Credit pair and lets
+ * `signedAmountMinor` decide — adding the next product is adding aliases here.
+ */
+const TRANSACTION_FIELDS: readonly FieldSpec[] = [
+  {
+    key: "txn_date",
+    label: "Date",
+    required: true,
+    kind: "date",
+    aliases: ["date", "transaction date", "posting date", "txn date"],
+  },
+  {
+    key: "description",
+    label: "Description",
+    required: false,
+    kind: "text",
+    aliases: ["description", "memo", "notes", "details", "payee", "narrative"],
+  },
+  {
+    key: "bank_account",
+    label: "Bank account",
+    required: false,
+    kind: "text",
+    aliases: ["bank", "bank account", "from account", "paid from", "source account"],
+    hint: "Leave unmapped to use the account chosen above for every row.",
+  },
+  {
+    key: "category_account",
+    label: "Chart of account",
+    required: true,
+    kind: "text",
+    aliases: [
+      "chart of account",
+      "chart of accounts",
+      "category",
+      "gl account",
+      "expense account",
+      "income account",
+      "account name",
+    ],
+    hint: "Must already exist in this company\u2019s chart of accounts.",
+  },
+  {
+    key: "amount",
+    label: "Amount",
+    required: false,
+    kind: "money",
+    aliases: ["amount", "total", "amount in business currency"],
+    hint: "Signed: positive is money into the bank. Or map Debit and Credit instead.",
+  },
+  {
+    key: "debit",
+    label: "Debit",
+    required: false,
+    kind: "money",
+    aliases: ["debit", "debit amount", "money in", "deposit"],
+  },
+  {
+    key: "credit",
+    label: "Credit",
+    required: false,
+    kind: "money",
+    aliases: ["credit", "credit amount", "money out", "withdrawal"],
+  },
+];
+
 export function fieldsFor(target: ImportTarget): readonly FieldSpec[] {
   switch (target) {
+    case "transactions":
+      return TRANSACTION_FIELDS;
     case "chart_of_accounts":
       return CHART_FIELDS;
     case "customers":
@@ -294,6 +371,7 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
   vendors: "Vendors",
   items: "Products and services",
   invoices: "Invoices (drafts)",
+  transactions: "Transactions",
 };
 
 // --- Proposing a mapping ----------------------------------------------------

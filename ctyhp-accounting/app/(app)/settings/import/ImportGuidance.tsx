@@ -16,6 +16,9 @@ const SOURCE_HINT: Record<ImportTarget, string> = {
   vendors: "QuickBooks: Reports → Vendor Contact List. Wave: Purchases → Vendors → Export.",
   items: "QuickBooks: Reports → Product/Service List. Wave: Sales → Products & Services → Export.",
   invoices: "QuickBooks: Reports → Invoice List with line detail. Wave: Sales → Invoices → Export.",
+  transactions:
+    "QuickBooks: Reports → Transaction List by Date. Wave: Accounting → Transactions → Export. " +
+    "The file must name both the bank and the chart-of-account for each row.",
 };
 
 export interface ImportGuidanceProps {
