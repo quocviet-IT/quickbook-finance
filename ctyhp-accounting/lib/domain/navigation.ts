@@ -305,6 +305,22 @@ export function settingsHubForAccess(
   });
 }
 
+/**
+ * The catalog entry behind a settings route, for the server guard in front of
+ * that route. Throws rather than guess: a settings page with no catalog entry
+ * has no declared audience, and opening it quietly is the failure this whole
+ * mechanism exists to prevent.
+ */
+export function settingsGateFor(href: string): SettingsHubItem {
+  const item = SETTINGS_HUB.flatMap((group) => group.items).find((i) => i.href === href);
+  if (!item) {
+    throw new Error(
+      `No settings catalog entry for ${href}. Add it to SETTINGS_HUB so its card and its guard agree.`,
+    );
+  }
+  return item;
+}
+
 // --- Create menu ------------------------------------------------------------
 
 export interface NewMenuItem {
