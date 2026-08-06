@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  describeTransactionRow,
+  signedAmountMinor,
+  transactionRawHash,
+  type TransactionImportRecord,
+} from "@/lib/domain/transaction-import";
+import {
   applyMapping,
   fieldsFor,
   type ImportProblem,
@@ -31,6 +37,37 @@ export interface ImportPreview {
   updates: number;
   /** Total opening balance carried by the file, if it carries any. */
   openingTotalMinor: number;
+  /** Rows already imported, matched on their hash. Counted, never re-posted. */
+  duplicates?: number;
+  /** Accounts named by the file that this company's chart does not have. */
+  missingAccounts?: string[];
+}
+
+/** Every way a file may name an account, mapped to the account it means. */
+async function accountIndex(sb: SupabaseClient): Promise<Map<string, string>> {
+  const { data, error } = await sb
+    .from("acc_account")
+    .select("id,account_code,name")
+    .neq("status", "archived");
+  if (error) throw new DataImportError(error.message);
+  const index = new Map<string, string>();
+  for (const row of (data ?? []) as { id: string; account_code: string; name: string }[]) {
+    const add = (key: string) => {
+      const k = (key ?? "").trim().toLowerCase();
+      if (k) index.set(k, row.id);
+    };
+    add(row.account_code);
+    add(row.name);
+    add(`${row.account_code} - ${row.name}`);
+  }
+  return index;
+}
+
+/** Hashes of what is already here, so a file imported twice adds nothing. */
+async function existingHashes(sb: SupabaseClient): Promise<Set<string>> {
+  const { data, error } = await sb.from("acc_bank_transaction").select("raw_hash");
+  if (error) throw new DataImportError(error.message);
+  return new Set(((data ?? []) as { raw_hash: string }[]).map((row) => row.raw_hash));
 }
 
 /** The column each target is matched on when deciding create versus update. */
@@ -81,8 +118,64 @@ export async function previewImport(
   target: ImportTarget,
   rows: readonly (readonly string[])[],
   mapping: Record<string, number | null>,
+  options: { bankAccountId?: string | null } = {},
 ): Promise<ImportPreview> {
   const parsed = applyMapping(rows, mapping, target);
+
+  // Transactions are the one target that posts both sides of an entry, so the
+  // preview has to answer a question the others do not: does this company's
+  // chart of accounts actually contain every account the file names?
+  if (target === "transactions") {
+    const [index, hashes] = await Promise.all([accountIndex(sb), existingHashes(sb)]);
+    const records = parsed.records as unknown as TransactionImportRecord[];
+    const problems = [...parsed.problems];
+    const missing = new Set<string>();
+    const previewRows: ImportPreviewRow[] = [];
+    let duplicates = 0;
+
+    records.forEach((record, position) => {
+      const signed = signedAmountMinor(record);
+      if ("problem" in signed) {
+        problems.push({ row: position + 1, message: signed.problem });
+        return;
+      }
+      const bankRef = (record.bank_account ?? "").trim();
+      const bankId = index.get(bankRef.toLowerCase()) ?? options.bankAccountId ?? null;
+      if (bankRef && !index.has(bankRef.toLowerCase())) missing.add(bankRef);
+      const categoryRef = (record.category_account ?? "").trim();
+      if (!index.has(categoryRef.toLowerCase())) missing.add(categoryRef);
+
+      const hash = transactionRawHash({
+        bankAccountId: bankId ?? "",
+        txnDate: record.txn_date,
+        description: record.description,
+        signedMinor: signed.minor,
+      });
+      if (hashes.has(hash)) {
+        duplicates += 1;
+        return;
+      }
+      previewRows.push({
+        key: hash,
+        name: describeTransactionRow(record, signed.minor),
+        action: "create",
+        openingBalanceMinor: signed.minor,
+        values: { ...record, signed_minor: signed.minor },
+      });
+    });
+
+    return {
+      target,
+      rows: previewRows,
+      problems,
+      blankRows: parsed.blankRows,
+      creates: previewRows.length,
+      updates: 0,
+      openingTotalMinor: previewRows.reduce((sum, row) => sum + row.openingBalanceMinor, 0),
+      duplicates,
+      missingAccounts: [...missing],
+    };
+  }
 
   // Invoices are the one target where rows do not map one-to-one onto records:
   // several lines make a document. The preview therefore counts documents, and
@@ -159,8 +252,44 @@ export async function runImport(
   target: ImportTarget,
   rows: readonly (readonly string[])[],
   mapping: Record<string, number | null>,
-  options: { openingBalancesAsOf?: string | null } = {},
+  options: { openingBalancesAsOf?: string | null; bankAccountId?: string | null } = {},
 ): Promise<ImportOutcome> {
+  // Transactions are previewed again here rather than trusted from the screen:
+  // the refusal that matters — an account this chart does not have — must not
+  // depend on the browser having asked first.
+  if (target === "transactions") {
+    const preview = await previewImport(sb, target, rows, mapping, options);
+    if (preview.missingAccounts && preview.missingAccounts.length > 0) {
+      throw new DataImportError(
+        `These accounts are not in this company's chart of accounts: ${preview.missingAccounts.join(", ")}. ` +
+          "Import the chart of accounts first.",
+      );
+    }
+    if (preview.rows.length === 0) {
+      throw new DataImportError("Nothing in this file could be imported");
+    }
+    const { data, error } = await sb.rpc("acc_import_transactions", {
+      p_rows: preview.rows.map((row) => ({
+        txn_date: row.values.txn_date,
+        description: row.values.description,
+        bank_account: row.values.bank_account,
+        category_account: row.values.category_account,
+        signed_minor: row.values.signed_minor,
+        raw_hash: row.key,
+      })),
+      p_default_bank_account_id: options.bankAccountId ?? null,
+    });
+    if (error) throw new DataImportError(error.message);
+    const result = (Array.isArray(data) ? data[0] : data) as
+      | { imported?: number; skipped?: number }
+      | null;
+    return {
+      created: Number(result?.imported ?? 0),
+      updated: 0,
+      skipped: Number(result?.skipped ?? 0) + (preview.duplicates ?? 0),
+    };
+  }
+
   const parsed = applyMapping(rows, mapping, target);
   if (parsed.records.length === 0) {
     throw new DataImportError("Nothing in this file could be imported");

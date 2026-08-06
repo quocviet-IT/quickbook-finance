@@ -27,9 +27,14 @@ export type SignedAmount = { minor: number } | { problem: string };
  * new code path.
  */
 export function signedAmountMinor(record: TransactionImportRecord): SignedAmount {
-  const hasPair = record.debit !== null || record.credit !== null;
-  const fromPair = (record.debit ?? 0) - (record.credit ?? 0);
-  const fromAmount = record.amount;
+  // A column the user did not map arrives as 0, not null — so zero means
+  // "this side of the pair says nothing", which is also true of a real file
+  // that writes 0.00 in the column it is not using.
+  const debit = record.debit || 0;
+  const credit = record.credit || 0;
+  const hasPair = debit !== 0 || credit !== 0;
+  const fromPair = debit - credit;
+  const fromAmount = record.amount === null || record.amount === 0 ? null : record.amount;
 
   if (fromAmount === null && !hasPair) {
     return { problem: "This row has no amount: map Amount, or map Debit and Credit." };

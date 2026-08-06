@@ -68,7 +68,18 @@ describe("signedAmountMinor", () => {
 
   it("refuses a row whose amount is zero", () => {
     expect(signedAmountMinor({ ...base, amount: 0 })).toEqual({
-      problem: expect.stringMatching(/zero/i),
+      problem: expect.stringMatching(/amount/i),
+    });
+  });
+
+  it("ignores the zeros an unmapped money column arrives as", () => {
+    // `applyMapping` gives 0 for a column nobody mapped, so a file with only an
+    // Amount column still reaches here with debit: 0, credit: 0.
+    expect(signedAmountMinor({ ...base, amount: -320000, debit: 0, credit: 0 })).toEqual({
+      minor: -320000,
+    });
+    expect(signedAmountMinor({ ...base, amount: 0, debit: 0, credit: 16800 })).toEqual({
+      minor: -16800,
     });
   });
 });
