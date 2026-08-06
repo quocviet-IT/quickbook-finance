@@ -21,8 +21,10 @@ const ROWS = [
   ["2026-01-16", "Deposit", "121 - PC49 BoA CK 3388", "Sales", "969.00"],
 ];
 
-/** A chart with both accounts, and no bank transactions yet. */
-function companyClient(overrides: { accounts?: string[][]; hashes?: string[] } = {}) {
+/** A chart with both accounts, a bank record for the bank, and no history. */
+function companyClient(
+  overrides: { accounts?: string[][]; hashes?: string[]; bankedIds?: string[] } = {},
+) {
   const accounts = overrides.accounts ?? [
     ["121", "PC49 BoA CK 3388"],
     ["", "Inventory Purchase"],
@@ -48,10 +50,17 @@ function companyClient(overrides: { accounts?: string[][]; hashes?: string[] } =
                 })),
                 error: null,
               }
-            : {
-                data: (overrides.hashes ?? []).map((raw_hash) => ({ raw_hash })),
-                error: null,
-              },
+            : table === "acc_bank_account"
+              ? {
+                  data: (overrides.bankedIds ?? ["account-0"]).map((account_id) => ({
+                    account_id,
+                  })),
+                  error: null,
+                }
+              : {
+                  data: (overrides.hashes ?? []).map((raw_hash) => ({ raw_hash })),
+                  error: null,
+                },
         ).then(resolve),
     };
     return chain;
@@ -119,6 +128,17 @@ describe("runImport for transactions", () => {
       signed_minor: -320000,
     });
     expect(String(sent.p_rows[0].raw_hash)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("refuses to run when the bank account has no bank record", async () => {
+    // Dedupe lives on the bank line's unique hash; without a bank record there
+    // is none, and a second import would post the same money again.
+    const sb = companyClient({ bankedIds: [] });
+
+    await expect(
+      runImport(sb, "transactions", ROWS, MAPPING, { bankAccountId: "account-0" }),
+    ).rejects.toThrow(/no bank record/i);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("refuses to run at all when an account is missing", async () => {

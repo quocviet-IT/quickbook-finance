@@ -41,6 +41,12 @@ export interface ImportPreview {
   duplicates?: number;
   /** Accounts named by the file that this company's chart does not have. */
   missingAccounts?: string[];
+  /**
+   * Bank accounts with no record under Banking. Dedupe lives on the bank line's
+   * unique hash, so without one a second import would post the same money
+   * again — which is why this blocks rather than warns.
+   */
+  unbankedAccounts?: string[];
 }
 
 /** Every way a file may name an account, mapped to the account it means. */
@@ -61,6 +67,13 @@ async function accountIndex(sb: SupabaseClient): Promise<Map<string, string>> {
     add(`${row.account_code} - ${row.name}`);
   }
   return index;
+}
+
+/** GL accounts that have a bank record, and so can carry a deduped bank line. */
+async function bankedAccountIds(sb: SupabaseClient): Promise<Set<string>> {
+  const { data, error } = await sb.from("acc_bank_account").select("account_id");
+  if (error) throw new DataImportError(error.message);
+  return new Set(((data ?? []) as { account_id: string }[]).map((row) => row.account_id));
 }
 
 /** Hashes of what is already here, so a file imported twice adds nothing. */
@@ -126,10 +139,15 @@ export async function previewImport(
   // preview has to answer a question the others do not: does this company's
   // chart of accounts actually contain every account the file names?
   if (target === "transactions") {
-    const [index, hashes] = await Promise.all([accountIndex(sb), existingHashes(sb)]);
+    const [index, hashes, banked] = await Promise.all([
+      accountIndex(sb),
+      existingHashes(sb),
+      bankedAccountIds(sb),
+    ]);
     const records = parsed.records as unknown as TransactionImportRecord[];
     const problems = [...parsed.problems];
     const missing = new Set<string>();
+    const unbanked = new Set<string>();
     const previewRows: ImportPreviewRow[] = [];
     let duplicates = 0;
 
@@ -142,6 +160,7 @@ export async function previewImport(
       const bankRef = (record.bank_account ?? "").trim();
       const bankId = index.get(bankRef.toLowerCase()) ?? options.bankAccountId ?? null;
       if (bankRef && !index.has(bankRef.toLowerCase())) missing.add(bankRef);
+      if (bankId && !banked.has(bankId)) unbanked.add(bankRef || "the account chosen above");
       const categoryRef = (record.category_account ?? "").trim();
       if (!index.has(categoryRef.toLowerCase())) missing.add(categoryRef);
 
@@ -174,6 +193,7 @@ export async function previewImport(
       openingTotalMinor: previewRows.reduce((sum, row) => sum + row.openingBalanceMinor, 0),
       duplicates,
       missingAccounts: [...missing],
+      unbankedAccounts: [...unbanked],
     };
   }
 
@@ -263,6 +283,12 @@ export async function runImport(
       throw new DataImportError(
         `These accounts are not in this company's chart of accounts: ${preview.missingAccounts.join(", ")}. ` +
           "Import the chart of accounts first.",
+      );
+    }
+    if (preview.unbankedAccounts && preview.unbankedAccounts.length > 0) {
+      throw new DataImportError(
+        `These accounts have no bank record under Banking: ${preview.unbankedAccounts.join(", ")}. ` +
+          "Add the bank account there first — it is what stops a second import posting the same money twice.",
       );
     }
     if (preview.rows.length === 0) {

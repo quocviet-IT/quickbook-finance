@@ -102,21 +102,27 @@ begin
 
     v_hash := r->>'raw_hash';
     select id into v_feed from acc_bank_account where account_id = v_bank limit 1;
+    -- No bank record, no dedupe: the unique index on (bank_account_id,
+    -- raw_hash) is the *only* thing standing between a second import and a
+    -- doubled ledger. Refusing here is the difference between an inconvenience
+    -- and books nobody can trust.
+    if v_feed is null then
+      raise exception
+        'No bank record for the account used here. Add it under Banking before importing, '
+        'so a second import of the same file cannot post twice.';
+    end if;
 
     -- The bank line first: if this file has been imported before, the unique
     -- index refuses it and the row is skipped whole, ledger included.
-    v_txn := null;
-    if v_feed is not null then
-      insert into acc_bank_transaction
-        (bank_account_id, txn_date, description, amount_minor, raw_hash, status, source)
-      values (v_feed, v_date, v_desc, v_signed, v_hash, 'matched', 'file_upload')
-      on conflict (bank_account_id, raw_hash) do nothing
-      returning id into v_txn;
+    insert into acc_bank_transaction
+      (bank_account_id, txn_date, description, amount_minor, raw_hash, status, source)
+    values (v_feed, v_date, v_desc, v_signed, v_hash, 'matched', 'file_upload')
+    on conflict (bank_account_id, raw_hash) do nothing
+    returning id into v_txn;
 
-      if v_txn is null then
-        v_skipped := v_skipped + 1;
-        continue;
-      end if;
+    if v_txn is null then
+      v_skipped := v_skipped + 1;
+      continue;
     end if;
 
     v_base := acc_to_base_minor(v_abs, v_currency, v_date);
@@ -142,12 +148,10 @@ begin
       end);
 
     -- A bank line marked matched that points at nothing would be a lie.
-    if v_txn is not null then
-      select id into v_line from acc_journal_line
-       where journal_entry_id = v_entry and account_id = v_bank limit 1;
-      insert into acc_reconciliation (bank_transaction_id, journal_line_id, status, confidence)
-      values (v_txn, v_line, 'approved', 1.000);
-    end if;
+    select id into v_line from acc_journal_line
+     where journal_entry_id = v_entry and account_id = v_bank limit 1;
+    insert into acc_reconciliation (bank_transaction_id, journal_line_id, status, confidence)
+    values (v_txn, v_line, 'approved', 1.000);
 
     v_imported := v_imported + 1;
   end loop;

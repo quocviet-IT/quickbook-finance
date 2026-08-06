@@ -15,6 +15,7 @@
     "verify:payment-correction": "node --env-file=.env.local scripts/verify-payment-correction.mjs",
     "verify:company-provisioning": "node --env-file=.env.local scripts/verify-company-provisioning.mjs",
     "verify:bank-categories": "node --env-file=.env.local scripts/verify-bank-categories.mjs",
+    "verify:import-transactions": "node --env-file=.env.local scripts/verify-import-transactions.mjs",
     "verify:feedback-access": "node --env-file=.env.local scripts/verify-feedback-access.mjs",
     "verify:settings-guard": "node --env-file=.env.local scripts/verify-settings-guard.mjs",
     "smoke:payments-void": "node --env-file=.env.local scripts/smoke-payments-void.mjs",

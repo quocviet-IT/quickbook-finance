@@ -35,7 +35,8 @@ export default function ImportPreviewPanel({
   onAsOfChange,
   onImport,
 }: ImportPreviewPanelProps) {
-  const blocked = (preview.missingAccounts?.length ?? 0) > 0;
+  const blocked =
+    (preview.missingAccounts?.length ?? 0) > 0 || (preview.unbankedAccounts?.length ?? 0) > 0;
 
   return (
     <>
@@ -127,12 +128,21 @@ export default function ImportPreviewPanel({
         ]}
       />
 
-      {blocked ? (
+      {preview.missingAccounts && preview.missingAccounts.length > 0 ? (
         <Alert
           type="error"
           showIcon
           message="Some accounts in this file are not in this company's chart of accounts"
           description={`${preview.missingAccounts?.join(", ")}. Import the chart of accounts first, then bring the transactions across.`}
+        />
+      ) : null}
+
+      {preview.unbankedAccounts && preview.unbankedAccounts.length > 0 ? (
+        <Alert
+          type="error"
+          showIcon
+          message="This bank account has no bank record yet"
+          description={`${preview.unbankedAccounts.join(", ")}. Add it under Banking first — the bank line is what stops a second import of this file posting the same money twice.`}
         />
       ) : null}
 
