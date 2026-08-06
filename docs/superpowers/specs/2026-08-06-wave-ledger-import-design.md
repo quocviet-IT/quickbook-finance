@@ -296,3 +296,7 @@ against the built server.
 - **Undo voids; it does not delete.** A voided import leaves its entries in
   `acc_journal_line` forever, exactly as a voided invoice does, and reports
   ignore them.
+- **Undo has a window.** The trigger from migration 0029 refuses to void an
+  entry dated in a closed period, so once a period the import touched has been
+  closed, that part of the import can only be corrected by a reversal. This is
+  the existing rule for every document in One Book, not a new limit.
