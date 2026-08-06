@@ -179,6 +179,14 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "saved-reports",
+    title: "Saved Reports",
+    description:
+      "Keep a report from QuickBooks, Wave, or a bank and read it here later. Saved reports never affect a balance.",
+    href: "/reports/saved",
+    group: "accounting",
+  },
+  {
     id: "journal-report",
     title: "Journal Report",
     description: "Review journal entries and their debit and credit lines.",

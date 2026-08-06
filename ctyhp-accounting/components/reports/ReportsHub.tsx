@@ -10,6 +10,7 @@ import {
   FileDoneOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  InboxOutlined,
   LineChartOutlined,
   PercentageOutlined,
   PieChartOutlined,
@@ -50,6 +51,7 @@ const REPORT_ICONS: Record<string, ReactNode> = {
   "trial-balance": <AuditOutlined />,
   "general-ledger": <BankOutlined />,
   "journal-report": <FileTextOutlined />,
+  "saved-reports": <InboxOutlined />,
   "inventory-valuation": <ShopOutlined />,
   "sales-tax": <PercentageOutlined />,
 };
