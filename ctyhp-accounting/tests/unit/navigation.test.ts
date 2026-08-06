@@ -10,6 +10,7 @@ import {
   navLeaves,
   findActivePage,
   navigationForAccess,
+  settingsHubForAccess,
   findActiveGroup,
   searchKindLabel,
 } from "@/lib/domain/navigation";
@@ -230,6 +231,108 @@ describe("SETTINGS_HUB", () => {
     for (const group of SETTINGS_HUB) {
       for (const item of group.items) {
         expect(item.description.length).toBeGreaterThan(10);
+      }
+    }
+  });
+});
+
+describe("settingsHubForAccess", () => {
+  const titles = (access: Parameters<typeof settingsHubForAccess>[0]) =>
+    settingsHubForAccess(access).flatMap((g) => g.items.map((i) => i.title));
+
+  const ADMIN = {
+    role: "admin" as const,
+    permissionKeys: [
+      "settings.manage",
+      "users.manage",
+      "permissions.manage",
+      "audit.read",
+      "period.close",
+      "feedback.read",
+    ],
+  };
+
+  it("shows an administrator every card", () => {
+    const shown = settingsHubForAccess(ADMIN).flatMap((g) => g.items);
+    expect(shown).toHaveLength(SETTINGS_HUB.flatMap((g) => g.items).length);
+  });
+
+  it("shows a viewer only the audit history and their own reports", () => {
+    expect(titles({ role: "viewer", permissionKeys: ["audit.read"] }).sort()).toEqual([
+      "Audit history",
+      "My reports",
+    ]);
+  });
+
+  it("shows a sales user only their own reports", () => {
+    expect(titles({ role: "sales", permissionKeys: ["items.manage"] })).toEqual(["My reports"]);
+  });
+
+  it("shows an accountant the periods, the audit history and their own reports", () => {
+    expect(
+      titles({ role: "accountant", permissionKeys: ["period.close", "audit.read"] }).sort(),
+    ).toEqual(["Accounting periods", "Audit history", "My reports"]);
+  });
+
+  it("swaps the title and description rather than dropping a card with a fallback", () => {
+    const card = settingsHubForAccess({ role: "viewer", permissionKeys: [] })
+      .flatMap((g) => g.items)
+      .find((i) => i.href === "/settings/feedback");
+    expect(card?.title).toBe("My reports");
+    expect(card?.description).toContain("you filed");
+  });
+
+  it("keeps the triage wording for someone who may read the queue", () => {
+    const card = settingsHubForAccess(ADMIN)
+      .flatMap((g) => g.items)
+      .find((i) => i.href === "/settings/feedback");
+    expect(card?.title).toBe("Feedback triage");
+  });
+
+  it("drops a gated card that has no fallback", () => {
+    const hrefs = settingsHubForAccess({ role: "viewer", permissionKeys: [] }).flatMap((g) =>
+      g.items.map((i) => i.href),
+    );
+    expect(hrefs).not.toContain("/settings/users");
+    expect(hrefs).not.toContain("/settings/companies");
+  });
+
+  it("drops a group once every card in it is hidden", () => {
+    const ids = settingsHubForAccess({ role: "sales", permissionKeys: [] }).map((g) => g.id);
+    expect(ids).not.toContain("purchasing");
+    expect(ids).not.toContain("company");
+  });
+
+  it("hides nothing gated by permission when the lookup failed, but still honours role", () => {
+    const shown = settingsHubForAccess({ role: "viewer", permissionKeys: null }).flatMap(
+      (g) => g.items,
+    );
+    // Permission gates pass, so a permission-gated card such as Users or
+    // Accounting periods shows. The admin-only Companies card is gated by
+    // `roles` and is still gone — that is the half that must not fail open.
+    expect(shown.some((i) => i.href === "/settings/companies")).toBe(false);
+    expect(shown.some((i) => i.href === "/settings/users")).toBe(true);
+    expect(shown.some((i) => i.href === "/settings/periods")).toBe(true);
+  });
+
+  it("gates every card on a permission key that exists, or on a role", () => {
+    const KNOWN = new Set([
+      "settings.manage",
+      "users.manage",
+      "permissions.manage",
+      "audit.read",
+      "period.close",
+      "feedback.read",
+    ]);
+    for (const group of SETTINGS_HUB) {
+      for (const item of group.items) {
+        expect(
+          Boolean(item.roles?.length) || Boolean(item.anyPermissions?.length),
+          `${item.href} has no gate`,
+        ).toBe(true);
+        for (const key of item.anyPermissions ?? []) {
+          expect(KNOWN.has(key), `${item.href} names unknown permission ${key}`).toBe(true);
+        }
       }
     }
   });

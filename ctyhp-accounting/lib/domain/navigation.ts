@@ -122,7 +122,12 @@ export interface NavigationAccess {
   permissionKeys: readonly string[] | null;
 }
 
-function canShowNavItem(
+/**
+ * One definition of "does this person pass a gate", shared by the sidebar, the
+ * settings hub and the server guard behind each settings page. Three copies
+ * would be three chances to disagree about who may see a screen.
+ */
+export function canShowNavItem(
   item: Pick<NavItem, "roles" | "anyPermissions">,
   access: NavigationAccess,
 ): boolean {
@@ -179,6 +184,14 @@ export interface SettingsHubItem {
   href: string;
   title: string;
   description: string;
+  /** Optional gate. The server guard reads this same entry. */
+  roles?: AppRole[];
+  anyPermissions?: string[];
+  /**
+   * Shown instead when the viewer fails the gate but the route still holds
+   * something for them. Absent means the card simply disappears.
+   */
+  fallback?: { title: string; description: string };
 }
 
 export interface SettingsHubGroup {
@@ -196,22 +209,26 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/company",
         title: "Company profile",
         description: "Legal name, addresses, fiscal year, base currency, and accounting basis.",
+        anyPermissions: ["settings.manage"],
       },
       {
         href: "/settings/companies",
         title: "Companies",
         description: "Every set of books this system holds, and how to start another one.",
+        roles: ["admin"],
       },
       {
         href: "/settings/periods",
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",
+        anyPermissions: ["period.close"],
       },
       {
         href: "/settings/import",
         title: "Import from QuickBooks or Wave",
         description:
           "Bring a chart of accounts, contacts, products and opening balances across from a CSV export.",
+        anyPermissions: ["settings.manage"],
       },
     ],
   },
@@ -223,26 +240,35 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/users",
         title: "Users",
         description: "Create login accounts, set roles, suspend or offboard access, and check MFA.",
+        anyPermissions: ["users.manage"],
       },
       {
         href: "/settings/permissions",
         title: "Permissions",
         description: "What each role may do, and which permissions the server enforces.",
+        anyPermissions: ["permissions.manage"],
       },
       {
         href: "/settings/approvals",
         title: "Approval policies",
         description: "Which actions need a second person, above what amount, and segregation.",
+        anyPermissions: ["settings.manage"],
       },
       {
         href: "/settings/audit",
         title: "Audit history",
         description: "Who changed what, when, and the before and after values.",
+        anyPermissions: ["audit.read"],
       },
       {
         href: "/settings/feedback",
         title: "Feedback triage",
         description: "Bug reports and suggestions filed by staff, with screenshots.",
+        anyPermissions: ["feedback.read"],
+        fallback: {
+          title: "My reports",
+          description: "The bug reports and suggestions you filed, and where each one stands.",
+        },
       },
     ],
   },
@@ -254,10 +280,30 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/purchasing",
         title: "Purchasing tolerances",
         description: "Price and quantity tolerances for three-way matching on a bill.",
+        anyPermissions: ["settings.manage"],
       },
     ],
   },
 ];
+
+/**
+ * The hub as one person sees it. A card that fails its gate is dropped unless
+ * it carries a `fallback`, in which case it stays under the wording that is
+ * true for them. A group with nothing left does not render as an empty heading.
+ */
+export function settingsHubForAccess(
+  access: NavigationAccess,
+  groups: SettingsHubGroup[] = SETTINGS_HUB,
+): SettingsHubGroup[] {
+  return groups.flatMap((group) => {
+    const items = group.items.flatMap((item) => {
+      if (canShowNavItem(item, access)) return [item];
+      if (!item.fallback) return [];
+      return [{ ...item, title: item.fallback.title, description: item.fallback.description }];
+    });
+    return items.length > 0 ? [{ ...group, items }] : [];
+  });
+}
 
 // --- Create menu ------------------------------------------------------------
 
