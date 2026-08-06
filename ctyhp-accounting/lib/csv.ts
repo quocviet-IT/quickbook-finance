@@ -1,8 +1,10 @@
 /**
- * Minimal CSV parser (handles quoted fields, escaped quotes, CRLF). Returns an
- * array of records keyed by the header row (lower-cased, trimmed).
+ * CSV to raw rows (handles quoted fields, escaped quotes, CRLF).
+ *
+ * Column order, blank headers and repeated headers all survive, which keying by
+ * header name cannot do — a report exported by another product has all three.
  */
-export function parseCsv(text: string): Record<string, string>[] {
+export function parseCsvGrid(text: string): string[][] {
   const rows: string[][] = [];
   let field = "";
   let row: string[] = [];
@@ -40,7 +42,15 @@ export function parseCsv(text: string): Record<string, string>[] {
     row.push(field);
     if (row.some((c) => c.trim() !== "")) rows.push(row);
   }
+  return rows;
+}
 
+/**
+ * Minimal CSV parser (handles quoted fields, escaped quotes, CRLF). Returns an
+ * array of records keyed by the header row (lower-cased, trimmed).
+ */
+export function parseCsv(text: string): Record<string, string>[] {
+  const rows = parseCsvGrid(text);
   if (rows.length < 2) return [];
   const headers = rows[0].map((h) => h.trim().toLowerCase());
   return rows.slice(1).map((r) => {
