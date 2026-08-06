@@ -3,10 +3,12 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import { listCurrencies } from "@/lib/services/reference";
 import PageHeader from "@/components/PageHeader";
 import ImportClient from "./ImportClient";
+import { requireSettingsAccess } from "@/lib/db/settings-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
+  await requireSettingsAccess("/settings/import");
   const sb = await createSupabaseServerClient();
   const [currencies, { active }] = await Promise.all([listCurrencies(sb), resolveActiveCompany()]);
   const base = currencies.find((c) => c.is_base);

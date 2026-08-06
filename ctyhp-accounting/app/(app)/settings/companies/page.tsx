@@ -3,6 +3,7 @@ import { isPlatformAdmin } from "@/lib/db/company";
 import PageHeader from "@/components/PageHeader";
 import CompaniesClient, { type CompanyRow } from "./CompaniesClient";
 import type { CompanyRequestView } from "./actions";
+import { requireSettingsAccess } from "@/lib/db/settings-access";
 
 export const dynamic = "force-dynamic";
 // `after` keeps provisioning running past the response this page's action
@@ -14,6 +15,7 @@ export default async function CompaniesPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
+  await requireSettingsAccess("/settings/companies");
   const initialCreateOpen = (await searchParams).new === "1";
   const control = await createSupabaseServerClientForSchema("onebook");
   const [canCreate, companies, requests] = await Promise.all([

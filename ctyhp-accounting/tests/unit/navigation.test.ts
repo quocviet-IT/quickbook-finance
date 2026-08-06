@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -370,5 +370,24 @@ describe("searchKindLabel", () => {
 
   it("falls back to the raw kind rather than throwing", () => {
     expect(searchKindLabel("something_new")).toBe("something new");
+  });
+});
+
+describe("settings pages guard themselves", () => {
+  /** Open to everyone, each for a stated reason. A third entry needs one too. */
+  const UNGUARDED = new Set([
+    "/settings", // the hub itself; it filters instead of refusing
+    "/settings/feedback", // a reporter goes here to see their own reports
+  ]);
+
+  it("calls requireSettingsAccess with its own href on every gated page", () => {
+    const missing: string[] = [];
+    for (const route of ROUTES.filter((r) => r.startsWith("/settings"))) {
+      if (UNGUARDED.has(route)) continue;
+      const file = join(process.cwd(), "app", "(app)", route, "page.tsx");
+      const source = readFileSync(file, "utf8");
+      if (!source.includes(`requireSettingsAccess("${route}")`)) missing.push(route);
+    }
+    expect(missing).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { isAdminClientConfigured } from "@/lib/db/admin";
 import { listUsers } from "@/lib/services/access";
@@ -9,6 +10,7 @@ import UsersClient from "./UsersClient";
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
+  await requireSettingsAccess("/settings/users");
   const [role, user] = await Promise.all([getUserRole(), getSessionUser()]);
   const canManage = isAdmin(role);
 

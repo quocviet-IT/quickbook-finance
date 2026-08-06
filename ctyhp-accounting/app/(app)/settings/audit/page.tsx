@@ -1,3 +1,4 @@
+import { requireSettingsAccess } from "@/lib/db/settings-access";
 import PageHeader from "@/components/PageHeader";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listActors } from "@/lib/services/access";
@@ -37,6 +38,7 @@ const AUDITED_TABLES = [
 ];
 
 export default async function AuditPage() {
+  await requireSettingsAccess("/settings/audit");
   const sb = await createSupabaseServerClient();
   const actors = await listActors(sb);
   return (

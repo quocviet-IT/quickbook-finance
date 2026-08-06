@@ -1,3 +1,4 @@
+import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { getCurrentCompanySettings } from "@/lib/services/company";
@@ -7,6 +8,7 @@ import PeriodsClient from "./PeriodsClient";
 export const dynamic = "force-dynamic";
 
 export default async function PeriodsPage() {
+  await requireSettingsAccess("/settings/periods");
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
   const current = await getCurrentCompanySettings(sb);
