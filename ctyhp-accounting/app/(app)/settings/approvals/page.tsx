@@ -1,3 +1,4 @@
+import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getApproverCount, listApprovalPolicies } from "@/lib/services/access";
 import { listCurrencies } from "@/lib/services/reference";
@@ -8,6 +9,7 @@ import ApprovalPoliciesClient from "./ApprovalPoliciesClient";
 export const dynamic = "force-dynamic";
 
 export default async function ApprovalPoliciesPage() {
+  await requireSettingsAccess("/settings/approvals");
   const sb = await createSupabaseServerClient();
   const [policies, currencies, approverCount, role] = await Promise.all([
     listApprovalPolicies(sb),

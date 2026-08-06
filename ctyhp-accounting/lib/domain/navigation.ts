@@ -95,18 +95,13 @@ export const NAV: NavItem[] = [
     ],
   },
   { key: "/reports", label: "Reports" },
-  {
-    key: "/settings",
-    label: "Settings",
-    anyPermissions: [
-      "settings.manage",
-      "users.manage",
-      "permissions.manage",
-      "audit.read",
-      "period.close",
-      "period.reopen",
-    ],
-  },
+  // Ungated on purpose. The hub now shows each person only the cards they may
+  // open, and every screen behind it refuses anyone else at the door, so a
+  // permission list here would only decide who gets a *door* to a hub that is
+  // already correct. It had one concrete cost: a sales user holds items.manage
+  // and nothing on that list, so the one card built for them — their own
+  // reports — was reachable only by typing the URL.
+  { key: "/settings", label: "Settings" },
 ];
 
 export function navLeaves(items: NavItem[] = NAV): NavPage[] {
@@ -122,7 +117,12 @@ export interface NavigationAccess {
   permissionKeys: readonly string[] | null;
 }
 
-function canShowNavItem(
+/**
+ * One definition of "does this person pass a gate", shared by the sidebar, the
+ * settings hub and the server guard behind each settings page. Three copies
+ * would be three chances to disagree about who may see a screen.
+ */
+export function canShowNavItem(
   item: Pick<NavItem, "roles" | "anyPermissions">,
   access: NavigationAccess,
 ): boolean {
@@ -179,6 +179,14 @@ export interface SettingsHubItem {
   href: string;
   title: string;
   description: string;
+  /** Optional gate. The server guard reads this same entry. */
+  roles?: AppRole[];
+  anyPermissions?: string[];
+  /**
+   * Shown instead when the viewer fails the gate but the route still holds
+   * something for them. Absent means the card simply disappears.
+   */
+  fallback?: { title: string; description: string };
 }
 
 export interface SettingsHubGroup {
@@ -196,22 +204,33 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/company",
         title: "Company profile",
         description: "Legal name, addresses, fiscal year, base currency, and accounting basis.",
+        anyPermissions: ["settings.manage"],
       },
       {
         href: "/settings/companies",
         title: "Companies",
         description: "Every set of books this system holds, and how to start another one.",
+        roles: ["admin"],
       },
       {
         href: "/settings/periods",
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",
+        // Not `period.close`, which an accountant holds: every action on this
+        // screen calls adminGuard() and the client gets canEdit={isAdmin(role)},
+        // so that gate would open a door onto controls that all refuse.
+        roles: ["admin"],
       },
       {
         href: "/settings/import",
         title: "Import from QuickBooks or Wave",
         description:
           "Bring a chart of accounts, contacts, products and opening balances across from a CSV export.",
+        // Matches `canWrite` in this screen's actions, which is the rule the
+        // server actually enforces: the chart of accounts is admin-only, the
+        // rest is ordinary bookkeeping. An admin-only gate here would have hidden
+        // a screen an accountant may still legitimately use.
+        roles: ["admin", "accountant"],
       },
     ],
   },
@@ -223,26 +242,35 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/users",
         title: "Users",
         description: "Create login accounts, set roles, suspend or offboard access, and check MFA.",
+        anyPermissions: ["users.manage"],
       },
       {
         href: "/settings/permissions",
         title: "Permissions",
         description: "What each role may do, and which permissions the server enforces.",
+        anyPermissions: ["permissions.manage"],
       },
       {
         href: "/settings/approvals",
         title: "Approval policies",
         description: "Which actions need a second person, above what amount, and segregation.",
+        anyPermissions: ["settings.manage"],
       },
       {
         href: "/settings/audit",
         title: "Audit history",
         description: "Who changed what, when, and the before and after values.",
+        anyPermissions: ["audit.read"],
       },
       {
         href: "/settings/feedback",
         title: "Feedback triage",
         description: "Bug reports and suggestions filed by staff, with screenshots.",
+        anyPermissions: ["feedback.read"],
+        fallback: {
+          title: "My reports",
+          description: "The bug reports and suggestions you filed, and where each one stands.",
+        },
       },
     ],
   },
@@ -254,10 +282,46 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/purchasing",
         title: "Purchasing tolerances",
         description: "Price and quantity tolerances for three-way matching on a bill.",
+        anyPermissions: ["settings.manage"],
       },
     ],
   },
 ];
+
+/**
+ * The hub as one person sees it. A card that fails its gate is dropped unless
+ * it carries a `fallback`, in which case it stays under the wording that is
+ * true for them. A group with nothing left does not render as an empty heading.
+ */
+export function settingsHubForAccess(
+  access: NavigationAccess,
+  groups: SettingsHubGroup[] = SETTINGS_HUB,
+): SettingsHubGroup[] {
+  return groups.flatMap((group) => {
+    const items = group.items.flatMap((item) => {
+      if (canShowNavItem(item, access)) return [item];
+      if (!item.fallback) return [];
+      return [{ ...item, title: item.fallback.title, description: item.fallback.description }];
+    });
+    return items.length > 0 ? [{ ...group, items }] : [];
+  });
+}
+
+/**
+ * The catalog entry behind a settings route, for the server guard in front of
+ * that route. Throws rather than guess: a settings page with no catalog entry
+ * has no declared audience, and opening it quietly is the failure this whole
+ * mechanism exists to prevent.
+ */
+export function settingsGateFor(href: string): SettingsHubItem {
+  const item = SETTINGS_HUB.flatMap((group) => group.items).find((i) => i.href === href);
+  if (!item) {
+    throw new Error(
+      `No settings catalog entry for ${href}. Add it to SETTINGS_HUB so its card and its guard agree.`,
+    );
+  }
+  return item;
+}
 
 // --- Create menu ------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -10,6 +10,7 @@ import {
   navLeaves,
   findActivePage,
   navigationForAccess,
+  settingsHubForAccess,
   findActiveGroup,
   searchKindLabel,
 } from "@/lib/domain/navigation";
@@ -169,12 +170,15 @@ describe("navigationForAccess", () => {
     expect(items.some((item) => item.key === "/settings")).toBe(true);
   });
 
-  it("hides settings when the resolved permission set has no settings access", () => {
-    const items = navigationForAccess({
-      role: "viewer",
-      permissionKeys: [],
-    });
-    expect(items.some((item) => item.key === "/settings")).toBe(false);
+  it("keeps settings in the sidebar for everyone, because the hub filters itself", () => {
+    // The entry used to carry a permission list. It no longer does: the hub
+    // shows each person only the cards they may open and every screen behind it
+    // refuses anyone else, so a gate here decided nothing except whether a sales
+    // user could reach the one card built for them — their own reports.
+    for (const role of ["admin", "accountant", "viewer", "sales"] as const) {
+      const items = navigationForAccess({ role, permissionKeys: [] });
+      expect(items.some((item) => item.key === "/settings"), role).toBe(true);
+    }
   });
 
   it("fails open for navigation when permission lookup is unavailable", () => {
@@ -235,6 +239,111 @@ describe("SETTINGS_HUB", () => {
   });
 });
 
+describe("settingsHubForAccess", () => {
+  const titles = (access: Parameters<typeof settingsHubForAccess>[0]) =>
+    settingsHubForAccess(access).flatMap((g) => g.items.map((i) => i.title));
+
+  const ADMIN = {
+    role: "admin" as const,
+    permissionKeys: [
+      "settings.manage",
+      "users.manage",
+      "permissions.manage",
+      "audit.read",
+      "period.close",
+      "feedback.read",
+    ],
+  };
+
+  it("shows an administrator every card", () => {
+    const shown = settingsHubForAccess(ADMIN).flatMap((g) => g.items);
+    expect(shown).toHaveLength(SETTINGS_HUB.flatMap((g) => g.items).length);
+  });
+
+  it("shows a viewer only the audit history and their own reports", () => {
+    expect(titles({ role: "viewer", permissionKeys: ["audit.read"] }).sort()).toEqual([
+      "Audit history",
+      "My reports",
+    ]);
+  });
+
+  it("shows a sales user only their own reports", () => {
+    expect(titles({ role: "sales", permissionKeys: ["items.manage"] })).toEqual(["My reports"]);
+  });
+
+  it("shows an accountant the import, the audit history and their own reports", () => {
+    // Not Accounting periods: every control on that screen refuses anyone but an
+    // admin, so it is gated on the role rather than on period.close.
+    expect(
+      titles({ role: "accountant", permissionKeys: ["period.close", "audit.read"] }).sort(),
+    ).toEqual(["Audit history", "Import from QuickBooks or Wave", "My reports"]);
+  });
+
+  it("swaps the title and description rather than dropping a card with a fallback", () => {
+    const card = settingsHubForAccess({ role: "viewer", permissionKeys: [] })
+      .flatMap((g) => g.items)
+      .find((i) => i.href === "/settings/feedback");
+    expect(card?.title).toBe("My reports");
+    expect(card?.description).toContain("you filed");
+  });
+
+  it("keeps the triage wording for someone who may read the queue", () => {
+    const card = settingsHubForAccess(ADMIN)
+      .flatMap((g) => g.items)
+      .find((i) => i.href === "/settings/feedback");
+    expect(card?.title).toBe("Feedback triage");
+  });
+
+  it("drops a gated card that has no fallback", () => {
+    const hrefs = settingsHubForAccess({ role: "viewer", permissionKeys: [] }).flatMap((g) =>
+      g.items.map((i) => i.href),
+    );
+    expect(hrefs).not.toContain("/settings/users");
+    expect(hrefs).not.toContain("/settings/companies");
+  });
+
+  it("drops a group once every card in it is hidden", () => {
+    const ids = settingsHubForAccess({ role: "sales", permissionKeys: [] }).map((g) => g.id);
+    expect(ids).not.toContain("purchasing");
+    expect(ids).not.toContain("company");
+  });
+
+  it("hides nothing gated by permission when the lookup failed, but still honours role", () => {
+    const shown = settingsHubForAccess({ role: "viewer", permissionKeys: null }).flatMap(
+      (g) => g.items,
+    );
+    // Permission gates pass, so a permission-gated card such as Users or
+    // Accounting periods shows. The admin-only Companies card is gated by
+    // `roles` and is still gone — that is the half that must not fail open.
+    expect(shown.some((i) => i.href === "/settings/companies")).toBe(false);
+    expect(shown.some((i) => i.href === "/settings/periods")).toBe(false);
+    expect(shown.some((i) => i.href === "/settings/users")).toBe(true);
+    expect(shown.some((i) => i.href === "/settings/audit")).toBe(true);
+  });
+
+  it("gates every card on a permission key that exists, or on a role", () => {
+    const KNOWN = new Set([
+      "settings.manage",
+      "users.manage",
+      "permissions.manage",
+      "audit.read",
+      "period.close",
+      "feedback.read",
+    ]);
+    for (const group of SETTINGS_HUB) {
+      for (const item of group.items) {
+        expect(
+          Boolean(item.roles?.length) || Boolean(item.anyPermissions?.length),
+          `${item.href} has no gate`,
+        ).toBe(true);
+        for (const key of item.anyPermissions ?? []) {
+          expect(KNOWN.has(key), `${item.href} names unknown permission ${key}`).toBe(true);
+        }
+      }
+    }
+  });
+});
+
 describe("NEW_MENU", () => {
   it("targets an existing route with the new-form flag", () => {
     for (const item of NEW_MENU) {
@@ -267,5 +376,42 @@ describe("searchKindLabel", () => {
 
   it("falls back to the raw kind rather than throwing", () => {
     expect(searchKindLabel("something_new")).toBe("something new");
+  });
+});
+
+describe("settings pages guard themselves", () => {
+  /** Open to everyone, each for a stated reason. A third entry needs one too. */
+  const UNGUARDED = new Set([
+    "/settings", // the hub itself; it filters instead of refusing
+    "/settings/feedback", // a reporter goes here to see their own reports
+  ]);
+
+  it("awaits requireSettingsAccess with its own href on every gated page", () => {
+    // The `await` is the whole guard. Without it redirect() throws inside a
+    // detached promise, Next never sees a redirect, and the page renders in full
+    // to someone who was supposed to be turned away — while a substring check
+    // for the call alone stays green.
+    const missing: string[] = [];
+    for (const route of ROUTES.filter((r) => r.startsWith("/settings"))) {
+      if (UNGUARDED.has(route)) continue;
+      const file = join(process.cwd(), "app", "(app)", route, "page.tsx");
+      const source = readFileSync(file, "utf8");
+      if (!source.includes(`await requireSettingsAccess("${route}")`)) missing.push(route);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("guards before reading anything, so a refusal cannot render a page body", () => {
+    const late: string[] = [];
+    for (const route of ROUTES.filter((r) => r.startsWith("/settings"))) {
+      if (UNGUARDED.has(route)) continue;
+      const file = join(process.cwd(), "app", "(app)", route, "page.tsx");
+      const source = readFileSync(file, "utf8");
+      const body = source.slice(source.indexOf("export default"));
+      const guardAt = body.indexOf("await requireSettingsAccess(");
+      const firstOtherAwait = body.search(/await (?!requireSettingsAccess\()/);
+      if (guardAt < 0 || (firstOtherAwait >= 0 && firstOtherAwait < guardAt)) late.push(route);
+    }
+    expect(late).toEqual([]);
   });
 });

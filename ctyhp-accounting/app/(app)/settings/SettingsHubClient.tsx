@@ -1,18 +1,36 @@
 "use client";
 import Link from "next/link";
-import { Card, Col, Row, Typography } from "antd";
-import { SETTINGS_HUB } from "@/lib/domain/navigation";
+import { Alert, Card, Col, Row, Typography } from "antd";
+import type { SettingsHubGroup } from "@/lib/domain/navigation";
 
 /**
  * Client Component for the same reason PageHeader is one: Ant Design ships
  * "use client", so a Server Component that reaches for a compound sub-component
  * such as Typography.Title reads a static property off a client-reference proxy
  * and the render fails.
+ *
+ * The groups arrive already filtered. Deciding here what to show would be a
+ * second copy of the rule, in the one place that cannot enforce it.
  */
-export default function SettingsHubClient() {
+export default function SettingsHubClient({
+  groups,
+  deniedTitle,
+}: {
+  groups: SettingsHubGroup[];
+  deniedTitle: string | null;
+}) {
   return (
     <>
-      {SETTINGS_HUB.map((group) => (
+      {deniedTitle ? (
+        <Alert
+          type="info"
+          showIcon
+          className="settings-hub__denied"
+          message={`${deniedTitle} is not available to your role`}
+          description="Ask an administrator if you need access to it."
+        />
+      ) : null}
+      {groups.map((group) => (
         <section key={group.id} className="settings-hub__group">
           <Typography.Title level={4} className="settings-hub__group-title">
             {group.label}

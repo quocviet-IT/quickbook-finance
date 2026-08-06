@@ -110,8 +110,11 @@ describe("settingsHubForAccess", () => {
     const shown = settingsHubForAccess({ role: "viewer", permissionKeys: null }).flatMap(
       (g) => g.items,
     );
-    // Permission gates pass; the admin-only Companies card is still gone.
-    expect(shown.some((i) => i.href === "/settings/users")).toBe(false);
+    // Permission gates pass, so a permission-gated card such as Users or
+    // Accounting periods shows. The admin-only Companies card is gated by
+    // `roles` and is still gone — that is the half that must not fail open.
+    expect(shown.some((i) => i.href === "/settings/companies")).toBe(false);
+    expect(shown.some((i) => i.href === "/settings/users")).toBe(true);
     expect(shown.some((i) => i.href === "/settings/periods")).toBe(true);
   });
 

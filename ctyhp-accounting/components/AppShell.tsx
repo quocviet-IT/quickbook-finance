@@ -240,7 +240,7 @@ export default function AppShell({
   /** Whether this session may create another company at all. */
   canCreateCompany: boolean;
   /** Null means the permission lookup failed; menu filtering then degrades open. */
-  permissionKeys: string[] | null;
+  permissionKeys: readonly string[] | null;
   /** Badge count, so the approvals queue is visible without a sidebar slot. */
   pendingApprovals: number;
   children: React.ReactNode;
