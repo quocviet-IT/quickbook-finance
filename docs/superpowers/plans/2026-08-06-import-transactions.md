@@ -58,7 +58,7 @@
 - Consumes: `applyMapping`'s record shape — `money` fields arrive as minor-unit numbers, `date` fields as `YYYY-MM-DD` strings.
 - Produces: `ImportTarget` includes `"transactions"`; `TRANSACTION_FIELDS`; and from the new module `interface TransactionImportRecord`, `signedAmountMinor(record): SignedAmount`, `transactionRawHash(input): string`, `describeTransactionRow(record, signedMinor): string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ctyhp-accounting/tests/unit/transaction-import.test.ts`:
 
@@ -173,13 +173,13 @@ describe("describeTransactionRow", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run: `npm test -- tests/unit/transaction-import.test.ts`
 
 Expected: FAIL — `@/lib/domain/transaction-import` does not exist.
 
-- [ ] **Step 3: Add the target and its fields**
+- [x] **Step 3: Add the target and its fields**
 
 In `ctyhp-accounting/lib/domain/import-mapping.ts`:
 
@@ -268,7 +268,7 @@ const TRANSACTION_FIELDS: readonly FieldSpec[] = [
 
 Return it from `fieldsFor` and add `transactions: "Transactions"` to `TARGET_LABEL`.
 
-- [ ] **Step 4: Write the pure module**
+- [x] **Step 4: Write the pure module**
 
 Create `ctyhp-accounting/lib/domain/transaction-import.ts`:
 
@@ -356,7 +356,7 @@ export function describeTransactionRow(
 }
 ```
 
-- [ ] **Step 5: Run the tests and verify GREEN**
+- [x] **Step 5: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/transaction-import.test.ts tests/unit/import-mapping.test.ts tests/unit/import-shape.test.ts`
 
@@ -364,7 +364,7 @@ Expected: PASS. If `import-shape.test.ts` fails because its loop now covers a
 sixth target, add `"transactions"` to the `TARGETS` array in that test — the
 template must exist for every target.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/domain/import-mapping.ts ctyhp-accounting/lib/domain/transaction-import.ts ctyhp-accounting/tests/unit/transaction-import.test.ts ctyhp-accounting/tests/unit/import-shape.test.ts
@@ -386,7 +386,7 @@ git commit -m "Read one signed amount out of whatever shape the export used"
 - Consumes: `acc_is_staff()`, `acc_post_entry`, `acc_to_base_minor`, `acc_bank_transaction`, `acc_bank_account`, `acc_account`, `acc_reconciliation`.
 - Produces: `acc_import_transactions(p_rows jsonb, p_default_bank_account_id uuid) returns jsonb` with `{ imported, skipped }`.
 
-- [ ] **Step 1: Write the failing migration contract test**
+- [x] **Step 1: Write the failing migration contract test**
 
 Create `ctyhp-accounting/tests/unit/import-transactions-migration.test.ts`:
 
@@ -444,13 +444,13 @@ describe("import transactions migration", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/import-transactions-migration.test.ts`
 
 Expected: FAIL with `ENOENT`.
 
-- [ ] **Step 3: Write migration 0099**
+- [x] **Step 3: Write migration 0099**
 
 Create `ctyhp-accounting/supabase/migrations/0100_import_transactions.sql`:
 
@@ -615,13 +615,13 @@ revoke all on function acc_import_transactions(jsonb, uuid) from public, anon;
 grant execute on function acc_import_transactions(jsonb, uuid) to authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run the tests and verify GREEN**
+- [x] **Step 4: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/import-transactions-migration.test.ts tests/unit/schema-template.test.ts`
 
 Expected: PASS, both files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/supabase/migrations/0100_import_transactions.sql ctyhp-accounting/tests/unit/import-transactions-migration.test.ts
@@ -640,7 +640,7 @@ git commit -m "Post an imported transaction through the door every document uses
 - Consumes: `applyMapping`, `signedAmountMinor`, `transactionRawHash`, `describeTransactionRow`, and `acc_import_transactions`.
 - Produces: `ImportPreview` gains `duplicates?: number` and `missingAccounts?: string[]`; `previewImport` and `runImport` accept `options.bankAccountId?: string | null`.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 Create `ctyhp-accounting/tests/unit/import-transactions-service.test.ts`:
 
@@ -778,13 +778,13 @@ describe("runImport for transactions", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/import-transactions-service.test.ts`
 
 Expected: FAIL — the transactions case does not exist.
 
-- [ ] **Step 3: Extend the preview type and add the transactions case**
+- [x] **Step 3: Extend the preview type and add the transactions case**
 
 In `ctyhp-accounting/lib/services/data-import.ts`, extend `ImportPreview`:
 
@@ -894,7 +894,7 @@ export async function previewImport(
 ): Promise<ImportPreview> {
 ```
 
-- [ ] **Step 4: Add the run branch**
+- [x] **Step 4: Add the run branch**
 
 In `runImport`, beside the invoices branch:
 
@@ -935,7 +935,7 @@ In `runImport`, beside the invoices branch:
 
 and widen its options to `{ openingBalancesAsOf?: string | null; bankAccountId?: string | null }`.
 
-- [ ] **Step 5: Run the tests and typecheck**
+- [x] **Step 5: Run the tests and typecheck**
 
 Run: `npm test -- tests/unit/import-transactions-service.test.ts`
 
@@ -945,7 +945,7 @@ Run: `npm run typecheck`
 
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/services/data-import.ts ctyhp-accounting/tests/unit/import-transactions-service.test.ts
@@ -966,7 +966,7 @@ git commit -m "Refuse an import that names an account this company does not have
 - Consumes: `previewImport`, `runImport` with `options.bankAccountId`.
 - Produces: the `transactions` tab, a bank-account picker, and a step-3 block when `missingAccounts` is non-empty.
 
-- [ ] **Step 1: Extend the UI contract test**
+- [x] **Step 1: Extend the UI contract test**
 
 Add to `ctyhp-accounting/tests/unit/import-guidance-ui-contract.test.ts`:
 
@@ -991,13 +991,13 @@ describe("the transactions tab", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/import-guidance-ui-contract.test.ts`
 
 Expected: FAIL on the three new cases.
 
-- [ ] **Step 3: Pass the bank accounts to the screen**
+- [x] **Step 3: Pass the bank accounts to the screen**
 
 In `ctyhp-accounting/app/(app)/settings/import/page.tsx`, import `listAccounts`
 from `@/lib/services/accounts`, load them beside whatever the page already loads,
@@ -1014,14 +1014,14 @@ filter to the ones a bank line can post to, and pass them down:
 
 `bankAccounts={bankAccounts}` on `ImportClient`.
 
-- [ ] **Step 4: Carry the choice through the action**
+- [x] **Step 4: Carry the choice through the action**
 
 In `ctyhp-accounting/app/(app)/settings/import/actions.ts`, add
 `bankAccountId: string | null` to the preview and run action inputs and pass it
 into `previewImport` / `runImport` as `{ bankAccountId }`. Keep every existing
 guard exactly as it is.
 
-- [ ] **Step 5: Add the tab, the picker and the block**
+- [x] **Step 5: Add the tab, the picker and the block**
 
 In `ImportClient.tsx`:
 
@@ -1071,7 +1071,7 @@ and add `|| (preview.missingAccounts?.length ?? 0) > 0` to the Import button's
 `disabled` condition. If `Select` is no longer imported in this file, import it
 from `antd` again.
 
-- [ ] **Step 6: Run the tests, typecheck and lint**
+- [x] **Step 6: Run the tests, typecheck and lint**
 
 Run:
 
@@ -1083,7 +1083,7 @@ npx eslint 'app/(app)/settings/import/*.tsx' 'app/(app)/settings/import/actions.
 
 Expected: all pass with zero errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/settings/import' ctyhp-accounting/tests/unit/import-guidance-ui-contract.test.ts
@@ -1094,17 +1094,24 @@ git commit -m "Bring categorized transactions in through their own tab"
 
 ### Task 5: Prove it against a real company, then ship
 
+> **The harness changed the design.** The first run showed the chosen bank
+> account had no `acc_bank_account` record, so no bank line was written — and
+> dedupe lives entirely on that line's unique hash, meaning a second import
+> would have posted the same money again. The RPC, the service and the screen
+> now refuse an account with no bank record, and the harness proves that refusal
+> along with the dedupe it protects.
+
 **Files:**
 - Create: `ctyhp-accounting/scripts/verify-import-transactions.mjs`
 - Modify: `ctyhp-accounting/package.json`
 
-- [ ] **Step 1: Add the package script**
+- [x] **Step 1: Add the package script**
 
 ```json
 "verify:import-transactions": "node --env-file=.env.local scripts/verify-import-transactions.mjs",
 ```
 
-- [ ] **Step 2: Write the rollback-only harness**
+- [x] **Step 2: Write the rollback-only harness**
 
 Create `ctyhp-accounting/scripts/verify-import-transactions.mjs`, copying the
 header comment style, `client`, `check`, `one`, `scenario` and `attempt` helpers
@@ -1251,7 +1258,7 @@ console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 ```
 
-- [ ] **Step 3: Static safety check, then run it**
+- [x] **Step 3: Static safety check, then run it**
 
 Run:
 
@@ -1264,7 +1271,7 @@ npm run verify:import-transactions
 Expected: the grep prints nothing, the credential check passes, every assertion
 prints PASS, the final line confirms `ROLLBACK`, and `0 failed`.
 
-- [ ] **Step 4: Run every project gate**
+- [x] **Step 4: Run every project gate**
 
 ```bash
 npm test
@@ -1277,7 +1284,7 @@ npm run build
 Expected: all tests pass, typecheck and the credential check clean, lint zero
 errors with only the pre-existing `scripts/verify-*.mjs` warnings, build exits 0.
 
-- [ ] **Step 5: Smoke the built server**
+- [x] **Step 5: Smoke the built server**
 
 Start the built server, then run:
 
@@ -1288,7 +1295,7 @@ node --env-file=.env.local scripts/smoke-pages.mjs http://127.0.0.1:3000
 Expected: every page 200, `/settings/import` among them. Stop the server
 afterwards.
 
-- [ ] **Step 6: Apply the migration to every company**
+- [x] **Step 6: Apply the migration to every company**
 
 Run: `node --env-file=.env.local scripts/migrate.mjs`
 
@@ -1296,7 +1303,7 @@ Expected: `0100_import_transactions.sql ... ok` for `public` and each company
 schema, then confirm `acc_import_transactions` and `acc_resolve_account_ref`
 exist in all four.
 
-- [ ] **Step 7: Review the diff, commit and report**
+- [x] **Step 7: Review the diff, commit and report**
 
 ```bash
 git diff --check
