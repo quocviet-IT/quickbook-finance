@@ -7,6 +7,7 @@ import { SAVED_REPORT_SOURCE_LABEL, type SavedReportSource } from "@/lib/domain/
 import type { SavedReportRow } from "@/lib/services/saved-reports";
 import { archiveSavedReportAction } from "./actions";
 import SaveReportModal from "./SaveReportModal";
+import SavedReportViewer from "./SavedReportViewer";
 
 export interface SavedReportsClientProps {
   reports: SavedReportRow[];
@@ -35,6 +36,7 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
   const { message } = App.useApp();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [viewing, setViewing] = useState<SavedReportRow | null>(null);
   const [archiving, setArchiving] = useState<SavedReportRow | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,7 +83,7 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
             dataIndex: "title",
             render: (title: string, row: SavedReportRow) => (
               <Space direction="vertical" size={0}>
-                <span>{title}</span>
+                <a onClick={() => setViewing(row)}>{title}</a>
                 <span style={{ color: "#8c8c8c", fontSize: 12 }}>
                   {row.file_name} · {formatBytes(row.size_bytes)}
                 </span>
@@ -153,6 +155,8 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
           router.refresh();
         }}
       />
+
+      <SavedReportViewer report={viewing} onClose={() => setViewing(null)} />
     </Card>
   );
 }

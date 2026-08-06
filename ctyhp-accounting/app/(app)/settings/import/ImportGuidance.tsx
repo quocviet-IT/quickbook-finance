@@ -93,6 +93,19 @@ export default function ImportGuidance({ target, detection, onSwitchTarget }: Im
           }
         />
       ) : null}
+
+      <Alert
+        type="info"
+        showIcon
+        message="Holding a report rather than a data file?"
+        description={
+          <>
+            A Profit and Loss, a Balance Sheet or a bank statement you only want to keep can be
+            saved under <a href="/reports/saved">Reports → Saved Reports</a>. Importing posts;
+            saving does not affect a balance at all.
+          </>
+        }
+      />
     </Space>
   );
 }

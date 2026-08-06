@@ -153,7 +153,10 @@ describe("planCompanySchema against the real migrations", () => {
   it("holds back the global storage policies rather than rewriting them per company", () => {
     const storage = plan.skipped.filter((s) => s.reason.includes("storage"));
     expect(storage.length).toBeGreaterThan(0);
-    expect(plan.statements.some((s) => /storage\.objects/i.test(s))).toBe(false);
+    // Comments are stripped for the same reason `scopeOf` strips them: a
+    // migration header explaining why it writes no storage policy names the
+    // table, and prose must not read as an executable reference.
+    expect(plan.statements.some((s) => /storage\.objects/i.test(stripComments(s)))).toBe(false);
   });
 
   it("reports everything it held back instead of dropping it silently", () => {
