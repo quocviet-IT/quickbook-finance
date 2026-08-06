@@ -46,7 +46,7 @@
 - Consumes: `fieldsFor`, `proposeMapping`, `TARGET_LABEL`, `type ImportTarget`, `type FieldSpec` from `@/lib/domain/import-mapping`.
 - Produces: `templateCsvFor(target: ImportTarget): string`; `detectFileShape(headers: readonly string[]): FileShapeDetection`; `describeShapeMismatch(selected: ImportTarget, detection: FileShapeDetection): string | null`; `interface FileShapeDetection { target: ImportTarget | null; matchedRequired: number; requiredTotal: number; looksLikeLedgerDetail: boolean; looksLikeWaveAccountTransactions: boolean }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ctyhp-accounting/tests/unit/import-shape.test.ts`:
 
@@ -165,13 +165,13 @@ describe("describeShapeMismatch", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run: `npm test -- tests/unit/import-shape.test.ts`
 
 Expected: FAIL — `Cannot find package '@/lib/domain/import-shape'`.
 
-- [ ] **Step 3: Write the module**
+- [x] **Step 3: Write the module**
 
 Create `ctyhp-accounting/lib/domain/import-shape.ts`:
 
@@ -359,13 +359,13 @@ export function describeShapeMismatch(
 }
 ```
 
-- [ ] **Step 4: Run the tests and verify GREEN**
+- [x] **Step 4: Run the tests and verify GREEN**
 
 Run: `npm test -- tests/unit/import-shape.test.ts tests/unit/import-mapping.test.ts`
 
 Expected: PASS, both files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/domain/import-shape.ts ctyhp-accounting/tests/unit/import-shape.test.ts
@@ -384,13 +384,13 @@ git commit -m "Work out what an import file actually is before anyone maps it"
 - Produces: `ImportColumnsTable` with props `{ fields, headers, mapping, unmapped, onChange }` — the exact set the moved markup already reads.
 - No behaviour changes. The guidance panel lands in Task 3; this task only makes the file small enough to accept it.
 
-- [ ] **Step 1: Record the starting line count**
+- [x] **Step 1: Record the starting line count**
 
 Run: `wc -l 'app/(app)/settings/import/ImportClient.tsx'`
 
 Expected: `413`. Step 5 compares against it.
 
-- [ ] **Step 2: Create the component with the moved markup**
+- [x] **Step 2: Create the component with the moved markup**
 
 Create `ctyhp-accounting/app/(app)/settings/import/ImportColumnsTable.tsx` as a
 `"use client"` component holding, unchanged, the "Columns" heading, its
@@ -415,7 +415,7 @@ export interface ImportColumnsTableProps {
 Keep every string, width and `Select` option exactly as it was. This step must
 not improve anything.
 
-- [ ] **Step 3: Use it from `ImportClient`**
+- [x] **Step 3: Use it from `ImportClient`**
 
 Delete the moved markup and render:
 
@@ -435,7 +435,7 @@ Use the existing state setter and handler names; if the current handler differs,
 adapt at the call site rather than renaming it. Drop any imports `ImportClient`
 no longer uses — lint will name them.
 
-- [ ] **Step 4: Prove nothing changed**
+- [x] **Step 4: Prove nothing changed**
 
 Run:
 
@@ -447,13 +447,13 @@ npm test
 
 Expected: typecheck clean, eslint silent, every test passing.
 
-- [ ] **Step 5: Check the file shrank below the ceiling**
+- [x] **Step 5: Check the file shrank below the ceiling**
 
 Run: `wc -l 'app/(app)/settings/import/ImportClient.tsx' 'app/(app)/settings/import/ImportColumnsTable.tsx'`
 
 Expected: `ImportClient.tsx` under 400, `ImportColumnsTable.tsx` under 400.
 
-- [ ] **Step 6: Commit the move on its own**
+- [x] **Step 6: Commit the move on its own**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/settings/import/ImportColumnsTable.tsx' 'ctyhp-accounting/app/(app)/settings/import/ImportClient.tsx'
@@ -473,7 +473,7 @@ git commit -m "Move the import column table into its own component"
 - Consumes: `templateCsvFor`, `detectFileShape`, `describeShapeMismatch`, `fieldsFor`, `TARGET_LABEL`.
 - Produces: `ImportGuidance` with props `{ target, detection, onSwitchTarget }`.
 
-- [ ] **Step 1: Write the failing UI contract test**
+- [x] **Step 1: Write the failing UI contract test**
 
 Create `ctyhp-accounting/tests/unit/import-guidance-ui-contract.test.ts`:
 
@@ -518,13 +518,13 @@ describe("the import guidance panel", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npm test -- tests/unit/import-guidance-ui-contract.test.ts`
 
 Expected: FAIL with `ENOENT` for `ImportGuidance.tsx`.
 
-- [ ] **Step 3: Write the panel**
+- [x] **Step 3: Write the panel**
 
 Create `ctyhp-accounting/app/(app)/settings/import/ImportGuidance.tsx`:
 
@@ -625,7 +625,7 @@ export default function ImportGuidance({ target, detection, onSwitchTarget }: Im
 }
 ```
 
-- [ ] **Step 4: Wire it into `ImportClient`**
+- [x] **Step 4: Wire it into `ImportClient`**
 
 In `ImportClient.tsx`:
 
@@ -667,7 +667,7 @@ import { detectFileShape, describeShapeMismatch } from "@/lib/domain/import-shap
 the decision to show a warning; the panel calls it. Leave the three steps, the
 dry run and every existing string untouched.
 
-- [ ] **Step 5: Run the tests, typecheck and lint**
+- [x] **Step 5: Run the tests, typecheck and lint**
 
 Run:
 
@@ -679,7 +679,7 @@ npx eslint 'app/(app)/settings/import/*.tsx'
 
 Expected: all pass with zero errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add 'ctyhp-accounting/app/(app)/settings/import' ctyhp-accounting/tests/unit/import-guidance-ui-contract.test.ts
@@ -693,7 +693,12 @@ git commit -m "Say what the import tab needs, and when the file is something els
 **Files:**
 - Modify only if a gate exposes a defect in files already in this plan.
 
-- [ ] **Step 1: Check the detector against the real file**
+- [x] **Step 1: Check the detector against the real file**
+
+> **Ran differently.** Plain Node cannot resolve `./import-mapping` without a file
+> extension, so this check ran as a temporary Vitest case instead, then was
+> deleted. Result on the real file: `looksLikeWaveAccountTransactions: true`,
+> `target: null`, and a message naming it a general ledger detail report.
 
 Run, from `ctyhp-accounting`:
 
@@ -713,7 +718,7 @@ Expected: `looksLikeWaveAccountTransactions: true`, `target: null`, and a senten
 that names the file as a general ledger detail report. If the detector says
 anything else, fix `import-shape.ts` and re-run Task 1's tests.
 
-- [ ] **Step 2: Run every project gate**
+- [x] **Step 2: Run every project gate**
 
 Run, recording real output:
 
@@ -728,7 +733,7 @@ npm run build
 Expected: all tests pass, typecheck and the credential check clean, lint zero
 errors with only the pre-existing `scripts/verify-*.mjs` warnings, build exits 0.
 
-- [ ] **Step 3: Smoke the built server**
+- [x] **Step 3: Smoke the built server**
 
 Start the built server, then run:
 
@@ -739,7 +744,7 @@ node --env-file=.env.local scripts/smoke-pages.mjs http://127.0.0.1:3000
 Expected: every page 200, `/settings/import` among them. Stop the server
 afterwards; port 3000 must be free for the next run.
 
-- [ ] **Step 4: Review the diff and commit**
+- [x] **Step 4: Review the diff and commit**
 
 Run:
 
@@ -752,7 +757,7 @@ git log --oneline -5
 Confirm only planned files changed and the user-owned `.claude/settings.json` is
 untouched.
 
-- [ ] **Step 5: Report what is still missing**
+- [x] **Step 5: Report what is still missing**
 
 State plainly in the completion report that the file from the report still has no
 home: this slice explains it, slice 2 gives it one. The feedback report
