@@ -7,7 +7,6 @@ import {
   Checkbox,
   DatePicker,
   Segmented,
-  Select,
   Space,
   Statistic,
   Steps,
@@ -26,6 +25,7 @@ import {
   TARGET_LABEL,
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
+import ImportColumnsTable from "./ImportColumnsTable";
 import type { ImportPreview } from "@/lib/services/data-import";
 import { previewImportAction, runImportAction, suggestMappingAction } from "./actions";
 
@@ -243,74 +243,18 @@ export default function ImportClient({
 
       {headers.length > 0 ? (
         <>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            Columns
-          </Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-            Proposed from the file&apos;s own headings. Change anything that is wrong — nothing is
-            read until you do.
-          </Typography.Paragraph>
-          <Table
-            size="small"
-            rowKey="key"
-            pagination={false}
-            dataSource={fields.map((field) => ({ ...field }))}
-            columns={[
-              {
-                title: "Field",
-                dataIndex: "label",
-                width: 200,
-                render: (label: string, field) => (
-                  <Space size={6}>
-                    {label}
-                    {field.required ? <Tag color="red">required</Tag> : null}
-                  </Space>
-                ),
-              },
-              {
-                title: "Column in your file",
-                key: "column",
-                render: (_: unknown, field) => (
-                  <Select
-                    allowClear
-                    style={{ minWidth: 260 }}
-                    placeholder="Not imported"
-                    value={mapping[field.key] ?? undefined}
-                    onChange={(value) =>
-                      setMapping((prev) => ({ ...prev, [field.key]: value ?? null }))
-                    }
-                    options={headers.map((header, index) => ({ value: index, label: header }))}
-                  />
-                ),
-              },
-              {
-                // Marks what the alias matcher could not place. These are the
-                // columns worth a second look before importing.
-                title: "",
-                key: "source",
-                width: 130,
-                render: (_: unknown, field) =>
-                  aiFields.includes(field.key) ? <Tag color="purple">matched by AI</Tag> : null,
-              },
-              { title: "", dataIndex: "hint", render: (hint: string | undefined) => hint ?? "" },
-            ]}
+          <ImportColumnsTable
+            fields={fields}
+            headers={headers}
+            mapping={mapping}
+            unmapped={unmapped}
+            aiFields={aiFields}
+            aiBusy={aiBusy}
+            aiNote={aiNote}
+            onChange={(fieldKey, columnIndex) =>
+              setMapping((prev) => ({ ...prev, [fieldKey]: columnIndex }))
+            }
           />
-
-          {aiBusy ? (
-            <Typography.Text type="secondary">
-              Asking the model about the columns it could not place by name…
-            </Typography.Text>
-          ) : null}
-
-          {aiNote ? <Alert type="info" showIcon message={aiNote} /> : null}
-
-          {unmapped.length > 0 ? (
-            <Alert
-              type="info"
-              showIcon
-              message={`${unmapped.length} column(s) in the file are not used: ${unmapped.join(", ")}`}
-            />
-          ) : null}
 
           <Space wrap>
             <Button type="primary" onClick={runPreview} loading={busy} disabled={missingRequired.length > 0}>
