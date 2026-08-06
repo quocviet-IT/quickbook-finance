@@ -34,7 +34,7 @@
 |---|---|
 | `ctyhp-accounting/lib/domain/import-mapping.ts` | Modify. `transactions` target, its fields, its label. |
 | `ctyhp-accounting/lib/domain/transaction-import.ts` | Create. Signed amount, dedupe hash, row description. Pure. |
-| `ctyhp-accounting/supabase/migrations/0099_import_transactions.sql` | Create. `acc_import_transactions`. |
+| `ctyhp-accounting/supabase/migrations/0100_import_transactions.sql` | Create. `acc_import_transactions`. |
 | `ctyhp-accounting/lib/services/data-import.ts` | Modify. Preview and run for the new target. |
 | `ctyhp-accounting/app/(app)/settings/import/actions.ts` | Modify. Carry the chosen bank account. |
 | `ctyhp-accounting/app/(app)/settings/import/ImportClient.tsx` | Modify. The tab, the bank picker, the missing-account block. |
@@ -375,8 +375,11 @@ git commit -m "Read one signed amount out of whatever shape the export used"
 
 ### Task 2: Posting a row, once
 
+> **Number changed.** 0099 was taken by `0099_feedback_read_admin_only.sql` from
+> another line of work, so this migration is **0100**.
+
 **Files:**
-- Create: `ctyhp-accounting/supabase/migrations/0099_import_transactions.sql`
+- Create: `ctyhp-accounting/supabase/migrations/0100_import_transactions.sql`
 - Test: `ctyhp-accounting/tests/unit/import-transactions-migration.test.ts`
 
 **Interfaces:**
@@ -393,7 +396,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { planCompanySchema } from "@/lib/domain/schema-template";
 
-const file = "0099_import_transactions.sql";
+const file = "0100_import_transactions.sql";
 const sql = readFileSync(join(process.cwd(), "supabase", "migrations", file), "utf8");
 
 describe("import transactions migration", () => {
@@ -449,7 +452,7 @@ Expected: FAIL with `ENOENT`.
 
 - [ ] **Step 3: Write migration 0099**
 
-Create `ctyhp-accounting/supabase/migrations/0099_import_transactions.sql`:
+Create `ctyhp-accounting/supabase/migrations/0100_import_transactions.sql`:
 
 ```sql
 -- ============================================================================
@@ -621,7 +624,7 @@ Expected: PASS, both files.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add ctyhp-accounting/supabase/migrations/0099_import_transactions.sql ctyhp-accounting/tests/unit/import-transactions-migration.test.ts
+git add ctyhp-accounting/supabase/migrations/0100_import_transactions.sql ctyhp-accounting/tests/unit/import-transactions-migration.test.ts
 git commit -m "Post an imported transaction through the door every document uses"
 ```
 
@@ -1112,11 +1115,11 @@ await client.connect();
 await client.query("begin");
 try {
   const migration = await readFile(
-    join(projectRoot, "supabase", "migrations", "0099_import_transactions.sql"),
+    join(projectRoot, "supabase", "migrations", "0100_import_transactions.sql"),
     "utf8",
   );
   await client.query(migration);
-  console.log("Applied 0099 inside the transaction (never committed).");
+  console.log("Applied 0100 inside the transaction (never committed).");
 
   const admin = await one(
     `select id from acc_app_user where role = 'admin' and status = 'active' order by created_at limit 1`,
@@ -1289,7 +1292,7 @@ afterwards.
 
 Run: `node --env-file=.env.local scripts/migrate.mjs`
 
-Expected: `0099_import_transactions.sql ... ok` for `public` and each company
+Expected: `0100_import_transactions.sql ... ok` for `public` and each company
 schema, then confirm `acc_import_transactions` and `acc_resolve_account_ref`
 exist in all four.
 
