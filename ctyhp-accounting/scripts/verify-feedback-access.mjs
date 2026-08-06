@@ -62,12 +62,38 @@ async function fileReport(reporterId, description, kind = "broken") {
   const { rows } = await client.query(
     `insert into acc_feedback_report
        (kind, description, page_url, page_route, viewport_width, viewport_height,
-        reporter_id, impact, frequency)
-     values ($1, $2, 'http://localhost:3000/dashboard', '/dashboard', 1440, 900, $3, 'blocking', 'every_time')
-     returning id`,
+        reporter_id, impact, frequency, screenshot_path)
+     values ($1, $2, 'http://localhost:3000/dashboard', '/dashboard', 1440, 900, $3,
+             'blocking', 'every_time', gen_random_uuid()::text || '.png')
+     returning id, screenshot_path`,
     [kind, description, reporterId],
   );
-  return rows[0].id;
+  return rows[0];
+}
+
+/**
+ * Put a real object in each feedback bucket for a report.
+ *
+ * Counting zero rows for a path nobody ever created proves nothing — the count
+ * would be zero with RLS switched off. The object has to exist for its absence
+ * to mean "refused".
+ */
+async function attachFiles(report) {
+  await client.query(
+    `insert into storage.objects (bucket_id, name, owner) values ('feedback-screenshots', $1, null)`,
+    [report.screenshot_path],
+  );
+  const attachmentPath = `${report.id}/probe.pdf`;
+  await client.query(
+    `insert into storage.objects (bucket_id, name, owner) values ('feedback-attachments', $1, null)`,
+    [attachmentPath],
+  );
+  await client.query(
+    `insert into acc_feedback_attachment (report_id, storage_path, file_name, mime_type, size_bytes)
+     values ($1, $2, 'probe.pdf', 'application/pdf', 1024)`,
+    [report.id, attachmentPath],
+  );
+  return attachmentPath;
 }
 
 /** Body runs authenticated as `userId` with RLS in force, then rolls back. */
@@ -75,14 +101,15 @@ async function scenario(name, userId, body) {
   console.log(`\n== ${name}`);
   await client.query("begin");
   try {
-    // Seeded inside the transaction, before the role switch: the row exists for
-    // the reader to fail to see, and the rollback takes it away again.
-    const theirs = await fileReport(ADMIN, "verify-feedback-access probe");
+    // Seeded inside the transaction, before the role switch: the rows exist for
+    // the reader to fail to see, and the rollback takes them away again.
+    const report = await fileReport(ADMIN, "verify-feedback-access probe");
+    const attachmentPath = await attachFiles(report);
     await client.query(`select set_config('request.jwt.claims', $1, true)`, [
       JSON.stringify({ sub: userId, role: "authenticated" }),
     ]);
     await client.query("set local role authenticated");
-    await body(theirs);
+    await body(report.id, { screenshot: report.screenshot_path, attachment: attachmentPath });
   } catch (error) {
     failed++;
     console.log(`  FAIL  scenario threw — ${error.message}`);
@@ -93,7 +120,7 @@ async function scenario(name, userId, body) {
 
 const count = async (sql, params = []) => Number((await client.query(sql, params)).rows[0].n);
 
-await scenario("an administrator still sees the whole queue", ADMIN, async (theirs) => {
+await scenario("an administrator still sees the whole queue", ADMIN, async (theirs, files) => {
   check(
     "reads the seeded report",
     (await count(`select count(*)::int n from acc_feedback_report where id = $1`, [theirs])) === 1,
@@ -101,6 +128,23 @@ await scenario("an administrator still sees the whole queue", ADMIN, async (thei
   check(
     "acc_feedback_queue returns rows",
     (await count(`select count(*)::int n from acc_feedback_queue(null)`)) > 0,
+  );
+  // Positive control for the storage checks below: these objects ARE visible to
+  // someone who holds feedback.read, so a zero for anyone else means refused
+  // rather than absent.
+  check(
+    "reads the screenshot object",
+    (await count(
+      `select count(*)::int n from storage.objects where bucket_id = 'feedback-screenshots' and name = $1`,
+      [files.screenshot],
+    )) === 1,
+  );
+  check(
+    "reads the attachment object",
+    (await count(
+      `select count(*)::int n from storage.objects where bucket_id = 'feedback-attachments' and name = $1`,
+      [files.attachment],
+    )) === 1,
   );
 });
 
@@ -110,7 +154,7 @@ for (const role of ["accountant", "viewer", "sales"]) {
     console.log(`\n== skipped ${role}: no active account`);
     continue;
   }
-  await scenario(`a ${role} sees only their own`, userId, async (theirs) => {
+  await scenario(`a ${role} sees only their own`, userId, async (theirs, files) => {
     check(
       "cannot read someone else's report",
       (await count(`select count(*)::int n from acc_feedback_report where id = $1`, [theirs])) === 0,
@@ -124,6 +168,26 @@ for (const role of ["accountant", "viewer", "sales"]) {
       (await count(`select count(*)::int n from acc_feedback_attachment where report_id = $1`, [
         theirs,
       ])) === 0,
+    );
+    // The images are the thing the exposure was actually about, and they live
+    // behind their own policies on storage.objects -- a different file, a
+    // different predicate. Checking the tables and assuming the buckets follow
+    // is the assumption a harness exists to remove.
+    check(
+      "cannot read someone else's screenshot object",
+      (await count(
+        `select count(*)::int n from storage.objects
+          where bucket_id = 'feedback-screenshots' and name = $1`,
+        [files.screenshot],
+      )) === 0,
+    );
+    check(
+      "cannot read someone else's attachment object",
+      (await count(
+        `select count(*)::int n from storage.objects
+          where bucket_id = 'feedback-attachments' and name = $1`,
+        [files.attachment],
+      )) === 0,
     );
 
     // The clause that makes "My reports" work must still hold, or revoking the

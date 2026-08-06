@@ -95,18 +95,13 @@ export const NAV: NavItem[] = [
     ],
   },
   { key: "/reports", label: "Reports" },
-  {
-    key: "/settings",
-    label: "Settings",
-    anyPermissions: [
-      "settings.manage",
-      "users.manage",
-      "permissions.manage",
-      "audit.read",
-      "period.close",
-      "period.reopen",
-    ],
-  },
+  // Ungated on purpose. The hub now shows each person only the cards they may
+  // open, and every screen behind it refuses anyone else at the door, so a
+  // permission list here would only decide who gets a *door* to a hub that is
+  // already correct. It had one concrete cost: a sales user holds items.manage
+  // and nothing on that list, so the one card built for them — their own
+  // reports — was reachable only by typing the URL.
+  { key: "/settings", label: "Settings" },
 ];
 
 export function navLeaves(items: NavItem[] = NAV): NavPage[] {
@@ -221,14 +216,21 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         href: "/settings/periods",
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",
-        anyPermissions: ["period.close"],
+        // Not `period.close`, which an accountant holds: every action on this
+        // screen calls adminGuard() and the client gets canEdit={isAdmin(role)},
+        // so that gate would open a door onto controls that all refuse.
+        roles: ["admin"],
       },
       {
         href: "/settings/import",
         title: "Import from QuickBooks or Wave",
         description:
           "Bring a chart of accounts, contacts, products and opening balances across from a CSV export.",
-        anyPermissions: ["settings.manage"],
+        // Matches `canWrite` in this screen's actions, which is the rule the
+        // server actually enforces: the chart of accounts is admin-only, the
+        // rest is ordinary bookkeeping. An admin-only gate here would have hidden
+        // a screen an accountant may still legitimately use.
+        roles: ["admin", "accountant"],
       },
     ],
   },

@@ -124,9 +124,20 @@ async function refusal(route) {
   return { refused: meta, how: meta ? "meta refresh" : `HTTP ${res.status}`, body };
 }
 
-// --- The doors that must be shut -------------------------------------------
-console.log("== gated screens turn this person away");
-for (const route of [
+/**
+ * What each role may open, taken from the catalog's own gates.
+ *
+ * Import is `roles: ["admin", "accountant"]` because that is what `canWrite` in
+ * its actions enforces; audit is `audit.read`, which an accountant and a viewer
+ * both hold. Everything else on this list is administrator work. A role that
+ * opens something not listed here is the failure this file exists to catch.
+ */
+const ALLOWED = {
+  viewer: ["/settings/audit"],
+  accountant: ["/settings/audit", "/settings/import"],
+  sales: [],
+};
+const GATED = [
   "/settings/users",
   "/settings/permissions",
   "/settings/companies",
@@ -134,9 +145,22 @@ for (const route of [
   "/settings/approvals",
   "/settings/import",
   "/settings/purchasing",
-]) {
+  "/settings/periods",
+  "/settings/audit",
+];
+const allowed = ALLOWED[role] ?? [];
+
+// --- The doors that must be shut -------------------------------------------
+console.log(`== what a ${role} is turned away from`);
+for (const route of GATED.filter((r) => !allowed.includes(r))) {
   const { refused, how } = await refusal(route);
   check(`${route} is refused and sent to the hub, named`, refused, how);
+}
+
+console.log(`\n== what a ${role} may still open`);
+for (const route of allowed) {
+  const res = await get(route);
+  check(`${route} opens`, res.status === 200, `HTTP ${res.status}`);
 }
 
 // A refusal that still rendered the screen would be no refusal at all.
@@ -157,11 +181,7 @@ console.log("\n== the refused screen's own content never reaches the browser");
 }
 
 // --- The doors that must stay open ------------------------------------------
-console.log("\n== what this role may still reach");
-{
-  const res = await get("/settings/audit");
-  check("audit history stays open (audit.read covers viewer)", res.status === 200, `HTTP ${res.status}`);
-}
+console.log("\n== the feedback route, which is deliberately unguarded");
 {
   const res = await get("/settings/feedback");
   const body = res.status === 200 ? await res.text() : "";
@@ -178,13 +198,81 @@ console.log("\n== the hub itself");
   check("the hub renders", res.status === 200, `HTTP ${res.status}`);
   check("no Users card", !body.includes("Create login accounts"));
   check("no Permissions card", !body.includes("What each role may do"));
-  check("the audit card is there", body.includes("Who changed what"));
+  // A card is present exactly when the door behind it opens — that equivalence
+  // is the whole point of reading both from one catalog entry.
+  check(
+    `the audit card is ${allowed.includes("/settings/audit") ? "there" : "absent"}`,
+    body.includes("Who changed what") === allowed.includes("/settings/audit"),
+  );
+  check(
+    `the import card is ${allowed.includes("/settings/import") ? "there" : "absent"}`,
+    body.includes("Bring a chart of accounts") === allowed.includes("/settings/import"),
+  );
+  // Everyone gets this one, whatever their role: it is the fallback wording.
   check("the reporter's card is there", body.includes("The bug reports and suggestions you filed"));
 }
 {
   const res = await get(`/settings?denied=${encodeURIComponent("/settings/users")}`);
   const body = res.status === 200 ? await res.text() : "";
   check("a denied redirect explains itself by name", body.includes("Users is not available to your role"));
+}
+
+// --- A revoked account is revoked here too ----------------------------------
+/**
+ * The product tells whoever suspends someone that it "revokes read and write
+ * access immediately across the whole application". The database agrees:
+ * acc_current_role() (0037) answers only for status in ('invited','active').
+ * currentAccess() has to answer the same way, or a suspended administrator
+ * keeps every screen gated on `roles` alone.
+ *
+ * Proven against an account that is already not active, so this writes nothing.
+ */
+const revoked = new pg.Client({
+  connectionString: process.env.SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false },
+});
+await revoked.connect();
+const { rows: inactive } = await revoked.query(
+  `select u.email, a.role, a.status
+     from acc_app_user a join auth.users u on u.id = a.id
+    where a.status not in ('invited', 'active')
+    order by a.status_changed_at nulls last
+    limit 1`,
+);
+await revoked.end();
+
+console.log("\n== an account that is no longer active");
+if (!inactive[0]) {
+  console.log("  SKIPPED — no suspended or offboarded account exists to test with");
+} else {
+  const { email: goneEmail, role: goneRole, status } = inactive[0];
+  console.log(`  signed out of the business: ${goneEmail} (${goneRole}, ${status})`);
+  const { data: goneLink } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: goneEmail,
+  });
+  const { data: goneSession, error: goneError } = await anon.auth.verifyOtp({
+    type: "magiclink",
+    token_hash: goneLink.properties.hashed_token,
+  });
+  if (goneError) {
+    check("their session can still be minted (so the guard is what must stop them)", false, goneError.message);
+  } else {
+    const goneCookie = sessionCookie(goneSession.session, goneSession.user);
+    for (const route of ["/settings/import", "/settings/periods", "/settings/companies", "/settings/audit"]) {
+      const res = await fetch(base + route, { headers: { cookie: goneCookie }, redirect: "manual" });
+      const target = `/settings?denied=${encodeURIComponent(route)}`;
+      const location = res.headers.get("location") ?? "";
+      let refused = res.status === 307 && location.includes(target);
+      if (!refused && res.status === 200) {
+        const b = await res.text();
+        refused = b.includes("__next-page-redirect") && b.includes(`url=${target}`);
+      }
+      // /settings/import is gated on roles: ["admin","accountant"]. Before the
+      // status filter went into currentAccess(), this exact request opened it.
+      check(`${route} is refused`, refused, `HTTP ${res.status} ${location}`);
+    }
+  }
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

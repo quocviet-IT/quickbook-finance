@@ -24,7 +24,19 @@ export const currentAccess = cache(async (): Promise<NavigationAccess> => {
   if (!user) return { role: null, permissionKeys: [] };
 
   const [profile, allowed] = await Promise.all([
-    sb.from("acc_app_user").select("role").eq("id", user.id).maybeSingle(),
+    // `status` is not decoration. acc_current_role() (migration 0037) answers
+    // this question for every RLS policy and RPC in the application, and it
+    // answers it only for 'invited' or 'active'. Reading the role without that
+    // filter would make this resolver disagree with the database about who a
+    // suspended administrator is — and the product tells the person doing the
+    // suspending that it "revokes access immediately across the whole
+    // application".
+    sb
+      .from("acc_app_user")
+      .select("role")
+      .eq("id", user.id)
+      .in("status", ["invited", "active"])
+      .maybeSingle(),
     sb.from("acc_role_permission").select("role,permission_key").eq("allowed", true),
   ]);
   const role = (profile.data?.role as AppRole | undefined) ?? null;
