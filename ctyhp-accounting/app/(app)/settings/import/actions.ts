@@ -42,12 +42,13 @@ export async function previewImportAction(
   target: ImportTarget,
   rows: string[][],
   mapping: Record<string, number | null>,
+  bankAccountId: string | null = null,
 ): Promise<ActionResult<ImportPreview>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    return { ok: true, data: await previewImport(sb, target, rows, mapping) };
+    return { ok: true, data: await previewImport(sb, target, rows, mapping, { bankAccountId }) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
@@ -59,13 +60,18 @@ export async function runImportAction(
   rows: string[][],
   mapping: Record<string, number | null>,
   openingBalancesAsOf: string | null,
+  bankAccountId: string | null = null,
 ): Promise<ActionResult<ImportOutcome>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    const outcome = await runImport(sb, target, rows, mapping, { openingBalancesAsOf });
-    for (const path of ["/accounts", "/customers", "/vendors", "/items", "/reports"]) {
+    const outcome = await runImport(sb, target, rows, mapping, {
+      openingBalancesAsOf,
+      bankAccountId,
+    });
+    // Transactions post to the ledger, so the screens that read it move too.
+    for (const path of ["/accounts", "/customers", "/vendors", "/items", "/reports", "/banking"]) {
       revalidatePath(path);
     }
     return { ok: true, data: outcome };

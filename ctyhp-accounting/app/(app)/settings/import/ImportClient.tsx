@@ -4,13 +4,10 @@ import {
   Alert,
   App,
   Button,
-  Checkbox,
-  DatePicker,
   Segmented,
+  Select,
   Space,
-  Statistic,
   Steps,
-  Table,
   Tag,
   Typography,
   Upload,
@@ -18,6 +15,7 @@ import {
 import { UploadOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { parseCsv } from "@/lib/csv";
+import type { AccountRow } from "@/lib/db/types";
 import { fromMinor } from "@/lib/domain/money";
 import {
   fieldsFor,
@@ -26,12 +24,20 @@ import {
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
 import ImportColumnsTable from "./ImportColumnsTable";
+import ImportPreviewPanel from "./ImportPreviewPanel";
 import ImportGuidance from "./ImportGuidance";
 import { detectFileShape } from "@/lib/domain/import-shape";
 import type { ImportPreview } from "@/lib/services/data-import";
 import { previewImportAction, runImportAction, suggestMappingAction } from "./actions";
 
-const TARGETS: ImportTarget[] = ["chart_of_accounts", "customers", "vendors", "items", "invoices"];
+const TARGETS: ImportTarget[] = [
+  "chart_of_accounts",
+  "customers",
+  "vendors",
+  "items",
+  "invoices",
+  "transactions",
+];
 
 /**
  * Bringing a company's lists across from QuickBooks or Wave.
@@ -46,13 +52,17 @@ export default function ImportClient({
   companyName,
   isSampleCompany,
   baseDecimals,
+  bankAccounts,
 }: {
   companyName: string;
   isSampleCompany: boolean;
   baseDecimals: number;
+  /** Where a transaction row posts when the file does not name a bank. */
+  bankAccounts: AccountRow[];
 }) {
   const { message, modal } = App.useApp();
   const [target, setTarget] = useState<ImportTarget>("chart_of_accounts");
+  const [bankAccountId, setBankAccountId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
@@ -135,7 +145,7 @@ export default function ImportClient({
 
   async function runPreview() {
     setBusy(true);
-    const res = await previewImportAction(target, rows, mapping);
+    const res = await previewImportAction(target, rows, mapping, bankAccountId);
     setBusy(false);
     if (res.ok && res.data) setPreview(res.data);
     else message.error(res.error ?? "Could not read the file");
@@ -187,6 +197,7 @@ export default function ImportClient({
           rows,
           mapping,
           balances ? asOf.format("YYYY-MM-DD") : null,
+          bankAccountId,
         );
         setBusy(false);
         if (!res.ok || !res.data) {
@@ -240,6 +251,19 @@ export default function ImportClient({
           }}
           options={TARGETS.map((t) => ({ label: TARGET_LABEL[t], value: t }))}
         />
+        {target === "transactions" ? (
+          <Select
+            allowClear
+            style={{ minWidth: 280 }}
+            placeholder="Post to bank account"
+            value={bankAccountId ?? undefined}
+            onChange={(value) => setBankAccountId(value ?? null)}
+            options={bankAccounts.map((account) => ({
+              value: account.id,
+              label: `${account.account_code} — ${account.name}`,
+            }))}
+          />
+        ) : null}
         <Upload accept=".csv,text/csv" showUploadList={false} beforeUpload={readFile}>
           <Button icon={<UploadOutlined />}>Choose a CSV file</Button>
         </Upload>
@@ -291,87 +315,17 @@ export default function ImportClient({
       ) : null}
 
       {preview ? (
-        <>
-          <Space size="large" wrap>
-            <Statistic title="To create" value={preview.creates} />
-            <Statistic title="To update" value={preview.updates} />
-            <Statistic
-              title="Rows with problems"
-              value={preview.problems.length}
-              valueStyle={preview.problems.length ? { color: "#cf1322" } : undefined}
-            />
-            {preview.openingTotalMinor !== 0 && target !== "invoices" ? (
-              <Statistic title="Opening balances in the file" value={money(preview.openingTotalMinor)} />
-            ) : null}
-          </Space>
-
-          {preview.problems.length > 0 ? (
-            <Alert
-              type="error"
-              showIcon
-              message={`${preview.problems.length} row(s) will be left out`}
-              description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {preview.problems.slice(0, 8).map((problem, index) => (
-                    <li key={index}>
-                      Row {problem.row}: {problem.message}
-                    </li>
-                  ))}
-                  {preview.problems.length > 8 ? <li>…and {preview.problems.length - 8} more</li> : null}
-                </ul>
-              }
-            />
-          ) : null}
-
-          {preview.openingTotalMinor !== 0 ? (
-            <Space direction="vertical" size={4}>
-              <Checkbox checked={withBalances} onChange={(e) => setWithBalances(e.target.checked)}>
-                Also bring the opening balances across
-              </Checkbox>
-              {withBalances ? (
-                <Space>
-                  <span>as of</span>
-                  <DatePicker value={asOf} onChange={(d) => d && setAsOf(d)} allowClear={false} />
-                  <Typography.Text type="secondary">
-                    {target === "customers" || target === "vendors"
-                      ? "Raised as one opening document each, so the ageing and the control account agree."
-                      : "Posted against Opening Balance Equity."}
-                  </Typography.Text>
-                </Space>
-              ) : null}
-            </Space>
-          ) : null}
-
-          <Table
-            size="small"
-            rowKey={(row) => `${row.action}-${row.key}`}
-            pagination={{ pageSize: 10 }}
-            dataSource={preview.rows}
-            columns={[
-              {
-                title: "",
-                dataIndex: "action",
-                width: 90,
-                render: (action: string) => (
-                  <Tag color={action === "create" ? "green" : "blue"}>{action}</Tag>
-                ),
-              },
-              { title: "Name", dataIndex: "name" },
-              { title: "Matched on", dataIndex: "key", width: 200 },
-              {
-                title: target === "invoices" ? "Invoice subtotal" : "Opening balance",
-                dataIndex: "openingBalanceMinor",
-                width: 150,
-                align: "right",
-                render: (value: number) => (value === 0 ? "—" : money(value)),
-              },
-            ]}
-          />
-
-          <Button type="primary" onClick={confirmImport} loading={busy} disabled={preview.rows.length === 0}>
-            Import {preview.rows.length} row(s)
-          </Button>
-        </>
+        <ImportPreviewPanel
+          preview={preview}
+          target={target}
+          busy={busy}
+          money={money}
+          withBalances={withBalances}
+          onWithBalancesChange={setWithBalances}
+          asOf={asOf}
+          onAsOfChange={setAsOf}
+          onImport={confirmImport}
+        />
       ) : null}
     </Space>
   );
