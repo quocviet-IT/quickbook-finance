@@ -138,14 +138,18 @@ export function detectFileShape(headers: readonly string[]): FileShapeDetection 
   const hasRunningBalance = hasColumn(headers, ["balance"]);
   const looksLikeLedgerDetail = hasDate && hasDebitOrCredit;
 
+  const looksLikeWaveAccountTransactions = looksLikeLedgerDetail && hasAccount && hasRunningBalance;
+  const covered = best && best.matched === best.total && best.total > 0;
   return {
     // Claimed only when every required field is covered. A partial match is the
     // state that produced the report; naming a target there would repeat it.
-    target: best && best.matched === best.total && best.total > 0 ? best.target : null,
-    matchedRequired: best?.matched ?? 0,
-    requiredTotal: best?.total ?? 0,
+    // The Wave ledger is the exception: it is recognised by its shape, because
+    // no column mapping can read it and there is now a tab that can.
+    target: looksLikeWaveAccountTransactions ? "general_ledger" : best && covered ? best.target : null,
+    matchedRequired: looksLikeWaveAccountTransactions ? 0 : (best?.matched ?? 0),
+    requiredTotal: looksLikeWaveAccountTransactions ? 0 : (best?.total ?? 0),
     looksLikeLedgerDetail,
-    looksLikeWaveAccountTransactions: looksLikeLedgerDetail && hasAccount && hasRunningBalance,
+    looksLikeWaveAccountTransactions,
   };
 }
 
@@ -158,11 +162,10 @@ export function describeShapeMismatch(
 
   if (detection.looksLikeWaveAccountTransactions) {
     return (
-      "This file is a general ledger detail report: one row per transaction, grouped into " +
-      "sections per account, with a running balance. " +
-      `${TARGET_LABEL.chart_of_accounts} reads one row per account and imports a balance, ` +
-      "so it cannot read this file. Export a chart of accounts to load the accounts, and use " +
-      "the template below."
+      "This file is a general ledger: one row per transaction, grouped into sections per " +
+      "account, with a running balance. Every row is one side of a double entry, so no column " +
+      `mapping can read it. Switch to ${TARGET_LABEL.general_ledger} — that tab reads this ` +
+      "file whole, every account in one go."
     );
   }
 

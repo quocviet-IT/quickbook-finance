@@ -19,6 +19,9 @@ const SOURCE_HINT: Record<ImportTarget, string> = {
   transactions:
     "QuickBooks: Reports → Transaction List by Date. Wave: Accounting → Transactions → Export. " +
     "The file must name both the bank and the chart-of-account for each row.",
+  general_ledger:
+    "Wave: Reports → Account Transactions → Export. QuickBooks: Reports → General Ledger. " +
+    "One file holds every account; there is nothing to import separately.",
 };
 
 export interface ImportGuidanceProps {

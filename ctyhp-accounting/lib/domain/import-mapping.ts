@@ -26,7 +26,8 @@ export type ImportTarget =
   | "vendors"
   | "items"
   | "invoices"
-  | "transactions";
+  | "transactions"
+  | "general_ledger";
 
 export interface FieldSpec {
   key: string;
@@ -362,6 +363,10 @@ export function fieldsFor(target: ImportTarget): readonly FieldSpec[] {
       return ITEM_FIELDS;
     case "invoices":
       return INVOICE_FIELDS;
+    // A general ledger is read by its own parser: the file has no columns to
+    // agree on, because a row's meaning comes from the section it sits in.
+    case "general_ledger":
+      return [];
   }
 }
 
@@ -372,6 +377,7 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
   items: "Products and services",
   invoices: "Invoices (drafts)",
   transactions: "Transactions",
+  general_ledger: "General ledger",
 };
 
 // --- Proposing a mapping ----------------------------------------------------

@@ -55,7 +55,8 @@ describe("detectFileShape", () => {
     expect(detection.looksLikeWaveAccountTransactions).toBe(true);
     // It must not claim this is a chart of accounts; that belief is the bug.
     expect(detection.target).not.toBe("chart_of_accounts");
-    expect(detection.matchedRequired).toBeLessThan(detection.requiredTotal);
+    // Since slice 4 there is a tab that reads this file whole.
+    expect(detection.target).toBe("general_ledger");
   });
 
   it("keeps ledger detail and the Wave report as two separate signals", () => {
@@ -94,7 +95,7 @@ describe("describeShapeMismatch", () => {
     expect(describeShapeMismatch("chart_of_accounts", detectFileShape(QUICKBOOKS_CHART))).toBeNull();
   });
 
-  it("names the Wave report and says it has no tab yet", () => {
+  it("names the Wave report and sends it to the tab that reads it", () => {
     const message = describeShapeMismatch(
       "chart_of_accounts",
       detectFileShape(WAVE_ACCOUNT_TRANSACTIONS),
@@ -102,7 +103,13 @@ describe("describeShapeMismatch", () => {
 
     expect(message).toBeTruthy();
     expect(message).toMatch(/one row per transaction/i);
-    expect(message).toMatch(/chart of accounts/i);
+    expect(message).toMatch(/general ledger/i);
+  });
+
+  it("says nothing once the ledger is on its own tab", () => {
+    expect(
+      describeShapeMismatch("general_ledger", detectFileShape(WAVE_ACCOUNT_TRANSACTIONS)),
+    ).toBeNull();
   });
 
   it("points at the tab a recognised file belongs in", () => {
