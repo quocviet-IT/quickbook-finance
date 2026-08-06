@@ -14,12 +14,23 @@ export interface SavedReportViewerProps {
   onClose: () => void;
 }
 
-const EMPTY: SavedReportPreview = { headers: [], rows: [], truncated: false };
-
 /** One row of the preview grid, carried with its position so it needs no key of its own. */
 interface PreviewRow {
   index: number;
   row: string[];
+}
+
+/**
+ * What was read, and which report it was read for.
+ *
+ * Keeping the id alongside the result is what lets opening a second report show
+ * a spinner rather than the first one's rows — without an effect that clears
+ * state synchronously and re-renders everything twice.
+ */
+interface LoadedPreview {
+  id: string;
+  preview?: SavedReportPreview;
+  problem?: string;
 }
 
 /**
@@ -30,29 +41,26 @@ interface PreviewRow {
  */
 export default function SavedReportViewer({ report, onClose }: SavedReportViewerProps) {
   const { message } = App.useApp();
-  const [preview, setPreview] = useState<SavedReportPreview>(EMPTY);
-  const [loading, setLoading] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<LoadedPreview | null>(null);
+  const tabular = Boolean(report) && isTabularSavedReport(report?.mime_type ?? "");
 
   useEffect(() => {
-    let cancelled = false;
-    setPreview(EMPTY);
-    setProblem(null);
     if (!report || !isTabularSavedReport(report.mime_type)) return;
-    setLoading(true);
+    let cancelled = false;
     savedReportPreviewAction(report.id).then((result) => {
       if (cancelled) return;
-      setLoading(false);
-      if (!result.ok || !result.data) {
-        setProblem(result.error ?? "Could not read that report");
-        return;
-      }
-      setPreview(savedReportPreview(result.data.text));
+      setLoaded(
+        result.ok && result.data
+          ? { id: report.id, preview: savedReportPreview(result.data.text) }
+          : { id: report.id, problem: result.error ?? "Could not read that report" },
+      );
     });
     return () => {
       cancelled = true;
     };
   }, [report]);
+
+  const current = report && loaded?.id === report.id ? loaded : null;
 
   const download = useCallback(async () => {
     if (!report) return;
@@ -92,20 +100,20 @@ export default function SavedReportViewer({ report, onClose }: SavedReportViewer
             />
           ) : null}
 
-          {!isTabularSavedReport(report.mime_type) ? (
+          {!tabular ? (
             <Alert
               type="info"
               showIcon
               message="This format is not shown as a table"
               description="One Book shows saved CSV files on screen. Download the original to open this one."
             />
-          ) : problem ? (
-            <Alert type="error" showIcon message={problem} />
-          ) : loading ? (
+          ) : current?.problem ? (
+            <Alert type="error" showIcon message={current.problem} />
+          ) : !current?.preview ? (
             <Spin />
           ) : (
             <>
-              {preview.truncated ? (
+              {current.preview.truncated ? (
                 <Alert
                   type="info"
                   showIcon
@@ -117,8 +125,8 @@ export default function SavedReportViewer({ report, onClose }: SavedReportViewer
                 rowKey={(item) => String(item.index)}
                 pagination={{ pageSize: 25 }}
                 scroll={{ x: true }}
-                dataSource={preview.rows.map((row, index) => ({ index, row }))}
-                columns={preview.headers.map((header, column) => ({
+                dataSource={current.preview.rows.map((row, index) => ({ index, row }))}
+                columns={current.preview.headers.map((header, column) => ({
                   title: header || `Column ${column + 1}`,
                   key: String(column),
                   render: (_: unknown, item: PreviewRow) => item.row[column] ?? "",

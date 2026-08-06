@@ -76,7 +76,7 @@ Everything here is a function of its arguments. No Supabase, no React, no `Date.
   - `savedReportRegisterSchema` and `savedReportArchiveSchema` (Zod)
   - `type SavedReportRegisterInput = z.infer<typeof savedReportRegisterSchema>`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/saved-reports.test.ts`:
 
@@ -238,7 +238,7 @@ describe("savedReportArchiveSchema", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -247,7 +247,7 @@ npx vitest run tests/unit/saved-reports.test.ts
 
 Expected: FAIL — `Failed to resolve import "@/lib/domain/saved-reports"`, and `parseCsvGrid` is not exported from `@/lib/csv`.
 
-- [ ] **Step 3: Export the raw grid from the CSV parser**
+- [x] **Step 3: Export the raw grid from the CSV parser**
 
 In `ctyhp-accounting/lib/csv.ts`, rename the existing `parseCsv` body's row-collecting half into a new exported function and have `parseCsv` call it. Replace the whole of the existing `parseCsv` (from its doc comment down to the closing brace before `export interface CsvColumn`) with:
 
@@ -315,7 +315,7 @@ export function parseCsv(text: string): Record<string, string>[] {
 }
 ```
 
-- [ ] **Step 4: Write the domain module**
+- [x] **Step 4: Write the domain module**
 
 Create `ctyhp-accounting/lib/domain/saved-reports.ts`:
 
@@ -468,7 +468,7 @@ export const savedReportArchiveSchema = z.object({
 });
 ```
 
-- [ ] **Step 5: Run the tests and watch them pass**
+- [x] **Step 5: Run the tests and watch them pass**
 
 ```
 cd ctyhp-accounting
@@ -477,7 +477,7 @@ npx vitest run tests/unit/saved-reports.test.ts
 
 Expected: PASS, 19 tests.
 
-- [ ] **Step 6: Prove the CSV refactor broke nothing**
+- [x] **Step 6: Prove the CSV refactor broke nothing**
 
 ```
 cd ctyhp-accounting
@@ -486,7 +486,7 @@ npx vitest run tests/unit
 
 Expected: the whole unit suite passes. `parseCsv` is used by the import screen and several report exports; if any of those move, the extraction was not behaviour-free and must be corrected rather than the test.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -511,7 +511,7 @@ git commit -m "Describe a report that is kept rather than posted"
   - `acc_archive_saved_report(p_id uuid, p_reason text) returns void`
   - table `acc_saved_report` with the columns listed in the migration below.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/saved-reports-migration.test.ts`:
 
@@ -568,7 +568,7 @@ describe("0101_saved_reports", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -577,7 +577,7 @@ npx vitest run tests/unit/saved-reports-migration.test.ts
 
 Expected: FAIL — `ENOENT: no such file or directory ... 0101_saved_reports.sql`.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `ctyhp-accounting/supabase/migrations/0101_saved_reports.sql`:
 
@@ -765,7 +765,7 @@ set public = false,
     allowed_mime_types = excluded.allowed_mime_types;
 ```
 
-- [ ] **Step 4: Run the migration test and watch it pass**
+- [x] **Step 4: Run the migration test and watch it pass**
 
 ```
 cd ctyhp-accounting
@@ -774,7 +774,7 @@ npx vitest run tests/unit/saved-reports-migration.test.ts
 
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Write the rollback-only behavioural harness**
+- [x] **Step 5: Write the rollback-only behavioural harness**
 
 Create `ctyhp-accounting/scripts/verify-saved-reports.mjs`:
 
@@ -981,7 +981,7 @@ console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 ```
 
-- [ ] **Step 6: Register the script**
+- [x] **Step 6: Register the script**
 
 In `ctyhp-accounting/package.json`, in `"scripts"`, immediately after the `"verify:import-transactions"` line, add:
 
@@ -989,7 +989,7 @@ In `ctyhp-accounting/package.json`, in `"scripts"`, immediately after the `"veri
     "verify:saved-reports": "node --env-file=.env.local scripts/verify-saved-reports.mjs",
 ```
 
-- [ ] **Step 7: Run the harness against the live database**
+- [x] **Step 7: Run the harness against the live database**
 
 ```
 cd ctyhp-accounting
@@ -998,7 +998,7 @@ npm run verify:saved-reports
 
 Expected: every scenario PASS, then `ROLLBACK — no saved report row was kept.` and `N passed, 0 failed`. A failure here is a defect in the migration, not in the harness — read the message and fix the SQL. If `SUPABASE_DB_URL` cannot connect from this network, say so plainly and do not mark the task done.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -1027,7 +1027,7 @@ git commit -m "Keep a saved report out of the ledger, and prove it"
   - `readSavedReportText(sb: SupabaseClient, id: string): Promise<string>`
   - `archiveSavedReport(sb: SupabaseClient, id: string, reason: string): Promise<void>`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/saved-reports-service.test.ts`:
 
@@ -1187,7 +1187,7 @@ describe("archiveSavedReport", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -1196,7 +1196,7 @@ npx vitest run tests/unit/saved-reports-service.test.ts
 
 Expected: FAIL — `Failed to resolve import "@/lib/services/saved-reports"`.
 
-- [ ] **Step 3: Write the storage client**
+- [x] **Step 3: Write the storage client**
 
 Create `ctyhp-accounting/lib/db/storage-admin.ts`:
 
@@ -1233,7 +1233,7 @@ export function createSavedReportStorageClient(): SupabaseClient {
 }
 ```
 
-- [ ] **Step 4: Write the service**
+- [x] **Step 4: Write the service**
 
 Create `ctyhp-accounting/lib/services/saved-reports.ts`:
 
@@ -1388,7 +1388,7 @@ export async function archiveSavedReport(
 }
 ```
 
-- [ ] **Step 5: Run the tests and watch them pass**
+- [x] **Step 5: Run the tests and watch them pass**
 
 ```
 cd ctyhp-accounting
@@ -1397,7 +1397,7 @@ npx vitest run tests/unit/saved-reports-service.test.ts
 
 Expected: PASS, 10 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -1430,7 +1430,7 @@ At the end of this task `/reports/saved` exists, lists what is saved, and archiv
   - `savedReportPreviewAction(id: string): Promise<SavedReportActionResult<{ text: string }>>`
   - `SavedReportsClient` props: `{ reports: SavedReportRow[]; canManage: boolean }`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/report-catalog.test.ts`:
 
@@ -1458,7 +1458,7 @@ describe("REPORT_CATALOG", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -1467,7 +1467,7 @@ npx vitest run tests/unit/report-catalog.test.ts
 
 Expected: FAIL — `expected undefined to be defined` for the `saved-reports` entry.
 
-- [ ] **Step 3: Add the catalog entry and its icon**
+- [x] **Step 3: Add the catalog entry and its icon**
 
 In `ctyhp-accounting/lib/domain/report-catalog.ts`, inside `REPORT_CATALOG`, immediately after the `journal-report` entry, add:
 
@@ -1488,7 +1488,7 @@ In `ctyhp-accounting/components/reports/ReportsHub.tsx`, add `InboxOutlined` to 
   "saved-reports": <InboxOutlined />,
 ```
 
-- [ ] **Step 4: Run the catalog test and watch it pass**
+- [x] **Step 4: Run the catalog test and watch it pass**
 
 ```
 cd ctyhp-accounting
@@ -1497,7 +1497,7 @@ npx vitest run tests/unit/report-catalog.test.ts
 
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Write the server actions**
+- [x] **Step 5: Write the server actions**
 
 Create `ctyhp-accounting/app/(app)/reports/saved/actions.ts`:
 
@@ -1618,7 +1618,7 @@ export async function savedReportPreviewAction(
 
 Note there is no role guard on the two read actions: the session client is filtered by the `documents.read` policy, and a row the caller may not see is refused as "Report not found" inside the service. Adding a role check here would be a second, looser statement of the same rule.
 
-- [ ] **Step 6: Write the page**
+- [x] **Step 6: Write the page**
 
 Create `ctyhp-accounting/app/(app)/reports/saved/page.tsx`:
 
@@ -1659,7 +1659,7 @@ export default async function SavedReportsPage() {
 }
 ```
 
-- [ ] **Step 7: Write the list client**
+- [x] **Step 7: Write the list client**
 
 Create `ctyhp-accounting/app/(app)/reports/saved/SavedReportsClient.tsx`:
 
@@ -1799,7 +1799,7 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
 }
 ```
 
-- [ ] **Step 8: Check it renders**
+- [x] **Step 8: Check it renders**
 
 ```
 cd ctyhp-accounting
@@ -1809,7 +1809,7 @@ npx vitest run tests/unit/rsc-antd.test.ts
 
 Expected: typecheck clean, and the RSC guard passes — `page.tsx` reads no Ant Design sub-component.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -1829,7 +1829,7 @@ git commit -m "Give a report from another system somewhere to live"
 - Consumes: `createSavedReportUploadTicketAction`, `registerSavedReportAction` from Task 4; `calculateFileSha256` from `@/lib/client/documents`; `validateSavedReportFile`, `SAVED_REPORT_ACCEPT`, `SAVED_REPORT_SOURCES`, `SAVED_REPORT_SOURCE_LABEL` from Task 1.
 - Produces: `SaveReportModal` with props `{ open: boolean; onClose: () => void; onSaved: () => void }`.
 
-- [ ] **Step 1: Write the modal**
+- [x] **Step 1: Write the modal**
 
 Create `ctyhp-accounting/app/(app)/reports/saved/SaveReportModal.tsx`:
 
@@ -1993,7 +1993,7 @@ export default function SaveReportModal({ open, onClose, onSaved }: SaveReportMo
 }
 ```
 
-- [ ] **Step 2: Mount it from the list**
+- [x] **Step 2: Mount it from the list**
 
 In `ctyhp-accounting/app/(app)/reports/saved/SavedReportsClient.tsx`:
 
@@ -2038,7 +2038,7 @@ And immediately before the closing `</Card>`, add:
       />
 ```
 
-- [ ] **Step 3: Check the types and the line count**
+- [x] **Step 3: Check the types and the line count**
 
 ```
 cd ctyhp-accounting
@@ -2048,7 +2048,7 @@ npx wc -l "app/(app)/reports/saved/SavedReportsClient.tsx" "app/(app)/reports/sa
 
 Expected: typecheck clean, and both files under 400 lines. If `SavedReportsClient.tsx` is close to the ceiling, move the table's `columns` array into a `savedReportColumns()` function in the same file rather than splitting the component.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -2069,7 +2069,7 @@ git commit -m "Let an accountant put an outside report somewhere it will be foun
 - Consumes: `savedReportPreviewAction`, `savedReportDownloadUrlAction` from Task 4; `savedReportPreview`, `isTabularSavedReport` from Task 1.
 - Produces: `SavedReportViewer` with props `{ report: SavedReportRow | null; onClose: () => void }`.
 
-- [ ] **Step 1: Write the viewer**
+- [x] **Step 1: Write the viewer**
 
 Create `ctyhp-accounting/app/(app)/reports/saved/SavedReportViewer.tsx`:
 
@@ -2197,7 +2197,7 @@ export default function SavedReportViewer({ report, onClose }: SavedReportViewer
 }
 ```
 
-- [ ] **Step 2: Open it from the list**
+- [x] **Step 2: Open it from the list**
 
 In `ctyhp-accounting/app/(app)/reports/saved/SavedReportsClient.tsx`:
 
@@ -2225,7 +2225,7 @@ And immediately before the closing `</Card>`, after `<SaveReportModal … />`, a
       <SavedReportViewer report={viewing} onClose={() => setViewing(null)} />
 ```
 
-- [ ] **Step 3: Point a report at the right screen from Import**
+- [x] **Step 3: Point a report at the right screen from Import**
 
 In `ctyhp-accounting/app/(app)/settings/import/ImportGuidance.tsx`, add this alert as the last element the component renders, immediately before its closing fragment or wrapper tag:
 
@@ -2246,7 +2246,7 @@ In `ctyhp-accounting/app/(app)/settings/import/ImportGuidance.tsx`, add this ale
 
 If `Alert` is not already imported in that file, add it to the existing `antd` import.
 
-- [ ] **Step 4: Check the types**
+- [x] **Step 4: Check the types**
 
 ```
 cd ctyhp-accounting
@@ -2256,7 +2256,7 @@ npx vitest run tests/unit
 
 Expected: typecheck clean and the whole unit suite green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -2271,7 +2271,7 @@ git commit -m "Read a saved report without leaving One Book"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-06-saved-reports.md` (tick the boxes)
 
-- [ ] **Step 1: Run every gate**
+- [x] **Step 1: Run every gate**
 
 ```
 cd ctyhp-accounting
@@ -2284,7 +2284,7 @@ npm run build
 
 Expected: tests all pass; typecheck silent; lint reports 0 errors (the 11 pre-existing warnings in `scripts/verify-*.mjs` are known); the credential check prints nothing; the build completes. Paste the real output. Do not proceed past a failure.
 
-- [ ] **Step 2: Smoke the built server**
+- [x] **Step 2: Smoke the built server**
 
 ```
 cd ctyhp-accounting
@@ -2302,7 +2302,7 @@ Expected: every page 200, now including `/reports/saved`. Stop the server afterw
 
 Note: `npm start` dies when it is launched from the Bash tool; start it detached from PowerShell. A wall of `fetch failed` means the server is gone, not that the pages regressed.
 
-- [ ] **Step 3: Re-run the behavioural harness**
+- [x] **Step 3: Re-run the behavioural harness**
 
 ```
 cd ctyhp-accounting
@@ -2311,7 +2311,7 @@ npm run verify:saved-reports
 
 Expected: all scenarios PASS, then `ROLLBACK`.
 
-- [ ] **Step 4: Apply 0101 to every company schema**
+- [x] **Step 4: Apply 0101 to every company schema**
 
 ```
 cd ctyhp-accounting
@@ -2327,7 +2327,7 @@ node --env-file=.env.local -e "const pg=require('pg');(async()=>{const c=new pg.
 
 Expected: both functions in all five schemas, ten rows.
 
-- [ ] **Step 5: Tick the plan and commit**
+- [x] **Step 5: Tick the plan and commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -2335,7 +2335,7 @@ git add docs/superpowers/plans/2026-08-06-saved-reports.md
 git commit -m "Record the saved reports plan as executed"
 ```
 
-- [ ] **Step 6: Report to the user, in Vietnamese**
+- [x] **Step 6: Report to the user, in Vietnamese**
 
 State plainly:
 
@@ -2344,3 +2344,24 @@ State plainly:
 - That the table view is **CSV only**, and that XLSX and PDF download.
 - That feedback report `428ca4db` stays `reviewing` until slice 4 gives the Wave *Account Transactions* file somewhere to go. Never resolve a feedback report from a script.
 - Ask whether to continue with slice 4.
+
+## Executed 2026-08-06
+
+All seven tasks done. Two things the plan did not foresee:
+
+* The migration header names `storage.objects` to explain why it writes no
+  policy there, and the provisioning invariant in `tests/unit/schema-template.test.ts`
+  read raw statement text — so prose read as an executable reference. The test
+  now strips comments the way `scopeOf` already does. `scopeOf` was never at
+  risk; the assertion was.
+* Nothing proved the bucket's central claim — that a session cannot reach an
+  object without a server-minted ticket. `scripts/verify-saved-report-bucket.mjs`
+  was added for it and passes 9/9, including "an upload WITHOUT a ticket is
+  refused" and "a session cannot list the bucket".
+
+Gates: `npm test` 1086 passed / 110 files · typecheck clean · lint 0 errors
+(11 pre-existing warnings) · `security:check-source` silent · build compiled ·
+smoke **56/56 pages**. `npm run verify:saved-reports` 16/16 then ROLLBACK.
+Migration 0101 applied to `public`, `co_pc_49`, `co_north_star`,
+`co_harbor_gems`, `co_cascade_metals`, each holding back the one global bucket
+statement.
