@@ -103,8 +103,8 @@ door cannot disagree, because there is only one of them.
 |---|---|---|
 | Company profile | `settings.manage` | admin-only, already the key for configuration |
 | Companies | `roles: ["admin"]` | no permission key covers the register |
-| Accounting periods | `period.close` | admin + accountant, matches who closes |
-| Import from QuickBooks or Wave | `settings.manage` | writes the chart and opening balances |
+| Accounting periods | `roles: ["admin"]` | every control calls `adminGuard`; see below |
+| Import from QuickBooks or Wave | `roles: ["admin", "accountant"]` | matches `canWrite` in its actions; see below |
 | Users | `users.manage` | exact match |
 | Permissions | `permissions.manage` | exact match |
 | Approval policies | `settings.manage` | configuring a policy is not deciding one |
@@ -115,6 +115,25 @@ door cannot disagree, because there is only one of them.
 Audit history stays visible to a viewer because `audit.read` says so today. That
 is an existing decision about a different screen; this spec reflects it rather
 than quietly reversing it.
+
+Two gates were corrected during the final review, because the first draft named
+a key that read well and enforced the wrong thing:
+
+- **Accounting periods** was `period.close`, which an accountant holds. But every
+  action on that screen calls `adminGuard()`, `PeriodsClient` gets
+  `canEdit={isAdmin(role)}`, and `period.close` is seeded `is_enforced = false`.
+  The gate would have opened a door onto controls that all refuse. Nobody but an
+  administrator closes a period in this codebase, so the gate says so.
+- **Import** was `settings.manage`, which is admin-only. Its actions guard with
+  `isAdmin` for `chart_of_accounts` and `canWrite` — admin *or accountant* — for
+  everything else, deliberately: "the chart of accounts is an administrator's to
+  change; the rest is ordinary bookkeeping." An admin-only card would have hidden
+  a screen an accountant may legitimately use, and left the door stricter than
+  the mutation behind it, which is a false statement about the system.
+
+The rule the corrections follow: **a gate must name what the server actually
+enforces.** A gate looser than the mutation is a hole; a gate tighter than it is
+a lie, and invites someone to loosen the mutation to match.
 
 ### The door
 
@@ -167,6 +186,17 @@ No policy is edited, because every read path already has the right shape:
 Revoking the permission collapses all four to "your own", in one statement,
 which is the strongest evidence that 0061 built them correctly and only the
 grant was provisional.
+
+One caveat, found in review and **not fixed here**: the two storage policies are
+global objects held back from company schemas by `scopeOf()`, and they are pinned
+to `public.` — `public.acc_has_permission(...)`, falling back to a lookup in
+`public.acc_feedback_report`. So in a company whose schema is not `public`, that
+fallback consults the wrong table and a reporter cannot open their own file.
+That arrived with multi-company (0081) and this change neither causes nor worsens
+it; `MyReportsClient` shows a file count and no download control, so nothing is
+visibly broken today. It belongs in a separate multi-company storage fix. The
+"all four collapse to your own" claim above is exact in `public` and, for the two
+storage paths, only in `public`.
 
 The comment at 0061 is superseded by the new migration's own comment explaining
 why the test period ended. The old file is not edited — it is history.
