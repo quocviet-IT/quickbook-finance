@@ -26,6 +26,8 @@ import {
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
 import ImportColumnsTable from "./ImportColumnsTable";
+import ImportGuidance from "./ImportGuidance";
+import { detectFileShape } from "@/lib/domain/import-shape";
 import type { ImportPreview } from "@/lib/services/data-import";
 import { previewImportAction, runImportAction, suggestMappingAction } from "./actions";
 
@@ -65,6 +67,9 @@ export default function ImportClient({
   const [aiFields, setAiFields] = useState<string[]>([]);
 
   const fields = fieldsFor(target);
+  // Derived from the headers already in state: no second copy of the file, and
+  // nothing to keep in step when the tab changes.
+  const detection = headers.length > 0 ? detectFileShape(headers) : null;
   const money = useCallback(
     (minor: number) =>
       fromMinor(minor, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals }),
@@ -240,6 +245,22 @@ export default function ImportClient({
         </Upload>
         {fileName ? <Typography.Text type="secondary">{fileName}</Typography.Text> : null}
       </Space>
+
+      <ImportGuidance
+        target={target}
+        detection={detection}
+        onSwitchTarget={(next) => {
+          setTarget(next);
+          // Re-propose against the same file rather than making them upload it
+          // again: the file was never the problem, the tab was.
+          if (headers.length > 0) {
+            const proposed = proposeMapping(headers, next);
+            setMapping(proposed.columns);
+            setUnmapped(proposed.unmapped);
+            setPreview(null);
+          }
+        }}
+      />
 
       {headers.length > 0 ? (
         <>
