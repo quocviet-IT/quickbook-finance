@@ -45,3 +45,6 @@ next-server.log
 
 # Server log from a local npm start; never part of the build.
 next-start.log
+
+# Page dump the guide capture writes when it fails; never part of the build.
+public/guide/last-failure.html
