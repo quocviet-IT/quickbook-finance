@@ -98,13 +98,27 @@ describe("previewImport for transactions", () => {
     expect(preview.creates).toBe(1);
   });
 
-  it("refuses a row with no amount, and keeps the others", async () => {
-    const rows = [...ROWS, ["2026-01-17", "No amount", "121 - PC49 BoA CK 3388", "Sales", ""]];
+  it("counts a row with no money apart from the rows with problems", async () => {
+    // A waived fee is written as 0.00 and there are 99 of them in the file the
+    // tester imported. Calling that a problem told them to map a column they
+    // had already mapped.
+    const rows = [...ROWS, ["2026-01-17", "Fee waived", "121 - PC49 BoA CK 3388", "Sales", ""]];
 
     const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
 
-    expect(preview.problems.some((problem) => /amount/i.test(problem.message))).toBe(true);
+    expect(preview.problems).toEqual([]);
+    expect(preview.emptyRows).toBe(1);
     expect(preview.creates).toBe(2);
+  });
+
+  it("says once, not per row, that no money column is mapped", async () => {
+    const withoutAmount = { ...MAPPING, amount: null, debit: null, credit: null };
+
+    const preview = await previewImport(companyClient(), "transactions", ROWS, withoutAmount);
+
+    expect(preview.problems).toHaveLength(1);
+    expect(preview.problems[0].message).toMatch(/No money column is mapped/i);
+    expect(preview.creates).toBe(0);
   });
 });
 

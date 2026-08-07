@@ -16,7 +16,30 @@ export interface TransactionImportRecord {
   credit: number | null;
 }
 
-export type SignedAmount = { minor: number } | { problem: string };
+/**
+ * Read an account reference the way the database does.
+ *
+ * `acc_normalize_ref` (migration 0102) lowercases, trims, and turns every kind
+ * of dash into a hyphen. The screen has to agree with it exactly: Wave writes
+ * "Payroll – Salary & Wages" with an en dash, and a screen that compares raw
+ * strings blocks a file the server would have accepted.
+ */
+export function normalizeAccountRef(ref: string | null | undefined): string {
+  return (ref ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2010-\u2015]/g, "-");
+}
+
+/**
+ * `empty` is not a fault.
+ *
+ * A file records a waived fee as 0.00, and the tester's had 99 of them. Calling
+ * that a problem and telling the reader to map a column they had already mapped
+ * sent them hunting a mistake that was not theirs. Whether the columns were
+ * mapped at all is a question about the file, answered once, not 1,566 times.
+ */
+export type SignedAmount = { minor: number } | { empty: true } | { problem: string };
 
 /**
  * How much money moved, and which way.
@@ -36,9 +59,7 @@ export function signedAmountMinor(record: TransactionImportRecord): SignedAmount
   const fromPair = debit - credit;
   const fromAmount = record.amount === null || record.amount === 0 ? null : record.amount;
 
-  if (fromAmount === null && !hasPair) {
-    return { problem: "This row has no amount: map Amount, or map Debit and Credit." };
-  }
+  if (fromAmount === null && !hasPair) return { empty: true };
   if (fromAmount !== null && hasPair && fromAmount !== fromPair) {
     return {
       problem:
@@ -48,7 +69,7 @@ export function signedAmountMinor(record: TransactionImportRecord): SignedAmount
   }
 
   const minor = fromAmount ?? fromPair;
-  if (minor === 0) return { problem: "This row moves zero, so there is nothing to post." };
+  if (minor === 0) return { empty: true };
   return { minor };
 }
 

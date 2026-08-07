@@ -36,7 +36,18 @@ export default function ImportPreviewPanel({
   onImport,
 }: ImportPreviewPanelProps) {
   const blocked =
-    (preview.missingAccounts?.length ?? 0) > 0 || (preview.unbankedAccounts?.length ?? 0) > 0;
+    (preview.missingAccounts?.length ?? 0) > 0 ||
+    (preview.unbankedAccounts?.length ?? 0) > 0 ||
+    (preview.nonBankAccounts?.length ?? 0) > 0;
+
+  /**
+   * On the transactions tab this figure is the net of the transactions, not an
+   * opening balance. Labelling it "Opening balances in the file" put
+   * −$2,257,487.08 in front of a tester under a heading that made it look like
+   * a balance nobody recognised.
+   */
+  const totalTitle =
+    target === "transactions" ? "Net of these transactions" : "Opening balances in the file";
 
   return (
     <>
@@ -48,10 +59,22 @@ export default function ImportPreviewPanel({
           value={preview.problems.length}
           valueStyle={preview.problems.length ? { color: "#cf1322" } : undefined}
         />
+        {preview.emptyRows ? (
+          <Statistic title="Rows carrying no money" value={preview.emptyRows} />
+        ) : null}
         {preview.openingTotalMinor !== 0 && target !== "invoices" ? (
-          <Statistic title="Opening balances in the file" value={money(preview.openingTotalMinor)} />
+          <Statistic title={totalTitle} value={money(preview.openingTotalMinor)} />
         ) : null}
       </Space>
+
+      {preview.emptyRows ? (
+        <Alert
+          type="info"
+          showIcon
+          message={`${preview.emptyRows} row(s) carry no money and will be left out`}
+          description="A fee that was waived, or a line recorded as 0.00. There is nothing to post for them, and nothing to fix."
+        />
+      ) : null}
 
       {preview.problems.length > 0 ? (
         <Alert
@@ -134,6 +157,24 @@ export default function ImportPreviewPanel({
           showIcon
           message="Some accounts in this file are not in this company's chart of accounts"
           description={`${preview.missingAccounts?.join(", ")}. Import the chart of accounts first, then bring the transactions across.`}
+        />
+      ) : null}
+
+      {preview.ambiguousAccounts && preview.ambiguousAccounts.length > 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Some names in this file belong to more than one account"
+          description={`${preview.ambiguousAccounts.join(", ")}. Two accounts in this chart share each of these names, so the import picks one of them. Give the file the account code instead — "1000 Cash on Hand" — if it matters which.`}
+        />
+      ) : null}
+
+      {preview.nonBankAccounts && preview.nonBankAccounts.length > 0 ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Some accounts used as a bank in this file are not bank accounts"
+          description={`${preview.nonBankAccounts.join(", ")}. Banking will never list these — they are not of a bank or credit card type. Either change the account's type under Chart of accounts, or point those rows at the account the money really moved through.`}
         />
       ) : null}
 

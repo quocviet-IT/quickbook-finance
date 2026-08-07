@@ -41,6 +41,75 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.4",
+    date: "2026-08-07",
+    headline: "The import screen says what is actually wrong with a file.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A row with no money is no longer called a problem",
+        detail:
+          "A waived fee is written as 0.00. The screen used to list every one of them in red and " +
+          "tell you to map a column you had already mapped — 100 of them on one file, when " +
+          "only one row was genuinely wrong. They are now counted on their own and left out " +
+          "quietly.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "An account name is read the same way everywhere",
+        detail:
+          "Wave writes “Payroll – Salary & Wages” with an en dash. The " +
+          "transactions tab compared it letter for letter and refused a file the import itself " +
+          "would have accepted.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "The total on the transactions tab is called what it is",
+        detail:
+          "It reads “Net of these transactions”. It was labelled “Opening " +
+          "balances in the file”, which made a perfectly ordinary net look like a balance " +
+          "nobody recognised.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "Every tab says what has to exist before you start",
+        detail:
+          "The chart of accounts, the bank accounts, and whether re-importing is safe — " +
+          "said before you map a column rather than discovered as a red panel afterwards.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "Fewer warnings over a file that is in the right place",
+        detail:
+          "A categorized export no longer triggers “this file may not belong in this tab” " +
+          "on the tab that reads it, and the note about saved reports only appears before a file " +
+          "is chosen.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "A warning when a name means two different accounts",
+        detail:
+          "This chart holds two accounts called Cash on Hand and two called Cost of Goods Sold. " +
+          "A file naming one of them is asking for either, so the screen says so and suggests " +
+          "using the account code.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "An account that is not a bank is told apart from one Banking has not seen",
+        detail:
+          "Only one of those can be fixed under Banking. The other needs the account's type " +
+          "changed, and saying which saves a trip to a screen that would never list it.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.3",
     date: "2026-08-07",
     headline: "Delete a payment outright, not only void it.",

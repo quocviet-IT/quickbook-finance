@@ -50,9 +50,11 @@ describe("signedAmountMinor", () => {
     expect(signedAmountMinor({ ...base, debit: 500, credit: 200 })).toEqual({ minor: 300 });
   });
 
-  it("refuses a row with no amount at all", () => {
-    const result = signedAmountMinor(base);
-    expect(result).toEqual({ problem: expect.stringMatching(/amount/i) });
+  it("calls a row with nothing in it empty, not broken", () => {
+    // The tester's file had 99 rows reading "fee waiver" — a real charge that
+    // was waived, so the amount is 0. Telling them to map a column they had
+    // already mapped sent them looking for a mistake that was not theirs.
+    expect(signedAmountMinor(base)).toEqual({ empty: true });
   });
 
   it("refuses a row where Amount and Debit/Credit disagree", () => {
@@ -66,10 +68,9 @@ describe("signedAmountMinor", () => {
     });
   });
 
-  it("refuses a row whose amount is zero", () => {
-    expect(signedAmountMinor({ ...base, amount: 0 })).toEqual({
-      problem: expect.stringMatching(/amount/i),
-    });
+  it("calls a row whose amount is explicitly zero empty too", () => {
+    expect(signedAmountMinor({ ...base, amount: 0 })).toEqual({ empty: true });
+    expect(signedAmountMinor({ ...base, debit: 0, credit: 0 })).toEqual({ empty: true });
   });
 
   it("ignores the zeros an unmapped money column arrives as", () => {

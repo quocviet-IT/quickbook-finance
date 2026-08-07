@@ -118,3 +118,42 @@ describe("describeShapeMismatch", () => {
     expect(message).toMatch(/chart of accounts/i);
   });
 });
+
+/** The file the tester imported: the transactions tab reads exactly this. */
+const ONE_BOOK_TRANSACTIONS = [
+  "Date",
+  "Description",
+  "Bank account",
+  "Chart of account",
+  "Amount",
+  "Debit",
+  "Credit",
+];
+
+describe("a categorized transactions export", () => {
+  it("is recognised as belonging to the transactions tab", () => {
+    expect(detectFileShape(ONE_BOOK_TRANSACTIONS).target).toBe("transactions");
+  });
+
+  it("says nothing when it is already on that tab", () => {
+    // It carried a date and debit/credit columns, so the old rule called it
+    // "transactions rather than one row per record" — on the transactions tab.
+    expect(
+      describeShapeMismatch("transactions", detectFileShape(ONE_BOOK_TRANSACTIONS)),
+    ).toBeNull();
+  });
+
+  it("still warns when the same file lands on the chart of accounts tab", () => {
+    const message = describeShapeMismatch(
+      "chart_of_accounts",
+      detectFileShape(ONE_BOOK_TRANSACTIONS),
+    );
+    expect(message).toMatch(/transactions/i);
+  });
+
+  it("never scolds the general ledger tab about holding transactions", () => {
+    // That tab exists to read transactions; the hint would always be wrong.
+    const ledgerish = ["Account", "Date", "Description", "Debit", "Credit"];
+    expect(describeShapeMismatch("general_ledger", detectFileShape(ledgerish))).toBeNull();
+  });
+});

@@ -18,12 +18,22 @@ import {
  * disagree: the labels shown are the labels the mapper matches.
  */
 
+/**
+ * The targets a file's columns can be scored against.
+ *
+ * `transactions` belongs here: leaving it out meant a categorized export was
+ * never recognised as belonging to its own tab, so the screen warned that a
+ * correct file was in the wrong place. `general_ledger` stays out — it is
+ * recognised by shape, not by column coverage, because it has no columns to
+ * agree on.
+ */
 const TARGETS: readonly ImportTarget[] = [
   "chart_of_accounts",
   "customers",
   "vendors",
   "items",
   "invoices",
+  "transactions",
 ];
 
 /** Compare headers the way a person would, as the mapper does. */
@@ -126,10 +136,24 @@ export function detectFileShape(headers: readonly string[]): FileShapeDetection 
   };
   if (headers.length === 0) return empty;
 
+  // A target whose required columns are all present beats one that merely
+  // matched more of them. Scoring on raw count alone let a six-column target
+  // matching three of them outrank a two-column target matching both, and the
+  // file was then reported as belonging nowhere.
   let best: { target: ImportTarget; matched: number; total: number } | null = null;
+  const better = (
+    candidate: { matched: number; total: number },
+    incumbent: { matched: number; total: number } | null,
+  ) => {
+    if (!incumbent) return true;
+    const candidateCovers = candidate.total > 0 && candidate.matched === candidate.total;
+    const incumbentCovers = incumbent.total > 0 && incumbent.matched === incumbent.total;
+    if (candidateCovers !== incumbentCovers) return candidateCovers;
+    return candidate.matched > incumbent.matched;
+  };
   for (const target of TARGETS) {
     const { matched, total } = requiredCoverage(headers, target);
-    if (!best || matched > best.matched) best = { target, matched, total };
+    if (better({ matched, total }, best)) best = { target, matched, total };
   }
 
   const hasDate = hasColumn(headers, ["date", "transaction date", "posting date"]);
@@ -169,11 +193,17 @@ export function describeShapeMismatch(
     );
   }
 
-  if (detection.target) {
+  // The general ledger tab maps no columns, so guessing a target from column
+  // coverage says nothing useful there — and it fires on files that are exactly
+  // what that tab wants. Its own panel refuses anything it cannot read.
+  if (detection.target && selected !== "general_ledger") {
     return `This file looks like ${TARGET_LABEL[detection.target]}, not ${TARGET_LABEL[selected]}.`;
   }
 
-  if (detection.looksLikeLedgerDetail) {
+  // Not on the two tabs that exist to read transactions: there the hint is
+  // always wrong, and a warning over a correct file teaches people to distrust
+  // every warning.
+  if (detection.looksLikeLedgerDetail && selected !== "transactions" && selected !== "general_ledger") {
     return (
       "This file has a date and debit or credit columns, so it holds transactions rather " +
       `than one row per ${TARGET_LABEL[selected].toLowerCase()} record. Check the tab before mapping.`

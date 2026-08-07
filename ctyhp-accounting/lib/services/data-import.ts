@@ -1,10 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  describeTransactionRow,
-  signedAmountMinor,
-  transactionRawHash,
-  type TransactionImportRecord,
-} from "@/lib/domain/transaction-import";
+import { DataImportError, previewTransactionImport } from "./transaction-import-preview";
 import {
   applyMapping,
   fieldsFor,
@@ -16,7 +11,9 @@ import {
   type InvoiceImportRecord,
 } from "@/lib/domain/invoice-import";
 
-export class DataImportError extends Error {}
+// The class lives beside the lookups that throw it; re-exported here because
+// every caller has always imported it from this module.
+export { DataImportError } from "./transaction-import-preview";
 
 export interface ImportPreviewRow {
   /** What the record will be matched on when it is imported. */
@@ -39,6 +36,30 @@ export interface ImportPreview {
   openingTotalMinor: number;
   /** Rows already imported, matched on their hash. Counted, never re-posted. */
   duplicates?: number;
+  /**
+   * Rows carrying no money — a waived fee written as 0.00.
+   *
+   * Counted apart from `problems` because they are not faults: nothing is wrong
+   * with the file, and there is simply nothing to post.
+   */
+  emptyRows?: number;
+  /**
+   * Accounts the file uses as a bank that are not bank accounts at all.
+   *
+   * Kept apart from `unbankedAccounts`, which can be fixed under Banking. This
+   * one cannot: telling somebody to add "Cash on Hand" under Banking when it is
+   * a current asset sends them somewhere it will never appear.
+   */
+  nonBankAccounts?: string[];
+  /**
+   * Names in the file that match more than one account in the chart.
+   *
+   * This chart holds "1000 Cash on Hand" and "140 Cash on Hand". A file naming
+   * "Cash on Hand" is asking for one of them and the resolver silently takes
+   * one — so the money could land in either. It warns rather than blocks: the
+   * two may be interchangeable for the reader, and only they can say.
+   */
+  ambiguousAccounts?: string[];
   /** Accounts named by the file that this company's chart does not have. */
   missingAccounts?: string[];
   /**
@@ -47,40 +68,6 @@ export interface ImportPreview {
    * again — which is why this blocks rather than warns.
    */
   unbankedAccounts?: string[];
-}
-
-/** Every way a file may name an account, mapped to the account it means. */
-async function accountIndex(sb: SupabaseClient): Promise<Map<string, string>> {
-  const { data, error } = await sb
-    .from("acc_account")
-    .select("id,account_code,name")
-    .neq("status", "archived");
-  if (error) throw new DataImportError(error.message);
-  const index = new Map<string, string>();
-  for (const row of (data ?? []) as { id: string; account_code: string; name: string }[]) {
-    const add = (key: string) => {
-      const k = (key ?? "").trim().toLowerCase();
-      if (k) index.set(k, row.id);
-    };
-    add(row.account_code);
-    add(row.name);
-    add(`${row.account_code} - ${row.name}`);
-  }
-  return index;
-}
-
-/** GL accounts that have a bank record, and so can carry a deduped bank line. */
-async function bankedAccountIds(sb: SupabaseClient): Promise<Set<string>> {
-  const { data, error } = await sb.from("acc_bank_account").select("account_id");
-  if (error) throw new DataImportError(error.message);
-  return new Set(((data ?? []) as { account_id: string }[]).map((row) => row.account_id));
-}
-
-/** Hashes of what is already here, so a file imported twice adds nothing. */
-async function existingHashes(sb: SupabaseClient): Promise<Set<string>> {
-  const { data, error } = await sb.from("acc_bank_transaction").select("raw_hash");
-  if (error) throw new DataImportError(error.message);
-  return new Set(((data ?? []) as { raw_hash: string }[]).map((row) => row.raw_hash));
 }
 
 /** The column each target is matched on when deciding create versus update. */
@@ -135,66 +122,10 @@ export async function previewImport(
 ): Promise<ImportPreview> {
   const parsed = applyMapping(rows, mapping, target);
 
-  // Transactions are the one target that posts both sides of an entry, so the
-  // preview has to answer a question the others do not: does this company's
-  // chart of accounts actually contain every account the file names?
+  // Transactions are the one target that posts both sides of an entry, so its
+  // preview asks questions no other target does. It lives in its own file.
   if (target === "transactions") {
-    const [index, hashes, banked] = await Promise.all([
-      accountIndex(sb),
-      existingHashes(sb),
-      bankedAccountIds(sb),
-    ]);
-    const records = parsed.records as unknown as TransactionImportRecord[];
-    const problems = [...parsed.problems];
-    const missing = new Set<string>();
-    const unbanked = new Set<string>();
-    const previewRows: ImportPreviewRow[] = [];
-    let duplicates = 0;
-
-    records.forEach((record, position) => {
-      const signed = signedAmountMinor(record);
-      if ("problem" in signed) {
-        problems.push({ row: position + 1, message: signed.problem });
-        return;
-      }
-      const bankRef = (record.bank_account ?? "").trim();
-      const bankId = index.get(bankRef.toLowerCase()) ?? options.bankAccountId ?? null;
-      if (bankRef && !index.has(bankRef.toLowerCase())) missing.add(bankRef);
-      if (bankId && !banked.has(bankId)) unbanked.add(bankRef || "the account chosen above");
-      const categoryRef = (record.category_account ?? "").trim();
-      if (!index.has(categoryRef.toLowerCase())) missing.add(categoryRef);
-
-      const hash = transactionRawHash({
-        bankAccountId: bankId ?? "",
-        txnDate: record.txn_date,
-        description: record.description,
-        signedMinor: signed.minor,
-      });
-      if (hashes.has(hash)) {
-        duplicates += 1;
-        return;
-      }
-      previewRows.push({
-        key: hash,
-        name: describeTransactionRow(record, signed.minor),
-        action: "create",
-        openingBalanceMinor: signed.minor,
-        values: { ...record, signed_minor: signed.minor },
-      });
-    });
-
-    return {
-      target,
-      rows: previewRows,
-      problems,
-      blankRows: parsed.blankRows,
-      creates: previewRows.length,
-      updates: 0,
-      openingTotalMinor: previewRows.reduce((sum, row) => sum + row.openingBalanceMinor, 0),
-      duplicates,
-      missingAccounts: [...missing],
-      unbankedAccounts: [...unbanked],
-    };
+    return previewTransactionImport(sb, parsed, mapping, options);
   }
 
   // Invoices are the one target where rows do not map one-to-one onto records:

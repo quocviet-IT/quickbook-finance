@@ -24,6 +24,31 @@ const SOURCE_HINT: Record<ImportTarget, string> = {
     "One file holds every account; there is nothing to import separately.",
 };
 
+/**
+ * What has to exist before a tab can accept a file.
+ *
+ * The tester's report said it twice, of two different prerequisites: "this
+ * requirement is not communicated upfront". Both were only discovered as a red
+ * panel after mapping every column.
+ */
+const BEFORE_YOU_START: Partial<Record<ImportTarget, string[]>> = {
+  transactions: [
+    "Import the chart of accounts first. Every account this file names must already exist — a transaction row never creates one, because the same name means different things in two charts.",
+    "Add the bank accounts under Banking first. The bank line is what stops a second import of the same file posting the same money twice, so a file cannot be imported without one.",
+    "Re-importing the same file is safe: rows already brought across are recognised and skipped, not doubled.",
+  ],
+  general_ledger: [
+    "Import the chart of accounts first. The file names accounts; it does not create them.",
+    "Do not close a period until you have checked the import. An entry in a closed period can no longer be voided, and undo is how a mistaken import is put right.",
+  ],
+  chart_of_accounts: [
+    "An account code that already exists is left exactly as it is and reported. The same number means different things in two charts, so nothing here overwrites an account you already rely on.",
+  ],
+  invoices: [
+    "Import customers first. An invoice row names a customer; it does not create one.",
+  ],
+};
+
 export interface ImportGuidanceProps {
   target: ImportTarget;
   /** Null until a file has been read. */
@@ -81,6 +106,21 @@ export default function ImportGuidance({ target, detection, onSwitchTarget }: Im
         </Space>
       </Card>
 
+      {BEFORE_YOU_START[target] ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Before you start"
+          description={
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {BEFORE_YOU_START[target]?.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          }
+        />
+      ) : null}
+
       {mismatch ? (
         <Alert
           type="warning"
@@ -97,18 +137,23 @@ export default function ImportGuidance({ target, detection, onSwitchTarget }: Im
         />
       ) : null}
 
-      <Alert
-        type="info"
-        showIcon
-        message="Holding a report rather than a data file?"
-        description={
-          <>
-            A Profit and Loss, a Balance Sheet or a bank statement you only want to keep can be
-            saved under <a href="/reports/saved">Reports → Saved Reports</a>. Importing posts;
-            saving does not affect a balance at all.
-          </>
-        }
-      />
+      {/* Only before a file is chosen. Once somebody is working on a real file
+          this is noise, and it appeared beside a warning about the tab — two
+          alerts over a correct file, which reads as "you are doing it wrong". */}
+      {detection ? null : (
+        <Alert
+          type="info"
+          showIcon
+          message="Holding a report rather than a data file?"
+          description={
+            <>
+              A Profit and Loss, a Balance Sheet or a bank statement you only want to keep can be
+              saved under <a href="/reports/saved">Reports → Saved Reports</a>. Importing posts;
+              saving does not affect a balance at all.
+            </>
+          }
+        />
+      )}
     </Space>
   );
 }
