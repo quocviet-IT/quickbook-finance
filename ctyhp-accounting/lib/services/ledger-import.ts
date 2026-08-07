@@ -60,6 +60,23 @@ export async function importLedgerBatch(
   return { batchId: result.batch_id, entries: result.entries, lines: result.lines };
 }
 
+/**
+ * The account names in this file that the chart does not have.
+ *
+ * Asked before the import runs so the screen can list every one of them at
+ * once. `acc_import_ledger_entries` refuses on the first it meets, which is the
+ * right behaviour for a write and a poor way to tell somebody what to fix.
+ */
+export async function unresolvedAccountRefs(
+  sb: SupabaseClient,
+  refs: string[],
+): Promise<string[]> {
+  if (refs.length === 0) return [];
+  const { data, error } = await sb.rpc("acc_unresolved_account_refs", { p_refs: refs });
+  if (error) throw new LedgerImportError(error.message);
+  return (data ?? []) as string[];
+}
+
 export async function listImportBatches(sb: SupabaseClient): Promise<ImportBatchRow[]> {
   const { data, error } = await sb
     .from("acc_import_batch")

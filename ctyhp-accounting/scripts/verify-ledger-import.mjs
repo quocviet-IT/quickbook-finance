@@ -63,6 +63,15 @@ async function attempt(sql, params) {
 
 const hash = (seed) => seed.padEnd(64, "0").slice(0, 64);
 
+/** 0103 adds the question the screen asks before the click. */
+async function c0103(client) {
+  const sql = await readFile(
+    join(projectRoot, "supabase", "migrations", "0103_unresolved_account_refs.sql"),
+    "utf8",
+  );
+  await client.query(sql);
+}
+
 await client.connect();
 await client.query("begin");
 try {
@@ -257,6 +266,24 @@ try {
       [hash("ffff6666"), entries(1)],
     );
     check("the file can be imported again once undone", again === null, again ?? "");
+  });
+
+  await scenario("the screen can ask which accounts are missing, all at once", async () => {
+    await c0103(client);
+    const answer = await one(
+      `select acc_unresolved_account_refs(array[$1, $2, 'No Such Account', 'Another Ghost']) as missing`,
+      [expense.name, bank.account_code],
+    );
+    check(
+      "it names every missing account and no others",
+      JSON.stringify(answer.missing) === JSON.stringify(["Another Ghost", "No Such Account"]),
+      JSON.stringify(answer.missing),
+    );
+    const none = await one(`select acc_unresolved_account_refs(array[$1]) as missing`, [
+      expense.name,
+    ]);
+    check("a file whose accounts all exist comes back empty", none.missing.length === 0,
+      JSON.stringify(none.missing));
   });
 
   await scenario("a viewer can do neither", async () => {

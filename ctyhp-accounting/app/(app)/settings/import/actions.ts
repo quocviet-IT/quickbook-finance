@@ -15,6 +15,7 @@ import {
   importLedgerBatch,
   linkImportBatchReport,
   listImportBatches,
+  unresolvedAccountRefs,
   voidImportBatch,
   type ImportBatchRow,
 } from "@/lib/services/ledger-import";
@@ -138,6 +139,18 @@ export async function importLedgerAction(
     revalidatePath("/reports");
     revalidatePath("/journal");
     return { ok: true, data: result };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Reads only, so it carries no role guard beyond the session's own RLS. */
+export async function unresolvedAccountRefsAction(
+  refs: string[],
+): Promise<ActionResult<{ missing: string[] }>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: { missing: await unresolvedAccountRefs(sb, refs) } };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

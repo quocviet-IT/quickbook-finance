@@ -31,6 +31,7 @@ import {
   importLedgerAction,
   linkImportBatchReportAction,
   listImportBatchesAction,
+  unresolvedAccountRefsAction,
 } from "./actions";
 
 export interface LedgerImportPanelProps {
@@ -81,6 +82,9 @@ export default function LedgerImportPanel({
   const [asOf, setAsOf] = useState(dayjs());
   const [busy, setBusy] = useState(false);
   const [batches, setBatches] = useState<ImportBatchRow[]>([]);
+  // Null while the question has not been asked or answered yet, so the button
+  // stays shut rather than opening on an unchecked file.
+  const [missingAccounts, setMissingAccounts] = useState<string[] | null>(null);
 
   const refresh = useCallback(() => {
     void listImportBatchesAction().then((result) => {
@@ -108,10 +112,17 @@ export default function LedgerImportPanel({
       const result = parseWaveLedger(grid);
       setParse(result);
       setFile(candidate);
+      setMissingAccounts(null);
       if (result.toDate) setAsOf(dayjs(result.toDate));
       message.info(
         `${result.sections.length} accounts, ${result.entries.length} dates, ${result.lineCount} lines.`,
       );
+      // Ask the database which names it cannot find, using the same resolver
+      // the import uses, so the screen and the server cannot disagree.
+      void unresolvedAccountRefsAction(result.sections.map((s) => s.account)).then((answer) => {
+        if (answer.ok && answer.data) setMissingAccounts(answer.data.missing);
+        else message.error(answer.error ?? "Could not check the accounts in this file");
+      });
     };
     reader.readAsText(candidate);
     return false;
@@ -121,7 +132,9 @@ export default function LedgerImportPanel({
     !parse ||
     parse.unbalancedDates.length > 0 ||
     parse.sectionMismatches.length > 0 ||
-    parse.entries.length === 0;
+    parse.entries.length === 0 ||
+    missingAccounts === null ||
+    missingAccounts.length > 0;
 
   async function runImport() {
     if (!parse || !file) return;
@@ -211,6 +224,16 @@ export default function LedgerImportPanel({
                   ))}
                 </ul>
               }
+            />
+          ) : null}
+
+          {missingAccounts && missingAccounts.length > 0 ? (
+            <Alert
+              style={{ marginTop: 12 }}
+              type="error"
+              showIcon
+              message={`${missingAccounts.length} account(s) in this file are not in this company's chart of accounts`}
+              description={`${missingAccounts.join(", ")}. Add them under Chart of accounts first — a ledger row never creates an account, because the same name can mean different things in two charts.`}
             />
           ) : null}
 
