@@ -16,20 +16,14 @@ export interface TransactionImportRecord {
   credit: number | null;
 }
 
-/**
- * Read an account reference the way the database does.
- *
- * `acc_normalize_ref` (migration 0102) lowercases, trims, and turns every kind
- * of dash into a hyphen. The screen has to agree with it exactly: Wave writes
- * "Payroll – Salary & Wages" with an en dash, and a screen that compares raw
- * strings blocks a file the server would have accepted.
+/*
+ * There was a `normalizeAccountRef` here, written to lowercase and fold dashes
+ * the way `acc_normalize_ref` does. It was faithful about dashes and unfaithful
+ * about precedence, and the preview built on it chose a different account from
+ * the import it was predicting. Nothing replaced it: the screen asks
+ * `acc_account_ref_matches` now (migration 0107), so there is one answer and no
+ * second implementation to keep in step. Do not write another.
  */
-export function normalizeAccountRef(ref: string | null | undefined): string {
-  return (ref ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\u2010-\u2015]/g, "-");
-}
 
 /**
  * `empty` is not a fault.
@@ -85,17 +79,40 @@ export function transactionRawHash(input: {
   txnDate: string;
   description: string | null;
   signedMinor: number;
+  /** Which time this identical row appears in the file. 0 is the first. */
+  occurrence?: number;
 }): string {
+  const base = [
+    input.bankAccountId,
+    input.txnDate,
+    (input.description ?? "").trim(),
+    input.signedMinor,
+  ].join(" ");
+  // Two identical rows in one file are two real transactions — a bank can
+  // charge the same wire fee twice on the same day, and one file did. Hashed
+  // the same they collide on the dedupe index, and the second is dropped in
+  // silence: the preview promised 1,467 rows and 1,466 arrived, $30 short.
+  // Numbering the repeats keeps them apart, and keeps them recognisable as the
+  // same two if the file is imported again.
+  //
+  // Only repeats carry the suffix. The first of a kind hashes exactly as it
+  // always did, so every row already imported still recognises itself.
+  const occurrence = input.occurrence ?? 0;
   return createHash("sha256")
-    .update(
-      [
-        input.bankAccountId,
-        input.txnDate,
-        (input.description ?? "").trim(),
-        input.signedMinor,
-      ].join(" "),
-    )
+    .update(occurrence === 0 ? base : `${base} #${occurrence + 1}`)
     .digest("hex");
+}
+
+/**
+ * A checksum for the file, taken from the rows read out of it.
+ *
+ * The register refuses a file that is already imported and still live, and it
+ * has to recognise one from what would actually be posted rather than from a
+ * name anybody can change. Two uploads of the same export hash the same however
+ * they are named.
+ */
+export function transactionFileChecksum(rows: readonly (readonly string[])[]): string {
+  return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
 }
 
 /** The one line the dry run shows for a row. */

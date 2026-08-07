@@ -70,6 +70,7 @@ export async function runImportAction(
   mapping: Record<string, number | null>,
   openingBalancesAsOf: string | null,
   bankAccountId: string | null = null,
+  fileName: string | null = null,
 ): Promise<ActionResult<ImportOutcome>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
@@ -78,6 +79,7 @@ export async function runImportAction(
     const outcome = await runImport(sb, target, rows, mapping, {
       openingBalancesAsOf,
       bankAccountId,
+      fileName,
     });
     // Transactions post to the ledger, so the screens that read it move too.
     for (const path of ["/accounts", "/customers", "/vendors", "/items", "/reports", "/banking"]) {

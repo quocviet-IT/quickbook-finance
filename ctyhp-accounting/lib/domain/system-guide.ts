@@ -435,6 +435,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "it cannot find and keeps the button shut until each one exists.",
       },
       {
+        title: "A name two accounts answer to is refused, and the account code is the way out",
+        body:
+          "An imported chart can easily hold both \"1000 Cash on Hand\" and \"140 Cash on Hand\". " +
+          "A row naming only \"Cash on Hand\" is then a question, not a reference — one of those " +
+          "is a bank and the other is not — so nothing is imported under it. Put the code in the " +
+          "file instead: either \"1000\" on its own, or \"1000 - Cash on Hand\" with the spaced " +
+          "hyphen. \"1000 Cash on Hand\", without the hyphen, is not a form the chart recognises.",
+      },
+      {
         title: "The bank accounts have to exist under Banking, not only in the chart",
         body:
           "Each row also writes a bank line, and that line is what stops a second import of the " +
@@ -443,10 +452,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "really moved through.",
       },
       {
-        title: "Importing the same file twice is safe",
+        title: "Every import is recorded, and can be undone",
         body:
-          "Rows already brought across are recognised and skipped rather than posted again, so a " +
-          "file that failed halfway can simply be loaded again.",
+          "The list under the preview shows what has been imported: the file, how many rows, over " +
+          "what dates, by whom. Undo voids the entries it posted and removes its bank lines, " +
+          "which is what frees the file to be imported again once it is corrected. Loading the " +
+          "very same file while its import is still live is refused rather than skipped in " +
+          "silence — rows from a *different* file that overlap are still recognised and skipped.",
       },
       {
         title: "Rows carrying no money are left out, and that is not a fault",
@@ -520,6 +532,20 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           caption: "What the preview counted is what the import posts.",
         },
       },
+      {
+        action: "Check it landed, and keep the way back",
+        control: "Undo",
+        route: "/settings/import",
+        note:
+          "The import now appears in the list under the preview, with its file name, row count " +
+          "and dates. Undo is how a mistaken import is put right: it voids the entries and " +
+          "removes the bank lines, leaving the corrected file free to be imported in their place.",
+        screenshot: {
+          src: "/guide/txn-05-record.png",
+          alt: "The register of imports, showing the file, its dates and row count, with an Undo button",
+          caption: "Undo voids the entries and removes the bank lines it posted.",
+        },
+      },
     ],
   },
   {
@@ -544,7 +570,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "things in two charts, and a typo would become a permanent account. The " +
           "screen lists every name it cannot find and keeps the button shut until " +
           "each one exists. Import the chart of accounts first, or add the few that " +
-          "are missing by hand.",
+          "are missing by hand. A name that two accounts answer to counts as one it " +
+          "cannot find: write the account code in the file — \"1000\", or " +
+          "\"1000 - Cash on Hand\" — so the file says which of them it means.",
       },
       {
         title: "Undo works only while the period is still open",

@@ -38,7 +38,8 @@ export default function ImportPreviewPanel({
   const blocked =
     (preview.missingAccounts?.length ?? 0) > 0 ||
     (preview.unbankedAccounts?.length ?? 0) > 0 ||
-    (preview.nonBankAccounts?.length ?? 0) > 0;
+    (preview.nonBankAccounts?.length ?? 0) > 0 ||
+    (preview.ambiguousAccounts?.length ?? 0) > 0;
 
   /**
    * On the transactions tab this figure is the net of the transactions, not an
@@ -163,10 +164,25 @@ export default function ImportPreviewPanel({
 
       {preview.ambiguousAccounts && preview.ambiguousAccounts.length > 0 ? (
         <Alert
-          type="warning"
+          type="error"
           showIcon
           message="Some names in this file belong to more than one account"
-          description={`${preview.ambiguousAccounts.join(", ")}. Two accounts in this chart share each of these names, so the import picks one of them. Give the file the account code instead — "1000 Cash on Hand" — if it matters which.`}
+          description={
+            <>
+              {preview.ambiguousAccounts
+                .map(({ ref, codes }) => `"${ref}" matches ${codes.join(" and ")}`)
+                .join("; ")}
+              . Which account the money belongs in is a question only you can answer, so
+              nothing is imported under a name that names two. Write the account code in
+              the file instead — either{" "}
+              <Typography.Text code>{preview.ambiguousAccounts[0].codes[0]}</Typography.Text>{" "}
+              on its own, or{" "}
+              <Typography.Text code>
+                {`${preview.ambiguousAccounts[0].codes[0]} - ${preview.ambiguousAccounts[0].ref}`}
+              </Typography.Text>
+              . The name on its own is what does not work.
+            </>
+          }
         />
       ) : null}
 

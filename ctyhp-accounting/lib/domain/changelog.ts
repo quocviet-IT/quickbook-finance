@@ -41,6 +41,71 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.6",
+    date: "2026-08-07",
+    headline: "A transactions import is recorded, can be undone, and does what its preview said.",
+    changes: [
+      {
+        kind: "added",
+        title: "Transactions imports are recorded, and can be undone",
+        detail:
+          "Every import now appears in a list under the preview — the file, how many rows, over " +
+          "what dates and by whom — with an Undo beside it, the same as the general ledger has " +
+          "had. Undo voids the entries it posted and removes its bank lines, which frees the " +
+          "file to be imported again once it is corrected. Reversing one used to mean asking " +
+          "somebody to clear it out of the database by hand.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "Two identical rows in one file are both imported",
+        detail:
+          "A bank can charge the same fee twice on the same day, and the second row was being " +
+          "dropped without a word — the preview promised 1,467 rows and 1,466 arrived. Both are " +
+          "kept now, and both are still recognised if the file is loaded again.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "The transactions import no longer claims it posts nothing",
+        detail:
+          "The box that asks you to confirm said “Lists only. Nothing is posted to the ledger.” " +
+          "That was true of the other tabs and untrue of this one: every row posts an entry. It " +
+          "now says so.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "A green preview no longer turns into a refusal at import time",
+        detail:
+          "The preview screen and the import were each working out for themselves which account " +
+          "a name referred to, and on a chart holding two accounts with the same name they " +
+          "reached different answers — so the preview passed and the import then failed on an " +
+          "account it had never looked at. There is one answer now, and the screen reads it.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "A name that belongs to two accounts is refused rather than picked",
+        detail:
+          "A chart brought over from another system can easily hold both “1000 Cash on Hand” and " +
+          "“140 Cash on Hand”. Which one a row means is a question only you can answer, so the " +
+          "import stops and names both, instead of choosing one — and which one it chose used to " +
+          "decide whether the money landed in a bank account or a current asset.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "The advice about account codes now shows a form that works",
+        detail:
+          "The warning suggested writing “1000 Cash on Hand”, which the chart does not recognise. " +
+          "It now shows the two forms that do: the code on its own, or the code and name joined " +
+          "by a spaced hyphen.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.5",
     date: "2026-08-07",
     headline: "The guide walks through a transactions import too, step by step.",

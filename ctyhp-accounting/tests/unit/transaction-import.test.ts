@@ -3,6 +3,7 @@ import { fieldsFor, TARGET_LABEL } from "@/lib/domain/import-mapping";
 import {
   describeTransactionRow,
   signedAmountMinor,
+  transactionFileChecksum,
   transactionRawHash,
   type TransactionImportRecord,
 } from "@/lib/domain/transaction-import";
@@ -107,6 +108,40 @@ describe("transactionRawHash", () => {
 
   it("is a hex digest, not the row itself", () => {
     expect(transactionRawHash(input)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("tells two identical rows in one file apart", () => {
+    // A bank can charge the same wire fee twice on the same day, and one file
+    // did. Hashed the same they collide on the dedupe index and the second is
+    // dropped in silence.
+    const first = transactionRawHash({ ...input, occurrence: 0 });
+    const second = transactionRawHash({ ...input, occurrence: 1 });
+    expect(second).not.toBe(first);
+    expect(second).toMatch(/^[0-9a-f]{64}$/);
+    // Stable, so the same pair is recognised if the file is imported again.
+    expect(transactionRawHash({ ...input, occurrence: 1 })).toBe(second);
+  });
+
+  it("leaves the first of a kind hashing exactly as it always did", () => {
+    // Rows already imported have to keep recognising themselves.
+    expect(transactionRawHash({ ...input, occurrence: 0 })).toBe(transactionRawHash(input));
+  });
+});
+
+describe("transactionFileChecksum", () => {
+  const rows = [
+    ["2026-01-15", "Zelle Transfer", "121", "Sales", "-3200.00"],
+    ["2026-01-16", "Deposit", "121", "Sales", "969.00"],
+  ];
+
+  it("is the same for the same rows, whatever the file was called", () => {
+    expect(transactionFileChecksum(rows)).toBe(transactionFileChecksum([...rows]));
+    expect(transactionFileChecksum(rows)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("changes when the rows change", () => {
+    const edited = [rows[0], ["2026-01-16", "Deposit", "121", "Sales", "970.00"]];
+    expect(transactionFileChecksum(edited)).not.toBe(transactionFileChecksum(rows));
   });
 });
 

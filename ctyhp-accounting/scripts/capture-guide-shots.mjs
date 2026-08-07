@@ -419,6 +419,31 @@ try {
     .first();
   await shoot(emptyNote, "txn-04-empty.png", "rows with nothing in them");
 
+  // Import for real, so the register can be photographed holding something.
+  // Undone a few lines below, through the control the picture is of.
+  await page.getByRole("button", { name: /^Import / }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByText(/created/).waitFor({ timeout: 60_000 });
+  await page.waitForTimeout(1500);
+
+  const register = page
+    .locator(".ant-table")
+    .filter({ hasText: "transactions.csv" })
+    .first();
+  await register.scrollIntoViewIfNeeded();
+  await shoot(register, "txn-05-record.png", "the import, and the way back out");
+
+  // Undo it through the real control, both to prove the button in the picture
+  // works and so the sample company does not collect an import per run.
+  await register.getByRole("button", { name: "Undo" }).first().click();
+  await page.getByPlaceholder("Imported against the wrong chart of accounts").fill(
+    "Captured for the system guide",
+  );
+  await page.getByRole("button", { name: "Undo the import" }).click();
+  await page.getByText(/entries voided/).waitFor({ timeout: 30_000 });
+  console.log("  undo   the captured transactions import was rolled back out");
+  await page.waitForTimeout(1000);
+
   // ---- Undo through the real control, so the sample company does not collect
   // a ledger for every run of this script.
   await page.goto(`${base}/settings/import`, { waitUntil: "networkidle" });

@@ -26,6 +26,8 @@ import {
 import ImportColumnsTable from "./ImportColumnsTable";
 import ImportPreviewPanel from "./ImportPreviewPanel";
 import ImportGuidance from "./ImportGuidance";
+import ImportBatchRegister from "./ImportBatchRegister";
+import ImportConfirmContent from "./ImportConfirmContent";
 import LedgerImportPanel from "./LedgerImportPanel";
 import { detectFileShape } from "@/lib/domain/import-shape";
 import type { ImportPreview } from "@/lib/services/data-import";
@@ -78,6 +80,7 @@ export default function ImportClient({
   const [withBalances, setWithBalances] = useState(false);
   const [asOf, setAsOf] = useState<Dayjs>(dayjs().startOf("year"));
   const [busy, setBusy] = useState(false);
+  const [imported, setImported] = useState(0);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [aiFields, setAiFields] = useState<string[]>([]);
@@ -173,40 +176,14 @@ export default function ImportClient({
       okText: "Import",
       okButtonProps: { danger: balances },
       content: (
-        <Space direction="vertical" size="small" style={{ width: "100%" }}>
-          <div>
-            {preview.creates} to create, {preview.updates} to update.
-          </div>
-          {balances ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="This also posts to the ledger"
-              description={
-                <>
-                  Opening balances of <b>{money(preview.openingTotalMinor)}</b>{" "}
-                  will be brought across as of {asOf.format("YYYY-MM-DD")}.
-                  Opening balances can only be brought across once — a second
-                  attempt is refused rather than doubling the books.
-                </>
-              }
-            />
-          ) : (
-            <Alert
-              type="info"
-              showIcon
-              message="Lists only. Nothing is posted to the ledger."
-            />
-          )}
-          {!isSampleCompany ? (
-            <Alert
-              type="error"
-              showIcon
-              message="These are live books"
-              description="Not a sample company. Imported documents cannot be deleted afterwards."
-            />
-          ) : null}
-        </Space>
+        <ImportConfirmContent
+          target={target}
+          preview={preview}
+          balances={balances}
+          isSampleCompany={isSampleCompany}
+          money={money}
+          asOf={asOf}
+        />
       ),
       onOk: async () => {
         setBusy(true);
@@ -216,6 +193,7 @@ export default function ImportClient({
           mapping,
           balances ? asOf.format("YYYY-MM-DD") : null,
           bankAccountId,
+          fileName,
         );
         setBusy(false);
         if (!res.ok || !res.data) {
@@ -230,6 +208,7 @@ export default function ImportClient({
               : ""),
         );
         reset();
+        setImported((count) => count + 1);
       },
     });
   }
@@ -376,6 +355,10 @@ export default function ImportClient({
           onAsOfChange={setAsOf}
           onImport={confirmImport}
         />
+      ) : null}
+
+      {target === "transactions" ? (
+        <ImportBatchRegister reloadKey={imported} onChanged={reset} />
       ) : null}
     </Space>
   );

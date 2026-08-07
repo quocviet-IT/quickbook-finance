@@ -305,7 +305,11 @@ export default function LedgerImportPanel({
       ) : null}
 
       <Card size="small" title="Ledgers imported before">
-        <LedgerBatchList batches={batches} canManage={canManage} onChanged={refresh} />
+        <LedgerBatchList
+          batches={batches.filter((batch) => batch.source === "wave_ledger")}
+          canManage={canManage}
+          onChanged={refresh}
+        />
       </Card>
     </Space>
   );

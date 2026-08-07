@@ -8,6 +8,8 @@ export interface LedgerBatchListProps {
   batches: ImportBatchRow[];
   canManage: boolean;
   onChanged: () => void;
+  /** Both kinds of import share this list, and an empty one has to say which. */
+  emptyText?: string;
 }
 
 /**
@@ -17,7 +19,12 @@ export interface LedgerBatchListProps {
  * plain journal entry, so without it a three-year ledger imported against the
  * wrong chart would have to be unpicked by hand.
  */
-export default function LedgerBatchList({ batches, canManage, onChanged }: LedgerBatchListProps) {
+export default function LedgerBatchList({
+  batches,
+  canManage,
+  onChanged,
+  emptyText,
+}: LedgerBatchListProps) {
   const { message } = App.useApp();
   const [undoing, setUndoing] = useState<ImportBatchRow | null>(null);
   const [reason, setReason] = useState("");
@@ -45,7 +52,7 @@ export default function LedgerBatchList({ batches, canManage, onChanged }: Ledge
         rowKey="id"
         pagination={false}
         dataSource={batches}
-        locale={{ emptyText: "No ledger has been imported into this company yet." }}
+        locale={{ emptyText: emptyText ?? "No ledger has been imported into this company yet." }}
         columns={[
           { title: "File", dataIndex: "file_name" },
           {

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   describeTransactionRow,
-  normalizeAccountRef,
   signedAmountMinor,
   transactionRawHash,
   type TransactionImportRecord,
@@ -12,56 +11,64 @@ import type { ImportPreview, ImportPreviewRow } from "./data-import";
  * What a transactions file would do, before it does any of it.
  *
  * Lifted out of `data-import.ts` when the fixes for the tester's report pushed
- * that file well past the size anyone can hold in their head. Nothing was
- * rewritten in the move: this is the branch that used to sit inside
- * `previewImport`, together with the chart lookups only it uses.
+ * that file well past the size anyone can hold in their head.
  *
  * Transactions are the one target that posts both sides of an entry, so this
  * preview has to answer questions the others do not: does the chart hold every
  * account the file names, can the bank side carry a deduped line, and is any
  * name in the file claimed by two accounts at once.
+ *
+ * It answers the first and last of those by *asking the database*, through the
+ * same function the import itself calls. It used to answer them from a lookup
+ * table built here, written to match and not matching: the two disagreed about
+ * a chart holding two accounts called "Cash on Hand", so this screen went green
+ * and the import then refused. A preview that does not predict the import is
+ * worse than no preview, because it is believed.
  */
 
 export class DataImportError extends Error {}
 
-/** Account references that name more than one account, and so choose nothing. */
-async function ambiguousAccountRefs(sb: SupabaseClient): Promise<Set<string>> {
-  const { data, error } = await sb
-    .from("acc_account")
-    .select("id,account_code,name")
-    .neq("status", "archived");
-  if (error) throw new DataImportError(error.message);
-  const seen = new Map<string, number>();
-  for (const row of (data ?? []) as { account_code: string; name: string }[]) {
-    // Only the bare name can collide: a code, and a code with its name, are
-    // unique by construction.
-    const key = normalizeAccountRef(row.name);
-    if (key) seen.set(key, (seen.get(key) ?? 0) + 1);
-  }
-  return new Set([...seen].filter(([, count]) => count > 1).map(([key]) => key));
+/** What the database says a reference names. The only answer either side reads. */
+interface AccountRefMatch {
+  accountId: string | null;
+  /** The rule that fired, or "ambiguous" when the name belongs to two accounts. */
+  matchedBy: "code" | "code_and_name" | "name" | "ambiguous" | null;
+  /** Every account that answers to an ambiguous name, so the fix can be named. */
+  candidateCodes: string[];
 }
 
-/** Every way a file may name an account, mapped to the account it means. */
-async function accountIndex(sb: SupabaseClient): Promise<Map<string, string>> {
-  const { data, error } = await sb
-    .from("acc_account")
-    .select("id,account_code,name")
-    .neq("status", "archived");
+interface AccountRefMatchRow {
+  ref: string;
+  account_id: string | null;
+  matched_by: AccountRefMatch["matchedBy"];
+  candidate_codes: string[] | null;
+}
+
+/**
+ * Resolve every account reference the file uses, in one round trip.
+ *
+ * Keyed on the trimmed reference exactly as sent, so nothing here has to know
+ * how the database compares two names — the day this file starts normalising
+ * for itself is the day the two can drift apart again.
+ */
+async function resolveAccountRefs(
+  sb: SupabaseClient,
+  refs: readonly string[],
+): Promise<Map<string, AccountRefMatch>> {
+  const wanted = [...new Set(refs.map((ref) => ref.trim()).filter((ref) => ref !== ""))];
+  const found = new Map<string, AccountRefMatch>();
+  if (wanted.length === 0) return found;
+
+  const { data, error } = await sb.rpc("acc_account_ref_matches", { p_refs: wanted });
   if (error) throw new DataImportError(error.message);
-  const index = new Map<string, string>();
-  for (const row of (data ?? []) as { id: string; account_code: string; name: string }[]) {
-    // Normalised the way `acc_normalize_ref` does, so this screen and the RPC
-    // behind it cannot disagree about whether a name matches. Wave writes
-    // "Payroll – Salary & Wages" with an en dash; the chart holds a hyphen.
-    const add = (key: string) => {
-      const k = normalizeAccountRef(key);
-      if (k) index.set(k, row.id);
-    };
-    add(row.account_code);
-    add(row.name);
-    add(`${row.account_code} - ${row.name}`);
+  for (const row of (data ?? []) as AccountRefMatchRow[]) {
+    found.set(row.ref, {
+      accountId: row.account_id,
+      matchedBy: row.matched_by,
+      candidateCodes: row.candidate_codes ?? [],
+    });
   }
-  return index;
+  return found;
 }
 
 /** GL accounts that have a bank record, and so can carry a deduped bank line. */
@@ -94,26 +101,13 @@ export async function previewTransactionImport(
   mapping: Record<string, number | null>,
   options: { bankAccountId?: string | null },
 ): Promise<ImportPreview> {
-  const [index, hashes, banked, bankTyped, ambiguousRefs] = await Promise.all([
-    accountIndex(sb),
-    existingHashes(sb),
-    bankedAccountIds(sb),
-    bankTypeAccountIds(sb),
-    ambiguousAccountRefs(sb),
-  ]);
   const records = parsed.records as unknown as TransactionImportRecord[];
-  const problems = [...parsed.problems];
-  const missing = new Set<string>();
-  const unbanked = new Set<string>();
-  const notBanks = new Set<string>();
-  const ambiguous = new Set<string>();
-  const previewRows: ImportPreviewRow[] = [];
-  let duplicates = 0;
-  let emptyRows = 0;
 
   // Whether the money columns were mapped is a question about the file, and it
   // is answered once. Asked per row it produced 1,566 identical messages
-  // telling the reader to map a column they had already mapped.
+  // telling the reader to map a column they had already mapped. Answered here,
+  // before the lookups, it also spares the database four queries about a file
+  // that cannot be read at all.
   const mapped = (key: string) => (mapping[key] ?? null) !== null;
   if (!mapped("amount") && !mapped("debit") && !mapped("credit")) {
     return {
@@ -132,6 +126,29 @@ export async function previewTransactionImport(
     };
   }
 
+  const refs: string[] = [];
+  for (const record of records) {
+    refs.push(record.bank_account ?? "", record.category_account ?? "");
+  }
+
+  const [matches, hashes, banked, bankTyped] = await Promise.all([
+    resolveAccountRefs(sb, refs),
+    existingHashes(sb),
+    bankedAccountIds(sb),
+    bankTypeAccountIds(sb),
+  ]);
+
+  const problems = [...parsed.problems];
+  const missing = new Set<string>();
+  const unbanked = new Set<string>();
+  const notBanks = new Set<string>();
+  const ambiguous = new Map<string, string[]>();
+  const previewRows: ImportPreviewRow[] = [];
+  /** How many times this exact row has already been seen in this file. */
+  const seenInFile = new Map<string, number>();
+  let duplicates = 0;
+  let emptyRows = 0;
+
   records.forEach((record, position) => {
     const signed = signedAmountMinor(record);
     if ("problem" in signed) {
@@ -142,11 +159,15 @@ export async function previewTransactionImport(
       emptyRows += 1;
       return;
     }
+
     const bankRef = (record.bank_account ?? "").trim();
-    const bankKey = normalizeAccountRef(bankRef);
-    const bankId = index.get(bankKey) ?? options.bankAccountId ?? null;
-    if (bankRef && !index.has(bankKey)) missing.add(bankRef);
-    if (bankRef && ambiguousRefs.has(bankKey)) ambiguous.add(bankRef);
+    const bankMatch = bankRef ? matches.get(bankRef) : undefined;
+    if (bankRef && bankMatch?.matchedBy === "ambiguous") {
+      ambiguous.set(bankRef, bankMatch.candidateCodes);
+    } else if (bankRef && !bankMatch?.accountId) {
+      missing.add(bankRef);
+    }
+    const bankId = bankMatch?.accountId ?? options.bankAccountId ?? null;
     if (bankId && !banked.has(bankId)) {
       // Two different problems with two different answers. One is fixed under
       // Banking; the other cannot be, and saying which is which saves a wasted
@@ -154,16 +175,33 @@ export async function previewTransactionImport(
       if (bankTyped.has(bankId)) unbanked.add(bankRef || "the account chosen above");
       else notBanks.add(bankRef || "the account chosen above");
     }
+
     const categoryRef = (record.category_account ?? "").trim();
-    const categoryKey = normalizeAccountRef(categoryRef);
-    if (!index.has(categoryKey)) missing.add(categoryRef);
-    if (categoryRef && ambiguousRefs.has(categoryKey)) ambiguous.add(categoryRef);
+    const categoryMatch = categoryRef ? matches.get(categoryRef) : undefined;
+    if (categoryRef && categoryMatch?.matchedBy === "ambiguous") {
+      ambiguous.set(categoryRef, categoryMatch.candidateCodes);
+    } else if (!categoryMatch?.accountId) {
+      missing.add(categoryRef);
+    }
+
+    // A row identical to one earlier in the same file is a second real
+    // transaction, not a repeat of the first, so it is numbered rather than
+    // left to collide with it on the dedupe index.
+    const identity = [
+      bankId ?? "",
+      record.txn_date,
+      (record.description ?? "").trim(),
+      signed.minor,
+    ].join("|");
+    const occurrence = seenInFile.get(identity) ?? 0;
+    seenInFile.set(identity, occurrence + 1);
 
     const hash = transactionRawHash({
       bankAccountId: bankId ?? "",
       txnDate: record.txn_date,
       description: record.description,
       signedMinor: signed.minor,
+      occurrence,
     });
     if (hashes.has(hash)) {
       duplicates += 1;
@@ -191,6 +229,6 @@ export async function previewTransactionImport(
     missingAccounts: [...missing],
     unbankedAccounts: [...unbanked],
     nonBankAccounts: [...notBanks],
-    ambiguousAccounts: [...ambiguous],
+    ambiguousAccounts: [...ambiguous].map(([ref, codes]) => ({ ref, codes })),
   };
 }

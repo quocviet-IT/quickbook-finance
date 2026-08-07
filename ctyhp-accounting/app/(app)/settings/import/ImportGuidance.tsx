@@ -35,10 +35,12 @@ const BEFORE_YOU_START: Partial<Record<ImportTarget, string[]>> = {
   transactions: [
     "Import the chart of accounts first. Every account this file names must already exist — a transaction row never creates one, because the same name means different things in two charts.",
     "Add the bank accounts under Banking first. The bank line is what stops a second import of the same file posting the same money twice, so a file cannot be imported without one.",
+    'Where two accounts share a name, write the code in the file: "1000", or "1000 - Cash on Hand". The name on its own is refused, because one of them may be a bank and the other may not.',
     "Re-importing the same file is safe: rows already brought across are recognised and skipped, not doubled.",
   ],
   general_ledger: [
     "Import the chart of accounts first. The file names accounts; it does not create them.",
+    'A name two accounts answer to is treated as one the chart does not have. Write the code — "1000", or "1000 - Cash on Hand" — so the file says which it means.',
     "Do not close a period until you have checked the import. An entry in a closed period can no longer be voided, and undo is how a mistaken import is put right.",
   ],
   chart_of_accounts: [

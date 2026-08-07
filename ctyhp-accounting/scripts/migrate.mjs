@@ -121,6 +121,16 @@ async function main() {
     for (const { schema_name } of rows) total += await migrateCompany(schema_name);
   }
 
+  // PostgREST answers from a cached picture of the schema, and a migration that
+  // adds an RPC is invisible to the application until that picture is retaken.
+  // Nothing fails loudly when it is stale: the screen simply cannot find the
+  // function, and the failure reads as a bug in the feature that was just
+  // shipped. It cost one afternoon already; it is one statement.
+  if (total > 0) {
+    await client.query("notify pgrst, 'reload schema'");
+    console.log("\nAsked PostgREST to reload its schema cache.");
+  }
+
   console.log(`\nDone. ${total} migration(s) applied across all companies.`);
 }
 

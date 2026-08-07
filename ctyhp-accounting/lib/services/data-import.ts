@@ -10,6 +10,7 @@ import {
   groupInvoiceRows,
   type InvoiceImportRecord,
 } from "@/lib/domain/invoice-import";
+import { transactionFileChecksum } from "@/lib/domain/transaction-import";
 
 // The class lives beside the lookups that throw it; re-exported here because
 // every caller has always imported it from this module.
@@ -52,14 +53,16 @@ export interface ImportPreview {
    */
   nonBankAccounts?: string[];
   /**
-   * Names in the file that match more than one account in the chart.
+   * Names in the file that match more than one account in the chart, with the
+   * codes of every account they match.
    *
-   * This chart holds "1000 Cash on Hand" and "140 Cash on Hand". A file naming
-   * "Cash on Hand" is asking for one of them and the resolver silently takes
-   * one — so the money could land in either. It warns rather than blocks: the
-   * two may be interchangeable for the reader, and only they can say.
+   * A chart holding "1000 Cash on Hand" and "140 Cash on Hand" makes the bare
+   * name a question, not a reference. It blocks: the resolver used to take one
+   * of them, and which one it took decided whether the money landed in a bank
+   * account or a current asset. Nobody can review a choice made that way, so it
+   * is handed back to the only person who knows the answer.
    */
-  ambiguousAccounts?: string[];
+  ambiguousAccounts?: { ref: string; codes: string[] }[];
   /** Accounts named by the file that this company's chart does not have. */
   missingAccounts?: string[];
   /**
@@ -203,7 +206,12 @@ export async function runImport(
   target: ImportTarget,
   rows: readonly (readonly string[])[],
   mapping: Record<string, number | null>,
-  options: { openingBalancesAsOf?: string | null; bankAccountId?: string | null } = {},
+  options: {
+    openingBalancesAsOf?: string | null;
+    bankAccountId?: string | null;
+    /** What to record this import under, so it can be found and undone. */
+    fileName?: string | null;
+  } = {},
 ): Promise<ImportOutcome> {
   // Transactions are previewed again here rather than trusted from the screen:
   // the refusal that matters — an account this chart does not have — must not
@@ -222,6 +230,16 @@ export async function runImport(
           "Add the bank account there first — it is what stops a second import posting the same money twice.",
       );
     }
+    // The database refuses these too, one row into the loop. Refusing here says
+    // which names and what to write instead, rather than surfacing whichever
+    // row happened to reach the resolver first.
+    if (preview.ambiguousAccounts && preview.ambiguousAccounts.length > 0) {
+      throw new DataImportError(
+        `${preview.ambiguousAccounts
+          .map(({ ref, codes }) => `"${ref}" belongs to ${codes.join(" and ")}`)
+          .join("; ")}. Write the account code in the file instead of the name.`,
+      );
+    }
     if (preview.rows.length === 0) {
       throw new DataImportError("Nothing in this file could be imported");
     }
@@ -235,6 +253,12 @@ export async function runImport(
         raw_hash: row.key,
       })),
       p_default_bank_account_id: options.bankAccountId ?? null,
+      // What the import records about itself, so it can be found and undone.
+      // The checksum comes from the rows rather than the file's own bytes: it
+      // has to recognise the same export uploaded again under another name.
+      p_file_name: options.fileName?.trim() || "transactions.csv",
+      p_sha256: transactionFileChecksum(rows),
+      p_line_count: rows.length,
     });
     if (error) throw new DataImportError(error.message);
     const result = (Array.isArray(data) ? data[0] : data) as
