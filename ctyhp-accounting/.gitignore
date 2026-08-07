@@ -42,3 +42,6 @@ yarn-error.log*
 next-env.d.ts
 supabase/.temp/
 next-server.log
+
+# Server log from a local npm start; never part of the build.
+next-start.log

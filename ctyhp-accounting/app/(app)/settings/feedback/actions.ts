@@ -1,12 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { activeSchema } from "@/lib/db/company";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES } from "@/lib/domain/feedback";
 import type { FeedbackKind, FeedbackStatus } from "@/lib/domain/feedback";
 import {
   attachmentUrl,
   fileFeedbackReport,
+  type FiledFeedbackReport,
   listFeedbackAttachments,
   listFeedbackImprovements,
   listFeedbackReports,
@@ -41,7 +43,7 @@ function msg(err: unknown): string {
  */
 export async function fileFeedbackReportAction(
   raw: unknown,
-): Promise<ActionResult<{ id: string; screenshotStored: boolean }>> {
+): Promise<ActionResult<FiledFeedbackReport>> {
   const parsed = feedbackReportSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid report" };
@@ -50,6 +52,9 @@ export async function fileFeedbackReportAction(
     const sb = await createSupabaseServerClient();
     // The reporter's own client inserts the row; the screenshot link is a
     // server-side write, because the table deliberately has no update policy.
+    // It has to be bound to the same company the row went into: left on its
+    // default it wrote to the first company's books, found no such report, and
+    // reported a stored screenshot that was linked to nothing.
     const result = await fileFeedbackReport(
       sb,
       {
@@ -69,7 +74,9 @@ export async function fileFeedbackReportAction(
         frequency: parsed.data.kind === "suggestion" ? parsed.data.frequency ?? null : null,
         page_purpose: parsed.data.page_purpose || null,
       },
-      parsed.data.screenshot_base64 ? createSupabaseAutomationClient() : undefined,
+      parsed.data.screenshot_base64
+        ? createSupabaseAutomationClient(await activeSchema())
+        : undefined,
     );
     revalidatePath("/settings/feedback");
     return { ok: true, data: result };

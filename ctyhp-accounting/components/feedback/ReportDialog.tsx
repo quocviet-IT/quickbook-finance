@@ -182,6 +182,14 @@ export default function ReportDialog({
       const attachments = await uploadAttachments(res.data.id);
       const parts = [kind === "broken" ? "Report sent" : "Suggestion sent"];
       if (res.data.screenshotStored) parts.push("with the screenshot");
+      // Silence here is what made this worth fixing: the reporter watched the
+      // screenshot being captured and had no way to learn it never arrived.
+      if (res.data.screenshotProblem) {
+        message.warning(
+          `The report was sent, but the screenshot could not be stored: ${res.data.screenshotProblem}`,
+          8,
+        );
+      }
       if (attachments.stored > 0) {
         parts.push(
           `${attachments.stored} attachment${attachments.stored === 1 ? "" : "s"} included`,

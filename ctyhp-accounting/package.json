@@ -21,6 +21,7 @@
     "verify:ledger-import": "node --env-file=.env.local scripts/verify-ledger-import.mjs",
     "guide:shots": "node --env-file=.env.local scripts/capture-guide-shots.mjs",
     "verify:feedback-access": "node --env-file=.env.local scripts/verify-feedback-access.mjs",
+    "verify:feedback-files": "node --env-file=.env.local scripts/verify-feedback-files.mjs",
     "verify:settings-guard": "node --env-file=.env.local scripts/verify-settings-guard.mjs",
     "smoke:payments-void": "node --env-file=.env.local scripts/smoke-payments-void.mjs",
     "test:e2e:document-ledger-report": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts",

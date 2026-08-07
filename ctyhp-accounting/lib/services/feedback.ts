@@ -90,7 +90,18 @@ export interface FileFeedbackInput {
  * segment is an existing report, so the row has to exist first. A failed upload
  * therefore leaves a readable report without its picture rather than losing the
  * report altogether — the words are worth more than the screenshot.
+ *
+ * When the picture does not make it, the reason comes back with the id.
+ * Returning only `screenshotStored: false` is what let four reports arrive with
+ * no screenshot while everyone believed one had been attached.
  */
+export interface FiledFeedbackReport {
+  id: string;
+  screenshotStored: boolean;
+  /** Set only when a screenshot was offered and did not make it. */
+  screenshotProblem?: string;
+}
+
 export async function fileFeedbackReport(
   sb: SupabaseClient,
   input: FileFeedbackInput,
@@ -101,7 +112,7 @@ export async function fileFeedbackReport(
    * filed without its picture.
    */
   linker?: SupabaseClient,
-): Promise<{ id: string; screenshotStored: boolean }> {
+): Promise<FiledFeedbackReport> {
   const {
     data: { user },
   } = await sb.auth.getUser();
@@ -131,8 +142,13 @@ export async function fileFeedbackReport(
   if (error) throw new FeedbackError(error.message);
 
   const reportId = (data as { id: string }).id;
-  if (!input.screenshotBase64 || !linker) {
-    return { id: reportId, screenshotStored: false };
+  if (!input.screenshotBase64) return { id: reportId, screenshotStored: false };
+  if (!linker) {
+    return {
+      id: reportId,
+      screenshotStored: false,
+      screenshotProblem: "This deployment cannot store screenshots.",
+    };
   }
 
   const path = `${reportId}/${crypto.randomUUID()}.png`;
@@ -141,8 +157,9 @@ export async function fileFeedbackReport(
     .from(SCREENSHOT_BUCKET)
     .upload(path, bytes, { contentType: "image/png", upsert: false });
   if (upload.error) {
-    // The report stands; only the picture is missing.
-    return { id: reportId, screenshotStored: false };
+    // The report stands; only the picture is missing — and the reporter is told
+    // so, because a screenshot they think they sent is worse than none.
+    return { id: reportId, screenshotStored: false, screenshotProblem: upload.error.message };
   }
 
   // Count the affected rows: without an update policy a client write reports no
@@ -156,8 +173,14 @@ export async function fileFeedbackReport(
   const stored = !linked.error && (linked.data ?? []).length === 1;
   if (!stored) {
     await linker.storage.from(SCREENSHOT_BUCKET).remove([path]);
+    return {
+      id: reportId,
+      screenshotStored: false,
+      screenshotProblem:
+        linked.error?.message ?? "The screenshot was uploaded but could not be linked to the report.",
+    };
   }
-  return { id: reportId, screenshotStored: stored };
+  return { id: reportId, screenshotStored: true };
 }
 
 export async function listFeedbackReports(
