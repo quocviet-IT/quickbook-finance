@@ -7,6 +7,7 @@ import {
   GUIDE_VERSION,
   guideRoutes,
 } from "@/lib/domain/system-guide";
+import { APP_VERSION } from "@/lib/domain/changelog";
 
 /** Every static route the app actually serves, read from the route folders. */
 function appRoutes(dir = join(process.cwd(), "app", "(app)"), prefix = ""): string[] {
@@ -77,7 +78,9 @@ describe("guide flows", () => {
 
 describe("guide notices", () => {
   it("states the version, the test data, and where the design came from", () => {
-    expect(GUIDE_VERSION).toBe("1.0");
+    // Pinned to the changelog rather than to a number, so a release does not
+    // have to remember to edit this line.
+    expect(GUIDE_VERSION).toBe(APP_VERSION);
     expect(GUIDE_NOTICES.map((notice) => notice.id)).toEqual([
       "version",
       "test-data",

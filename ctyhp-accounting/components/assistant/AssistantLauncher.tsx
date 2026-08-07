@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Button, Space, Tooltip } from "antd";
+import { Badge, Button, Space, Tooltip } from "antd";
 import {
   BookOutlined,
   DownOutlined,
@@ -11,6 +11,12 @@ import {
 import AskAiPanel from "@/components/ai/AskAiPanel";
 import ReportDialog from "@/components/feedback/ReportDialog";
 import SystemGuideDrawer from "@/components/guide/SystemGuideDrawer";
+import { releasesSince } from "@/lib/domain/changelog";
+import {
+  lastReleaseSeen,
+  lastReleaseSeenServerSnapshot,
+  subscribeReleaseNotes,
+} from "@/lib/client/release-notes";
 import {
   isLauncherCollapsed,
   launcherCollapsedServerSnapshot,
@@ -31,6 +37,15 @@ export default function AssistantLauncher() {
   const [askOpen, setAskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  // Nothing is rendered as unread on the server: it cannot know what this
+  // browser has read, and a dot that appears then vanishes on every page load
+  // is how people learn to ignore a dot.
+  const seenRelease = useSyncExternalStore(
+    subscribeReleaseNotes,
+    lastReleaseSeen,
+    lastReleaseSeenServerSnapshot,
+  );
+  const hasNews = releasesSince(seenRelease).length > 0;
   // The stored choice is a browser-only value: the server renders expanded and
   // React swaps in the real state on hydration, without a mismatch.
   const collapsed = useSyncExternalStore(
@@ -89,15 +104,24 @@ export default function AssistantLauncher() {
                 </Button>
               </Tooltip>
             </Space>
-            <Tooltip title="How each workflow runs, and which button does what" placement="top">
-              <Button
-                shape="round"
-                icon={<BookOutlined />}
-                onClick={() => setGuideOpen(true)}
-                aria-label="System guide"
-              >
-                Guide
-              </Button>
+            <Tooltip
+              title={
+                hasNews
+                  ? "New in this version, and how each workflow runs"
+                  : "How each workflow runs, and which button does what"
+              }
+              placement="top"
+            >
+              <Badge dot={hasNews} offset={[-6, 4]}>
+                <Button
+                  shape="round"
+                  icon={<BookOutlined />}
+                  onClick={() => setGuideOpen(true)}
+                  aria-label={hasNews ? "System guide, with unread release notes" : "System guide"}
+                >
+                  Guide
+                </Button>
+              </Badge>
             </Tooltip>
           </Space>
         )}

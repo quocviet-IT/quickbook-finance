@@ -3194,6 +3194,48 @@ body {
   font-size: 12px;
 }
 
+/* Release notes, at the top of the guide drawer. Bordered so they read as a
+   notice rather than as part of the guide, and quiet enough not to shout over
+   the workflow somebody opened the drawer to find. */
+.release-notes {
+  border: 1px solid #d6e4ff;
+  background: #f0f5ff;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.release-notes__release + .release-notes__release {
+  border-top: 1px solid #d6e4ff;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.release-notes__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.release-notes__headline {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+.release-notes__changes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.release-notes__changes > li + li {
+  margin-top: 10px;
+}
+.release-notes__detail {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+/* A change with no description would otherwise leave its link on the title's
+   own line, which reads as part of the sentence. */
+.release-notes__changes a {
+  display: inline-block;
+  margin-top: 4px;
+}
+
 /* What to settle before step one. Loud enough to stop a reader who is skimming,
    because the steps below post to a ledger. */
 .system-guide__cautions {

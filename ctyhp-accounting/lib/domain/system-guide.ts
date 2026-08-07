@@ -59,7 +59,11 @@ export interface GuideFlow {
   steps: GuideStep[];
 }
 
-export const GUIDE_VERSION = "1.0";
+/**
+ * The product's version, not the guide's. A person saying "I am on 1.1" means
+ * the whole application, so there is one number and the changelog owns it.
+ */
+export { APP_VERSION as GUIDE_VERSION } from "./changelog";
 
 /** Shown before any workflow: what this build is and is not. */
 export const GUIDE_NOTICES = [

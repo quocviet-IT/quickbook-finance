@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,7 +15,12 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { ArrowRightOutlined, SearchOutlined, WarningOutlined } from "@ant-design/icons";
+import {
+  ArrowRightOutlined,
+  NotificationOutlined,
+  SearchOutlined,
+  WarningOutlined,
+} from "@ant-design/icons";
 import {
   GUIDE_FLOWS,
   GUIDE_NOTICES,
@@ -23,6 +28,9 @@ import {
   type GuideFlow,
 } from "@/lib/domain/system-guide";
 import { screenContextFor, searchGuide } from "@/lib/domain/screen-context";
+import { RELEASES, releasesSince } from "@/lib/domain/changelog";
+import { lastReleaseSeen, markReleasesSeen } from "@/lib/client/release-notes";
+import WhatsNewPanel from "./WhatsNewPanel";
 
 function FlowBody({
   flow,
@@ -123,6 +131,19 @@ export default function SystemGuideDrawer({
   const pathname = usePathname() ?? "/";
   const [scope, setScope] = useState<"here" | "all">("here");
   const [query, setQuery] = useState("");
+  const [showEveryRelease, setShowEveryRelease] = useState(false);
+
+  // What was unread when this drawer opened, captured once.
+  //
+  // The list must not be live. Opening the drawer is what marks the notes read,
+  // and a live list would empty itself in the same tick — the reader would see
+  // the panel appear and vanish. The drawer is destroyed when hidden, so this
+  // is recomputed on every open, which is exactly the intent.
+  const [unread] = useState(() => releasesSince(lastReleaseSeen()));
+
+  useEffect(() => {
+    if (open && unread.length > 0) markReleasesSeen();
+  }, [open, unread.length]);
 
   const screen = useMemo(() => screenContextFor(pathname), [pathname]);
   const relevant = useMemo(
@@ -166,6 +187,30 @@ export default function SystemGuideDrawer({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
+
+        {!query.trim() && (unread.length > 0 || showEveryRelease) ? (
+          <section className="release-notes">
+            <Space style={{ width: "100%", justifyContent: "space-between" }} wrap>
+              <Typography.Text strong>
+                <NotificationOutlined />{" "}
+                {showEveryRelease ? "Every release" : "What's new"}
+              </Typography.Text>
+              <a onClick={() => setShowEveryRelease((was) => !was)}>
+                {showEveryRelease ? "Only what is new" : "Show every release"}
+              </a>
+            </Space>
+            <WhatsNewPanel
+              releases={showEveryRelease ? RELEASES : unread}
+              onNavigate={onClose}
+            />
+          </section>
+        ) : null}
+
+        {!query.trim() && unread.length === 0 && !showEveryRelease ? (
+          <a onClick={() => setShowEveryRelease(true)}>
+            <NotificationOutlined /> What changed in version {RELEASES[0].version}
+          </a>
+        ) : null}
 
         {!query.trim() ? (
           <Space style={{ width: "100%", justifyContent: "space-between" }} wrap>
