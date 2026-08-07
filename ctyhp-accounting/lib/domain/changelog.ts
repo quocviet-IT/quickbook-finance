@@ -41,6 +41,31 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.2",
+    date: "2026-08-07",
+    headline: "Narrow the transaction list to what you are actually reviewing.",
+    changes: [
+      {
+        kind: "added",
+        title: "Filters on the transaction list",
+        detail:
+          "By customer or vendor, by account, by document type, and by any words in the " +
+          "description or the number. The figures across the top and the PDF and Excel exports " +
+          "all follow what you have filtered to.",
+        route: "/reports/transactions",
+      },
+      {
+        kind: "changed",
+        title: "Filtering by account finds split transactions too",
+        detail:
+          "An entry touching several accounts shows as “— Split —” in the " +
+          "Account Type column. Filtering by an account still finds it, because the filter " +
+          "looks at every line of the entry rather than at that label.",
+        route: "/reports/transactions",
+      },
+    ],
+  },
+  {
     version: "1.1",
     date: "2026-08-07",
     headline: "Bring a company's books across from QuickBooks or Wave, and keep the reports.",
