@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listPayments, listCustomers } from "@/lib/services/invoicing";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
@@ -56,6 +56,7 @@ export default async function PaymentsPage({
         currencies={currencies}
         actors={actors}
         canWrite={canWrite(role)}
+        canDelete={isAdmin(role)}
         canReadAudit={canReadAudit}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}

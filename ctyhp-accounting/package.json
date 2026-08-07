@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:void-payment": "node --env-file=.env.local scripts/verify-void-payment.mjs",
+    "verify:delete-payment": "node --env-file=.env.local scripts/verify-delete-payment.mjs",
     "verify:payment-correction": "node --env-file=.env.local scripts/verify-payment-correction.mjs",
     "verify:company-provisioning": "node --env-file=.env.local scripts/verify-company-provisioning.mjs",
     "verify:bank-categories": "node --env-file=.env.local scripts/verify-bank-categories.mjs",

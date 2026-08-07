@@ -1,12 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { hasPermission, searchAudit } from "@/lib/services/access";
 import {
   recordPayment,
   listOpenInvoicesForCustomer,
   voidPayment,
+  deletePayment,
   updatePaymentDetails,
   correctPayment,
   getPaymentDetail,
@@ -15,6 +16,7 @@ import {
 import {
   paymentCreateSchema,
   paymentVoidSchema,
+  paymentDeleteSchema,
   paymentCorrectionSchema,
   paymentDetailsSchema,
 } from "@/lib/domain/schemas";
@@ -91,6 +93,31 @@ export async function voidPaymentAction(paymentId: string, reason: string): Prom
     await voidPayment(sb, parsed.data.payment_id, parsed.data.reason);
     for (const path of PAYMENT_VOID_REVALIDATION_PATHS) revalidatePath(path);
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Delete a receipt.
+ *
+ * Administrators only, and said here as well as in the database: the menu item
+ * is hidden from everybody else, and hiding a control the server would refuse
+ * anyway is what stops people discovering a refusal by clicking.
+ */
+export async function deletePaymentAction(
+  paymentId: string,
+  reason: string,
+): Promise<ActionResult<{ paymentNumber: string | null }>> {
+  const role = await getUserRole();
+  if (!isAdmin(role)) return { ok: false, error: "Only an administrator can delete a payment" };
+  const parsed = paymentDeleteSchema.safeParse({ payment_id: paymentId, reason });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const removed = await deletePayment(sb, parsed.data.payment_id, parsed.data.reason);
+    for (const path of PAYMENT_VOID_REVALIDATION_PATHS) revalidatePath(path);
+    return { ok: true, data: removed };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

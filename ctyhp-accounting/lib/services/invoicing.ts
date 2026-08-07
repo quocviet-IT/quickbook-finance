@@ -270,6 +270,28 @@ export async function voidPayment(
   if (error) throw new InvoicingError(error.message);
 }
 
+/**
+ * Remove a receipt entirely.
+ *
+ * The RPC voids it first when it is still live, so every rule about whether it
+ * may be undone applies unchanged; only then is the record removed. What it
+ * took from an invoice goes back, the number it held is written to the gap
+ * note, and the audit log keeps the row that was deleted.
+ */
+export async function deletePayment(
+  sb: SupabaseClient,
+  paymentId: string,
+  reason: string,
+): Promise<{ paymentNumber: string | null }> {
+  const { data, error } = await sb.rpc("acc_delete_payment", {
+    p_payment_id: paymentId,
+    p_reason: reason,
+  });
+  if (error) throw new InvoicingError(error.message);
+  const result = (data ?? {}) as { payment_number?: string | null };
+  return { paymentNumber: result.payment_number ?? null };
+}
+
 /** Rewrite only what a receipt says about itself; the RPC is the whitelist. */
 export async function updatePaymentDetails(
   sb: SupabaseClient,

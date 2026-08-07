@@ -147,6 +147,22 @@ export const paymentVoidSchema = z.object({
 });
 export type PaymentVoidInput = z.infer<typeof paymentVoidSchema>;
 
+/**
+ * Deleting asks for more than voiding does.
+ *
+ * Ten characters because the same words become the note that explains the
+ * receipt number nobody will ever be able to look up again.
+ */
+export const paymentDeleteSchema = z.object({
+  payment_id: z.uuid("Select a payment"),
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Say why this payment is being deleted, in at least 10 characters")
+    .max(500),
+});
+export type PaymentDeleteInput = z.infer<typeof paymentDeleteSchema>;
+
 /** An empty description field means "cleared", not "unchanged". */
 const optionalText = (max: number) =>
   z

@@ -41,6 +41,31 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.3",
+    date: "2026-08-07",
+    headline: "Delete a payment outright, not only void it.",
+    changes: [
+      {
+        kind: "added",
+        title: "Delete a payment",
+        detail:
+          "In the ⋯ menu on Payments. Voiding keeps the receipt and its details; deleting " +
+          "removes it. It is voided first, so the invoices it paid get their balances back and " +
+          "every rule that refuses a void refuses this too — a refund taken out of it, a " +
+          "matched bank line, a closed period. Administrators only, and it asks why.",
+        route: "/payments",
+      },
+      {
+        kind: "changed",
+        title: "A deleted receipt still leaves a trail",
+        detail:
+          "Its number is written to the document number report so the sequence still adds up, " +
+          "and the audit log keeps what was deleted and who deleted it.",
+        route: "/reports/number-sequence",
+      },
+    ],
+  },
+  {
     version: "1.2",
     date: "2026-08-07",
     headline: "Narrow the transaction list to what you are actually reviewing.",

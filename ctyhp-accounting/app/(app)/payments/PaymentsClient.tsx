@@ -11,7 +11,12 @@ import {
   type MenuProps,
   type TableColumnsType,
 } from "antd";
-import { MoreOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  MoreOutlined,
+  PaperClipOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
@@ -29,9 +34,10 @@ import EditPaymentDetailsModal from "./EditPaymentDetailsModal";
 import PaymentDetailDrawer from "./PaymentDetailDrawer";
 import ReceivePaymentModal, { type ReceivePaymentBasis } from "./ReceivePaymentModal";
 import VoidPaymentModal from "./VoidPaymentModal";
+import DeletePaymentModal from "./DeletePaymentModal";
 import RefundModal from "../settlements/RefundModal";
 
-type PaymentListRow = PaymentRow & { customer_name: string };
+export type PaymentListRow = PaymentRow & { customer_name: string };
 
 const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
   unapplied: { text: "Unapplied", color: "orange" },
@@ -48,6 +54,7 @@ export default function PaymentsClient({
   currencies,
   actors,
   canWrite,
+  canDelete,
   canReadAudit,
   canReadDocuments,
   canManageDocuments,
@@ -62,6 +69,8 @@ export default function PaymentsClient({
   currencies: CurrencyRow[];
   actors: ActorRow[];
   canWrite: boolean;
+  /** Deleting a receipt is an administrator's action, not ordinary bookkeeping. */
+  canDelete: boolean;
   canReadAudit: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
@@ -105,6 +114,8 @@ export default function PaymentsClient({
    * Everything that can be done to one receipt. A void row offers only View and
    * a replacement — it is history, and history is not edited.
    */
+  const [deleteFor, setDeleteFor] = useState<PaymentListRow | null>(null);
+
   function actionsFor(row: PaymentListRow): MenuProps["items"] {
     const live = row.status !== "void";
     return [
@@ -131,6 +142,19 @@ export default function PaymentsClient({
               key: "replace",
               label: "Create replacement",
               onClick: () => openReceive({ mode: "replacement", payment: row }),
+            },
+          ]
+        : []),
+      // Last, and separated: it is the only item here that removes something.
+      ...(canDelete
+        ? [
+            { type: "divider" as const, key: "before-delete" },
+            {
+              key: "delete",
+              label: "Delete payment",
+              icon: <DeleteOutlined />,
+              danger: true,
+              onClick: () => setDeleteFor(row),
             },
           ]
         : []),
@@ -255,6 +279,15 @@ export default function PaymentsClient({
           onDone={() => router.refresh()}
         />
       )}
+
+      <DeletePaymentModal
+        payment={deleteFor}
+        onClose={() => setDeleteFor(null)}
+        onDeleted={() => {
+          setDeleteFor(null);
+          router.refresh();
+        }}
+      />
 
       <VoidPaymentModal
         payment={voidFor}
