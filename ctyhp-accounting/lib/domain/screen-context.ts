@@ -175,11 +175,27 @@ export function describeContextForAssistant(context: AssistantContext): string {
 
   if (screen.summary) lines.push(`- What that screen is for: ${screen.summary}`);
 
+  // The briefing sits in front of every question, so it is budgeted rather than
+  // trimmed by hand. A screen gains workflows over time — /settings/import went
+  // from one to three — and without a ceiling here the next one silently makes
+  // every answer more expensive and eventually truncates somewhere worse.
+  const BUDGET = 3400;
+  let spent = lines.join("\n").length;
+  let dropped = 0;
+  const add = (line: string) => {
+    if (spent + line.length > BUDGET) {
+      dropped += 1;
+      return;
+    }
+    lines.push(line);
+    spent += line.length + 1;
+  };
+
   if (screen.flowsStartingHere.length > 0) {
     for (const flow of screen.flowsStartingHere) {
-      lines.push(`- Workflow "${flow.title}" starts here. Steps:`);
+      add(`- Workflow "${flow.title}" starts here. Steps:`);
       for (const step of flow.steps) {
-        lines.push(
+        add(
           `    * ${step.action} — control "${step.control}"${step.route ? ` on ${step.route}` : ""}` +
             `${step.note ? `. ${step.note}` : ""}`,
         );
@@ -188,12 +204,18 @@ export function describeContextForAssistant(context: AssistantContext): string {
   } else if (screen.flowsPassingThrough.length > 0) {
     for (const entry of screen.flowsPassingThrough) {
       for (const step of entry.steps) {
-        lines.push(
+        add(
           `- Part of "${entry.flow.title}": ${step.action} — control "${step.control}"` +
             `${step.note ? `. ${step.note}` : ""}`,
         );
       }
     }
+  }
+  if (dropped > 0) {
+    lines.push(
+      `- ${dropped} further step(s) on this screen are not listed here. Say so if asked, ` +
+        "and point at the Guide rather than inventing them.",
+    );
   }
 
   lines.push(`- Company open: ${context.companyName}${context.isSampleCompany ? " (a sample company, not real books)" : ""}`);

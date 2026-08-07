@@ -101,6 +101,33 @@ describe("guide notices", () => {
   });
 });
 
+describe("the transactions import flow", () => {
+  const flow = GUIDE_FLOWS.find((candidate) => candidate.id === "import-transactions");
+
+  it("exists beside the ledger one, because they read different files", () => {
+    expect(flow).toBeDefined();
+    expect(flow?.route).toBe("/settings/import");
+  });
+
+  it("warns about the two things that stop the import dead", () => {
+    const text = (flow?.cautions ?? []).map((c) => `${c.title} ${c.body}`).join(" ").toLowerCase();
+    expect(text, "the chart must hold every account").toContain("chart of accounts");
+    expect(text, "the bank must be declared under Banking").toContain("banking");
+  });
+
+  it("says what this file is, so nobody brings the wrong one", () => {
+    const text = `${flow?.purpose} ${(flow?.steps ?? []).map((s) => s.note).join(" ")}`;
+    expect(text).toMatch(/both sides|bank .*and .*account|each row/i);
+  });
+
+  it("shows a picture for every step", () => {
+    for (const step of flow?.steps ?? []) {
+      expect(step.screenshot?.src.startsWith("/guide/txn-"), step.action).toBe(true);
+      expect((step.screenshot?.alt ?? "").length).toBeGreaterThan(15);
+    }
+  });
+});
+
 describe("the import flow", () => {
   const flow = GUIDE_FLOWS.find((candidate) => candidate.id === "import-a-ledger");
 

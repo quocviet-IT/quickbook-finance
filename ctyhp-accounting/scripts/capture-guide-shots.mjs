@@ -127,10 +127,28 @@ function ledgerCsv({ bank, expense, income }, ghost, stamp) {
   ].join("\r\n");
 }
 
+/** A categorized export: every row names both sides, which is what this tab needs. */
+function transactionsCsv(bank, { expense, income }, stamp) {
+  const big = (4000 + stamp).toFixed(2);
+  const small = (100 + (stamp % 90)).toFixed(2);
+  return [
+    "Date,Description,Bank account,Chart of account,Amount",
+    `1/4/2026,Opening float,${bank.name},${income.name},${big}`,
+    `1/9/2026,Card terminal fee,${bank.name},${expense.name},-${small}`,
+    `1/9/2026,Fee waived,${bank.name},${expense.name},0.00`,
+    "",
+  ].join("\r\n");
+}
+
 /** antd's Segmented hides its radio input; the label is what a person clicks. */
 async function chooseLedgerTab(page) {
   await page.locator(".ant-segmented-item", { hasText: "General ledger" }).first().click();
   await page.locator(".ant-upload-drag").first().waitFor({ timeout: 10_000 });
+}
+
+async function chooseTransactionsTab(page) {
+  await page.locator(".ant-segmented-item", { hasText: "Transactions" }).first().click();
+  await page.getByRole("button", { name: "Choose a CSV file" }).waitFor({ timeout: 10_000 });
 }
 
 /** Hide the floating launcher; a style tag does not survive a navigation. */
@@ -171,6 +189,56 @@ async function clearGuideLitter(admin, schema) {
     .in("id", ids);
   if (removeError) throw new Error(`could not clear old shots: ${removeError.message}`);
   return data.length;
+}
+
+/**
+ * Make sure the sample company has one bank account on the Banking screen.
+ *
+ * Without it the transactions tab can only ever show its refusal — the bank
+ * line is what stops a second import posting twice, so a file cannot be
+ * imported without one. This is setup, not litter: it is created once, only in
+ * a sample company, and left in place.
+ */
+async function ensureSampleBankAccount(admin, schema) {
+  const { data: existing } = await admin
+    .schema(schema)
+    .from("acc_bank_account")
+    .select("account_id, acc_account!inner(id,name)")
+    .limit(1);
+  if (existing?.length) {
+    const linked = existing[0].acc_account;
+    return { id: linked.id, name: linked.name, created: false };
+  }
+
+  const { data: accounts, error } = await admin
+    .schema(schema)
+    .from("acc_account")
+    .select("id,account_code,name")
+    .eq("account_type", "bank")
+    .eq("is_posting_account", true)
+    .eq("status", "active")
+    .order("account_code");
+  if (error) throw new Error(`chart unavailable: ${error.message}`);
+  if (!accounts?.length) throw new Error("the sample company has no bank account in its chart");
+
+  // Not every bank-type account may be linked: the database refuses Cash on
+  // Hand, because physical cash is not a bank balance. Take the first the
+  // database actually accepts rather than assuming which that is.
+  const refusals = [];
+  for (const account of accounts) {
+    const { error: insertError } = await admin
+      .schema(schema)
+      .from("acc_bank_account")
+      .insert({
+        account_id: account.id,
+        bank_name: account.name,
+        account_number_masked: "0000",
+        currency_code: "USD",
+      });
+    if (!insertError) return { ...account, created: true };
+    refusals.push(`${account.name}: ${insertError.message.slice(0, 60)}`);
+  }
+  throw new Error(`could not set up banking — ${refusals.join(" | ")}`);
 }
 
 async function savedReportCount(admin, schema) {
@@ -312,8 +380,47 @@ try {
   await page.waitForTimeout(800);
   await shoot(page.locator(".ant-card").first(), "import-07-saved.png", "the file, kept as it arrived");
 
-  // Undo through the real control, so the sample company does not collect a
-  // ledger for every run of this script.
+  // ---- The transactions tab -------------------------------------------------
+  // The file must name the account Banking actually holds — the chart's first
+  // bank account is Cash on Hand, which the database refuses to link because
+  // physical cash is not a bank balance.
+  const bankAccount = await ensureSampleBankAccount(admin, company.schema_name);
+  if (bankAccount.created) console.log(`  setup  linked ${bankAccount.name} under Banking`);
+
+  await page.goto(`${base}/settings/import`, { waitUntil: "networkidle" });
+  await hideChrome(page);
+  await chooseTransactionsTab(page);
+  await page.waitForTimeout(500);
+
+  const beforeYouStart = page.locator(".ant-alert").filter({ hasText: "Before you start" }).first();
+  await shoot(beforeYouStart, "txn-01-before.png", "what has to exist first");
+
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: "transactions.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(transactionsCsv(bankAccount, accounts, stamp), "utf8"),
+  });
+  await page.getByText("Agree the columns").waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(1200);
+
+  const columns = page.locator(".ant-table-wrapper").filter({ hasText: "Column in your file" }).first();
+  await columns.scrollIntoViewIfNeeded();
+  await shoot(columns, "txn-02-columns.png", "the columns One Book proposed");
+
+  await page.getByRole("button", { name: "See what will happen" }).click();
+  await page.getByText("Rows carrying no money").waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(1200);
+  const figures = page.locator(".import-preview__figures").first();
+  await shoot(figures, "txn-03-preview.png", "what the file will do");
+
+  const emptyNote = page
+    .locator(".ant-alert")
+    .filter({ hasText: "carry no money" })
+    .first();
+  await shoot(emptyNote, "txn-04-empty.png", "rows with nothing in them");
+
+  // ---- Undo through the real control, so the sample company does not collect
+  // a ledger for every run of this script.
   await page.goto(`${base}/settings/import`, { waitUntil: "networkidle" });
   await hideChrome(page);
   await chooseLedgerTab(page);

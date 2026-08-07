@@ -412,6 +412,117 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: "import-transactions",
+    title: "Bring across a list of transactions you have already categorized",
+    purpose:
+      "Load an export where every row already says which bank the money moved through and which "
+      + "account it belongs to, so each row can be posted as it stands.",
+    route: "/settings/import",
+    cautions: [
+      {
+        title: "This is not the same file as a general ledger",
+        body:
+          "A general ledger has one row per side of a transaction, grouped under each account. " +
+          "This tab wants the other shape: one row per transaction, naming both the bank and the " +
+          "chart-of-account. If the file is grouped into sections per account, use the General " +
+          "ledger tab instead.",
+      },
+      {
+        title: "Every account the file names must already be in the chart of accounts",
+        body:
+          "A transaction row never creates an account — the same name means different things in " +
+          "two charts, and a typo would become a permanent account. The screen lists every name " +
+          "it cannot find and keeps the button shut until each one exists.",
+      },
+      {
+        title: "The bank accounts have to exist under Banking, not only in the chart",
+        body:
+          "Each row also writes a bank line, and that line is what stops a second import of the " +
+          "same file posting the same money twice. An account that is not of a bank or credit " +
+          "card type cannot be added there at all — point those rows at the account the money " +
+          "really moved through.",
+      },
+      {
+        title: "Importing the same file twice is safe",
+        body:
+          "Rows already brought across are recognised and skipped rather than posted again, so a " +
+          "file that failed halfway can simply be loaded again.",
+      },
+      {
+        title: "Rows carrying no money are left out, and that is not a fault",
+        body:
+          "A waived fee is often written as 0.00. There is nothing to post for those rows. They " +
+          "are counted on their own, apart from rows that really do have a problem.",
+      },
+    ],
+    steps: [
+      {
+        action: "Open the company these transactions belong to, and read what is needed first",
+        control: "Transactions",
+        route: "/settings/import",
+        note:
+          "Everything posts into whichever company is open in the switcher. The panel at the top " +
+          "of the tab names what has to exist before the file will go in.",
+        screenshot: {
+          src: "/guide/txn-01-before.png",
+          alt: "The Before you start panel on the transactions tab, listing the chart of accounts and Banking as prerequisites",
+          caption: "Read this before choosing a file, not after mapping every column.",
+        },
+      },
+      {
+        action: "Choose the file, and check the columns One Book proposed",
+        control: "Choose a CSV file",
+        note:
+          "The columns are matched from the file's own headings and can all be changed. Date and " +
+          "Chart of account are required. Money is either a signed Amount — positive is money " +
+          "into the bank — or a Debit and Credit pair; map one or the other.",
+        screenshot: {
+          src: "/guide/txn-02-columns.png",
+          alt: "The column mapping table with Date, Description, Bank account, Chart of account and Amount matched to the file's headings",
+          caption: "Leave Bank account unmapped to post every row to one account chosen above.",
+        },
+      },
+      {
+        action: "See what will happen before anything happens",
+        control: "See what will happen",
+        note:
+          "How many rows will be created, how many have a genuine problem, how many carry no " +
+          "money, and the net of the transactions — which is a net, not an opening balance.",
+        screenshot: {
+          src: "/guide/txn-03-preview.png",
+          alt: "The figures above the preview: rows to create, rows with problems, rows carrying no money, and the net",
+          caption: "Check the net against the report you exported before importing.",
+        },
+      },
+      {
+        action: "Read anything the screen refuses to import",
+        control: "The panels below the preview",
+        note:
+          "An account the chart does not have, a bank account Banking has not seen, and a name " +
+          "that belongs to two accounts at once each say exactly what to do. None is worth " +
+          "working around: the import posts real money.",
+        screenshot: {
+          src: "/guide/txn-04-empty.png",
+          alt: "The note explaining that rows carrying no money are left out and need no fixing",
+          caption: "A row worth 0.00 is left out quietly. Only real problems are red.",
+        },
+      },
+      {
+        action: "Import, then check the bank",
+        control: "Import",
+        route: "/banking",
+        note:
+          "Each row posts one journal entry and one bank line already marked matched, so " +
+          "connecting a bank feed for the same account later cannot count the same money twice.",
+        screenshot: {
+          src: "/guide/txn-03-preview.png",
+          alt: "The same figures, which are what the import will have posted once it finishes",
+          caption: "What the preview counted is what the import posts.",
+        },
+      },
+    ],
+  },
+  {
     id: "import-a-ledger",
     title: "Bring a company's books across from QuickBooks or Wave",
     purpose:

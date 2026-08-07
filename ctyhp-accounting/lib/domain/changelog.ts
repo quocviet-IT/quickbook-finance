@@ -41,6 +41,30 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.5",
+    date: "2026-08-07",
+    headline: "The guide walks through a transactions import too, step by step.",
+    changes: [
+      {
+        kind: "added",
+        title: "A guided walk-through for importing transactions",
+        detail:
+          "Open Guide on the import screen and read “Bring across a list of transactions you " +
+          "have already categorized”. It starts with what has to exist before you begin, and " +
+          "shows a picture of each step — the same shape as the general ledger walk-through.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "The assistant's briefing no longer grows without limit",
+        detail:
+          "A screen with several workflows was starting to carry more context than it should in " +
+          "front of every question. It is now budgeted, and says plainly when there is more in " +
+          "the Guide than it listed.",
+      },
+    ],
+  },
+  {
     version: "1.4",
     date: "2026-08-07",
     headline: "The import screen says what is actually wrong with a file.",

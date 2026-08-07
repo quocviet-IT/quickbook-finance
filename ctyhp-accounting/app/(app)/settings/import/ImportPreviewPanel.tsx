@@ -51,7 +51,8 @@ export default function ImportPreviewPanel({
 
   return (
     <>
-      <Space size="large" wrap>
+      {/* Named so the guide capture can frame exactly this row. */}
+      <Space size="large" wrap className="import-preview__figures">
         <Statistic title="To create" value={preview.creates} />
         <Statistic title="To update" value={preview.updates} />
         <Statistic
