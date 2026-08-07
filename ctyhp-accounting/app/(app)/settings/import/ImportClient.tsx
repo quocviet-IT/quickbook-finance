@@ -26,9 +26,14 @@ import {
 import ImportColumnsTable from "./ImportColumnsTable";
 import ImportPreviewPanel from "./ImportPreviewPanel";
 import ImportGuidance from "./ImportGuidance";
+import LedgerImportPanel from "./LedgerImportPanel";
 import { detectFileShape } from "@/lib/domain/import-shape";
 import type { ImportPreview } from "@/lib/services/data-import";
-import { previewImportAction, runImportAction, suggestMappingAction } from "./actions";
+import {
+  previewImportAction,
+  runImportAction,
+  suggestMappingAction,
+} from "./actions";
 
 const TARGETS: ImportTarget[] = [
   "chart_of_accounts",
@@ -37,6 +42,7 @@ const TARGETS: ImportTarget[] = [
   "items",
   "invoices",
   "transactions",
+  "general_ledger",
 ];
 
 /**
@@ -77,12 +83,17 @@ export default function ImportClient({
   const [aiFields, setAiFields] = useState<string[]>([]);
 
   const fields = fieldsFor(target);
+  // A ledger export has no columns to agree on, so none of the three steps —
+  // upload, map, preview — apply to it. It gets its own panel instead.
+  const ledgerTab = target === "general_ledger";
   // Derived from the headers already in state: no second copy of the file, and
   // nothing to keep in step when the tab changes.
   const detection = headers.length > 0 ? detectFileShape(headers) : null;
   const money = useCallback(
     (minor: number) =>
-      fromMinor(minor, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals }),
+      fromMinor(minor, baseDecimals).toLocaleString(undefined, {
+        minimumFractionDigits: baseDecimals,
+      }),
     [baseDecimals],
   );
 
@@ -108,7 +119,9 @@ export default function ImportClient({
       // before the model answers, and stays usable if it never does.
       const proposed = proposeMapping(columns, target);
       setHeaders(columns);
-      setRows(records.map((record) => columns.map((column) => record[column] ?? "")));
+      setRows(
+        records.map((record) => columns.map((column) => record[column] ?? "")),
+      );
       setMapping(proposed.columns);
       setUnmapped(proposed.unmapped);
       setAiNote(null);
@@ -171,14 +184,19 @@ export default function ImportClient({
               message="This also posts to the ledger"
               description={
                 <>
-                  Opening balances of <b>{money(preview.openingTotalMinor)}</b> will be brought
-                  across as of {asOf.format("YYYY-MM-DD")}. Opening balances can only be brought
-                  across once — a second attempt is refused rather than doubling the books.
+                  Opening balances of <b>{money(preview.openingTotalMinor)}</b>{" "}
+                  will be brought across as of {asOf.format("YYYY-MM-DD")}.
+                  Opening balances can only be brought across once — a second
+                  attempt is refused rather than doubling the books.
                 </>
               }
             />
           ) : (
-            <Alert type="info" showIcon message="Lists only. Nothing is posted to the ledger." />
+            <Alert
+              type="info"
+              showIcon
+              message="Lists only. Nothing is posted to the ledger."
+            />
           )}
           {!isSampleCompany ? (
             <Alert
@@ -207,7 +225,9 @@ export default function ImportClient({
         const { created, updated, skipped, openingCreated } = res.data;
         message.success(
           `${created} created, ${updated} updated, ${skipped} skipped` +
-            (openingCreated ? `, ${openingCreated} opening balance(s) brought across` : ""),
+            (openingCreated
+              ? `, ${openingCreated} opening balance(s) brought across`
+              : ""),
         );
         reset();
       },
@@ -222,7 +242,11 @@ export default function ImportClient({
         message={
           <>
             Importing into <b>{companyName}</b>
-            {isSampleCompany ? <Tag color="orange" style={{ marginLeft: 8 }}>sample</Tag> : null}
+            {isSampleCompany ? (
+              <Tag color="orange" style={{ marginLeft: 8 }}>
+                sample
+              </Tag>
+            ) : null}
           </>
         }
         description={
@@ -232,15 +256,17 @@ export default function ImportClient({
         }
       />
 
-      <Steps
-        size="small"
-        current={preview ? 2 : headers.length > 0 ? 1 : 0}
-        items={[
-          { title: "Choose and upload" },
-          { title: "Agree the columns" },
-          { title: "See what will happen" },
-        ]}
-      />
+      {ledgerTab ? null : (
+        <Steps
+          size="small"
+          current={preview ? 2 : headers.length > 0 ? 1 : 0}
+          items={[
+            { title: "Choose and upload" },
+            { title: "Agree the columns" },
+            { title: "See what will happen" },
+          ]}
+        />
+      )}
 
       <Space wrap>
         <Segmented
@@ -264,29 +290,48 @@ export default function ImportClient({
             }))}
           />
         ) : null}
-        <Upload accept=".csv,text/csv" showUploadList={false} beforeUpload={readFile}>
-          <Button icon={<UploadOutlined />}>Choose a CSV file</Button>
-        </Upload>
-        {fileName ? <Typography.Text type="secondary">{fileName}</Typography.Text> : null}
+        {ledgerTab ? null : (
+          <Upload
+            accept=".csv,text/csv"
+            showUploadList={false}
+            beforeUpload={readFile}
+          >
+            <Button icon={<UploadOutlined />}>Choose a CSV file</Button>
+          </Upload>
+        )}
+        {fileName && !ledgerTab ? (
+          <Typography.Text type="secondary">{fileName}</Typography.Text>
+        ) : null}
       </Space>
 
-      <ImportGuidance
-        target={target}
-        detection={detection}
-        onSwitchTarget={(next) => {
-          setTarget(next);
-          // Re-propose against the same file rather than making them upload it
-          // again: the file was never the problem, the tab was.
-          if (headers.length > 0) {
-            const proposed = proposeMapping(headers, next);
-            setMapping(proposed.columns);
-            setUnmapped(proposed.unmapped);
-            setPreview(null);
-          }
-        }}
-      />
+      {ledgerTab ? (
+        <LedgerImportPanel
+          companyName={companyName}
+          isSampleCompany={isSampleCompany}
+          baseDecimals={baseDecimals}
+          canManage
+        />
+      ) : null}
 
-      {headers.length > 0 ? (
+      {ledgerTab ? null : (
+        <ImportGuidance
+          target={target}
+          detection={detection}
+          onSwitchTarget={(next) => {
+            setTarget(next);
+            // Re-propose against the same file rather than making them upload it
+            // again: the file was never the problem, the tab was.
+            if (headers.length > 0) {
+              const proposed = proposeMapping(headers, next);
+              setMapping(proposed.columns);
+              setUnmapped(proposed.unmapped);
+              setPreview(null);
+            }
+          }}
+        />
+      )}
+
+      {headers.length > 0 && !ledgerTab ? (
         <>
           <ImportColumnsTable
             fields={fields}
@@ -302,7 +347,12 @@ export default function ImportClient({
           />
 
           <Space wrap>
-            <Button type="primary" onClick={runPreview} loading={busy} disabled={missingRequired.length > 0}>
+            <Button
+              type="primary"
+              onClick={runPreview}
+              loading={busy}
+              disabled={missingRequired.length > 0}
+            >
               See what will happen
             </Button>
             {missingRequired.length > 0 ? (
@@ -314,7 +364,7 @@ export default function ImportClient({
         </>
       ) : null}
 
-      {preview ? (
+      {preview && !ledgerTab ? (
         <ImportPreviewPanel
           preview={preview}
           target={target}

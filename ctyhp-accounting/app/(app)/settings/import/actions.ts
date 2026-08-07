@@ -10,6 +10,14 @@ import {
   type ImportPreview,
 } from "@/lib/services/data-import";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
+import type { WaveLedgerEntry } from "@/lib/domain/wave-ledger";
+import {
+  importLedgerBatch,
+  linkImportBatchReport,
+  listImportBatches,
+  voidImportBatch,
+  type ImportBatchRow,
+} from "@/lib/services/ledger-import";
 import { suggestMapping } from "@/lib/ai/suggest-mapping";
 
 export interface ActionResult<T = undefined> {
@@ -105,6 +113,72 @@ export async function suggestMappingAction(
   if (denied) return { ok: false, error: denied };
   try {
     return { ok: true, data: await suggestMapping(headers, target) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+// --- The general ledger tab -------------------------------------------------
+//
+// A ledger export has no columns to agree on, so these actions carry a parsed
+// file rather than a mapping. `guard("general_ledger")` lands on the same
+// canWrite check the rest of the import uses, and the RPC checks again.
+
+export async function importLedgerAction(
+  mode: "history" | "balances",
+  fileName: string,
+  sha256: string,
+  entries: WaveLedgerEntry[],
+): Promise<ActionResult<{ batchId: string; entries: number; lines: number }>> {
+  const denied = await guard("general_ledger");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const result = await importLedgerBatch(sb, { mode, fileName, sha256, entries });
+    revalidatePath("/reports");
+    revalidatePath("/journal");
+    return { ok: true, data: result };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function listImportBatchesAction(): Promise<ActionResult<ImportBatchRow[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listImportBatches(sb) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function voidImportBatchAction(
+  batchId: string,
+  reason: string,
+): Promise<ActionResult<{ voided: number }>> {
+  const denied = await guard("general_ledger");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const voided = await voidImportBatch(sb, batchId, reason);
+    revalidatePath("/reports");
+    revalidatePath("/journal");
+    return { ok: true, data: { voided } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function linkImportBatchReportAction(
+  batchId: string,
+  reportId: string,
+): Promise<ActionResult> {
+  const denied = await guard("general_ledger");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    await linkImportBatchReport(sb, batchId, reportId);
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

@@ -12,12 +12,12 @@ interface RpcArgs {
 }
 
 function stubClient(response: { data?: unknown; error?: { message: string } }) {
-  // The argument type is declared so the assertions below can read what was
-  // sent; an argument-less mock hides the payload from the type checker.
-  const rpc = vi.fn(async (_name: string, _args: RpcArgs) => ({
-    data: response.data ?? null,
-    error: response.error ?? null,
-  }));
+  // The signature is declared on the generic rather than as parameters, so the
+  // assertions below can read what was sent without the mock carrying two
+  // arguments it never looks at.
+  const rpc = vi.fn<(name: string, args: RpcArgs) => Promise<{ data: unknown; error: unknown }>>(
+    async () => ({ data: response.data ?? null, error: response.error ?? null }),
+  );
   return { client: { rpc } as never, rpc };
 }
 
