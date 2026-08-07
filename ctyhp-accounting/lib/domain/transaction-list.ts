@@ -27,6 +27,97 @@ export interface TransactionListRow {
   amountMinor: Minor;
   currencyCode: string;
   reconciled: boolean;
+  /**
+   * Every account the entry touched.
+   *
+   * The labels above collapse to "— Split —" when a side hit more than one
+   * account, so they cannot answer "did this entry touch 6010". This can.
+   */
+  accountIds: string[];
+}
+
+/**
+ * The choice standing for rows with no customer or vendor.
+ *
+ * A sentinel rather than null, because a Select needs a value and an empty
+ * string cannot be told apart from "nothing chosen". The brackets keep it clear
+ * of any real customer or vendor name.
+ */
+export const NO_PARTY = "[no party]";
+
+export interface TransactionListFilter {
+  /** An exact party name, or NO_PARTY for rows without one. */
+  party: string | null;
+  accountId: string | null;
+  sourceType: string | null;
+  reconciled: "all" | "yes" | "no";
+  /** Matched against description, entry number, party and both labels. */
+  search: string;
+}
+
+/**
+ * Narrow the rows already on screen.
+ *
+ * Every filter here works on rows the browser holds. Only the date range is a
+ * query, because the range is what was asked of the database.
+ */
+export function filterTransactionList(
+  rows: TransactionListRow[],
+  filter: TransactionListFilter,
+): TransactionListRow[] {
+  const search = filter.search.trim().toLowerCase();
+  return rows.filter((row) => {
+    if (filter.party !== null) {
+      const party = row.partyName ?? NO_PARTY;
+      if (party !== filter.party) return false;
+    }
+    // Any line, not the label: a split entry touching this account must stay.
+    if (filter.accountId !== null && !row.accountIds.includes(filter.accountId)) return false;
+    if (filter.sourceType !== null && row.sourceType !== filter.sourceType) return false;
+    if (filter.reconciled !== "all" && row.reconciled !== (filter.reconciled === "yes")) {
+      return false;
+    }
+    if (search) {
+      const haystack = [
+        row.description,
+        row.entryNumber,
+        row.partyName ?? "",
+        row.categoryLabel ?? "",
+        row.moneyLabel ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * What to offer in the dropdowns, taken from the rows on screen.
+ *
+ * Not the whole chart of accounts: a list of everything makes the reader hunt
+ * for the entries that have anything in them, and choosing one that is absent
+ * empties the table in a way that looks like a fault.
+ */
+export function transactionListChoices(rows: TransactionListRow[]): {
+  parties: string[];
+  accountIds: string[];
+  sourceTypes: string[];
+} {
+  const parties = new Set<string>();
+  const accountIds = new Set<string>();
+  const sourceTypes = new Set<string>();
+  for (const row of rows) {
+    if (row.partyName) parties.add(row.partyName);
+    for (const id of row.accountIds) accountIds.add(id);
+    if (row.sourceType) sourceTypes.add(row.sourceType);
+  }
+  return {
+    parties: [...parties].sort((a, b) => a.localeCompare(b)),
+    accountIds: [...accountIds].sort(),
+    sourceTypes: [...sourceTypes].sort(),
+  };
 }
 
 export interface TransactionListTotals {

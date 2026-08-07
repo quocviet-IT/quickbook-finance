@@ -17,6 +17,7 @@ const row = (over: Partial<TransactionListRow> = {}): TransactionListRow => ({
   amountMinor: -125_000,
   currencyCode: "USD",
   reconciled: false,
+  accountIds: [],
   ...over,
 });
 

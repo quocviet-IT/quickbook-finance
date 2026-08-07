@@ -1,17 +1,33 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, DatePicker, Select, Space, Statistic, Tag, Typography } from "antd";
+import { Button, Card, DatePicker, Input, Select, Space, Statistic, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import {
   buildTransactionListSheet,
+  filterTransactionList,
+  NO_PARTY,
+  transactionListChoices,
   transactionListTotals,
+  type TransactionListFilter,
   type TransactionListRow,
 } from "@/lib/domain/transaction-list";
 import { formatMoney } from "@/lib/format";
+
+const NO_FILTER: TransactionListFilter = {
+  party: null,
+  accountId: null,
+  sourceType: null,
+  reconciled: "all",
+  search: "",
+};
+
+function documentTypeLabel(sourceType: string): string {
+  return sourceType.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+}
 
 export default function TransactionListClient({
   rows,
@@ -20,6 +36,7 @@ export default function TransactionListClient({
   companyName,
   baseCurrency,
   baseDecimals,
+  accountNames,
 }: {
   rows: TransactionListRow[];
   from: string;
@@ -27,21 +44,32 @@ export default function TransactionListClient({
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  /** Account id to "code — name", for labelling the account filter. */
+  accountNames: Record<string, string>;
 }) {
   const router = useRouter();
   const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs(from), dayjs(to)]);
-  const [reconciledFilter, setReconciledFilter] = useState<"all" | "yes" | "no">("all");
+  const [filter, setFilter] = useState<TransactionListFilter>(NO_FILTER);
 
-  const visible = useMemo(
-    () =>
-      reconciledFilter === "all"
-        ? rows
-        : rows.filter((row) => row.reconciled === (reconciledFilter === "yes")),
-    [rows, reconciledFilter],
-  );
+  const choices = useMemo(() => transactionListChoices(rows), [rows]);
+  const visible = useMemo(() => filterTransactionList(rows, filter), [rows, filter]);
 
+  const narrowed =
+    filter.party !== null ||
+    filter.accountId !== null ||
+    filter.sourceType !== null ||
+    filter.reconciled !== "all" ||
+    filter.search.trim() !== "";
+
+  // The figures and the export follow what is on screen. An export that does
+  // not match the table is how a report stops being believed.
   const totals = transactionListTotals(visible);
   const money = (minor: number) => formatMoney(minor, baseCurrency, baseDecimals);
+
+  const set = <K extends keyof TransactionListFilter>(
+    key: K,
+    value: TransactionListFilter[K],
+  ) => setFilter((previous) => ({ ...previous, [key]: value }));
 
   // The range is a server round-trip because the range is what the query is;
   // filtering it in the browser would only ever hide rows already fetched.
@@ -96,17 +124,73 @@ export default function TransactionListClient({
           <Button type="primary" onClick={applyRange}>
             Apply
           </Button>
+
+          <Input.Search
+            allowClear
+            placeholder="Search description, number, name"
+            style={{ width: 260 }}
+            value={filter.search}
+            onChange={(event) => set("search", event.target.value)}
+          />
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            aria-label="Filter by customer or vendor"
+            placeholder="Customer or vendor"
+            style={{ minWidth: 210 }}
+            value={filter.party ?? undefined}
+            onChange={(value) => set("party", value ?? null)}
+            options={[
+              ...choices.parties.map((party) => ({ value: party, label: party })),
+              { value: NO_PARTY, label: "— No customer or vendor —" },
+            ]}
+          />
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            aria-label="Filter by account"
+            placeholder="Account"
+            style={{ minWidth: 240 }}
+            value={filter.accountId ?? undefined}
+            onChange={(value) => set("accountId", value ?? null)}
+            options={choices.accountIds.map((id) => ({
+              value: id,
+              label: accountNames[id] ?? "An account no longer in the chart",
+            }))}
+          />
+          <Select
+            allowClear
+            aria-label="Filter by document type"
+            placeholder="Document type"
+            style={{ minWidth: 170 }}
+            value={filter.sourceType ?? undefined}
+            onChange={(value) => set("sourceType", value ?? null)}
+            options={choices.sourceTypes.map((type) => ({
+              value: type,
+              label: documentTypeLabel(type),
+            }))}
+          />
           <Select
             aria-label="Filter by reconciled"
-            value={reconciledFilter}
+            value={filter.reconciled}
             style={{ minWidth: 170 }}
-            onChange={setReconciledFilter}
+            onChange={(value) => set("reconciled", value)}
             options={[
               { value: "all", label: "All transactions" },
               { value: "no", label: "Not reconciled" },
               { value: "yes", label: "Reconciled" },
             ]}
           />
+          {narrowed ? (
+            <Space size={8}>
+              <Button onClick={() => setFilter(NO_FILTER)}>Clear filters</Button>
+              <Typography.Text type="secondary">
+                Showing {visible.length} of {rows.length}
+              </Typography.Text>
+            </Space>
+          ) : null}
         </Space>
       </FilterBar>
 
@@ -115,8 +199,12 @@ export default function TransactionListClient({
         dataSource={visible}
         pagination={{ pageSize: 50 }}
         sticky
-        emptyTitle="No transactions in this range"
-        emptyDescription="Widen the dates, or post a document to see it here."
+        emptyTitle={narrowed ? "Nothing matches these filters" : "No transactions in this range"}
+        emptyDescription={
+          narrowed
+            ? "Clear a filter, or widen the dates."
+            : "Widen the dates, or post a document to see it here."
+        }
         columns={[
           { title: "Date", dataIndex: "entryDate", width: 115 },
           {

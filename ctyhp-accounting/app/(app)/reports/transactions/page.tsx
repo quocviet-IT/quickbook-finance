@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
+import { listAccounts } from "@/lib/services/accounts";
 import { getTransactionList } from "@/lib/services/reports";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { resolveActiveCompany } from "@/lib/db/company";
@@ -32,10 +33,13 @@ export default async function TransactionListPage({
   const sb = await createSupabaseServerClient();
 
   const entity = await resolveActiveCompany();
-  const [rows, currencies, settings] = await Promise.all([
+  const [rows, currencies, settings, accounts] = await Promise.all([
     getTransactionList(sb, from, to),
     listCurrencies(sb),
     getCurrentCompanySettings(sb),
+    // Only to label the account filter. The rows decide which accounts are
+    // offered; the chart decides what each one is called.
+    listAccounts(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
 
@@ -59,6 +63,12 @@ export default async function TransactionListPage({
         companyName={settings?.legal_name ?? "This company"}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        accountNames={Object.fromEntries(
+          accounts.map((account) => [
+            account.id,
+            `${account.account_code} — ${account.name}`,
+          ]),
+        )}
       />
     </div>
   );

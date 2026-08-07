@@ -48,5 +48,8 @@ export async function getTransactionList(
     amountMinor: Number(r.amount_minor),
     currencyCode: r.currency_code as string,
     reconciled: Boolean(r.reconciled),
+    // Postgres hands back a uuid[]; an older function that predates 0105 would
+    // send nothing, and an empty list simply matches no account filter.
+    accountIds: ((r.account_ids as string[] | null) ?? []).map(String),
   }));
 }
