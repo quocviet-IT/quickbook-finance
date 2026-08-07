@@ -98,7 +98,7 @@ export function waveLedgerPayload(
 ): WaveLedgerEntry[];
 ```
 
-- [ ] **Step 1: Write the fixtures**
+- [x] **Step 1: Write the fixtures**
 
 Create `ctyhp-accounting/tests/fixtures/wave-account-transactions.csv`. Every trap from the real file is here: the first account named in column 0, later accounts named in column 1, an account repeating its name on every row, all three markers, a zero-amount row, money with commas and parentheses, and an en dash in an account name.
 
@@ -145,7 +145,7 @@ Totals and Ending Balance,,,$100.00,$0.00,$100.00
 Totals and Ending Balance,,,$0.00,$60.00,$60.00
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/wave-ledger.test.ts`:
 
@@ -299,7 +299,7 @@ describe("waveLedgerPayload", () => {
 });
 ```
 
-- [ ] **Step 3: Run it and watch it fail**
+- [x] **Step 3: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -308,7 +308,7 @@ npx vitest run tests/unit/wave-ledger.test.ts
 
 Expected: FAIL — `Failed to resolve import "@/lib/domain/wave-ledger"`.
 
-- [ ] **Step 4: Write the parser**
+- [x] **Step 4: Write the parser**
 
 Create `ctyhp-accounting/lib/domain/wave-ledger.ts`:
 
@@ -537,7 +537,7 @@ export function parseWaveLedgerText(text: string): WaveLedgerParse {
 }
 ```
 
-- [ ] **Step 5: Run the tests and watch them pass**
+- [x] **Step 5: Run the tests and watch them pass**
 
 ```
 cd ctyhp-accounting
@@ -546,7 +546,7 @@ npx vitest run tests/unit/wave-ledger.test.ts
 
 Expected: PASS, 16 tests. If `sections` includes a phantom account, the section-detection rule is matching a data row — fix the rule, not the test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -567,7 +567,7 @@ git commit -m "Read a general ledger whose rows are each half a transaction"
 - Consumes: nothing from Task 1.
 - Produces: `ImportTarget` gains `"general_ledger"`; `TARGET_LABEL.general_ledger === "General ledger"`; `fieldsFor("general_ledger")` returns `[]`; `detectFileShape` returns `target: "general_ledger"` for a Wave ledger header.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `ctyhp-accounting/tests/unit/import-shape.test.ts`:
 
@@ -599,7 +599,7 @@ describe("a Wave Account Transactions header", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -608,7 +608,7 @@ npx vitest run tests/unit/import-shape.test.ts
 
 Expected: FAIL — `expected 'chart_of_accounts' to be 'general_ledger'`.
 
-- [ ] **Step 3: Register the target**
+- [x] **Step 3: Register the target**
 
 In `ctyhp-accounting/lib/domain/import-mapping.ts`, extend the union (around line 23):
 
@@ -638,7 +638,7 @@ Add to `fieldsFor` (around line 351), before the closing brace of the switch:
       return [];
 ```
 
-- [ ] **Step 4: Point the detection at the tab**
+- [x] **Step 4: Point the detection at the tab**
 
 In `ctyhp-accounting/lib/domain/import-shape.ts`, inside `detectFileShape`, replace the `return` object's `target` line so the Wave report wins over the best column match. The function currently ends:
 
@@ -681,7 +681,7 @@ And rewrite the Wave branch of `describeShapeMismatch` (around line 159):
   }
 ```
 
-- [ ] **Step 5: Run the tests and watch them pass**
+- [x] **Step 5: Run the tests and watch them pass**
 
 ```
 cd ctyhp-accounting
@@ -691,7 +691,7 @@ npm run typecheck
 
 Expected: both suites pass and typecheck is clean. Typecheck is the point of this step: `fieldsFor` and `TARGET_LABEL` are exhaustive over `ImportTarget`, so a missed case fails here rather than at runtime.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -717,7 +717,7 @@ git commit -m "Send a general ledger to the tab that can read it"
   - `acc_link_import_batch_report(p_batch_id uuid, p_report_id uuid) returns void`
   - tables `acc_import_batch`, `acc_import_batch_entry`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/ledger-import-migration.test.ts`:
 
@@ -772,7 +772,7 @@ describe("0102_import_ledger_batches", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -781,7 +781,7 @@ npx vitest run tests/unit/ledger-import-migration.test.ts
 
 Expected: FAIL — `ENOENT: no such file or directory … 0102_import_ledger_batches.sql`.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `ctyhp-accounting/supabase/migrations/0102_import_ledger_batches.sql`:
 
@@ -1104,7 +1104,7 @@ revoke all on function acc_link_import_batch_report(uuid, uuid) from public, ano
 grant execute on function acc_link_import_batch_report(uuid, uuid) to authenticated, service_role;
 ```
 
-- [ ] **Step 4: Run the migration test and watch it pass**
+- [x] **Step 4: Run the migration test and watch it pass**
 
 ```
 cd ctyhp-accounting
@@ -1113,7 +1113,7 @@ npx vitest run tests/unit/ledger-import-migration.test.ts
 
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Write the rollback-only harness**
+- [x] **Step 5: Write the rollback-only harness**
 
 Create `ctyhp-accounting/scripts/verify-ledger-import.mjs`:
 
@@ -1412,7 +1412,7 @@ console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 ```
 
-- [ ] **Step 6: Register the script**
+- [x] **Step 6: Register the script**
 
 In `ctyhp-accounting/package.json`, after the `"verify:saved-report-bucket"` line, add:
 
@@ -1420,7 +1420,7 @@ In `ctyhp-accounting/package.json`, after the `"verify:saved-report-bucket"` lin
     "verify:ledger-import": "node --env-file=.env.local scripts/verify-ledger-import.mjs",
 ```
 
-- [ ] **Step 7: Run the harness against the live database**
+- [x] **Step 7: Run the harness against the live database**
 
 ```
 cd ctyhp-accounting
@@ -1429,7 +1429,7 @@ npm run verify:ledger-import
 
 Expected: every scenario PASS, then `ROLLBACK — no entry and no batch was kept.` A failure here is a defect in the migration, not in the harness. If the happy-path dates fall in a closed period, move them forward — do not weaken a guard to make a test pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -1466,7 +1466,7 @@ export async function voidImportBatch(sb: SupabaseClient, batchId: string, reaso
 export async function linkImportBatchReport(sb: SupabaseClient, batchId: string, reportId: string): Promise<void>;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `ctyhp-accounting/tests/unit/ledger-import-service.test.ts`:
 
@@ -1556,7 +1556,7 @@ describe("voidImportBatch", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```
 cd ctyhp-accounting
@@ -1565,7 +1565,7 @@ npx vitest run tests/unit/ledger-import-service.test.ts
 
 Expected: FAIL — `Cannot find package '@/lib/services/ledger-import'`.
 
-- [ ] **Step 3: Write the service**
+- [x] **Step 3: Write the service**
 
 Create `ctyhp-accounting/lib/services/ledger-import.ts`:
 
@@ -1668,7 +1668,7 @@ export async function linkImportBatchReport(
 }
 ```
 
-- [ ] **Step 4: Run the tests and watch them pass**
+- [x] **Step 4: Run the tests and watch them pass**
 
 ```
 cd ctyhp-accounting
@@ -1678,7 +1678,7 @@ npm run typecheck
 
 Expected: PASS, 5 tests, and typecheck clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -1708,7 +1708,7 @@ git commit -m "Carry a parsed ledger to the one function that posts it"
   - `saveLedgerCopy(file: File, parse: WaveLedgerParse): Promise<{ ok: boolean; reportId?: string; error?: string }>`
   - `LedgerBatchList` props `{ batches: ImportBatchRow[]; canManage: boolean; onChanged: () => void }`
 
-- [ ] **Step 1: Add the actions**
+- [x] **Step 1: Add the actions**
 
 In `ctyhp-accounting/app/(app)/settings/import/actions.ts`, add these imports at the top alongside the existing ones:
 
@@ -1794,7 +1794,7 @@ export async function linkImportBatchReportAction(
 `msg` already covers `LedgerImportError`, so do not import that class here — an
 unused import fails lint.
 
-- [ ] **Step 2: Write the past-imports list**
+- [x] **Step 2: Write the past-imports list**
 
 Create `ctyhp-accounting/app/(app)/settings/import/LedgerBatchList.tsx`:
 
@@ -1914,7 +1914,7 @@ export default function LedgerBatchList({ batches, canManage, onChanged }: Ledge
 }
 ```
 
-- [ ] **Step 3: Write the import panel**
+- [x] **Step 3: Write the import panel**
 
 Create `ctyhp-accounting/app/(app)/settings/import/LedgerImportPanel.tsx`:
 
@@ -2185,7 +2185,7 @@ export default function LedgerImportPanel({
 }
 ```
 
-- [ ] **Step 4: Write the saved-copy helper**
+- [x] **Step 4: Write the saved-copy helper**
 
 Create `ctyhp-accounting/app/(app)/settings/import/saveLedgerCopy.ts`:
 
@@ -2238,7 +2238,7 @@ export async function saveLedgerCopy(
 }
 ```
 
-- [ ] **Step 5: Route the tab**
+- [x] **Step 5: Route the tab**
 
 In `ctyhp-accounting/app/(app)/settings/import/ImportClient.tsx`:
 
@@ -2282,7 +2282,7 @@ Nothing else in the file changes. `canManage` is passed as a literal `true`
 because reaching `/settings/import` at all already requires admin or accountant
 (`requireSettingsAccess`), and the action and the RPC each check again.
 
-- [ ] **Step 6: Check the types and the line count**
+- [x] **Step 6: Check the types and the line count**
 
 ```
 cd ctyhp-accounting
@@ -2292,7 +2292,7 @@ npx wc -l "app/(app)/settings/import/ImportClient.tsx" "app/(app)/settings/impor
 
 Expected: typecheck clean and every file under 400 lines. If `LedgerImportPanel.tsx` is over, move the section table's `columns` array into a `sectionColumns(money)` function in the same file.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -2307,7 +2307,7 @@ git commit -m "Give the general ledger a tab that reads it whole"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-06-wave-ledger-import.md` (tick the boxes)
 
-- [ ] **Step 1: Run every gate**
+- [x] **Step 1: Run every gate**
 
 ```
 cd ctyhp-accounting
@@ -2320,7 +2320,7 @@ npm run build
 
 Expected: tests pass; typecheck silent; lint 0 errors (the 11 pre-existing warnings in `scripts/verify-*.mjs` are known); the credential check prints nothing; the build completes. Paste the real output. Do not proceed past a failure.
 
-- [ ] **Step 2: Run the parser over the real file, and check it against Wave's own numbers**
+- [x] **Step 2: Run the parser over the real file, and check it against Wave's own numbers**
 
 The real file lives at the repository root and must not be committed. The domain
 modules are TypeScript behind an `@/` alias, so plain `node` cannot import them —
@@ -2382,7 +2382,7 @@ rm tests/unit/zz-realfile.test.ts realfile.txt
 
 Expected: PASS. A mismatch here means the parser is wrong about the real file even though the fixtures pass — fix the parser and add whatever the real file does to the fixture.
 
-- [ ] **Step 3: Re-run the behavioural harness**
+- [x] **Step 3: Re-run the behavioural harness**
 
 ```
 cd ctyhp-accounting
@@ -2391,7 +2391,7 @@ npm run verify:ledger-import
 
 Expected: all scenarios PASS, then `ROLLBACK`.
 
-- [ ] **Step 4: Smoke the built server**
+- [x] **Step 4: Smoke the built server**
 
 Start the built server detached from PowerShell — `npm start` dies when launched from the Bash tool, and a wall of `fetch failed` means the server is gone rather than the pages being broken:
 
@@ -2401,7 +2401,7 @@ node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000
 
 Expected: 56 of 56 pages, including `/settings/import`. Stop the server afterwards.
 
-- [ ] **Step 5: Apply 0102 to every company schema**
+- [x] **Step 5: Apply 0102 to every company schema**
 
 ```
 cd ctyhp-accounting
@@ -2417,7 +2417,7 @@ node --env-file=.env.local -e "const pg=require('pg');(async()=>{const c=new pg.
 
 Expected: all three functions in all five schemas, fifteen rows.
 
-- [ ] **Step 6: Tick the plan and commit**
+- [x] **Step 6: Tick the plan and commit**
 
 ```bash
 cd /c/Users/pit010/QUICKBOOK_WEBAPP
@@ -2425,7 +2425,7 @@ git add docs/superpowers/plans/2026-08-06-wave-ledger-import.md
 git commit -m "Record the ledger import plan as executed"
 ```
 
-- [ ] **Step 7: Report to the user, in Vietnamese**
+- [x] **Step 7: Report to the user, in Vietnamese**
 
 State plainly:
 
@@ -2434,3 +2434,31 @@ State plainly:
 - That the history mode posts into past periods, which is what a migration means.
 - Which feedback report this closes: `428ca4db`. Resolve it **by hand** in `/settings/feedback`, never from a script — and only after the user agrees the file now has somewhere to go.
 - That all four slices of the import work are now done.
+
+## Executed 2026-08-07
+
+All six tasks done. Three things the plan did not foresee:
+
+* Two existing tests in `tests/unit/import-shape.test.ts` asserted the Wave
+  report "has no tab yet" and that its column coverage was partial. Both became
+  false the moment the tab existed, so they were rewritten rather than worked
+  around.
+* `fieldsFor` and `SOURCE_HINT` are exhaustive over `ImportTarget`, so adding
+  the target broke typecheck in two places until both were filled in. That is
+  the guard doing its job.
+* The service test's Supabase stub had to declare its call signature on
+  `vi.fn`'s generic; naming the parameters instead left two unused-variable
+  warnings on a repository that had none of its own.
+
+**The real file, run through the parser once and then deleted:** 26 accounts,
+554 entries, 2,956 lines, 198 zero rows skipped, total debits
+**$53,182,909.72**, **zero** unbalanced dates and **zero** accounts where our
+sums disagree with Wave's own *Totals and Ending Balance* rows.
+
+Gates: `npm test` 1116 passed / 113 files · typecheck clean · lint 0 errors
+(11 pre-existing warnings) · `security:check-source` silent · build compiled in
+56s · smoke **56/56 pages**. `npm run verify:ledger-import` 18/18 then ROLLBACK.
+Migration 0102 applied to `public`, `co_pc_49`, `co_north_star`,
+`co_harbor_gems`, `co_cascade_metals` — four functions and two tables in each,
+and `acc_normalize_ref` proven on the live database to make an en dash match a
+hyphen.
