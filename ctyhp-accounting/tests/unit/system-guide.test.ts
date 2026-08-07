@@ -97,3 +97,37 @@ describe("guide notices", () => {
     expect(provenance?.body.toLowerCase()).toContain("after this test round");
   });
 });
+
+describe("the import flow", () => {
+  const flow = GUIDE_FLOWS.find((candidate) => candidate.id === "import-a-ledger");
+
+  it("exists, because a migration is the first thing a new company does", () => {
+    expect(flow).toBeDefined();
+    expect(flow?.route).toBe("/settings/import");
+  });
+
+  it("warns before it instructs — an import posts, and some of it cannot be undone", () => {
+    expect(flow?.cautions?.length ?? 0).toBeGreaterThanOrEqual(3);
+    const text = (flow?.cautions ?? []).map((c) => `${c.title} ${c.body}`).join(" ").toLowerCase();
+    expect(text, "must say which company it posts into").toContain("company");
+    expect(text, "must say a closed period blocks the undo").toContain("closed period");
+    expect(text, "must say the chart has to hold every account first").toContain("chart of accounts");
+  });
+
+  it("shows a picture for every step, since that is what was asked for", () => {
+    for (const step of flow?.steps ?? []) {
+      expect(step.screenshot, `${step.action} has no screenshot`).toBeTruthy();
+      expect(step.screenshot?.src.startsWith("/guide/")).toBe(true);
+      expect((step.screenshot?.alt ?? "").length, "a screenshot needs an alt text").toBeGreaterThan(
+        15,
+      );
+    }
+  });
+
+  it("keeps every caution short enough to be read before clicking", () => {
+    for (const caution of flow?.cautions ?? []) {
+      expect(caution.title.length).toBeLessThan(70);
+      expect(caution.body.length).toBeGreaterThan(40);
+    }
+  });
+});

@@ -7,6 +7,22 @@
  * renamed is worse than no guide at all.
  */
 
+/**
+ * A picture of the step, captured from the running application by
+ * `scripts/capture-guide-shots.mjs`.
+ *
+ * Only ever captured against a sample company: a screenshot of a real screen
+ * carries whatever was on it, and these books hold a customer's bank history.
+ */
+export interface GuideShot {
+  /** Path under `public/`, so it is served without a route of its own. */
+  src: string;
+  /** What the picture shows, for a reader who cannot see it. */
+  alt: string;
+  /** One line under the image, when the picture needs pointing at. */
+  caption?: string;
+}
+
 export interface GuideStep {
   /** What the user is trying to achieve. */
   action: string;
@@ -16,6 +32,19 @@ export interface GuideStep {
   route?: string;
   /** What the system does behind the control, or the rule that can block it. */
   note?: string;
+  screenshot?: GuideShot;
+}
+
+/**
+ * Something to settle before the first step, not while recovering from it.
+ *
+ * Most flows need none. A flow earns one when a step is hard to reverse — an
+ * import posts three years of ledger, and a period closed afterwards puts part
+ * of it beyond undo.
+ */
+export interface GuideCaution {
+  title: string;
+  body: string;
 }
 
 export interface GuideFlow {
@@ -25,6 +54,8 @@ export interface GuideFlow {
   purpose: string;
   /** Where the flow starts. */
   route: string;
+  /** Read before step one. */
+  cautions?: GuideCaution[];
   steps: GuideStep[];
 }
 
@@ -373,6 +404,152 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Audit history",
         route: "/settings/audit",
         note: "Every protected write records the actor, the action and the before and after values.",
+      },
+    ],
+  },
+  {
+    id: "import-a-ledger",
+    title: "Bring a company's books across from QuickBooks or Wave",
+    purpose:
+      "Load a general ledger exported from another product so its accounts, its " +
+      "history and its balances live in One Book.",
+    route: "/settings/import",
+    cautions: [
+      {
+        title: "Check which company you are in first",
+        body:
+          "An import posts into the company open in the switcher at the top of the " +
+          "screen, and it says which one on the button before you press it. There is " +
+          "no way to move an import from one company to another afterwards.",
+      },
+      {
+        title: "The chart of accounts must already hold every account the file names",
+        body:
+          "A ledger row never creates an account: the same name means different " +
+          "things in two charts, and a typo would become a permanent account. The " +
+          "screen lists every name it cannot find and keeps the button shut until " +
+          "each one exists. Import the chart of accounts first, or add the few that " +
+          "are missing by hand.",
+      },
+      {
+        title: "Undo works only while the period is still open",
+        body:
+          "An import can be undone from the list at the bottom of the tab, which " +
+          "voids every entry it created. An entry dated in a closed period cannot be " +
+          "voided at all — the refusal says so in those words — so a mistake there has " +
+          "to be corrected with a reversing entry instead. Do not close a period until " +
+          "you have checked the import against the report you exported.",
+      },
+      {
+        title: "The same file cannot be imported twice",
+        body:
+          "One Book remembers the file, not the file name, so a second attempt is " +
+          "refused even if you rename it or pick the other mode. That is deliberate: " +
+          "a doubled ledger balances perfectly and looks entirely correct.",
+      },
+      {
+        title: "Try it on a sample company before the real books",
+        body:
+          "A sample company can be thrown away. Load the file there first, read the " +
+          "Trial Balance, and only then do it for real.",
+      },
+    ],
+    steps: [
+      {
+        action: "Open the company these books belong to",
+        control: "The company switcher",
+        route: "/settings/import",
+        note:
+          "Everything below posts into whichever company is open here. The import " +
+          "button repeats the name so it cannot be missed.",
+        screenshot: {
+          src: "/guide/import-01-tab.png",
+          alt: "The import screen with the General ledger tab selected among the other import tabs",
+          caption: "The tab strip. A general ledger has its own tab because it needs no column mapping.",
+        },
+      },
+      {
+        action: "Choose the General ledger tab",
+        control: "General ledger",
+        note:
+          "The other tabs read one row per record and ask you to match columns. A " +
+          "general ledger is different: every row is one side of a double entry, and " +
+          "what it means comes from the account section it sits under, so there is " +
+          "nothing to match.",
+        screenshot: {
+          src: "/guide/import-02-empty.png",
+          alt: "The General ledger tab before a file is chosen, showing the drop area",
+          caption: "Drop the export here. Nothing is sent until you press Import.",
+        },
+      },
+      {
+        action: "Drop the exported file in",
+        control: "Drop the Account Transactions export here",
+        note:
+          "The file is read in your browser. The screen then shows how many accounts, " +
+          "dates and lines it found, and the total debits — check those against the " +
+          "totals printed at the bottom of the export before going on.",
+        screenshot: {
+          src: "/guide/import-03-preview.png",
+          alt: "The preview showing account count, entry count, line count, total debits and the per-account table",
+          caption: "Every account in the file, with its own debits and credits.",
+        },
+      },
+      {
+        action: "Read anything the screen refuses to import",
+        control: "The red panels",
+        note:
+          "Three things stop an import before it starts: an account the chart does " +
+          "not have, a date whose debits and credits differ, and a disagreement " +
+          "between One Book's totals and the file's own. Each names exactly what is " +
+          "wrong. None of them is worth working around.",
+        screenshot: {
+          src: "/guide/import-04-blocked.png",
+          alt: "A red panel listing the accounts in the file that the chart of accounts does not have",
+          caption: "Missing accounts are listed together, so one trip fixes all of them.",
+        },
+      },
+      {
+        action: "Choose how much to bring across",
+        control: "The whole history / Closing balances only",
+        note:
+          "The whole history posts one journal entry per date, so every transaction " +
+          "stays searchable in the General Ledger report. Closing balances only posts " +
+          "a single entry with each account's net, dated as of the day you choose — " +
+          "smaller and safer, but the detail is gone. Either way the original file is " +
+          "kept under Reports.",
+        screenshot: {
+          src: "/guide/import-05-mode.png",
+          alt: "The two import modes with the whole history selected and the import button beneath",
+          caption: "The button counts what it is about to post.",
+        },
+      },
+      {
+        action: "Import, then check the result",
+        control: "Import",
+        note:
+          "Everything posts in one go: if any part of it fails, none of it lands. " +
+          "Afterwards, read the Trial Balance and compare it with the report you " +
+          "exported. The file itself is saved under Reports → Saved Reports.",
+        screenshot: {
+          src: "/guide/import-06-batches.png",
+          alt: "The list of ledgers imported before, each row offering an Undo button",
+          caption: "Every import is listed here, and Undo voids the entries it created.",
+        },
+      },
+      {
+        action: "Check the numbers against the source",
+        control: "Trial Balance",
+        route: "/reports",
+        note:
+          "The one check worth doing every time: the trial balance in One Book should " +
+          "match the closing balances on the report you exported. If it does not, undo " +
+          "the import while the period is still open.",
+        screenshot: {
+          src: "/guide/import-07-saved.png",
+          alt: "The Saved Reports screen listing the imported file, kept as it arrived",
+          caption: "The original export, kept so the ledger can be checked against its source.",
+        },
       },
     ],
   },

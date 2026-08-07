@@ -3194,6 +3194,44 @@ body {
   font-size: 12px;
 }
 
+/* What to settle before step one. Loud enough to stop a reader who is skimming,
+   because the steps below post to a ledger. */
+.system-guide__cautions {
+  border: 1px solid #ffe58f;
+  background: #fffbe6;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.system-guide__cautions ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.system-guide__cautions > ul > li + li {
+  margin-top: 10px;
+}
+
+/* A picture of the step. Bordered so it reads as a screenshot rather than as
+   part of the drawer, and clickable to see it full size. */
+.system-guide__shot {
+  margin: 10px 0 0;
+}
+.system-guide__shot .ant-image {
+  width: 100%;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.system-guide__shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.system-guide__shot figcaption {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
 /* The entity a statement belongs to, above its title. One Book holds one
    company's books; naming it on the page is what stops a printout being filed
    against the wrong company. */

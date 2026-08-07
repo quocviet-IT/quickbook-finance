@@ -3,8 +3,19 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Alert, Collapse, Drawer, Empty, Input, Segmented, Space, Tag, Typography } from "antd";
-import { ArrowRightOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  Alert,
+  Collapse,
+  Drawer,
+  Empty,
+  Image as PreviewImage,
+  Input,
+  Segmented,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
+import { ArrowRightOutlined, SearchOutlined, WarningOutlined } from "@ant-design/icons";
 import {
   GUIDE_FLOWS,
   GUIDE_NOTICES,
@@ -26,6 +37,25 @@ function FlowBody({
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
       <Typography.Text type="secondary">{flow.purpose}</Typography.Text>
+
+      {flow.cautions?.length ? (
+        <section className="system-guide__cautions">
+          <Typography.Text strong>
+            <WarningOutlined /> Before you start
+          </Typography.Text>
+          <ul>
+            {flow.cautions.map((caution) => (
+              <li key={caution.title}>
+                <Typography.Text strong>{caution.title}</Typography.Text>
+                <Typography.Paragraph type="secondary" className="system-guide__note">
+                  {caution.body}
+                </Typography.Paragraph>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <ol className="system-guide__steps">
         {flow.steps.map((step, index) => (
           <li key={`${flow.id}-${index}`}>
@@ -49,6 +79,20 @@ function FlowBody({
                 {step.note}
               </Typography.Paragraph>
             ) : null}
+            {step.screenshot ? (
+              <figure className="system-guide__shot">
+                {/* Captured from a sample company, never from real books. */}
+                <PreviewImage
+                  src={step.screenshot.src}
+                  alt={step.screenshot.alt}
+                  width="100%"
+                  preview={{ mask: "Enlarge" }}
+                />
+                {step.screenshot.caption ? (
+                  <figcaption>{step.screenshot.caption}</figcaption>
+                ) : null}
+              </figure>
+            ) : null}
           </li>
         ))}
       </ol>
@@ -60,9 +104,14 @@ function FlowBody({
  * The system guide: what each workflow is for, which control performs each step,
  * and a link to the page it lives on.
  *
- * It links to the live interface instead of embedding screenshots on purpose — a
- * screenshot of an accounting screen goes stale on the next layout change and
- * carries test data with it, while a named control plus a route stays true.
+ * Every flow links to the live interface rather than describing it, because a
+ * named control plus a route survives a layout change.
+ *
+ * The import flow is the one exception that carries pictures, and they are held
+ * to the reason screenshots were avoided in the first place: they are captured
+ * from the running application by `scripts/capture-guide-shots.mjs`, which
+ * refuses any company not marked as a sample, so no screenshot can carry a
+ * customer's balances. Re-run that script when the screen changes.
  */
 export default function SystemGuideDrawer({
   open,
