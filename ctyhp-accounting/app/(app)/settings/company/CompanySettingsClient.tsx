@@ -60,8 +60,19 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
   const submit = async () => {
     const v = await form.validateFields();
     const r = await saveCompanySettingsAction(v);
-    if (r.ok) { message.success("Settings saved (new version)"); setEditing(false); void loadVersions(); }
-    else message.error(r.error ?? "Failed to save");
+    if (!r.ok) {
+      message.error(r.error ?? "Failed to save");
+      return;
+    }
+    message.success("Settings saved (new version)");
+    // The name also lives in the company register, which is what the switcher
+    // reads. If it did not follow, say so: two different names on screen with
+    // no explanation is worse than a warning.
+    if (r.data?.registerProblem) {
+      message.warning(`The settings were saved, but ${r.data.registerProblem}`, 8);
+    }
+    setEditing(false);
+    void loadVersions();
   };
 
   return (

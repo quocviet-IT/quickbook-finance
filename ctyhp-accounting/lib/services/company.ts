@@ -15,6 +15,38 @@ export async function getCurrentCompanySettings(sb: SupabaseClient): Promise<Com
   if (error) throw new CompanyError(error.message);
   return (data as unknown as CompanySettingRow) ?? null;
 }
+/**
+ * Keep the company register's name in step with the company's own settings.
+ *
+ * The name lives twice: in `acc_company_setting_version`, which is the
+ * company's versioned record of itself, and in `onebook.company`, which is what
+ * the switcher and the Companies list read. Correcting a typo in the first left
+ * the second saying something else — the books said "Pacific Four Nine" while
+ * every screen still said "Pacific Four Nice".
+ *
+ * The settings are the truth and the register follows them. The register has no
+ * write policy for an application session, so the caller passes a client that
+ * can: this function only decides what the change is.
+ */
+export async function syncCompanyRegisterName(
+  register: SupabaseClient,
+  schemaName: string,
+  legalName: string,
+  dbaName: string | null,
+): Promise<void> {
+  const { data, error } = await register
+    .from("company")
+    .update({ legal_name: legalName, dba_name: dbaName })
+    .eq("schema_name", schemaName)
+    .select("id");
+  if (error) throw new CompanyError(error.message);
+  if ((data ?? []).length === 0) {
+    throw new CompanyError(
+      `The company register has no entry for ${schemaName}, so the new name was not carried across to the company switcher.`,
+    );
+  }
+}
+
 export async function listCompanySettingVersions(sb: SupabaseClient): Promise<CompanySettingRow[]> {
   const { data, error } = await sb.from("acc_company_setting_version").select(COLS).order("version", { ascending: false });
   if (error) throw new CompanyError(error.message);

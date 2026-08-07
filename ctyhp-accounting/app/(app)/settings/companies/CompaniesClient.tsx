@@ -126,7 +126,6 @@ export default function CompaniesClient({
             dataSource={openRequests}
             columns={[
               { title: "Company", dataIndex: "legal_name" },
-              { title: "Key", dataIndex: "slug", width: 160 },
               {
                 title: "Status",
                 dataIndex: "status",
@@ -156,6 +155,10 @@ export default function CompaniesClient({
         </>
       ) : null}
 
+      {/* The key and the schema are how the system addresses a company, not
+          anything a reader acts on, and putting a Postgres schema name in front
+          of an accountant only invites questions. Both are still on the row —
+          `CompanyRow` carries them — they are simply not shown. */}
       <Typography.Text strong>Companies</Typography.Text>
       <Table
         rowKey="id"
@@ -174,8 +177,6 @@ export default function CompaniesClient({
               </Space>
             ),
           },
-          { title: "Key", dataIndex: "slug", width: 180 },
-          { title: "Schema", dataIndex: "schema_name", width: 200 },
           {
             title: "Status",
             dataIndex: "status",

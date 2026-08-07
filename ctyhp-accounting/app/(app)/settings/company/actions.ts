@@ -3,7 +3,14 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { companySettingsSchema } from "@/lib/domain/schemas";
-import { saveCompanySettings, listCompanySettingVersions, CompanyError } from "@/lib/services/company";
+import {
+  saveCompanySettings,
+  syncCompanyRegisterName,
+  listCompanySettingVersions,
+  CompanyError,
+} from "@/lib/services/company";
+import { activeSchema } from "@/lib/db/company";
+import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import type { CompanySettingRow } from "@/lib/db/types";
 import { strToU8, zipSync } from "fflate";
 import {
@@ -22,13 +29,41 @@ import {
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 function msg(e: unknown): string { return e instanceof CompanyError || e instanceof Error ? e.message : "An unexpected error occurred"; }
 
-export async function saveCompanySettingsAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
+export async function saveCompanySettingsAction(
+  raw: unknown,
+): Promise<ActionResult<{ id: string; registerProblem?: string }>> {
   const role = await getUserRole();
   if (!isAdmin(role)) return { ok: false, error: "Only an admin can change company settings" };
   const parsed = companySettingsSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  try { const sb = await createSupabaseServerClient(); const id = await saveCompanySettings(sb, parsed.data); revalidatePath("/settings/company"); return { ok: true, data: { id } }; }
-  catch (e) { return { ok: false, error: msg(e) }; }
+  try {
+    const sb = await createSupabaseServerClient();
+    const id = await saveCompanySettings(sb, parsed.data);
+
+    // The switcher and the Companies list read the register, not these
+    // settings, so a name corrected here has to be carried across or the two
+    // disagree on screen. The register admits no application session, hence the
+    // service-role client; the admin check above is what authorises it.
+    let registerProblem: string | undefined;
+    try {
+      await syncCompanyRegisterName(
+        createSupabaseAutomationClient("onebook"),
+        await activeSchema(),
+        parsed.data.legal_name,
+        parsed.data.dba_name || null,
+      );
+    } catch (e) {
+      registerProblem = msg(e);
+    }
+
+    // The company name is in the shell on every page, so the whole layout is
+    // stale until it is rebuilt — not just this screen.
+    revalidatePath("/", "layout");
+    revalidatePath("/settings/company");
+    return { ok: true, data: { id, registerProblem } };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
 }
 export async function listCompanySettingVersionsAction(): Promise<ActionResult<CompanySettingRow[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await listCompanySettingVersions(sb) }; }
