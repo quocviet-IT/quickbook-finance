@@ -41,6 +41,33 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.14",
+    date: "2026-08-08",
+    headline: "Check how a chart of accounts file's types were read before the import settles them.",
+    changes: [
+      {
+        kind: "added",
+        title: "Review the account types before the import is finalised",
+        detail:
+          "Importing a chart of accounts translates each type word — QuickBooks writes “Other "
+          + "Current Asset”, and which One Book type that becomes decides where the money sits "
+          + "on the balance sheet for every transaction afterwards. The preview now lists each "
+          + "word in your file with what it was read as and how many accounts carry it, and lets "
+          + "you change any of them. Grouped by word, because ninety-five accounts are usually a "
+          + "dozen words.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "A type nothing here matches is offered a choice rather than only refused",
+        detail:
+          "It was reported row by row as “no equivalent here — map it by hand”, which meant "
+          + "editing the file. You can now say what it means in the same panel.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.13",
     date: "2026-08-08",
     headline: "Scanning an uploaded document looks in the company you are working in.",

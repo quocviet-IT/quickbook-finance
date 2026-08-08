@@ -10,20 +10,21 @@ import {
   Typography,
 } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { readImportFile } from "@/lib/domain/import-file";
 import { excludedRowsCsv } from "@/lib/domain/excluded-rows";
 import { downloadTextFile } from "@/lib/client/download";
 import type { AccountRow } from "@/lib/db/types";
+import type { AccountType } from "@/lib/domain/accounts";
 import { fromMinor } from "@/lib/domain/money";
 import {
   fieldsFor,
-  proposeMapping,
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
 import ImportColumnsTable from "./ImportColumnsTable";
 import ImportPreviewPanel from "./ImportPreviewPanel";
 import ImportGuidance from "./ImportGuidance";
 import ImportToolbar from "./ImportToolbar";
+import { useImportSource } from "./useImportSource";
+import AccountTypeReview from "./AccountTypeReview";
 import ImportBatchRegister from "./ImportBatchRegister";
 import ImportPreflightSection from "./ImportPreflightSection";
 import ImportConfirmContent from "./ImportConfirmContent";
@@ -33,7 +34,6 @@ import type { ImportPreview } from "@/lib/services/data-import";
 import {
   previewImportAction,
   runImportAction,
-  suggestMappingAction,
 } from "./actions";
 
 const TARGETS: ImportTarget[] = [
@@ -73,11 +73,6 @@ export default function ImportClient({
   const { message, modal } = App.useApp();
   const [target, setTarget] = useState<ImportTarget>("chart_of_accounts");
   const [bankAccountId, setBankAccountId] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<string[][]>([]);
-  const [mapping, setMapping] = useState<Record<string, number | null>>({});
-  const [unmapped, setUnmapped] = useState<string[]>([]);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [withBalances, setWithBalances] = useState(false);
   const [asOf, setAsOf] = useState<Dayjs>(dayjs().startOf("year"));
@@ -85,9 +80,10 @@ export default function ImportClient({
   const [imported, setImported] = useState(0);
   // What the reader decided a name in the file means, as an account code.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiNote, setAiNote] = useState<string | null>(null);
-  const [aiFields, setAiFields] = useState<string[]>([]);
+  // The file's own type word → the One Book type the reader chose for it.
+  const [typeOverrides, setTypeOverrides] = useState<Record<string, AccountType>>({});
+  const source = useImportSource(target);
+  const { fileName, headers, rows, mapping, unmapped, aiBusy, aiNote, aiFields } = source;
 
   const fields = fieldsFor(target);
   // A ledger export has no columns to agree on, so none of the three steps —
@@ -105,65 +101,22 @@ export default function ImportClient({
   );
 
   function reset() {
-    setFileName(null);
-    setHeaders([]);
-    setRows([]);
-    setMapping({});
-    setUnmapped([]);
+    source.clear();
     setPreview(null);
     setOverrides({});
+    setTypeOverrides({});
   }
-
-  function readFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      // Matched by name first and shown straight away: the screen is usable
-      // before the model answers, and stays usable if it never does.
-      const read = readImportFile(String(reader.result), target);
-      if (!read) {
-        message.warning("That file has no rows under its header.");
-        return;
-      }
-      const { columns, rows: dataRows, proposed } = read;
-      setHeaders(columns);
-      setRows(dataRows);
-      setMapping(proposed.columns);
-      setUnmapped(proposed.unmapped);
-      setAiNote(null);
-      setAiFields([]);
-      setPreview(null);
-      setFileName(file.name);
-      message.info(
-        proposed.missingRequired.length === 0
-          ? `Read ${dataRows.length} row(s). Check the columns below.`
-          : `Read ${dataRows.length} row(s), but some required columns need choosing.`,
-      );
-
-      // Then ask the model to fill what the names could not, in the background.
-      // Only the headers go out; the rows never leave this browser until import.
-      setAiBusy(true);
-      void suggestMappingAction(columns, target)
-        .then((result) => {
-          if (!result.ok || !result.data) return;
-          if (result.data.aiFields.length === 0 && !result.data.note) return;
-          setMapping(result.data.columns);
-          setUnmapped(result.data.unmapped);
-          setAiFields(result.data.aiFields);
-          setAiNote(result.data.note);
-        })
-        .finally(() => setAiBusy(false));
-    };
-    reader.readAsText(file);
-    return false;
-  }
-
-  const missingRequired = fields
-    .filter((field) => field.required && (mapping[field.key] ?? null) === null)
-    .map((field) => field.label);
 
   async function runPreview() {
     setBusy(true);
-    const res = await previewImportAction(target, rows, mapping, bankAccountId, overrides);
+    const res = await previewImportAction(
+      target,
+      rows,
+      mapping,
+      bankAccountId,
+      overrides,
+      typeOverrides,
+    );
     setBusy(false);
     if (res.ok && res.data) setPreview(res.data);
     else message.error(res.error ?? "Could not read the file");
@@ -211,6 +164,7 @@ export default function ImportClient({
           bankAccountId,
           fileName,
           overrides,
+          typeOverrides,
         );
         setBusy(false);
         if (!res.ok || !res.data) {
@@ -284,7 +238,7 @@ export default function ImportClient({
         onBankAccountChange={setBankAccountId}
         ledgerTab={ledgerTab}
         fileName={fileName}
-        onFile={readFile}
+        onFile={source.read}
       />
 
       {ledgerTab ? (
@@ -303,14 +257,8 @@ export default function ImportClient({
           detection={detection}
           onSwitchTarget={(next) => {
             setTarget(next);
-            // Re-propose against the same file rather than making them upload it
-            // again: the file was never the problem, the tab was.
-            if (headers.length > 0) {
-              const proposed = proposeMapping(headers, next);
-              setMapping(proposed.columns);
-              setUnmapped(proposed.unmapped);
-              setPreview(null);
-            }
+            source.reproposeFor(next);
+            setPreview(null);
           }}
         />
       )}
@@ -336,7 +284,7 @@ export default function ImportClient({
             aiBusy={aiBusy}
             aiNote={aiNote}
             onChange={(fieldKey, columnIndex) =>
-              setMapping((prev) => ({ ...prev, [fieldKey]: columnIndex }))
+              source.setMapping((prev) => ({ ...prev, [fieldKey]: columnIndex }))
             }
           />
 
@@ -345,17 +293,35 @@ export default function ImportClient({
               type="primary"
               onClick={runPreview}
               loading={busy}
-              disabled={missingRequired.length > 0}
+              disabled={source.missingRequired.length > 0}
             >
               See what will happen
             </Button>
-            {missingRequired.length > 0 ? (
+            {source.missingRequired.length > 0 ? (
               <Typography.Text type="danger">
-                Still to choose: {missingRequired.join(", ")}
+                Still to choose: {source.missingRequired.join(", ")}
               </Typography.Text>
             ) : null}
           </Space>
         </>
+      ) : null}
+
+      {preview?.typeReadings && preview.typeReadings.length > 0 ? (
+        <AccountTypeReview
+          readings={preview.typeReadings}
+          onChange={(source, type) => {
+            const next = { ...typeOverrides };
+            if (type) next[source] = type;
+            else delete next[source];
+            setTypeOverrides(next);
+            void previewImportAction(target, rows, mapping, bankAccountId, overrides, next).then(
+              (res) => {
+                if (res.ok && res.data) setPreview(res.data);
+                else message.error(res.error ?? "Could not re-read the file");
+              },
+            );
+          }}
+        />
       ) : null}
 
       {preview && !ledgerTab ? (

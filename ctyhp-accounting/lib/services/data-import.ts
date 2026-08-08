@@ -11,6 +11,11 @@ import {
   type InvoiceImportRecord,
 } from "@/lib/domain/invoice-import";
 import { transactionFileChecksum } from "@/lib/domain/transaction-import";
+import {
+  accountTypeReadings,
+  type AccountTypeReading,
+} from "@/lib/domain/account-type-readings";
+import type { AccountType } from "@/lib/domain/accounts";
 import { classifyAccounts, type ClassificationOutcome } from "./account-classification";
 
 // The class lives beside the lookups that throw it; re-exported here because
@@ -75,6 +80,15 @@ export interface ImportPreview {
   /** Money coming in, and money going out. Their difference is the net. */
   moneyInMinor?: number;
   moneyOutMinor?: number;
+  /**
+   * How the type words in a chart of accounts file were read, one row per word.
+   *
+   * The type decides where an account's money appears on the balance sheet for
+   * every transaction afterwards, and it is a translation — "Other Current
+   * Asset" becoming `current_asset` — so it is worth a look before it is
+   * settled. Grouped, because ninety-five accounts are usually a dozen words.
+   */
+  typeReadings?: AccountTypeReading[];
   /** Accounts named by the file that this company's chart does not have. */
   missingAccounts?: string[];
   /**
@@ -133,7 +147,12 @@ export async function previewImport(
   target: ImportTarget,
   rows: readonly (readonly string[])[],
   mapping: Record<string, number | null>,
-  options: { bankAccountId?: string | null; accountOverrides?: Record<string, string> } = {},
+  options: {
+    bankAccountId?: string | null;
+    accountOverrides?: Record<string, string>;
+    /** The file's own type word → the One Book type a person chose for it. */
+    typeOverrides?: Record<string, AccountType>;
+  } = {},
 ): Promise<ImportPreview> {
   const parsed = applyMapping(rows, mapping, target);
 
@@ -175,14 +194,22 @@ export async function previewImport(
 
   const existing = await existingKeys(sb, target);
 
-  const preview: ImportPreviewRow[] = parsed.records.map((record) => {
+  // A type a person chose overrides what the matcher read, and it has to reach
+  // the row that will be posted — not only the panel that reviews it.
+  const typeOverrides = options.typeOverrides ?? {};
+  const typeColumn = mapping.account_type ?? null;
+
+  const preview: ImportPreviewRow[] = parsed.records.map((record, position) => {
     const key = keyOf(target, record);
+    const line = parsed.sourceLines[position] ?? position + 2;
+    const source = typeColumn === null ? "" : (rows[line - 2]?.[typeColumn] ?? "").trim();
+    const chosen = typeOverrides[source];
     return {
       key,
       name: String(record.name ?? ""),
       action: existing.has(key) ? "update" : "create",
       openingBalanceMinor: Number(record.opening_balance_minor ?? 0),
-      values: record,
+      values: chosen ? { ...record, account_type: chosen } : record,
     };
   });
 
@@ -194,6 +221,10 @@ export async function previewImport(
     creates: preview.filter((r) => r.action === "create").length,
     updates: preview.filter((r) => r.action === "update").length,
     openingTotalMinor: preview.reduce((sum, r) => sum + r.openingBalanceMinor, 0),
+    typeReadings:
+      target === "chart_of_accounts"
+        ? accountTypeReadings(rows, mapping, mapping.name ?? null, typeOverrides)
+        : undefined,
   };
 }
 
@@ -233,6 +264,8 @@ export async function runImport(
     fileName?: string | null;
     /** Names in the file the reader has pointed at an account, by code. */
     accountOverrides?: Record<string, string>;
+    /** Type words in the file the reader has read differently. */
+    typeOverrides?: Record<string, AccountType>;
   } = {},
 ): Promise<ImportOutcome> {
   // Transactions are previewed again here rather than trusted from the screen:
@@ -334,7 +367,15 @@ export async function runImport(
   let outcome: ImportOutcome;
 
   if (target === "chart_of_accounts") {
-    const { data, error } = await sb.rpc("acc_import_accounts", { p_rows: payload });
+    // Through the preview, so a type the reader chose reaches the row that
+    // posts. Sending `parsed.records` here would post the matcher's reading and
+    // leave the review it just went through meaning nothing.
+    const reviewed = await previewImport(sb, target, rows, mapping, {
+      typeOverrides: options.typeOverrides,
+    });
+    const { data, error } = await sb.rpc("acc_import_accounts", {
+      p_rows: reviewed.rows.map((row) => row.values),
+    });
     if (error) throw new DataImportError(error.message);
     outcome = first(data);
     // The same classification an account created by hand gets. Left to the

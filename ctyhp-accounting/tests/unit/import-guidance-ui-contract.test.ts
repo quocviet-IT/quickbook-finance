@@ -101,6 +101,7 @@ describe("the import screen's shape", () => {
       "ImportBatchRegister.tsx",
       "ImportToolbar.tsx",
       "UnresolvedAccountsTable.tsx",
+      "AccountTypeReview.tsx",
       "LedgerImportPanel.tsx",
       "LedgerBatchList.tsx",
     ]) {

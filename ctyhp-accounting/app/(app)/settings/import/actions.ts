@@ -16,6 +16,7 @@ import {
   type ImportPreview,
 } from "@/lib/services/data-import";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
+import type { AccountType } from "@/lib/domain/accounts";
 import type { WaveLedgerEntry } from "@/lib/domain/wave-ledger";
 import {
   importLedgerBatch,
@@ -59,6 +60,7 @@ export async function previewImportAction(
   mapping: Record<string, number | null>,
   bankAccountId: string | null = null,
   accountOverrides: Record<string, string> = {},
+  typeOverrides: Record<string, AccountType> = {},
 ): Promise<ActionResult<ImportPreview>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
@@ -66,7 +68,11 @@ export async function previewImportAction(
     const sb = await createSupabaseServerClient();
     return {
       ok: true,
-      data: await previewImport(sb, target, rows, mapping, { bankAccountId, accountOverrides }),
+      data: await previewImport(sb, target, rows, mapping, {
+        bankAccountId,
+        accountOverrides,
+        typeOverrides,
+      }),
     };
   } catch (err) {
     return { ok: false, error: msg(err) };
@@ -82,6 +88,7 @@ export async function runImportAction(
   bankAccountId: string | null = null,
   fileName: string | null = null,
   accountOverrides: Record<string, string> = {},
+  typeOverrides: Record<string, AccountType> = {},
 ): Promise<ActionResult<ImportOutcome>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
@@ -92,6 +99,7 @@ export async function runImportAction(
       bankAccountId,
       fileName,
       accountOverrides,
+      typeOverrides,
     });
     // Transactions post to the ledger, so the screens that read it move too.
     for (const path of ["/accounts", "/customers", "/vendors", "/items", "/reports", "/banking"]) {
