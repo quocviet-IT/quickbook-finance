@@ -27,6 +27,10 @@ import {
 import FilterBar from "@/components/ui/FilterBar";
 import { EmptyState } from "@/components/ui/PageStates";
 import BankTransactionsTable from "./BankTransactionsTable";
+import BankImportList from "./BankImportList";
+import DeleteBankLineModal, {
+  type DeleteBankLineTarget,
+} from "./DeleteBankLineModal";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
@@ -183,6 +187,9 @@ export default function BankingClient({
   const [busy, setBusy] = useState<string | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
   const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
+  // Bumped after an import so the register below picks the new batch up.
+  const [importsKey, setImportsKey] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteBankLineTarget | null>(null);
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
@@ -399,6 +406,7 @@ export default function BankingClient({
       );
       setImportOpen(false);
       setParsed([]);
+      setImportsKey((count) => count + 1);
       reload();
     } else {
       message.error(result.error ?? "Import failed");
@@ -693,6 +701,14 @@ export default function BankingClient({
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}
+        onDelete={(row) =>
+          setDeleteTarget({
+            id: row.transaction.id,
+            txnDate: row.transaction.txn_date,
+            description: row.transaction.description,
+            amount: rowMoney(row),
+          })
+        }
         onAttachments={(row) =>
           setAttachmentTarget({
             entityType: "bank_transaction",
@@ -700,6 +716,30 @@ export default function BankingClient({
             label: `${row.transaction.txn_date} · ${row.transaction.description}`,
           })
         }
+      />
+
+      <Card
+        size="small"
+        title="Statement imports"
+        style={{ marginTop: 16 }}
+        styles={{ body: { padding: 0 } }}
+      >
+        <BankImportList
+          bankAccountId={selectedId === ALL_ACCOUNTS ? null : (selectedId ?? null)}
+          canWrite={canWrite}
+          reloadKey={importsKey}
+          onChanged={reload}
+        />
+      </Card>
+
+      <DeleteBankLineModal
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => {
+          setDeleteTarget(null);
+          setImportsKey((count) => count + 1);
+          reload();
+        }}
       />
 
       <AttachmentDrawer

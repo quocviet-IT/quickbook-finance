@@ -132,6 +132,65 @@ export async function importStatement(
   };
 }
 
+export interface BankStatementImportRow {
+  id: string;
+  bank_account_id: string;
+  account_code: string;
+  account_name: string;
+  filename: string;
+  /** Rows the file held. */
+  row_count: number;
+  /** Lines of it still in the register. */
+  lines_here: number;
+  /** Lines the ledger now cites, which is what stops an undo. */
+  locked_lines: number;
+  imported_at: string;
+  status: "active" | "voided";
+  voided_at: string | null;
+  void_reason: string | null;
+}
+
+/** Statement imports, newest first. Null means every bank account. */
+export async function listBankStatementImports(
+  sb: SupabaseClient,
+  bankAccountId: string | null,
+): Promise<BankStatementImportRow[]> {
+  const { data, error } = await sb.rpc("acc_bank_statement_imports", {
+    p_bank_account_id: bankAccountId,
+  });
+  if (error) throw new BankingError(error.message);
+  return (data ?? []) as unknown as BankStatementImportRow[];
+}
+
+/**
+ * Take back a statement import, removing every line it brought in.
+ *
+ * Refused the moment one of those lines has been matched: a bank line the
+ * ledger points at cannot be removed without leaving the entry citing nothing.
+ */
+export async function undoBankStatementImport(
+  sb: SupabaseClient,
+  batchId: string,
+  reason: string,
+): Promise<number> {
+  const { data, error } = await sb.rpc("acc_undo_bank_statement_import", {
+    p_batch_id: batchId,
+    p_reason: reason,
+  });
+  if (error) throw new BankingError(error.message);
+  return Number(data ?? 0);
+}
+
+/** Remove a single unmatched bank line. Same refusal, one line at a time. */
+export async function deleteBankTransaction(
+  sb: SupabaseClient,
+  id: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await sb.rpc("acc_delete_bank_transaction", { p_id: id, p_reason: reason });
+  if (error) throw new BankingError(error.message);
+}
+
 /** Null means every bank account, for the review queue that spans them all. */
 export async function listBankTransactions(
   sb: SupabaseClient,

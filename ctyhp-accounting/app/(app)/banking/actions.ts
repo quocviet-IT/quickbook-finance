@@ -5,6 +5,10 @@ import { getUserRole, canWrite, getSessionUser } from "@/lib/auth";
 import {
   createBankAccount,
   importStatement,
+  listBankStatementImports,
+  undoBankStatementImport,
+  deleteBankTransaction,
+  type BankStatementImportRow,
   listBankTransactions,
   generateSuggestions,
   listSuggestions,
@@ -85,6 +89,58 @@ export async function importStatementAction(
     const res = await importStatement(sb, bankAccountId, filename, rows);
     revalidatePath("/banking");
     return { ok: true, data: res };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Statement imports, and the two ways back out of one.
+ *
+ * Importing a statement had no reverse at all: it posts nothing to the ledger,
+ * so there was no entry to void, and the lines could only be removed through a
+ * database connection. Somebody put a 1,566-row file through the tab, realised
+ * it imports into one bank account while their file covered eight, and had to
+ * ask for help. These three are that help, in the screen.
+ */
+export async function getStatementImportsAction(
+  bankAccountId: string | null,
+): Promise<ActionResult<BankStatementImportRow[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listBankStatementImports(sb, bankAccountId) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function undoStatementImportAction(
+  batchId: string,
+  reason: string,
+): Promise<ActionResult<{ removed: number }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const removed = await undoBankStatementImport(sb, batchId, reason);
+    revalidatePath("/banking");
+    return { ok: true, data: { removed } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+export async function deleteBankTransactionAction(
+  id: string,
+  reason: string,
+): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    await deleteBankTransaction(sb, id, reason);
+    revalidatePath("/banking");
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

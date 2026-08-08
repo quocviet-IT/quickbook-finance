@@ -1,6 +1,6 @@
 "use client";
 import { Button, Space, Tag, Typography, type TableColumnsType } from "antd";
-import { PaperClipOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
@@ -33,6 +33,8 @@ export interface BankTransactionsTableProps {
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
   onAttachments: (row: BankReviewTableRow) => void;
+  /** Remove a line that should never have been imported. Unmatched lines only. */
+  onDelete: (row: BankReviewTableRow) => void;
 }
 
 /**
@@ -57,6 +59,7 @@ export default function BankTransactionsTable({
   onApprove,
   onReject,
   onAttachments,
+  onDelete,
 }: BankTransactionsTableProps) {
   const columns: TableColumnsType<BankReviewTableRow> = [
     { title: "Date", dataIndex: ["transaction", "txn_date"], width: 115 },
@@ -193,6 +196,27 @@ export default function BankTransactionsTable({
         </Space>
       ),
     },
+    ...(canWrite
+      ? [
+          {
+            title: "",
+            key: "delete",
+            width: 56,
+            fixed: "right" as const,
+            render: (_value: unknown, row: BankReviewTableRow) =>
+              // Only an unmatched line. Once the ledger cites one, removing it
+              // would leave an entry pointing at a transaction that is gone.
+              row.transaction.status === "unmatched" ? (
+                <IconActionButton
+                  danger
+                  label="Delete this bank transaction"
+                  icon={<DeleteOutlined />}
+                  onClick={() => onDelete(row)}
+                />
+              ) : null,
+          } as TableColumnsType<BankReviewTableRow>[number],
+        ]
+      : []),
     ...(canReadDocuments
       ? [
           {

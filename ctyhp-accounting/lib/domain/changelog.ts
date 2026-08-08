@@ -41,6 +41,42 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.7",
+    date: "2026-08-08",
+    headline: "A statement import can be taken back, and a stray bank line can be deleted.",
+    changes: [
+      {
+        kind: "added",
+        title: "Undo a statement import",
+        detail:
+          "Banking now lists the statements imported into this company, and offers Undo beside "
+          + "each one. It removes every line that import brought in. There was no way back "
+          + "before: a statement import posts nothing to the ledger, so there was no entry to "
+          + "void and no button of any kind — importing a file into the wrong bank account "
+          + "meant asking somebody to clear it out of the database.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Delete a single bank transaction",
+        detail:
+          "A line that should never have been there can be removed on its own, with a reason "
+          + "that is kept in the audit log.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Neither will remove a line the ledger points at",
+        detail:
+          "Once a bank line has been matched, an entry cites it, and deleting it would leave "
+          + "that entry pointing at a transaction that no longer exists. Undo says how many "
+          + "lines are matched and stays shut until they are unmatched, rather than failing "
+          + "when pressed.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.6",
     date: "2026-08-07",
     headline: "A transactions import is recorded, can be undone, and does what its preview said.",
