@@ -21,7 +21,18 @@ describe("the banking category column", () => {
     // Searching is the whole complaint: a chart of ninety-five accounts cannot
     // be scrolled, and the reader asked to type a word and see what matches.
     expect(cell).toContain("showSearch");
-    expect(cell).toMatch(/filterOption/);
+    expect(cell).toContain("searchAccounts");
+    // Ranked here, not by the dropdown: an exact code first, then the chart's
+    // own wording, then a word that means the same thing.
+    expect(cell).toContain("filterOption={false}");
+  });
+
+  it("says which report the money lands in, and which side of the books", () => {
+    // "If it is debit, if it is credit, anything" — a code and a name alone do
+    // not tell an accountant what choosing this account will do.
+    const cell = read("CategoriseCell.tsx");
+    expect(cell).toContain("ACCOUNT_TYPE_LABEL");
+    expect(cell).toContain("normalBalanceOf");
   });
 
   it("does not ask a line the books have already answered", () => {

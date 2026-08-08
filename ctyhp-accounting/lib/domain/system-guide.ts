@@ -292,7 +292,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         action: "Say which account a line belongs to, for anything the ledger does not already hold",
         control: "Category",
         note:
-          "Type a word and every account whose code or name contains it is offered. Choosing " +
+          "Type a word and the accounts that answer to it are offered, closest first — an " +
+          "exact code, then your chart's own wording, then a word that means the same, so " +
+          "\"wages\" finds an account called \"Payroll\". Each shows its type and whether it is " +
+          "a debit or a credit account. Choosing " +
           "one posts the line: the bank on one side, that account on the other, and the line " +
           "becomes matched. A line already in the books shows the account its entry posted to " +
           "instead of asking again, and Change voids the entry and hands the line back.",

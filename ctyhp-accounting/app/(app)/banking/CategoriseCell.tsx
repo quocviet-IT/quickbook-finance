@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { App, Button, Select, Space, Tooltip, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
+import { ACCOUNT_TYPE_LABEL, normalBalanceOf, type AccountType } from "@/lib/domain/accounts";
+import { searchAccounts } from "@/lib/domain/account-search";
 import type { BankPostingRow } from "@/lib/services/banking";
 import { categoriseBankTransactionAction, uncategoriseBankTransactionAction } from "./actions";
 
@@ -41,6 +43,32 @@ export default function CategoriseCell({
 }: CategoriseCellProps) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+
+  /**
+   * Ranked here rather than by the dropdown, so the order is ours: an exact
+   * code first, then the chart's own wording, then a word that means the same.
+   * A chart of ninety-five accounts answering to "sales" is not a shortlist.
+   */
+  const options = useMemo(
+    () =>
+      searchAccounts(
+        accounts.map((account) => ({
+          id: account.id,
+          account_code: account.account_code,
+          name: account.name,
+          account_type: account.account_type as AccountType,
+        })),
+        query,
+      ).map((hit) => ({
+        value: hit.account.id,
+        // What a keyboard match runs against, and what the closed control shows.
+        label: `${hit.account.account_code} — ${hit.account.name}`,
+        type: hit.account.account_type,
+        via: hit.via,
+      })),
+    [accounts, query],
+  );
 
   if (posting) {
     const label = `${posting.account_code} — ${posting.account_name}`;
@@ -90,20 +118,28 @@ export default function CategoriseCell({
     <Tooltip title="Choosing an account posts this line to the ledger">
       <Select
         showSearch
-        style={{ minWidth: 210 }}
+        style={{ minWidth: 240 }}
         placeholder="Search accounts…"
         loading={busy}
         disabled={busy}
-        optionFilterProp="label"
-        // Every account whose name or code contains what was typed, which is
-        // what somebody typing "bank" into a chart of ninety-five expects.
-        filterOption={(input, option) =>
-          (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-        }
-        options={accounts.map((account) => ({
-          value: account.id,
-          label: `${account.account_code} — ${account.name}`,
-        }))}
+        // The list is already filtered and ranked; antd must not filter again.
+        filterOption={false}
+        searchValue={query}
+        onSearch={setQuery}
+        options={options}
+        // Which report the money will land in, and which side of the books it
+        // sits on — the reader asked for exactly this: "if it is debit, if it
+        // is credit, anything".
+        optionRender={(option) => (
+          <Space direction="vertical" size={0}>
+            <span>{option.data.label}</span>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {ACCOUNT_TYPE_LABEL[option.data.type as AccountType]} ·{" "}
+              {normalBalanceOf(option.data.type as AccountType) === "debit" ? "Debit" : "Credit"}
+              {option.data.via ? ` · matched on “${option.data.via}”` : ""}
+            </Typography.Text>
+          </Space>
+        )}
         onChange={async (accountId: string) => {
           setBusy(true);
           const res = await categoriseBankTransactionAction(transactionId, accountId);

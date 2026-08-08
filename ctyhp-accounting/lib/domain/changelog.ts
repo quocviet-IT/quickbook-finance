@@ -41,6 +41,40 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.16",
+    date: "2026-08-08",
+    headline: "Typing a word finds the account even when your chart calls it something else.",
+    changes: [
+      {
+        kind: "added",
+        title: "The account search understands words that mean the same thing",
+        detail:
+          "Type “wages” and it finds “Payroll Liabilities”; type “fee” and it finds “Bank "
+          + "Service Charges”. A chart imported from another product uses that product’s "
+          + "wording, and nobody tries three spellings before deciding the search is broken. "
+          + "When a word other than the one you typed found the account, the list says which.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "The list says what each account is, and which side it sits on",
+        detail:
+          "Every suggestion now shows its type and whether it is a debit or a credit account, "
+          + "so you can see what choosing it will do before you choose it.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "The closest answer comes first",
+        detail:
+          "An exact account code beats everything — it can only mean one account. Then the "
+          + "chart’s own wording, then a word that means the same. Typing “sales” reaches Sales "
+          + "Revenue before Sales Tax Payable.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.15",
     date: "2026-08-08",
     headline: "Categorising a bank line now means posting it, and the column says what was posted.",
