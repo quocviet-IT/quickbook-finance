@@ -41,6 +41,32 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.8",
+    date: "2026-08-08",
+    headline: "Switching an account off now settles which of two same-named accounts an import means.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Making a duplicate account inactive now unblocks the import",
+        detail:
+          "An import refuses a name that two accounts answer to, and told you to write the "
+          + "account code in the file. That is no help when the file is a customer's export you "
+          + "cannot edit — so people did the sensible thing and made the duplicate inactive in "
+          + "the chart of accounts. Nothing happened: only archived accounts were being left out "
+          + "of the search. One live account of that name is now taken as the answer.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "The refusal names both ways out",
+        detail:
+          "Write the code in the file, or set the account you do not use to Inactive. It used to "
+          + "offer only the first, which is the one you cannot always do.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.7",
     date: "2026-08-08",
     headline: "A statement import can be taken back, and a stray bank line can be deleted.",

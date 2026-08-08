@@ -439,9 +439,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         body:
           "An imported chart can easily hold both \"1000 Cash on Hand\" and \"140 Cash on Hand\". " +
           "A row naming only \"Cash on Hand\" is then a question, not a reference — one of those " +
-          "is a bank and the other is not — so nothing is imported under it. Put the code in the " +
-          "file instead: either \"1000\" on its own, or \"1000 - Cash on Hand\" with the spaced " +
-          "hyphen. \"1000 Cash on Hand\", without the hyphen, is not a form the chart recognises.",
+          "is a bank and the other is not — so nothing is imported under it. Two ways to answer " +
+          "it. Put the code in the file: either \"1000\" on its own, or \"1000 - Cash on Hand\" " +
+          "with the spaced hyphen; \"1000 Cash on Hand\" without the hyphen is not a form the " +
+          "chart recognises. Or, when the file is somebody else's export and cannot be edited, " +
+          "set the account you do not use to Inactive under Chart of accounts — one live account " +
+          "of that name is no longer a question.",
       },
       {
         title: "The bank accounts have to exist under Banking, not only in the chart",
@@ -570,9 +573,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "things in two charts, and a typo would become a permanent account. The " +
           "screen lists every name it cannot find and keeps the button shut until " +
           "each one exists. Import the chart of accounts first, or add the few that " +
-          "are missing by hand. A name that two accounts answer to counts as one it " +
-          "cannot find: write the account code in the file — \"1000\", or " +
-          "\"1000 - Cash on Hand\" — so the file says which of them it means.",
+          "are missing by hand. A name that two live accounts answer to counts as one " +
+          "it cannot find: write the account code in the file — \"1000\", or " +
+          "\"1000 - Cash on Hand\" — or set the one you do not use to Inactive.",
       },
       {
         title: "Undo works only while the period is still open",

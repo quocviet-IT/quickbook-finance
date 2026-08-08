@@ -173,14 +173,17 @@ export default function ImportPreviewPanel({
                 .map(({ ref, codes }) => `"${ref}" matches ${codes.join(" and ")}`)
                 .join("; ")}
               . Which account the money belongs in is a question only you can answer, so
-              nothing is imported under a name that names two. Write the account code in
-              the file instead — either{" "}
+              nothing is imported under a name that names two. There are two ways to answer
+              it. Write the account code in the file — either{" "}
               <Typography.Text code>{preview.ambiguousAccounts[0].codes[0]}</Typography.Text>{" "}
               on its own, or{" "}
               <Typography.Text code>
                 {`${preview.ambiguousAccounts[0].codes[0]} - ${preview.ambiguousAccounts[0].ref}`}
               </Typography.Text>
-              . The name on its own is what does not work.
+              ; the name on its own is what does not work. Or, if the file is somebody
+              else&apos;s and cannot be edited, set the account you do not use to{" "}
+              <b>Inactive</b> in the chart of accounts — one live account of that name is no
+              longer a question.
             </>
           }
         />
