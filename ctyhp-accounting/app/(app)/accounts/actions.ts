@@ -13,6 +13,11 @@ import {
   accountUpdateSchema,
   accountStatusSchema,
 } from "@/lib/domain/schemas";
+import {
+  classifyAccounts,
+  planAccountClassification,
+  type ClassificationOutcome,
+} from "@/lib/services/account-classification";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -29,6 +34,53 @@ function messageFrom(err: unknown): string {
   if (err instanceof AccountServiceError) return err.message;
   if (err instanceof Error) return err.message;
   return "An unexpected error occurred";
+}
+
+/**
+ * What a classification pass would change, so it can be shown before it runs.
+ *
+ * Reads only. An account whose type the application has a settled answer for is
+ * offered; one that needs an accountant's policy — a generic current asset or
+ * liability — is listed separately and left alone.
+ */
+export async function planClassificationAction(): Promise<
+  ActionResult<{ roles: number; details: number; unanswerable: { account_code: string; name: string }[] }>
+> {
+  try {
+    const sb = await createSupabaseServerClient();
+    const plan = await planAccountClassification(sb);
+    return {
+      ok: true,
+      data: {
+        roles: plan.roles.length,
+        details: plan.details.length,
+        unanswerable: plan.unanswerable.map((a) => ({ account_code: a.account_code, name: a.name })),
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: messageFrom(err) };
+  }
+}
+
+/**
+ * Classify the accounts an import left unclassified.
+ *
+ * Existing charts carry the gap the import has now closed: 54 of 95 accounts in
+ * one company, fifty of them types the application already answers for. Nothing
+ * already classified is touched.
+ */
+export async function classifyAccountsAction(): Promise<ActionResult<ClassificationOutcome>> {
+  const denied = await guardWrite();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const outcome = await classifyAccounts(sb);
+    revalidatePath("/accounts");
+    revalidatePath("/reports/cash-flow");
+    return { ok: true, data: outcome };
+  } catch (err) {
+    return { ok: false, error: messageFrom(err) };
+  }
 }
 
 /** Returns the new account's id so a caller can select what it just created. */

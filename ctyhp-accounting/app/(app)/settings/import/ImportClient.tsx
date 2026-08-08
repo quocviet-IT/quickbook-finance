@@ -4,29 +4,28 @@ import {
   Alert,
   App,
   Button,
-  Segmented,
-  Select,
   Space,
   Steps,
   Tag,
   Typography,
-  Upload,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
-import { parseCsv } from "@/lib/csv";
+import { readImportFile } from "@/lib/domain/import-file";
+import { excludedRowsCsv } from "@/lib/domain/excluded-rows";
+import { downloadTextFile } from "@/lib/client/download";
 import type { AccountRow } from "@/lib/db/types";
 import { fromMinor } from "@/lib/domain/money";
 import {
   fieldsFor,
   proposeMapping,
-  TARGET_LABEL,
   type ImportTarget,
 } from "@/lib/domain/import-mapping";
 import ImportColumnsTable from "./ImportColumnsTable";
 import ImportPreviewPanel from "./ImportPreviewPanel";
 import ImportGuidance from "./ImportGuidance";
+import ImportToolbar from "./ImportToolbar";
 import ImportBatchRegister from "./ImportBatchRegister";
+import ImportPreflightSection from "./ImportPreflightSection";
 import ImportConfirmContent from "./ImportConfirmContent";
 import LedgerImportPanel from "./LedgerImportPanel";
 import { detectFileShape } from "@/lib/domain/import-shape";
@@ -61,12 +60,15 @@ export default function ImportClient({
   isSampleCompany,
   baseDecimals,
   bankAccounts,
+  accounts,
 }: {
   companyName: string;
   isSampleCompany: boolean;
   baseDecimals: number;
   /** Where a transaction row posts when the file does not name a bank. */
   bankAccounts: AccountRow[];
+  /** The whole chart, for pointing a name in the file at an account. */
+  accounts: AccountRow[];
 }) {
   const { message, modal } = App.useApp();
   const [target, setTarget] = useState<ImportTarget>("chart_of_accounts");
@@ -81,6 +83,8 @@ export default function ImportClient({
   const [asOf, setAsOf] = useState<Dayjs>(dayjs().startOf("year"));
   const [busy, setBusy] = useState(false);
   const [imported, setImported] = useState(0);
+  // What the reader decided a name in the file means, as an account code.
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [aiFields, setAiFields] = useState<string[]>([]);
@@ -107,24 +111,22 @@ export default function ImportClient({
     setMapping({});
     setUnmapped([]);
     setPreview(null);
+    setOverrides({});
   }
 
   function readFile(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
-      const records = parseCsv(String(reader.result));
-      if (records.length === 0) {
+      // Matched by name first and shown straight away: the screen is usable
+      // before the model answers, and stays usable if it never does.
+      const read = readImportFile(String(reader.result), target);
+      if (!read) {
         message.warning("That file has no rows under its header.");
         return;
       }
-      const columns = Object.keys(records[0]);
-      // Match by name first and show that straight away: the screen is usable
-      // before the model answers, and stays usable if it never does.
-      const proposed = proposeMapping(columns, target);
+      const { columns, rows: dataRows, proposed } = read;
       setHeaders(columns);
-      setRows(
-        records.map((record) => columns.map((column) => record[column] ?? "")),
-      );
+      setRows(dataRows);
       setMapping(proposed.columns);
       setUnmapped(proposed.unmapped);
       setAiNote(null);
@@ -133,8 +135,8 @@ export default function ImportClient({
       setFileName(file.name);
       message.info(
         proposed.missingRequired.length === 0
-          ? `Read ${records.length} row(s). Check the columns below.`
-          : `Read ${records.length} row(s), but some required columns need choosing.`,
+          ? `Read ${dataRows.length} row(s). Check the columns below.`
+          : `Read ${dataRows.length} row(s), but some required columns need choosing.`,
       );
 
       // Then ask the model to fill what the names could not, in the background.
@@ -161,10 +163,24 @@ export default function ImportClient({
 
   async function runPreview() {
     setBusy(true);
-    const res = await previewImportAction(target, rows, mapping, bankAccountId);
+    const res = await previewImportAction(target, rows, mapping, bankAccountId, overrides);
     setBusy(false);
     if (res.ok && res.data) setPreview(res.data);
     else message.error(res.error ?? "Could not read the file");
+  }
+
+  /**
+   * Write the rows this import will leave out, from the file already in hand.
+   *
+   * Nothing goes to the server: the browser still holds every row it read, so
+   * the count on screen and the file written from it cannot disagree.
+   */
+  function downloadExcluded() {
+    if (!preview?.excluded?.length) return;
+    downloadTextFile(
+      `${(fileName ?? "import").replace(/\.csv$/i, "")}-rows-left-out.csv`,
+      excludedRowsCsv(headers, rows, preview.excluded),
+    );
   }
 
   function confirmImport() {
@@ -194,17 +210,26 @@ export default function ImportClient({
           balances ? asOf.format("YYYY-MM-DD") : null,
           bankAccountId,
           fileName,
+          overrides,
         );
         setBusy(false);
         if (!res.ok || !res.data) {
           message.error(res.error ?? "Import failed");
           throw new Error(res.error);
         }
-        const { created, updated, skipped, openingCreated } = res.data;
+        const { created, updated, skipped, openingCreated, classification } = res.data;
         message.success(
           `${created} created, ${updated} updated, ${skipped} skipped` +
             (openingCreated
               ? `, ${openingCreated} opening balance(s) brought across`
+              : "") +
+            // Said out loud because it used to be silent, and its absence only
+            // showed up later as a Cash Flow Statement stuck in review.
+            (classification && classification.rolesSet > 0
+              ? `. ${classification.rolesSet} account(s) classified for cash flow`
+              : "") +
+            (classification && classification.stillUnclassified.length > 0
+              ? `; ${classification.stillUnclassified.length} still need a policy — set it under Chart of accounts`
               : ""),
         );
         reset();
@@ -247,41 +272,20 @@ export default function ImportClient({
         />
       )}
 
-      <Space wrap>
-        <Segmented
-          value={target}
-          onChange={(value) => {
-            setTarget(value as ImportTarget);
-            reset();
-          }}
-          options={TARGETS.map((t) => ({ label: TARGET_LABEL[t], value: t }))}
-        />
-        {target === "transactions" ? (
-          <Select
-            allowClear
-            style={{ minWidth: 280 }}
-            placeholder="Post to bank account"
-            value={bankAccountId ?? undefined}
-            onChange={(value) => setBankAccountId(value ?? null)}
-            options={bankAccounts.map((account) => ({
-              value: account.id,
-              label: `${account.account_code} — ${account.name}`,
-            }))}
-          />
-        ) : null}
-        {ledgerTab ? null : (
-          <Upload
-            accept=".csv,text/csv"
-            showUploadList={false}
-            beforeUpload={readFile}
-          >
-            <Button icon={<UploadOutlined />}>Choose a CSV file</Button>
-          </Upload>
-        )}
-        {fileName && !ledgerTab ? (
-          <Typography.Text type="secondary">{fileName}</Typography.Text>
-        ) : null}
-      </Space>
+      <ImportToolbar
+        targets={TARGETS}
+        target={target}
+        onTargetChange={(next) => {
+          setTarget(next);
+          reset();
+        }}
+        bankAccounts={bankAccounts}
+        bankAccountId={bankAccountId}
+        onBankAccountChange={setBankAccountId}
+        ledgerTab={ledgerTab}
+        fileName={fileName}
+        onFile={readFile}
+      />
 
       {ledgerTab ? (
         <LedgerImportPanel
@@ -289,6 +293,7 @@ export default function ImportClient({
           isSampleCompany={isSampleCompany}
           baseDecimals={baseDecimals}
           canManage
+          accounts={accounts}
         />
       ) : null}
 
@@ -309,6 +314,16 @@ export default function ImportClient({
           }}
         />
       )}
+
+      {headers.length > 0 && target === "transactions" ? (
+        <ImportPreflightSection
+          rows={rows}
+          mapping={mapping}
+          accounts={accounts}
+          overrides={overrides}
+          onOverridesChange={setOverrides}
+        />
+      ) : null}
 
       {headers.length > 0 && !ledgerTab ? (
         <>
@@ -354,6 +369,7 @@ export default function ImportClient({
           asOf={asOf}
           onAsOfChange={setAsOf}
           onImport={confirmImport}
+          onDownloadExcluded={downloadExcluded}
         />
       ) : null}
 

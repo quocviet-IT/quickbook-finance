@@ -1,6 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import {
+  accountRefPreflight,
+  importPreflight,
+  type ImportPreflight,
+  type UnresolvedRef,
+} from "@/lib/services/import-preflight";
 import { getUserRole, isAdmin, canWrite } from "@/lib/auth";
 import {
   previewImport,
@@ -52,12 +58,16 @@ export async function previewImportAction(
   rows: string[][],
   mapping: Record<string, number | null>,
   bankAccountId: string | null = null,
+  accountOverrides: Record<string, string> = {},
 ): Promise<ActionResult<ImportPreview>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    return { ok: true, data: await previewImport(sb, target, rows, mapping, { bankAccountId }) };
+    return {
+      ok: true,
+      data: await previewImport(sb, target, rows, mapping, { bankAccountId, accountOverrides }),
+    };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
@@ -71,6 +81,7 @@ export async function runImportAction(
   openingBalancesAsOf: string | null,
   bankAccountId: string | null = null,
   fileName: string | null = null,
+  accountOverrides: Record<string, string> = {},
 ): Promise<ActionResult<ImportOutcome>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
@@ -80,12 +91,37 @@ export async function runImportAction(
       openingBalancesAsOf,
       bankAccountId,
       fileName,
+      accountOverrides,
     });
     // Transactions post to the ledger, so the screens that read it move too.
     for (const path of ["/accounts", "/customers", "/vendors", "/items", "/reports", "/banking"]) {
       revalidatePath(path);
     }
     return { ok: true, data: outcome };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * What the file will ask of this company, before a column is agreed.
+ *
+ * Read-only, and cheap: the distinct names in the file rather than its rows.
+ * It exists because the tester's report said, twice, that a prerequisite was
+ * "only revealed after the user has already gone through the upload and
+ * mapping steps".
+ */
+export async function importPreflightAction(
+  target: ImportTarget,
+  rows: string[][],
+  mapping: Record<string, number | null>,
+  accountOverrides: Record<string, string> = {},
+): Promise<ActionResult<ImportPreflight>> {
+  const denied = await guard(target);
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await importPreflight(sb, target, rows, mapping, accountOverrides) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
@@ -153,6 +189,21 @@ export async function unresolvedAccountRefsAction(
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: { missing: await unresolvedAccountRefs(sb, refs) } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** The same pre-flight for a ledger, whose accounts arrive already counted. */
+export async function ledgerPreflightAction(
+  refs: { ref: string; rows: number }[],
+  accountOverrides: Record<string, string> = {},
+): Promise<ActionResult<UnresolvedRef[]>> {
+  const denied = await guard("general_ledger");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await accountRefPreflight(sb, refs, accountOverrides) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

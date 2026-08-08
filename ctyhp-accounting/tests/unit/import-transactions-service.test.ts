@@ -213,6 +213,72 @@ describe("previewImport for transactions", () => {
   });
 });
 
+describe("what the preview says about the rows it leaves out", () => {
+  it("numbers a problem row by its line in the file, header included", async () => {
+    // It reported "Row 543" for what a spreadsheet shows as line 544, because
+    // it counted records rather than lines. Off by one, and further off after
+    // any blank line, on the one message telling somebody where to look.
+    const rows = [
+      ["2026-01-15", "Zelle Transfer", "121 - PC49 BoA CK 3388", "Inventory Purchase", "-3200.00"],
+      ["2026-01-16", "Check 1171", "121 - PC49 BoA CK 3388", "Sales", "-3450"],
+    ];
+    const mapping = { ...MAPPING, debit: 5, credit: 6 };
+    const withConflict = rows.map((row, index) => [...row, index === 1 ? "2000" : "0", index === 1 ? "3450" : "0"]);
+
+    const preview = await previewImport(companyClient(), "transactions", withConflict, mapping);
+
+    // The second data row is line 3 of the file.
+    expect(preview.problems[0].row).toBe(3);
+  });
+
+  it("keeps counting lines correctly past a blank one", async () => {
+    const rows = [
+      ["2026-01-15", "Zelle Transfer", "121 - PC49 BoA CK 3388", "Inventory Purchase", "-3200.00"],
+      ["", "", "", "", ""],
+      ["2026-01-17", "Fee waived", "121 - PC49 BoA CK 3388", "Sales", "0.00"],
+    ];
+
+    const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
+
+    expect(preview.blankRows).toBe(1);
+    // The waived fee is line 4 of the file, not the second surviving record.
+    expect(preview.excluded?.map((row) => row.line)).toEqual([4]);
+  });
+
+  it("names every row it leaves out, with the reason", async () => {
+    const rows = [...ROWS, ["2026-01-17", "Fee waived", "121 - PC49 BoA CK 3388", "Sales", ""]];
+
+    const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
+
+    expect(preview.excluded).toEqual([
+      expect.objectContaining({ line: 4, reason: "No money" }),
+    ]);
+  });
+
+  it("counts a row already imported among the ones left out", async () => {
+    const first = await previewImport(companyClient(), "transactions", ROWS, MAPPING);
+    const sb = companyClient({ hashes: [String(first.rows[0].key)] });
+
+    const preview = await previewImport(sb, "transactions", ROWS, MAPPING);
+
+    expect(preview.excluded).toEqual([
+      expect.objectContaining({ line: 2, reason: "Already imported" }),
+    ]);
+  });
+
+  it("splits the total into money in and money out", async () => {
+    // A single net figure hides a sign column read the wrong way round; these
+    // two do not, which is the whole reason they are reported.
+    const preview = await previewImport(companyClient(), "transactions", ROWS, MAPPING);
+
+    expect(preview.moneyInMinor).toBe(96900);
+    expect(preview.moneyOutMinor).toBe(-320000);
+    expect((preview.moneyInMinor ?? 0) + (preview.moneyOutMinor ?? 0)).toBe(
+      preview.openingTotalMinor,
+    );
+  });
+});
+
 describe("runImport for transactions", () => {
   it("sends resolved rows and the chosen bank account to the RPC", async () => {
     const sb = companyClient();

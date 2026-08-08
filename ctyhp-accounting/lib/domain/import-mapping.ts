@@ -382,9 +382,23 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
 
 // --- Proposing a mapping ----------------------------------------------------
 
-/** Compare headers the way a person would: ignoring case, spacing and punctuation. */
+/**
+ * Compare headers the way a person would: ignoring case, spacing and
+ * punctuation — except for "#", which is a word.
+ *
+ * Stripping it turned QuickBooks' "Account #" into "account", which is an exact
+ * alias of the account *name*. So the account number was read as the name and
+ * the code column was left empty, on the one file every migration starts with.
+ * Read as "account number" it matches the code exactly, and the name is left to
+ * "Account name" where it belongs. Applied to aliases too, so both sides of the
+ * comparison say the same thing.
+ */
 function normalise(header: string): string {
-  return header.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return header
+    .toLowerCase()
+    .replace(/#/g, " number ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function tokens(header: string): string[] {
@@ -529,6 +543,15 @@ export interface ParsedImport {
   problems: ImportProblem[];
   /** Rows skipped because every mapped column was empty. */
   blankRows: number;
+  /**
+   * The line each record came from, counting the header as line 1.
+   *
+   * Parallel to `records`, because they are not the same list: a blank row is
+   * skipped without becoming a record, so the nth record is not the nth line.
+   * A preview that assumed it was reported "Row 543" for what a spreadsheet
+   * shows as line 544 — and would have drifted further with every blank line.
+   */
+  sourceLines: number[];
 }
 
 /**
@@ -570,6 +593,7 @@ export function applyMapping(
   const fields = fieldsFor(target);
   const records: Record<string, string | number | boolean | null>[] = [];
   const problems: ImportProblem[] = [];
+  const sourceLines: number[] = [];
   let blankRows = 0;
 
   rows.forEach((row, index) => {
@@ -676,9 +700,10 @@ export function applyMapping(
       return;
     }
     records.push(record);
+    sourceLines.push(rowNumber);
   });
 
-  return { records, problems, blankRows };
+  return { records, problems, blankRows, sourceLines };
 }
 
 /** One sentence describing what the file holds, before anything is imported. */

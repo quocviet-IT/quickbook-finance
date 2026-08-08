@@ -236,3 +236,64 @@ describe("fieldsFor", () => {
     }
   });
 });
+
+describe("the headers the two products actually export", () => {
+  const named = (headers: string[], target: Parameters<typeof proposeMapping>[1]) => {
+    const proposed = proposeMapping(headers, target);
+    return Object.fromEntries(
+      Object.entries(proposed.columns).map(([key, index]) => [
+        key,
+        index === null ? null : headers[index],
+      ]),
+    );
+  };
+
+  it("reads a QuickBooks account list without swapping the code for the name", () => {
+    // "Account #" normalised to "account", which is an exact alias of the
+    // account *name*. So the number was read as the name and the code column
+    // was left empty — on the first file of every migration.
+    const mapped = named(
+      ["Account #", "Account name", "Type", "Detail Type", "Description", "Balance"],
+      "chart_of_accounts",
+    );
+
+    expect(mapped.account_code).toBe("Account #");
+    expect(mapped.name).toBe("Account name");
+    expect(mapped.account_type).toBe("Type");
+    expect(mapped.opening_balance_minor).toBe("Balance");
+  });
+
+  it("keeps reading the plainer headings it always did", () => {
+    const mapped = named(
+      ["Account Number", "Name", "Account Type", "Description"],
+      "chart_of_accounts",
+    );
+
+    expect(mapped.account_code).toBe("Account Number");
+    expect(mapped.name).toBe("Name");
+    expect(mapped.account_type).toBe("Account Type");
+  });
+
+  it("does not hand Detail Type to the type column when Type is there", () => {
+    // QuickBooks detail types are a different vocabulary — "Checking",
+    // "Accounts Receivable (A/R)" — and would fail translation row by row.
+    const proposed = proposeMapping(
+      ["Account #", "Account name", "Type", "Detail Type"],
+      "chart_of_accounts",
+    );
+
+    expect(proposed.unmapped).toContain("Detail Type");
+  });
+
+  it("still reads a Wave transactions export", () => {
+    const mapped = named(
+      ["Date", "Description", "Bank account", "Chart of account", "Amount", "Debit", "Credit"],
+      "transactions",
+    );
+
+    expect(mapped.txn_date).toBe("Date");
+    expect(mapped.bank_account).toBe("Bank account");
+    expect(mapped.category_account).toBe("Chart of account");
+    expect(mapped.amount).toBe("Amount");
+  });
+});

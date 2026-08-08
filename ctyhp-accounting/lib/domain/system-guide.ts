@@ -432,7 +432,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         body:
           "A transaction row never creates an account — the same name means different things in " +
           "two charts, and a typo would become a permanent account. The screen lists every name " +
-          "it cannot find and keeps the button shut until each one exists.",
+          "it cannot find and keeps the button shut until each one is answered. Answering it " +
+          "does not mean editing the file: point the name at an account you already have, or " +
+          "create it there with the type you choose.",
       },
       {
         title: "A name two accounts answer to is refused, and the account code is the way out",
@@ -477,11 +479,29 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/settings/import",
         note:
           "Everything posts into whichever company is open in the switcher. The panel at the top " +
-          "of the tab names what has to exist before the file will go in.",
+          "of the tab names what has to exist before the file will go in — and once a file is " +
+          "chosen, a second panel checks it against this company straight away: which account " +
+          "names cannot be found, and which banks have no record. Both can be answered there, " +
+          "by pointing a name at an account you already have or by creating what is missing.",
         screenshot: {
           src: "/guide/txn-01-before.png",
           alt: "The Before you start panel on the transactions tab, listing the chart of accounts and Banking as prerequisites",
           caption: "Read this before choosing a file, not after mapping every column.",
+        },
+      },
+      {
+        action: "Read what this company is missing, before mapping anything",
+        control: "What this file needs",
+        note:
+          "Choosing the file is enough for this: the screen checks every account name and every " +
+          "bank in it against this company straight away. A name the chart does not have can be " +
+          "pointed at an account that does exist — which is what a file somebody else exported " +
+          "usually needs, since you cannot edit it — or created here, with the type chosen by " +
+          "you. A bank with no record can be declared without leaving the screen.",
+        screenshot: {
+          src: "/guide/txn-02-preflight.png",
+          alt: "The panel listing account names the chart cannot find, each with a picker to choose the account it means",
+          caption: "Answered here, rather than on two other screens after mapping seven columns.",
         },
       },
       {
@@ -492,7 +512,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Chart of account are required. Money is either a signed Amount — positive is money " +
           "into the bank — or a Debit and Credit pair; map one or the other.",
         screenshot: {
-          src: "/guide/txn-02-columns.png",
+          src: "/guide/txn-03-columns.png",
           alt: "The column mapping table with Date, Description, Bank account, Chart of account and Amount matched to the file's headings",
           caption: "Leave Bank account unmapped to post every row to one account chosen above.",
         },
@@ -504,7 +524,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "How many rows will be created, how many have a genuine problem, how many carry no " +
           "money, and the net of the transactions — which is a net, not an opening balance.",
         screenshot: {
-          src: "/guide/txn-03-preview.png",
+          src: "/guide/txn-04-preview.png",
           alt: "The figures above the preview: rows to create, rows with problems, rows carrying no money, and the net",
           caption: "Check the net against the report you exported before importing.",
         },
@@ -517,7 +537,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "that belongs to two accounts at once each say exactly what to do. None is worth " +
           "working around: the import posts real money.",
         screenshot: {
-          src: "/guide/txn-04-empty.png",
+          src: "/guide/txn-05-empty.png",
           alt: "The note explaining that rows carrying no money are left out and need no fixing",
           caption: "A row worth 0.00 is left out quietly. Only real problems are red.",
         },
@@ -530,7 +550,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Each row posts one journal entry and one bank line already marked matched, so " +
           "connecting a bank feed for the same account later cannot count the same money twice.",
         screenshot: {
-          src: "/guide/txn-03-preview.png",
+          src: "/guide/txn-04-preview.png",
           alt: "The same figures, which are what the import will have posted once it finishes",
           caption: "What the preview counted is what the import posts.",
         },
@@ -544,7 +564,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "and dates. Undo is how a mistaken import is put right: it voids the entries and " +
           "removes the bank lines, leaving the corrected file free to be imported in their place.",
         screenshot: {
-          src: "/guide/txn-05-record.png",
+          src: "/guide/txn-06-record.png",
           alt: "The register of imports, showing the file, its dates and row count, with an Undo button",
           caption: "Undo voids the entries and removes the bank lines it posted.",
         },
@@ -572,10 +592,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "A ledger row never creates an account: the same name means different " +
           "things in two charts, and a typo would become a permanent account. The " +
           "screen lists every name it cannot find and keeps the button shut until " +
-          "each one exists. Import the chart of accounts first, or add the few that " +
-          "are missing by hand. A name that two live accounts answer to counts as one " +
-          "it cannot find: write the account code in the file — \"1000\", or " +
-          "\"1000 - Cash on Hand\" — or set the one you do not use to Inactive.",
+          "each one is answered — and it is answered there, not on another screen: " +
+          "point the name at an account you already have, or create it with the type " +
+          "you choose. A name two live accounts answer to counts as one it cannot " +
+          "find, and the same picker settles that.",
       },
       {
         title: "Undo works only while the period is still open",
@@ -651,8 +671,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "wrong. None of them is worth working around.",
         screenshot: {
           src: "/guide/import-04-blocked.png",
-          alt: "A red panel listing the accounts in the file that the chart of accounts does not have",
-          caption: "Missing accounts are listed together, so one trip fixes all of them.",
+          alt: "A table of the names in the file the chart cannot find, each with a picker to choose the account it means",
+          caption: "Point each name at an account you already have, or create it here.",
         },
       },
       {

@@ -97,9 +97,25 @@ async function existingHashes(sb: SupabaseClient): Promise<Set<string>> {
 
 export async function previewTransactionImport(
   sb: SupabaseClient,
-  parsed: { records: readonly Record<string, unknown>[]; problems: ImportPreview["problems"]; blankRows: number },
+  parsed: {
+    records: readonly Record<string, unknown>[];
+    problems: ImportPreview["problems"];
+    blankRows: number;
+    sourceLines: readonly number[];
+  },
   mapping: Record<string, number | null>,
-  options: { bankAccountId?: string | null },
+  options: {
+    bankAccountId?: string | null;
+    /**
+     * What the reader decided a name in the file means, as an account code.
+     *
+     * Substituted into the row before anything is resolved, so the code goes
+     * to the database in place of the name and the server resolves it the one
+     * way it resolves everything. Nothing here decides which account is meant;
+     * it carries an answer somebody already gave.
+     */
+    accountOverrides?: Record<string, string>;
+  },
 ): Promise<ImportPreview> {
   const records = parsed.records as unknown as TransactionImportRecord[];
 
@@ -126,9 +142,15 @@ export async function previewTransactionImport(
     };
   }
 
+  const overrides = options.accountOverrides ?? {};
+  const substitute = (ref: string | null | undefined): string => {
+    const raw = (ref ?? "").trim();
+    return raw === "" ? "" : (overrides[raw] ?? raw);
+  };
+
   const refs: string[] = [];
   for (const record of records) {
-    refs.push(record.bank_account ?? "", record.category_account ?? "");
+    refs.push(substitute(record.bank_account), substitute(record.category_account));
   }
 
   const [matches, hashes, banked, bankTyped] = await Promise.all([
@@ -139,6 +161,15 @@ export async function previewTransactionImport(
   ]);
 
   const problems = [...parsed.problems];
+  /**
+   * Every row that will not be imported, and why.
+   *
+   * Counted was not enough: "100 row(s) will be left out" over a 1,566-row file
+   * is 7% of somebody's books going missing with no way to see which 7%. The
+   * lines are carried rather than the rows — the screen still holds the file it
+   * read, so it can write the CSV itself from its own copy.
+   */
+  const excluded: { line: number; reason: string; message: string }[] = [];
   const missing = new Set<string>();
   const unbanked = new Set<string>();
   const notBanks = new Set<string>();
@@ -150,17 +181,26 @@ export async function previewTransactionImport(
   let emptyRows = 0;
 
   records.forEach((record, position) => {
+    // The line this row came from in the file, not its position among the rows
+    // that survived parsing. A blank line makes those two diverge.
+    const line = parsed.sourceLines[position] ?? position + 2;
     const signed = signedAmountMinor(record);
     if ("problem" in signed) {
-      problems.push({ row: position + 1, message: signed.problem });
+      problems.push({ row: line, message: signed.problem });
+      excluded.push({ line, reason: "Problem", message: signed.problem });
       return;
     }
     if ("empty" in signed) {
       emptyRows += 1;
+      excluded.push({
+        line,
+        reason: "No money",
+        message: "This row carries no amount — a waived fee, or a line recorded as 0.00.",
+      });
       return;
     }
 
-    const bankRef = (record.bank_account ?? "").trim();
+    const bankRef = substitute(record.bank_account);
     const bankMatch = bankRef ? matches.get(bankRef) : undefined;
     if (bankRef && bankMatch?.matchedBy === "ambiguous") {
       ambiguous.set(bankRef, bankMatch.candidateCodes);
@@ -176,7 +216,7 @@ export async function previewTransactionImport(
       else notBanks.add(bankRef || "the account chosen above");
     }
 
-    const categoryRef = (record.category_account ?? "").trim();
+    const categoryRef = substitute(record.category_account);
     const categoryMatch = categoryRef ? matches.get(categoryRef) : undefined;
     if (categoryRef && categoryMatch?.matchedBy === "ambiguous") {
       ambiguous.set(categoryRef, categoryMatch.candidateCodes);
@@ -205,14 +245,20 @@ export async function previewTransactionImport(
     });
     if (hashes.has(hash)) {
       duplicates += 1;
+      excluded.push({
+        line,
+        reason: "Already imported",
+        message: "This exact row is already in the bank register, so it is not posted again.",
+      });
       return;
     }
+    const posting = { ...record, bank_account: bankRef, category_account: categoryRef };
     previewRows.push({
       key: hash,
-      name: describeTransactionRow(record, signed.minor),
+      name: describeTransactionRow(posting, signed.minor),
       action: "create",
       openingBalanceMinor: signed.minor,
-      values: { ...record, signed_minor: signed.minor },
+      values: { ...posting, signed_minor: signed.minor },
     });
   });
 
@@ -226,6 +272,18 @@ export async function previewTransactionImport(
     openingTotalMinor: previewRows.reduce((sum, row) => sum + row.openingBalanceMinor, 0),
     duplicates,
     emptyRows,
+    excluded,
+    // Money in and money out, not just their difference. A sign column mapped
+    // the wrong way round shows up here at once — everything on one side —
+    // where a single net figure hides it completely.
+    moneyInMinor: previewRows.reduce(
+      (sum, row) => sum + Math.max(row.openingBalanceMinor, 0),
+      0,
+    ),
+    moneyOutMinor: previewRows.reduce(
+      (sum, row) => sum + Math.min(row.openingBalanceMinor, 0),
+      0,
+    ),
     missingAccounts: [...missing],
     unbankedAccounts: [...unbanked],
     nonBankAccounts: [...notBanks],

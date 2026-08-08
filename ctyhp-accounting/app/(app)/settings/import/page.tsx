@@ -35,6 +35,7 @@ export default async function ImportPage() {
         isSampleCompany={active?.isSample ?? false}
         baseDecimals={base?.decimal_places ?? 2}
         bankAccounts={bankAccounts}
+        accounts={accounts}
       />
     </div>
   );

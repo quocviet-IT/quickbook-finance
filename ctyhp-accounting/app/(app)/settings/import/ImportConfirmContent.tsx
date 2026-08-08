@@ -37,6 +37,15 @@ export default function ImportConfirmContent({
       <div>
         {preview.creates} to create, {preview.updates} to update.
       </div>
+      {target === "transactions" && preview.moneyInMinor !== undefined ? (
+        // The figures the reader confirms against. A single net number hides a
+        // sign column read the wrong way round; these two do not.
+        <div>
+          <b>{money(preview.moneyInMinor)}</b> in, <b>{money(preview.moneyOutMinor ?? 0)}</b> out
+          {" — a net of "}
+          <b>{money(preview.openingTotalMinor)}</b>.
+        </div>
+      ) : null}
       {balances ? (
         <Alert
           type="warning"

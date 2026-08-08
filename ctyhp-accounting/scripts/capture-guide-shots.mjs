@@ -127,6 +127,9 @@ function ledgerCsv({ bank, expense, income }, ghost, stamp) {
   ].join("\r\n");
 }
 
+/** A name no chart has, used to photograph the pre-flight doing its job. */
+const UNKNOWN_ACCOUNT = "Courier & Freight (not in this chart)";
+
 /** A categorized export: every row names both sides, which is what this tab needs. */
 function transactionsCsv(bank, { expense, income }, stamp) {
   const big = (4000 + stamp).toFixed(2);
@@ -136,6 +139,10 @@ function transactionsCsv(bank, { expense, income }, stamp) {
     `1/4/2026,Opening float,${bank.name},${income.name},${big}`,
     `1/9/2026,Card terminal fee,${bank.name},${expense.name},-${small}`,
     `1/9/2026,Fee waived,${bank.name},${expense.name},0.00`,
+    // One name this chart does not have, so the pre-flight has something real
+    // to show. It is answered through the picker further down, which is both
+    // the picture worth taking and a rehearsal of the path it documents.
+    `1/12/2026,Courier charge,${bank.name},${UNKNOWN_ACCOUNT},-${small}`,
     "",
   ].join("\r\n");
 }
@@ -323,11 +330,13 @@ try {
       "utf8",
     ),
   });
-  await page.getByText("are not in this company's chart of accounts").waitFor({ timeout: 15_000 });
+  // The ledger tab now offers the same picker the transactions tab does, so the
+  // picture is of the table that answers the problem, not only of the refusal.
+  await page.getByText("do not name one account").waitFor({ timeout: 15_000 });
   await shoot(
-    page.locator(".ant-alert-error").first(),
+    page.locator(".ant-table-wrapper").filter({ hasText: "Name in the file" }).first(),
     "import-04-blocked.png",
-    "the missing-account refusal",
+    "a name the chart does not have, and the way to answer it",
   );
 
   await page.reload({ waitUntil: "networkidle" });
@@ -400,24 +409,45 @@ try {
     mimeType: "text/csv",
     buffer: Buffer.from(transactionsCsv(bankAccount, accounts, stamp), "utf8"),
   });
-  await page.getByText("Agree the columns").waitFor({ timeout: 15_000 });
+  // ---- The pre-flight, before a column is agreed ----------------------------
+  const preflight = page.locator(".ant-card").filter({ hasText: "What this file needs" }).first();
+  await preflight.waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(2000);
+  await preflight.scrollIntoViewIfNeeded();
+  await shoot(preflight, "txn-02-preflight.png", "what this company is missing");
+
+  // Answer it the way the screen intends: point the name at an account that
+  // exists. If that stops working the picture becomes a lie, so it is done here
+  // rather than described.
+  await preflight.locator(".ant-select").first().click();
+  await page.keyboard.type(accounts.expense.name.slice(0, 12));
+  await page.waitForTimeout(800);
+  await page.locator(".ant-select-dropdown:visible .ant-select-item-option-content").first().click();
+  await preflight
+    .getByText("Every account this file names already exists")
+    .waitFor({ timeout: 30_000 });
+  console.log("  check  the pre-flight cleared once the name was pointed at an account");
+
+  // The pre-flight now says "Agree the columns below" too, so be precise.
+  await page.locator(".ant-steps-item-title", { hasText: "Agree the columns" }).first()
+    .waitFor({ timeout: 15_000 });
   await page.waitForTimeout(1200);
 
   const columns = page.locator(".ant-table-wrapper").filter({ hasText: "Column in your file" }).first();
   await columns.scrollIntoViewIfNeeded();
-  await shoot(columns, "txn-02-columns.png", "the columns One Book proposed");
+  await shoot(columns, "txn-03-columns.png", "the columns One Book proposed");
 
   await page.getByRole("button", { name: "See what will happen" }).click();
   await page.getByText("Rows carrying no money").waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1200);
   const figures = page.locator(".import-preview__figures").first();
-  await shoot(figures, "txn-03-preview.png", "what the file will do");
+  await shoot(figures, "txn-04-preview.png", "what the file will do");
 
   const emptyNote = page
     .locator(".ant-alert")
     .filter({ hasText: "carry no money" })
     .first();
-  await shoot(emptyNote, "txn-04-empty.png", "rows with nothing in them");
+  await shoot(emptyNote, "txn-05-empty.png", "rows with nothing in them");
 
   // Import for real, so the register can be photographed holding something.
   // Undone a few lines below, through the control the picture is of.
@@ -431,7 +461,7 @@ try {
     .filter({ hasText: "transactions.csv" })
     .first();
   await register.scrollIntoViewIfNeeded();
-  await shoot(register, "txn-05-record.png", "the import, and the way back out");
+  await shoot(register, "txn-06-record.png", "the import, and the way back out");
 
   // Undo it through the real control, both to prove the button in the picture
   // works and so the sample company does not collect an import per run.

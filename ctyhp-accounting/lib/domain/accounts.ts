@@ -27,6 +27,29 @@ export const ACCOUNT_TYPES = [
 
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
+/**
+ * What each type is called on screen.
+ *
+ * Beside the list it labels, because two screens now offer the same choice —
+ * the chart of accounts, and the import screen creating the one account a file
+ * names. A second copy of these words is a second chance for them to differ.
+ */
+export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
+  bank: "Bank",
+  accounts_receivable: "Accounts Receivable",
+  current_asset: "Current Asset",
+  fixed_asset: "Fixed Asset",
+  accounts_payable: "Accounts Payable",
+  credit_card: "Credit Card",
+  current_liability: "Current Liability",
+  equity: "Equity",
+  income: "Income",
+  cost_of_goods_sold: "Cost of Goods Sold",
+  expense: "Expense",
+  other_income: "Other Income",
+  other_expense: "Other Expense",
+};
+
 export type NormalBalance = "debit" | "credit";
 export type StatementSection = "balance_sheet" | "profit_and_loss";
 

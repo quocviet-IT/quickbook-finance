@@ -20,8 +20,15 @@ import {
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import ClassifyAccountsButton from "./ClassifyAccountsButton";
 import IconActionButton from "@/components/ui/IconActionButton";
-import { ACCOUNT_TYPES, normalBalanceOf, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
+import {
+  ACCOUNT_TYPES,
+  ACCOUNT_TYPE_LABEL,
+  normalBalanceOf,
+  statementSectionOf,
+  type AccountType,
+} from "@/lib/domain/accounts";
 import { BANK_DETAIL_TYPES, bankDetailLabel } from "@/lib/domain/bank-account-detail";
 import {
   CASH_FLOW_ROLES,
@@ -30,22 +37,6 @@ import {
 } from "@/lib/domain/cashflow";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
-
-const TYPE_LABELS: Record<AccountType, string> = {
-  bank: "Bank",
-  accounts_receivable: "Accounts Receivable",
-  current_asset: "Current Asset",
-  fixed_asset: "Fixed Asset",
-  accounts_payable: "Accounts Payable",
-  credit_card: "Credit Card",
-  current_liability: "Current Liability",
-  equity: "Equity",
-  income: "Income",
-  cost_of_goods_sold: "Cost of Goods Sold",
-  expense: "Expense",
-  other_income: "Other Income",
-  other_expense: "Other Expense",
-};
 
 const STATUS_LABELS: Record<AccountStatus, { text: string; color: string }> = {
   draft: { text: "Draft", color: "default" },
@@ -181,8 +172,8 @@ export default function AccountsClient({
     {
       title: "Type",
       dataIndex: "account_type",
-      render: (t: AccountType) => <Tag>{TYPE_LABELS[t]}</Tag>,
-      filters: ACCOUNT_TYPES.map((t) => ({ text: TYPE_LABELS[t], value: t })),
+      render: (t: AccountType) => <Tag>{ACCOUNT_TYPE_LABEL[t]}</Tag>,
+      filters: ACCOUNT_TYPES.map((t) => ({ text: ACCOUNT_TYPE_LABEL[t], value: t })),
       onFilter: (value, row) => row.account_type === value,
     },
     {
@@ -264,11 +255,14 @@ export default function AccountsClient({
       <FilterBar
         resultCount={filtered.length}
         actions={
-          canWrite ? (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              New account
-            </Button>
-          ) : null
+          <Space wrap>
+            <ClassifyAccountsButton canWrite={canWrite} />
+            {canWrite ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                New account
+              </Button>
+            ) : null}
+          </Space>
         }
       >
         <Input.Search
@@ -315,7 +309,7 @@ export default function AccountsClient({
           </Form.Item>
           <Form.Item name="account_type" label="Account type" rules={[{ required: true, message: "Select a type" }]}>
             <Select
-              options={ACCOUNT_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+              options={ACCOUNT_TYPES.map((t) => ({ value: t, label: ACCOUNT_TYPE_LABEL[t] }))}
               placeholder="Select an account type"
               onChange={(type: AccountType) => {
                 form.setFieldValue("cash_flow_role", defaultCashFlowRole(type));

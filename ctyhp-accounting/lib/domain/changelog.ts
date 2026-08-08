@@ -41,6 +41,140 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.12",
+    date: "2026-08-08",
+    headline: "A QuickBooks account list reads correctly, and the ledger tab answers a missing account where it finds it.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A QuickBooks chart of accounts no longer reads the number as the name",
+        detail:
+          "“Account #” was being matched to the account name, leaving the code column empty "
+          + "— on the first file most migrations start with. The “#” is now read as the word "
+          + "“number”, so the code lands in the code column and the name in the name column.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "The general ledger tab offers the same picker the transactions tab does",
+        detail:
+          "It listed the account names it could not find and sent you to another screen to create "
+          + "them. It now lets you point each name at an account you already have, or create it "
+          + "there with the type you choose — which is the only remedy available when the file "
+          + "is a customer’s export you cannot edit.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
+    version: "1.11",
+    date: "2026-08-08",
+    headline: "You can see which rows an import leaves out, and check the money before it posts.",
+    changes: [
+      {
+        kind: "added",
+        title: "Download the rows an import will leave out",
+        detail:
+          "The preview said “100 row(s) will be left out” and stopped there. There is now a "
+          + "button beside that count: it writes a CSV with your file’s own columns, the line "
+          + "number, and the reason each row was left out — so it opens beside the original and "
+          + "can be corrected against it.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "A row is reported by its line in the file",
+        detail:
+          "The preview said “Row 543” for what a spreadsheet shows as line 544, because it "
+          + "counted rows it had parsed rather than lines in the file — and drifted further "
+          + "after every blank line. It now names the line you would scroll to.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "Money in and money out, not only the net",
+        detail:
+          "A transactions preview now shows both, and so does the box that asks you to confirm. A "
+          + "single net figure hides a sign column read the wrong way round; two figures do not. "
+          + "If every row in a file moves money the same way, it says so before you import.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
+    version: "1.10",
+    date: "2026-08-08",
+    headline: "An imported chart of accounts is classified the way a hand-typed one always was.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Imported accounts no longer arrive unclassified",
+        detail:
+          "An account you type in gets its cash-flow role from its type. One arriving through an "
+          + "import did not — so a chart brought across from Wave landed with 54 of its 95 "
+          + "accounts unclassified, and an unclassified account holds the Cash Flow Statement in "
+          + "review. The import now applies the same answer, and says how many it set.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "Classify the accounts an earlier import left behind",
+        detail:
+          "Chart of accounts offers to fix charts imported before that change. It shows exactly "
+          + "what it will set before it sets anything, never touches an account somebody has "
+          + "already classified, and leaves generic current assets and liabilities alone — "
+          + "whether a loan is operating or financing is a policy, not a default.",
+        route: "/accounts",
+      },
+      {
+        kind: "changed",
+        title: "An imported bank account is given the kind its name states",
+        detail:
+          "A bank account called “Northern Savings” arrives as a savings account rather than "
+          + "as “unclassified” on the bank setup screen. Only what the name plainly settles; "
+          + "anything else is still left for you.",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
+    version: "1.9",
+    date: "2026-08-08",
+    headline: "The import says what it needs the moment it reads your file, and lets you answer it there.",
+    changes: [
+      {
+        kind: "added",
+        title: "A pre-flight check, before you agree a single column",
+        detail:
+          "Choose a file and the screen immediately says what this company is missing: which "
+          + "account names it cannot find, and which banks have no record under Banking. Both "
+          + "used to appear as red panels under the preview, after seven columns had been "
+          + "mapped — the same complaint was raised twice, once for each.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "Point a name in the file at an account you already have",
+        detail:
+          "Every unresolved name gets a picker. Choose the account it means and the import reads "
+          + "it that way — no editing the file, which matters when the file is a customer's "
+          + "export you are not allowed to change. It is also the answer when a name belongs to "
+          + "two accounts: say which, rather than deactivating one of them.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "Create an account, or declare a bank, without leaving the screen",
+        detail:
+          "If the name really is an account nobody has yet, create it here — you choose the type, "
+          + "because a transaction row cannot tell anyone what kind of account it is. A bank the "
+          + "file uses can be added to Banking in the same place, instead of eight trips to "
+          + "another screen and back.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.8",
     date: "2026-08-08",
     headline: "Switching an account off now settles which of two same-named accounts an import means.",

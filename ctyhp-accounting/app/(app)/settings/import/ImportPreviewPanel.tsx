@@ -3,6 +3,7 @@ import { Alert, Button, Checkbox, DatePicker, Space, Statistic, Table, Tag, Typo
 import type { Dayjs } from "dayjs";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
 import type { ImportPreview } from "@/lib/services/data-import";
+import { DownloadOutlined } from "@ant-design/icons";
 
 export interface ImportPreviewPanelProps {
   preview: ImportPreview;
@@ -14,6 +15,8 @@ export interface ImportPreviewPanelProps {
   asOf: Dayjs;
   onAsOfChange: (next: Dayjs) => void;
   onImport: () => void;
+  /** Writes the rows this import will leave out, from the file already read. */
+  onDownloadExcluded?: () => void;
 }
 
 /**
@@ -34,6 +37,7 @@ export default function ImportPreviewPanel({
   asOf,
   onAsOfChange,
   onImport,
+  onDownloadExcluded,
 }: ImportPreviewPanelProps) {
   const blocked =
     (preview.missingAccounts?.length ?? 0) > 0 ||
@@ -50,6 +54,20 @@ export default function ImportPreviewPanel({
   const totalTitle =
     target === "transactions" ? "Net of these transactions" : "Opening balances in the file";
 
+  /**
+   * Every row one way is the shape a mis-mapped sign column makes.
+   *
+   * The review asked for a prompt above "a certain threshold". A threshold on
+   * money is arbitrary — three years of a real business nets to a large
+   * negative number and nothing is wrong. This is not arbitrary: a file of
+   * payments and receipts that shows no receipts is either a very unusual file
+   * or a column read backwards, and the reader is the only one who can say.
+   */
+  const oneWayOnly =
+    target === "transactions" &&
+    preview.rows.length > 1 &&
+    (preview.moneyInMinor === 0 || preview.moneyOutMinor === 0);
+
   return (
     <>
       {/* Named so the guide capture can frame exactly this row. */}
@@ -64,10 +82,40 @@ export default function ImportPreviewPanel({
         {preview.emptyRows ? (
           <Statistic title="Rows carrying no money" value={preview.emptyRows} />
         ) : null}
+        {target === "transactions" && preview.moneyInMinor !== undefined ? (
+          <>
+            <Statistic title="Money in" value={money(preview.moneyInMinor)} />
+            <Statistic title="Money out" value={money(preview.moneyOutMinor ?? 0)} />
+          </>
+        ) : null}
         {preview.openingTotalMinor !== 0 && target !== "invoices" ? (
           <Statistic title={totalTitle} value={money(preview.openingTotalMinor)} />
         ) : null}
       </Space>
+
+      {oneWayOnly ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Every row in this file moves money the same way"
+          description={
+            preview.moneyOutMinor === 0
+              ? "Nothing is going out. If the file records both payments and receipts, the sign or the money column is probably mapped the wrong way round — check before importing."
+              : "Nothing is coming in. If the file records both payments and receipts, the sign or the money column is probably mapped the wrong way round — check before importing."
+          }
+        />
+      ) : null}
+
+      {preview.excluded && preview.excluded.length > 0 && onDownloadExcluded ? (
+        <Space>
+          <Button size="small" icon={<DownloadOutlined />} onClick={onDownloadExcluded}>
+            Download the {preview.excluded.length} row(s) left out
+          </Button>
+          <Typography.Text type="secondary">
+            The file&apos;s own columns, with the line number and the reason beside each.
+          </Typography.Text>
+        </Space>
+      ) : null}
 
       {preview.emptyRows ? (
         <Alert

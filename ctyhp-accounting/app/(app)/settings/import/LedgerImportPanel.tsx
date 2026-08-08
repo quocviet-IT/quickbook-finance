@@ -26,12 +26,16 @@ import {
 } from "@/lib/domain/wave-ledger";
 import type { ImportBatchRow } from "@/lib/services/ledger-import";
 import LedgerBatchList from "./LedgerBatchList";
+import UnresolvedAccountsTable from "./UnresolvedAccountsTable";
+import CreateAccountFromImport from "./CreateAccountFromImport";
+import type { AccountRow } from "@/lib/db/types";
+import type { UnresolvedRef } from "@/lib/services/import-preflight";
 import { saveLedgerCopy } from "./saveLedgerCopy";
 import {
   importLedgerAction,
   linkImportBatchReportAction,
   listImportBatchesAction,
-  unresolvedAccountRefsAction,
+  ledgerPreflightAction,
 } from "./actions";
 
 export interface LedgerImportPanelProps {
@@ -39,6 +43,8 @@ export interface LedgerImportPanelProps {
   isSampleCompany: boolean;
   baseDecimals: number;
   canManage: boolean;
+  /** The whole chart, for pointing a name in the file at an account. */
+  accounts: AccountRow[];
 }
 
 function sectionColumns(money: (minor: number) => string) {
@@ -74,6 +80,7 @@ export default function LedgerImportPanel({
   isSampleCompany,
   baseDecimals,
   canManage,
+  accounts,
 }: LedgerImportPanelProps) {
   const { message } = App.useApp();
   const [file, setFile] = useState<File | null>(null);
@@ -84,7 +91,11 @@ export default function LedgerImportPanel({
   const [batches, setBatches] = useState<ImportBatchRow[]>([]);
   // Null while the question has not been asked or answered yet, so the button
   // stays shut rather than opening on an unchecked file.
-  const [missingAccounts, setMissingAccounts] = useState<string[] | null>(null);
+  const [missingAccounts, setMissingAccounts] = useState<UnresolvedRef[] | null>(null);
+  /** What the reader decided a name in the file means, as an account code. */
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [creatingFor, setCreatingFor] = useState<string | null>(null);
+  const [created, setCreated] = useState<AccountRow[]>([]);
 
   const refresh = useCallback(() => {
     void listImportBatchesAction().then((result) => {
@@ -113,19 +124,36 @@ export default function LedgerImportPanel({
       setParse(result);
       setFile(candidate);
       setMissingAccounts(null);
+      setOverrides({});
       if (result.toDate) setAsOf(dayjs(result.toDate));
       message.info(
         `${result.sections.length} accounts, ${result.entries.length} dates, ${result.lineCount} lines.`,
       );
       // Ask the database which names it cannot find, using the same resolver
       // the import uses, so the screen and the server cannot disagree.
-      void unresolvedAccountRefsAction(result.sections.map((s) => s.account)).then((answer) => {
-        if (answer.ok && answer.data) setMissingAccounts(answer.data.missing);
-        else message.error(answer.error ?? "Could not check the accounts in this file");
-      });
+      void checkAccounts(result.sections.map((s) => ({ ref: s.account, rows: s.rows })), {});
     };
     reader.readAsText(candidate);
     return false;
+  }
+
+  /**
+   * Ask the database which names it cannot find, using the same resolver the
+   * import uses, so the screen and the server cannot disagree.
+   */
+  function checkAccounts(
+    refs: { ref: string; rows: number }[],
+    answers: Record<string, string>,
+  ) {
+    void ledgerPreflightAction(refs, answers).then((answer) => {
+      if (answer.ok && answer.data) setMissingAccounts(answer.data);
+      else message.error(answer.error ?? "Could not check the accounts in this file");
+    });
+  }
+
+  function answer(next: Record<string, string>) {
+    setOverrides(next);
+    if (parse) checkAccounts(parse.sections.map((s) => ({ ref: s.account, rows: s.rows })), next);
   }
 
   const blocked =
@@ -140,7 +168,15 @@ export default function LedgerImportPanel({
     if (!parse || !file) return;
     setBusy(true);
     try {
-      const entries = waveLedgerPayload(parse, mode, asOf.format("YYYY-MM-DD"));
+      // The reader's answers travel as account codes, so the server resolves
+      // them the one way it resolves everything.
+      const entries = waveLedgerPayload(parse, mode, asOf.format("YYYY-MM-DD")).map((entry) => ({
+        ...entry,
+        lines: entry.lines.map((line) => ({
+          ...line,
+          account: overrides[line.account] ?? line.account,
+        })),
+      }));
       const sha256 = await calculateFileSha256(file);
       const imported = await importLedgerAction(mode, file.name, sha256, entries);
       if (!imported.ok || !imported.data) {
@@ -228,12 +264,28 @@ export default function LedgerImportPanel({
           ) : null}
 
           {missingAccounts && missingAccounts.length > 0 ? (
+            <UnresolvedAccountsTable
+              rows={missingAccounts}
+              accounts={[...accounts, ...created]}
+              overrides={overrides}
+              onOverride={(ref, code) => {
+                const next = { ...overrides };
+                if (code) next[ref] = code;
+                else delete next[ref];
+                answer(next);
+              }}
+              onCreateAccount={setCreatingFor}
+              countLabel="Lines"
+            />
+          ) : null}
+
+          {missingAccounts && missingAccounts.length > 0 ? (
             <Alert
               style={{ marginTop: 12 }}
               type="error"
               showIcon
-              message={`${missingAccounts.length} account(s) in this file are not in this company's chart of accounts`}
-              description={`${missingAccounts.join(", ")}. Add them under Chart of accounts first — a ledger row never creates an account, because the same name can mean different things in two charts.`}
+              message={`${missingAccounts.length} name(s) in this file do not name one account`}
+              description="Point each at an account that already exists, or create it above. A ledger row never creates an account on its own — the same name can mean different things in two charts, and a typo would become a permanent account."
             />
           ) : null}
 
@@ -305,6 +357,19 @@ export default function LedgerImportPanel({
       ) : null}
 
       <Card size="small" title="Ledgers imported before">
+        <CreateAccountFromImport
+          ref={creatingFor}
+          onClose={() => setCreatingFor(null)}
+          onCreated={(account) => {
+            setCreated((current) => [
+              ...current,
+              { ...(account as unknown as AccountRow), status: "active" } as AccountRow,
+            ]);
+            if (creatingFor) answer({ ...overrides, [creatingFor]: account.account_code });
+            setCreatingFor(null);
+          }}
+        />
+
         <LedgerBatchList
           batches={batches.filter((batch) => batch.source === "wave_ledger")}
           canManage={canManage}

@@ -48,6 +48,33 @@ export function holdsBankStatement(detail: string | null | undefined): boolean {
 }
 
 /** The types the bank setup screen offers; cash on hand is not one of them. */
+/**
+ * What a bank account's name plainly says it is, or null when it says nothing.
+ *
+ * Migration 0072 classified the accounts that existed by these same four
+ * readings, as a one-off backfill. An import creates new ones every time, and
+ * left unclassified they turn up on the bank setup screen as "(unclassified)"
+ * — so the reading moves here, where it can run again.
+ *
+ * Only what the name settles. Anything else stays null for a person to answer:
+ * guessing a classification onto a ledger account is how a balance sheet ends
+ * up quietly wrong, which is the reason 0072 gave for stopping at four.
+ */
+export function detailTypeFromName(name: string | null | undefined): BankDetailType | null {
+  const text = (name ?? "").toLowerCase();
+  if (text.includes("cash on hand") || text.includes("petty cash")) return "cash_on_hand";
+  if (
+    text.includes("checking") ||
+    text.includes("operating bank") ||
+    text.includes("current account")
+  ) {
+    return "checking";
+  }
+  if (text.includes("savings")) return "savings";
+  if (text.includes("money market")) return "money_market";
+  return null;
+}
+
 export const BANK_SETUP_DETAIL_TYPES: BankDetailType[] = [
   "checking",
   "savings",

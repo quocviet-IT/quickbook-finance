@@ -11,6 +11,7 @@ import {
   type InvoiceImportRecord,
 } from "@/lib/domain/invoice-import";
 import { transactionFileChecksum } from "@/lib/domain/transaction-import";
+import { classifyAccounts, type ClassificationOutcome } from "./account-classification";
 
 // The class lives beside the lookups that throw it; re-exported here because
 // every caller has always imported it from this module.
@@ -63,6 +64,17 @@ export interface ImportPreview {
    * is handed back to the only person who knows the answer.
    */
   ambiguousAccounts?: { ref: string; codes: string[] }[];
+  /**
+   * Every row that will not be imported, with the line it came from and why.
+   *
+   * "100 row(s) will be left out" over a 1,566-row file is 7% of somebody's
+   * books going missing with no way to see which 7%. Carried as line numbers so
+   * the screen can write the CSV from the file it already holds.
+   */
+  excluded?: { line: number; reason: string; message: string }[];
+  /** Money coming in, and money going out. Their difference is the net. */
+  moneyInMinor?: number;
+  moneyOutMinor?: number;
   /** Accounts named by the file that this company's chart does not have. */
   missingAccounts?: string[];
   /**
@@ -121,7 +133,7 @@ export async function previewImport(
   target: ImportTarget,
   rows: readonly (readonly string[])[],
   mapping: Record<string, number | null>,
-  options: { bankAccountId?: string | null } = {},
+  options: { bankAccountId?: string | null; accountOverrides?: Record<string, string> } = {},
 ): Promise<ImportPreview> {
   const parsed = applyMapping(rows, mapping, target);
 
@@ -191,6 +203,14 @@ export interface ImportOutcome {
   skipped: number;
   /** Opening documents raised, when the file carried balances. */
   openingCreated?: number;
+  /**
+   * What the chart import classified on the way in, and what it could not.
+   *
+   * `acc_import_accounts` writes seven columns and leaves the cash-flow role to
+   * its column default, so an imported chart used to arrive unclassified while
+   * an account typed in by hand did not. This closes that gap and says so.
+   */
+  classification?: ClassificationOutcome;
 }
 
 /**
@@ -211,6 +231,8 @@ export async function runImport(
     bankAccountId?: string | null;
     /** What to record this import under, so it can be found and undone. */
     fileName?: string | null;
+    /** Names in the file the reader has pointed at an account, by code. */
+    accountOverrides?: Record<string, string>;
   } = {},
 ): Promise<ImportOutcome> {
   // Transactions are previewed again here rather than trusted from the screen:
@@ -315,6 +337,10 @@ export async function runImport(
     const { data, error } = await sb.rpc("acc_import_accounts", { p_rows: payload });
     if (error) throw new DataImportError(error.message);
     outcome = first(data);
+    // The same classification an account created by hand gets. Left to the
+    // column default, an imported chart holds the Cash Flow Statement in review
+    // over accounts the application already has a settled answer for.
+    outcome = { ...outcome, classification: await classifyAccounts(sb) };
   } else if (target === "items") {
     const { data, error } = await sb.rpc("acc_import_items", { p_rows: payload });
     if (error) throw new DataImportError(error.message);

@@ -7,6 +7,7 @@ import {
   templateCsvFor,
   type FileShapeDetection,
 } from "@/lib/domain/import-shape";
+import { downloadTextFile } from "@/lib/client/download";
 
 /** Where each kind of file comes from in the product being left behind. */
 const SOURCE_HINT: Record<ImportTarget, string> = {
@@ -74,13 +75,10 @@ export default function ImportGuidance({ target, detection, onSwitchTarget }: Im
   const switchTo = detection?.target ?? null;
 
   function downloadTemplate() {
-    const blob = new Blob([templateCsvFor(target)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `one-book-${target.replaceAll("_", "-")}-template.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadTextFile(
+      `one-book-${target.replaceAll("_", "-")}-template.csv`,
+      templateCsvFor(target),
+    );
   }
 
   return (
