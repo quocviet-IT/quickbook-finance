@@ -41,6 +41,50 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.15",
+    date: "2026-08-08",
+    headline: "Categorising a bank line now means posting it, and the column says what was posted.",
+    changes: [
+      {
+        kind: "changed",
+        title: "The Category column names an account, and choosing one posts to the ledger",
+        detail:
+          "It used to hold a free-form label — a word you had to invent first, saved beside the "
+          + "line and posted nowhere. Nobody had invented one, so it was an empty dropdown and "
+          + "there was no way to categorise anything. Type a word now and every account whose "
+          + "code or name contains it is offered; choosing one posts the entry, and the line "
+          + "becomes matched.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "A line already in the books is not asked to be categorised again",
+        detail:
+          "“Uncategorized” sat beside “Matched” on lines that were already posted. Each now "
+          + "shows the account its entry went to, and its entry number. A line settled against "
+          + "an invoice says so rather than offering a control that would refuse.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Change what a line was categorised as",
+        detail:
+          "Change voids the entry and hands the line back to the review queue, so a wrong "
+          + "account is a correction rather than something to live with. Only entries this "
+          + "column made — an import batch and an invoice settlement own their own.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Filter the queue by the account lines were posted to",
+        detail:
+          "The old filter listed labels nobody had made. It now lists the accounts these lines "
+          + "actually went to, and “Not categorised yet” finds the ones still awaiting review.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.14",
     date: "2026-08-08",
     headline: "Check how a chart of accounts file's types were read before the import settles them.",

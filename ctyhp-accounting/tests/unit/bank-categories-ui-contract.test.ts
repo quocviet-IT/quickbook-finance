@@ -5,18 +5,44 @@ import { describe, expect, it } from "vitest";
 const route = ["app", "(app)", "banking"];
 const read = (file: string) => readFileSync(join(process.cwd(), ...route, file), "utf8");
 
+/**
+ * The Category column names an account, and choosing one posts.
+ *
+ * It used to hold a free-form label: a word somebody had to invent first, saved
+ * beside the line and posted nowhere. Every company had zero of them, so the
+ * control was an empty dropdown and a reader reported, exactly, that they could
+ * not categorise a transaction. These assertions pin the replacement.
+ */
 describe("the banking category column", () => {
-  it("puts the label control in its own component", () => {
-    const cell = read("BankCategoryCell.tsx");
-    expect(cell).toContain("setBankTransactionCategoryAction");
-    expect(cell).toContain("createBankCategoryAction");
-    // Typing a name that does not exist has to be offered, or "freely" is a lie.
-    expect(cell).toMatch(/Create\s/);
+  it("puts the control in its own component, and posting is what it does", () => {
+    const cell = read("CategoriseCell.tsx");
+    expect(cell).toContain("categoriseBankTransactionAction");
+    expect(cell).toContain("uncategoriseBankTransactionAction");
+    // Searching is the whole complaint: a chart of ninety-five accounts cannot
+    // be scrolled, and the reader asked to type a word and see what matches.
+    expect(cell).toContain("showSearch");
+    expect(cell).toMatch(/filterOption/);
+  });
+
+  it("does not ask a line the books have already answered", () => {
+    // "Uncategorized" sat beside "Matched" on fifteen lines that were in the
+    // ledger. A line with an entry shows the account that entry posted to.
+    const cell = read("CategoriseCell.tsx");
+    expect(cell).toContain("posting.account_code");
+    expect(cell).toContain("entry_number");
+    expect(cell).toMatch(/status !== "unmatched"/);
+  });
+
+  it("only offers to take back an entry this screen could have made", () => {
+    // An invoice settled from a bank line, or a transactions import, owns its
+    // own entry and its own undo. Reversing either from here would leave the
+    // thing that owns it pointing at nothing.
+    expect(read("CategoriseCell.tsx")).toContain("posting.own_entry");
   });
 
   it("shows the column between the amount and the match", () => {
     const table = read("BankTransactionsTable.tsx");
-    expect(table).toContain("<BankCategoryCell");
+    expect(table).toContain("<CategoriseCell");
     const amountAt = table.indexOf('title: "Amount"');
     const categoryAt = table.indexOf('title: "Category"');
     const matchAt = table.indexOf('title: "Match"');
@@ -25,22 +51,34 @@ describe("the banking category column", () => {
     expect(matchAt).toBeGreaterThan(categoryAt);
   });
 
-  it("lets the list be narrowed to a label, and to the lines with none", () => {
+  it("lets the list be narrowed by the account posted to, and to the lines with none", () => {
     const client = read("BankingClient.tsx");
-    expect(client).toContain("bankCategories");
-    expect(client).toContain("All categories");
-    expect(client).toContain("Uncategorized");
-    expect(read("page.tsx")).toContain("listBankCategories");
+    expect(client).toContain("All accounts posted to");
+    expect(client).toContain("Not categorised yet");
+    expect(client).toContain("getBankPostingsAction");
   });
 
   it("never touches the feed's own category through this column", () => {
-    const cell = read("BankCategoryCell.tsx");
+    // What the bank said is what the bank said; it belongs under the
+    // description and is not an accounting decision.
+    const cell = read("CategoriseCell.tsx");
     expect(cell).not.toMatch(/transaction\.category\b/);
-    expect(cell).toContain("bank_category_id");
+    expect(cell).not.toContain("bank_category_id");
+  });
+
+  it("offers only accounts money may actually land in", () => {
+    const client = read("BankingClient.tsx");
+    expect(client).toContain("is_posting_account");
+    expect(client).toMatch(/status === "active"/);
   });
 
   it("keeps every banking component under the 400-line ceiling", () => {
-    for (const file of ["BankTransactionsTable.tsx", "BankCategoryCell.tsx"]) {
+    for (const file of [
+      "BankTransactionsTable.tsx",
+      "CategoriseCell.tsx",
+      "BankImportList.tsx",
+      "DeleteBankLineModal.tsx",
+    ]) {
       expect(read(file).split(/\r?\n/).length, file).toBeLessThanOrEqual(400);
     }
   });

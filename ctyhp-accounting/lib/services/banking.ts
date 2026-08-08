@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import type {
   BankAccountRow,
-  BankCategoryRow,
   BankConnectionRow,
   BankFeedAccountRow,
   BankTransactionRow,
@@ -191,6 +190,76 @@ export async function deleteBankTransaction(
   if (error) throw new BankingError(error.message);
 }
 
+export interface BankPostingRow {
+  bank_transaction_id: string;
+  journal_entry_id: string;
+  entry_number: string | null;
+  account_id: string;
+  account_code: string;
+  account_name: string;
+  source_type: string;
+  /** Whether Banking may take this entry back, or something else owns it. */
+  own_entry: boolean;
+}
+
+/**
+ * What each matched line was actually posted to.
+ *
+ * The screen asked "which category?" beside a line already marked matched — a
+ * question the books had answered and it had no way to read. This is the
+ * answer: the account on the other side of the entry, and whether undoing it
+ * from here would be reversing something this screen did or something that
+ * belongs to an invoice, a bill or an import.
+ */
+export async function listBankTransactionPostings(
+  sb: SupabaseClient,
+  bankAccountId: string | null,
+): Promise<BankPostingRow[]> {
+  const { data, error } = await sb.rpc("acc_bank_transaction_postings", {
+    p_bank_account_id: bankAccountId,
+  });
+  if (error) throw new BankingError(error.message);
+  return (data ?? []) as unknown as BankPostingRow[];
+}
+
+/**
+ * Say which account the other side of this money belongs to, and post it.
+ *
+ * One line in, one entry out. The bank's own ledger account on one side, the
+ * account chosen on the other — the same shape the transactions import posts,
+ * because it is the same act done one row at a time.
+ */
+export async function categoriseBankTransaction(
+  sb: SupabaseClient,
+  transactionId: string,
+  accountId: string,
+): Promise<{ entry_number: string | null; account_code: string; account_name: string }> {
+  const { data, error } = await sb.rpc("acc_categorise_bank_transaction", {
+    p_transaction_id: transactionId,
+    p_account_id: accountId,
+  });
+  if (error) throw new BankingError(error.message);
+  return (Array.isArray(data) ? data[0] : data) as {
+    entry_number: string | null;
+    account_code: string;
+    account_name: string;
+  };
+}
+
+/** Take it back: the entry is voided, and the line awaits review again. */
+export async function uncategoriseBankTransaction(
+  sb: SupabaseClient,
+  transactionId: string,
+  reason?: string,
+): Promise<number> {
+  const { data, error } = await sb.rpc("acc_uncategorise_bank_transaction", {
+    p_transaction_id: transactionId,
+    p_reason: reason ?? null,
+  });
+  if (error) throw new BankingError(error.message);
+  return Number(data ?? 0);
+}
+
 /** Null means every bank account, for the review queue that spans them all. */
 export async function listBankTransactions(
   sb: SupabaseClient,
@@ -211,45 +280,6 @@ export async function listBankTransactions(
 }
 
 /** The labels a bookkeeper may choose from, in the order they read them. */
-export async function listBankCategories(sb: SupabaseClient): Promise<BankCategoryRow[]> {
-  const { data, error } = await sb
-    .from("acc_bank_category")
-    .select("id,name,is_active")
-    .eq("is_active", true)
-    .order("name");
-  if (error) throw new BankingError(error.message);
-  return (data ?? []) as unknown as BankCategoryRow[];
-}
-
-/**
- * Create a label, or hand back the one that already carries this name. The
- * decision is the database's, so two people typing "Inventory" at once cannot
- * produce two labels.
- */
-export async function createBankCategory(sb: SupabaseClient, name: string): Promise<string> {
-  const { data, error } = await sb.rpc("acc_upsert_bank_category", { p_name: name });
-  if (error) throw new BankingError(error.message);
-  return data as string;
-}
-
-/**
- * Attach a label to a bank line, or pass null to take it off.
- *
- * Everything a label may and may not touch belongs to
- * `acc_set_bank_transaction_category`; this is only the adapter.
- */
-export async function setBankTransactionCategory(
-  sb: SupabaseClient,
-  txnId: string,
-  categoryId: string | null,
-): Promise<void> {
-  const { error } = await sb.rpc("acc_set_bank_transaction_category", {
-    p_txn_id: txnId,
-    p_category_id: categoryId,
-  });
-  if (error) throw new BankingError(error.message);
-}
-
 export interface BankConnectionView extends BankConnectionRow {
   accounts: BankFeedAccountRow[];
 }

@@ -289,6 +289,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note: "Suggestions are one-to-one and need approval before they take effect.",
       },
       {
+        action: "Say which account a line belongs to, for anything the ledger does not already hold",
+        control: "Category",
+        note:
+          "Type a word and every account whose code or name contains it is offered. Choosing " +
+          "one posts the line: the bank on one side, that account on the other, and the line " +
+          "becomes matched. A line already in the books shows the account its entry posted to " +
+          "instead of asking again, and Change voids the entry and hands the line back.",
+      },
+      {
         action: "Reconcile to a statement balance",
         control: "New reconciliation",
         route: "/banking/reconcile",

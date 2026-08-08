@@ -4,9 +4,11 @@ import { DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
-import type { BankCategoryRow, BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
+import type { BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
-import BankCategoryCell from "./BankCategoryCell";
+import CategoriseCell from "./CategoriseCell";
+import type { AccountRow } from "@/lib/db/types";
+import type { BankPostingRow } from "@/lib/services/banking";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -25,10 +27,11 @@ export interface BankTransactionsTableProps {
   /** The suggestion currently being approved or rejected, if any. */
   busy: string | null;
   formatRowMoney: (row: BankReviewTableRow) => string;
-  /** The labels on offer, and how the screen learns about a change. */
-  categories: BankCategoryRow[];
-  onCategoryCreated: (category: BankCategoryRow) => void;
-  onCategoryAssigned: (transactionId: string, categoryId: string | null) => void;
+  /** Every account money may be posted to, for the Category search. */
+  postableAccounts: AccountRow[];
+  /** What each matched line was posted to, keyed by transaction. */
+  postings: Map<string, BankPostingRow>;
+  onCategorised: () => void;
   onSettle: (row: BankReviewTableRow) => void;
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
@@ -52,9 +55,9 @@ export default function BankTransactionsTable({
   canReadDocuments,
   busy,
   formatRowMoney,
-  categories,
-  onCategoryCreated,
-  onCategoryAssigned,
+  postableAccounts,
+  postings,
+  onCategorised,
   onSettle,
   onApprove,
   onReject,
@@ -111,14 +114,13 @@ export default function BankTransactionsTable({
       key: "category",
       width: 190,
       render: (_value: unknown, row: BankReviewTableRow) => (
-        <BankCategoryCell
+        <CategoriseCell
           transactionId={row.transaction.id}
-          value={row.transaction.bank_category_id}
-          valueName={row.transaction.bank_category_name}
-          categories={categories}
+          status={row.transaction.status}
+          accounts={postableAccounts}
+          posting={postings.get(row.transaction.id) ?? null}
           canWrite={canWrite}
-          onCreated={onCategoryCreated}
-          onAssigned={onCategoryAssigned}
+          onChanged={onCategorised}
         />
       ),
     },

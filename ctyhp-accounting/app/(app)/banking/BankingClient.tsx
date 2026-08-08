@@ -45,11 +45,11 @@ import {
 import { createAccountAction } from "@/app/(app)/accounts/actions";
 import type {
   AccountRow,
-  BankCategoryRow,
   BankTransactionRow,
   BankTxnStatus,
   CurrencyRow,
 } from "@/lib/db/types";
+import type { BankPostingRow } from "@/lib/services/banking";
 import type {
   BankAccountWithGl,
   BankConnectionView,
@@ -70,6 +70,7 @@ import {
   createPlaidLinkTokenAction,
   generateSuggestionsAction,
   getSuggestionsAction,
+  getBankPostingsAction,
   getTransactionsAction,
   importStatementAction,
   rejectReconciliationAction,
@@ -138,7 +139,7 @@ interface PendingPlaidLink {
 
 export default function BankingClient({
   bankAccounts,
-  bankCategories,
+  accounts,
   initialAccountId,
   initialQueueStatus,
   initialFocusId,
@@ -155,7 +156,8 @@ export default function BankingClient({
 }: {
   bankAccounts: BankAccountWithGl[];
   /** The labels a bank line may carry; a new one is appended as it is created. */
-  bankCategories: BankCategoryRow[];
+  /** The whole chart, so a line can be posted to any account money may go to. */
+  accounts: AccountRow[];
   initialAccountId: string | null;
   initialQueueStatus: "unmatched" | null;
   initialFocusId: string | null;
@@ -180,8 +182,11 @@ export default function BankingClient({
     initialQueueStatus ?? "all",
   );
   const [txns, setTxns] = useState<BankTransactionRow[]>([]);
-  const [categories, setCategories] = useState<BankCategoryRow[]>(bankCategories);
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  // What each matched line was posted to. Fetched beside the transactions so
+  // the Category column can show the answer instead of asking over the top of
+  // it — fifteen lines read "Uncategorized" beside "Matched".
+  const [postings, setPostings] = useState<Map<string, BankPostingRow>>(new Map());
+  const [postedToFilter, setPostedToFilter] = useState<string>("all");
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -200,6 +205,16 @@ export default function BankingClient({
   const [pendingLink, setPendingLink] = useState<PendingPlaidLink | null>(null);
   const [mappingSelections, setMappingSelections] = useState<Record<string, string | undefined>>({});
   const oauthResumeStarted = useRef(false);
+
+  // Anywhere money may actually land. A heading cannot carry a balance, and an
+  // account somebody retired should not quietly come back through this column.
+  const postableAccounts = useMemo(
+    () =>
+      accounts.filter(
+        (account) => account.is_posting_account && account.status === "active",
+      ),
+    [accounts],
+  );
 
   // Undefined in the all-accounts view, which is why anything account-specific
   // — importing a statement, running the matcher, the feed panel — checks it.
@@ -229,13 +244,17 @@ export default function BankingClient({
     // ALL_ACCOUNTS asks the server for every account at once; the review queue
     // is one list, and which bank a line came from is a column, not a mode.
     const accountFilter = selectedId === ALL_ACCOUNTS ? null : selectedId;
-    const [transactions, matches] = await Promise.all([
+    const [transactions, matches, posted] = await Promise.all([
       getTransactionsAction(accountFilter),
       getSuggestionsAction(accountFilter),
+      getBankPostingsAction(accountFilter),
     ]);
     setLoading(false);
     if (transactions.ok && transactions.data) setTxns(transactions.data);
     if (matches.ok && matches.data) setSuggestions(matches.data);
+    if (posted.ok && posted.data) {
+      setPostings(new Map(posted.data.map((row) => [row.bank_transaction_id, row])));
+    }
   }, [selectedId]);
 
   useEffect(() => {
@@ -504,13 +523,13 @@ export default function BankingClient({
 
   // "Uncategorized" is the option that makes labels worth having: it is how you
   // find the lines nobody has looked at yet.
-  const categorized = visibleTransactions.filter((transaction) =>
-    categoryFilter === "all"
-      ? true
-      : categoryFilter === "none"
-        ? transaction.bank_category_id === null
-        : transaction.bank_category_id === categoryFilter,
-  );
+  const categorized = visibleTransactions.filter((transaction) => {
+    if (postedToFilter === "all") return true;
+    // "Not categorised yet" means still awaiting review, not merely "no account
+    // to show" — a line settled against an invoice is posted and has neither.
+    if (postedToFilter === "none") return transaction.status === "unmatched";
+    return postings.get(transaction.id)?.account_id === postedToFilter;
+  });
 
   // Each row carries the account it came from, that account's currency, and its
   // best suggested match — so one table can answer what a line is and where it
@@ -648,14 +667,23 @@ export default function BankingClient({
             ]}
           />
           <Select
-            aria-label="Filter bank transactions by category"
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            style={{ minWidth: 180 }}
+            showSearch
+            aria-label="Filter bank transactions by the account they were posted to"
+            value={postedToFilter}
+            onChange={setPostedToFilter}
+            style={{ minWidth: 220 }}
+            optionFilterProp="label"
             options={[
-              { value: "all", label: "All categories" },
-              { value: "none", label: "Uncategorized" },
-              ...categories.map((category) => ({ value: category.id, label: category.name })),
+              { value: "all", label: "All accounts posted to" },
+              { value: "none", label: "Not categorised yet" },
+              // Only accounts these lines actually use: the whole chart here
+              // would be a list of things that filter to nothing.
+              ...[...new Map([...postings.values()].map((p) => [p.account_id, p])).values()]
+                .sort((a, b) => a.account_code.localeCompare(b.account_code))
+                .map((p) => ({
+                  value: p.account_id,
+                  label: `${p.account_code} — ${p.account_name}`,
+                })),
             ]}
           />
           {suggestions.length ? (
@@ -674,30 +702,9 @@ export default function BankingClient({
         canReadDocuments={canReadDocuments}
         busy={busy}
         formatRowMoney={rowMoney}
-        categories={categories}
-        onCategoryCreated={(category) =>
-          setCategories((current) =>
-            current.some((existing) => existing.id === category.id)
-              ? current
-              : [...current, category].sort((a, b) => a.name.localeCompare(b.name)),
-          )
-        }
-        onCategoryAssigned={(transactionId, categoryId) =>
-          // Kept in step locally so the row shows the label at once, rather than
-          // waiting for the list to be fetched again.
-          setTxns((current) =>
-            current.map((transaction) =>
-              transaction.id === transactionId
-                ? {
-                    ...transaction,
-                    bank_category_id: categoryId,
-                    bank_category_name:
-                      categories.find((category) => category.id === categoryId)?.name ?? null,
-                  }
-                : transaction,
-            ),
-          )
-        }
+        postableAccounts={postableAccounts}
+        postings={postings}
+        onCategorised={reload}
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}

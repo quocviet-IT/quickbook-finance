@@ -5,6 +5,10 @@ import { getUserRole, canWrite, getSessionUser } from "@/lib/auth";
 import {
   createBankAccount,
   importStatement,
+  categoriseBankTransaction,
+  uncategoriseBankTransaction,
+  listBankTransactionPostings,
+  type BankPostingRow,
   listBankStatementImports,
   undoBankStatementImport,
   deleteBankTransaction,
@@ -21,8 +25,6 @@ import {
   syncBankConnection,
   listSettlementCandidates,
   settleFromBankTransaction,
-  createBankCategory,
-  setBankTransactionCategory,
   type PlaidAccountMappingInput,
   type SettlementCandidateRow,
 } from "@/lib/services/banking";
@@ -141,6 +143,62 @@ export async function deleteBankTransactionAction(
     await deleteBankTransaction(sb, id, reason);
     revalidatePath("/banking");
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Categorising a bank line, which means posting it.
+ *
+ * The Category column used to hold a free-form label that posted nowhere, and
+ * every company had zero of them — so the control was an empty dropdown, and
+ * the reader's complaint was exact: they could not categorise a transaction.
+ */
+export async function categoriseBankTransactionAction(
+  transactionId: string,
+  accountId: string,
+): Promise<
+  ActionResult<{ entry_number: string | null; account_code: string; account_name: string }>
+> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const posted = await categoriseBankTransaction(sb, transactionId, accountId);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: posted };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Take it back: the entry is voided, and the line awaits review again. */
+export async function uncategoriseBankTransactionAction(
+  transactionId: string,
+  reason?: string,
+): Promise<ActionResult<{ voided: number }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const voided = await uncategoriseBankTransaction(sb, transactionId, reason);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: { voided } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Reads only: what each matched line on this account was posted to. */
+export async function getBankPostingsAction(
+  bankAccountId: string | null,
+): Promise<ActionResult<BankPostingRow[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listBankTransactionPostings(sb, bankAccountId) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
@@ -314,47 +372,3 @@ export async function settleFromBankTransactionAction(input: {
  * The name is trimmed here so the screen and the database agree on what was
  * typed; everything else about uniqueness belongs to `acc_upsert_bank_category`.
  */
-export async function createBankCategoryAction(
-  name: string,
-): Promise<ActionResult<{ id: string; name: string }>> {
-  const denied = await guard();
-  if (denied) return { ok: false, error: denied };
-  const trimmed = name.trim();
-  if (!trimmed) return { ok: false, error: "A category name is required" };
-  if (trimmed.length > 60) {
-    return { ok: false, error: "A category name cannot exceed 60 characters" };
-  }
-  try {
-    const sb = await createSupabaseServerClient();
-    const id = await createBankCategory(sb, trimmed);
-    revalidatePath("/banking");
-    return { ok: true, data: { id, name: trimmed } };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Could not create the category",
-    };
-  }
-}
-
-/**
- * Attach a label to a bank line, or pass null to take it off.
- *
- * A label is metadata, not a posting — nothing here reaches the ledger, and the
- * RPC behind it can only write the one column.
- */
-export async function setBankTransactionCategoryAction(
-  txnId: string,
-  categoryId: string | null,
-): Promise<ActionResult> {
-  const denied = await guard();
-  if (denied) return { ok: false, error: denied };
-  try {
-    const sb = await createSupabaseServerClient();
-    await setBankTransactionCategory(sb, txnId, categoryId);
-    revalidatePath("/banking");
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Could not save the category" };
-  }
-}
