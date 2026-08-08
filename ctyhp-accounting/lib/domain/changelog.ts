@@ -53,7 +53,6 @@ export const RELEASES: Release[] = [
           + "whichever company you were in, so outside it the file sat unscanned until the "
           + "overnight job caught up — and the Rescan button failed outright. Both now look "
           + "where the file actually is.",
-        route: "/documents",
       },
     ],
   },
