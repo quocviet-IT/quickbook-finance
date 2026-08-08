@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
+import { activeSchema } from "@/lib/db/company";
 import type { DocumentAttachmentRow } from "@/lib/db/types";
 import {
   documentAccessSchema,
@@ -113,7 +114,7 @@ export async function registerDocumentAttachmentAction(
       return {
         ok: true,
         data: await scanDocumentAttachment(
-          createSupabaseAutomationClient(),
+          createSupabaseAutomationClient(await activeSchema()),
           attachment.id,
         ),
       };
@@ -186,7 +187,7 @@ export async function rescanDocumentAttachmentAction(
     return {
       ok: true,
       data: await scanDocumentAttachment(
-        createSupabaseAutomationClient(),
+        createSupabaseAutomationClient(await activeSchema()),
         parsed.data.attachment_id,
       ),
     };

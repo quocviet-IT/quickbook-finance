@@ -10,8 +10,14 @@ import type { AutomationCompany } from "@/lib/domain/company-automation";
  * The schema is explicit because automation now serves several companies. It is
  * never derived from a request: a cron job names the schema the register handed
  * it, and a client bound to one company cannot reach another's tables at all.
+ *
+ * Required, with no default. It used to default to `public`, and two callers in
+ * the documents screen took it — so scanning an uploaded file looked for that
+ * file in the first company's books whichever company you were working in. It
+ * found nothing there, which is not an error a caller can tell apart from a
+ * clean scan queue. A missing schema is now a compile error instead.
  */
-export function createSupabaseAutomationClient(schema = "public"): SupabaseClient {
+export function createSupabaseAutomationClient(schema: string): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !key || key.length < 20 || /^REPLACE/i.test(key)) {

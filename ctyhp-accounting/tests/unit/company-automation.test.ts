@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   runForAutomationCompanies,
@@ -153,10 +155,25 @@ describe("createSupabaseAutomationClient", () => {
     );
   });
 
-  it("defaults to the first company's schema so existing callers do not move", () => {
-    createSupabaseAutomationClient();
+  it("still binds to the first company when that is what the caller asked for", () => {
+    createSupabaseAutomationClient("public");
 
     expect(createClient.mock.calls[0][2]).toMatchObject({ db: { schema: "public" } });
+  });
+
+  it("has no default schema to fall through to", () => {
+    // It used to default to `public`, and two callers in the documents screen
+    // took it — so scanning an uploaded file looked for that file in the first
+    // company's books whichever company you were in, found nothing, and
+    // reported a queue that was simply empty. Reading the source because the
+    // guarantee is a compile error, which a running test cannot observe.
+    const source = readFileSync(
+      join(process.cwd(), "lib", "db", "automation.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("createSupabaseAutomationClient(schema: string)");
+    expect(source).not.toMatch(/createSupabaseAutomationClient\(schema\s*=/);
   });
 
   it("refuses to run without a service-role key", () => {

@@ -41,6 +41,23 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.13",
+    date: "2026-08-08",
+    headline: "Scanning an uploaded document looks in the company you are working in.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A document uploaded outside the first company is scanned straight away again",
+        detail:
+          "The scan that runs on upload was looking for the file in the first company’s books "
+          + "whichever company you were in, so outside it the file sat unscanned until the "
+          + "overnight job caught up — and the Rescan button failed outright. Both now look "
+          + "where the file actually is.",
+        route: "/documents",
+      },
+    ],
+  },
+  {
     version: "1.12",
     date: "2026-08-08",
     headline: "A QuickBooks account list reads correctly, and the ledger tab answers a missing account where it finds it.",
