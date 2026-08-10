@@ -27,9 +27,10 @@
 // Flags:
 //   --only=/a,/b     check just these routes (after a change to one screen)
 //   --concurrency=N  requests in flight at once; default 6, use 1 against dev
-import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { discoverStaticRoutes } from "./quality/routes.mjs";
+import { sessionCookieHeader } from "./quality/session-cookie.mjs";
 import { smokeSession } from "./smoke-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -49,53 +50,13 @@ const onlyRoutes = (flag("only") ?? "")
   .map((route) => (route.startsWith("/") ? route : `/${route}`));
 const concurrency = Math.max(1, Number(flag("concurrency") ?? 6));
 
-/** Every static route under app/(app). */
-function discoverRoutes(dir = appDir, prefix = "") {
-  const routes = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      if (entry.startsWith("[")) continue; // needs a real id
-      routes.push(...discoverRoutes(full, `${prefix}/${entry}`));
-    } else if (entry === "page.tsx" && prefix !== "") {
-      routes.push(prefix);
-    }
-  }
-  return routes;
-}
-
-/**
- * Build the session cookie the way @supabase/ssr reads it: base64-prefixed JSON,
- * split into numbered chunks past the cookie size limit.
- */
-function sessionCookie(session, user, supabaseUrl) {
-  const ref = new URL(supabaseUrl).hostname.split(".")[0];
-  const payload = {
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-    expires_at: session.expires_at,
-    expires_in: session.expires_in,
-    token_type: "bearer",
-    user,
-  };
-  const encoded = "base64-" + Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
-  const name = `sb-${ref}-auth-token`;
-  const CHUNK = 3180;
-  if (encoded.length <= CHUNK) return `${name}=${encoded}`;
-  const parts = [];
-  for (let i = 0; i * CHUNK < encoded.length; i++) {
-    parts.push(`${name}.${i}=${encoded.slice(i * CHUNK, (i + 1) * CHUNK)}`);
-  }
-  return parts.join("; ");
-}
-
 async function main() {
   const { session, user, supabaseUrl } = await smokeSession();
-  const cookie = sessionCookie(session, user, supabaseUrl);
+  const cookie = sessionCookieHeader({ session, user, supabaseUrl });
 
   const routes = onlyRoutes.length
     ? onlyRoutes
-    : [...new Set([...discoverRoutes(), ...extraRoutes])].sort();
+    : [...new Set([...discoverStaticRoutes(appDir), ...extraRoutes])].sort();
   let failed = 0;
 
   async function check(route) {
