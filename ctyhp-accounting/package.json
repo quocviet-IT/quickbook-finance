@@ -11,6 +11,7 @@
     "security:verify-deployment": "node --env-file=.env.local scripts/verify-production-security-readonly.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "quality:bundle": "node scripts/quality/run-bundle.mjs",
     "verify:void-payment": "node --env-file=.env.local scripts/verify-void-payment.mjs",
     "verify:delete-payment": "node --env-file=.env.local scripts/verify-delete-payment.mjs",
     "verify:payment-correction": "node --env-file=.env.local scripts/verify-payment-correction.mjs",
