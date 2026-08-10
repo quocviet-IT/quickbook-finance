@@ -19,11 +19,11 @@ function normalizeMeasurements(measurements) {
 function numericBudgets(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  return Object.fromEntries(
+  const entries =
     Object.entries(value)
       .map(([key, item]) => [key, numericBudgets(item)])
-      .filter(([, item]) => item !== undefined),
-  );
+      .filter(([, item]) => item !== undefined);
+  return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
 export function acceptBaseline(resultsPath, baselinePath, env = process.env) {
@@ -37,14 +37,21 @@ export function acceptBaseline(resultsPath, baselinePath, env = process.env) {
   } catch (error) {
     throw new Error(`Cannot accept malformed quality summary at ${resultsPath}: ${error.message}`);
   }
-  const fingerprints = [...new Set((summary.findings ?? []).map((finding) =>
-    finding.fingerprint || findingFingerprint(finding),
-  ))].sort();
+  const fingerprints = [...new Set((summary.findings ?? []).map((finding) => {
+    if (Object.hasOwn(finding, "fingerprint") && typeof finding.fingerprint !== "string") {
+      throw new Error("Cannot accept quality baseline: every explicit fingerprint must be a string");
+    }
+    return finding.fingerprint || findingFingerprint(finding);
+  }))].sort();
+  const budgets = numericBudgets(summary.budgets);
+  if (!budgets) {
+    throw new Error("Cannot accept quality baseline without numeric threshold budgets");
+  }
   const baseline = redactQualityValue({
     version: 1,
     fingerprints,
     measurements: normalizeMeasurements(summary.measurements),
-    budgets: numericBudgets(summary.budgets) ?? {},
+    budgets,
   });
   mkdirSync(dirname(baselinePath), { recursive: true });
   const temporaryPath = `${baselinePath}.tmp`;

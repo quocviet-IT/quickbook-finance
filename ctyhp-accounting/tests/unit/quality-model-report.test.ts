@@ -39,6 +39,50 @@ describe("quality result model", () => {
     });
   });
 
+  it("redacts free-text credentials, database URLs, relative queries, Basic auth, and customer fields from artifacts", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-redaction-regression-"));
+    const unsafe = {
+      notes: [
+        "password=hunter2",
+        "token=secret",
+        "mysql://user:pw@host/db",
+        "/invoices?token=secret",
+        "Authorization: Basic credential",
+      ],
+      customerName: "Acme",
+      dbPassword: "database-password",
+      authMaterial: "private-auth-value",
+    };
+
+    expect(redactQualityValue(unsafe)).toEqual({
+      notes: [
+        "password=[redacted]",
+        "token=[redacted]",
+        "[redacted-url]",
+        "/invoices",
+        "Authorization=[redacted]",
+      ],
+      customerName: "[redacted]",
+      dbPassword: "[redacted]",
+      authMaterial: "[redacted]",
+    });
+
+    writeQualityReport(dir, {
+      version: 1,
+      mode: "report",
+      findings: [unsafe],
+      measurements: [],
+      unavailable: [],
+      safetyFailures: [],
+    });
+    for (const artifact of ["summary.json", "summary.md"]) {
+      const contents = readFileSync(join(dir, artifact), "utf8");
+      for (const secret of ["hunter2", "secret", "user:pw", "credential", "Acme", "database-password", "private-auth-value", "?token="]) {
+        expect(contents).not.toContain(secret);
+      }
+    }
+  });
+
   it("reports new fingerprints plus material metric regressions", () => {
     const baseline = {
       fingerprints: ["axe|label|/invoices|desktop|#name"],
@@ -135,6 +179,34 @@ describe("quality result model", () => {
     });
   });
 
+  it("rejects non-string fingerprints during baseline acceptance", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-fingerprint-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    writeFileSync(results, JSON.stringify({
+      findings: [{ fingerprint: 42 }],
+      measurements: [],
+      budgets: { performance: { percent: 0.2 } },
+    }));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/fingerprint/i);
+    expect(existsSync(baseline)).toBe(false);
+  });
+
+  it("refuses to create an accepted baseline without numeric threshold budgets", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-budget-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    writeFileSync(results, JSON.stringify({
+      findings: [],
+      measurements: [],
+      budgets: { performance: { percent: "secret" } },
+    }));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/numeric.*budget/i);
+    expect(existsSync(baseline)).toBe(false);
+  });
+
   it("direct report CLI aggregates section artifacts", () => {
     const dir = mkdtempSync(join(tmpdir(), "onebook-report-cli-"));
     writeFileSync(join(dir, "accessibility.json"), JSON.stringify({
@@ -156,7 +228,9 @@ describe("quality result model", () => {
     const emptyDir = mkdtempSync(join(tmpdir(), "onebook-report-empty-"));
     const missingDir = join(emptyDir, "not-created");
     const regressionDir = mkdtempSync(join(tmpdir(), "onebook-report-regression-"));
-    writeFileSync(join(regressionDir, "bundle.json"), JSON.stringify({ findings: [], measurements: [] }));
+    writeFileSync(join(regressionDir, "bundle.json"), JSON.stringify({
+      findings: [], measurements: [], unavailable: [], safetyFailures: [],
+    }));
     const script = join(process.cwd(), "scripts", "quality", "report.mjs");
 
     const empty = spawnSync(process.execPath, [script, emptyDir], { cwd: process.cwd(), encoding: "utf8" });
@@ -174,5 +248,58 @@ describe("quality result model", () => {
     });
     expect(regression.status).toBe(1);
     expect(regression.stderr).toMatch(/baseline/i);
+  });
+
+  it("rejects malformed regression baseline scalar values", () => {
+    const root = mkdtempSync(join(tmpdir(), "onebook-invalid-baseline-"));
+    const resultsDir = mkdtempSync(join(tmpdir(), "onebook-invalid-baseline-results-"));
+    const baseline = join(root, "baseline.json");
+    const script = join(process.cwd(), "scripts", "quality", "report.mjs");
+    const valid = {
+      version: 1,
+      fingerprints: ["axe|label|/invoices|desktop|#name"],
+      measurements: [{ key: "performance./invoices.responseMs", kind: "performance", value: 1_000 }],
+      budgets: { performance: { percent: 0.2, absoluteMs: 200, clsAbsolute: 0.03 } },
+    };
+    const invalidBaselines = [
+      { ...valid, fingerprints: [42] },
+      { ...valid, measurements: [{ key: "metric", kind: "performance", value: null }] },
+      { ...valid, measurements: [{ key: 42, kind: "performance", value: 1 }] },
+      { ...valid, measurements: [{ key: "metric", kind: null, value: 1 }] },
+      { ...valid, measurements: [{ key: "metric", kind: "unknown", value: 1 }] },
+      { ...valid, budgets: { performance: { percent: "twenty percent" } } },
+    ];
+    writeFileSync(join(resultsDir, "performance.json"), JSON.stringify({
+      findings: [], measurements: [], unavailable: [], safetyFailures: [],
+    }));
+    for (const invalid of invalidBaselines) {
+      writeFileSync(baseline, JSON.stringify(invalid));
+      const result = spawnSync(process.execPath, [script, resultsDir], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: { ...process.env, QUALITY_MODE: "regression", QUALITY_BASELINE_PATH: baseline },
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/baseline.*malformed/i);
+    }
+  });
+
+  it("rejects empty and invalid section artifact contracts with a clear harness error", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-invalid-section-"));
+    const script = join(process.cwd(), "scripts", "quality", "report.mjs");
+    const invalidSections = [
+      {},
+      { findings: {}, measurements: [], unavailable: [], safetyFailures: [] },
+      { findings: [], measurements: "fast", unavailable: [], safetyFailures: [] },
+      { findings: [], measurements: [], unavailable: {}, safetyFailures: [] },
+      { findings: [], measurements: [], unavailable: [], safetyFailures: {} },
+    ];
+
+    for (const invalid of invalidSections) {
+      writeFileSync(join(dir, "section.json"), JSON.stringify(invalid));
+      const result = spawnSync(process.execPath, [script, dir], { cwd: process.cwd(), encoding: "utf8" });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/quality harness error.*section artifact.*contract/i);
+    }
   });
 });

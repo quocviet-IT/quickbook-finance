@@ -4,11 +4,15 @@ const HTML = /<\/?[a-z][^>]*>/i;
 
 function isSensitiveKey(key) {
   const normalized = key.replaceAll(/[-_]/g, "").toLowerCase();
-  return [
-    "password", "passwd", "secret", "token", "accesstoken", "refreshtoken", "apikey",
-    "authorization", "cookie", "databaseurl", "customerpayload", "customerhtml", "customerdata",
-    "html", "payload",
-  ].includes(normalized);
+  const sensitiveFragments = [
+    "password", "passwd", "secret", "token", "apikey", "authorization", "credential", "cookie",
+    "databaseurl",
+  ];
+  return sensitiveFragments.some((fragment) => normalized.includes(fragment))
+    || normalized.startsWith("auth")
+    || normalized.startsWith("customer")
+    || normalized === "html"
+    || normalized === "payload";
 }
 
 export function median(values) {
@@ -25,10 +29,10 @@ export function findingFingerprint(finding) {
 }
 
 function redactString(value) {
-  if (/(?:postgres|postgresql):\/\//i.test(value)) return "[redacted-url]";
   if (HTML.test(value)) return "[redacted-content]";
 
   return value
+    .replace(/(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis(?:s)?|mssql|sqlserver):\/\/[^\s)]+/gi, "[redacted-url]")
     .replace(/https?:\/\/[^\s)]+/gi, (rawUrl) => {
       try {
         const parsed = new URL(rawUrl);
@@ -37,9 +41,10 @@ function redactString(value) {
         return "[redacted-url]";
       }
     })
+    .replace(/(\/[^?\s)]*)\?[^\s)]*/g, "$1")
     .replace(/(authorization|cookie)\s*[:=]\s*[^,\r\n]+/gi, "$1=[redacted]")
-    .replace(/(access[-_]?token|refresh[-_]?token|api[-_]?key)\s*[:=]\s*[^&,;\s]+/gi, "$1=[redacted]")
-    .replace(/\bBearer\s+[^,;\s]+/gi, "Bearer [redacted]");
+    .replace(/(password|passwd|secret|token|access[-_]?token|refresh[-_]?token|api[-_]?key)\s*[:=]\s*[^&,;\s]+/gi, "$1=[redacted]")
+    .replace(/\b(Bearer|Basic)\s+[^,;\s]+/gi, "$1 [redacted]");
 }
 
 export function redactQualityValue(value, key = "") {

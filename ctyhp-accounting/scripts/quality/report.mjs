@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { BUDGETS, qualityMode, qualityPaths } from "./config.mjs";
 import { compareAgainstBaseline, findingFingerprint, qualityExitCode, redactQualityValue } from "./model.mjs";
 
+const VALID_MEASUREMENT_KINDS = new Set(["bundle", "performance", "cls", "query"]);
+
 function atomicWrite(path, contents) {
   const temporaryPath = `${path}.tmp`;
   writeFileSync(temporaryPath, contents, "utf8");
@@ -52,10 +54,52 @@ function readJson(path, label) {
   }
 }
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNumericBudgetTree(value) {
+  if (!isRecord(value) || !Object.keys(value).length) return false;
+  return Object.values(value).every((item) =>
+    typeof item === "number" ? Number.isFinite(item) : isNumericBudgetTree(item),
+  );
+}
+
+function validMeasurement(metric) {
+  return isRecord(metric)
+    && typeof metric.key === "string" && metric.key.length > 0
+    && typeof metric.kind === "string" && VALID_MEASUREMENT_KINDS.has(metric.kind)
+    && typeof metric.value === "number" && Number.isFinite(metric.value);
+}
+
+function validateSection(section, path) {
+  const measurements = Array.isArray(section?.measurements)
+    ? section.measurements
+    : isRecord(section?.measurements)
+      ? Object.values(section.measurements)
+      : null;
+  const valid = isRecord(section)
+    && Array.isArray(section.findings) && section.findings.every(isRecord)
+    && measurements !== null && measurements.every(validMeasurement)
+    && Array.isArray(section.unavailable)
+    && Array.isArray(section.safetyFailures);
+  if (!valid) {
+    throw new Error(`Quality harness error: section artifact at ${path} violates the required result contract`);
+  }
+  return section;
+}
+
 function readBaseline(path) {
   if (!existsSync(path)) throw new Error(`Quality harness error: regression baseline is missing at ${path}`);
   const baseline = readJson(path, "regression baseline");
-  if (!baseline || baseline.version !== 1 || !Array.isArray(baseline.fingerprints) || !Array.isArray(baseline.measurements)) {
+  const valid = isRecord(baseline)
+    && baseline.version === 1
+    && Array.isArray(baseline.fingerprints)
+    && baseline.fingerprints.every((fingerprint) => typeof fingerprint === "string" && fingerprint.length > 0)
+    && Array.isArray(baseline.measurements)
+    && baseline.measurements.every(validMeasurement)
+    && isNumericBudgetTree(baseline.budgets);
+  if (!valid) {
     throw new Error(`Quality harness error: regression baseline is malformed at ${path}`);
   }
   return baseline;
@@ -72,7 +116,10 @@ export function aggregateQualityArtifacts(resultsDir, options = {}) {
     .sort();
   if (!files.length) throw new Error(`Quality harness error: no section artifacts found in ${resultsDir}`);
 
-  const sections = files.map((name) => readJson(join(resultsDir, name), `section artifact ${name}`));
+  const sections = files.map((name) => {
+    const path = join(resultsDir, name);
+    return validateSection(readJson(path, `section artifact ${name}`), path);
+  });
   const findings = sections.flatMap((section) => section.findings ?? []).map((finding) => ({
     ...finding,
     fingerprint: finding.fingerprint || findingFingerprint(finding),
