@@ -1,5 +1,5 @@
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { lstatSync, mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { smokeSession } from "../smoke-environment.mjs";
@@ -64,15 +64,111 @@ export function performanceMedians(samples) {
   }));
 }
 
+export async function waitForLoadFinalization(page, timeout = 5_000) {
+  try {
+    await page.waitForLoadState("load", { timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function finiteOrNull(value) {
+  return Number.isFinite(value) ? Number(value) : null;
+}
+
+export function performanceSample(snapshot, { loadFinalized, failedSubresources }) {
+  const navigation = snapshot?.navigation;
+  if (!navigation) return null;
+  const metrics = snapshot.metrics ?? {};
+  const unsupported = new Set(metrics.unsupported ?? []);
+  const interactions = Array.isArray(metrics.interactions) ? metrics.interactions.map(Number).filter(Number.isFinite) : [];
+  const longTasks = Array.isArray(metrics.longTasks) ? metrics.longTasks.map(Number).filter(Number.isFinite) : [];
+  const resources = Array.isArray(snapshot.resources) ? snapshot.resources : [];
+  const transferSupported = loadFinalized
+    && Number.isFinite(navigation.transferSize)
+    && resources.every((entry) => Number.isFinite(entry.transferSize));
+  const loadMs = loadFinalized && Number(navigation.loadEventEnd) > 0
+    ? finiteOrNull(navigation.loadEventEnd)
+    : null;
+
+  return {
+    navigationMs: loadMs === null ? null : finiteOrNull(navigation.duration),
+    responseMs: finiteOrNull(navigation.responseEnd),
+    ttfbMs: finiteOrNull(navigation.responseStart),
+    dclMs: finiteOrNull(navigation.domContentLoadedEventEnd),
+    loadMs,
+    lcpMs: unsupported.has("lcp") ? null : finiteOrNull(metrics.lcp),
+    cls: unsupported.has("cls") ? null : finiteOrNull(metrics.cls),
+    interactionMs: unsupported.has("interactions") || interactions.length === 0
+      ? null
+      : Math.max(...interactions),
+    longTaskMs: unsupported.has("longTasks") ? null : longTasks.reduce((sum, value) => sum + value, 0),
+    transferredBytes: transferSupported
+      ? Number(navigation.transferSize) + resources.reduce((sum, entry) => sum + Number(entry.transferSize), 0)
+      : null,
+    failedSubresources: finiteOrNull(failedSubresources),
+  };
+}
+
+export function isLoginLocation(value) {
+  try {
+    const pathname = new URL(String(value), "http://quality.invalid").pathname;
+    const canonical = pathname.replace(/\/+$/, "") || "/";
+    return canonical === "/login";
+  } catch {
+    return false;
+  }
+}
+
 export function navigationSafetyFailures({ route, status, finalPath, errorBoundary, pageError }) {
   const failures = [];
   if (!Number.isInteger(status) || status < 200 || status >= 300) {
     failures.push({ kind: "document-navigation", route, status: Number.isInteger(status) ? status : 0 });
   }
-  if (finalPath === "/login") failures.push({ kind: "auth", route });
+  if (isLoginLocation(finalPath)) failures.push({ kind: "auth", route });
   if (errorBoundary) failures.push({ kind: "error-boundary", route });
   if (pageError) failures.push({ kind: "page-error", route });
   return failures;
+}
+
+export function isUnsafeOwnedRootEntry(entry) {
+  return !entry?.isDirectory?.() || Boolean(entry?.isSymbolicLink?.());
+}
+
+function contained(root, target) {
+  const fromRoot = relative(root, target);
+  return fromRoot !== ""
+    && fromRoot !== ".."
+    && !fromRoot.startsWith(`..\\`)
+    && !fromRoot.startsWith("../")
+    && !isAbsolute(fromRoot);
+}
+
+function validateOwnedDirectory(path) {
+  let entry;
+  try {
+    entry = lstatSync(path);
+  } catch {
+    throw new Error("Owned quality result root must be a real directory");
+  }
+  if (isUnsafeOwnedRootEntry(entry)) {
+    throw new Error("Owned quality result root must be a real directory, not a link or reparse target");
+  }
+  return realpathSync(path);
+}
+
+export function validateOwnedResultRoots(resultsDir, screenshotRoot) {
+  const lexicalResults = resolve(resultsDir);
+  const lexicalScreenshots = resolve(screenshotRoot);
+  const physicalResults = validateOwnedDirectory(lexicalResults);
+  const physicalScreenshots = validateOwnedDirectory(lexicalScreenshots);
+  const physicalParent = realpathSync(dirname(lexicalResults));
+  if (!contained(physicalParent, physicalResults) || !contained(lexicalResults, lexicalScreenshots)
+    || !contained(physicalResults, physicalScreenshots)) {
+    throw new Error("Owned quality result root and screenshot root must remain physically contained");
+  }
+  return { resultsDir: physicalResults, screenshotRoot: physicalScreenshots };
 }
 
 export function subresourceFinding({ route, viewport, url, resourceType, status }) {
@@ -196,6 +292,14 @@ function assertGuard(guard, sections, route, viewport) {
   }
 }
 
+export async function finalizeGuardedContext({ tracker, guard, sections, route, viewport }) {
+  if (tracker?.pageError) {
+    addSafetyFailures(sections.routes.safetyFailures, [{ kind: "page-error", route }]);
+  }
+  assertGuard(guard, sections, route, viewport);
+  await guard.context.close();
+}
+
 async function runScheduledAudit(browser, input) {
   const { baseUrl, cookies, item, screenshotRoot, sections, probe } = input;
   const viewport = VIEWPORT_BY_NAME.get(item.viewport);
@@ -267,8 +371,7 @@ async function runScheduledAudit(browser, input) {
       viewport: item.viewport,
     }]);
   } finally {
-    assertGuard(guard, sections, item.route, item.viewport);
-    await guard.context.close();
+    await finalizeGuardedContext({ tracker, guard, sections, route: item.route, viewport: item.viewport });
   }
 }
 
@@ -276,6 +379,7 @@ async function navigateForPerformance(page, tracker, url, route) {
   tracker.reset();
   const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector("#main-content", { state: "visible", timeout: 30_000 });
+  const loadFinalized = await waitForLoadFinalization(page);
   await page.waitForTimeout(500);
   const safetyFailures = navigationSafetyFailures({
     route,
@@ -284,31 +388,38 @@ async function navigateForPerformance(page, tracker, url, route) {
     errorBoundary: await hasErrorBoundary(page),
     pageError: tracker.pageError,
   });
-  const sample = await page.evaluate(() => {
+  const snapshot = await page.evaluate(() => {
     const navigation = performance.getEntriesByType("navigation")[0];
     if (!navigation) return null;
     const quality = window.__oneBookQuality ?? { lcp: 0, cls: 0, interactions: [], longTasks: [], unsupported: [] };
     const resources = performance.getEntriesByType("resource");
-    const transferSupported = "transferSize" in navigation && resources.every((entry) => "transferSize" in entry);
-    const unsupported = new Set(quality.unsupported ?? []);
     return {
-      navigationMs: Number(navigation.duration),
-      responseMs: Number(navigation.responseEnd),
-      ttfbMs: Number(navigation.responseStart),
-      dclMs: Number(navigation.domContentLoadedEventEnd),
-      loadMs: Number(navigation.loadEventEnd),
-      lcpMs: unsupported.has("lcp") ? null : Number(quality.lcp),
-      cls: unsupported.has("cls") ? null : Number(quality.cls),
-      interactionMs: unsupported.has("interactions") ? null : Math.max(0, ...quality.interactions.map(Number)),
-      longTaskMs: unsupported.has("longTasks") ? null : quality.longTasks.map(Number).reduce((sum, value) => sum + value, 0),
-      transferredBytes: transferSupported
-        ? Number(navigation.transferSize) + resources.reduce((sum, entry) => sum + Number(entry.transferSize), 0)
-        : null,
-      unsupported: [...unsupported],
+      navigation: {
+        duration: Number(navigation.duration),
+        responseEnd: Number(navigation.responseEnd),
+        responseStart: Number(navigation.responseStart),
+        domContentLoadedEventEnd: Number(navigation.domContentLoadedEventEnd),
+        loadEventEnd: Number(navigation.loadEventEnd),
+        transferSize: "transferSize" in navigation ? Number(navigation.transferSize) : null,
+      },
+      resources: resources.map((entry) => ({
+        transferSize: "transferSize" in entry ? Number(entry.transferSize) : null,
+      })),
+      metrics: {
+        lcp: Number(quality.lcp),
+        cls: Number(quality.cls),
+        interactions: quality.interactions.map(Number),
+        longTasks: quality.longTasks.map(Number),
+        unsupported: [...quality.unsupported],
+      },
     };
   });
+  const sample = performanceSample(snapshot, {
+    loadFinalized,
+    failedSubresources: tracker.findings().length,
+  });
   return {
-    sample: sample ? { ...sample, failedSubresources: tracker.findings().length } : null,
+    sample,
     safetyFailures,
     subresources: tracker.findings(),
   };
@@ -379,8 +490,7 @@ async function runPerformanceRoute(browser, input) {
   } catch {
     addSafetyFailures(sections.routes.safetyFailures, [{ kind: "performance-audit", route }]);
   } finally {
-    assertGuard(guard, sections, route, "desktop");
-    await guard.context.close();
+    await finalizeGuardedContext({ tracker, guard, sections, route, viewport: "desktop" });
   }
 }
 
@@ -388,7 +498,10 @@ export async function runRuntime(env = process.env) {
   const paths = qualityPaths(process.cwd());
   const resultsDir = paths.resultsDir;
   const screenshotRoot = join(resultsDir, "screenshots");
+  mkdirSync(resultsDir, { recursive: true });
+  validateOwnedDirectory(resultsDir);
   mkdirSync(screenshotRoot, { recursive: true });
+  validateOwnedResultRoots(resultsDir, screenshotRoot);
   const sections = {
     axe: section({ runs: [] }),
     viewports: section({ snapshots: [] }),
