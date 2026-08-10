@@ -41,7 +41,7 @@ function redactString(value) {
         return "[redacted-url]";
       }
     })
-    .replace(/(\/[^?\s)]*)\?[^\s)]*/g, "$1")
+    .replace(/(^|[\s("'=])([^?\s)]*)\?[^\s)]+/g, "$1$2")
     .replace(/(authorization|cookie)\s*[:=]\s*[^,\r\n]+/gi, "$1=[redacted]")
     .replace(/(password|passwd|secret|token|access[-_]?token|refresh[-_]?token|api[-_]?key)\s*[:=]\s*[^&,;\s]+/gi, "$1=[redacted]")
     .replace(/\b(Bearer|Basic)\s+[^,;\s]+/gi, "$1 [redacted]");

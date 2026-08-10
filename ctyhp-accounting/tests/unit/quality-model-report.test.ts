@@ -47,6 +47,7 @@ describe("quality result model", () => {
         "token=secret",
         "mysql://user:pw@host/db",
         "/invoices?token=secret",
+        "invoices?customer=QueryLeak",
         "Authorization: Basic credential",
       ],
       customerName: "Acme",
@@ -60,6 +61,7 @@ describe("quality result model", () => {
         "token=[redacted]",
         "[redacted-url]",
         "/invoices",
+        "invoices",
         "Authorization=[redacted]",
       ],
       customerName: "[redacted]",
@@ -77,7 +79,7 @@ describe("quality result model", () => {
     });
     for (const artifact of ["summary.json", "summary.md"]) {
       const contents = readFileSync(join(dir, artifact), "utf8");
-      for (const secret of ["hunter2", "secret", "user:pw", "credential", "Acme", "database-password", "private-auth-value", "?token="]) {
+      for (const secret of ["hunter2", "secret", "user:pw", "credential", "Acme", "QueryLeak", "database-password", "private-auth-value", "?token=", "?customer="]) {
         expect(contents).not.toContain(secret);
       }
     }
@@ -163,7 +165,6 @@ describe("quality result model", () => {
       ],
       measurements: {
         response: { key: "performance./invoices.responseMs", kind: "performance", value: 1_000, raw: "private" },
-        ignored: { key: "ignored", kind: "performance", value: "not-a-number" },
       },
       budgets: { performance: { percent: 0.20, absoluteMs: 200, clsAbsolute: 0.03 } },
       unavailable: [{ reason: "secret" }],
@@ -201,6 +202,42 @@ describe("quality result model", () => {
       findings: [],
       measurements: [],
       budgets: { performance: { percent: "secret" } },
+    }));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/numeric.*budget/i);
+    expect(existsSync(baseline)).toBe(false);
+  });
+
+  it("atomically rejects mixed accepted measurements with invalid keys, kinds, or nonfinite values", () => {
+    const validMetric = '{"key":"performance.valid.responseMs","kind":"performance","value":1000}';
+    const invalidMetrics = [
+      '{"key":42,"kind":"performance","value":1001}',
+      '{"key":"performance.invalid.responseMs","kind":"unknown","value":1001}',
+      '{"key":"performance.invalid.responseMs","kind":"performance","value":1e999}',
+    ];
+
+    for (const invalidMetric of invalidMetrics) {
+      const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-measurement-"));
+      const results = join(dir, "summary.json");
+      const baseline = join(dir, "baseline.json");
+      writeFileSync(results, `{"findings":[],"measurements":[${validMetric},${invalidMetric}],"budgets":{"performance":{"percent":0.2}}}`);
+
+      expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/measurement/i);
+      expect(existsSync(baseline)).toBe(false);
+    }
+  });
+
+  it("atomically rejects accepted budget trees containing any invalid leaf", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-mixed-budget-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    writeFileSync(results, JSON.stringify({
+      findings: [],
+      measurements: [],
+      budgets: {
+        performance: { percent: 0.2, absoluteMs: "two hundred" },
+        bundle: { percent: 0.1, absoluteGzipBytes: 20_480 },
+      },
     }));
 
     expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/numeric.*budget/i);

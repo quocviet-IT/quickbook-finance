@@ -4,26 +4,36 @@ import { fileURLToPath } from "node:url";
 import { qualityPaths } from "./config.mjs";
 import { findingFingerprint, redactQualityValue } from "./model.mjs";
 
+const VALID_MEASUREMENT_KINDS = new Set(["bundle", "performance", "cls", "query"]);
+
 function normalizeMeasurements(measurements) {
   const candidates = Array.isArray(measurements)
     ? measurements
     : measurements && typeof measurements === "object"
       ? Object.values(measurements)
-      : [];
+      : null;
+  const valid = candidates?.every((metric) =>
+    metric && typeof metric === "object" && !Array.isArray(metric)
+      && typeof metric.key === "string" && metric.key.length > 0
+      && typeof metric.kind === "string" && VALID_MEASUREMENT_KINDS.has(metric.kind)
+      && typeof metric.value === "number" && Number.isFinite(metric.value),
+  );
+  if (!valid) {
+    throw new Error("Cannot accept quality baseline: every measurement must have a valid key, kind, and finite scalar value");
+  }
   return candidates
-    .filter((metric) => metric && typeof metric.key === "string" && typeof metric.kind === "string" && Number.isFinite(metric.value))
     .map(({ key, kind, value }) => ({ key, kind, value }))
     .sort((left, right) => left.key.localeCompare(right.key));
 }
 
 function numericBudgets(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const entries =
-    Object.entries(value)
-      .map(([key, item]) => [key, numericBudgets(item)])
-      .filter(([, item]) => item !== undefined);
-  return entries.length ? Object.fromEntries(entries) : undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length) {
+    throw new Error("Cannot accept quality baseline: only numeric threshold budget leaves are allowed");
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, numericBudgets(item)]),
+  );
 }
 
 export function acceptBaseline(resultsPath, baselinePath, env = process.env) {
@@ -44,9 +54,6 @@ export function acceptBaseline(resultsPath, baselinePath, env = process.env) {
     return finding.fingerprint || findingFingerprint(finding);
   }))].sort();
   const budgets = numericBudgets(summary.budgets);
-  if (!budgets) {
-    throw new Error("Cannot accept quality baseline without numeric threshold budgets");
-  }
   const baseline = redactQualityValue({
     version: 1,
     fingerprints,
