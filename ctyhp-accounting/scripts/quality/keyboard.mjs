@@ -104,11 +104,8 @@ async function focusIsVisible(page) {
 }
 
 async function activeIs(page, locator) {
-  try {
-    return await locator.evaluate((element) => document.activeElement === element);
-  } catch {
-    return false;
-  }
+  if (await locator.count() === 0) return false;
+  return await locator.evaluate((element) => document.activeElement === element);
 }
 
 export async function waitForVisibleLocator(locator) {

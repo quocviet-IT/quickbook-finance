@@ -96,6 +96,38 @@ describe("keyboard quality scenarios", () => {
     });
   });
 
+  it("escalates a locator evaluation rejection instead of reporting a focus assertion", async () => {
+    const evaluationFailure = new Error("Target page, context or browser has been closed");
+    const skipLink = {
+      count: async () => 1,
+      evaluate: async () => { throw evaluationFailure; },
+      filter: () => ({ first: () => skipLink }),
+      waitFor: async () => undefined,
+    };
+    const main = {
+      waitFor: async () => undefined,
+    };
+    const page = {
+      evaluate: async () => true,
+      getByText: () => ({ count: async () => 0 }),
+      keyboard: { press: async () => undefined },
+      locator: (selector: string) => selector === ".accounting-skip-link" ? skipLink : main,
+      setViewportSize: async () => undefined,
+      goto: async () => ({ status: () => 200 }),
+      url: () => "https://quality.example.test/dashboard",
+    };
+
+    await expect(runKeyboardScenario(
+      page,
+      "https://quality.example.test",
+      KEYBOARD_SCENARIOS[0],
+    )).rejects.toMatchObject({
+      name: "KeyboardSafetyError",
+      kind: "harness-error",
+      route: "/dashboard",
+    });
+  });
+
   it.each([
     ["crash", "page-crash"],
     ["close", "page-closed"],
@@ -120,6 +152,7 @@ describe("keyboard quality scenarios", () => {
     let focusCalls = 0;
     const pressed: string[] = [];
     const target = {
+      count: async () => 1,
       evaluate: async () => focused,
       focus: async () => { focusCalls += 1; },
       waitFor: async () => undefined,
