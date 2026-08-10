@@ -22,20 +22,29 @@ export function safeRequestTarget(rawUrl) {
 
 export async function createReadOnlyContext(browser, { cookies = [], viewport } = {}) {
   const blocked = [];
-  const context = await browser.newContext({ viewport });
-  if (cookies.length) await context.addCookies(cookies);
+  const context = await browser.newContext({ viewport, serviceWorkers: "block" });
 
-  await context.route("**/*", async (route) => {
-    const request = route.request();
-    const method = safeRequestMethod(request.method());
-    if (isAllowedBrowserMethod(method)) {
-      await route.continue();
-      return;
+  try {
+    if (cookies.length) await context.addCookies(cookies);
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const method = safeRequestMethod(request.method());
+      if (isAllowedBrowserMethod(method)) {
+        await route.continue();
+        return;
+      }
+
+      blocked.push({ method, target: safeRequestTarget(request.url()) });
+      await route.abort("blockedbyclient");
+    });
+  } catch (setupError) {
+    try {
+      await context.close();
+    } catch (closeError) {
+      throw new AggregateError([setupError, closeError], "Read-only browser context setup and cleanup failed");
     }
-
-    blocked.push({ method, target: safeRequestTarget(request.url()) });
-    await route.abort("blockedbyclient");
-  });
+    throw setupError;
+  }
 
   return {
     context,
@@ -47,6 +56,27 @@ export async function createReadOnlyContext(browser, { cookies = [], viewport } 
       }
     },
   };
+}
+
+function closeServer(server) {
+  if (!server?.listening) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    try {
+      server.close((error) => error ? reject(error) : resolve());
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+export async function closeRuntimeResources(browser, server) {
+  const operations = [];
+  if (browser) operations.push(browser.close());
+  operations.push(closeServer(server));
+  const results = await Promise.allSettled(operations);
+  const failures = results.filter((result) => result.status === "rejected").map((result) => result.reason);
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, "Runtime browser and server cleanup failed");
 }
 
 export async function installMetricObservers(page) {

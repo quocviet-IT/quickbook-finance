@@ -1,6 +1,18 @@
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isAllowedBrowserMethod, safeRequestTarget } from "../../scripts/quality/browser.mjs";
-import { classifyViewportSnapshot } from "../../scripts/quality/page-audit.mjs";
+import {
+  closeRuntimeResources,
+  createReadOnlyContext,
+  isAllowedBrowserMethod,
+  safeRequestTarget,
+} from "../../scripts/quality/browser.mjs";
+import {
+  classifyViewportSnapshot,
+  resolveOwnedScreenshotPath,
+  structuralTargetToken,
+} from "../../scripts/quality/page-audit.mjs";
 
 describe("quality browser safety", () => {
   it("allows reads and refuses every write transport", () => {
@@ -34,5 +46,92 @@ describe("quality browser safety", () => {
       clippedTargets: [],
       shellOverlaps: ["#primary-action"],
     }).findings[0].rule).toBe("fixed-shell-overlap");
+  });
+
+  it("uses structural target tokens without customer-shaped ids or classes", () => {
+    const token = structuralTargetToken({
+      tagName: "INPUT",
+      role: "textbox",
+      type: "text",
+      ordinal: 2,
+      id: "Acme-Customer-123",
+      className: "Acme-Customer-secret",
+    });
+
+    expect(token).toBe("input[role=textbox][type=text]:nth-structural(2)");
+    expect(token).not.toContain("Acme");
+  });
+
+  it("rejects absolute and traversal screenshot destinations", () => {
+    const temporary = mkdtempSync(join(tmpdir(), "quality-screenshots-"));
+    const root = join(temporary, "owned");
+    mkdirSync(root);
+    try {
+      expect(resolveOwnedScreenshotPath(root, "finding.png")).toBe(join(root, "finding.png"));
+      expect(() => resolveOwnedScreenshotPath(root, "../escape.png")).toThrow(/owned screenshot root/);
+      expect(() => resolveOwnedScreenshotPath(root, resolve(temporary, "absolute.png"))).toThrow(/owned screenshot root/);
+    } finally {
+      rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a screenshot destination whose physical parent escapes through a link", () => {
+    const temporary = mkdtempSync(join(tmpdir(), "quality-screenshots-link-"));
+    const root = join(temporary, "owned");
+    const outside = join(temporary, "outside");
+    mkdirSync(root);
+    mkdirSync(outside);
+    symlinkSync(outside, join(root, "linked"), "junction");
+    try {
+      expect(() => resolveOwnedScreenshotPath(root, "linked/finding.png")).toThrow(/owned screenshot root/);
+    } finally {
+      rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+
+  it("closes a new context when cookie setup fails", async () => {
+    let closeCalls = 0;
+    const context = {
+      addCookies: async () => { throw new Error("cookie setup failed"); },
+      route: async () => undefined,
+      close: async () => { closeCalls += 1; },
+    };
+    const browser = { newContext: async () => context };
+
+    await expect(createReadOnlyContext(browser, { cookies: [{ name: "session" }] })).rejects.toThrow("cookie setup failed");
+    expect(closeCalls).toBe(1);
+  });
+
+  it("closes a new context when route setup fails", async () => {
+    let closeCalls = 0;
+    const context = {
+      addCookies: async () => undefined,
+      route: async () => { throw new Error("route setup failed"); },
+      close: async () => { closeCalls += 1; },
+    };
+    const browser = { newContext: async () => context };
+
+    await expect(createReadOnlyContext(browser)).rejects.toThrow("route setup failed");
+    expect(closeCalls).toBe(1);
+  });
+
+  it("closes the server even when browser cleanup rejects", async () => {
+    const calls: string[] = [];
+    const browser = {
+      close: async () => {
+        calls.push("browser");
+        throw new Error("browser close failed");
+      },
+    };
+    const server = {
+      listening: true,
+      close(callback: (error?: Error) => void) {
+        calls.push("server");
+        callback();
+      },
+    };
+
+    await expect(closeRuntimeResources(browser, server)).rejects.toThrow("browser close failed");
+    expect(calls).toEqual(["browser", "server"]);
   });
 });
