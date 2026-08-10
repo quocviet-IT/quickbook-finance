@@ -17,6 +17,15 @@ function measurementsFor(report) {
     ...report.routes.map((route) => ({
       key: `bundle.route.${route.route}.gzipBytes`, kind: "bundle", value: route.gzipBytes,
     })),
+    ...report.chunks.map((chunk) => ({
+      key: `bundle.chunk.${chunk.chunk}.gzipBytes`,
+      kind: "bundle",
+      value: chunk.gzipBytes,
+      chunk: chunk.chunk,
+      bytes: chunk.bytes,
+      hash: chunk.hash,
+      routes: chunk.routes,
+    })),
     { key: "bundle.shared.gzipBytes", kind: "bundle", value: report.shared.gzipBytes },
     { key: "bundle.total.gzipBytes", kind: "bundle", value: report.total.gzipBytes },
   ];

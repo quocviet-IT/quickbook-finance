@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const MANIFEST_NAME = "page_client-reference-manifest.js";
@@ -55,6 +55,23 @@ function normalizeChunk(nextDir, chunk) {
   return { chunk: normalized, path };
 }
 
+export function resolvePhysicalChunkPath(nextDir, chunk) {
+  const { chunk: normalized, path } = normalizeChunk(nextDir, chunk);
+  let chunksRoot;
+  let physicalPath;
+  try {
+    chunksRoot = realpathSync(join(resolve(nextDir), "static", "chunks"));
+    physicalPath = realpathSync(path);
+  } catch (error) {
+    throw new Error(`Unreadable referenced chunk ${normalized}: ${error.message}`);
+  }
+  const chunkRelativePath = relative(chunksRoot, physicalPath);
+  if (chunkRelativePath.startsWith("..") || isAbsolute(chunkRelativePath)) {
+    throw new Error(`Referenced chunk escapes .next/static/chunks: ${normalized}`);
+  }
+  return physicalPath;
+}
+
 export function parseClientReferenceManifest(text) {
   if (typeof text !== "string") throw new Error("Unreadable client reference manifest");
   const match = manifestAssignment(text);
@@ -82,10 +99,11 @@ export function summarizeRouteChunks(manifest) {
 }
 
 export function chunkSize(nextDir, chunk) {
-  const { chunk: normalized, path } = normalizeChunk(nextDir, chunk);
+  const { chunk: normalized } = normalizeChunk(nextDir, chunk);
   let stat;
   let contents;
   try {
+    const path = resolvePhysicalChunkPath(nextDir, chunk);
     stat = statSync(path);
     if (!stat.isFile()) throw new Error("not a file");
     contents = readFileSync(path);
