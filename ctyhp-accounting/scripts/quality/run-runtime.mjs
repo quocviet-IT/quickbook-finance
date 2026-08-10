@@ -21,6 +21,7 @@ import { auditPage } from "./page-audit.mjs";
 import { aggregateQualityArtifacts, writeQualityReport } from "./report.mjs";
 import { discoverStaticRoutes } from "./routes.mjs";
 import { playwrightSessionCookies } from "./session-cookie.mjs";
+import { startQueryTiming } from "./query-timing.mjs";
 import {
   KEYBOARD_SCENARIOS,
   KeyboardSafetyError,
@@ -239,6 +240,7 @@ function writeRuntimeArtifacts(resultsDir, sections) {
   writeSection(resultsDir, "viewports.json", sections.viewports);
   writeSection(resultsDir, "web-vitals.json", sections.performance);
   writeSection(resultsDir, "routes.json", sections.routes);
+  writeSection(resultsDir, "queries.json", sections.queries);
 }
 
 function routeSlug(route) {
@@ -564,9 +566,11 @@ export async function runRuntime(env = process.env) {
     viewports: section({ snapshots: [] }),
     performance: section(),
     routes: section({ routes: [] }),
+    queries: section(),
   };
   let browser;
   const guards = [];
+  const queryTiming = await startQueryTiming(env);
 
   try {
     const baseUrl = resolvedBaseUrl(env.QUALITY_BASE_URL);
@@ -582,36 +586,37 @@ export async function runRuntime(env = process.env) {
     } catch {
       addSafetyFailures(sections.routes.safetyFailures, [{ kind: "auth" }]);
       process.stderr.write("Quality runtime authentication failed\n");
-      return await finishRuntime(resultsDir, sections, env);
     }
 
-    const cookies = playwrightSessionCookies({ ...authentication, appBaseUrl: baseUrl });
-    browser = await chromium.launch({ headless: true });
-    if (phases.keyboard) {
-      await runKeyboardAudit(browser, { baseUrl, cookies, sections, guards });
-    }
-    if (phases.routes && !sections.keyboard.safetyFailures.length
-      && !sections.routes.safetyFailures.length) {
-      const schedule = runtimeSchedule(routes);
-      let probe = env.QUALITY_PROBE_BLOCKED_METHOD === "1";
-      for (const item of schedule) {
-        await runScheduledAudit(browser, {
-          baseUrl,
-          cookies,
-          item,
-          screenshotRoot,
-          sections,
-          guards,
-          probe,
-        });
-        probe = false;
-        if (sections.routes.safetyFailures.some(({ kind }) => kind === "blocked-method")) break;
+    if (authentication) {
+      const cookies = playwrightSessionCookies({ ...authentication, appBaseUrl: baseUrl });
+      browser = await chromium.launch({ headless: true });
+      if (phases.keyboard) {
+        await runKeyboardAudit(browser, { baseUrl, cookies, sections, guards });
       }
+      if (phases.routes && !sections.keyboard.safetyFailures.length
+        && !sections.routes.safetyFailures.length) {
+        const schedule = runtimeSchedule(routes);
+        let probe = env.QUALITY_PROBE_BLOCKED_METHOD === "1";
+        for (const item of schedule) {
+          await runScheduledAudit(browser, {
+            baseUrl,
+            cookies,
+            item,
+            screenshotRoot,
+            sections,
+            guards,
+            probe,
+          });
+          probe = false;
+          if (sections.routes.safetyFailures.some(({ kind }) => kind === "blocked-method")) break;
+        }
 
-      if (!sections.routes.safetyFailures.length) {
-        for (const route of routes) {
-          await runPerformanceRoute(browser, { baseUrl, cookies, route, sections, guards });
-          if (sections.routes.safetyFailures.length) break;
+        if (!sections.routes.safetyFailures.length) {
+          for (const route of routes) {
+            await runPerformanceRoute(browser, { baseUrl, cookies, route, sections, guards });
+            if (sections.routes.safetyFailures.length) break;
+          }
         }
       }
     }
@@ -626,6 +631,7 @@ export async function runRuntime(env = process.env) {
       addSafetyFailures(sections.routes.safetyFailures, [{ kind: "cleanup" }]);
       process.stderr.write("Quality runtime cleanup failed\n");
     }
+    sections.queries = await queryTiming.finish();
   }
 
   return await finishRuntime(resultsDir, sections, env);
