@@ -1,4 +1,5 @@
 import { isAllowedBrowserMethod, safeRequestTarget } from "./browser.mjs";
+import { errors as playwrightErrors } from "playwright";
 
 const DESKTOP = Object.freeze({ width: 1440, height: 900 });
 const MOBILE = Object.freeze({ width: 375, height: 812 });
@@ -14,8 +15,15 @@ export class KeyboardSafetyError extends Error {
   }
 }
 
+export class KeyboardAssertionError extends Error {
+  constructor(message = "Keyboard assertion failed") {
+    super(message);
+    this.name = "KeyboardAssertionError";
+  }
+}
+
 function assertion(condition, message = "Keyboard assertion failed") {
-  if (!condition) throw new Error(message);
+  if (!condition) throw new KeyboardAssertionError(message);
 }
 
 function safeToken(value, fallback) {
@@ -105,15 +113,42 @@ async function activeIs(page, locator) {
 
 export async function waitForVisibleLocator(locator) {
   const target = locator.filter({ visible: true }).first();
-  await target.waitFor({ state: "visible", timeout: 5_000 });
+  try {
+    await target.waitFor({ state: "visible", timeout: 5_000 });
+  } catch (error) {
+    if (error instanceof playwrightErrors.TimeoutError) {
+      throw new KeyboardAssertionError("The keyboard target is not visible");
+    }
+    throw error;
+  }
   return target;
 }
 
-async function tabTo(page, locator, safety, limit = 180, requireVisible = true) {
+export async function waitForKeyboardState(locator, state, message, timeout = 5_000) {
+  try {
+    await locator.waitFor({ state, timeout });
+  } catch (error) {
+    if (error instanceof playwrightErrors.TimeoutError) {
+      throw new KeyboardAssertionError(message);
+    }
+    throw error;
+  }
+}
+
+export async function tabTo(page, locator, safety, limit = 180, requireVisible = true) {
   const target = requireVisible
     ? await waitForVisibleLocator(locator)
     : locator.first();
-  if (!requireVisible) await target.waitFor({ state: "attached", timeout: 5_000 });
+  if (!requireVisible) {
+    try {
+      await target.waitFor({ state: "attached", timeout: 5_000 });
+    } catch (error) {
+      if (error instanceof playwrightErrors.TimeoutError) {
+        throw new KeyboardAssertionError("The keyboard target is not present");
+      }
+      throw error;
+    }
+  }
   for (let index = 0; index < limit; index += 1) {
     assertSafety(safety);
     if (await activeIs(page, target)) {
@@ -122,7 +157,7 @@ async function tabTo(page, locator, safety, limit = 180, requireVisible = true) 
     }
     await page.keyboard.press("Tab");
   }
-  throw new Error("The target was not reached in logical Tab order");
+  throw new KeyboardAssertionError("The target was not reached in logical Tab order");
 }
 
 async function assertFocused(page, locator) {
@@ -134,8 +169,19 @@ async function assertActiveFocusVisible(page) {
   assertion(await focusIsVisible(page), "The active element does not match :focus-visible");
 }
 
-function observeSafety(page) {
-  const state = { failure: null };
+function observedPageRoute(page) {
+  try {
+    return safeRoute(page?.url?.());
+  } catch {
+    return "/dashboard";
+  }
+}
+
+export function observeKeyboardSafety(page) {
+  const state = { failure: null, completed: false };
+  const fail = (kind, route = observedPageRoute(page)) => {
+    if (!state.failure) state.failure = new KeyboardSafetyError(kind, route);
+  };
   page.on("request", (request) => {
     if (state.failure || isAllowedBrowserMethod(request.method())) return;
     state.failure = new KeyboardSafetyError(
@@ -143,8 +189,10 @@ function observeSafety(page) {
       safeRequestTarget(request.url()),
     );
   });
-  page.on("pageerror", () => {
-    if (!state.failure) state.failure = new KeyboardSafetyError("page-error", page.url());
+  page.on("pageerror", () => fail("page-error"));
+  page.on("crash", () => fail("page-crash"));
+  page.on("close", () => {
+    if (!state.completed) fail("page-closed");
   });
   return state;
 }
@@ -202,13 +250,56 @@ async function assertFocusInside(page, container) {
   await assertActiveFocusVisible(page);
 }
 
+export async function verifyFocusWrap(driver, limit = 80) {
+  const first = await driver.readToken();
+  assertion(first && first !== "unavailable", "The first focus boundary is unavailable");
+  let last = null;
+
+  for (let index = 0; index < limit; index += 1) {
+    await driver.press("Tab");
+    driver.assertSafe();
+    await driver.assertInside();
+    await driver.assertVisible();
+    const current = await driver.readToken();
+    if (current === first) {
+      assertion(last !== null, "The focus trap did not traverse a distinct element");
+      await driver.press("Shift+Tab");
+      driver.assertSafe();
+      await driver.assertInside();
+      await driver.assertVisible();
+      assertion(await driver.readToken() === last,
+        "Shift+Tab did not wrap from the first to the last focus boundary");
+      await driver.press("Tab");
+      driver.assertSafe();
+      await driver.assertInside();
+      await driver.assertVisible();
+      assertion(await driver.readToken() === first,
+        "Tab did not wrap from the last to the first focus boundary");
+      return { first, last };
+    }
+    last = current;
+  }
+
+  throw new KeyboardAssertionError("Focus did not wrap within the bounded drawer traversal");
+}
+
+async function assertDrawerFocusWrap(page, drawer, safety) {
+  return await verifyFocusWrap({
+    press: async (key) => await page.keyboard.press(key),
+    readToken: async () => structuralFocusTarget(await activeFocusSnapshot(page)),
+    assertInside: async () => await assertFocusInside(page, drawer),
+    assertVisible: async () => await assertActiveFocusVisible(page),
+    assertSafe: () => assertSafety(safety),
+  });
+}
+
 async function openAndCloseMenu(page, trigger, safety) {
   await assertFocused(page, trigger);
   await page.keyboard.press("Enter");
   assertSafety(safety);
   const menu = await waitForVisibleLocator(page.locator(".ant-dropdown [role=menu]"));
   await page.keyboard.press("Escape");
-  await menu.waitFor({ state: "hidden" });
+  await waitForKeyboardState(menu, "hidden", "Escape did not close the menu");
   assertSafety(safety);
   await assertFocused(page, trigger);
 }
@@ -253,13 +344,11 @@ async function mobileNavigationScenario(page, baseUrl, safety) {
   const focusedBefore = await activeFocusSnapshot(page);
   await page.keyboard.press("Enter");
   const drawer = await visibleDialog(page);
-  await drawer.waitFor({ state: "visible" });
   await tabTo(page, drawer.getByRole("button", { name: "Close" }), safety, 10);
   await assertFocusInside(page, drawer);
-  await page.keyboard.press("Tab");
-  await assertFocusInside(page, drawer);
+  await assertDrawerFocusWrap(page, drawer, safety);
   await page.keyboard.press("Escape");
-  await drawer.waitFor({ state: "hidden" });
+  await waitForKeyboardState(drawer, "hidden", "Escape did not close mobile navigation");
   assertSafety(safety);
   await assertFocused(page, trigger);
   return { route: page.url(), focusedBefore, focusedAfter: await activeFocusSnapshot(page) };
@@ -293,7 +382,11 @@ async function reportCenterScenario(page, baseUrl, safety) {
   await tabTo(page, page.locator('[aria-label="Search reports"]'), safety);
   const focusedBefore = await activeFocusSnapshot(page);
   await page.keyboard.type("cash");
-  await page.getByRole("heading", { name: "Search results" }).waitFor({ state: "visible" });
+  await waitForKeyboardState(
+    page.getByRole("heading", { name: "Search results" }),
+    "visible",
+    "Report results did not update after keyboard search",
+  );
   const countText = page.getByText(/^\d+ reports? found$/);
   assertion(await countText.count() > 0, "Report results did not update after keyboard search");
   await page.keyboard.press("Control+A");
@@ -319,13 +412,11 @@ async function guideDrawerScenario(page, baseUrl, safety) {
   const focusedBefore = await activeFocusSnapshot(page);
   await page.keyboard.press("Enter");
   const drawer = await visibleDialog(page);
-  await drawer.waitFor({ state: "visible" });
-  await tabTo(page, drawer.getByRole("textbox").first(), safety, 20);
+  await tabTo(page, drawer.getByRole("button", { name: "Close" }), safety, 20);
   await assertFocusInside(page, drawer);
-  await page.keyboard.press("Shift+Tab");
-  await assertFocusInside(page, drawer);
+  await assertDrawerFocusWrap(page, drawer, safety);
   await page.keyboard.press("Escape");
-  await drawer.waitFor({ state: "hidden" });
+  await waitForKeyboardState(drawer, "hidden", "Escape did not close the guide drawer");
   assertSafety(safety);
   await assertFocused(page, trigger);
   return { route: page.url(), focusedBefore, focusedAfter: await activeFocusSnapshot(page) };
@@ -350,8 +441,7 @@ async function importControlsScenario(page, baseUrl, safety) {
   assertion(await fileInput.count() > 0,
     "The CSV file input is not present");
   await assertFocused(page, fileControl);
-  await fileInput.focus();
-  await assertFocused(page, fileInput);
+  await tabTo(page, fileInput, safety, 20, false);
   assertion(arrowMoved, "Arrow keys did not move through file types");
   assertSafety(safety);
   return { route: page.url(), focusedBefore, focusedAfter: await activeFocusSnapshot(page) };
@@ -424,16 +514,20 @@ export async function runKeyboardScenario(page, baseUrl, scenario, safety) {
   } catch (error) {
     if (error instanceof KeyboardSafetyError) throw error;
     assertSafety(safety);
-    return resultFor(scenario, "failed", {}, page);
+    if (error instanceof KeyboardAssertionError) {
+      return resultFor(scenario, "failed", {}, page);
+    }
+    throw new KeyboardSafetyError("harness-error", observedPageRoute(page));
   }
 }
 
 export async function runKeyboardScenarios(page, baseUrl) {
-  const safety = observeSafety(page);
+  const safety = observeKeyboardSafety(page);
   const results = [];
   for (const scenario of KEYBOARD_SCENARIOS) {
     results.push(await runKeyboardScenario(page, baseUrl, scenario, safety));
   }
   assertSafety(safety);
+  safety.completed = true;
   return results;
 }
