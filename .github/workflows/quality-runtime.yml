@@ -1,0 +1,66 @@
+name: Runtime quality report
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-quality:
+    name: Authenticated read-only quality audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ctyhp-accounting
+    env:
+      QUALITY_MODE: report
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ctyhp-accounting/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate runtime configuration
+        run: >-
+          node -e "const required=['QUALITY_BASE_URL','NEXT_PUBLIC_SUPABASE_URL','NEXT_PUBLIC_SUPABASE_ANON_KEY','SMOKE_EMAIL','SMOKE_PASSWORD']; const missing=required.filter((name) => !process.env[name]?.trim()); if (missing.length) { console.error('Missing required runtime quality configuration: ' + missing.join(', ')); process.exit(1); }"
+        env:
+          QUALITY_BASE_URL: ${{ vars.QUALITY_BASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+
+      - name: Prove the read-only browser guard
+        run: node scripts/quality/self-test-runtime.mjs
+
+      - name: Run runtime quality report
+        run: npm run quality:runtime
+        env:
+          QUALITY_BASE_URL: ${{ vars.QUALITY_BASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          QUALITY_DATABASE_URL: ${{ secrets.QUALITY_DATABASE_URL }}
+
+      - name: Upload runtime quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-runtime-${{ github.sha }}
+          path: ctyhp-accounting/.quality-results
+          if-no-files-found: warn
+          retention-days: 14

@@ -56,3 +56,17 @@ jobs:
       # Last because it is the slowest gate; the three above fail faster.
       - name: Build
         run: npm run build
+
+      - name: Bundle quality report
+        run: npm run quality:bundle
+        env:
+          QUALITY_MODE: report
+
+      - name: Upload quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-bundle-${{ github.sha }}
+          path: ctyhp-accounting/.quality-results
+          if-no-files-found: error
+          retention-days: 14
