@@ -225,7 +225,7 @@ async function hasErrorBoundary(page) {
   return await page.getByText("We could not load this page", { exact: false }).count() > 0;
 }
 
-function pageFailureTracker(page, route, viewport) {
+export function pageFailureTracker(page, route, viewport) {
   let pageError = false;
   let findings = new Map();
   page.on("pageerror", () => { pageError = true; });
@@ -254,7 +254,6 @@ function pageFailureTracker(page, route, viewport) {
     get pageError() { return pageError; },
     findings() { return [...findings.values()]; },
     reset() {
-      pageError = false;
       findings = new Map();
     },
   };
@@ -375,7 +374,7 @@ async function runScheduledAudit(browser, input) {
   }
 }
 
-async function navigateForPerformance(page, tracker, url, route) {
+export async function navigateForPerformance(page, tracker, url, route) {
   tracker.reset();
   const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForSelector("#main-content", { state: "visible", timeout: 30_000 });

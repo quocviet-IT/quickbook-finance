@@ -14,7 +14,9 @@ import {
   finalizeGuardedContext,
   isLoginLocation,
   isUnsafeOwnedRootEntry,
+  navigateForPerformance,
   navigationSafetyFailures,
+  pageFailureTracker,
   performanceSample,
   performanceMedians,
   selectRuntimeRoutes,
@@ -162,6 +164,47 @@ describe("quality configuration", () => {
     });
     expect(sections.routes.safetyFailures).toEqual([{ kind: "page-error", route: "/dashboard" }]);
     expect(order).toEqual(["page-error-check", "assert-safe", "close"]);
+  });
+
+  it("keeps a late page error sticky across sequential performance navigations", async () => {
+    const handlers = new Map<string, () => void>();
+    let navigations = 0;
+    const page = {
+      on(event: string, handler: () => void) { handlers.set(event, handler); },
+      async goto() {
+        navigations += 1;
+        return { status: () => 200 };
+      },
+      async waitForSelector() {},
+      async waitForLoadState() {},
+      async waitForTimeout() {},
+      url: () => "http://quality.test/dashboard",
+      getByText: () => ({ count: async () => 0 }),
+      async evaluate() {
+        return {
+          navigation: {
+            duration: 900,
+            responseEnd: 300,
+            responseStart: 100,
+            domContentLoadedEventEnd: 500,
+            loadEventEnd: 700,
+            transferSize: 3_000,
+          },
+          resources: [{ transferSize: 1_000 }],
+          metrics: { lcp: 600, cls: 0.06, interactions: [], longTasks: [40], unsupported: [] },
+        };
+      },
+    };
+    const tracker = pageFailureTracker(page, "/dashboard", "desktop");
+
+    const first = await navigateForPerformance(page, tracker, "http://quality.test/dashboard", "/dashboard");
+    expect(first.safetyFailures).toEqual([]);
+    handlers.get("pageerror")?.();
+    const second = await navigateForPerformance(page, tracker, "http://quality.test/dashboard", "/dashboard");
+
+    expect(navigations).toBe(2);
+    expect(second.safetyFailures).toContainEqual({ kind: "page-error", route: "/dashboard" });
+    expect(tracker.pageError).toBe(true);
   });
 
   it("normalizes canonical login locations without matching unrelated routes", () => {
