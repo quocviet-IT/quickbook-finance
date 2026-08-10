@@ -26,6 +26,25 @@ export function qualityMode(env = process.env) {
   return mode;
 }
 
+export function runtimeSchedule(routes) {
+  const matrixRoutes = new Set(MATRIX_ROUTES);
+  const seen = new Set();
+  const schedule = [];
+
+  for (const route of routes) {
+    const viewports = matrixRoutes.has(route)
+      ? VIEWPORTS
+      : VIEWPORTS.filter(({ name }) => name === "desktop");
+    for (const { name: viewport } of viewports) {
+      const key = `${route}\u0000${viewport}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      schedule.push({ route, viewport, audit: matrixRoutes.has(route) ? "matrix" : "axe" });
+    }
+  }
+  return schedule;
+}
+
 export function qualityPaths(root = process.cwd()) {
   const pathFromRoot = (...segments) => resolve(root, ...segments).replaceAll("\\", "/");
 
