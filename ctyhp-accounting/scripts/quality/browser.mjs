@@ -20,11 +20,36 @@ export function safeRequestTarget(rawUrl) {
   }
 }
 
+export function classifyServiceWorkerAttempt(attempt = {}) {
+  if (attempt.bypassEstablished) return "bypass-established";
+  if (attempt.registered) return "registration-succeeded";
+  return "blocked";
+}
+
 export async function createReadOnlyContext(browser, { cookies = [], viewport } = {}) {
   const blocked = [];
   const context = await browser.newContext({ viewport, serviceWorkers: "block" });
 
   try {
+    await context.addInitScript(() => {
+      if (!navigator.serviceWorker) return;
+      const denyRegistration = () => Promise.reject(new DOMException(
+        "Service workers are disabled during a read-only quality audit",
+        "NotAllowedError",
+      ));
+      Object.defineProperty(navigator.serviceWorker, "register", {
+        configurable: false,
+        writable: false,
+        value: denyRegistration,
+      });
+      if (typeof ServiceWorkerContainer === "function") {
+        Object.defineProperty(ServiceWorkerContainer.prototype, "register", {
+          configurable: false,
+          writable: false,
+          value: denyRegistration,
+        });
+      }
+    });
     if (cookies.length) await context.addCookies(cookies);
     await context.route("**/*", async (route) => {
       const request = route.request();

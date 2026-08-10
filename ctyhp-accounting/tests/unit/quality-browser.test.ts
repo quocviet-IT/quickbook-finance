@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  classifyServiceWorkerAttempt,
   closeRuntimeResources,
   createReadOnlyContext,
   isAllowedBrowserMethod,
@@ -10,6 +11,7 @@ import {
 } from "../../scripts/quality/browser.mjs";
 import {
   classifyViewportSnapshot,
+  isUnsafeScreenshotEntry,
   resolveOwnedScreenshotPath,
   structuralTargetToken,
 } from "../../scripts/quality/page-audit.mjs";
@@ -89,9 +91,47 @@ describe("quality browser safety", () => {
     }
   });
 
+  it("classifies a successful service-worker registration as unsafe after readiness times out", () => {
+    expect(classifyServiceWorkerAttempt({
+      registered: true,
+      ready: false,
+      bypassEstablished: false,
+    })).toBe("registration-succeeded");
+    expect(classifyServiceWorkerAttempt({
+      registered: false,
+      ready: false,
+      bypassEstablished: false,
+    })).toBe("blocked");
+  });
+
+  it("classifies link entries as unsafe even when their targets do not exist", () => {
+    expect(isUnsafeScreenshotEntry({ isSymbolicLink: () => true })).toBe(true);
+    expect(isUnsafeScreenshotEntry({ isSymbolicLink: () => false })).toBe(false);
+  });
+
+  it("rejects a dangling destination link when the platform permits creating one", () => {
+    const temporary = mkdtempSync(join(tmpdir(), "quality-screenshots-dangling-"));
+    const root = join(temporary, "owned");
+    const destination = join(root, "finding.png");
+    mkdirSync(root);
+    try {
+      try {
+        symlinkSync(join(temporary, "missing-outside.png"), destination, "file");
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        if (["EACCES", "EPERM", "ENOTSUP"].includes(code)) return;
+        throw error;
+      }
+      expect(() => resolveOwnedScreenshotPath(root, "finding.png")).toThrow(/owned screenshot root/);
+    } finally {
+      rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+
   it("closes a new context when cookie setup fails", async () => {
     let closeCalls = 0;
     const context = {
+      addInitScript: async () => undefined,
       addCookies: async () => { throw new Error("cookie setup failed"); },
       route: async () => undefined,
       close: async () => { closeCalls += 1; },
@@ -105,6 +145,7 @@ describe("quality browser safety", () => {
   it("closes a new context when route setup fails", async () => {
     let closeCalls = 0;
     const context = {
+      addInitScript: async () => undefined,
       addCookies: async () => undefined,
       route: async () => { throw new Error("route setup failed"); },
       close: async () => { closeCalls += 1; },

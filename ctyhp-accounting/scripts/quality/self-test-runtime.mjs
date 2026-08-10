@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { chromium } from "playwright";
-import { closeRuntimeResources, createReadOnlyContext } from "./browser.mjs";
+import {
+  classifyServiceWorkerAttempt,
+  closeRuntimeResources,
+  createReadOnlyContext,
+} from "./browser.mjs";
 import { auditPage } from "./page-audit.mjs";
 
 const fixture = `<!doctype html>
@@ -75,13 +79,25 @@ try {
   assert.equal(result.viewport.internalScrollers, 1,
     "the fixture must exercise one allowed internal scroller");
   const serviceWorkerAttempt = await page.evaluate(async () => {
+    const attempt = { registered: false, ready: false, bypassEstablished: false };
+    let registration;
     try {
       await navigator.serviceWorker.register("/sw.js");
-      const registration = await Promise.race([
+      attempt.registered = true;
+    } catch {
+      return attempt;
+    }
+    try {
+      registration = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise((_, reject) => setTimeout(() => reject(new Error("service worker ready timeout")), 2_000)),
       ]);
-      const bypassEstablished = await new Promise((resolve) => {
+      attempt.ready = true;
+    } catch {
+      return attempt;
+    }
+    try {
+      attempt.bypassEstablished = await new Promise((resolve) => {
         const timeout = setTimeout(() => resolve(false), 1_000);
         navigator.serviceWorker.addEventListener("message", (event) => {
           if (event.data !== "bypass-complete") return;
@@ -90,13 +106,14 @@ try {
         }, { once: true });
         registration.active.postMessage("attempt-bypass");
       });
-      return { registered: true, bypassEstablished };
     } catch {
-      return { registered: false, bypassEstablished: false };
+      return attempt;
     }
+    return attempt;
   });
-  assert.deepEqual(serviceWorkerAttempt, { registered: false, bypassEstablished: false },
+  assert.equal(classifyServiceWorkerAttempt(serviceWorkerAttempt), "blocked",
     "service workers must be blocked before they can attempt to bypass request routing");
+  assert.deepEqual(serviceWorkerAttempt, { registered: false, ready: false, bypassEstablished: false });
   const serializedResult = JSON.stringify(result);
   assert(!serializedResult.includes("Acme-Customer"),
     "findings must not retain customer-shaped DOM ids or classes");

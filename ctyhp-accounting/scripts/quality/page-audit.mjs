@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { installMetricObservers } from "./browser.mjs";
@@ -28,6 +28,31 @@ function contained(root, target) {
     && !isAbsolute(pathFromRoot);
 }
 
+export function isUnsafeScreenshotEntry(entry) {
+  return Boolean(entry?.isSymbolicLink?.());
+}
+
+function inspectScreenshotEntries(root, destination) {
+  const segments = relative(root, destination).split(/[\\/]/).filter(Boolean);
+  let current = root;
+  let destinationEntry;
+  for (const segment of segments) {
+    current = join(current, segment);
+    let entry;
+    try {
+      entry = lstatSync(current, { throwIfNoEntry: false });
+    } catch {
+      throw new Error("Screenshot destination entries could not be safely validated");
+    }
+    if (!entry) break;
+    if (isUnsafeScreenshotEntry(entry)) {
+      throw new Error("Screenshot destination must stay beneath the owned screenshot root");
+    }
+    if (current === destination) destinationEntry = entry;
+  }
+  return destinationEntry;
+}
+
 export function resolveOwnedScreenshotPath(screenshotRoot, screenshotPath) {
   if (!screenshotRoot || !screenshotPath || isAbsolute(screenshotPath)) {
     throw new Error("Screenshot destination must stay beneath the owned screenshot root");
@@ -37,6 +62,7 @@ export function resolveOwnedScreenshotPath(screenshotRoot, screenshotPath) {
   if (!contained(lexicalRoot, lexicalDestination)) {
     throw new Error("Screenshot destination must stay beneath the owned screenshot root");
   }
+  const destinationEntry = inspectScreenshotEntries(lexicalRoot, lexicalDestination);
 
   let physicalRoot;
   let physicalParent;
@@ -46,7 +72,7 @@ export function resolveOwnedScreenshotPath(screenshotRoot, screenshotPath) {
   } catch {
     throw new Error("Owned screenshot root and destination parent must already exist");
   }
-  const physicalDestination = existsSync(lexicalDestination)
+  const physicalDestination = destinationEntry
     ? realpathSync(lexicalDestination)
     : join(physicalParent, basename(lexicalDestination));
   if (!contained(physicalRoot, physicalDestination)) {
