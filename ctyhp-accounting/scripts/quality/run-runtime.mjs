@@ -21,6 +21,11 @@ import { auditPage } from "./page-audit.mjs";
 import { aggregateQualityArtifacts, writeQualityReport } from "./report.mjs";
 import { discoverStaticRoutes } from "./routes.mjs";
 import { playwrightSessionCookies } from "./session-cookie.mjs";
+import {
+  KEYBOARD_SCENARIOS,
+  KeyboardSafetyError,
+  runKeyboardScenarios,
+} from "./keyboard.mjs";
 
 const PERFORMANCE_FIELDS = Object.freeze([
   "navigationMs",
@@ -187,6 +192,32 @@ function section(extra = {}) {
   return { findings: [], measurements: [], unavailable: [], safetyFailures: [], ...extra };
 }
 
+export function keyboardSection(results) {
+  const viewports = new Map(KEYBOARD_SCENARIOS.map((scenario) => [
+    scenario.id,
+    scenario.viewport.width <= 375 ? "mobile" : "desktop",
+  ]));
+  const scenarios = Array.isArray(results) ? results : [];
+  return section({
+    scenarios,
+    findings: scenarios.filter(({ status }) => status === "failed").map((result) => ({
+      kind: "keyboard",
+      rule: result.id,
+      route: result.route,
+      viewport: viewports.get(result.id) ?? "desktop",
+      target: result.focusedAfter,
+      message: result.message,
+    })),
+  });
+}
+
+export function runtimeAuditPhases(only = "") {
+  return {
+    keyboard: true,
+    routes: String(only).trim() !== "keyboard",
+  };
+}
+
 function resolvedBaseUrl(raw) {
   const parsed = new URL(raw || "http://localhost:3000");
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -204,6 +235,7 @@ function writeSection(resultsDir, name, value) {
 
 function writeRuntimeArtifacts(resultsDir, sections) {
   writeSection(resultsDir, "axe.json", sections.axe);
+  writeSection(resultsDir, "keyboard.json", sections.keyboard);
   writeSection(resultsDir, "viewports.json", sections.viewports);
   writeSection(resultsDir, "web-vitals.json", sections.performance);
   writeSection(resultsDir, "routes.json", sections.routes);
@@ -493,6 +525,31 @@ async function runPerformanceRoute(browser, input) {
   }
 }
 
+async function runKeyboardAudit(browser, input) {
+  const { baseUrl, cookies, sections } = input;
+  const guard = await createReadOnlyContext(browser, {
+    cookies,
+    viewport: VIEWPORT_BY_NAME.get("desktop"),
+  });
+  input.guards.push({ guard, route: "/keyboard", viewport: "keyboard" });
+  const page = await guard.context.newPage();
+  const tracker = pageFailureTracker(page, "/keyboard", "keyboard");
+
+  try {
+    sections.keyboard = keyboardSection(await runKeyboardScenarios(page, baseUrl));
+  } catch (error) {
+    if (!(error instanceof KeyboardSafetyError)) throw error;
+    addSafetyFailures(sections.keyboard.safetyFailures, [{
+      kind: error.kind,
+      route: error.route,
+      viewport: "keyboard",
+    }]);
+  } finally {
+    addFindings(sections.routes.findings, tracker.findings());
+    await finalizeGuardedContext({ tracker, guard, sections, route: "/keyboard", viewport: "keyboard" });
+  }
+}
+
 export async function runRuntime(env = process.env) {
   const paths = qualityPaths(process.cwd());
   const resultsDir = paths.resultsDir;
@@ -503,6 +560,7 @@ export async function runRuntime(env = process.env) {
   validateOwnedResultRoots(resultsDir, screenshotRoot);
   const sections = {
     axe: section({ runs: [] }),
+    keyboard: keyboardSection([]),
     viewports: section({ snapshots: [] }),
     performance: section(),
     routes: section({ routes: [] }),
@@ -512,8 +570,11 @@ export async function runRuntime(env = process.env) {
 
   try {
     const baseUrl = resolvedBaseUrl(env.QUALITY_BASE_URL);
-    const routes = selectRuntimeRoutes(discoverStaticRoutes(paths.appDir), env.QUALITY_ONLY);
-    if (!routes.length) throw new Error("No static authenticated routes were selected");
+    const phases = runtimeAuditPhases(env.QUALITY_ONLY);
+    const routes = !phases.routes
+      ? []
+      : selectRuntimeRoutes(discoverStaticRoutes(paths.appDir), env.QUALITY_ONLY);
+    if (phases.routes && !routes.length) throw new Error("No static authenticated routes were selected");
 
     let authentication;
     try {
@@ -526,26 +587,32 @@ export async function runRuntime(env = process.env) {
 
     const cookies = playwrightSessionCookies({ ...authentication, appBaseUrl: baseUrl });
     browser = await chromium.launch({ headless: true });
-    const schedule = runtimeSchedule(routes);
-    let probe = env.QUALITY_PROBE_BLOCKED_METHOD === "1";
-    for (const item of schedule) {
-      await runScheduledAudit(browser, {
-        baseUrl,
-        cookies,
-        item,
-        screenshotRoot,
-        sections,
-        guards,
-        probe,
-      });
-      probe = false;
-      if (sections.routes.safetyFailures.some(({ kind }) => kind === "blocked-method")) break;
+    if (phases.keyboard) {
+      await runKeyboardAudit(browser, { baseUrl, cookies, sections, guards });
     }
+    if (phases.routes && !sections.keyboard.safetyFailures.length
+      && !sections.routes.safetyFailures.length) {
+      const schedule = runtimeSchedule(routes);
+      let probe = env.QUALITY_PROBE_BLOCKED_METHOD === "1";
+      for (const item of schedule) {
+        await runScheduledAudit(browser, {
+          baseUrl,
+          cookies,
+          item,
+          screenshotRoot,
+          sections,
+          guards,
+          probe,
+        });
+        probe = false;
+        if (sections.routes.safetyFailures.some(({ kind }) => kind === "blocked-method")) break;
+      }
 
-    if (!sections.routes.safetyFailures.length) {
-      for (const route of routes) {
-        await runPerformanceRoute(browser, { baseUrl, cookies, route, sections, guards });
-        if (sections.routes.safetyFailures.length) break;
+      if (!sections.routes.safetyFailures.length) {
+        for (const route of routes) {
+          await runPerformanceRoute(browser, { baseUrl, cookies, route, sections, guards });
+          if (sections.routes.safetyFailures.length) break;
+        }
       }
     }
   } catch {
