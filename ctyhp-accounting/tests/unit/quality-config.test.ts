@@ -1,4 +1,12 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,6 +34,81 @@ import {
 } from "../../scripts/quality/run-runtime.mjs";
 
 describe("quality configuration", () => {
+  it("exposes five runnable quality operations through npm", () => {
+    const npmCli = process.env.npm_execpath;
+    expect(npmCli).toBeTruthy();
+    const listed = spawnSync(process.execPath, [npmCli!, "run", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    expect(listed.status, listed.stderr).toBe(0);
+    const scripts = JSON.parse(listed.stdout) as Record<string, string>;
+    const qualityScripts = Object.fromEntries(
+      Object.entries(scripts).filter(([name]) => name.startsWith("quality:")),
+    );
+    expect(qualityScripts).toEqual({
+      "quality:bundle": "node scripts/quality/run-bundle.mjs",
+      "quality:runtime": "node --env-file-if-exists=.env.local scripts/quality/run-runtime.mjs",
+      "quality:report": "node scripts/quality/report.mjs",
+      "quality:all": "npm run quality:bundle && npm run quality:runtime",
+      "quality:accept-baseline": "node scripts/quality/accept-baseline.mjs",
+    });
+
+    const entryPoints = new Set(
+      Object.values(qualityScripts).flatMap((command) =>
+        command.match(/scripts\/quality\/[a-z-]+\.mjs/g) ?? [],
+      ),
+    );
+    expect([...entryPoints].sort()).toEqual([
+      "scripts/quality/accept-baseline.mjs",
+      "scripts/quality/report.mjs",
+      "scripts/quality/run-bundle.mjs",
+      "scripts/quality/run-runtime.mjs",
+    ]);
+    for (const entryPoint of entryPoints) {
+      expect(existsSync(join(process.cwd(), entryPoint)), entryPoint).toBe(true);
+    }
+
+    const temporary = mkdtempSync(join(tmpdir(), "quality-command-contract-"));
+    const baselinePath = join(temporary, "baseline.json");
+    try {
+      writeFileSync(join(temporary, "bundle.json"), JSON.stringify({
+        version: 1,
+        findings: [],
+        measurements: [],
+        unavailable: [],
+        safetyFailures: [],
+      }));
+      const safeEnv: NodeJS.ProcessEnv = { ...process.env, QUALITY_MODE: "report" };
+      delete safeEnv.QUALITY_ACCEPT_BASELINE;
+      const reported = spawnSync(
+        process.execPath,
+        [npmCli!, "run", "quality:report", "--", temporary],
+        { cwd: process.cwd(), encoding: "utf8", env: safeEnv },
+      );
+      expect(reported.status, reported.stderr).toBe(0);
+      expect(existsSync(join(temporary, "summary.json"))).toBe(true);
+
+      const rejectedAcceptance = spawnSync(
+        process.execPath,
+        [
+          npmCli!,
+          "run",
+          "quality:accept-baseline",
+          "--",
+          join(temporary, "summary.json"),
+          baselinePath,
+        ],
+        { cwd: process.cwd(), encoding: "utf8", env: safeEnv },
+      );
+      expect(rejectedAcceptance.status).toBe(1);
+      expect(rejectedAcceptance.stderr).toMatch(/ONEBOOK_REVIEWED_QUALITY_BASELINE/);
+      expect(existsSync(baselinePath)).toBe(false);
+    } finally {
+      rmSync(temporary, { recursive: true, force: true });
+    }
+  }, 15_000);
+
   it("uses the approved viewport matrix and report-only default", () => {
     expect(VIEWPORTS).toEqual([
       { name: "mobile", width: 375, height: 812 },

@@ -48,3 +48,6 @@ next-start.log
 
 # Page dump the guide capture writes when it fails; never part of the build.
 public/guide/last-failure.html
+
+# Generated accessibility, performance, viewport, and bundle reports.
+/.quality-results/
