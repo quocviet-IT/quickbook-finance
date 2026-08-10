@@ -114,7 +114,9 @@ export function sanitizeNormalizedQuery(query) {
       }
     }
 
-    const numeric = source.slice(index).match(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
+    const numeric = source.slice(index).match(
+      /^[+-]?(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[oO][0-7](?:_?[0-7])*|0[bB][01](?:_?[01])*|(?:(?:\d(?:_?\d)*)(?:\.(?:\d(?:_?\d)*)?)?|\.(?:\d(?:_?\d)*))(?:[eE][+-]?(?:\d(?:_?\d)*))?)/,
+    );
     if (numeric && tokenBoundary(source, index)) {
       output += "?";
       index += numeric[0].length;
@@ -210,6 +212,12 @@ export async function startQueryTiming(env = process.env, poolFactory = (config)
     return { async finish() { return artifact; } };
   }
 
+  let poolError;
+  const rememberPoolError = (error) => {
+    poolError ??= error;
+  };
+  pool.on("error", rememberPoolError);
+
   let before;
   let startError;
   try {
@@ -222,18 +230,28 @@ export async function startQueryTiming(env = process.env, poolFactory = (config)
     async finish() {
       let artifact;
       try {
-        if (startError) {
-          artifact = unavailableQuerySection("Query timing is unavailable", startError);
+        if (startError || poolError) {
+          artifact = unavailableQuerySection("Query timing is unavailable", startError ?? poolError);
         } else {
-          artifact = availableQuerySection(before, await readQuerySnapshot(pool));
+          const after = await readQuerySnapshot(pool);
+          artifact = poolError
+            ? unavailableQuerySection("Query timing is unavailable", poolError)
+            : availableQuerySection(before, after);
         }
       } catch (error) {
         artifact = unavailableQuerySection("Query timing is unavailable", error);
       } finally {
+        let closeError;
         try {
           await pool.end();
         } catch (error) {
-          artifact = unavailableQuerySection("Query timing is unavailable", error);
+          closeError = error;
+        }
+        if (!closeError) {
+          pool.removeListener("error", rememberPoolError);
+        }
+        if (closeError || poolError) {
+          artifact = unavailableQuerySection("Query timing is unavailable", closeError ?? poolError);
         }
       }
       return artifact;

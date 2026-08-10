@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +10,13 @@ import {
   sanitizeNormalizedQuery,
   startQueryTiming,
 } from "../../scripts/quality/query-timing.mjs";
+
+function eventPool(methods: {
+  query: (statement: string) => Promise<{ rows: unknown[] }>;
+  end: () => Promise<void>;
+}) {
+  return Object.assign(new EventEmitter(), methods);
+}
 
 describe("quality query timing", () => {
   it("runs the one approved read-only pg_stat_statements query", async () => {
@@ -121,6 +129,15 @@ limit 500`]);
       .toBe("select ?");
   });
 
+  it("removes PostgreSQL base-prefixed and underscore-separated numeric literals", () => {
+    expect(sanitizeNormalizedQuery("select 0xDEADBEEF")).toBe("select ?");
+    expect(sanitizeNormalizedQuery("select 1_234_567")).toBe("select ?");
+    expect(sanitizeNormalizedQuery("select 0xDEAD_BEEF, 0o755, 0b1010_0110"))
+      .toBe("select ?, ?, ?");
+    expect(sanitizeNormalizedQuery("select 1_234.5_6e+7_8"))
+      .toBe("select ?");
+  });
+
   it("stays unavailable without the explicit quality database variable", async () => {
     let poolCreated = false;
     const sampler = await startQueryTiming({
@@ -153,13 +170,13 @@ limit 500`]);
     ];
     const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, (config) => {
       configurations.push(config);
-      return {
+      return eventPool({
         async query(statement: string) {
           statements.push(statement);
           return { rows: snapshots.shift() ?? [] };
         },
         async end() { closed += 1; },
-      };
+      });
     });
 
     const artifact = await sampler.finish();
@@ -191,7 +208,7 @@ limit 500`]);
   it("redacts database failures, closes the pool, and remains non-blocking", async () => {
     let reads = 0;
     let closed = 0;
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => ({
+    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => eventPool({
       async query() {
         reads += 1;
         throw new TypeError("relation missing at postgresql://user:secret@db/name password=hunter2");
@@ -221,7 +238,7 @@ limit 500`]);
   it("turns a failed after-snapshot into an unavailable artifact and still closes", async () => {
     let reads = 0;
     let closed = 0;
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => ({
+    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => eventPool({
       async query() {
         reads += 1;
         if (reads === 2) throw new Error("pg_stat_statements disappeared");
@@ -240,7 +257,7 @@ limit 500`]);
   });
 
   it("turns a close failure into an unavailable artifact", async () => {
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => ({
+    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => eventPool({
       async query() { return { rows: [] }; },
       async end() { throw new Error("close failed password=hunter2"); },
     }));
@@ -252,6 +269,47 @@ limit 500`]);
       error: { class: "Error", message: "close failed password=[redacted]" },
     });
     expect(JSON.stringify(artifact)).not.toContain("hunter2");
+  });
+
+  it("captures idle pool errors before the first snapshot and closes exactly once", async () => {
+    const listenerCountsAtQuery: number[] = [];
+    let reads = 0;
+    let closed = 0;
+    const pool = eventPool({
+      async query() {
+        reads += 1;
+        listenerCountsAtQuery.push(pool.listenerCount("error"));
+        return { rows: [] };
+      },
+      async end() { closed += 1; },
+    });
+    const sampler = await startQueryTiming(
+      { QUALITY_DATABASE_URL: "postgresql://qa-only" },
+      () => pool,
+    );
+
+    let emittedError;
+    try {
+      pool.emit("error", new Error("idle failure at postgresql://user:secret@db/name password=hunter2"));
+    } catch (error) {
+      emittedError = error;
+    }
+    const artifact = await sampler.finish();
+    const serialized = JSON.stringify(artifact);
+
+    expect(emittedError).toBeUndefined();
+    expect(listenerCountsAtQuery).toEqual([1]);
+    expect(reads).toBe(1);
+    expect(closed).toBe(1);
+    expect(pool.listenerCount("error")).toBe(0);
+    expect(artifact).toMatchObject({
+      available: false,
+      reason: "Query timing is unavailable",
+      error: { class: "Error", message: expect.any(String) },
+    });
+    expect(serialized).not.toContain("secret");
+    expect(serialized).not.toContain("hunter2");
+    expect(serialized).not.toContain("postgresql://");
   });
 
   it("writes the unavailable query artifact while the remaining runtime finishes", () => {
