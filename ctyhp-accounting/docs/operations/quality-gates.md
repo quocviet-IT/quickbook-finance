@@ -4,10 +4,11 @@ The quality harness measures the existing production build without changing appl
 
 ## Prerequisites and server ownership
 
+- Use Node 22 LTS version 22.9.0 or later, or Node 24 or later. The runtime command relies on `--env-file-if-exists`, which was added in Node 22.9; CI currently uses Node 22.
 - Install the project dependencies and the Playwright Chromium browser used by this repository.
 - Run `npm run build` before bundle analysis or before starting a local production server. `quality:bundle` reads `.next`; it does not build the application.
 - Run runtime checks against either that built local server or an approved QA/preview URL. Do not use `npm run dev` as runtime evidence.
-- Configure `QUALITY_BASE_URL` and authentication in `.env.local`. `quality:runtime` loads that file when it exists. The preferred path needs the public Supabase URL and anonymous key plus both `SMOKE_EMAIL` and `SMOKE_PASSWORD`. An existing local service-role fallback can mint a smoke session when explicitly approved, but use dedicated smoke credentials for QA and CI and never give the runtime workflow a service-role key.
+- Configure `QUALITY_BASE_URL` and authentication in `.env.local`. `quality:runtime` loads that file when it exists. Authentication always needs the public Supabase URL and anonymous key. It resolves the email and password independently, preferring each `SMOKE_*` variable over its corresponding `E2E_*` fallback; when both resolved values are present it uses password sign-in. Otherwise, an explicitly approved local service-role key mints a session for the resolved email or the first active administrator. Use dedicated `SMOKE_*` credentials for QA and CI and never give the runtime workflow a service-role key.
 - Leave `QUALITY_DATABASE_URL` empty unless a separately approved, non-production QA database and audit window are available.
 
 For a local run, start the built server in a separate foreground terminal:
@@ -132,7 +133,7 @@ The accepted baseline is different: `tests/quality/baseline.json` is intended fo
 
 Leave `QUALITY_DATABASE_URL` empty for normal local work. The runtime then writes `queries.json` with `available: false` and reason `QUALITY_DATABASE_URL is not configured`; the rest of the audit continues.
 
-For a separately approved QA database only, set `QUALITY_DATABASE_URL` to a least-privilege connection where `pg_stat_statements` can be read. Never point it at production. The sampler opens one bounded pool connection, reads the current database's top `pg_stat_statements` rows before and after the route sweep, computes non-negative deltas, and closes the pool. It never resets statistics or changes database settings.
+For a separately approved QA database only, set `QUALITY_DATABASE_URL` to a least-privilege connection where `pg_stat_statements` can be read. Never point it at production. The sampler opens one bounded pool connection and takes its first snapshot before authentication and keyboard work begin. Its final snapshot runs after the route/performance phases and browser cleanup, so the delta spans the entire runtime audit rather than only the route sweep. It then computes non-negative deltas and closes the pool. It never resets statistics or changes database settings.
 
 Pool construction, snapshot, extension/permission, idle-connection, final-read, and pool-close errors produce a redacted `Query timing is unavailable` result rather than a runtime safety failure. Query measurements and regressions remain advisory because `pg_stat_statements` is shared state; do not promote them to blocking until a dedicated QA database and isolated audit window exist.
 
