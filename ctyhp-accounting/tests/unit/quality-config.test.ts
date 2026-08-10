@@ -116,8 +116,8 @@ describe("quality configuration", () => {
       { name: "compact-desktop", width: 1024, height: 768 },
       { name: "desktop", width: 1440, height: 900 },
     ]);
-    expect(qualityMode({})).toBe("report");
-    expect(() => qualityMode({ QUALITY_MODE: "unknown" })).toThrow(/QUALITY_MODE/);
+    expect(qualityMode({ NODE_ENV: "test" })).toBe("report");
+    expect(() => qualityMode({ NODE_ENV: "test", QUALITY_MODE: "unknown" })).toThrow(/QUALITY_MODE/);
     expect(MATRIX_ROUTES).toContain("/settings/import");
     expect(BUDGETS.bundle.absoluteGzipBytes).toBe(20 * 1024);
   });
@@ -295,7 +295,13 @@ describe("quality configuration", () => {
     expect(isLoginLocation("/login/")).toBe(true);
     expect(isLoginLocation("https://example.test/login/?next=%2Fdashboard#form")).toBe(true);
     expect(isLoginLocation("/login-help")).toBe(false);
-    expect(navigationSafetyFailures({ route: "/dashboard", status: 200, finalPath: "/login/" }))
+    expect(navigationSafetyFailures({
+      route: "/dashboard",
+      status: 200,
+      finalPath: "/login/",
+      errorBoundary: false,
+      pageError: false,
+    }))
       .toEqual([{ kind: "auth", route: "/dashboard" }]);
   });
 

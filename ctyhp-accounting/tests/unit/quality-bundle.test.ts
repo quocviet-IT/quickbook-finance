@@ -79,7 +79,7 @@ describe("quality bundle analyzer", () => {
     try {
       cpSync(fixtureNextDir, join(root, ".next"), { recursive: true });
       process.chdir(root);
-      expect(runBundleCli([".next"], {})).toBe(0);
+      expect(runBundleCli([".next"], { NODE_ENV: "test" })).toBe(0);
 
       const summary = readFileSync(join(root, ".quality-results", "summary.md"), "utf8");
       expect(summary).toContain("/dashboard");

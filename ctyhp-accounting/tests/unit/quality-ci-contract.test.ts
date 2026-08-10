@@ -55,6 +55,70 @@ function structuralTokens(value: unknown): string[] {
   return value == null ? [] : [String(value)];
 }
 
+function secretReferences(value: unknown): string[] {
+  const references = new Set<string>();
+
+  function visit(candidate: unknown) {
+    if (typeof candidate === "string") {
+      for (const match of candidate.matchAll(/\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g)) {
+        references.add(match[1]);
+      }
+      return;
+    }
+    if (Array.isArray(candidate)) {
+      for (const item of candidate) visit(item);
+      return;
+    }
+    if (candidate && typeof candidate === "object") {
+      for (const [key, nested] of Object.entries(candidate)) {
+        visit(key);
+        visit(nested);
+      }
+    }
+  }
+
+  visit(value);
+  return [...references].sort();
+}
+
+function credentialPolicyViolations(workflow: Workflow): string[] {
+  const allowedSecrets = new Set([
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "QUALITY_DATABASE_URL",
+    "SMOKE_EMAIL",
+    "SMOKE_PASSWORD",
+  ]);
+  const allowedEnvByStep: Record<string, Set<string>> = {
+    "Validate runtime configuration": new Set([
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "SMOKE_EMAIL",
+      "SMOKE_PASSWORD",
+    ]),
+    "Run runtime quality report": allowedSecrets,
+  };
+  const violations = secretReferences(workflow)
+    .filter((name) => !allowedSecrets.has(name))
+    .map((name) => `unexpected secret reference: ${name}`);
+
+  for (const job of Object.values(workflow.jobs ?? {})) {
+    for (const [envName, envValue] of Object.entries(job.env ?? {})) {
+      for (const secretName of secretReferences(envValue)) {
+        violations.push(`credential env is forbidden at job scope: ${envName} -> ${secretName}`);
+      }
+    }
+    for (const step of job.steps ?? []) {
+      for (const [envName, envValue] of Object.entries(step.env ?? {})) {
+        for (const secretName of secretReferences(envValue)) {
+          if (allowedEnvByStep[step.name ?? ""]?.has(envName) && envName === secretName) continue;
+          violations.push(`credential env is forbidden on step "${step.name ?? "<unnamed>"}": ${envName}`);
+        }
+      }
+    }
+  }
+
+  return violations;
+}
+
 function runNodeValidation(command: string, values: Record<string, string>) {
   const match = /^node -e "([\s\S]+)"$/.exec(command.trim());
   expect(match, "configuration validation must be an executable Node command").not.toBeNull();
@@ -198,32 +262,75 @@ describe("quality CI contracts", () => {
     }
   });
 
-  it("fails closed on missing runtime configuration without printing configured values", () => {
+  it("allows only the four runtime secrets and rejects credential env on every other step", () => {
+    const workflow = readWorkflow("quality-runtime.yml");
+    expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
+
+    expect(secretReferences(workflow)).toEqual([
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "QUALITY_DATABASE_URL",
+      "SMOKE_EMAIL",
+      "SMOKE_PASSWORD",
+    ]);
+    expect(credentialPolicyViolations(workflow!)).toEqual([]);
+
+    const maliciousWorkflow = structuredClone(workflow!);
+    const selfTest = stepByName(
+      maliciousWorkflow.jobs?.["runtime-quality"]?.steps ?? [],
+      "Prove the read-only browser guard",
+    );
+    selfTest.env = { ARBITRARY_SECRET: "${{ secrets.ARBITRARY_SECRET }}" };
+
+    expect(credentialPolicyViolations(maliciousWorkflow)).toEqual([
+      "unexpected secret reference: ARBITRARY_SECRET",
+      'credential env is forbidden on step "Prove the read-only browser guard": ARBITRARY_SECRET',
+    ]);
+  });
+
+  const configuredRuntime = {
+    QUALITY_BASE_URL: "https://quality-base.invalid",
+    NEXT_PUBLIC_SUPABASE_URL: "https://supabase-url.invalid",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "sentinel-anon-key",
+    SMOKE_EMAIL: "quality-user@example.invalid",
+    SMOKE_PASSWORD: "sentinel-smoke-password",
+  };
+  const requiredRuntimeNames = Object.keys(configuredRuntime);
+
+  it("accepts complete runtime configuration without printing configured values", () => {
     const workflow = readWorkflow("quality-runtime.yml");
     expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
     const steps = workflow!.jobs?.["runtime-quality"]?.steps ?? [];
     const validation = stepByName(steps, "Validate runtime configuration");
     expect(validation.run).toBeTypeOf("string");
 
-    const configured = {
-      QUALITY_BASE_URL: "https://quality-base.invalid",
-      NEXT_PUBLIC_SUPABASE_URL: "https://supabase-url.invalid",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sentinel-anon-key",
-      SMOKE_EMAIL: "quality-user@example.invalid",
-      SMOKE_PASSWORD: "sentinel-smoke-password",
-    };
-    const accepted = runNodeValidation(validation.run!, configured);
+    const accepted = runNodeValidation(validation.run!, configuredRuntime);
     expect(accepted.status, accepted.stderr).toBe(0);
     expect(accepted.stdout).toBe("");
     expect(accepted.stderr).toBe("");
-
-    const { SMOKE_PASSWORD: omittedPassword, ...missingPassword } = configured;
-    const rejected = runNodeValidation(validation.run!, missingPassword);
-    expect(rejected.status).toBe(1);
-    expect(rejected.stderr).toContain("SMOKE_PASSWORD");
-    for (const value of Object.values(missingPassword)) {
-      expect(rejected.stderr).not.toContain(value);
-    }
-    expect(rejected.stderr).not.toContain(omittedPassword);
   });
+
+  it.each(requiredRuntimeNames)(
+    "fails closed when %s is missing, naming only that variable and printing no values",
+    (missingName) => {
+      const workflow = readWorkflow("quality-runtime.yml");
+      expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
+      const steps = workflow!.jobs?.["runtime-quality"]?.steps ?? [];
+      const validation = stepByName(steps, "Validate runtime configuration");
+      expect(validation.run).toBeTypeOf("string");
+
+      const missingConfiguration: Record<string, string> = { ...configuredRuntime };
+      delete missingConfiguration[missingName];
+      const rejected = runNodeValidation(validation.run!, missingConfiguration);
+
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toBe("");
+      expect(rejected.stderr).toContain(missingName);
+      for (const otherName of requiredRuntimeNames.filter((name) => name !== missingName)) {
+        expect(rejected.stderr).not.toContain(otherName);
+      }
+      for (const value of Object.values(configuredRuntime)) {
+        expect(rejected.stderr).not.toContain(value);
+      }
+    },
+  );
 });

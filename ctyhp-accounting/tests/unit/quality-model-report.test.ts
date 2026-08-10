@@ -13,7 +13,23 @@ import {
 import { acceptBaseline } from "../../scripts/quality/accept-baseline.mjs";
 import { writeQualityReport } from "../../scripts/quality/report.mjs";
 
-const reviewedBaseline = { QUALITY_ACCEPT_BASELINE: "ONEBOOK_REVIEWED_QUALITY_BASELINE" };
+type QualityExitInput = {
+  mode: "report" | "regression";
+  comparison: {
+    newFindings: unknown[];
+    measurementRegressions: Array<{ advisory?: boolean }>;
+  };
+  safetyFailures: Array<{ kind: string }>;
+};
+
+const qualityExitCodeWithTypedFindings = qualityExitCode as unknown as (
+  input: QualityExitInput,
+) => number;
+const emptyTestEnv: NodeJS.ProcessEnv = { NODE_ENV: "test" };
+const reviewedBaseline: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
+  QUALITY_ACCEPT_BASELINE: "ONEBOOK_REVIEWED_QUALITY_BASELINE",
+};
 
 describe("quality result model", () => {
   it("uses stable fingerprints and medians", () => {
@@ -109,15 +125,15 @@ describe("quality result model", () => {
       performance: { percent: 0.20, absoluteMs: 200, clsAbsolute: 0.03 },
     });
     expect(comparison.newFindings).toHaveLength(1);
-    expect(comparison.measurementRegressions.map(({ key }) => key)).toEqual([
+    expect(comparison.measurementRegressions.map(({ key }: { key: string }) => key)).toEqual([
       "bundle.route./invoices.gzipBytes",
       "performance./invoices.responseMs",
       "performance./invoices.cls",
       "query./invoices.count",
     ]);
     expect(comparison.measurementRegressions.at(-1)?.advisory).toBe(true);
-    expect(qualityExitCode({ mode: "report", comparison, safetyFailures: [] })).toBe(0);
-    expect(qualityExitCode({ mode: "regression", comparison, safetyFailures: [] })).toBe(1);
+    expect(qualityExitCodeWithTypedFindings({ mode: "report", comparison, safetyFailures: [] })).toBe(0);
+    expect(qualityExitCodeWithTypedFindings({ mode: "regression", comparison, safetyFailures: [] })).toBe(1);
   });
 
   it("keeps query regressions advisory but always fails safety failures", () => {
@@ -125,8 +141,8 @@ describe("quality result model", () => {
       newFindings: [],
       measurementRegressions: [{ key: "query.count", advisory: true }],
     };
-    expect(qualityExitCode({ mode: "regression", comparison, safetyFailures: [] })).toBe(0);
-    expect(qualityExitCode({ mode: "report", comparison, safetyFailures: [{ kind: "auth" }] })).toBe(1);
+    expect(qualityExitCodeWithTypedFindings({ mode: "regression", comparison, safetyFailures: [] })).toBe(0);
+    expect(qualityExitCodeWithTypedFindings({ mode: "report", comparison, safetyFailures: [{ kind: "auth" }] })).toBe(1);
   });
 
   it("writes sanitized JSON and Markdown atomically without implicit baseline mutation", () => {
@@ -170,7 +186,7 @@ describe("quality result model", () => {
       unavailable: [{ reason: "secret" }],
       safetyFailures: [{ html: "<p>Customer</p>" }],
     }), "utf8");
-    expect(() => acceptBaseline(results, baseline, {})).toThrow(/QUALITY_ACCEPT_BASELINE/);
+    expect(() => acceptBaseline(results, baseline, emptyTestEnv)).toThrow(/QUALITY_ACCEPT_BASELINE/);
     acceptBaseline(results, baseline, reviewedBaseline);
     expect(JSON.parse(readFileSync(baseline, "utf8"))).toEqual({
       version: 1,

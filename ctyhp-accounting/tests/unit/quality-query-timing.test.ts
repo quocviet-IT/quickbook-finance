@@ -18,6 +18,15 @@ function eventPool(methods: {
   return Object.assign(new EventEmitter(), methods);
 }
 
+const startQueryTimingWithTestPool = startQueryTiming as unknown as (
+  env: NodeJS.ProcessEnv,
+  poolFactory: (config: unknown) => ReturnType<typeof eventPool>,
+) => ReturnType<typeof startQueryTiming>;
+
+function testEnvironment(values: Record<string, string> = {}): NodeJS.ProcessEnv {
+  return { NODE_ENV: "test", ...values };
+}
+
 describe("quality query timing", () => {
   it("runs the one approved read-only pg_stat_statements query", async () => {
     const statements: string[] = [];
@@ -140,11 +149,11 @@ limit 500`]);
 
   it("stays unavailable without the explicit quality database variable", async () => {
     let poolCreated = false;
-    const sampler = await startQueryTiming({
+    const sampler = await startQueryTimingWithTestPool(testEnvironment({
       DATABASE_URL: "postgresql://application.example/private",
       SUPABASE_DB_URL: "postgresql://supabase.example/private",
       E2E_DATABASE_URL: "postgresql://e2e.example/private",
-    }, () => {
+    }), () => {
       poolCreated = true;
       throw new Error("must not create a pool");
     });
@@ -168,7 +177,7 @@ limit 500`]);
       [{ queryid: "7", calls: "4", total_exec_time: 20, mean_exec_time: 5, query: "select memo from acc_invoice where id = $1" }],
       [{ queryid: "7", calls: "6", total_exec_time: 36, mean_exec_time: 6, query: "select memo from acc_invoice where id = $1 -- internal" }],
     ];
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, (config) => {
+    const sampler = await startQueryTimingWithTestPool(testEnvironment({ QUALITY_DATABASE_URL: "postgresql://qa-only" }), (config) => {
       configurations.push(config);
       return eventPool({
         async query(statement: string) {
@@ -208,7 +217,7 @@ limit 500`]);
   it("redacts database failures, closes the pool, and remains non-blocking", async () => {
     let reads = 0;
     let closed = 0;
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => eventPool({
+    const sampler = await startQueryTimingWithTestPool(testEnvironment({ QUALITY_DATABASE_URL: "postgresql://qa-only" }), () => eventPool({
       async query() {
         reads += 1;
         throw new TypeError("relation missing at postgresql://user:secret@db/name password=hunter2");
@@ -238,7 +247,7 @@ limit 500`]);
   it("turns a failed after-snapshot into an unavailable artifact and still closes", async () => {
     let reads = 0;
     let closed = 0;
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => eventPool({
+    const sampler = await startQueryTimingWithTestPool(testEnvironment({ QUALITY_DATABASE_URL: "postgresql://qa-only" }), () => eventPool({
       async query() {
         reads += 1;
         if (reads === 2) throw new Error("pg_stat_statements disappeared");
@@ -257,7 +266,7 @@ limit 500`]);
   });
 
   it("turns a close failure into an unavailable artifact", async () => {
-    const sampler = await startQueryTiming({ QUALITY_DATABASE_URL: "postgresql://qa-only" }, () => eventPool({
+    const sampler = await startQueryTimingWithTestPool(testEnvironment({ QUALITY_DATABASE_URL: "postgresql://qa-only" }), () => eventPool({
       async query() { return { rows: [] }; },
       async end() { throw new Error("close failed password=hunter2"); },
     }));
@@ -283,8 +292,8 @@ limit 500`]);
       },
       async end() { closed += 1; },
     });
-    const sampler = await startQueryTiming(
-      { QUALITY_DATABASE_URL: "postgresql://qa-only" },
+    const sampler = await startQueryTimingWithTestPool(
+      testEnvironment({ QUALITY_DATABASE_URL: "postgresql://qa-only" }),
       () => pool,
     );
 
@@ -315,7 +324,7 @@ limit 500`]);
   it("writes the unavailable query artifact while the remaining runtime finishes", () => {
     const root = mkdtempSync(join(tmpdir(), "onebook-query-unavailable-"));
     const script = join(process.cwd(), "scripts", "quality", "run-runtime.mjs");
-    const env = {
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       QUALITY_ONLY: "keyboard",
       QUALITY_MODE: "report",

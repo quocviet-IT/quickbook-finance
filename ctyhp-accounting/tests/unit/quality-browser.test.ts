@@ -137,8 +137,12 @@ describe("quality browser safety", () => {
       close: async () => { closeCalls += 1; },
     };
     const browser = { newContext: async () => context };
+    const createContextWithCookies = createReadOnlyContext as unknown as (
+      candidate: typeof browser,
+      options: { cookies: Array<{ name: string }> },
+    ) => Promise<unknown>;
 
-    await expect(createReadOnlyContext(browser, { cookies: [{ name: "session" }] })).rejects.toThrow("cookie setup failed");
+    await expect(createContextWithCookies(browser, { cookies: [{ name: "session" }] })).rejects.toThrow("cookie setup failed");
     expect(closeCalls).toBe(1);
   });
 
