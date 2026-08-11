@@ -1,9 +1,9 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BUDGETS, qualityMode, qualityPaths } from "./config.mjs";
 import { compareAgainstBaseline, findingFingerprint, qualityExitCode, redactQualityValue } from "./model.mjs";
-import { atomicWriteOwnedFile, ensureOwnedDirectory } from "./artifact-storage.mjs";
+import { atomicWriteOwnedFile, ensureOwnedDirectory, readOwnedFile } from "./artifact-storage.mjs";
 
 const VALID_MEASUREMENT_KINDS = new Set(["bundle", "performance", "cls", "query"]);
 
@@ -40,9 +40,9 @@ function normalizeMeasurements(measurements) {
   return [];
 }
 
-function readJson(path, label) {
+function readJson(path, label, rootDir = dirname(path)) {
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    return JSON.parse(readOwnedFile(rootDir, path));
   } catch (error) {
     throw new Error(`Quality harness error: malformed ${label} at ${path}: ${error.message}`);
   }
@@ -113,7 +113,7 @@ export function aggregateQualityArtifacts(resultsDir, options = {}) {
 
   const sections = files.map((name) => {
     const path = join(resultsDir, name);
-    return validateSection(readJson(path, `section artifact ${name}`), path);
+    return validateSection(readJson(path, `section artifact ${name}`, resultsDir), path);
   });
   const findings = sections.flatMap((section) => section.findings ?? []).map((finding) => ({
     ...finding,

@@ -63,6 +63,24 @@ function completeReportSummary(overrides: Record<string, unknown> = {}): Record<
   };
 }
 
+function writeVerifiedReport(
+  dir: string,
+  overrides: Record<string, Record<string, unknown>> = {},
+) {
+  for (const name of requiredSectionArtifacts) {
+    writeFileSync(join(dir, name), JSON.stringify({
+      findings: [],
+      measurements: [],
+      unavailable: [],
+      safetyFailures: [],
+      ...(overrides[name] ?? {}),
+    }));
+  }
+  const generated = aggregateQualityArtifacts(dir, { mode: "report" });
+  writeQualityReport(dir, generated);
+  return generated;
+}
+
 function expectNoBaselineOutput(dir: string, baseline: string) {
   expect(existsSync(baseline)).toBe(false);
   expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
@@ -209,24 +227,90 @@ describe("quality result model", () => {
     const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-"));
     const results = join(dir, "summary.json");
     const baseline = join(dir, "nested", "baseline.json");
-    writeFileSync(results, JSON.stringify(completeReportSummary({
-      findings: [
+    writeVerifiedReport(dir, {
+      "axe.json": { findings: [
         { fingerprint: "z-finding", payload: "customer" },
         { kind: "axe", rule: "label", route: "/invoices", viewport: "desktop", target: "#name" },
-      ],
-      measurements: [
+      ] },
+      "web-vitals.json": { measurements: [
         { key: "performance./invoices.responseMs", kind: "performance", value: 1_000, raw: "private" },
-      ],
-      unavailable: [{ kind: "query", reason: "QUALITY_DATABASE_URL is not configured" }],
-    })), "utf8");
+      ] },
+      "queries.json": { unavailable: [{ kind: "query", reason: "QUALITY_DATABASE_URL is not configured" }] },
+    });
     expect(() => acceptBaseline(results, baseline, emptyTestEnv)).toThrow(/QUALITY_ACCEPT_BASELINE/);
     acceptBaseline(results, baseline, reviewedBaseline);
     expect(JSON.parse(readFileSync(baseline, "utf8"))).toEqual({
       version: 1,
       fingerprints: ["axe|label|/invoices|desktop|#name", "z-finding"],
       measurements: [{ key: "performance./invoices.responseMs", kind: "performance", value: 1_000 }],
-      budgets: { performance: { percent: 0.20, absoluteMs: 200, clsAbsolute: 0.03 } },
+      budgets: {
+        bundle: { percent: 0.10, absoluteGzipBytes: 20_480 },
+        performance: { percent: 0.20, absoluteMs: 200, clsAbsolute: 0.03 },
+        informational: {
+          lcpMs: 2_500,
+          cls: 0.1,
+          interactionMs: 200,
+          responseMs: 1_000,
+          longTaskMs: 200,
+        },
+      },
     });
+  });
+
+  it("rejects declared complete provenance when the seven source artifacts are absent", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-forged-provenance-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    writeFileSync(results, JSON.stringify(completeReportSummary()));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline))
+      .toThrow(/source|section artifact|provenance/i);
+    expectNoBaselineOutput(dir, baseline);
+  });
+
+  it("rejects a generated summary whose canonical findings no longer match its source artifacts", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-mismatch-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    writeVerifiedReport(dir);
+    const summary = JSON.parse(readFileSync(results, "utf8"));
+    summary.findings.push({ fingerprint: "forged|finding|/dashboard|desktop|main" });
+    writeFileSync(results, JSON.stringify(summary));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline))
+      .toThrow(/match|source|provenance/i);
+    expectNoBaselineOutput(dir, baseline);
+  });
+
+  it("rejects linked results roots and linked summary entries before reading baseline input", () => {
+    const base = mkdtempSync(join(tmpdir(), "onebook-baseline-linked-read-"));
+    const outside = join(base, "outside");
+    const linkedResults = join(base, "linked-results");
+    const baseline = join(base, "baseline.json");
+    mkdirSync(outside);
+    writeVerifiedReport(outside);
+    writeFileSync(join(outside, "sentinel.txt"), "outside-sentinel", "utf8");
+    symlinkSync(outside, linkedResults, "junction");
+
+    expect(() => acceptBaseline(join(linkedResults, "summary.json"), baseline, reviewedBaseline))
+      .toThrow(/result root|owned|link|reparse/i);
+    expect(readFileSync(join(outside, "sentinel.txt"), "utf8")).toBe("outside-sentinel");
+    expectNoBaselineOutput(base, baseline);
+    unlinkSync(linkedResults);
+
+    const results = join(base, "real-results");
+    const outsideSummary = join(base, "outside-summary");
+    mkdirSync(results);
+    mkdirSync(outsideSummary);
+    writeVerifiedReport(results);
+    unlinkSync(join(results, "summary.json"));
+    writeFileSync(join(outsideSummary, "sentinel.txt"), "outside-summary-sentinel", "utf8");
+    symlinkSync(outsideSummary, join(results, "summary.json"), "junction");
+
+    expect(() => acceptBaseline(join(results, "summary.json"), baseline, reviewedBaseline))
+      .toThrow(/target|owned|link|reparse/i);
+    expect(readFileSync(join(outsideSummary, "sentinel.txt"), "utf8")).toBe("outside-summary-sentinel");
+    expectNoBaselineOutput(base, baseline);
   });
 
   it.each([
@@ -287,7 +371,7 @@ describe("quality result model", () => {
     const outside = join(dir, "outside");
     const sentinel = join(outside, "sentinel.txt");
     const temporary = join(dir, "injected-baseline.tmp");
-    writeFileSync(results, JSON.stringify(completeReportSummary()));
+    writeVerifiedReport(dir);
     mkdirSync(outside);
     writeFileSync(sentinel, "outside-sentinel", "utf8");
     try {
@@ -379,7 +463,7 @@ describe("quality result model", () => {
     const results = join(dir, "summary.json");
     const baseline = join(dir, "baseline.json");
     const outside = join(dir, "outside.txt");
-    writeFileSync(results, JSON.stringify(completeReportSummary()));
+    writeVerifiedReport(dir);
     writeFileSync(outside, "outside-sentinel", "utf8");
     try {
       symlinkSync(outside, baseline, "file");
@@ -492,6 +576,41 @@ describe("quality result model", () => {
     });
     expect(regression.status).toBe(1);
     expect(regression.stderr).toMatch(/baseline/i);
+  });
+
+  it("rejects a regression baseline beneath a linked parent before reading it", () => {
+    const root = mkdtempSync(join(tmpdir(), "onebook-linked-regression-baseline-"));
+    const resultsDir = join(root, "results");
+    const outside = join(root, "outside");
+    const linkedParent = join(root, "linked-parent");
+    mkdirSync(resultsDir);
+    mkdirSync(outside);
+    writeFileSync(join(resultsDir, "bundle.json"), JSON.stringify({
+      findings: [], measurements: [], unavailable: [], safetyFailures: [],
+    }));
+    writeFileSync(join(outside, "baseline.json"), JSON.stringify({
+      version: 1,
+      fingerprints: [],
+      measurements: [],
+      budgets: { performance: { percent: 0.2 } },
+    }));
+    symlinkSync(outside, linkedParent, "junction");
+    const script = join(process.cwd(), "scripts", "quality", "report.mjs");
+
+    const result = spawnSync(process.execPath, [script, resultsDir], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        QUALITY_MODE: "regression",
+        QUALITY_BASELINE_PATH: join(linkedParent, "baseline.json"),
+      },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/baseline.*owned|result root|link|reparse/i);
+    expect(readFileSync(join(outside, "baseline.json"), "utf8")).toContain('"version":1');
+    expect(existsSync(join(resultsDir, "summary.json"))).toBe(false);
+    unlinkSync(linkedParent);
   });
 
   it("rejects malformed regression baseline scalar values", () => {

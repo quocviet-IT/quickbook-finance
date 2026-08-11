@@ -5,12 +5,30 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  readFileSync,
   realpathSync,
   renameSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+
+const DEFAULT_FS = Object.freeze({
+  closeSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+});
+
+function filesystem(overrides) {
+  return overrides ? { ...DEFAULT_FS, ...overrides } : DEFAULT_FS;
+}
 
 function containedOrEqual(root, target) {
   const fromRoot = relative(root, target);
@@ -21,8 +39,8 @@ function containedOrEqual(root, target) {
       && !isAbsolute(fromRoot));
 }
 
-function entryAt(path) {
-  return lstatSync(path, { throwIfNoEntry: false });
+function entryAt(path, fs) {
+  return fs.lstatSync(path, { throwIfNoEntry: false });
 }
 
 function rejectUnsafeEntry(path, entry, label, expected) {
@@ -32,47 +50,70 @@ function rejectUnsafeEntry(path, entry, label, expected) {
   }
 }
 
-export function ensureOwnedDirectory(rootDir) {
-  const lexicalRoot = resolve(rootDir);
-  try {
-    mkdirSync(lexicalRoot, { recursive: true });
-  } catch (error) {
-    throw new Error(`Owned quality result root could not be created at ${lexicalRoot}: ${error.message}`);
+function validateExistingAncestors(path, fs) {
+  const ancestors = [];
+  for (let current = path; ; current = dirname(current)) {
+    ancestors.push(current);
+    if (dirname(current) === current) break;
   }
-  rejectUnsafeEntry(lexicalRoot, entryAt(lexicalRoot), "result root", "directory");
+  for (const ancestor of ancestors.reverse()) {
+    const entry = entryAt(ancestor, fs);
+    if (!entry) continue;
+    if (entry.isSymbolicLink() || !entry.isDirectory()) {
+      throw new Error("Owned quality result-root ancestor must be a real directory, not a link or reparse point");
+    }
+  }
+}
+
+function ownedDirectoryWithFs(rootDir, fs, create) {
+  const lexicalRoot = resolve(rootDir);
+  validateExistingAncestors(lexicalRoot, fs);
+  if (create) {
+    try {
+      fs.mkdirSync(lexicalRoot, { recursive: true });
+    } catch (error) {
+      throw new Error(`Owned quality result root could not be created at ${lexicalRoot}: ${error.message}`);
+    }
+  }
+  validateExistingAncestors(lexicalRoot, fs);
+  rejectUnsafeEntry(lexicalRoot, entryAt(lexicalRoot, fs), "result root", "directory");
 
   const lexicalParent = dirname(lexicalRoot);
-  const physicalParent = realpathSync(lexicalParent);
-  const physicalRoot = realpathSync(lexicalRoot);
+  const physicalParent = fs.realpathSync(lexicalParent);
+  const physicalRoot = fs.realpathSync(lexicalRoot);
   if (!containedOrEqual(physicalParent, physicalRoot) || physicalParent === physicalRoot) {
     throw new Error("Owned quality result root must remain physically contained by its real parent");
   }
   return { lexicalRoot, physicalRoot };
 }
 
-function validateDestinationParent(root, destination) {
+export function ensureOwnedDirectory(rootDir, options = {}) {
+  return ownedDirectoryWithFs(rootDir, filesystem(options.fs), true);
+}
+
+function validateDestinationParent(root, destination, fs, create) {
   const lexicalParent = dirname(destination);
   if (!containedOrEqual(root.lexicalRoot, lexicalParent)) {
     throw new Error("Owned quality artifact parent escapes the intended result root");
   }
-  mkdirSync(lexicalParent, { recursive: true });
+  if (create) fs.mkdirSync(lexicalParent, { recursive: true });
 
   const fromRoot = relative(root.lexicalRoot, lexicalParent);
   let current = root.lexicalRoot;
   for (const part of fromRoot.split(/[\\/]+/).filter(Boolean)) {
     current = join(current, part);
-    rejectUnsafeEntry(current, entryAt(current), "artifact parent", "directory");
+    rejectUnsafeEntry(current, entryAt(current, fs), "artifact parent", "directory");
   }
 
-  const physicalParent = realpathSync(lexicalParent);
+  const physicalParent = fs.realpathSync(lexicalParent);
   if (!containedOrEqual(root.physicalRoot, physicalParent)) {
     throw new Error("Owned quality artifact parent escapes physical result-root containment");
   }
   return { lexicalParent, physicalParent };
 }
 
-function validateFinalEntry(path) {
-  const entry = entryAt(path);
+function validateFinalEntry(path, fs) {
+  const entry = entryAt(path, fs);
   if (entry) rejectUnsafeEntry(path, entry, "artifact target", "file");
 }
 
@@ -87,20 +128,21 @@ function fileIdentity(entry) {
   return `${entry.dev}:${entry.ino}:${entry.birthtimeMs}`;
 }
 
-function cleanupCreatedTemporary(path, identity) {
+function cleanupOwnedPath(path, identity, fs) {
   try {
-    const entry = entryAt(path);
-    if (entry?.isFile() && !entry.isSymbolicLink() && fileIdentity(entry) === identity) unlinkSync(path);
+    const entry = entryAt(path, fs);
+    if (entry?.isFile() && !entry.isSymbolicLink() && fileIdentity(entry) === identity) fs.unlinkSync(path);
   } catch {
     // Preserve any entry that is not provably the exact temporary file created by this call.
   }
 }
 
 export function atomicWriteOwnedFile(rootDir, destinationPath, contents, options = {}) {
-  const root = ensureOwnedDirectory(rootDir);
+  const fs = filesystem(options.fs);
+  const root = ownedDirectoryWithFs(rootDir, fs, true);
   const destination = resolve(destinationPath);
-  const parent = validateDestinationParent(root, destination);
-  validateFinalEntry(destination);
+  const parent = validateDestinationParent(root, destination, fs, true);
+  validateFinalEntry(destination, fs);
 
   const temporary = resolve(
     options.temporaryPathFor?.(destination) ?? defaultTemporaryPath(destination),
@@ -108,7 +150,7 @@ export function atomicWriteOwnedFile(rootDir, destinationPath, contents, options
   if (dirname(temporary) !== parent.lexicalParent) {
     throw new Error("Owned quality temporary artifact must be in the same directory as its target");
   }
-  const temporaryEntry = entryAt(temporary);
+  const temporaryEntry = entryAt(temporary, fs);
   if (temporaryEntry) {
     throw new Error("Owned quality temporary artifact must not already exist or be a link or reparse point");
   }
@@ -116,28 +158,82 @@ export function atomicWriteOwnedFile(rootDir, destinationPath, contents, options
   let descriptor;
   let createdIdentity;
   let renamed = false;
+  let published = false;
   try {
-    descriptor = openSync(temporary, "wx", 0o600);
-    createdIdentity = fileIdentity(fstatSync(descriptor));
-    writeFileSync(descriptor, contents, "utf8");
-    closeSync(descriptor);
-    descriptor = undefined;
+    descriptor = fs.openSync(temporary, "wx", 0o600);
+    createdIdentity = fileIdentity(fs.fstatSync(descriptor));
+    fs.writeFileSync(descriptor, contents, "utf8");
 
-    validateFinalEntry(destination);
-    const physicalTemporary = realpathSync(temporary);
+    const temporaryBeforePublish = entryAt(temporary, fs);
+    if (!temporaryBeforePublish?.isFile() || temporaryBeforePublish.isSymbolicLink()
+      || fileIdentity(temporaryBeforePublish) !== createdIdentity) {
+      throw new Error("Owned quality temporary artifact identity changed before publish");
+    }
+    validateFinalEntry(destination, fs);
+    const physicalTemporary = fs.realpathSync(temporary);
     if (!containedOrEqual(parent.physicalParent, physicalTemporary)) {
       throw new Error("Owned quality temporary artifact escapes physical result-root containment");
     }
-    renameSync(temporary, destination);
+    // Node exposes no fd-relative rename. Keeping the fd open and checking the
+    // pathname identity immediately before and after rename narrows, but cannot
+    // eliminate, same-user races between those filesystem operations.
+    fs.renameSync(temporary, destination);
     renamed = true;
+
+    const descriptorAfterPublish = fs.fstatSync(descriptor);
+    const destinationAfterPublish = entryAt(destination, fs);
+    if (!destinationAfterPublish?.isFile() || destinationAfterPublish.isSymbolicLink()
+      || fileIdentity(descriptorAfterPublish) !== createdIdentity
+      || fileIdentity(destinationAfterPublish) !== createdIdentity) {
+      throw new Error("Owned quality artifact identity changed during publish");
+    }
+    const physicalDestination = fs.realpathSync(destination);
+    if (!containedOrEqual(parent.physicalParent, physicalDestination)) {
+      throw new Error("Owned quality artifact escaped physical result-root containment during publish");
+    }
+    published = true;
   } finally {
     if (descriptor !== undefined) {
       try {
-        closeSync(descriptor);
+        fs.closeSync(descriptor);
       } catch {
         // Cleanup below is still restricted to the created file identity.
       }
     }
-    if (!renamed && createdIdentity) cleanupCreatedTemporary(temporary, createdIdentity);
+    if (!renamed && createdIdentity) cleanupOwnedPath(temporary, createdIdentity, fs);
+    if (renamed && !published && createdIdentity) cleanupOwnedPath(destination, createdIdentity, fs);
+  }
+}
+
+export function readOwnedFile(rootDir, sourcePath, options = {}) {
+  const fs = filesystem(options.fs);
+  const root = ownedDirectoryWithFs(rootDir, fs, false);
+  const source = resolve(sourcePath);
+  const parent = validateDestinationParent(root, source, fs, false);
+  validateFinalEntry(source, fs);
+  const physicalSource = fs.realpathSync(source);
+  if (!containedOrEqual(parent.physicalParent, physicalSource)) {
+    throw new Error("Owned quality artifact source escapes physical result-root containment");
+  }
+
+  let descriptor;
+  try {
+    descriptor = fs.openSync(source, "r");
+    const openedIdentity = fileIdentity(fs.fstatSync(descriptor));
+    const sourceBeforeRead = entryAt(source, fs);
+    if (!sourceBeforeRead?.isFile() || sourceBeforeRead.isSymbolicLink()
+      || fileIdentity(sourceBeforeRead) !== openedIdentity) {
+      throw new Error("Owned quality artifact source identity changed before read");
+    }
+    const contents = fs.readFileSync(descriptor, "utf8");
+    const sourceAfterRead = entryAt(source, fs);
+    if (!sourceAfterRead?.isFile() || sourceAfterRead.isSymbolicLink()
+      || fileIdentity(fs.fstatSync(descriptor)) !== openedIdentity
+      || fileIdentity(sourceAfterRead) !== openedIdentity) {
+      throw new Error("Owned quality artifact source identity changed during read");
+    }
+    return contents;
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
   }
 }

@@ -4,6 +4,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   symlinkSync,
@@ -49,6 +50,57 @@ function summary() {
 }
 
 describe("owned quality artifact storage", () => {
+  it("rejects a linked ancestor before creating a nested result root outside its lexical base", () => {
+    const base = mkdtempSync(join(tmpdir(), "quality-storage-ancestor-link-"));
+    const outside = join(base, "outside");
+    const linkedParent = join(base, "linked-parent");
+    const nestedRoot = join(linkedParent, "nested-results");
+    const target = join(nestedRoot, "summary.json");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "sentinel.txt"), "outside-sentinel", "utf8");
+    symlinkSync(outside, linkedParent, "junction");
+
+    expect(() => atomicWriteOwnedFile(nestedRoot, target, "owned-content\n"))
+      .toThrow(/ancestor|result root|link|reparse/i);
+    expect(readFileSync(join(outside, "sentinel.txt"), "utf8")).toBe("outside-sentinel");
+    expect(existsSync(join(outside, "nested-results"))).toBe(false);
+    expect(existsSync(target)).toBe(false);
+    unlinkSync(linkedParent);
+  });
+
+  it("rejects a replaced temporary pathname identity before publish and cleans its owned temp", () => {
+    const root = mkdtempSync(join(tmpdir(), "quality-storage-temp-identity-"));
+    const target = join(root, "summary.json");
+    const temporary = join(root, "injected-summary.tmp");
+    const injected = join(root, "injected-content.txt");
+    writeFileSync(injected, "injected-content", "utf8");
+    let temporaryOpened = false;
+    let replacementReported = false;
+    const fsAdapter = {
+      openSync(...args: Parameters<typeof openSync>) {
+        const descriptor = openSync(...args);
+        if (resolve(String(args[0])) === temporary) temporaryOpened = true;
+        return descriptor;
+      },
+      lstatSync(...args: Parameters<typeof lstatSync>) {
+        if (temporaryOpened && !replacementReported && resolve(String(args[0])) === temporary) {
+          replacementReported = true;
+          return lstatSync(injected);
+        }
+        return lstatSync(...args);
+      },
+    };
+
+    expect(() => atomicWriteOwnedFile(root, target, "owned-content\n", {
+      temporaryPathFor: () => temporary,
+      fs: fsAdapter,
+    })).toThrow(/identity|temporary|publish/i);
+    expect(replacementReported).toBe(true);
+    expect(existsSync(target)).toBe(false);
+    expect(existsSync(temporary)).toBe(false);
+    expect(readFileSync(injected, "utf8")).toBe("injected-content");
+  });
+
   it("atomically replaces an existing regular artifact on repeated Windows runs", () => {
     const root = mkdtempSync(join(tmpdir(), "quality-storage-repeat-"));
     const target = join(root, "section.json");

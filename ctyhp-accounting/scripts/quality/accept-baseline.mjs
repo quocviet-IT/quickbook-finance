@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 import { qualityPaths } from "./config.mjs";
 import { findingFingerprint, redactQualityValue } from "./model.mjs";
-import { atomicWriteOwnedFile } from "./artifact-storage.mjs";
+import { aggregateQualityArtifacts } from "./report.mjs";
+import { atomicWriteOwnedFile, readOwnedFile } from "./artifact-storage.mjs";
 
 const VALID_MEASUREMENT_KINDS = new Set(["bundle", "performance", "cls", "query"]);
 const REQUIRED_SECTION_ARTIFACTS = Object.freeze([
@@ -83,6 +84,34 @@ function numericBudgets(value) {
   );
 }
 
+function fingerprintsFor(findings) {
+  return [...new Set(findings.map((finding) => {
+    if (Object.hasOwn(finding, "fingerprint") && typeof finding.fingerprint !== "string") {
+      throw new Error("Cannot accept quality baseline: every explicit fingerprint must be a string");
+    }
+    return finding.fingerprint || findingFingerprint(finding);
+  }))].sort();
+}
+
+function verifiedAggregate(summary, resultsPath) {
+  const generated = redactQualityValue(aggregateQualityArtifacts(dirname(resultsPath), { mode: "report" }));
+  for (const field of [
+    "version",
+    "mode",
+    "sectionArtifacts",
+    "findings",
+    "measurements",
+    "unavailable",
+    "safetyFailures",
+    "budgets",
+  ]) {
+    if (!isDeepStrictEqual(summary[field], generated[field])) {
+      throw new Error(`Cannot accept quality baseline: summary ${field} does not match canonical section source artifacts`);
+    }
+  }
+  return generated;
+}
+
 export function acceptBaseline(resultsPath, baselinePath, env = process.env, storageOptions = {}) {
   if (env.QUALITY_ACCEPT_BASELINE !== "ONEBOOK_REVIEWED_QUALITY_BASELINE") {
     throw new Error("Set QUALITY_ACCEPT_BASELINE=ONEBOOK_REVIEWED_QUALITY_BASELINE after reviewing summary.md");
@@ -90,22 +119,21 @@ export function acceptBaseline(resultsPath, baselinePath, env = process.env, sto
 
   let summary;
   try {
-    summary = JSON.parse(readFileSync(resultsPath, "utf8"));
+    summary = JSON.parse(readOwnedFile(dirname(resultsPath), resultsPath));
   } catch (error) {
     throw new Error(`Cannot accept malformed quality summary at ${resultsPath}: ${error.message}`);
   }
   validateAcceptedSummary(summary);
-  const fingerprints = [...new Set((summary.findings ?? []).map((finding) => {
-    if (Object.hasOwn(finding, "fingerprint") && typeof finding.fingerprint !== "string") {
-      throw new Error("Cannot accept quality baseline: every explicit fingerprint must be a string");
-    }
-    return finding.fingerprint || findingFingerprint(finding);
-  }))].sort();
-  const budgets = numericBudgets(summary.budgets);
+  fingerprintsFor(summary.findings);
+  normalizeMeasurements(summary.measurements);
+  numericBudgets(summary.budgets);
+  const generated = verifiedAggregate(summary, resultsPath);
+  const fingerprints = fingerprintsFor(generated.findings);
+  const budgets = numericBudgets(generated.budgets);
   const baseline = redactQualityValue({
     version: 1,
     fingerprints,
-    measurements: normalizeMeasurements(summary.measurements),
+    measurements: normalizeMeasurements(generated.measurements),
     budgets,
   });
   atomicWriteOwnedFile(
