@@ -63,21 +63,87 @@ type SecretReference = {
 
 const dynamicSecretReference = "<dynamic>";
 
+type WorkflowExpression = {
+  body: string;
+  closed: boolean;
+};
+
+function workflowExpressions(value: string): WorkflowExpression[] {
+  const expressions: WorkflowExpression[] = [];
+  let cursor = 0;
+
+  while (cursor < value.length) {
+    const start = value.indexOf("${{", cursor);
+    if (start === -1) break;
+
+    let inSingleQuotedLiteral = false;
+    let closed = false;
+    for (let index = start + 3; index < value.length; index += 1) {
+      if (value[index] === "'") {
+        if (inSingleQuotedLiteral && value[index + 1] === "'") {
+          index += 1;
+        } else {
+          inSingleQuotedLiteral = !inSingleQuotedLiteral;
+        }
+        continue;
+      }
+      if (!inSingleQuotedLiteral && value[index] === "}" && value[index + 1] === "}") {
+        expressions.push({ body: value.slice(start + 3, index), closed: true });
+        cursor = index + 2;
+        closed = true;
+        break;
+      }
+    }
+    if (!closed) {
+      expressions.push({ body: value.slice(start + 3), closed: false });
+      break;
+    }
+  }
+
+  return expressions;
+}
+
+function maskSingleQuotedLiterals(expression: string): string {
+  const masked = [...expression];
+  let inSingleQuotedLiteral = false;
+
+  for (let index = 0; index < expression.length; index += 1) {
+    if (expression[index] === "'") {
+      masked[index] = " ";
+      if (inSingleQuotedLiteral && expression[index + 1] === "'") {
+        masked[index + 1] = " ";
+        index += 1;
+      } else {
+        inSingleQuotedLiteral = !inSingleQuotedLiteral;
+      }
+    } else if (inSingleQuotedLiteral) {
+      masked[index] = " ";
+    }
+  }
+
+  return masked.join("");
+}
+
 function secretReferencesByPath(value: unknown): SecretReference[] {
   const references: SecretReference[] = [];
 
   function visit(candidate: unknown, path: Array<string | number>) {
     if (typeof candidate === "string") {
-      for (const expressionMatch of candidate.matchAll(/\$\{\{([\s\S]*?)\}\}/g)) {
-        const expression = expressionMatch[1];
+      for (const { body: expression, closed } of workflowExpressions(candidate)) {
+        if (!closed && /\bsecrets\b/i.test(expression)) {
+          references.push({ name: dynamicSecretReference, path });
+          continue;
+        }
+        const searchableExpression = maskSingleQuotedLiterals(expression);
         const recognizedStarts = new Set<number>();
         for (const match of expression.matchAll(
           /\bsecrets\s*(?:\.\s*([A-Za-z_][A-Za-z0-9_]*)|\[\s*(["'])([A-Za-z_][A-Za-z0-9_]*)\2\s*\])/gi,
         )) {
+          if (!/^secrets$/i.test(searchableExpression.slice(match.index, match.index + 7))) continue;
           references.push({ name: match[1] ?? match[3], path });
           recognizedStarts.add(match.index);
         }
-        for (const match of expression.matchAll(/\bsecrets\b/gi)) {
+        for (const match of searchableExpression.matchAll(/\bsecrets\b/gi)) {
           if (!recognizedStarts.has(match.index)) {
             references.push({ name: dynamicSecretReference, path });
           }
@@ -391,6 +457,18 @@ describe("quality CI contracts", () => {
       expectedViolation:
         "dynamic secret reference is forbidden at jobs.runtime-quality.steps[5].run",
     },
+    {
+      syntax: "allowlisted secret after a quoted expression terminator",
+      expression: "${{ format('}}{0}', secrets.SMOKE_PASSWORD) }}",
+      expectedViolation:
+        "secret reference is forbidden at jobs.runtime-quality.steps[5].run: SMOKE_PASSWORD",
+    },
+    {
+      syntax: "allowlisted secret after an escaped quote and quoted expression terminator",
+      expression: "${{ format('it''s }} {0}', secrets.SMOKE_PASSWORD) }}",
+      expectedViolation:
+        "secret reference is forbidden at jobs.runtime-quality.steps[5].run: SMOKE_PASSWORD",
+    },
   ])("rejects $syntax secret syntax instead of ignoring it", ({ expression, expectedViolation }) => {
     const workflow = readWorkflow("quality-runtime.yml");
     expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
@@ -402,6 +480,43 @@ describe("quality CI contracts", () => {
     selfTest.run = `echo "${expression}"`;
 
     expect(credentialPolicyViolations(maliciousWorkflow)).toEqual([expectedViolation]);
+  });
+
+  it("ignores secret-like text inside a single-quoted expression literal", () => {
+    const workflow = readWorkflow("quality-runtime.yml");
+    expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
+    const workflowWithLiteral = structuredClone(workflow!);
+    const selfTest = stepByName(
+      workflowWithLiteral.jobs?.["runtime-quality"]?.steps ?? [],
+      "Prove the read-only browser guard",
+    );
+    selfTest.run = "echo \"${{ format('literal secrets.SMOKE_PASSWORD') }}\"";
+
+    expect(credentialPolicyViolations(workflowWithLiteral)).toEqual([]);
+  });
+
+  it.each([
+    {
+      description: "is missing its closing delimiter",
+      expression: "${{ secrets.SMOKE_PASSWORD",
+    },
+    {
+      description: "has an unterminated single-quoted literal",
+      expression: "${{ 'unterminated secrets.SMOKE_PASSWORD }}",
+    },
+  ])("fails closed when an expression $description", ({ expression }) => {
+    const workflow = readWorkflow("quality-runtime.yml");
+    expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
+    const malformedWorkflow = structuredClone(workflow!);
+    const selfTest = stepByName(
+      malformedWorkflow.jobs?.["runtime-quality"]?.steps ?? [],
+      "Prove the read-only browser guard",
+    );
+    selfTest.run = `echo "${expression}"`;
+
+    expect(credentialPolicyViolations(malformedWorkflow)).toEqual([
+      "dynamic secret reference is forbidden at jobs.runtime-quality.steps[5].run",
+    ]);
   });
 
   const configuredRuntime = {
