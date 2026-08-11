@@ -58,15 +58,24 @@ jobs:
         run: npm run build
 
       - name: Bundle quality report
+        id: bundle
         run: npm run quality:bundle
         env:
           QUALITY_MODE: report
 
       - name: Upload quality report
-        if: always()
+        # always() so the report still survives a gate failing after it, but
+        # there is nothing to upload when the report step never ran — and
+        # if-no-files-found below would then add a second red step that hides
+        # which gate actually failed.
+        if: always() && steps.bundle.conclusion == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: quality-bundle-${{ github.sha }}
           path: ctyhp-accounting/.quality-results
+          # The directory name starts with a dot, and upload-artifact excludes
+          # hidden paths by default — without this the glob matches nothing and
+          # the job fails on a report that was written correctly.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14

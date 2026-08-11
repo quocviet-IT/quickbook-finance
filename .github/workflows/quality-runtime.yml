@@ -62,5 +62,9 @@ jobs:
         with:
           name: quality-runtime-${{ github.sha }}
           path: ctyhp-accounting/.quality-results
+          # See ci.yml: the directory name starts with a dot, which
+          # upload-artifact excludes by default. Left unset here the artifact
+          # uploads empty and `warn` says so in a log nobody reads.
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
