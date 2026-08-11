@@ -57,7 +57,7 @@ The runtime currently records these safety-failure kinds:
 | Kind | Recorded condition |
 | --- | --- |
 | `auth` | Smoke-session authentication fails, or an audited navigation lands on canonical `/login`. |
-| `document-navigation` | A main-document navigation returns an unsuccessful/non-2xx status or otherwise lacks a valid success status in the route audit. |
+| `document-navigation` | A main-document navigation returns an unsuccessful/non-2xx status or otherwise lacks a valid success status in the route or keyboard audit. |
 | `error-boundary` | The application renders its `We could not load this page` error boundary. |
 | `page-error` | Playwright observes an uncaught page error, including one arriving immediately before guard assertion and cleanup. |
 | `blocked-method` | The read-only route guard aborts a non-allowed browser request. |
