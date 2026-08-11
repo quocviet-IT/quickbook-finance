@@ -14,6 +14,7 @@ type WorkflowStep = {
 };
 
 type WorkflowJob = {
+  name?: string;
   "runs-on"?: string;
   "timeout-minutes"?: number;
   defaults?: { run?: { "working-directory"?: string } };
@@ -55,30 +56,61 @@ function structuralTokens(value: unknown): string[] {
   return value == null ? [] : [String(value)];
 }
 
-function secretReferences(value: unknown): string[] {
-  const references = new Set<string>();
+type SecretReference = {
+  name: string;
+  path: Array<string | number>;
+};
 
-  function visit(candidate: unknown) {
+const dynamicSecretReference = "<dynamic>";
+
+function secretReferencesByPath(value: unknown): SecretReference[] {
+  const references: SecretReference[] = [];
+
+  function visit(candidate: unknown, path: Array<string | number>) {
     if (typeof candidate === "string") {
-      for (const match of candidate.matchAll(/\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g)) {
-        references.add(match[1]);
+      for (const expressionMatch of candidate.matchAll(/\$\{\{([\s\S]*?)\}\}/g)) {
+        const expression = expressionMatch[1];
+        const recognizedStarts = new Set<number>();
+        for (const match of expression.matchAll(
+          /\bsecrets\s*(?:\.\s*([A-Za-z_][A-Za-z0-9_]*)|\[\s*(["'])([A-Za-z_][A-Za-z0-9_]*)\2\s*\])/gi,
+        )) {
+          references.push({ name: match[1] ?? match[3], path });
+          recognizedStarts.add(match.index);
+        }
+        for (const match of expression.matchAll(/\bsecrets\b/gi)) {
+          if (!recognizedStarts.has(match.index)) {
+            references.push({ name: dynamicSecretReference, path });
+          }
+        }
       }
       return;
     }
     if (Array.isArray(candidate)) {
-      for (const item of candidate) visit(item);
+      candidate.forEach((item, index) => visit(item, [...path, index]));
       return;
     }
     if (candidate && typeof candidate === "object") {
       for (const [key, nested] of Object.entries(candidate)) {
-        visit(key);
-        visit(nested);
+        visit(key, [...path, `<key:${key}>`]);
+        visit(nested, [...path, key]);
       }
     }
   }
 
-  visit(value);
-  return [...references].sort();
+  visit(value, []);
+  return references;
+}
+
+function secretReferences(value: unknown): string[] {
+  return [...new Set(secretReferencesByPath(value).map(({ name }) => name))].sort();
+}
+
+function formatReferencePath(path: Array<string | number>): string {
+  return path.reduce<string>(
+    (formatted, segment) =>
+      typeof segment === "number" ? `${formatted}[${segment}]` : `${formatted ? `${formatted}.` : ""}${segment}`,
+    "",
+  );
 }
 
 function credentialPolicyViolations(workflow: Workflow): string[] {
@@ -88,35 +120,51 @@ function credentialPolicyViolations(workflow: Workflow): string[] {
     "SMOKE_EMAIL",
     "SMOKE_PASSWORD",
   ]);
-  const allowedEnvByStep: Record<string, Set<string>> = {
-    "Validate runtime configuration": new Set([
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-      "SMOKE_EMAIL",
-      "SMOKE_PASSWORD",
-    ]),
-    "Run runtime quality report": allowedSecrets,
-  };
-  const violations = secretReferences(workflow)
-    .filter((name) => !allowedSecrets.has(name))
+  const allowedSecretByPath = new Map<string, string>([
+    ["jobs.runtime-quality.steps[4].env.NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    ["jobs.runtime-quality.steps[4].env.SMOKE_EMAIL", "SMOKE_EMAIL"],
+    ["jobs.runtime-quality.steps[4].env.SMOKE_PASSWORD", "SMOKE_PASSWORD"],
+    ["jobs.runtime-quality.steps[6].env.NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    ["jobs.runtime-quality.steps[6].env.QUALITY_DATABASE_URL", "QUALITY_DATABASE_URL"],
+    ["jobs.runtime-quality.steps[6].env.SMOKE_EMAIL", "SMOKE_EMAIL"],
+    ["jobs.runtime-quality.steps[6].env.SMOKE_PASSWORD", "SMOKE_PASSWORD"],
+  ]);
+  const references = secretReferencesByPath(workflow);
+  const violations = [...new Set(references.map(({ name }) => name))]
+    .filter((name) => name !== dynamicSecretReference && !allowedSecrets.has(name))
+    .sort()
     .map((name) => `unexpected secret reference: ${name}`);
 
-  for (const job of Object.values(workflow.jobs ?? {})) {
-    for (const [envName, envValue] of Object.entries(job.env ?? {})) {
-      for (const secretName of secretReferences(envValue)) {
-        violations.push(`credential env is forbidden at job scope: ${envName} -> ${secretName}`);
-      }
+  for (const reference of references) {
+    const path = formatReferencePath(reference.path);
+    if (reference.name === dynamicSecretReference) {
+      violations.push(`dynamic secret reference is forbidden at ${path}`);
+      continue;
     }
-    for (const step of job.steps ?? []) {
-      for (const [envName, envValue] of Object.entries(step.env ?? {})) {
-        for (const secretName of secretReferences(envValue)) {
-          if (allowedEnvByStep[step.name ?? ""]?.has(envName) && envName === secretName) continue;
-          violations.push(`credential env is forbidden on step "${step.name ?? "<unnamed>"}": ${envName}`);
-        }
-      }
+    if (allowedSecretByPath.get(path) === reference.name) continue;
+
+    const [root, jobName, scope, indexOrEnv, field, envName] = reference.path;
+    if (root === "jobs" && scope === "env" && typeof indexOrEnv === "string") {
+      violations.push(`credential env is forbidden at job scope: ${indexOrEnv} -> ${reference.name}`);
+      continue;
     }
+    if (
+      root === "jobs" &&
+      typeof jobName === "string" &&
+      scope === "steps" &&
+      typeof indexOrEnv === "number" &&
+      field === "env" &&
+      typeof envName === "string"
+    ) {
+      const step = workflow.jobs?.[jobName]?.steps?.[indexOrEnv];
+      violations.push(`credential env is forbidden on step "${step?.name ?? "<unnamed>"}": ${envName}`);
+      continue;
+    }
+
+    violations.push(`secret reference is forbidden at ${path}: ${reference.name}`);
   }
 
-  return violations;
+  return [...new Set(violations)];
 }
 
 function runNodeValidation(command: string, values: Record<string, string>) {
@@ -285,6 +333,75 @@ describe("quality CI contracts", () => {
       "unexpected secret reference: ARBITRARY_SECRET",
       'credential env is forbidden on step "Prove the read-only browser guard": ARBITRARY_SECRET',
     ]);
+  });
+
+  it.each([
+    {
+      location: "the self-test run command",
+      mutate(workflow: Workflow) {
+        const selfTest = stepByName(
+          workflow.jobs?.["runtime-quality"]?.steps ?? [],
+          "Prove the read-only browser guard",
+        );
+        selfTest.run = 'echo "${{ secrets.SMOKE_PASSWORD }}"';
+      },
+      expectedPath: "jobs.runtime-quality.steps[5].run",
+    },
+    {
+      location: "the artifact upload inputs",
+      mutate(workflow: Workflow) {
+        const upload = stepByName(
+          workflow.jobs?.["runtime-quality"]?.steps ?? [],
+          "Upload runtime quality report",
+        );
+        upload.with = { ...upload.with, password: "${{ secrets.SMOKE_PASSWORD }}" };
+      },
+      expectedPath: "jobs.runtime-quality.steps[7].with.password",
+    },
+    {
+      location: "a job-level non-env field",
+      mutate(workflow: Workflow) {
+        const job = workflow.jobs?.["runtime-quality"];
+        expect(job, "the runtime-quality job must remain present").toBeDefined();
+        job!.name = "${{ secrets.SMOKE_PASSWORD }}";
+      },
+      expectedPath: "jobs.runtime-quality.name",
+    },
+  ])("rejects an allowlisted secret injected into $location", ({ mutate, expectedPath }) => {
+    const workflow = readWorkflow("quality-runtime.yml");
+    expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
+    const maliciousWorkflow = structuredClone(workflow!);
+    mutate(maliciousWorkflow);
+
+    expect(credentialPolicyViolations(maliciousWorkflow)).toEqual([
+      `secret reference is forbidden at ${expectedPath}: SMOKE_PASSWORD`,
+    ]);
+  });
+
+  it.each([
+    {
+      syntax: "static bracket",
+      expression: "${{ SeCrEtS [ 'SMOKE_PASSWORD' ] }}",
+      expectedViolation:
+        "secret reference is forbidden at jobs.runtime-quality.steps[5].run: SMOKE_PASSWORD",
+    },
+    {
+      syntax: "dynamic bracket",
+      expression: "${{ secrets [ matrix.secret_name ] }}",
+      expectedViolation:
+        "dynamic secret reference is forbidden at jobs.runtime-quality.steps[5].run",
+    },
+  ])("rejects $syntax secret syntax instead of ignoring it", ({ expression, expectedViolation }) => {
+    const workflow = readWorkflow("quality-runtime.yml");
+    expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
+    const maliciousWorkflow = structuredClone(workflow!);
+    const selfTest = stepByName(
+      maliciousWorkflow.jobs?.["runtime-quality"]?.steps ?? [],
+      "Prove the read-only browser guard",
+    );
+    selfTest.run = `echo "${expression}"`;
+
+    expect(credentialPolicyViolations(maliciousWorkflow)).toEqual([expectedViolation]);
   });
 
   const configuredRuntime = {
