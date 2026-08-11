@@ -58,17 +58,12 @@ jobs:
         run: npm run build
 
       - name: Bundle quality report
-        id: bundle
         run: npm run quality:bundle
         env:
           QUALITY_MODE: report
 
       - name: Upload quality report
-        # always() so the report still survives a gate failing after it, but
-        # there is nothing to upload when the report step never ran — and
-        # if-no-files-found below would then add a second red step that hides
-        # which gate actually failed.
-        if: always() && steps.bundle.conclusion == 'success'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: quality-bundle-${{ github.sha }}

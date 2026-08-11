@@ -282,6 +282,10 @@ describe("quality CI contracts", () => {
       with: {
         name: "quality-bundle-${{ github.sha }}",
         path: "ctyhp-accounting/.quality-results",
+        // Required, not optional: the path starts with a dot and
+        // upload-artifact excludes hidden paths by default, so without this the
+        // glob matches nothing and the job fails on a report it did write.
+        "include-hidden-files": true,
         "if-no-files-found": "error",
         "retention-days": 14,
       },
@@ -353,6 +357,9 @@ describe("quality CI contracts", () => {
       with: {
         name: "quality-runtime-${{ github.sha }}",
         path: "ctyhp-accounting/.quality-results",
+        // As in ci.yml. This workflow warns rather than fails on no files, so
+        // without this key the artifact uploads empty and nothing goes red.
+        "include-hidden-files": true,
         "if-no-files-found": "warn",
         "retention-days": 14,
       },
