@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BUDGETS,
@@ -123,7 +123,24 @@ describe("quality configuration", () => {
   });
 
   it("keeps generated output outside committed source", () => {
-    expect(qualityPaths("C:/repo/app").resultsDir).toBe("C:/repo/app/.quality-results");
+    // The root has to be absolute on whichever platform runs this. It used to be
+    // the literal "C:/repo/app", which is absolute on Windows and *relative* on
+    // Linux — so CI resolved it against the workspace and compared
+    // "/home/runner/…/ctyhp-accounting/C:/repo/app/.quality-results" against
+    // "C:/repo/app/.quality-results". The assertion was about the platform,
+    // not about the code.
+    const root = resolve(tmpdir(), "quality-root");
+    const asPosix = root.replaceAll("\\", "/");
+
+    const paths = qualityPaths(root);
+
+    expect(paths.resultsDir).toBe(`${asPosix}/.quality-results`);
+    // The point of the test, said in the function's own terms rather than in
+    // whatever the temporary directory happens to be called: results sit beside
+    // the root, never inside the app tree, and the baseline is the one thing
+    // here that does belong in committed source.
+    expect(paths.resultsDir.startsWith(`${paths.appDir}/`)).toBe(false);
+    expect(paths.baselinePath).toBe(`${asPosix}/tests/quality/baseline.json`);
   });
 
   it("audits every static route at desktop and matrix routes at four viewports", () => {
