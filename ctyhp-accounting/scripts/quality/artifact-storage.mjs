@@ -96,11 +96,24 @@ function validateDestinationParent(root, destination, fs, create) {
   if (!containedOrEqual(root.lexicalRoot, lexicalParent)) {
     throw new Error("Owned quality artifact parent escapes the intended result root");
   }
-  if (create) fs.mkdirSync(lexicalParent, { recursive: true });
 
   const fromRoot = relative(root.lexicalRoot, lexicalParent);
+  const parts = fromRoot.split(/[\\/]+/).filter(Boolean);
   let current = root.lexicalRoot;
-  for (const part of fromRoot.split(/[\\/]+/).filter(Boolean)) {
+  for (const part of parts) {
+    current = join(current, part);
+    const entry = entryAt(current, fs);
+    if (!entry && create) {
+      // Node has no fd-relative mkdir. Creating exactly one validated segment
+      // at a time avoids traversing a prepositioned linked descendant, while
+      // the checks below fail closed on filesystem changes Node can observe.
+      fs.mkdirSync(current);
+    }
+    rejectUnsafeEntry(current, entryAt(current, fs), "artifact parent", "directory");
+  }
+
+  current = root.lexicalRoot;
+  for (const part of parts) {
     current = join(current, part);
     rejectUnsafeEntry(current, entryAt(current, fs), "artifact parent", "directory");
   }

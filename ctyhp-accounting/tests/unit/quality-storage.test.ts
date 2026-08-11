@@ -68,6 +68,24 @@ describe("owned quality artifact storage", () => {
     unlinkSync(linkedParent);
   });
 
+  it("rejects a linked destination parent without creating descendants outside the owned root", () => {
+    const root = mkdtempSync(join(tmpdir(), "quality-storage-parent-link-"));
+    const outside = mkdtempSync(join(tmpdir(), "quality-storage-parent-outside-"));
+    const linkedParent = join(root, "linked-parent");
+    const outsideNested = join(outside, "created-outside");
+    const target = join(linkedParent, "created-outside", "artifact.json");
+    const sentinel = join(outside, "sentinel.txt");
+    writeFileSync(sentinel, "outside-sentinel", "utf8");
+    symlinkSync(outside, linkedParent, "junction");
+
+    expect(() => atomicWriteOwnedFile(root, target, "owned-content\n"))
+      .toThrow(/artifact parent|owned|link|reparse/i);
+    expect(readFileSync(sentinel, "utf8")).toBe("outside-sentinel");
+    expect(existsSync(outsideNested)).toBe(false);
+    expect(existsSync(join(outsideNested, "artifact.json"))).toBe(false);
+    unlinkSync(linkedParent);
+  });
+
   it("rejects a replaced temporary pathname identity before publish and cleans its owned temp", () => {
     const root = mkdtempSync(join(tmpdir(), "quality-storage-temp-identity-"));
     const target = join(root, "summary.json");
