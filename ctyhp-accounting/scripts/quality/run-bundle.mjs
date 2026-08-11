@@ -1,16 +1,10 @@
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeBundle } from "./bundle.mjs";
 import { BUDGETS, qualityMode, qualityPaths } from "./config.mjs";
 import { qualityExitCode } from "./model.mjs";
 import { aggregateQualityArtifacts, writeQualityReport } from "./report.mjs";
-
-function atomicWrite(path, value) {
-  const temporary = `${path}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-  renameSync(temporary, path);
-}
+import { atomicWriteOwnedFile } from "./artifact-storage.mjs";
 
 function measurementsFor(report) {
   return [
@@ -31,7 +25,7 @@ function measurementsFor(report) {
   ];
 }
 
-export function runBundleCli(argv = process.argv.slice(2), env = process.env) {
+export function runBundleCli(argv = process.argv.slice(2), env = process.env, storageOptions = {}) {
   const paths = qualityPaths(process.cwd());
   const mode = qualityMode(env);
   const nextDir = resolve(argv[0] ?? paths.nextDir);
@@ -47,12 +41,16 @@ export function runBundleCli(argv = process.argv.slice(2), env = process.env) {
     budgets: BUDGETS.bundle,
     bundle,
   };
-  mkdirSync(resultsDir, { recursive: true });
-  atomicWrite(join(resultsDir, "bundle.json"), section);
+  atomicWriteOwnedFile(
+    resultsDir,
+    join(resultsDir, "bundle.json"),
+    `${JSON.stringify(section, null, 2)}\n`,
+    storageOptions,
+  );
 
   const baselinePath = resolve(env.QUALITY_BASELINE_PATH ?? argv[1] ?? paths.baselinePath);
   const summary = aggregateQualityArtifacts(resultsDir, { mode, baselinePath });
-  writeQualityReport(resultsDir, summary);
+  writeQualityReport(resultsDir, summary, storageOptions);
   return qualityExitCode({
     mode,
     comparison: summary.comparison ?? { newFindings: [], measurementRegressions: [] },

@@ -1,16 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BUDGETS, qualityMode, qualityPaths } from "./config.mjs";
 import { compareAgainstBaseline, findingFingerprint, qualityExitCode, redactQualityValue } from "./model.mjs";
+import { atomicWriteOwnedFile, ensureOwnedDirectory } from "./artifact-storage.mjs";
 
 const VALID_MEASUREMENT_KINDS = new Set(["bundle", "performance", "cls", "query"]);
-
-function atomicWrite(path, contents) {
-  const temporaryPath = `${path}.tmp`;
-  writeFileSync(temporaryPath, contents, "utf8");
-  renameSync(temporaryPath, path);
-}
 
 function markdownFromSummary(summary) {
   const lines = [
@@ -32,11 +27,10 @@ function markdownFromSummary(summary) {
   return lines.join("\n");
 }
 
-export function writeQualityReport(resultsDir, summary) {
-  mkdirSync(resultsDir, { recursive: true });
+export function writeQualityReport(resultsDir, summary, storageOptions = {}) {
   const sanitized = redactQualityValue(summary);
-  atomicWrite(join(resultsDir, "summary.json"), `${JSON.stringify(sanitized, null, 2)}\n`);
-  atomicWrite(join(resultsDir, "summary.md"), markdownFromSummary(sanitized));
+  atomicWriteOwnedFile(resultsDir, join(resultsDir, "summary.json"), `${JSON.stringify(sanitized, null, 2)}\n`, storageOptions);
+  atomicWriteOwnedFile(resultsDir, join(resultsDir, "summary.md"), markdownFromSummary(sanitized), storageOptions);
   return sanitized;
 }
 
@@ -107,6 +101,7 @@ function readBaseline(path) {
 
 export function aggregateQualityArtifacts(resultsDir, options = {}) {
   const mode = options.mode ?? qualityMode();
+  ensureOwnedDirectory(resultsDir);
   if (!existsSync(resultsDir)) {
     throw new Error(`Quality harness error: no section artifacts found in ${resultsDir}`);
   }
@@ -127,7 +122,16 @@ export function aggregateQualityArtifacts(resultsDir, options = {}) {
   const measurements = sections.flatMap((section) => normalizeMeasurements(section.measurements));
   const unavailable = sections.flatMap((section) => section.unavailable ?? []);
   const safetyFailures = sections.flatMap((section) => section.safetyFailures ?? []);
-  const summary = { version: 1, mode, findings, measurements, unavailable, safetyFailures, budgets: BUDGETS };
+  const summary = {
+    version: 1,
+    mode,
+    sectionArtifacts: files,
+    findings,
+    measurements,
+    unavailable,
+    safetyFailures,
+    budgets: BUDGETS,
+  };
 
   if (mode === "regression") {
     const baseline = readBaseline(options.baselinePath);

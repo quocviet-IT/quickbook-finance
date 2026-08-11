@@ -38,7 +38,7 @@ When using an approved QA/preview server, its owner remains responsible for that
 npm run quality:report -- <results-directory> [baseline-file]
 ```
 
-The aggregate represents the section JSON files currently present in the selected results directory. Check their timestamps and provenance before treating a mixed or copied directory as one run.
+The aggregate represents the section JSON files currently present in the selected results directory and records their exact filenames in `sectionArtifacts`. Check that list and the files' timestamps before treating a mixed or copied directory as one run. Baseline acceptance requires the complete `axe.json`, `bundle.json`, `keyboard.json`, `queries.json`, `routes.json`, `viewports.json`, and `web-vitals.json` provenance set; validated `unavailable` records are allowed, but any safety failure rejects acceptance.
 
 ## Exit semantics
 

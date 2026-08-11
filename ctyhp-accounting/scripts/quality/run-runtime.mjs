@@ -1,4 +1,4 @@
-import { lstatSync, mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -27,6 +27,7 @@ import {
   KeyboardSafetyError,
   runKeyboardScenarios,
 } from "./keyboard.mjs";
+import { atomicWriteOwnedFile } from "./artifact-storage.mjs";
 
 const PERFORMANCE_FIELDS = Object.freeze([
   "navigationMs",
@@ -227,20 +228,23 @@ function resolvedBaseUrl(raw) {
   return parsed.origin;
 }
 
-function writeSection(resultsDir, name, value) {
+function writeSection(resultsDir, name, value, storageOptions = {}) {
   const path = join(resultsDir, name);
-  const temporary = `${path}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(redactQualityValue(value), null, 2)}\n`, "utf8");
-  renameSync(temporary, path);
+  atomicWriteOwnedFile(
+    resultsDir,
+    path,
+    `${JSON.stringify(redactQualityValue(value), null, 2)}\n`,
+    storageOptions,
+  );
 }
 
-function writeRuntimeArtifacts(resultsDir, sections) {
-  writeSection(resultsDir, "axe.json", sections.axe);
-  writeSection(resultsDir, "keyboard.json", sections.keyboard);
-  writeSection(resultsDir, "viewports.json", sections.viewports);
-  writeSection(resultsDir, "web-vitals.json", sections.performance);
-  writeSection(resultsDir, "routes.json", sections.routes);
-  writeSection(resultsDir, "queries.json", sections.queries);
+export function writeRuntimeArtifacts(resultsDir, sections, storageOptions = {}) {
+  writeSection(resultsDir, "axe.json", sections.axe, storageOptions);
+  writeSection(resultsDir, "keyboard.json", sections.keyboard, storageOptions);
+  writeSection(resultsDir, "viewports.json", sections.viewports, storageOptions);
+  writeSection(resultsDir, "web-vitals.json", sections.performance, storageOptions);
+  writeSection(resultsDir, "routes.json", sections.routes, storageOptions);
+  writeSection(resultsDir, "queries.json", sections.queries, storageOptions);
 }
 
 function routeSlug(route) {

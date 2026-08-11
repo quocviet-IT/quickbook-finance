@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
@@ -11,7 +20,7 @@ import {
   redactQualityValue,
 } from "../../scripts/quality/model.mjs";
 import { acceptBaseline } from "../../scripts/quality/accept-baseline.mjs";
-import { writeQualityReport } from "../../scripts/quality/report.mjs";
+import { aggregateQualityArtifacts, writeQualityReport } from "../../scripts/quality/report.mjs";
 
 type QualityExitInput = {
   mode: "report" | "regression";
@@ -30,6 +39,34 @@ const reviewedBaseline: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   QUALITY_ACCEPT_BASELINE: "ONEBOOK_REVIEWED_QUALITY_BASELINE",
 };
+const requiredSectionArtifacts = [
+  "axe.json",
+  "bundle.json",
+  "keyboard.json",
+  "queries.json",
+  "routes.json",
+  "viewports.json",
+  "web-vitals.json",
+];
+
+function completeReportSummary(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    version: 1,
+    mode: "report",
+    sectionArtifacts: requiredSectionArtifacts,
+    findings: [],
+    measurements: [],
+    unavailable: [],
+    safetyFailures: [],
+    budgets: { performance: { percent: 0.2, absoluteMs: 200, clsAbsolute: 0.03 } },
+    ...overrides,
+  };
+}
+
+function expectNoBaselineOutput(dir: string, baseline: string) {
+  expect(existsSync(baseline)).toBe(false);
+  expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+}
 
 describe("quality result model", () => {
   it("uses stable fingerprints and medians", () => {
@@ -168,24 +205,20 @@ describe("quality result model", () => {
     expect(existsSync(join(dir, "summary.json.tmp"))).toBe(false);
   });
 
-  it("requires the exact opt-in and accepts only a compact normalized baseline", () => {
+  it("requires the exact opt-in and accepts only a complete safety-clean report summary", () => {
     const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-"));
     const results = join(dir, "summary.json");
     const baseline = join(dir, "nested", "baseline.json");
-    writeFileSync(results, JSON.stringify({
-      version: 9,
-      mode: "report",
+    writeFileSync(results, JSON.stringify(completeReportSummary({
       findings: [
         { fingerprint: "z-finding", payload: "customer" },
         { kind: "axe", rule: "label", route: "/invoices", viewport: "desktop", target: "#name" },
       ],
-      measurements: {
-        response: { key: "performance./invoices.responseMs", kind: "performance", value: 1_000, raw: "private" },
-      },
-      budgets: { performance: { percent: 0.20, absoluteMs: 200, clsAbsolute: 0.03 } },
-      unavailable: [{ reason: "secret" }],
-      safetyFailures: [{ html: "<p>Customer</p>" }],
-    }), "utf8");
+      measurements: [
+        { key: "performance./invoices.responseMs", kind: "performance", value: 1_000, raw: "private" },
+      ],
+      unavailable: [{ kind: "query", reason: "QUALITY_DATABASE_URL is not configured" }],
+    })), "utf8");
     expect(() => acceptBaseline(results, baseline, emptyTestEnv)).toThrow(/QUALITY_ACCEPT_BASELINE/);
     acceptBaseline(results, baseline, reviewedBaseline);
     expect(JSON.parse(readFileSync(baseline, "utf8"))).toEqual({
@@ -196,15 +229,177 @@ describe("quality result model", () => {
     });
   });
 
+  it.each([
+    ["a non-v1 summary", { version: 9 }, /version/i],
+    ["a regression summary", { mode: "regression" }, /report/i],
+  ])("rejects %s without creating baseline or temporary output", (_label, override, expected) => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-contract-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    writeFileSync(results, JSON.stringify(completeReportSummary(override)));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(expected);
+    expectNoBaselineOutput(dir, baseline);
+  });
+
+  it.each([
+    ["findings", undefined],
+    ["findings", {}],
+    ["measurements", undefined],
+    ["measurements", "fast"],
+    ["unavailable", undefined],
+    ["unavailable", {}],
+    ["unavailable", ["not-a-record"]],
+    ["safetyFailures", undefined],
+    ["safetyFailures", {}],
+  ])("rejects a summary with invalid required %s without output", (field, value) => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-array-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    const summary = completeReportSummary();
+    if (value === undefined) delete summary[field as keyof typeof summary];
+    else summary[field as keyof typeof summary] = value as never;
+    writeFileSync(results, JSON.stringify(summary));
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(new RegExp(String(field).replace(/s$/, "s?"), "i"));
+    expectNoBaselineOutput(dir, baseline);
+  });
+
+  it("rejects any safety failure and incomplete section provenance without output", () => {
+    for (const override of [
+      { safetyFailures: [{ kind: "auth" }] },
+      { sectionArtifacts: requiredSectionArtifacts.slice(0, -1) },
+    ]) {
+      const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-provenance-"));
+      const results = join(dir, "summary.json");
+      const baseline = join(dir, "baseline.json");
+      writeFileSync(results, JSON.stringify(completeReportSummary(override)));
+
+      expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/safety|section artifact|provenance/i);
+      expectNoBaselineOutput(dir, baseline);
+    }
+  });
+
+  it("rejects a prepositioned baseline temporary reparse entry without touching outside content", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-temp-link-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    const outside = join(dir, "outside");
+    const sentinel = join(outside, "sentinel.txt");
+    const temporary = join(dir, "injected-baseline.tmp");
+    writeFileSync(results, JSON.stringify(completeReportSummary()));
+    mkdirSync(outside);
+    writeFileSync(sentinel, "outside-sentinel", "utf8");
+    try {
+      symlinkSync(outside, temporary, "junction");
+    } catch (error) {
+      if (["EACCES", "EPERM", "ENOTSUP"].includes((error as NodeJS.ErrnoException).code ?? "")) return;
+      throw error;
+    }
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline, {
+      temporaryPathFor: () => temporary,
+    })).toThrow(/temporary|link|exclusive|artifact/i);
+    expect(readFileSync(sentinel, "utf8")).toBe("outside-sentinel");
+    expect(existsSync(baseline)).toBe(false);
+    expect(existsSync(temporary)).toBe(true);
+    unlinkSync(temporary);
+  });
+
+  it("reports the exact section artifact filenames used for aggregation", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-section-provenance-"));
+    const emptySection = { findings: [], measurements: [], unavailable: [], safetyFailures: [] };
+    for (const name of requiredSectionArtifacts) writeFileSync(join(dir, name), JSON.stringify(emptySection));
+
+    expect(aggregateQualityArtifacts(dir, { mode: "report" }).sectionArtifacts)
+      .toEqual(requiredSectionArtifacts);
+  });
+
+  it("rejects a linked report result root without writing through it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-report-linked-root-"));
+    const outside = join(dir, "outside");
+    const linked = join(dir, "linked-results");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "sentinel.txt"), "outside-sentinel", "utf8");
+    writeFileSync(join(outside, "bundle.json"), JSON.stringify({
+      findings: [], measurements: [], unavailable: [], safetyFailures: [],
+    }));
+    try {
+      symlinkSync(outside, linked, "junction");
+    } catch (error) {
+      if (["EACCES", "EPERM", "ENOTSUP"].includes((error as NodeJS.ErrnoException).code ?? "")) return;
+      throw error;
+    }
+
+    expect(() => aggregateQualityArtifacts(linked, { mode: "report" }))
+      .toThrow(/result root|owned|link|reparse/i);
+    expect(() => writeQualityReport(linked, completeReportSummary()))
+      .toThrow(/result root|owned|link|reparse/i);
+    expect(readFileSync(join(outside, "sentinel.txt"), "utf8")).toBe("outside-sentinel");
+    expect(existsSync(join(outside, "summary.json"))).toBe(false);
+    unlinkSync(linked);
+  });
+
+  it("rejects a linked summary target without touching its outside sentinel", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-summary-target-link-"));
+    const outside = join(dir, "outside.txt");
+    const target = join(dir, "summary.json");
+    writeFileSync(outside, "outside-sentinel", "utf8");
+    try {
+      symlinkSync(outside, target, "file");
+    } catch (error) {
+      if (["EACCES", "EPERM", "ENOTSUP"].includes((error as NodeJS.ErrnoException).code ?? "")) return;
+      throw error;
+    }
+
+    expect(() => writeQualityReport(dir, completeReportSummary())).toThrow(/target|artifact|link|reparse/i);
+    expect(readFileSync(outside, "utf8")).toBe("outside-sentinel");
+    expect(existsSync(target)).toBe(true);
+  });
+
+  it("rejects a deterministic prepositioned summary temporary reparse entry", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-summary-temp-link-"));
+    const outside = join(dir, "outside");
+    const temporary = join(dir, "injected-summary.tmp");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "sentinel.txt"), "outside-sentinel", "utf8");
+    symlinkSync(outside, temporary, "junction");
+
+    expect(() => writeQualityReport(dir, completeReportSummary(), {
+      temporaryPathFor: () => temporary,
+    })).toThrow(/temporary|link|exclusive|artifact/i);
+    expect(readFileSync(join(outside, "sentinel.txt"), "utf8")).toBe("outside-sentinel");
+    expect(existsSync(join(dir, "summary.json"))).toBe(false);
+    expect(existsSync(temporary)).toBe(true);
+    unlinkSync(temporary);
+  });
+
+  it("rejects a linked baseline target without touching its outside sentinel", () => {
+    const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-target-link-"));
+    const results = join(dir, "summary.json");
+    const baseline = join(dir, "baseline.json");
+    const outside = join(dir, "outside.txt");
+    writeFileSync(results, JSON.stringify(completeReportSummary()));
+    writeFileSync(outside, "outside-sentinel", "utf8");
+    try {
+      symlinkSync(outside, baseline, "file");
+    } catch (error) {
+      if (["EACCES", "EPERM", "ENOTSUP"].includes((error as NodeJS.ErrnoException).code ?? "")) return;
+      throw error;
+    }
+
+    expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/target|artifact|link|reparse/i);
+    expect(readFileSync(outside, "utf8")).toBe("outside-sentinel");
+    expect(existsSync(baseline)).toBe(true);
+  });
+
   it("rejects non-string fingerprints during baseline acceptance", () => {
     const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-fingerprint-"));
     const results = join(dir, "summary.json");
     const baseline = join(dir, "baseline.json");
-    writeFileSync(results, JSON.stringify({
+    writeFileSync(results, JSON.stringify(completeReportSummary({
       findings: [{ fingerprint: 42 }],
-      measurements: [],
-      budgets: { performance: { percent: 0.2 } },
-    }));
+    })));
 
     expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/fingerprint/i);
     expect(existsSync(baseline)).toBe(false);
@@ -214,11 +409,9 @@ describe("quality result model", () => {
     const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-budget-"));
     const results = join(dir, "summary.json");
     const baseline = join(dir, "baseline.json");
-    writeFileSync(results, JSON.stringify({
-      findings: [],
-      measurements: [],
+    writeFileSync(results, JSON.stringify(completeReportSummary({
       budgets: { performance: { percent: "secret" } },
-    }));
+    })));
 
     expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/numeric.*budget/i);
     expect(existsSync(baseline)).toBe(false);
@@ -236,7 +429,7 @@ describe("quality result model", () => {
       const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-measurement-"));
       const results = join(dir, "summary.json");
       const baseline = join(dir, "baseline.json");
-      writeFileSync(results, `{"findings":[],"measurements":[${validMetric},${invalidMetric}],"budgets":{"performance":{"percent":0.2}}}`);
+      writeFileSync(results, `{"version":1,"mode":"report","sectionArtifacts":${JSON.stringify(requiredSectionArtifacts)},"findings":[],"measurements":[${validMetric},${invalidMetric}],"unavailable":[],"safetyFailures":[],"budgets":{"performance":{"percent":0.2}}}`);
 
       expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/measurement/i);
       expect(existsSync(baseline)).toBe(false);
@@ -247,14 +440,12 @@ describe("quality result model", () => {
     const dir = mkdtempSync(join(tmpdir(), "onebook-baseline-mixed-budget-"));
     const results = join(dir, "summary.json");
     const baseline = join(dir, "baseline.json");
-    writeFileSync(results, JSON.stringify({
-      findings: [],
-      measurements: [],
+    writeFileSync(results, JSON.stringify(completeReportSummary({
       budgets: {
         performance: { percent: 0.2, absoluteMs: "two hundred" },
         bundle: { percent: 0.1, absoluteGzipBytes: 20_480 },
       },
-    }));
+    })));
 
     expect(() => acceptBaseline(results, baseline, reviewedBaseline)).toThrow(/numeric.*budget/i);
     expect(existsSync(baseline)).toBe(false);
