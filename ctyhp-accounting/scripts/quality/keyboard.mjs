@@ -175,22 +175,103 @@ function observedPageRoute(page) {
 }
 
 export function observeKeyboardSafety(page) {
-  const state = { failure: null, completed: false };
+  let documentNavigation = null;
+  const state = {
+    failure: null,
+    completed: false,
+    beginDocumentNavigation(route) {
+      if (documentNavigation) {
+        if (!state.failure) state.failure = new KeyboardSafetyError("harness-error", route);
+        return null;
+      }
+      const token = {};
+      documentNavigation = {
+        token,
+        route: safeRoute(route),
+        requests: new Set(),
+        response: null,
+        requestFailure: null,
+      };
+      return token;
+    },
+    endDocumentNavigation(token) {
+      if (!documentNavigation || documentNavigation.token !== token) {
+        if (!state.failure) state.failure = new KeyboardSafetyError("harness-error", observedPageRoute(page));
+        documentNavigation = null;
+        return;
+      }
+      const observation = documentNavigation;
+      documentNavigation = null;
+      const failedRoute = observation.requestFailure?.route;
+      const status = observation.response?.status;
+      if (failedRoute) {
+        if (!state.failure) state.failure = new KeyboardSafetyError("document-navigation", failedRoute);
+      } else if (observation.response && (!Number.isInteger(status) || status < 200 || status >= 300)) {
+        if (!state.failure) {
+          state.failure = new KeyboardSafetyError(
+            "document-navigation",
+            observation.response.route,
+          );
+        }
+      }
+    },
+    dispose() {
+      documentNavigation = null;
+      for (const [event, listener] of listeners) page.off?.(event, listener);
+    },
+  };
   const fail = (kind, route = observedPageRoute(page)) => {
     if (!state.failure) state.failure = new KeyboardSafetyError(kind, route);
   };
-  page.on("request", (request) => {
-    if (state.failure || isAllowedBrowserMethod(request.method())) return;
-    state.failure = new KeyboardSafetyError(
-      `blocked-${String(request.method()).toLowerCase()}`,
-      safeRequestTarget(request.url()),
-    );
-  });
-  page.on("pageerror", () => fail("page-error"));
-  page.on("crash", () => fail("page-crash"));
-  page.on("close", () => {
+  const onRequest = (request) => {
+    try {
+      if (documentNavigation && isMainDocument(request)) {
+        documentNavigation.requests.add(request);
+      }
+      if (state.failure || isAllowedBrowserMethod(request.method())) return;
+      state.failure = new KeyboardSafetyError(
+        `blocked-${String(request.method()).toLowerCase()}`,
+        safeRequestTarget(request.url()),
+      );
+    } catch {
+      fail("harness-error");
+    }
+  };
+  const isMainDocument = (request) => request.resourceType() === "document"
+    && request.frame() === page.mainFrame();
+  const onResponse = (response) => {
+    try {
+      if (!documentNavigation || !documentNavigation.requests.has(response.request())) return;
+      documentNavigation.response = {
+        status: response.status(),
+        route: safeRequestTarget(response.url()),
+      };
+    } catch {
+      fail("harness-error");
+    }
+  };
+  const onRequestFailed = (request) => {
+    try {
+      if (!documentNavigation || !documentNavigation.requests.has(request)) return;
+      documentNavigation.requestFailure = { route: safeRequestTarget(request.url()) };
+    } catch {
+      fail("harness-error");
+    }
+  };
+  const onPageError = () => fail("page-error");
+  const onCrash = () => fail("page-crash");
+  const onClose = () => {
     if (!state.completed) fail("page-closed");
-  });
+  };
+  const listeners = [
+    ["request", onRequest],
+    ["response", onResponse],
+    ["requestfailed", onRequestFailed],
+    ["pageerror", onPageError],
+    ["crash", onCrash],
+    ["close", onClose],
+  ];
+  for (const [event, listener] of listeners) page.on(event, listener);
   return state;
 }
 
@@ -198,21 +279,27 @@ function assertSafety(state) {
   if (state?.failure) throw state.failure;
 }
 
-async function assertRendered(page, route, response, safety) {
+async function assertRendered(page, route, safety) {
   assertSafety(safety);
-  const status = response?.status?.();
-  if (Number.isInteger(status) && (status < 200 || status >= 300)) {
-    throw new KeyboardSafetyError("document-navigation", route);
-  }
   if (safeRoute(page.url()) === "/login") throw new KeyboardSafetyError("auth", route);
   if (await page.getByText("We could not load this page", { exact: false }).count()) {
     throw new KeyboardSafetyError("error-boundary", route);
   }
 }
 
+function beginDocumentNavigation(safety, route) {
+  return safety?.beginDocumentNavigation?.(route) ?? null;
+}
+
+function endDocumentNavigation(safety, token) {
+  if (token) safety?.endDocumentNavigation?.(token);
+}
+
 async function navigate(page, baseUrl, route, viewport, safety) {
   await page.setViewportSize(viewport);
+  const observation = beginDocumentNavigation(safety, route);
   let response;
+  let navigationError = false;
   try {
     response = await page.goto(new URL(route, baseUrl).toString(), {
       waitUntil: "domcontentloaded",
@@ -220,21 +307,34 @@ async function navigate(page, baseUrl, route, viewport, safety) {
     });
     await page.locator("#main-content").waitFor({ state: "visible", timeout: 30_000 });
   } catch {
-    assertSafety(safety);
-    throw new KeyboardSafetyError("navigation-render", route);
+    navigationError = true;
+  } finally {
+    endDocumentNavigation(safety, observation);
   }
-  await assertRendered(page, route, response, safety);
+  assertSafety(safety);
+  if (navigationError) throw new KeyboardSafetyError("navigation-render", route);
+  const status = response?.status?.();
+  if (!Number.isInteger(status) || status < 200 || status >= 300) {
+    throw new KeyboardSafetyError("document-navigation", route);
+  }
+  await assertRendered(page, route, safety);
 }
 
-async function waitForPath(page, route, safety) {
+export async function waitForKeyboardPath(page, route, safety, activate) {
+  const observation = beginDocumentNavigation(safety, route);
+  let navigationError = false;
   try {
+    await activate();
     await page.waitForURL((url) => url.pathname === route, { timeout: 30_000 });
     await page.locator("#main-content").waitFor({ state: "visible", timeout: 30_000 });
   } catch {
-    assertSafety(safety);
-    throw new KeyboardSafetyError("navigation-render", route);
+    navigationError = true;
+  } finally {
+    endDocumentNavigation(safety, observation);
   }
-  await assertRendered(page, route, null, safety);
+  assertSafety(safety);
+  if (navigationError) throw new KeyboardSafetyError("navigation-render", route);
+  await assertRendered(page, route, safety);
 }
 
 async function visibleDialog(page) {
@@ -329,8 +429,12 @@ async function desktopNavigationScenario(page, baseUrl, safety) {
     safety,
   );
   const focusedBefore = await activeFocusSnapshot(page);
-  await page.keyboard.press("Enter");
-  await waitForPath(page, "/sales", safety);
+  await waitForKeyboardPath(
+    page,
+    "/sales",
+    safety,
+    async () => await page.keyboard.press("Enter"),
+  );
   await assertActiveFocusVisible(page);
   return { route: page.url(), focusedBefore, focusedAfter: await activeFocusSnapshot(page) };
 }
@@ -521,10 +625,14 @@ export async function runKeyboardScenario(page, baseUrl, scenario, safety) {
 export async function runKeyboardScenarios(page, baseUrl) {
   const safety = observeKeyboardSafety(page);
   const results = [];
-  for (const scenario of KEYBOARD_SCENARIOS) {
-    results.push(await runKeyboardScenario(page, baseUrl, scenario, safety));
+  try {
+    for (const scenario of KEYBOARD_SCENARIOS) {
+      results.push(await runKeyboardScenario(page, baseUrl, scenario, safety));
+    }
+    assertSafety(safety);
+    safety.completed = true;
+    return results;
+  } finally {
+    safety.dispose();
   }
-  assertSafety(safety);
-  safety.completed = true;
-  return results;
 }

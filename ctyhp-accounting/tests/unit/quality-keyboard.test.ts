@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { errors as playwrightErrors } from "playwright";
+import * as keyboardModule from "../../scripts/quality/keyboard.mjs";
 import {
   KEYBOARD_SCENARIOS,
   KeyboardAssertionError,
@@ -16,6 +17,71 @@ import {
   keyboardSection,
   runtimeAuditPhases,
 } from "../../scripts/quality/run-runtime.mjs";
+
+type PageListener = (value?: unknown) => void;
+
+function keyboardNavigationPage(startUrl = "https://quality.example.test/dashboard") {
+  const listeners = new Map<string, Set<PageListener>>();
+  const mainFrame = {};
+  let currentUrl = startUrl;
+
+  const page = {
+    on(name: string, listener: PageListener) {
+      const eventListeners = listeners.get(name) ?? new Set<PageListener>();
+      eventListeners.add(listener);
+      listeners.set(name, eventListeners);
+      return page;
+    },
+    off(name: string, listener: PageListener) {
+      listeners.get(name)?.delete(listener);
+      return page;
+    },
+    emit(name: string, value?: unknown) {
+      for (const listener of listeners.get(name) ?? []) listener(value);
+    },
+    mainFrame: () => mainFrame,
+    url: () => currentUrl,
+    waitForURL: async (predicate: (url: URL) => boolean) => {
+      if (!predicate(new URL(currentUrl))) throw new Error("URL did not match");
+    },
+    locator: () => ({ waitFor: async () => undefined }),
+    getByText: () => ({ count: async () => 0 }),
+  };
+
+  return {
+    page,
+    mainFrame,
+    navigateTo(url: string) { currentUrl = url; },
+    listenerCount(name: string) { return listeners.get(name)?.size ?? 0; },
+  };
+}
+
+function documentRequest(page: ReturnType<typeof keyboardNavigationPage>, url: string) {
+  return {
+    method: () => "GET",
+    resourceType: () => "document",
+    frame: () => page.mainFrame,
+    url: () => url,
+  };
+}
+
+async function waitForTestKeyboardPath(
+  page: ReturnType<typeof keyboardNavigationPage>,
+  route: string,
+  safety: ReturnType<typeof observeKeyboardSafety>,
+  activate: () => Promise<void>,
+) {
+  const waitForKeyboardPath = (keyboardModule as unknown as {
+    waitForKeyboardPath?: (
+      page: ReturnType<typeof keyboardNavigationPage>["page"],
+      route: string,
+      safety: ReturnType<typeof observeKeyboardSafety>,
+      activate: () => Promise<void>,
+    ) => Promise<void>;
+  }).waitForKeyboardPath;
+  expect(waitForKeyboardPath).toBeTypeOf("function");
+  return await waitForKeyboardPath!(page.page, route, safety, activate);
+}
 
 describe("keyboard quality scenarios", () => {
   it("names the approved stable scenarios and excludes mutation actions", () => {
@@ -145,6 +211,167 @@ describe("keyboard quality scenarios", () => {
       kind,
       route: "/dashboard",
     });
+  });
+
+  it("fails closed when keyboard navigation renders a 503 main document", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+    const destination = "https://quality.example.test/sales?customer=private";
+
+    const failure = await waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo(destination);
+      const request = documentRequest(controlled, destination);
+      controlled.page.emit("request", request);
+      controlled.page.emit("response", {
+        status: () => 503,
+        url: () => destination,
+        request: () => request,
+      });
+    }).catch((error) => error);
+    expect(failure).toMatchObject({
+      name: "KeyboardSafetyError",
+      kind: "document-navigation",
+      route: "/sales",
+    });
+    expect(String(failure)).not.toContain("customer=private");
+  });
+
+  it("fails closed when a keyboard destination document request fails", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+    const destination = "https://quality.example.test/sales?token=private";
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo(destination);
+      const request = documentRequest(controlled, destination);
+      controlled.page.emit("request", request);
+      controlled.page.emit("requestfailed", request);
+    })).rejects.toMatchObject({
+      name: "KeyboardSafetyError",
+      kind: "document-navigation",
+      route: "/sales",
+    });
+  });
+
+  it("does not misclassify a failed subresource as document navigation", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo("https://quality.example.test/sales");
+      controlled.page.emit("response", {
+        status: () => 503,
+        url: () => "https://quality.example.test/_next/static/chunk.js",
+        request: () => ({
+          resourceType: () => "script",
+          frame: () => controlled.mainFrame,
+          url: () => "https://quality.example.test/_next/static/chunk.js",
+        }),
+      });
+    })).resolves.toBeUndefined();
+    expect(safety.failure).toBeNull();
+  });
+
+  it("allows a successful SPA keyboard transition without a document response", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo("https://quality.example.test/sales");
+    })).resolves.toBeUndefined();
+    expect(safety.failure).toBeNull();
+  });
+
+  it("does not leak a document failure emitted before the navigation interval", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+    controlled.page.emit("requestfailed", documentRequest(
+      controlled,
+      "https://quality.example.test/earlier?token=private",
+    ));
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo("https://quality.example.test/sales");
+    })).resolves.toBeUndefined();
+    expect(safety.failure).toBeNull();
+  });
+
+  it("ignores a delayed response for a document request begun before the interval", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+    const staleUrl = "https://quality.example.test/earlier?token=private";
+    const staleRequest = documentRequest(controlled, staleUrl);
+    controlled.page.emit("request", staleRequest);
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo("https://quality.example.test/sales");
+      controlled.page.emit("response", {
+        status: () => 503,
+        url: () => staleUrl,
+        request: () => staleRequest,
+      });
+    })).resolves.toBeUndefined();
+    expect(safety.failure).toBeNull();
+  });
+
+  it("uses the final main-document response after an intermediate redirect", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+    const destination = "https://quality.example.test/sales";
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo(destination);
+      const redirectRequest = documentRequest(controlled, "https://quality.example.test/go-to-sales");
+      controlled.page.emit("request", redirectRequest);
+      controlled.page.emit("response", {
+        status: () => 307,
+        url: () => "https://quality.example.test/go-to-sales",
+        request: () => redirectRequest,
+      });
+      const destinationRequest = documentRequest(controlled, destination);
+      controlled.page.emit("request", destinationRequest);
+      controlled.page.emit("response", {
+        status: () => 200,
+        url: () => destination,
+        request: () => destinationRequest,
+      });
+    })).resolves.toBeUndefined();
+    expect(safety.failure).toBeNull();
+  });
+
+  it("classifies document-observer API exceptions as harness safety failures", async () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+
+    await expect(waitForTestKeyboardPath(controlled, "/sales", safety, async () => {
+      controlled.navigateTo("https://quality.example.test/sales");
+      controlled.page.emit("response", {
+        request: () => { throw new Error("Playwright response API failed with private content"); },
+      });
+    })).rejects.toMatchObject({
+      name: "KeyboardSafetyError",
+      kind: "harness-error",
+      route: "/sales",
+    });
+  });
+
+  it("removes every keyboard safety listener during explicit cleanup", () => {
+    const controlled = keyboardNavigationPage();
+    const safety = observeKeyboardSafety(controlled.page);
+    expect(controlled.listenerCount("response")).toBe(1);
+    expect(controlled.listenerCount("requestfailed")).toBe(1);
+
+    const dispose = (safety as unknown as { dispose?: () => void }).dispose;
+    expect(dispose).toBeTypeOf("function");
+    dispose!();
+
+    for (const event of ["request", "response", "requestfailed", "pageerror", "crash", "close"]) {
+      expect(controlled.listenerCount(event)).toBe(0);
+    }
+
+    const nextSafety = observeKeyboardSafety(controlled.page);
+    expect(controlled.listenerCount("response")).toBe(1);
+    nextSafety.dispose();
   });
 
   it("reaches a hidden file input with bounded Tab presses and no focus call", async () => {
