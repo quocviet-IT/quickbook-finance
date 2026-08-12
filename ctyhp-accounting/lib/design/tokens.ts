@@ -117,3 +117,18 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["intent.danger", "surface.card"],
   ["intent.info", "surface.card"],
 ];
+
+/**
+ * The tokens as a `:root` block.
+ *
+ * Emitted into globals.css as static text rather than injected at runtime: a
+ * runtime style block costs bytes on every response and cannot be inspected in
+ * a diff. A unit test asserts the committed CSS still matches this output, so
+ * editing one without the other fails the build instead of drifting quietly.
+ */
+export function cssVariableBlock(): string {
+  const lines = flattenTokens().map(
+    ([path, value]) => `  --ob-${path.replace(".", "-")}: ${value};`,
+  );
+  return `:root {\n${lines.join("\n")}\n}\n`;
+}

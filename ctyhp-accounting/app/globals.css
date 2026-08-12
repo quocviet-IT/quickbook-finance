@@ -1,3 +1,41 @@
+/* Generated from lib/design/tokens.ts. Do not edit by hand — a unit test
+   asserts this block still matches cssVariableBlock() exactly, so changing a
+   colour means changing the token and copying the new block over. */
+:root {
+  --ob-money-positive: #15803d;
+  --ob-money-negative: #b91c1c;
+  --ob-money-zero: #475569;
+  --ob-intent-primary: #0f766e;
+  --ob-intent-success: #15803d;
+  --ob-intent-warning: #b45309;
+  --ob-intent-danger: #b91c1c;
+  --ob-intent-info: #1d4ed8;
+  --ob-text-heading: #0f172a;
+  --ob-text-body: #0f172a;
+  --ob-text-secondary: #475569;
+  --ob-text-onDark: #ffffff;
+  --ob-surface-page: #f6f7f9;
+  --ob-surface-card: #ffffff;
+  --ob-surface-muted: #f1f5f9;
+  --ob-surface-sider: #0f172a;
+  --ob-border-default: #e2e8f0;
+  --ob-border-subtle: #f1f5f9;
+  --ob-series-sales: #0f766e;
+  --ob-series-purchases: #7c3aed;
+  --ob-series-inventory: #0369a1;
+  --ob-series-banking: #1d4ed8;
+  --ob-series-close: #c2410c;
+  --ob-series-governance: #475569;
+  --ob-series-other: #94a3b8;
+  --ob-series-income: #0f766e;
+  --ob-series-expense: #c2410c;
+  --ob-series-net: #1d4ed8;
+  --ob-series-receivable: #0f766e;
+  --ob-series-payable: #7c3aed;
+  --ob-series-axis: #94a3b8;
+  --ob-series-grid: #e2e8f0;
+}
+
 html,
 body {
   padding: 0;

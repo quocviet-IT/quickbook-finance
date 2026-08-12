@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PALETTE } from "@/lib/design/palette";
-import { TOKENS, flattenTokens, resolveToken, TEXT_ON_SURFACE_PAIRS } from "@/lib/design/tokens";
+import { TOKENS, cssVariableBlock, flattenTokens, resolveToken, TEXT_ON_SURFACE_PAIRS } from "@/lib/design/tokens";
 
 describe("design tokens", () => {
   it("resolves every semantic token to a palette entry", () => {
@@ -49,5 +51,20 @@ describe("colour contrast", () => {
 
   it("checks a meaningful number of pairs", () => {
     expect(TEXT_ON_SURFACE_PAIRS.length).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe("CSS custom properties", () => {
+  it("names every token as --ob-group-name", () => {
+    const block = cssVariableBlock();
+    expect(block).toContain("--ob-money-negative: #b91c1c;");
+    expect(block).toContain("--ob-intent-primary: #0f766e;");
+    expect(block.startsWith(":root {")).toBe(true);
+    expect(block.endsWith("}\n")).toBe(true);
+  });
+
+  it("matches the block committed in globals.css character for character", () => {
+    const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+    expect(css).toContain(cssVariableBlock());
   });
 });
