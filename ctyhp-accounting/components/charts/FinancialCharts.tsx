@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Card, Empty, Typography } from "antd";
+import { TOKENS } from "@/lib/design/tokens";
 import type {
   AgingSnapshot,
   CashMovementSnapshot,
@@ -9,14 +10,14 @@ import type {
 } from "@/lib/services/dashboard";
 
 const PALETTE = {
-  income: "#0f766e",
-  expense: "#c2410c",
-  net: "#1d4ed8",
-  receivable: "#0f766e",
-  payable: "#7c3aed",
-  positive: "#15803d",
-  negative: "#b91c1c",
-  neutral: "#475569",
+  income: TOKENS.series.income,
+  expense: TOKENS.series.expense,
+  net: TOKENS.series.net,
+  receivable: TOKENS.series.receivable,
+  payable: TOKENS.series.payable,
+  positive: TOKENS.money.positive,
+  negative: TOKENS.money.negative,
+  neutral: TOKENS.text.secondary,
 };
 
 function ChartCard({
@@ -122,7 +123,7 @@ export function PerformanceChart({
                     x2={width - plot.right}
                     y1={y(tick)}
                     y2={y(tick)}
-                    stroke="#e2e8f0"
+                    stroke={TOKENS.series.grid}
                     strokeDasharray="4 4"
                   />
                   <text x={plot.left - 10} y={y(tick) + 4} textAnchor="end" className="financial-chart__axis">
@@ -135,7 +136,7 @@ export function PerformanceChart({
                 x2={width - plot.right}
                 y1={baselineY}
                 y2={baselineY}
-                stroke="#94a3b8"
+                stroke={TOKENS.series.axis}
               />
               {data.map((point, index) => {
                 const center = plot.left + groupWidth * index + groupWidth / 2;
@@ -185,7 +186,7 @@ export function PerformanceChart({
                     cx={center}
                     cy={y(point.netIncomeMinor)}
                     r={4.5}
-                    fill="#ffffff"
+                    fill={TOKENS.text.onDark}
                     stroke={PALETTE.net}
                     strokeWidth={3}
                   >

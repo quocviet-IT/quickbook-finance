@@ -27,6 +27,7 @@ import {
   ComparisonBars,
   PerformanceChart,
 } from "@/components/charts/FinancialCharts";
+import { TOKENS } from "@/lib/design/tokens";
 import { fromMinor } from "@/lib/domain/money";
 import { INTERNAL_REPORT_HREFS } from "@/lib/domain/report-catalog";
 import type {
@@ -278,19 +279,19 @@ export default function DashboardClient({
                 key: "current-assets",
                 label: "Current assets",
                 value: metrics.currentAssetsMinor,
-                color: "#0f766e",
+                color: TOKENS.intent.primary,
               },
               {
                 key: "current-liabilities",
                 label: "Current liabilities",
                 value: metrics.currentLiabilitiesMinor,
-                color: "#c2410c",
+                color: TOKENS.intent.warning,
               },
               {
                 key: "working-capital",
                 label: "Working capital",
                 value: metrics.workingCapitalMinor,
-                color: "#1d4ed8",
+                color: TOKENS.intent.info,
               },
             ]}
             formatMoney={formatMoney}
@@ -308,19 +309,19 @@ export default function DashboardClient({
                 key: "overdue-receivables",
                 label: "Overdue receivables",
                 value: metrics.overdueArMinor,
-                color: "#b91c1c",
+                color: TOKENS.intent.danger,
               },
               {
                 key: "overdue-payables",
                 label: "Overdue payables",
                 value: metrics.overdueApMinor,
-                color: "#b45309",
+                color: TOKENS.intent.warning,
               },
               {
                 key: "unreconciled-bank",
                 label: "Unreconciled bank activity",
                 value: metrics.unreconciledMinor,
-                color: "#7c3aed",
+                color: TOKENS.series.purchases,
               },
             ]}
             formatMoney={formatMoney}
@@ -563,13 +564,13 @@ const ACTIVITY_FILTERS: Array<{
 ];
 
 const ACTIVITY_COLORS: Record<DashboardActivityCategory, string> = {
-  sales: "#0f766e",
-  purchases: "#7c3aed",
-  inventory: "#0369a1",
-  banking: "#1d4ed8",
-  close: "#c2410c",
-  governance: "#475569",
-  other: "#94a3b8",
+  sales: TOKENS.series.sales,
+  purchases: TOKENS.series.purchases,
+  inventory: TOKENS.series.inventory,
+  banking: TOKENS.series.banking,
+  close: TOKENS.series.close,
+  governance: TOKENS.series.governance,
+  other: TOKENS.series.other,
 };
 
 function ActivityTimeline({

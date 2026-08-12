@@ -15,8 +15,6 @@ import { describe, expect, it } from "vitest";
  * generated PDF are not CSS and do not derive from the theme.
  */
 const ALLOWLIST = new Set([
-  "app/(app)/dashboard/DashboardClient.tsx",
-  "components/charts/FinancialCharts.tsx",
   "components/payables/PayRunPanel.tsx",
   "app/(app)/reports/transactions/TransactionListClient.tsx",
   "components/feedback/ReportDialog.tsx",
