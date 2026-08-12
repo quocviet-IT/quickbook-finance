@@ -55,6 +55,14 @@ describe("Ant Design theme", () => {
     ]) {
       expect(source).toContain(setting);
     }
+
+    // The mirror of the same bug. Restoring headerHeight means writing a
+    // `Layout` key, and a `Layout` key written without spreading the token one
+    // drops siderBg, triggerBg and headerBg instead — silently, because every
+    // page still renders and the settings above are all still present.
+    expect(source).toContain("...components.Layout");
+    expect(source).toContain("...components,");
+    expect(source).toContain("...token,");
   });
 });
 

@@ -2,7 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Đưa toàn bộ màu của One Book về một nguồn sự thật duy nhất trong `lib/design/tokens.ts`, để `providers.tsx`, CSS và mọi component đều dẫn xuất từ đó thay vì chép tay hex.
+**Goal:** Dựng `lib/design/tokens.ts` làm nguồn sự thật cho màu, rồi đưa **theme Ant Design và mọi màu viết thẳng trong TSX** về đọc từ đó.
+
+**Phạm vi thật — sửa lại sau review toàn nhánh.** Bản đầu của dòng này viết "toàn bộ màu của One Book", và đó là nói quá. Đợt này gỡ 71 hex khỏi 21 file `.tsx` cộng 18 hex trong `providers.tsx`. Nó **không** đụng tới **309 hex nằm trong CSS** của chính hai thư mục đó:
+
+| File | Hex còn lại |
+|---|---|
+| `app/globals.css` | 225 (chưa kể 32 dòng `:root` mới) |
+| `components/work-areas/WorkAreaOverview.module.css` | 84 |
+
+Và chúng đúng là loại trùng lặp đợt này sinh ra để dẹp — riêng `#0f766e` xuất hiện 30 lần trong `globals.css`. Nguyên nhân của sai sót: khảo sát ban đầu đo `globals.css` có 6 custom property rồi kết luận "token gần như không tồn tại", mà **không đếm số hex trong đó**.
+
+Hai file này giờ nằm trong allowlist của `tests/unit/no-hardcoded-color.test.ts` kèm số lượng và lý do, và guard đã mở sang `.css` — trước đó nó chỉ quét `.ts`/`.tsx`, tức lối thoát dễ nhất (đặt màu vào CSS Module cạnh component) đang mở toang và **đã có một component đi qua đó**.
+
+**Cũng chưa thuộc phạm vi:** 64 chỗ `<Tag color="red">` dùng bảng preset của antd, sinh độc lập với `colorError`. Nên `CustomerCreditClient` hiện vẽ `#b91c1c` cạnh `#cf1322` — hai sắc đỏ cùng nghĩa trên một màn hình. Bài toán "ba sắc đỏ" mới giải được một nửa; nửa còn lại thuộc `statusColumn()` của Đợt 2.
 
 **Architecture:** Module thuần ba tầng — palette (màu thô) → semantic (ý nghĩa kế toán) → emitters (`antdThemeTokens()` cho Ant Design, `cssVariableBlock()` cho CSS). Không I/O, không React, nên unit test giữ được toàn bộ. Chống trôi lệch bằng test so khớp thay vì bằng kỷ luật review.
 

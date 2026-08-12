@@ -144,6 +144,21 @@ Khối `:root` nằm **tĩnh** trong `globals.css`, không emit lúc chạy. M�
 khẳng định nó khớp từng ký tự với `cssVariableBlock()`. Sửa một nơi mà quên nơi
 kia thì test đỏ.
 
+### Đợt 1 làm được tới đâu — ghi lại sau khi thi công xong
+
+Đợt 1 đã chạy xong. Ba điều cần nói đúng, vì Đợt 2–4 sẽ dựng lên trên nó:
+
+1. **Phạm vi hẹp hơn mục 5 này mô tả ban đầu.** Đợt 1 gỡ màu khỏi **TSX và theme
+   antd**. Trong `app/` và `components/` vẫn còn **309 hex trong CSS**
+   (`globals.css` 225, `WorkAreaOverview.module.css` 84). Chúng nằm trong
+   allowlist kèm lý do, và guard đã mở sang `.css`.
+2. **`var(--ob-*)` hiện được đọc 0 lần.** Khối `:root` là nửa đầu của đường ống,
+   chưa có đầu tiêu thụ. Đợt 2 đừng giả định CSS đã chạy bằng token.
+3. **`StatusBadge` chưa có nơi gọi nào.** Mọi trạng thái trong app vẫn hiện bằng
+   `<Tag color="green">` không icon. Component đúng và có test, nhưng người dùng
+   dự kiến của nó là `statusColumn()` ở Đợt 2 — tính là đã *dựng*, chưa tính là
+   đã *áp dụng*.
+
 ### Kiểm thử — `tests/unit/design-tokens.test.ts`
 
 | Khẳng định | Bắt được lỗi gì |
