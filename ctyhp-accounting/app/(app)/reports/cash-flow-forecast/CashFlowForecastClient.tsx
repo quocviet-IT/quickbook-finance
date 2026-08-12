@@ -24,6 +24,8 @@ import {
   type OpenItem,
 } from "@/lib/domain/forecast";
 import { outstandingAge } from "@/lib/domain/settlement";
+import { TOKENS } from "@/lib/design/tokens";
+import { statusToken } from "@/lib/design/status";
 
 const money = (minor: number) => formatMoney(minor, "USD", 2);
 
@@ -107,12 +109,12 @@ export default function CashFlowForecastClient({
         <Statistic
           title="Net over the horizon"
           value={money(closing)}
-          valueStyle={closing < 0 ? { color: "#cf1322" } : { color: "#3f8600" }}
+          valueStyle={closing < 0 ? { color: TOKENS.money.negative } : { color: TOKENS.money.positive }}
         />
         <Statistic
           title="Already overdue"
           value={money(overdueIn)}
-          valueStyle={overdueIn > 0 ? { color: "#cf1322" } : undefined}
+          valueStyle={overdueIn > 0 ? { color: statusToken("overdue").color } : undefined}
         />
       </Space>
 

@@ -19,6 +19,8 @@ import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import { formatMoney } from "@/lib/format";
 import { creditStateColor, sortByCreditRisk } from "@/lib/domain/credit";
 import type { CustomerCreditRow } from "@/lib/services/credit";
+import { TOKENS } from "@/lib/design/tokens";
+import { statusToken } from "@/lib/design/status";
 
 type View = "attention" | "all";
 
@@ -118,12 +120,12 @@ export default function CustomerCreditClient({
         <Statistic
           title="Past due"
           value={money(totalOverdue)}
-          valueStyle={totalOverdue > 0 ? { color: "#cf1322" } : undefined}
+          valueStyle={totalOverdue > 0 ? { color: statusToken("overdue").color } : undefined}
         />
         <Statistic
           title="Over limit"
           value={money(overLimitExposure)}
-          valueStyle={overLimitExposure > 0 ? { color: "#cf1322" } : undefined}
+          valueStyle={overLimitExposure > 0 ? { color: TOKENS.intent.danger } : undefined}
         />
         <Statistic title="On credit hold" value={onHold} />
         <Statistic

@@ -36,6 +36,7 @@ import {
   sequenceAuditAction,
   sequenceOverviewAction,
 } from "./actions";
+import { TOKENS } from "@/lib/design/tokens";
 
 type View = "breaks" | "all";
 
@@ -268,7 +269,7 @@ export default function NumberSequenceClient({
               value={audit.summary.unexplained + audit.summary.beyondSequence}
               valueStyle={
                 audit.summary.unexplained + audit.summary.beyondSequence > 0
-                  ? { color: "#cf1322" }
+                  ? { color: TOKENS.intent.danger }
                   : undefined
               }
             />

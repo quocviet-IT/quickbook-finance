@@ -7,6 +7,7 @@ import { toCsv } from "@/lib/csv";
 import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import type { Report1099, Vendor1099Assessed } from "@/lib/services/vendorTax";
 import { report1099Action } from "../../vendors/tax-actions";
+import { TOKENS } from "@/lib/design/tokens";
 
 const label = (v: string) => v.replace(/_/g, " ");
 
@@ -130,7 +131,7 @@ export default function Report1099Client({
             </Col>
             <Col xs={24} sm={8}>
               <Card>
-                <Statistic title="Vendors with blockers" value={rep.blockerCount} valueStyle={rep.blockerCount ? { color: "#cf1322" } : undefined} />
+                <Statistic title="Vendors with blockers" value={rep.blockerCount} valueStyle={rep.blockerCount ? { color: TOKENS.intent.danger } : undefined} />
               </Card>
             </Col>
           </Row>

@@ -16,6 +16,7 @@ import {
   type TransactionListRow,
 } from "@/lib/domain/transaction-list";
 import { formatMoney } from "@/lib/format";
+import { TOKENS } from "@/lib/design/tokens";
 
 const NO_FILTER: TransactionListFilter = {
   party: null,
@@ -96,10 +97,10 @@ export default function TransactionListClient({
           <Statistic title="Transactions" value={totals.count} />
         </Card>
         <Card size="small">
-          <Statistic title="Money in" value={money(totals.inMinor)} valueStyle={{ color: "#15803d" }} />
+          <Statistic title="Money in" value={money(totals.inMinor)} valueStyle={{ color: TOKENS.money.positive }} />
         </Card>
         <Card size="small">
-          <Statistic title="Money out" value={money(totals.outMinor)} valueStyle={{ color: "#b91c1c" }} />
+          <Statistic title="Money out" value={money(totals.outMinor)} valueStyle={{ color: TOKENS.money.negative }} />
         </Card>
         <Card size="small">
           <Statistic title="Net" value={money(totals.netMinor)} />
@@ -246,7 +247,7 @@ export default function TransactionListClient({
             width: 150,
             align: "right",
             render: (amount: number) => (
-              <span style={{ color: amount < 0 ? "#b91c1c" : "#15803d" }}>{money(amount)}</span>
+              <span style={{ color: amount < 0 ? TOKENS.money.negative : TOKENS.money.positive }}>{money(amount)}</span>
             ),
           },
           {
