@@ -1,6 +1,6 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-import { STATUS_KEYS, statusToken } from "@/lib/design/status";
+import { STATUS_KEYS, StatusBadge, statusToken } from "@/lib/design/status";
 import { TOKENS } from "@/lib/design/tokens";
 
 describe("status tokens", () => {
@@ -36,5 +36,28 @@ describe("status tokens", () => {
   it("gives each status a distinct label so colour is never the only signal", () => {
     const labels = STATUS_KEYS.map((key) => statusToken(key).label);
     expect(new Set(labels).size).toBe(STATUS_KEYS.length);
+  });
+});
+
+describe("StatusBadge", () => {
+  it("carries the icon and the wording, not the colour alone", () => {
+    for (const key of STATUS_KEYS) {
+      const badge = StatusBadge({ status: key });
+      const [icon, label] = badge.props.children as [unknown, string];
+      expect(isValidElement(icon)).toBe(true);
+      expect(label).toBe(statusToken(key).label);
+      expect(badge.props.style.color).toBe(statusToken(key).color);
+    }
+  });
+
+  it("tells void and draft apart even though they share a colour", () => {
+    const voidBadge = StatusBadge({ status: "void" });
+    const draftBadge = StatusBadge({ status: "draft" });
+    expect(voidBadge.props.style.color).toBe(draftBadge.props.style.color);
+
+    const [voidIcon, voidLabel] = voidBadge.props.children as [{ type: unknown }, string];
+    const [draftIcon, draftLabel] = draftBadge.props.children as [{ type: unknown }, string];
+    expect(voidIcon.type).not.toBe(draftIcon.type);
+    expect(voidLabel).not.toBe(draftLabel);
   });
 });

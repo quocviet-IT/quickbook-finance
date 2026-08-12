@@ -122,8 +122,21 @@ Token trạng thái không trả về màu đơn thuần mà trả về bộ ba:
 statusToken("overdue") → { color, icon, label }
 ```
 
-Muốn tô màu một trạng thái thì buộc phải nhận cả icon và nhãn. Quy tắc "không
-dùng màu làm tín hiệu duy nhất" vì thế không thể bị bỏ sót.
+**Sửa lại một tuyên bố sai của bản spec đầu.** Bản đầu nói bộ ba này khiến quy
+tắc trở thành *cấu trúc*. Không đúng: `statusToken("overdue").color` vẫn là một
+dòng, nên đó chỉ là *quy ước*. Review Task 5 chỉ ra điều này, và nó không phải
+chuyện lý thuyết — `void` và `draft` cố ý dùng chung một màu xám, nên màn hình
+nào lấy mỗi `.color` sẽ vẽ hai trạng thái đó giống hệt nhau.
+
+Cấu trúc thật nằm ở `StatusBadge`:
+
+```tsx
+<StatusBadge status="overdue" />   // icon + nhãn + màu, không tách rời được
+```
+
+Đây là đường mặc định cho mọi màn hình. `statusToken()` vẫn còn cho ca ngoại lệ
+thật — một con số tổng được tô màu theo tình trạng quá hạn chẳng hạn — nhưng
+hiện trạng thái bằng badge phải là việc **dễ hơn** hiện sai.
 
 ### Chống trôi lệch
 
