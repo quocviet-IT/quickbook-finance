@@ -114,6 +114,7 @@ export default function CashFlowForecastClient({
         <Statistic
           title="Already overdue"
           value={money(overdueIn)}
+          prefix={overdueIn > 0 ? statusToken("overdue").icon : undefined}
           valueStyle={overdueIn > 0 ? { color: statusToken("overdue").color } : undefined}
         />
       </Space>

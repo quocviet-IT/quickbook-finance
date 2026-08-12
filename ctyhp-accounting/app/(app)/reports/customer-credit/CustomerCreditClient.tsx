@@ -120,6 +120,7 @@ export default function CustomerCreditClient({
         <Statistic
           title="Past due"
           value={money(totalOverdue)}
+          prefix={totalOverdue > 0 ? statusToken("overdue").icon : undefined}
           valueStyle={totalOverdue > 0 ? { color: statusToken("overdue").color } : undefined}
         />
         <Statistic

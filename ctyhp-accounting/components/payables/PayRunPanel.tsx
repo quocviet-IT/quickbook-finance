@@ -79,6 +79,10 @@ export default function PayRunPanel({
           <Statistic
             title="Overdue"
             value={money(run.totals.overdueMinor)}
+            // The icon rides alongside the colour rather than instead of it: a
+            // figure that is only red says nothing to a reader who cannot see
+            // the red, or to anyone holding a printout.
+            prefix={run.totals.overdueMinor > 0 ? statusToken("overdue").icon : undefined}
             valueStyle={run.totals.overdueMinor > 0 ? { color: statusToken("overdue").color } : undefined}
           />
           <Statistic title={`Due within ${DISCOUNT_WARNING_DAYS * 2} days`} value={money(run.totals.dueSoonMinor)} />
