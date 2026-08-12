@@ -1,0 +1,31 @@
+[00:02.2 - 00:02.8] Hi, Vyath.
+[00:02.8 - 00:04.4] Uh, good afternoon again.
+[00:04.4 - 00:07.6] So I just want to make a clarification here.
+[00:07.6 - 00:18.0] So I already created the PC four nine, um, company profile here, but it's not showing because, um, there is
+[00:18.0 - 00:21.6] a, I think, an approval with that admin.
+[00:21.6 - 00:26.3] I am an admin, but I cannot see where it can approve.
+[00:26.3 - 00:32.7] So definitely I'm going go to the task that given by Boss Alex.
+[00:32.7 - 00:43.5] So right now, I do see here that the fields here is the one that the import is requiring.
+[00:43.5 - 00:53.9] To-- I mean, yeah, the, the fields here is the, the fields that need to be imported from the exported
+[00:53.9 - 00:55.2] files from Wave.
+[00:55.2 - 01:05.5] So as you can see here, there is an account, that code, which is required, but definitely we don't have a account code.
+[01:05.5 - 01:16.7] So first, um, I'm going to do here is to add all the accounts from
+[01:16.7 - 01:21.1] Wave going into this, then the opening balances.
+[01:21.1 - 01:23.9] I will definitely go ahead and try that.
+[01:23.9 - 01:34.1] Then second, I want you to have, um, another, another import details,
+[01:34.1 - 01:36.9] uh, like transactions.
+[01:36.9 - 01:41.6] Uh, transactions coming from Wave because it is already categorized there.
+[01:41.6 - 01:48.2] So I need to, to, to export all of that information from Wave going into OneBook.
+[01:48.2 - 01:53.6] So instead of having multiple, um-- I mean...
+[01:53.6 - 02:01.1] So we need to have a transaction here.
+[02:01.1 - 02:04.8] Um, you can add it here, uh, between these two.
+[02:04.8 - 02:14.9] Um, the, the fields will be account, I mean, the, the date, the description, the bank where
+[02:14.9 - 02:23.3] it is came from, the chart of account, and then the amount.
+[02:23.3 - 02:24.2] Yeah, the amount.
+[02:24.2 - 02:26.8] Definitely, we need that.
+[02:26.8 - 02:31.7] And then if it is reconciled or not.
+[02:31.7 - 02:36.4] But definitely don't include that 'cause I can manage it.
+[02:36.4 - 02:46.5] So I just want you to add that, um, to add that import files here, so I can go and work on
+[02:46.5 - 02:46.9] that.
+[02:46.9 - 02:48.2] Okay?
+[02:48.2 - 02:48.5] Thank you.
