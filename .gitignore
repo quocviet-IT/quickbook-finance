@@ -8,3 +8,9 @@ node_modules/
 # Shared Claude Code configuration is committed; the .local override is
 # per-machine by convention and conflicts the moment two people share it.
 .claude/settings.local.json
+
+# Customer data used to exercise the importer. These exports carry real names,
+# real bank descriptions, Zelle confirmation numbers and account balances, so
+# they stay on the machine that needs them. Committing one is not a mistake you
+# can take back: the file leaves the working tree easily and the history never.
+data/
