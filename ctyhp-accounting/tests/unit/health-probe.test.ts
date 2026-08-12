@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { probeHealth, type HealthDeps } from "@/lib/services/health";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  CACHE_TTL_MS,
+  cachedHealth,
+  probeHealth,
+  type HealthDeps,
+} from "@/lib/services/health";
 
 const CONFIGURED = {
   url: "https://abcdefg.supabase.co",
@@ -97,5 +102,75 @@ describe("probing health", () => {
       }),
     );
     expect(peak).toBe(2);
+  });
+});
+
+describe("the cache", () => {
+  const realFetch = globalThis.fetch;
+  const realUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const realKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Each test starts far past anything a previous one left behind, so the order
+  // the tests run in cannot decide whether the cache is warm.
+  let clock = Date.parse("2026-08-11T15:00:00.000Z");
+  let calls = 0;
+
+  function stubFetch(impl: HealthDeps["fetch"]) {
+    globalThis.fetch = (async (...args: Parameters<HealthDeps["fetch"]>) => {
+      calls += 1;
+      return impl(...args);
+    }) as HealthDeps["fetch"];
+  }
+
+  beforeEach(() => {
+    clock += CACHE_TTL_MS * 10;
+    calls = 0;
+    vi.useFakeTimers();
+    vi.setSystemTime(clock);
+    process.env.NEXT_PUBLIC_SUPABASE_URL = CONFIGURED.url;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = CONFIGURED.anonKey;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.fetch = realFetch;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = realUrl;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = realKey;
+  });
+
+  it("asks once and reuses the answer inside the window", async () => {
+    stubFetch(async (input) =>
+      String(input).includes("/rpc/health") ? respond(200, '"ok"') : respond(200),
+    );
+    const first = await cachedHealth();
+    const second = await cachedHealth();
+
+    // Two probes for the first call, none for the second.
+    expect(calls).toBe(2);
+    expect(second).toEqual(first);
+  });
+
+  it("asks again once the window has passed", async () => {
+    stubFetch(async (input) =>
+      String(input).includes("/rpc/health") ? respond(200, '"ok"') : respond(200),
+    );
+    await cachedHealth();
+    vi.setSystemTime(clock + CACHE_TTL_MS + 1);
+    await cachedHealth();
+    expect(calls).toBe(4);
+  });
+
+  it("reuses a failure exactly as it reuses a success", async () => {
+    // Caching only the good answer would let a flood arriving during an outage
+    // bypass the cap entirely — the worst moment to remove it.
+    stubFetch(async () => {
+      throw new Error("connect ECONNREFUSED");
+    });
+    const first = await cachedHealth();
+    const second = await cachedHealth();
+
+    expect(first.status).toBe("down");
+    expect(calls).toBe(2);
+    expect(second).toEqual(first);
   });
 });

@@ -2,6 +2,7 @@ import {
   buildPayload,
   checkConfiguration,
   type CheckResult,
+  type HealthCheckName,
   type HealthPayload,
 } from "@/lib/domain/health";
 
@@ -35,19 +36,29 @@ export const PROBE_TIMEOUT_MS = 5000;
  */
 export const CACHE_TTL_MS = 10_000;
 
-async function probe(request: () => Promise<Response>): Promise<boolean> {
+async function probe(
+  name: HealthCheckName,
+  request: () => Promise<Response>,
+): Promise<boolean> {
   try {
     const response = await request();
     return response.ok;
-  } catch {
-    // Not swallowed: an unreachable dependency is the outage this reports, and
-    // the reason belongs in the server log rather than in a public response.
+  } catch (error) {
+    // The verdict is all a public caller may be told, so the reason goes to the
+    // log instead of the response. It has to go somewhere: without this line an
+    // outage leaves no trace anywhere in the system, and whoever is woken by the
+    // alert has only "database: fail" to work from — no DNS failure, no timeout,
+    // no malformed URL. Same shape as lib/services/banking.ts.
+    console.warn(
+      `Health probe "${name}" could not reach its dependency:`,
+      error instanceof Error ? error.message : error,
+    );
     return false;
   }
 }
 
 async function probeDatabase(deps: HealthDeps): Promise<CheckResult> {
-  const ok = await probe(async () => {
+  const ok = await probe("database", async () => {
     const response = await deps.fetch(`${deps.url}/rest/v1/rpc/health`, {
       method: "POST",
       headers: {
@@ -71,7 +82,7 @@ async function probeDatabase(deps: HealthDeps): Promise<CheckResult> {
 }
 
 async function probeAuthentication(deps: HealthDeps): Promise<CheckResult> {
-  const ok = await probe(() =>
+  const ok = await probe("authentication", () =>
     deps.fetch(`${deps.url}/auth/v1/health`, {
       headers: { apikey: deps.anonKey ?? "" },
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
