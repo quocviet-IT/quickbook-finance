@@ -23,7 +23,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       theme={{
         algorithm: antdTheme.defaultAlgorithm,
         token: { ...token, borderRadius: 8, fontFamily: SANS, fontSize: 14, wireframe: false },
-        components: { ...components, Card: { borderRadiusLG: 12 } },
+        components: {
+          ...components,
+          // The tokens give Layout its colours; the header's height is a
+          // dimension, so it stays here with the other non-colour settings
+          // rather than moving into a module that governs colour alone.
+          // Spreading over components.Layout keeps those colours.
+          Layout: { ...components.Layout, headerHeight: 56 },
+          Card: { borderRadiusLG: 12 },
+        },
       }}
     >
       <App>{children}</App>

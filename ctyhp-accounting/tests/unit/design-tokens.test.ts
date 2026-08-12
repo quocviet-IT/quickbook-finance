@@ -37,6 +37,25 @@ describe("Ant Design theme", () => {
     const source = readFileSync(join(process.cwd(), "app", "providers.tsx"), "utf8");
     expect(source.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).toEqual([]);
   });
+
+  it("keeps the theme settings that are not colours and so live only there", () => {
+    const source = readFileSync(join(process.cwd(), "app", "providers.tsx"), "utf8");
+    // Dimensions and typography are deliberately outside antdThemeTokens(),
+    // which governs colour alone. That leaves providers.tsx as their only
+    // home, so a rewrite can drop one and nothing else notices: moving the
+    // theme onto tokens silently lost headerHeight and every page rendered
+    // fine with the wrong header height.
+    for (const setting of [
+      "borderRadius: 8",
+      "fontSize: 14",
+      "wireframe: false",
+      "headerHeight: 56",
+      "borderRadiusLG: 12",
+      "fontFamily: SANS",
+    ]) {
+      expect(source).toContain(setting);
+    }
+  });
 });
 
 /** WCAG 2.1 relative luminance. */
