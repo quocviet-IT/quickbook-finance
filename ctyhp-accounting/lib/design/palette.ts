@@ -4,7 +4,9 @@
  * so a screen that wants "an overdue amount" cannot pick a different red from
  * the one every other screen uses.
  *
- * Nothing outside tokens.ts may import this file.
+ * To ensure all screens use consistent meanings, application code must import
+ * colours only through tokens.ts. This module's tests are exempt: they import
+ * from here to verify that every semantic token resolves to a palette entry.
  */
 export const PALETTE = {
   // Brand and chrome

@@ -571,7 +571,27 @@ export function antdThemeTokens() {
 }
 ```
 
-**Lưu ý thay đổi hình ảnh:** `triggerBg` đổi từ `#0b1220` sang `surface.sider` (`#0f172a`), `darkItemColor` từ `#cbd5e1` sang `border.default` (`#e2e8f0`), `darkItemHoverBg` từ `#1e293b` sang `text.secondary` (`#475569`). Ba giá trị cũ là sắc độ riêng lẻ không thuộc thang màu nào. Nếu reviewer muốn giữ nguyên, thêm `slate800: "#1e293b"`, `slate300: "#cbd5e1"`, `slate950: "#0b1220"` vào palette và trỏ token vào chúng.
+**Lưu ý thay đổi hình ảnh — NĂM giá trị, không phải ba.** Bản kiểm kê đầu tiên của kế hoạch này đếm thiếu; review Task 4 tìm ra hai giá trị còn lại. Tất cả đều là sắc độ riêng lẻ không thuộc thang màu nào:
+
+| Thuộc tính | Cũ | Mới | Ảnh hưởng |
+|---|---|---|---|
+| `Layout.triggerBg` | `#0b1220` | `surface.sider` `#0f172a` | Trước đã gần như trùng siderBg (1.05:1) |
+| `Menu.darkItemColor` | `#cbd5e1` | `border.default` `#e2e8f0` | 14.5:1 trên nền sider |
+| `Menu.darkItemHoverBg` | `#1e293b` | `text.secondary` `#475569` | Hover **rõ hơn** trước (2.4:1 so với 1.2:1) |
+| `Table.headerColor` | `#334155` | `text.secondary` `#475569` | Tương phản 9.5:1 → 6.9:1, vẫn vượt AA |
+| `Table.borderColor` | `#eef2f6` | `border.subtle` `#f1f5f9` | Lệch 3/255 mỗi kênh, không nhìn thấy |
+
+Cả năm đã được chấp nhận có cân nhắc. Lý do giữ `Table.headerColor` theo `text.secondary`: tiêu đề cột là nhãn phụ, nên đó mới là token đúng về ngữ nghĩa; `#334155` cũ là một sắc độ tùy ý. **Không** thêm giá trị mới vào palette chỉ để bảo toàn sắc độ cũ — đó đúng là thứ đợt này dẹp.
+
+**Một thứ `antdThemeTokens()` không được mang: các giá trị không phải màu.** `Layout.headerHeight: 56` từng bị mất đúng vì lý do này khi theme chuyển sang token, và mọi trang vẫn render bình thường với chiều cao header sai. Giữ chúng trong `providers.tsx`, và spread lên `components.Layout` để không xóa mất màu:
+
+```tsx
+components: {
+  ...components,
+  Layout: { ...components.Layout, headerHeight: 56 },
+  Card: { borderRadiusLG: 12 },
+},
+```
 
 - [ ] **Step 4: Rewrite providers.tsx**
 
