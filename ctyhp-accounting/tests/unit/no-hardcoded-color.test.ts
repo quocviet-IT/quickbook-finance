@@ -15,15 +15,9 @@ import { describe, expect, it } from "vitest";
  * generated PDF are not CSS and do not derive from the theme.
  */
 const ALLOWLIST = new Set([
-  "components/payables/PayRunPanel.tsx",
   "components/feedback/ReportDialog.tsx",
-  "app/(app)/fixed-assets/FixedAssetsClient.tsx",
   "app/(auth)/login/page.tsx",
   "app/(app)/settings/import/ImportPreviewPanel.tsx",
-  "app/(app)/recurring/RecurringClient.tsx",
-  "app/(app)/banking/BankingClient.tsx",
-  "app/(app)/banking/BankTransactionsTable.tsx",
-  "app/(app)/accounts/AccountsClient.tsx",
 ]);
 
 /**

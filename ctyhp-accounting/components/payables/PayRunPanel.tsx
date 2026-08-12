@@ -11,6 +11,8 @@ import {
   type RankedBill,
 } from "@/lib/domain/payment-terms";
 import { payRunAction } from "@/app/(app)/bills/actions";
+import { TOKENS } from "@/lib/design/tokens";
+import { statusToken } from "@/lib/design/status";
 
 const PRIORITY_COLOR: Record<PayPriority, string> = {
   overdue: "red",
@@ -77,14 +79,14 @@ export default function PayRunPanel({
           <Statistic
             title="Overdue"
             value={money(run.totals.overdueMinor)}
-            valueStyle={run.totals.overdueMinor > 0 ? { color: "#cf1322" } : undefined}
+            valueStyle={run.totals.overdueMinor > 0 ? { color: statusToken("overdue").color } : undefined}
           />
           <Statistic title={`Due within ${DISCOUNT_WARNING_DAYS * 2} days`} value={money(run.totals.dueSoonMinor)} />
           <Statistic title="Scheduled" value={money(run.totals.scheduledMinor)} />
           <Statistic
             title="Discount still available"
             value={money(run.totals.discountAvailableMinor)}
-            valueStyle={run.totals.discountAvailableMinor > 0 ? { color: "#389e0d" } : undefined}
+            valueStyle={run.totals.discountAvailableMinor > 0 ? { color: TOKENS.intent.success } : undefined}
           />
           <Statistic title="Total owed" value={money(run.totals.totalMinor)} />
           <Button onClick={load} loading={loading}>
@@ -153,7 +155,7 @@ export default function PayRunPanel({
                     row.discountAvailableMinor,
                   )} discount, if paid by ${row.discountDueDate}`}
                 >
-                  <b style={{ color: "#389e0d" }}>{money(row.payTodayMinor)}</b>
+                  <b style={{ color: TOKENS.intent.success }}>{money(row.payTodayMinor)}</b>
                 </Tooltip>
               ) : (
                 money(row.payTodayMinor)

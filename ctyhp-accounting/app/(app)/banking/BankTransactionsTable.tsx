@@ -9,6 +9,7 @@ import type { SuggestionView } from "@/lib/services/banking";
 import CategoriseCell from "./CategoriseCell";
 import type { AccountRow } from "@/lib/db/types";
 import type { BankPostingRow } from "@/lib/services/banking";
+import { TOKENS } from "@/lib/design/tokens";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -102,7 +103,7 @@ export default function BankTransactionsTable({
       width: 140,
       align: "right",
       render: (_value: unknown, row: BankReviewTableRow) => (
-        <span style={{ color: row.transaction.amount_minor < 0 ? "#b91c1c" : "#15803d" }}>
+        <span style={{ color: row.transaction.amount_minor < 0 ? TOKENS.money.negative : TOKENS.money.positive }}>
           {formatRowMoney(row)}
         </span>
       ),

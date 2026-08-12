@@ -57,6 +57,7 @@ import type {
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
+import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import {
   describeStatementParse,
@@ -554,7 +555,7 @@ export default function BankingClient({
 
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space wrap size="middle">
-          <BankOutlined style={{ fontSize: 20, color: "#0f766e" }} />
+          <BankOutlined style={{ fontSize: 20, color: TOKENS.intent.primary }} />
           <div>
             <Typography.Text strong>
               {selectedConnection ? selectedConnection.institution_name : "No direct feed for this account"}

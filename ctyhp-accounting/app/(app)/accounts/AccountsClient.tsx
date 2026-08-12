@@ -37,6 +37,7 @@ import {
 } from "@/lib/domain/cashflow";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
+import { TOKENS } from "@/lib/design/tokens";
 
 const STATUS_LABELS: Record<AccountStatus, { text: string; color: string }> = {
   draft: { text: "Draft", color: "default" },
@@ -164,7 +165,7 @@ export default function AccountsClient({
       dataIndex: "name",
       render: (name: string, row) => (
         <span>
-          {row.parent_account_id ? <span style={{ color: "#999" }}>↳ </span> : null}
+          {row.parent_account_id ? <span style={{ color: TOKENS.text.secondary }}>↳ </span> : null}
           {name}
         </span>
       ),

@@ -57,6 +57,7 @@ import {
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { withVendor } from "@/lib/domain/vendors";
 import NewVendorButton from "@/components/NewVendorButton";
+import { TOKENS } from "@/lib/design/tokens";
 import {
   createRecurringTemplateAction,
   generateRecurringTemplateAction,
@@ -562,7 +563,7 @@ export default function RecurringClient({
               title="Failed runs"
               value={failedCount}
               prefix={failedCount ? <WarningOutlined /> : <CheckCircleOutlined />}
-              valueStyle={failedCount ? { color: "#b42318" } : undefined}
+              valueStyle={failedCount ? { color: TOKENS.intent.danger } : undefined}
             />
           </Card>
         </Col>
