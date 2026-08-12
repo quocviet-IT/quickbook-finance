@@ -4,7 +4,9 @@ import { TOKENS, flattenTokens, resolveToken } from "@/lib/design/tokens";
 
 describe("design tokens", () => {
   it("resolves every semantic token to a palette entry", () => {
-    const paletteValues = new Set(Object.values(PALETTE));
+    // Widened on purpose: PALETTE is `as const`, so an inferred Set would be
+    // typed to the literal hexes and refuse the plain string a token carries.
+    const paletteValues = new Set<string>(Object.values(PALETTE));
     const orphans = flattenTokens(TOKENS)
       .filter(([, value]) => !paletteValues.has(value))
       .map(([path, value]) => `${path} → ${value}`);

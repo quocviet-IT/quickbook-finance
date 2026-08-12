@@ -64,6 +64,13 @@ export const TOKENS = {
 
 export type Tokens = typeof TOKENS;
 
+/**
+ * The dotted form a token is looked up by, such as `"money.negative"`. A bare
+ * `string` at a call site says nothing about what shape it must take; this
+ * names it, so a signature reads as the intent rather than as free text.
+ */
+export type TokenPath = string;
+
 /** Every token as a `["group.name", value]` pair, in declaration order. */
 export function flattenTokens(tokens: Tokens = TOKENS): [string, string][] {
   const out: [string, string][] = [];
@@ -80,7 +87,7 @@ export function flattenTokens(tokens: Tokens = TOKENS): [string, string][] {
  * an unknown path is a typo, and a silent `undefined` reaches the DOM as a
  * missing colour that nobody notices until a screenshot looks wrong.
  */
-export function resolveToken(path: string): string {
+export function resolveToken(path: TokenPath): string {
   const found = flattenTokens().find(([key]) => key === path);
   if (!found) throw new Error(`Unknown design token: ${path}`);
   return found[1];
