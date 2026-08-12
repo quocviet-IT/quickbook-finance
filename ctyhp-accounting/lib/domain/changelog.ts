@@ -41,6 +41,40 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.17",
+    date: "2026-08-11",
+    headline: "An overdue total no longer relies on being red, and the sidebar shows what you are pointing at.",
+    changes: [
+      {
+        kind: "changed",
+        title: "An overdue total carries a warning mark, not only a red figure",
+        detail:
+          "The overdue figures on Pay Bills, the cash flow forecast and the customer credit "
+          + "report now show a warning mark beside the amount. A figure that is only red says "
+          + "nothing to a reader who cannot pick that red out, and nothing at all once the "
+          + "page is printed.",
+        route: "/pay-bills",
+      },
+      {
+        kind: "fixed",
+        title: "The sidebar shows which item the pointer is on",
+        detail:
+          "The highlight under the pointer was very nearly the same shade as the sidebar "
+          + "behind it, so on most screens there was nothing to see. It is clearly lighter now.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "A few greys, reds and greens shifted by a shade",
+        detail:
+          "Colour is now set in one place instead of being written out screen by screen, "
+          + "which had left three different reds and four different greens all meaning the "
+          + "same thing. Nothing moved and nothing reads differently — a handful of shades "
+          + "are a step lighter or darker, most visibly on table column headings.",
+      },
+    ],
+  },
+  {
     version: "1.16",
     date: "2026-08-08",
     headline: "Typing a word finds the account even when your chart calls it something else.",
