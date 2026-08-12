@@ -1,81 +1,78 @@
-# P1 Đợt 1 — Semantic Token: Implementation Plan
+# P1 Wave 1 — Semantic Tokens: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Dựng `lib/design/tokens.ts` làm nguồn sự thật cho màu, rồi đưa **theme Ant Design và mọi màu viết thẳng trong TSX** về đọc từ đó.
+**Goal:** Establish `lib/design/tokens.ts` as the source of truth for colour, then move **the Ant Design theme and every colour written inline in TSX** onto it.
 
-**Phạm vi thật — sửa lại sau review toàn nhánh.** Bản đầu của dòng này viết "toàn bộ màu của One Book", và đó là nói quá. Đợt này gỡ 71 hex khỏi 21 file `.tsx` cộng 18 hex trong `providers.tsx`. Nó **không** đụng tới **309 hex nằm trong CSS** của chính hai thư mục đó:
+**Actual scope — corrected after the whole-branch review.** The first draft of this line said "all of One Book's colour", which was an overstatement. This wave removes 71 hex literals from 21 `.tsx` files plus 18 in `providers.tsx`. It does **not** touch the **309 hex literals living in CSS** inside those same two directories:
 
-| File | Hex còn lại |
+| File | Hex remaining |
 |---|---|
-| `app/globals.css` | 225 (chưa kể 32 dòng `:root` mới) |
+| `app/globals.css` | 225 (excluding the 32 new `:root` lines) |
 | `components/work-areas/WorkAreaOverview.module.css` | 84 |
 
-Và chúng đúng là loại trùng lặp đợt này sinh ra để dẹp — riêng `#0f766e` xuất hiện 30 lần trong `globals.css`. Nguyên nhân của sai sót: khảo sát ban đầu đo `globals.css` có 6 custom property rồi kết luận "token gần như không tồn tại", mà **không đếm số hex trong đó**.
+And they are exactly the kind of duplication this wave exists to remove — `#0f766e` alone appears 30 times in `globals.css`. The cause of the miss: the initial survey measured six custom properties in `globals.css` and concluded tokens barely existed, without ever **counting the hex literals in the same file**.
 
-Hai file này giờ nằm trong allowlist của `tests/unit/no-hardcoded-color.test.ts` kèm số lượng và lý do, và guard đã mở sang `.css` — trước đó nó chỉ quét `.ts`/`.tsx`, tức lối thoát dễ nhất (đặt màu vào CSS Module cạnh component) đang mở toang và **đã có một component đi qua đó**.
+Both files are now in the allowlist of `tests/unit/no-hardcoded-color.test.ts` with counts and reasons, and the guard walks `.css` — before that it matched only `.ts`/`.tsx`, which left the easiest bypass wide open (put the colour in a CSS Module beside the component) and **one component was already using it**.
 
-**Cũng chưa thuộc phạm vi:** 64 chỗ `<Tag color="red">` dùng bảng preset của antd, sinh độc lập với `colorError`. Nên `CustomerCreditClient` hiện vẽ `#b91c1c` cạnh `#cf1322` — hai sắc đỏ cùng nghĩa trên một màn hình. Bài toán "ba sắc đỏ" mới giải được một nửa; nửa còn lại thuộc `statusColumn()` của Đợt 2.
+**Also out of scope:** 64 `<Tag color="red">` call sites use Ant Design's preset scale, generated independently of `colorError`. So `CustomerCreditClient` now renders `#b91c1c` beside `#cf1322` — two reds meaning the same thing on one screen. The "three different reds" problem is half solved; the other half belongs to wave 2's `statusColumn()`.
 
-**Architecture:** Module thuần ba tầng — palette (màu thô) → semantic (ý nghĩa kế toán) → emitters (`antdThemeTokens()` cho Ant Design, `cssVariableBlock()` cho CSS). Không I/O, không React, nên unit test giữ được toàn bộ. Chống trôi lệch bằng test so khớp thay vì bằng kỷ luật review.
+**Architecture:** A pure module in three layers — palette (raw colour) → semantics (accounting meaning) → emitters (`antdThemeTokens()` for Ant Design, `cssVariableBlock()` for CSS). No I/O, no React, so unit tests hold all of it. Drift is prevented by an equality test rather than by review discipline.
 
 **Tech Stack:** TypeScript 5, Vitest 4 (`environment: "node"`, `include: ["tests/**/*.test.ts"]`), Ant Design 6 `ConfigProvider`, Next.js 16.
 
 ## Global Constraints
 
-- Thư mục làm việc là `ctyhp-accounting/`. Mọi đường dẫn dưới đây tương đối với nó.
-- Tiền là minor units nguyên; không đụng tới logic tiền trong đợt này.
-- Prose hướng người dùng bằng tiếng Anh Mỹ (US English). Code, định danh, comment bằng tiếng Anh.
-- Comment giải thích **tại sao**, theo văn phong sẵn có của codebase.
-- Không bao giờ nuốt lỗi (không `catch {}` rỗng).
-- Bốn cổng bắt buộc trước khi tuyên bố xong: `npm run build`, `npm test`, `npm run typecheck`, `npm run lint`.
-- Đổi UI thì phải chạy `scripts/smoke-pages.mjs` **trên server đã build**, không phải `npm run dev`.
-- Không force-push. Không commit lên `main` khi chưa được yêu cầu — tạo nhánh trước.
+- The working directory is `ctyhp-accounting/`. Every path below is relative to it.
+- Money is integer minor units; this wave does not touch money logic.
+- User-facing prose is US English. Code, identifiers and comments are English.
+- Comments explain **why**, in the prose style the codebase already uses.
+- Never swallow an error (no empty `catch {}`).
+- Four mandatory gates before declaring the wave done: `npm run build`, `npm test`, `npm run typecheck`, `npm run lint`.
+- Any UI change requires `scripts/smoke-pages.mjs` **against the built server**, not `npm run dev`.
+- No force-push. No commits to `main` unless asked — branch first.
 
-## Phạm vi và thay đổi hình ảnh có chủ ý
+## Scope, and the pixel changes that are deliberate
 
-Task 1–6 (nền tảng) **không đổi pixel nào** vì không component nào bị sửa.
+Tasks 1–6 (the foundation) change **no pixels**, because no component is touched.
 
-Task 7–10 (chuyển đổi) **có** đổi pixel ở những chỗ đang tồn tại màu trùng nghĩa. Đây là chủ ý, và đây là danh sách đầy đủ:
+Tasks 7–10 (the migration) **do** change pixels wherever two colours currently mean the same thing. That is intended, and this is the complete list:
 
-| Hex hiện tại | Số chỗ | Gộp về | Ghi chú |
+| Current hex | Sites | Consolidated to | Note |
 |---|---|---|---|
-| `#cf1322` | 11 | `intent.danger` = `#b91c1c` | Đỏ mặc định của antd, lẫn với đỏ của theme |
-| `#b42318` | 1 | `intent.danger` = `#b91c1c` | Đỏ thứ ba cùng nghĩa |
-| `#389e0d` | 2 | `intent.success` = `#15803d` | Xanh mặc định của antd |
-| `#3f8600` | 1 | `intent.success` = `#15803d` | Xanh thứ ba cùng nghĩa |
-| `#047857` | 1 | `intent.success` = `#15803d` | Xanh thứ tư cùng nghĩa |
-| `#8c8c8c`, `#999`, `#f5f5f5` | 4 | `text.secondary` / `surface.muted` | Xám mặc định của antd |
+| `#cf1322` | 11 | `intent.danger` = `#b91c1c` | Ant Design's default red, mixed in with the theme's own |
+| `#b42318` | 1 | `intent.danger` = `#b91c1c` | A third red for the same meaning |
+| `#389e0d` | 2 | `intent.success` = `#15803d` | Ant Design's default green |
+| `#3f8600` | 1 | `intent.success` = `#15803d` | A third green for the same meaning |
+| `#047857` | 1 | `intent.success` = `#15803d` | A fourth green for the same meaning |
+| `#8c8c8c`, `#999`, `#f5f5f5` | 4 | `text.secondary` / `surface.muted` | Ant Design's default greys |
 
-Màu của **chuỗi dữ liệu biểu đồ** (`series.*`) được chuyển nguyên giá trị, không gộp. Chọn lại một dải màu phân loại đã kiểm định là quyết định riêng, **ngoài phạm vi đợt này**, vì nó đổi diện mạo biểu đồ chứ không sửa trôi lệch.
+Chart **series** colours (`series.*`) are carried across unchanged, not consolidated. Choosing a validated categorical scale is a separate decision and is **out of scope for this wave**, because it changes how the charts look rather than fixing drift.
 
 ## File Structure
 
-| File | Trách nhiệm |
+| File | Responsibility |
 |---|---|
-| `lib/design/palette.ts` (tạo) | Chỉ giá trị màu thô. Không ý nghĩa. Không ai ngoài `tokens.ts` được import |
-| `lib/design/tokens.ts` (tạo) | Ánh xạ ngữ nghĩa + hai hàm phát sinh. Đây là API công khai |
-| `lib/design/status.tsx` (tạo) | `statusToken()` trả bộ ba màu+icon+nhãn. Tách khỏi `tokens.ts` vì có JSX icon |
-| `tests/unit/design-tokens.test.ts` (tạo) | Phân giải, tương phản, đồng bộ `:root`, `providers.tsx` sạch hex |
-| `tests/unit/no-hardcoded-color.test.ts` (tạo) | Guard chống tái phát + allowlist thu hẹp dần |
-| `app/providers.tsx` (sửa) | Đọc từ `antdThemeTokens()` thay vì 18 literal hex |
-| `app/globals.css` (sửa) | Thêm khối `:root` ở đầu file |
+| `lib/design/palette.ts` (create) | Raw colour values only. No meaning. Nothing outside `tokens.ts` may import it |
+| `lib/design/tokens.ts` (create) | The semantic mapping plus the emitters. This is the public API |
+| `lib/design/status.tsx` (create) | `statusToken()` returning colour, icon and label. Separate from `tokens.ts` because it holds JSX |
+| `tests/unit/design-tokens.test.ts` (create) | Resolution, contrast, `:root` equality, `providers.tsx` free of hex |
+| `tests/unit/no-hardcoded-color.test.ts` (create) | The regression guard and its shrinking allowlist |
+| `app/providers.tsx` (modify) | Reads `antdThemeTokens()` instead of 18 hex literals |
+| `app/globals.css` (modify) | Gains the `:root` block at the top |
 
-**Sai khác có chủ ý so với spec.** Spec mục 5 mô tả `lib/design/tokens.ts` là một file duy nhất. Kế hoạch tách thành ba, vì hai lý do kỹ thuật chỉ lộ ra khi viết test:
+**A deliberate divergence from the spec.** Spec section 5 describes `lib/design/tokens.ts` as one file. This plan splits it into three, for two technical reasons that only surfaced while writing the tests:
 
-- Tách `palette.ts` để phép kiểm "mọi token ngữ nghĩa phân giải về một mục trong palette" có hai vế thật sự độc lập. Cùng một file thì phép kiểm đó tự khẳng định chính nó.
-- Tách `status.tsx` vì nó chứa JSX, còn `tokens.ts` phải giữ thuần để chạy được trong `environment: "node"` mà Vitest đang cấu hình.
+- `palette.ts` is split out so the assertion "every semantic token resolves to a palette entry" has two genuinely independent sides. In one file, that assertion would only be confirming itself.
+- `status.tsx` is split out because it contains JSX, and `tokens.ts` must stay pure to run under the `environment: "node"` Vitest is configured with.
 
-Ranh giới ngữ nghĩa của spec không đổi: vẫn một nguồn sự thật, chỉ là ba file thay vì một.
+The spec's semantic boundary is unchanged: still one source of truth, just across three files.
 
-**Về các bước "thêm vào file test":** Task 2, 3 và 4 đều bổ sung vào cùng
-`tests/unit/design-tokens.test.ts`. Mỗi task hiển thị dòng `import` mà ca kiểm
-thử mới cần — hãy **gộp chúng vào khối import ở đầu file**, đừng chèn giữa file.
-Import lặp lại cùng một module sẽ làm `npm run typecheck` đỏ.
+**About the "add to the test file" steps:** Tasks 2, 3 and 4 all append to the same `tests/unit/design-tokens.test.ts`. Each task shows the `import` line its new case needs — **merge those into the import block at the top of the file**, do not insert them mid-file. A duplicate import of the same module turns `npm run typecheck` red.
 
 ---
 
-### Task 1: Palette và semantic token
+### Task 1: Palette and semantic tokens
 
 **Files:**
 - Create: `lib/design/palette.ts`
@@ -83,16 +80,16 @@ Import lặp lại cùng một module sẽ làm `npm run typecheck` đỏ.
 - Test: `tests/unit/design-tokens.test.ts`
 
 **Interfaces:**
-- Consumes: không có (task đầu tiên)
+- Consumes: nothing (first task)
 - Produces:
-  - `PALETTE: Record<string, string>` từ `lib/design/palette.ts`
-  - `TOKENS` với các nhánh `money`, `intent`, `text`, `surface`, `border`, `series` từ `lib/design/tokens.ts`
-  - `type TokenPath = string` — khóa phẳng dạng `"money.negative"`
+  - `PALETTE: Record<string, string>` from `lib/design/palette.ts`
+  - `TOKENS` with the branches `money`, `intent`, `text`, `surface`, `border`, `series` from `lib/design/tokens.ts`
+  - `type TokenPath = string` — a flat key such as `"money.negative"`
   - `resolveToken(path: TokenPath): string`
 
 - [ ] **Step 1: Write the failing test**
 
-Tạo `tests/unit/design-tokens.test.ts`:
+Create `tests/unit/design-tokens.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -128,7 +125,7 @@ Expected: FAIL — `Cannot find module '@/lib/design/palette'`
 
 - [ ] **Step 3: Write the palette**
 
-Tạo `lib/design/palette.ts`:
+Create `lib/design/palette.ts`:
 
 ```ts
 /**
@@ -137,7 +134,9 @@ Tạo `lib/design/palette.ts`:
  * so a screen that wants "an overdue amount" cannot pick a different red from
  * the one every other screen uses.
  *
- * Nothing outside tokens.ts may import this file.
+ * To ensure all screens use consistent meanings, application code must import
+ * colours only through tokens.ts. This module's tests are exempt: they import
+ * from here to verify that every semantic token resolves to a palette entry.
  */
 export const PALETTE = {
   // Brand and chrome
@@ -165,7 +164,7 @@ export type PaletteKey = keyof typeof PALETTE;
 
 - [ ] **Step 4: Write the semantic layer**
 
-Tạo `lib/design/tokens.ts`:
+Create `lib/design/tokens.ts`:
 
 ```ts
 import { PALETTE } from "./palette";
@@ -234,6 +233,13 @@ export const TOKENS = {
 
 export type Tokens = typeof TOKENS;
 
+/**
+ * The dotted form a token is looked up by, such as `"money.negative"`. A bare
+ * `string` at a call site says nothing about what shape it must take; this
+ * names it, so a signature reads as the intent rather than as free text.
+ */
+export type TokenPath = string;
+
 /** Every token as a `["group.name", value]` pair, in declaration order. */
 export function flattenTokens(tokens: Tokens = TOKENS): [string, string][] {
   const out: [string, string][] = [];
@@ -250,7 +256,7 @@ export function flattenTokens(tokens: Tokens = TOKENS): [string, string][] {
  * an unknown path is a typo, and a silent `undefined` reaches the DOM as a
  * missing colour that nobody notices until a screenshot looks wrong.
  */
-export function resolveToken(path: string): string {
+export function resolveToken(path: TokenPath): string {
   const found = flattenTokens().find(([key]) => key === path);
   if (!found) throw new Error(`Unknown design token: ${path}`);
   return found[1];
@@ -271,21 +277,21 @@ git commit -m "feat(design): add palette and semantic colour tokens"
 
 ---
 
-### Task 2: Kiểm tra tương phản WCAG AA
+### Task 2: WCAG AA contrast check
 
 **Files:**
-- Modify: `lib/design/tokens.ts` (thêm `TEXT_ON_SURFACE_PAIRS`)
-- Test: `tests/unit/design-tokens.test.ts` (thêm ca kiểm thử)
+- Modify: `lib/design/tokens.ts` (add `TEXT_ON_SURFACE_PAIRS`)
+- Test: `tests/unit/design-tokens.test.ts` (add cases)
 
 **Interfaces:**
 - Consumes: `TOKENS`, `resolveToken` (Task 1)
-- Produces: `TEXT_ON_SURFACE_PAIRS: readonly [string, string][]` — các cặp `[textPath, surfacePath]` phải đạt AA
+- Produces: `TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][]` — the `[textPath, surfacePath]` pairs that must meet AA
 
-Tương phản chỉ áp cho **chữ trên nền**. `series.axis` và `series.grid` là nét vẽ trang trí, không phải chữ; ép chúng đạt 4.5:1 sẽ làm hỏng biểu đồ mà không giúp ai.
+Contrast applies only to **text on a background**. `series.axis` and `series.grid` are decorative strokes, not text; holding them to 4.5:1 would darken the chart furniture without helping anyone read it.
 
 - [ ] **Step 1: Write the failing test**
 
-Thêm vào `tests/unit/design-tokens.test.ts`:
+Add to `tests/unit/design-tokens.test.ts`:
 
 ```ts
 import { TEXT_ON_SURFACE_PAIRS } from "@/lib/design/tokens";
@@ -323,11 +329,11 @@ describe("colour contrast", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/design-tokens.test.ts`
-Expected: FAIL — `TEXT_ON_SURFACE_PAIRS` chưa được export
+Expected: FAIL — `TEXT_ON_SURFACE_PAIRS` is not exported yet
 
 - [ ] **Step 3: Declare the pairs**
 
-Thêm vào cuối `lib/design/tokens.ts`:
+Add to the end of `lib/design/tokens.ts`:
 
 ```ts
 /**
@@ -337,7 +343,7 @@ Thêm vào cuối `lib/design/tokens.ts`:
  * strokes on a chart: holding them to a text contrast ratio would darken the
  * chart furniture without making anything more readable.
  */
-export const TEXT_ON_SURFACE_PAIRS: readonly [string, string][] = [
+export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["text.heading", "surface.page"],
   ["text.heading", "surface.card"],
   ["text.body", "surface.page"],
@@ -361,7 +367,7 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [string, string][] = [
 Run: `npx vitest run tests/unit/design-tokens.test.ts`
 Expected: PASS — 5 tests
 
-Nếu một cặp trượt, **không nới ngưỡng**. Đổi giá trị trong `palette.ts` sang sắc độ đậm hơn và ghi lý do vào comment.
+If a pair fails, **do not loosen the threshold**. Darken the value in `palette.ts` and record why in a comment.
 
 - [ ] **Step 5: Commit**
 
@@ -372,20 +378,20 @@ git commit -m "test(design): hold every text-on-surface pair to WCAG AA"
 
 ---
 
-### Task 3: Phát sinh CSS custom property và đồng bộ globals.css
+### Task 3: Emit CSS custom properties and keep globals.css in step
 
 **Files:**
-- Modify: `lib/design/tokens.ts` (thêm `cssVariableBlock`)
-- Modify: `app/globals.css` (chèn khối `:root` ở đầu file)
+- Modify: `lib/design/tokens.ts` (add `cssVariableBlock`)
+- Modify: `app/globals.css` (insert the `:root` block at the top)
 - Test: `tests/unit/design-tokens.test.ts`
 
 **Interfaces:**
 - Consumes: `flattenTokens` (Task 1)
-- Produces: `cssVariableBlock(): string` — khối `:root` hoàn chỉnh, kết thúc bằng newline
+- Produces: `cssVariableBlock(): string` — the complete `:root` block, ending in a newline
 
 - [ ] **Step 1: Write the failing test**
 
-Thêm vào `tests/unit/design-tokens.test.ts`:
+Add to `tests/unit/design-tokens.test.ts`:
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -401,9 +407,13 @@ describe("CSS custom properties", () => {
     expect(block.endsWith("}\n")).toBe(true);
   });
 
-  it("matches the block committed in globals.css character for character", () => {
+  it("matches the block committed in globals.css, value for value", () => {
     const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
-    expect(css).toContain(cssVariableBlock());
+    // Newlines are normalised before comparing. This repository is developed on
+    // Windows with core.autocrlf=true, so a fresh clone rewrites globals.css
+    // with CRLF while the emitter always produces \n — and the drift this guard
+    // exists to catch is a changed colour, not a changed line ending.
+    expect(css.replace(/\r\n/g, "\n")).toContain(cssVariableBlock());
   });
 });
 ```
@@ -411,11 +421,11 @@ describe("CSS custom properties", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/design-tokens.test.ts`
-Expected: FAIL — `cssVariableBlock` chưa được export
+Expected: FAIL — `cssVariableBlock` is not exported yet
 
 - [ ] **Step 3: Write the emitter**
 
-Thêm vào cuối `lib/design/tokens.ts`:
+Add to the end of `lib/design/tokens.ts`:
 
 ```ts
 /**
@@ -436,7 +446,7 @@ export function cssVariableBlock(): string {
 
 - [ ] **Step 4: Paste the block into globals.css**
 
-Chèn vào **đầu** `app/globals.css`, phía trên khối `html, body {`. Đây là đầu ra chính xác của `cssVariableBlock()` với `TOKENS` ở Task 1 — 32 dòng, đúng thứ tự khai báo:
+Insert at the **top** of `app/globals.css`, above the `html, body {` rule. This is the exact output of `cssVariableBlock()` given Task 1's `TOKENS` — 32 lines, in declaration order:
 
 ```css
 /* Generated from lib/design/tokens.ts. Do not edit by hand — a unit test
@@ -478,13 +488,11 @@ Chèn vào **đầu** `app/globals.css`, phía trên khối `html, body {`. Đâ
 }
 ```
 
-Nếu test ở Step 5 báo lệch, **đừng sửa CSS bằng tay**. Chạy lệnh sau để in ra khối đúng rồi thay nguyên:
+If Step 5 reports a mismatch, **do not hand-edit the CSS to chase it**. Run the test with a verbose reporter and replace the whole block with the expected string Vitest prints:
 
 ```bash
 npx vitest run tests/unit/design-tokens.test.ts --reporter=verbose
 ```
-
-Thông báo lệch của Vitest hiển thị chuỗi mong đợi đầy đủ.
 
 - [ ] **Step 5: Run test to verify it passes**
 
@@ -500,11 +508,11 @@ git commit -m "feat(design): emit tokens as CSS custom properties, guarded by te
 
 ---
 
-### Task 4: Nối providers.tsx vào tokens
+### Task 4: Wire providers.tsx to the tokens
 
 **Files:**
 - Modify: `app/providers.tsx:17-53`
-- Modify: `lib/design/tokens.ts` (thêm `antdThemeTokens`)
+- Modify: `lib/design/tokens.ts` (add `antdThemeTokens`)
 - Test: `tests/unit/design-tokens.test.ts`
 
 **Interfaces:**
@@ -513,7 +521,7 @@ git commit -m "feat(design): emit tokens as CSS custom properties, guarded by te
 
 - [ ] **Step 1: Write the failing test**
 
-Thêm vào `tests/unit/design-tokens.test.ts`:
+Add to `tests/unit/design-tokens.test.ts`:
 
 ```ts
 import { antdThemeTokens } from "@/lib/design/tokens";
@@ -530,17 +538,44 @@ describe("Ant Design theme", () => {
     const source = readFileSync(join(process.cwd(), "app", "providers.tsx"), "utf8");
     expect(source.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).toEqual([]);
   });
+
+  it("keeps the theme settings that are not colours and so live only there", () => {
+    const source = readFileSync(join(process.cwd(), "app", "providers.tsx"), "utf8");
+    // Dimensions and typography are deliberately outside antdThemeTokens(),
+    // which governs colour alone. That leaves providers.tsx as their only
+    // home, so a rewrite can drop one and nothing else notices: moving the
+    // theme onto tokens silently lost headerHeight and every page rendered
+    // fine with the wrong header height.
+    for (const setting of [
+      "borderRadius: 8",
+      "fontSize: 14",
+      "wireframe: false",
+      "headerHeight: 56",
+      "borderRadiusLG: 12",
+      "fontFamily: SANS",
+    ]) {
+      expect(source).toContain(setting);
+    }
+
+    // The mirror of the same bug. Restoring headerHeight means writing a
+    // `Layout` key, and a `Layout` key written without spreading the token one
+    // drops siderBg, triggerBg and headerBg instead — silently, because every
+    // page still renders and the settings above are all still present.
+    expect(source).toContain("...components.Layout");
+    expect(source).toContain("...components,");
+    expect(source).toContain("...token,");
+  });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/design-tokens.test.ts`
-Expected: FAIL — `antdThemeTokens` chưa export, và `providers.tsx` còn 18 hex
+Expected: FAIL — `antdThemeTokens` is not exported, and `providers.tsx` still holds 18 hex literals
 
 - [ ] **Step 3: Write the emitter**
 
-Thêm vào cuối `lib/design/tokens.ts`:
+Add to the end of `lib/design/tokens.ts`:
 
 ```ts
 /**
@@ -584,19 +619,19 @@ export function antdThemeTokens() {
 }
 ```
 
-**Lưu ý thay đổi hình ảnh — NĂM giá trị, không phải ba.** Bản kiểm kê đầu tiên của kế hoạch này đếm thiếu; review Task 4 tìm ra hai giá trị còn lại. Tất cả đều là sắc độ riêng lẻ không thuộc thang màu nào:
+**Pixel changes — FIVE values, not three.** This plan's first inventory undercounted; the Task 4 review found the remaining two. All five were one-off shades belonging to no scale:
 
-| Thuộc tính | Cũ | Mới | Ảnh hưởng |
+| Property | Old | New | Effect |
 |---|---|---|---|
-| `Layout.triggerBg` | `#0b1220` | `surface.sider` `#0f172a` | Trước đã gần như trùng siderBg (1.05:1) |
-| `Menu.darkItemColor` | `#cbd5e1` | `border.default` `#e2e8f0` | 14.5:1 trên nền sider |
-| `Menu.darkItemHoverBg` | `#1e293b` | `text.secondary` `#475569` | Hover **rõ hơn** trước (2.4:1 so với 1.2:1) |
-| `Table.headerColor` | `#334155` | `text.secondary` `#475569` | Tương phản 9.5:1 → 6.9:1, vẫn vượt AA |
-| `Table.borderColor` | `#eef2f6` | `border.subtle` `#f1f5f9` | Lệch 3/255 mỗi kênh, không nhìn thấy |
+| `Layout.triggerBg` | `#0b1220` | `surface.sider` `#0f172a` | Was already all but identical to siderBg (1.05:1) |
+| `Menu.darkItemColor` | `#cbd5e1` | `border.default` `#e2e8f0` | 14.5:1 against the sider |
+| `Menu.darkItemHoverBg` | `#1e293b` | `text.secondary` `#475569` | Hover is now **clearer** than before (2.4:1 versus 1.2:1) |
+| `Table.headerColor` | `#334155` | `text.secondary` `#475569` | Contrast 9.5:1 → 6.9:1, still comfortably AA |
+| `Table.borderColor` | `#eef2f6` | `border.subtle` `#f1f5f9` | 3/255 per channel; invisible |
 
-Cả năm đã được chấp nhận có cân nhắc. Lý do giữ `Table.headerColor` theo `text.secondary`: tiêu đề cột là nhãn phụ, nên đó mới là token đúng về ngữ nghĩa; `#334155` cũ là một sắc độ tùy ý. **Không** thêm giá trị mới vào palette chỉ để bảo toàn sắc độ cũ — đó đúng là thứ đợt này dẹp.
+All five were accepted deliberately. The reasoning for `Table.headerColor`: a column heading is a secondary label, so `text.secondary` is the semantically correct token; the old `#334155` was an arbitrary shade. **Do not** add new palette entries merely to preserve an old shade — that is exactly what this wave removes.
 
-**Một thứ `antdThemeTokens()` không được mang: các giá trị không phải màu.** `Layout.headerHeight: 56` từng bị mất đúng vì lý do này khi theme chuyển sang token, và mọi trang vẫn render bình thường với chiều cao header sai. Giữ chúng trong `providers.tsx`, và spread lên `components.Layout` để không xóa mất màu:
+**One thing `antdThemeTokens()` must not carry: non-colour values.** `Layout.headerHeight: 56` was lost for exactly this reason when the theme moved onto tokens, and every page still rendered fine with the wrong header height. Keep them in `providers.tsx`, and spread over `components.Layout` so the colours survive:
 
 ```tsx
 components: {
@@ -608,7 +643,7 @@ components: {
 
 - [ ] **Step 4: Rewrite providers.tsx**
 
-Thay `app/providers.tsx` bằng:
+Replace `app/providers.tsx` with:
 
 ```tsx
 "use client";
@@ -636,7 +671,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       theme={{
         algorithm: antdTheme.defaultAlgorithm,
         token: { ...token, borderRadius: 8, fontFamily: SANS, fontSize: 14, wireframe: false },
-        components: { ...components, Card: { borderRadiusLG: 12 } },
+        components: {
+          ...components,
+          // The tokens give Layout its colours; the header's height is a
+          // dimension, so it stays here with the other non-colour settings
+          // rather than moving into a module that governs colour alone.
+          // Spreading over components.Layout keeps those colours.
+          Layout: { ...components.Layout, headerHeight: 56 },
+          Card: { borderRadiusLG: 12 },
+        },
       }}
     >
       <App>{children}</App>
@@ -648,7 +691,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/design-tokens.test.ts`
-Expected: PASS — 9 tests
+Expected: PASS — 10 tests
 
 - [ ] **Step 6: Verify the app still renders**
 
@@ -658,7 +701,9 @@ npm start
 node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000
 ```
 
-Expected: 48 trang, 0 lỗi. Dừng server sau khi xong.
+Expected: every page renders, 0 failures. Stop the server afterwards.
+
+Note: `npm start` launched from an agent's shell dies mid-sweep. Start it detached (on Windows, PowerShell `Start-Process`) and pass `--concurrency=2`. A run of `fetch failed` results means the server died, not that the pages regressed.
 
 - [ ] **Step 7: Commit**
 
@@ -669,7 +714,7 @@ git commit -m "refactor(design): derive the Ant Design theme from tokens"
 
 ---
 
-### Task 5: statusToken — màu không bao giờ đi một mình
+### Task 5: statusToken — colour never travels alone
 
 **Files:**
 - Create: `lib/design/status.tsx`
@@ -680,16 +725,18 @@ git commit -m "refactor(design): derive the Ant Design theme from tokens"
 - Produces:
   - `type StatusKey = "posted" | "void" | "draft" | "overdue" | "pending"`
   - `statusToken(key: StatusKey): { color: string; icon: ReactNode; label: string }`
+  - `StatusBadge({ status }: { status: StatusKey })`
 
-Đây là điểm biến quy tắc a11y thành cấu trúc: không có cách nào lấy màu trạng thái mà không nhận kèm icon và nhãn.
+This is where the accessibility rule becomes structure. Note the correction recorded in the spec: returning a triple from `statusToken` is a *convention*, not structure, because `.color` is still a one-liner. `StatusBadge` is the structural answer, and it is the default path for screens.
 
 - [ ] **Step 1: Write the failing test**
 
-Tạo `tests/unit/design-status.test.ts`:
+Create `tests/unit/design-status.test.ts`:
 
 ```ts
+import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
-import { STATUS_KEYS, statusToken } from "@/lib/design/status";
+import { STATUS_KEYS, StatusBadge, statusToken } from "@/lib/design/status";
 import { TOKENS } from "@/lib/design/tokens";
 
 describe("status tokens", () => {
@@ -697,9 +744,20 @@ describe("status tokens", () => {
     for (const key of STATUS_KEYS) {
       const token = statusToken(key);
       expect(token.color).toMatch(/^#[0-9a-f]{6}$/i);
-      expect(token.icon).toBeTruthy();
+      // Not `toBeTruthy`: under environment "node" any non-null value passes
+      // that, including a stray string, so it would prove nothing.
+      expect(isValidElement(token.icon)).toBe(true);
       expect(token.label.length).toBeGreaterThan(0);
     }
+  });
+
+  it("gives each status a distinct icon, which is what separates void from draft", () => {
+    const types = STATUS_KEYS.map((key) => {
+      const icon = statusToken(key).icon;
+      if (!isValidElement(icon)) throw new Error(`Status ${key} carries no icon element`);
+      return icon.type;
+    });
+    expect(new Set(types).size).toBe(STATUS_KEYS.length);
   });
 
   it("gives overdue the danger colour and void a muted one", () => {
@@ -712,6 +770,29 @@ describe("status tokens", () => {
     expect(new Set(labels).size).toBe(STATUS_KEYS.length);
   });
 });
+
+describe("StatusBadge", () => {
+  it("carries the icon and the wording, not the colour alone", () => {
+    for (const key of STATUS_KEYS) {
+      const badge = StatusBadge({ status: key });
+      const [icon, label] = badge.props.children as [unknown, string];
+      expect(isValidElement(icon)).toBe(true);
+      expect(label).toBe(statusToken(key).label);
+      expect(badge.props.style.color).toBe(statusToken(key).color);
+    }
+  });
+
+  it("tells void and draft apart even though they share a colour", () => {
+    const voidBadge = StatusBadge({ status: "void" });
+    const draftBadge = StatusBadge({ status: "draft" });
+    expect(voidBadge.props.style.color).toBe(draftBadge.props.style.color);
+
+    const [voidIcon, voidLabel] = voidBadge.props.children as [{ type: unknown }, string];
+    const [draftIcon, draftLabel] = draftBadge.props.children as [{ type: unknown }, string];
+    expect(voidIcon.type).not.toBe(draftIcon.type);
+    expect(voidLabel).not.toBe(draftLabel);
+  });
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -721,7 +802,7 @@ Expected: FAIL — `Cannot find module '@/lib/design/status'`
 
 - [ ] **Step 3: Write the implementation**
 
-Tạo `lib/design/status.tsx`:
+Create `lib/design/status.tsx`:
 
 ```tsx
 import type { ReactNode } from "react";
@@ -737,10 +818,16 @@ import { TOKENS } from "./tokens";
 /**
  * A document status, and the three things a reader needs to tell it apart.
  *
- * The colour is never returned on its own. Colour alone fails anyone who cannot
- * distinguish the hues, and it fails everyone in a printed report — so asking
- * this module for a status colour hands back the icon and the wording with it,
- * and a caller cannot take the colour while leaving the other two behind.
+ * Colour alone fails anyone who cannot distinguish the hues, and it fails
+ * everyone in a printed report. `void` and `draft` make that concrete here:
+ * they deliberately share one muted colour, because a document that is off the
+ * ledger reads the same either way — only the icon and the wording separate
+ * them.
+ *
+ * `StatusBadge` below is therefore the way to show a status, and `statusToken`
+ * is the exception for the few places that need a raw colour and nothing else
+ * (a total tinted by whether it is overdue, say). Reaching for the token where
+ * a badge would do is how a status ends up shown in colour alone.
  */
 export const STATUS_KEYS = ["posted", "void", "draft", "overdue", "pending"] as const;
 
@@ -763,11 +850,34 @@ const STATUS: Record<StatusKey, StatusToken> = {
 export function statusToken(key: StatusKey): StatusToken {
   return STATUS[key];
 }
+
+/**
+ * A status shown the way a status should be shown: icon, wording and colour
+ * together.
+ *
+ * This exists so that showing a status correctly is less work than showing it
+ * incorrectly. Composing the three parts by hand at every call site is what
+ * lets one screen quietly drop the icon, and the reader who cannot tell the two
+ * muted greys apart never learns which document was voided.
+ *
+ * Styled inline rather than through a class so the badge carries its own
+ * appearance wherever it is dropped, and so this module keeps its single
+ * dependency on the icon set.
+ */
+export function StatusBadge({ status }: { status: StatusKey }) {
+  const { color, icon, label } = statusToken(status);
+  return (
+    <span style={{ color, display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {icon}
+      {label}
+    </span>
+  );
+}
 ```
 
-- [ ] **Step 4: Allow TSX in the test include**
+- [ ] **Step 4: Allow JSX in the test transform**
 
-`vitest.config.ts` hiện chỉ nhận `tests/**/*.test.ts`. Test này import một file `.tsx`, nên cần JSX transform. Sửa `vitest.config.ts`:
+`vitest.config.ts` has no JSX handling, and this is the first `.tsx` file a unit test imports. This Vite builds with Rolldown, where the `esbuild` config block is a deprecated shim whose types come from a package that is not installed — setting it needs an `as any` that switches off checking for the whole block. Use the natively-typed `oxc` field instead:
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -776,10 +886,14 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
-  esbuild: {
+  oxc: {
     // lib/design/status.tsx carries JSX. React 19's automatic runtime means no
     // React import is needed in the source file.
-    jsx: "automatic",
+    //
+    // Configured through `oxc`, not `esbuild`: this Vite builds with Rolldown,
+    // where the `esbuild` block is a deprecated shim it converts internally —
+    // and whose types come from a package that is not even installed here.
+    jsx: { runtime: "automatic" },
   },
   test: {
     environment: "node",
@@ -788,10 +902,12 @@ export default defineConfig({
 });
 ```
 
+`vitest.config.ts` is shared by every test file. After changing it, run the **full** suite, not just this test, and confirm the count did not drop.
+
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/design-status.test.ts`
-Expected: PASS — 3 tests
+Expected: PASS — 6 tests
 
 - [ ] **Step 6: Commit**
 
@@ -802,20 +918,20 @@ git commit -m "feat(design): pair every status colour with an icon and a label"
 
 ---
 
-### Task 6: Guard chống tái phát hex, kèm allowlist
+### Task 6: The regression guard and its allowlist
 
 **Files:**
 - Create: `tests/unit/no-hardcoded-color.test.ts`
 
 **Interfaces:**
-- Consumes: không có
-- Produces: allowlist mà Task 7–10 thu hẹp dần
+- Consumes: nothing
+- Produces: the allowlist that Tasks 7–10 shrink
 
-Guard bật **ngay bây giờ**, khi 21 file còn nợ, để gate xanh suốt và phần nợ hiện thành danh sách đọc được.
+The guard goes on **now**, while 21 files are still in debt, so the gate stays green throughout and the remaining debt is a readable list.
 
 - [ ] **Step 1: Write the test with the current offenders listed**
 
-Tạo `tests/unit/no-hardcoded-color.test.ts`:
+Create `tests/unit/no-hardcoded-color.test.ts`:
 
 ```ts
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -828,11 +944,15 @@ import { describe, expect, it } from "vitest";
  * Every hex below is a hand-copied duplicate of a value the theme already
  * defines, which is how three different reds all came to mean "error". The
  * allowlist is the work still outstanding: it shrinks with each migration
- * batch and is deleted with the last one. A file may not be added back.
+ * batch. A file may not be added back.
  *
- * Scope is app/ and components/. lib/client/invoice-pdf.ts and
- * lib/client/report-export.ts are excluded on purpose: colours inside a
- * generated PDF are not CSS and do not derive from the theme.
+ * Stylesheets are in scope too, and that is not a formality: walking only .ts
+ * and .tsx leaves the easiest bypass wide open — put the colour in a CSS Module
+ * beside the component.
+ *
+ * Excluded on purpose, and not listed: lib/client/invoice-pdf.ts and
+ * lib/client/report-export.ts. Colours inside a generated PDF or an XLSX cell
+ * are not CSS and never derive from the theme.
  */
 const ALLOWLIST = new Set([
   "app/(app)/dashboard/DashboardClient.tsx",
@@ -856,6 +976,10 @@ const ALLOWLIST = new Set([
   "app/(app)/banking/BankingClient.tsx",
   "app/(app)/banking/BankTransactionsTable.tsx",
   "app/(app)/accounts/AccountsClient.tsx",
+  // The two stylesheets this wave does not convert. Listed rather than skipped,
+  // because debt nobody can see is debt nobody pays.
+  "app/globals.css",
+  "components/work-areas/WorkAreaOverview.module.css",
 ]);
 
 /**
@@ -874,48 +998,54 @@ function sourceFiles(dir: string): string[] {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...sourceFiles(full));
-    else if (entry.endsWith(".tsx") || entry.endsWith(".ts")) out.push(full);
+    else if (/\.(tsx?|css)$/.test(entry)) out.push(full);
   }
   return out;
 }
 
 const files = [...sourceFiles(join(ROOT, "app")), ...sourceFiles(join(ROOT, "components"))];
 
+function relativePath(file: string): string {
+  return relative(ROOT, file).replaceAll("\\", "/");
+}
+
 describe("hard-coded colour", () => {
   it("finds files to check", () => {
     expect(files.length).toBeGreaterThan(150);
   });
 
+  it("walks stylesheets, not only TypeScript", () => {
+    expect(files.some((file) => file.endsWith(".css"))).toBe(true);
+  });
+
   it("appears in no file outside the shrinking allowlist", () => {
     const offenders = files
-      .map((file) => ({ path: relative(ROOT, file).replaceAll("\\", "/"), source: readFileSync(file, "utf8") }))
+      .map((file) => ({ path: relativePath(file), source: readFileSync(file, "utf8") }))
       .filter(({ path }) => !ALLOWLIST.has(path))
       .filter(({ source }) => hexPattern().test(source))
       .map(({ path }) => path);
     expect(offenders).toEqual([]);
   });
 
-  it("lists no file that has already been cleaned", () => {
-    const stale = [...ALLOWLIST].filter((path) => {
-      const source = readFileSync(join(ROOT, path), "utf8");
-      return !hexPattern().test(source);
-    });
+  it("lists no file that has already been converted", () => {
+    const stale = [...ALLOWLIST].filter(
+      (path) => !hexPattern().test(readFileSync(join(ROOT, path), "utf8")),
+    );
     expect(stale).toEqual([]);
   });
 });
 ```
 
-Ca kiểm thử thứ ba là phần quan trọng: nó **buộc allowlist phải co lại**. Dọn sạch một file mà quên xóa khỏi allowlist thì test đỏ, nên danh sách không thể phình ra thành lời nói dối.
+The last case is the important one: it **forces the allowlist to shrink**. Clean a file but forget to delete its entry and the test goes red, so the list cannot inflate into a lie.
 
 - [ ] **Step 2: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/no-hardcoded-color.test.ts`
-Expected: PASS — 3 tests. `providers.tsx` đã sạch từ Task 4 nên không có mặt trong allowlist.
+Expected: PASS. `providers.tsx` was cleaned in Task 4, so it is correctly absent from the list.
 
-- [ ] **Step 3: Run the whole suite**
+- [ ] **Step 3: Prove the guard bites**
 
-Run: `npm test`
-Expected: PASS toàn bộ
+Temporarily add a hex literal to any file NOT on the allowlist, confirm the test fails and names that file, then revert. Confirm `git status` is clean before committing.
 
 - [ ] **Step 4: Commit**
 
@@ -926,26 +1056,26 @@ git commit -m "test(design): guard against hard-coded colour, with a shrinking a
 
 ---
 
-## Task 7–10: Chuyển đổi theo cụm
+## Tasks 7–10: Migration by area
 
-Bốn task còn lại dùng **chung một quy trình**. Chép lại đầy đủ ở đây vì người thực hiện có thể đọc không theo thứ tự.
+The four remaining tasks share **one procedure**. It is written out in full here because the implementer may read the tasks out of order.
 
-### Quy trình cho mỗi file
+### The procedure, per file
 
-1. Mở file, tìm mọi hex bằng `#[0-9a-fA-F]{3,8}\b`
-2. Tra bảng ánh xạ dưới đây để chọn token
-3. Thay bằng `TOKENS.<nhóm>.<tên>`, thêm `import { TOKENS } from "@/lib/design/tokens";`
-4. Nếu hex đó biểu thị một **trạng thái chứng từ**, dùng `statusToken()` thay vì màu trần, và hiển thị cả icon lẫn nhãn
-5. Xóa đường dẫn file khỏi `ALLOWLIST` trong `tests/unit/no-hardcoded-color.test.ts`
-6. Chạy `npx vitest run tests/unit/no-hardcoded-color.test.ts` — phải PASS
-7. Commit từng file hoặc từng cụm nhỏ
+1. Open the file and find every hex with `#[0-9a-fA-F]{3,8}\b`
+2. Look the value up in the mapping table below
+3. Replace with `TOKENS.<group>.<name>`, adding `import { TOKENS } from "@/lib/design/tokens";`
+4. If the hex marks a **document status**, use `StatusBadge` rather than a bare colour, so the icon and the wording come with it
+5. Delete the file's path from `ALLOWLIST` in `tests/unit/no-hardcoded-color.test.ts`
+6. Run `npx vitest run tests/unit/no-hardcoded-color.test.ts` — it must PASS
+7. Commit
 
-### Bảng ánh xạ đầy đủ
+### The complete mapping
 
-| Hex | Token | Ghi chú |
+| Hex | Token | Note |
 |---|---|---|
-| `#b91c1c`, `#cf1322`, `#b42318` | `TOKENS.intent.danger` | Gộp ba đỏ |
-| `#15803d`, `#389e0d`, `#3f8600`, `#047857` | `TOKENS.intent.success` | Gộp bốn xanh |
+| `#b91c1c`, `#cf1322`, `#b42318` | `TOKENS.intent.danger` | Three reds consolidated |
+| `#15803d`, `#389e0d`, `#3f8600`, `#047857` | `TOKENS.intent.success` | Four greens consolidated |
 | `#b45309`, `#d46b08` | `TOKENS.intent.warning` | |
 | `#7c3aed` | `TOKENS.series.purchases` | |
 | `#0369a1` | `TOKENS.series.inventory` | |
@@ -953,13 +1083,13 @@ Bốn task còn lại dùng **chung một quy trình**. Chép lại đầy đủ
 | `#f1f5f9`, `#f5f5f5` | `TOKENS.surface.muted` | |
 | `#e5e7eb` | `TOKENS.border.default` | |
 
-Số âm trong bảng số liệu dùng `TOKENS.money.negative`, **không** dùng `intent.danger`: một số âm không phải một lỗi.
+A signed amount uses `TOKENS.money.negative` / `TOKENS.money.positive`, **not** `intent.danger` / `intent.success`. A negative number is not an error, and the name is what carries that meaning.
 
-### Những chỗ cùng một hex mang hai nghĩa
+### Where one hex means two different things
 
-Bốn giá trị dưới đây xuất hiện ở nhiều nơi với ý nghĩa khác nhau, nên không có ánh xạ chung. Đây là địa chỉ chính xác của từng chỗ, để không phải đoán:
+These values appear in several places with different meanings, so they have no single mapping. Here is the exact address of each, so nothing has to be guessed:
 
-| File:dòng | Hex | Token |
+| File:line | Hex | Token |
 |---|---|---|
 | `DashboardClient.tsx:281` | `#0f766e` | `TOKENS.intent.primary` |
 | `DashboardClient.tsx:566` | `#0f766e` | `TOKENS.series.sales` |
@@ -976,20 +1106,22 @@ Bốn giá trị dưới đây xuất hiện ở nhiều nơi với ý nghĩa kh
 | `FinancialCharts.tsx:125` | `#e2e8f0` | `TOKENS.series.grid` |
 | `FinancialCharts.tsx:188` | `#ffffff` | `TOKENS.text.onDark` |
 
-Hex ở các file khác không nằm trong bảng này đều đơn nghĩa và tra được từ bảng ánh xạ trên.
+Line numbers were taken before the wave began; if they have drifted, match on the hex value and its surrounding context rather than editing blind by line number.
 
-### Task 7: Biểu đồ và dashboard
+Every other hex is unambiguous and resolves from the mapping table above.
+
+### Task 7: Charts and dashboard
 
 **Files:**
-- Modify: `app/(app)/dashboard/DashboardClient.tsx` (13 hex, dòng 281–323 và 566–572)
-- Modify: `components/charts/FinancialCharts.tsx` (11 hex, dòng 12–19, 125, 138, 188)
-- Test: `tests/unit/no-hardcoded-color.test.ts` (xóa 2 mục khỏi allowlist)
+- Modify: `app/(app)/dashboard/DashboardClient.tsx` (13 hex, lines 281–323 and 566–572)
+- Modify: `components/charts/FinancialCharts.tsx` (11 hex, lines 12–19, 125, 138, 188)
+- Test: `tests/unit/no-hardcoded-color.test.ts` (remove 2 entries from the allowlist)
 
-Hai file này giữ **bản đồ danh mục riêng chồng nhau** — `sales: #0f766e` ở file này và `income: #0f766e` ở file kia. Sau khi chuyển, cả hai đọc từ `TOKENS.series`, và sự trùng lặp trở nên nhìn thấy được cho quyết định về sau.
+These two files keep **their own overlapping category maps** — `sales: #0f766e` in one and `income: #0f766e` in the other. After the migration both read from `TOKENS.series`, and the duplication becomes visible for a later decision.
 
-- [ ] **Step 1:** Chuyển `DashboardClient.tsx` theo quy trình trên
-- [ ] **Step 2:** Chuyển `FinancialCharts.tsx` theo quy trình trên
-- [ ] **Step 3:** Xóa hai đường dẫn khỏi `ALLOWLIST`
+- [ ] **Step 1:** Migrate `DashboardClient.tsx` following the procedure above
+- [ ] **Step 2:** Migrate `FinancialCharts.tsx` following the procedure above
+- [ ] **Step 3:** Remove both paths from `ALLOWLIST`
 - [ ] **Step 4:** Run: `npx vitest run tests/unit/no-hardcoded-color.test.ts` — Expected: PASS
 - [ ] **Step 5:** Commit
 
@@ -998,58 +1130,57 @@ git add app/\(app\)/dashboard/DashboardClient.tsx components/charts/FinancialCha
 git commit -m "refactor(design): read chart and dashboard colour from tokens"
 ```
 
-### Task 8: Báo cáo
+### Task 8: Reports
 
-**Files:** 9 file trong `app/(app)/reports/` (`transactions`, `inventory-review`, `gl-posting`, `customer-credit`, `cash-flow-forecast`, `saved/SavedReportsClient`, `saved/SaveReportModal`, `number-sequence`, `fixed-assets`, `1099`) — tổng 14 hex
+**Files:** ten paths under `app/(app)/reports/` — `transactions`, `inventory-review`, `gl-posting`, `customer-credit`, `cash-flow-forecast`, `saved/SavedReportsClient`, `saved/SaveReportModal`, `number-sequence`, `fixed-assets`, `1099`. Roughly 18 hex literals; two of them are ternaries carrying two hexes on one line, so a count by location gives a smaller number than a count by literal.
 
-- [ ] **Step 1:** Chuyển từng file theo quy trình trên. `TransactionListClient.tsx:249` (`amount < 0 ? "#b91c1c" : "#15803d"`) phải thành `TOKENS.money.negative` / `TOKENS.money.positive`, **không** phải `intent.*`
-- [ ] **Step 2:** Xóa 9 đường dẫn khỏi `ALLOWLIST`
+- [ ] **Step 1:** Migrate each file. `TransactionListClient.tsx:249` (`amount < 0 ? "#b91c1c" : "#15803d"`) becomes `TOKENS.money.negative` / `TOKENS.money.positive`, **not** `intent.*`
+- [ ] **Step 2:** Remove the cleaned paths from `ALLOWLIST`
 - [ ] **Step 3:** Run: `npx vitest run tests/unit/no-hardcoded-color.test.ts` — Expected: PASS
 - [ ] **Step 4:** Commit `refactor(design): read report colour from tokens`
 
-### Task 9: Nghiệp vụ
+### Task 9: Operational screens
 
-**Files:** `components/payables/PayRunPanel.tsx` (3), `app/(app)/fixed-assets/FixedAssetsClient.tsx` (2), `app/(app)/recurring/RecurringClient.tsx` (1), `app/(app)/banking/BankingClient.tsx` (1), `app/(app)/banking/BankTransactionsTable.tsx` (1), `app/(app)/accounts/AccountsClient.tsx` (1)
+**Files:** `components/payables/PayRunPanel.tsx`, `app/(app)/fixed-assets/FixedAssetsClient.tsx`, `app/(app)/recurring/RecurringClient.tsx`, `app/(app)/banking/BankingClient.tsx`, `app/(app)/banking/BankTransactionsTable.tsx`, `app/(app)/accounts/AccountsClient.tsx` — nine locations, eleven literals.
 
-- [ ] **Step 1:** Chuyển từng file. `PayRunPanel.tsx:80` là tổng quá hạn → dùng `statusToken("overdue")` để có cả icon và nhãn, không chỉ màu
-- [ ] **Step 2:** Xóa 6 đường dẫn khỏi `ALLOWLIST`
+- [ ] **Step 1:** Migrate each file. `PayRunPanel.tsx:80` is the overdue total: a `Statistic`'s `valueStyle` cannot hold JSX, but its `prefix` prop can, so pass `statusToken("overdue").icon` there rather than showing colour alone
+- [ ] **Step 2:** Remove the six paths from `ALLOWLIST`
 - [ ] **Step 3:** Run: `npx vitest run tests/unit/no-hardcoded-color.test.ts` — Expected: PASS
 - [ ] **Step 4:** Commit `refactor(design): read operational screen colour from tokens`
 
-### Task 10: Còn lại, và xóa cơ chế allowlist
+### Task 10: The last files, and retiring the TSX half of the allowlist
 
 **Files:** `components/feedback/ReportDialog.tsx` (2), `app/(auth)/login/page.tsx` (1), `app/(app)/settings/import/ImportPreviewPanel.tsx` (1)
 
-- [ ] **Step 1:** Chuyển ba file cuối
-- [ ] **Step 2:** Xóa ba đường dẫn khỏi `ALLOWLIST` — danh sách giờ rỗng
-- [ ] **Step 3:** Xóa hằng `ALLOWLIST`, bỏ hai `.filter()` dùng nó, và xóa luôn ca kiểm thử `"lists no file that has already been cleaned"` (không còn gì để giữ đúng)
-- [ ] **Step 4:** Run: `npx vitest run tests/unit/no-hardcoded-color.test.ts` — Expected: PASS, 2 tests
-- [ ] **Step 5:** Chạy đủ bốn cổng
+- [ ] **Step 1:** Migrate the last three files
+- [ ] **Step 2:** Remove their three paths from `ALLOWLIST`, leaving only the two stylesheets
+- [ ] **Step 3:** Run: `npx vitest run tests/unit/no-hardcoded-color.test.ts` — Expected: PASS
+- [ ] **Step 4:** Run all four gates
 
 ```bash
 npm run typecheck && npm test && npm run lint && npm run build
 ```
 
-Expected: cả bốn xanh. **Dán nguyên văn đầu ra, không cắt bớt** — dòng pass/fail thường nằm ở cuối.
+Expected: all four green. **Paste the output verbatim, never trimmed** — the pass/fail line is usually at the end.
 
-- [ ] **Step 6:** Xác nhận trên ứng dụng thật
+- [ ] **Step 5:** Confirm against the real app
 
 ```bash
 npm start
-node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000
+node --env-file=.env.local scripts/smoke-pages.mjs http://localhost:3000 --concurrency=2
 ```
 
-Expected: 48 trang, 0 lỗi.
+Expected: every page renders, 0 failures.
 
-- [ ] **Step 7:** Đo lại chất lượng
+- [ ] **Step 6:** Re-measure quality
 
 ```bash
 npm run quality:bundle
 ```
 
-Expected: không vượt budget (10% hoặc 20 KB gzip). Đợt này không nhằm giảm bundle; phép đo để chắc chắn nó không **tăng**.
+Expected: within budget (10% or 20 KB gzip). This wave does not aim to reduce the bundle; the measurement is to be sure it did not **grow**.
 
-- [ ] **Step 8:** Commit
+- [ ] **Step 7:** Commit
 
 ```bash
 git add -A
@@ -1058,12 +1189,13 @@ git commit -m "refactor(design): finish the colour migration and retire the allo
 
 ---
 
-## Tiêu chí nghiệm thu Đợt 1
+## Wave 1 acceptance criteria
 
-- [ ] `ALLOWLIST` không còn tồn tại trong mã nguồn
-- [ ] `grep -rE '#[0-9a-fA-F]{3,8}\b' app components --include=*.tsx --include=*.ts` không trả về kết quả nào
-- [ ] Test tương phản WCAG AA xanh với ≥ 10 cặp
-- [ ] Khối `:root` trong `globals.css` khớp `cssVariableBlock()`
-- [ ] Bốn cổng xanh, đầu ra dán nguyên văn
-- [ ] `scripts/smoke-pages.mjs` xanh trên server đã build
-- [ ] `npm run quality:bundle` không vượt budget
+- [ ] No hex literal in `app/` or `components/` outside the two allowlisted stylesheets
+- [ ] The allowlist holds exactly `app/globals.css` and `components/work-areas/WorkAreaOverview.module.css`, each with its count and reason
+- [ ] The guard walks `.ts`, `.tsx` **and** `.css`, and has been shown to fail when a new file carries a hex
+- [ ] The WCAG AA contrast test green over ≥ 10 pairs
+- [ ] The `:root` block in `globals.css` matches `cssVariableBlock()`
+- [ ] All four gates green, output pasted verbatim
+- [ ] `scripts/smoke-pages.mjs` green against the built server
+- [ ] `npm run quality:bundle` within budget

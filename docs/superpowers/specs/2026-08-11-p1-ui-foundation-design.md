@@ -1,332 +1,359 @@
-# P1 — Chuẩn hóa nền tảng UI của One Book
+# P1 — Standardising One Book's UI foundation
 
-Ngày: 2026-08-11
-Trạng thái: thiết kế đã duyệt, chờ lập kế hoạch triển khai
+Date: 2026-08-11
+Status: design approved; wave 1 built and merged-ready, waves 2–4 awaiting plans
 
-## 1. Mục đích
+## 1. Purpose
 
-P0 đã dựng xong bộ đo (Axe, keyboard harness, ma trận viewport, budget bundle,
-baseline). P1 dùng bộ đo đó để chuẩn hóa nền tảng UI, nhằm đưa trục UX và
-Accessibility lên mức 8.0.
+P0 built the instruments: Axe, a keyboard harness, a viewport matrix, bundle
+budgets and a baseline. P1 uses those instruments to standardise the UI
+foundation, aiming to bring the UX and Accessibility axes to 8.0.
 
-P1 **không** đưa trục Performance lên 8.0. Lý do nằm ở mục 3.
+P1 does **not** bring Performance to 8.0. Section 3 says why.
 
-## 2. Hiện trạng đo được
+## 2. Measured starting point
 
-Toàn bộ số dưới đây đo trực tiếp từ mã nguồn và từ `.quality-results/` ngày
-2026-08-11, không phải ước lượng.
+Every number below was measured directly from the source and from
+`.quality-results/` on 2026-08-11. None of it is an estimate.
 
-| Chỉ số | Giá trị |
+| Metric | Value |
 |---|---|
-| File khai báo `columns=` | 73 |
-| File tự định dạng tiền tệ | 56 |
-| Chỗ dùng `<Table>` | 51 (37 file import antd `Table` trực tiếp, 33 file dùng `DataTable`) |
+| Files declaring `columns=` | 73 |
+| Files formatting currency by hand | 56 |
+| `<Table>` call sites | 51 (37 files import antd `Table` directly, 33 use `DataTable`) |
 | `pagination={false}` | 61 |
-| Trang `force-dynamic` | 59/60 |
-| TSX là Client Component | 128/201 |
-| Component trên 400 dòng | 13 |
-| `next/dynamic` | **0** |
-| CSS custom property trong `globals.css` (3.312 dòng) | **6** (5 trong số đó là `--dashboard-*` cục bộ, không có khối `:root`) |
+| Pages marked `force-dynamic` | 59/60 |
+| TSX files that are Client Components | 128/201 |
+| Components over 400 lines | 13 |
+| `next/dynamic` usages | **0** |
+| CSS custom properties in `globals.css` (3,312 lines) | **6** (five of them `--dashboard-*`, scoped to one section; no `:root` block at all) |
 
-Mức đa dạng tính năng của bảng rất thấp: `summary=` 6 chỗ (toàn báo cáo),
+Table feature variety is very low: `summary=` appears 6 times (all in reports),
 `expandable=` 5, `rowSelection=` 1, `onRow=` 1, `rowClassName=` 12.
 
 ### Bundle (gzip)
 
 | | |
 |---|---|
-| Tải trên ~59/63 route, trải trên 30 chunk | **613 KB** |
-| `/invoices` tổng | 935 KB |
-| `/banking` tổng | 921 KB |
-| Route nhẹ nhất trong nhóm app | ~720 KB |
+| Loaded on ~59/63 routes, spread over 30 chunks | **613 KB** |
+| `/invoices` total | 935 KB |
+| `/banking` total | 921 KB |
+| Lightest route in the app group | ~720 KB |
 
-Chunk lớn nhất chỉ thuộc một route: 136 KB trên `/banking`, 121 KB trên
+The largest single-route chunks are 136 KB on `/banking` and 121 KB on
 `/invoices`.
 
-### Ba phát hiện làm đổi hướng triển khai
+### Three findings that changed the approach
 
-**a. Hệ token đã tồn tại, chỉ là không ai đọc nó.**
-`app/providers.tsx` khai báo đầy đủ `colorPrimary: #0f766e`,
-`colorSuccess: #15803d`, `colorError: #b91c1c`, `colorTextHeading: #0f172a`.
-Các hex cứng rải trong TSX chính là bản sao chép tay của đúng các giá trị đó:
-`#0f766e` 8 chỗ, `#b91c1c` 7, `#15803d` 5, `#0f172a` 4. Vậy công việc không phải
-phát minh hệ token, mà là làm nguồn sự thật đã có với tới được CSS và TSX.
+**a. The token system already exists; nothing reads it.**
+`app/providers.tsx` declares `colorPrimary: #0f766e`, `colorSuccess: #15803d`,
+`colorError: #b91c1c` and `colorTextHeading: #0f172a`. The hex literals scattered
+through the TSX are hand-copied duplicates of exactly those values — `#0f766e`
+eight times, `#b91c1c` seven, `#15803d` five, `#0f172a` four. So the work is not
+inventing a token system; it is making the source of truth that already exists
+reachable from CSS and TSX.
 
-**b. Trùng lặp của bảng nằm ở cột, không ở component bảng.**
-Bảng hầu hết phẳng, nhưng 56 file tự đấu dây định dạng tiền. `formatMoney` trong
-`lib/format.ts` đã đúng và đã tồn tại — vấn đề là mỗi nơi tự lo căn lề, dấu âm và
-nhãn trợ năng một kiểu.
+**b. The duplication in tables lives in the columns, not in the table component.**
+The tables are mostly flat, but 56 files wire up currency formatting themselves.
+`formatMoney` in `lib/format.ts` is already correct and already exists — the
+problem is that every site handles alignment, the negative sign and the
+accessible name its own way.
 
-**c. Perf bị chi phối bởi chunk dùng chung, không phải code trang.**
-`/invoices` tổng 935 KB nhưng chỉ tự đóng góp ~77 KB. Tách `InvoicesClient` 992
-dòng cải thiện khả năng bảo trì và phạm vi re-render, **không giảm tải xuống**.
+**c. Performance is dominated by the shared chunk, not by page code.**
+`/invoices` totals 935 KB but contributes only ~77 KB of its own. Splitting the
+992-line `InvoicesClient` improves maintainability and narrows re-render scope;
+it does **not** reduce what the browser downloads.
 
-## 3. Nguyên tắc thiết kế
+## 3. Design principles
 
-1. **Đặt điểm tái sử dụng đúng chỗ trùng lặp thật.** Cột, không phải bảng.
-2. **Biến quy tắc thành cấu trúc, không thành mục checklist.** Nếu một quy tắc
-   chỉ được nhắc trong tài liệu review, nó sẽ bị quên. Nếu API buộc phải tuân
-   theo, nó không thể bị quên.
-3. **Một nguồn sự thật, nhiều nơi dẫn xuất** — cùng khuôn mẫu `lib/domain/*` mà
-   codebase đã dùng cho quy tắc kế toán.
-4. **Guard bằng unit test, không bằng kỷ luật review** — cùng khuôn mẫu
-   `tests/unit/rsc-antd.test.ts` và `navigation.test.ts`.
-5. **Gate luôn xanh trong suốt quá trình.** Không có lô nào để lại gate đỏ.
-6. **Nợ còn lại phải nhìn thấy được**, dưới dạng danh sách file cụ thể.
+1. **Put the reuse where the duplication actually is.** Columns, not tables.
+2. **Turn a rule into structure, not a checklist item.** A rule that lives only
+   in a review document gets forgotten. A rule the API enforces cannot be.
+3. **One definition, many derivations** — the same pattern `lib/domain/*` already
+   uses for the accounting rules.
+4. **Guard with unit tests, not with review discipline** — the same pattern as
+   `tests/unit/rsc-antd.test.ts` and `navigation.test.ts`.
+5. **The gate stays green throughout.** No batch leaves it red.
+6. **Remaining debt must be visible** as a concrete list of files.
 
-## 4. Cơ chế allowlist thu hẹp dần
+## 4. The shrinking allowlist
 
-Áp dụng thống nhất cho cả bốn đợt. Đây là cách giải quyết đánh đổi của lối quét
-ngang: mỗi đợt chạm nhiều file, nên không thể là một PR khổng lồ.
+Applied uniformly across all four waves. This is how the horizontal-sweep
+trade-off is paid for: each wave touches many files, so it cannot be one
+enormous pull request.
 
-- Lô đầu của mỗi đợt dựng primitive + test + **bật guard ngay**, kèm allowlist
-  liệt kê đúng từng file còn nợ. **Không màn hình nào đổi.**
-- Các lô sau chuyển đổi theo cụm nghiệp vụ, mỗi lô xóa vài dòng khỏi allowlist.
-- Lô cuối: allowlist rỗng, xóa luôn cơ chế allowlist.
+- The first batch of each wave builds the primitives and their tests and **turns
+  the guard on immediately**, with an allowlist naming every file still in debt.
+  **No screen changes.**
+- Later batches migrate by business area, each deleting entries from the list.
+- The final batch empties the list and deletes the mechanism.
 
-Kết quả: gate xanh suốt, và phần chưa làm luôn là một danh sách đọc được chứ
-không phải cảm giác. Một đợt bị bỏ dở giữa chừng sẽ tự tố cáo.
+The result: the gate is green throughout, and what remains is always a readable
+list rather than a feeling. A wave abandoned half-way denounces itself.
 
-**Kế hoạch triển khai viết riêng cho từng đợt**, không gộp thành một kế hoạch
-duy nhất. Bốn đợt có phụ thuộc theo thứ tự nhưng không dùng chung file, nên gộp
-lại chỉ tạo ra một kế hoạch quá lớn để theo dõi. Đợt song song ở mục 9 có kế
-hoạch riêng của nó.
+**Each wave gets its own implementation plan**, not one combined plan. The four
+waves depend on each other in order but share no files, so combining them would
+only produce a plan too large to follow. The parallel wave in section 9 has its
+own plan.
 
-## 5. Đợt 1 — Semantic token
+## 5. Wave 1 — Semantic tokens
 
-### Kiến trúc
+### Architecture
 
 ```
-lib/design/tokens.ts          ← định nghĩa duy nhất, thuần, không I/O, không React
-   ├──► app/providers.tsx     → ConfigProvider theme   (component antd)
-   └──► app/globals.css       → khối :root { --ob-* }  (CSS + inline style)
+lib/design/tokens.ts          ← the single definition; pure, no I/O, no React
+   ├──► app/providers.tsx     → ConfigProvider theme   (Ant Design components)
+   └──► app/globals.css       → :root { --ob-* } block (CSS and inline styles)
 ```
 
-Ba tầng tách bạch:
+Three separated layers:
 
-1. **Palette** — giá trị màu thô, không mang ý nghĩa (`teal700: "#0f766e"`).
-   Không component nào được import tầng này.
-2. **Ngữ nghĩa** — ánh xạ khái niệm kế toán sang palette:
+1. **Palette** — raw colour values carrying no meaning (`teal700: "#0f766e"`).
+   No component may import this layer.
+2. **Semantics** — accounting concepts mapped onto the palette:
    `money.negative | positive | zero`;
    `status.posted | void | draft | overdue | pending`;
    `intent.primary | success | warning | danger | info`;
    `surface.* | text.* | border.*`
-3. **Phát sinh** — `antdThemeTokens()` trả về object cho `ConfigProvider`;
-   `cssVariableBlock()` trả về chuỗi `:root`.
+3. **Emitters** — `antdThemeTokens()` returns the object `ConfigProvider` takes;
+   `cssVariableBlock()` returns the `:root` string.
 
-### Quy tắc a11y biến thành cấu trúc
+### Making the accessibility rule structural
 
-Token trạng thái không trả về màu đơn thuần mà trả về bộ ba:
+A status token does not return a bare colour; it returns three things:
 
 ```ts
 statusToken("overdue") → { color, icon, label }
 ```
 
-**Sửa lại một tuyên bố sai của bản spec đầu.** Bản đầu nói bộ ba này khiến quy
-tắc trở thành *cấu trúc*. Không đúng: `statusToken("overdue").color` vẫn là một
-dòng, nên đó chỉ là *quy ước*. Review Task 5 chỉ ra điều này, và nó không phải
-chuyện lý thuyết — `void` và `draft` cố ý dùng chung một màu xám, nên màn hình
-nào lấy mỗi `.color` sẽ vẽ hai trạng thái đó giống hệt nhau.
+**Correcting a false claim from the first draft of this spec.** That draft said
+the triple made the rule *structural*. It does not: `statusToken("overdue").color`
+is still a one-liner, so it is a *convention*. The wave-1 Task 5 review caught
+this, and it is not academic — `void` and `draft` deliberately share one muted
+colour, so any screen that takes only `.color` renders the two identically.
 
-Cấu trúc thật nằm ở `StatusBadge`:
+The structure lives in `StatusBadge`:
 
 ```tsx
-<StatusBadge status="overdue" />   // icon + nhãn + màu, không tách rời được
+<StatusBadge status="overdue" />   // icon, wording and colour, inseparable
 ```
 
-Đây là đường mặc định cho mọi màn hình. `statusToken()` vẫn còn cho ca ngoại lệ
-thật — một con số tổng được tô màu theo tình trạng quá hạn chẳng hạn — nhưng
-hiện trạng thái bằng badge phải là việc **dễ hơn** hiện sai.
+That is the default path for every screen. `statusToken()` remains for the
+genuine exception — a total tinted by whether it is overdue, say — but showing a
+status as a badge has to be **easier** than showing it wrongly.
 
-### Chống trôi lệch
+### Preventing drift
 
-Khối `:root` nằm **tĩnh** trong `globals.css`, không emit lúc chạy. Một unit test
-khẳng định nó khớp từng ký tự với `cssVariableBlock()`. Sửa một nơi mà quên nơi
-kia thì test đỏ.
+The `:root` block sits **statically** in `globals.css`; it is not injected at
+runtime. A unit test asserts it matches `cssVariableBlock()` exactly. Edit one
+without the other and the test fails.
 
-### Đợt 1 làm được tới đâu — ghi lại sau khi thi công xong
+### How far wave 1 actually got — recorded after it shipped
 
-Đợt 1 đã chạy xong. Ba điều cần nói đúng, vì Đợt 2–4 sẽ dựng lên trên nó:
+Wave 1 is complete. Three things must be stated accurately, because waves 2–4
+build on it:
 
-1. **Phạm vi hẹp hơn mục 5 này mô tả ban đầu.** Đợt 1 gỡ màu khỏi **TSX và theme
-   antd**. Trong `app/` và `components/` vẫn còn **309 hex trong CSS**
-   (`globals.css` 225, `WorkAreaOverview.module.css` 84). Chúng nằm trong
-   allowlist kèm lý do, và guard đã mở sang `.css`.
-2. **`var(--ob-*)` hiện được đọc 0 lần.** Khối `:root` là nửa đầu của đường ống,
-   chưa có đầu tiêu thụ. Đợt 2 đừng giả định CSS đã chạy bằng token.
-3. **`StatusBadge` chưa có nơi gọi nào.** Mọi trạng thái trong app vẫn hiện bằng
-   `<Tag color="green">` không icon. Component đúng và có test, nhưng người dùng
-   dự kiến của nó là `statusColumn()` ở Đợt 2 — tính là đã *dựng*, chưa tính là
-   đã *áp dụng*.
+1. **The scope was narrower than this section originally described.** Wave 1
+   removed colour from **TSX and the Ant Design theme**. Inside `app/` and
+   `components/` there are still **309 hex literals in CSS** (`globals.css` 225,
+   `WorkAreaOverview.module.css` 84) — including `#0f766e` thirty times over, the
+   same hand-copied duplication the wave removed from TSX. They are listed in the
+   guard's allowlist with counts and reasons, and the guard now walks `.css`.
+   The mistake traces to the survey above: it measured six custom properties in
+   `globals.css` and concluded tokens barely existed, without ever counting the
+   hex literals in the same file.
+2. **`var(--ob-*)` is read zero times.** The `:root` block is the first half of a
+   pipe with nothing yet drinking from it. Wave 2 must not assume CSS is already
+   token-driven.
+3. **`StatusBadge` has no call sites.** Every status in the app still renders as
+   `<Tag color="green">` with no icon. The component is correct and tested, but
+   its intended consumer is `statusColumn()` in wave 2 — count it as *built*, not
+   as *adopted*.
 
-### Kiểm thử — `tests/unit/design-tokens.test.ts`
+Also still outstanding, and out of wave 1's scope: 64 `<Tag color="red">` call
+sites use Ant Design's preset colour scale, which is generated independently of
+`colorError`. So `CustomerCreditClient` now renders `#b91c1c` beside `#cf1322` —
+two reds meaning the same thing on one screen. The "three different reds" problem
+is half solved; the other half belongs to wave 2's `statusColumn()`.
 
-| Khẳng định | Bắt được lỗi gì |
+### Testing — `tests/unit/design-tokens.test.ts`
+
+| Assertion | What it catches |
 |---|---|
-| Mọi token ngữ nghĩa phân giải về một mục trong palette | Hex mồ côi lọt vào tầng ngữ nghĩa |
-| Khối `:root` khớp `cssVariableBlock()` | Hai nguồn trôi khỏi nhau |
-| `providers.tsx` không chứa literal hex | Màu dán thẳng vào theme |
-| Mọi cặp text/background đạt WCAG AA 4.5:1 | Màu không đọc được — tính được thuần túy nên là unit test, không phải chờ Axe |
-| Guard no-hex: quét `app/` + `components/`, chỉ `tokens.ts` được phép | Tái phát hex cứng |
+| Every semantic token resolves to a palette entry | An orphan hex smuggled into the semantic layer |
+| The `:root` block matches `cssVariableBlock()` | The two sources drifting apart |
+| `providers.tsx` contains no hex literal | A colour pasted straight into the theme |
+| Every text/background pair meets WCAG AA 4.5:1 | Unreadable colour — computable from the values alone, so it is a unit test rather than something to wait for Axe to find |
+| Non-colour theme settings survive in `providers.tsx` | A rewrite silently dropping `headerHeight`, which is exactly what happened once |
+| No-hex guard over `app/` and `components/`, walking `.ts`, `.tsx` and `.css` | Hard-coded colour coming back, including through a CSS Module beside a component |
 
-Guard chỉ quét `app/` và `components/`. `lib/client/invoice-pdf.ts` và
-`lib/client/report-export.ts` nằm ngoài: màu trong tài liệu PDF không phải token
-CSS và không dẫn xuất từ theme.
+`lib/client/invoice-pdf.ts` and `lib/client/report-export.ts` are deliberately
+outside the guard: colours inside a generated PDF or an XLSX cell are not CSS and
+never derive from the theme.
 
-### Chia lô
+### Batches
 
-- **Lô 1** — `tokens.ts` + test + nối `providers.tsx` + emit `:root` + bật guard
-  no-hex kèm allowlist (~39 chỗ). Không đổi pixel nào.
-- **Lô 2…n** — gỡ hex theo cụm: reports, banking, dashboard, còn lại.
-- **Lô cuối** — allowlist rỗng.
+- **Batch 1** — `tokens.ts`, its tests, wiring `providers.tsx`, emitting `:root`,
+  and turning the no-hex guard on with its allowlist. No pixel changes.
+- **Batches 2…n** — remove hex by area: charts and dashboard, reports,
+  operational screens, the rest.
+- **Final batch** — the allowlist covers only the two stylesheets left for a
+  later wave.
 
-## 6. Đợt 2 — Table
+## 6. Wave 2 — Table
 
-### Thành phần
+### Components
 
 ```
-components/ui/DataTable.tsx      ← giữ mỏng (~80 dòng), thêm contract 2 chế độ
-components/ui/ReportTable.tsx    ← biến thể cho 6 bảng báo cáo có dòng tổng
-components/ui/columns.tsx        ← bộ dựng cột: nơi tái sử dụng thật
-lib/client/table-url-state.ts    ← hook đồng bộ URL
+components/ui/DataTable.tsx      ← stays thin (~80 lines), gains a two-mode contract
+components/ui/ReportTable.tsx    ← variant for the 6 report tables with summary rows
+components/ui/columns.tsx        ← the column kit: where the reuse really is
+lib/client/table-url-state.ts    ← the URL-sync hook
 ```
 
-### Bộ dựng cột
+### The column kit
 
-| Builder | Giải quyết |
+| Builder | What it solves |
 |---|---|
-| `moneyColumn()` | Căn phải, chữ số tabular, dấu âm có **cả dấu lẫn icon** chứ không chỉ màu, `aria-label` đọc rõ ("negative 1,234.56 US dollars"). Gọi `formatMoney` sẵn có, không viết lại |
-| `statusColumn()` | Dùng `statusToken()` của đợt 1 → màu + icon + nhãn |
-| `dateColumn()` | Một định dạng ngày duy nhất, `<time datetime>` đúng chuẩn |
-| `actionsColumn()` | Qua `IconActionButton`, thừa hưởng vùng bấm 44×44 từ đợt 3 |
+| `moneyColumn()` | Right alignment, tabular figures, a negative marked by **sign and icon** rather than colour alone, and an `aria-label` that reads clearly ("negative 1,234.56 US dollars"). Calls the existing `formatMoney`; does not reimplement it |
+| `statusColumn()` | Uses wave 1's `statusToken()` — colour, icon and label |
+| `dateColumn()` | One date format, with a correct `<time datetime>` |
+| `actionsColumn()` | Routes through `IconActionButton`, inheriting the 44×44 target from wave 3 |
 
-### Contract hai chế độ
+### The two-mode contract
 
-`DataTable` nhận **một trong hai** nguồn dữ liệu:
+`DataTable` accepts **one of two** data sources:
 
-- chế độ client: `rows={T[]}` — phân trang/sắp xếp cục bộ
-- chế độ server: `page={{ rows, total, pageIndex, pageSize }}` + callbacks
+- client mode: `rows={T[]}` — paginated and sorted locally
+- server mode: `page={{ rows, total, pageIndex, pageSize }}` plus callbacks
 
-Cả hai cùng chạy qua `useTableUrlState`. Khi sau này chuyển một màn hình sang
-server-side, thứ thay đổi là nguồn dữ liệu trong `page.tsx`; markup bảng và toàn
-bộ khai báo cột **không đụng tới**.
+Both run through `useTableUrlState`. When a screen later moves to server-side
+paging, what changes is the data source in `page.tsx`; the table markup and every
+column declaration are **untouched**.
 
-### URL state và cái bẫy hiệu năng
+### URL state, and a performance trap
 
-59/60 trang đang `force-dynamic`. Nếu hook gọi `router.replace()` cho mọi thay
-đổi filter thì mỗi lần gõ phím kích hoạt một vòng render lại phía server — sửa
-UX xong lại làm hỏng perf. Nên hook phân biệt:
+59 of 60 pages are `force-dynamic`. If the hook called `router.replace()` on
+every filter change, each keystroke would trigger a server render — fixing the UX
+by breaking the performance. So the hook distinguishes:
 
-- **chế độ client** → ghi URL bằng `history.replaceState`, không gọi router.
-  URL vẫn chia sẻ và khôi phục được, không có round-trip.
-- **chế độ server** → `router.replace()`, vì round-trip chính là mục đích.
+- **client mode** → writes the URL with `history.replaceState`, no router call.
+  The URL is still shareable and restorable, with no round trip.
+- **server mode** → `router.replace()`, because the round trip is the point.
 
-Tham số URL parse bằng **Zod** theo quy ước `lib/domain/schemas.ts`. Link cũ có
-`page=abc` hoặc cột sort không còn tồn tại thì rơi về mặc định, không ném lỗi.
-Đây là kiểm tra dữ liệu không tin cậy, không phải nuốt lỗi.
+URL parameters are parsed with **Zod**, following the `lib/domain/schemas.ts`
+convention. An old link carrying `page=abc`, or a sort column that no longer
+exists, falls back to the defaults rather than throwing. That is validating
+untrusted input, not swallowing an error.
 
-### Kiểm thử
+### Testing
 
-- `moneyColumn` với số dương / âm / 0 → kiểm chuỗi hiển thị **và** `aria-label`
-- `useTableUrlState` → round-trip parse↔serialize; tham số rác rơi về mặc định
-- Guard 1: mọi `<Table>` ngoài `DataTable`/`ReportTable` phải nằm trong allowlist
-- Guard 2: `pagination={false}` (61 chỗ) — mỗi mục allowlist **phải kèm lý do**,
-  vì một số bảng có số dòng chặn cứng theo cấu trúc và không sai
+- `moneyColumn` with a positive, a negative and zero — check the rendered string
+  **and** the `aria-label`
+- `useTableUrlState` — parse↔serialise round trip; junk parameters fall back
+- Guard 1: every `<Table>` outside `DataTable`/`ReportTable` must be allowlisted
+- Guard 2: `pagination={false}` (61 sites) — each allowlist entry **must carry a
+  reason**, because some tables are bounded by construction and are not wrong
 
-### Chia lô
+### Batches
 
-- **Lô 1** — bộ cột + hook + contract `DataTable` + test. Không màn hình nào đổi.
-- **Lô 2…n** — Sales → Purchases → Banking → Accounting → Settings.
-- **Lô cuối** — Reports, vì cần `ReportTable` với dòng tổng.
+- **Batch 1** — column kit, hook and `DataTable` contract, with tests. No screen
+  changes.
+- **Batches 2…n** — Sales → Purchases → Banking → Accounting → Settings.
+- **Final batch** — Reports, which need `ReportTable` and its summary rows.
 
-### Ngoài phạm vi đợt này
+### Out of scope for this wave
 
-Đợt này cải thiện UX và khả năng bảo trì, **không hạ bundle**.
+This wave improves UX and maintainability. It does **not** reduce the bundle.
 
-## 7. Đợt 3 — Form và Accessibility
+## 7. Wave 3 — Forms and accessibility
 
-Trục yếu nhất, nhưng nguyên nhân không phải thiếu ý thức: đã có 97 chỗ khai
-`aria-label`. Nguyên nhân là mỗi form tự nhớ lấy phần khó. Thiết kế vì thế gom
-phần khó vào một đường đi chung mà form không thể bỏ qua.
+The weakest axis, but not for want of awareness: 97 `aria-label` declarations
+already exist. The cause is that every form has to remember the hard parts for
+itself. So the design collects the hard parts into one path a form cannot bypass.
 
-### Thành phần
+### Components
 
 ```
-components/ui/AccessibleField.tsx    ← bọc Form.Item, nối aria-describedby đầy đủ
-components/ui/LiveAnnouncer.tsx      ← 2 vùng live, gắn một lần trong AppShell
-lib/client/use-feedback.ts           ← toast + announce trong MỘT lệnh gọi
-lib/client/use-form-submit.ts        ← đường đi chung khi gọi Server Action
+components/ui/AccessibleField.tsx    ← wraps Form.Item, wiring aria-describedby fully
+components/ui/LiveAnnouncer.tsx      ← two live regions, mounted once in AppShell
+lib/client/use-feedback.ts           ← toast and announcement in ONE call
+lib/client/use-form-submit.ts        ← the shared path for calling a Server Action
 lib/domain/error-message.ts          ← describeError()
 ```
 
 ### AccessibleField
 
-`Form.Item` của antd đã nối label và error. Khoảng trống là helper text: khi có
-cả mô tả lẫn lỗi, antd chỉ nối lỗi và phần mô tả biến mất với người dùng screen
-reader. `AccessibleField` sinh `id` bằng `useId()` và ghép `aria-describedby` từ
-**cả hai**. Bắt buộc diễn đạt bằng chữ chứ không chỉ dấu hoa thị; thông báo lỗi
-mang theo tên trường.
+Ant Design's `Form.Item` already links the label and the error. The gap is helper
+text: when a field has both a description and an error, antd links only the
+error, and the description disappears for screen-reader users. `AccessibleField`
+generates ids with `useId()` and composes `aria-describedby` from **both**.
+Required is expressed in words rather than by an asterisk alone, and an error
+message carries its field's name.
 
-Phải là `"use client"` — theo bẫy đã ghi trong CLAUDE.md, Server Component không
-được đọc `Form.Item`.
+It must be `"use client"` — per the trap recorded in CLAUDE.md, a Server
+Component cannot read `Form.Item`.
 
-### Live announcer buộc dính với toast
+### The announcer is welded to the toast
 
-Nếu tách riêng `announce()` và `message.success()`, người viết sẽ gọi cái thứ hai
-rồi quên cái thứ nhất. Nên gộp: `useFeedback().success(...)` và
-`useFeedback().error(...)` làm cả hai việc. Guard test **cấm gọi thẳng
-`message.*` ngoài `useFeedback`**.
+If `announce()` and `message.success()` stay separate, people will call the
+second and forget the first. So they are one: `useFeedback().success(...)` and
+`useFeedback().error(...)` do both. A guard test **forbids calling `message.*`
+directly outside `useFeedback`**.
 
-### Quản lý focus — bốn thời điểm
+### Focus management — four moments
 
-| Thời điểm | Xử lý |
+| Moment | Behaviour |
 |---|---|
-| Mở modal/drawer | Focus trường đầu tiên |
-| Đóng | Trả focus về nút đã mở (`useReturnFocus`) |
-| **Đổi route** | App Router không tự dời focus; screen reader đứng nguyên chỗ cũ. `RouteFocus` trong AppShell đưa focus về `<h1>` mà `PageHeader` đã render |
-| Validate thất bại | Focus trường sai đầu tiên + đọc "N lỗi cần sửa" |
+| Modal or drawer opens | Focus the first field |
+| It closes | Return focus to the trigger (`useReturnFocus`) |
+| **Route change** | App Router does not move focus; a screen reader stays where it was. `RouteFocus` in AppShell moves focus to the `<h1>` that `PageHeader` renders |
+| Validation fails | Focus the first invalid field and announce "N errors to fix" |
 
 ### useFormSubmit
 
-Bọc lời gọi Server Action và lo trọn gói: pending → thành công thì announce +
-toast → thất bại thì map lỗi về đúng trường, focus trường đầu, announce số lượng.
-Thay cho việc trông chờ 44 file `actions.ts` mỗi nơi tự nhớ.
+Wraps a Server Action call and handles the whole cycle: pending → on success,
+announce and toast → on failure, map errors onto their fields, focus the first,
+announce the count. This replaces hoping that 44 `actions.ts` files each remember
+to do it.
 
-`describeError()` gỡ nhiễu Postgres và **thêm hướng phục hồi**. Thuận lợi là các
-RPC đã raise tiếng Anh đọc được (`'Not authorized to post journal entries'`,
-`'This line is already matched to the ledger'`). Lỗi không nhận dạng được thì
-**hiện nguyên văn**, không nuốt, theo luật trong CLAUDE.md.
+`describeError()` strips Postgres noise and **adds recovery guidance**. It has an
+easy job because the RPCs already raise readable English (`'Not authorized to
+post journal entries'`, `'This line is already matched to the ledger'`). An
+unrecognised error is shown **verbatim** rather than swallowed, per CLAUDE.md.
 
-### Vùng bấm 44×44
+### 44×44 touch targets
 
-Đặt mức tối thiểu lên `IconActionButton`. Vì `actionsColumn` của đợt 2 đã đi qua
-component này, mọi nút hành động trong bảng được sửa theo mà không phải đụng lại.
+Set the minimum on `IconActionButton`. Because wave 2's `actionsColumn` already
+routes through that component, every table action inherits the fix without being
+touched again.
 
-### Kiểm thử
+### Testing
 
-- Unit: `AccessibleField` ghép `aria-describedby` từ helper + error
-- Unit: `describeError`, gồm ca lỗi lạ phải đi qua nguyên vẹn
-- Unit: guard cấm `message.*` trực tiếp
-- Runtime: **bổ sung kịch bản vào `scripts/quality/keyboard.mjs` sẵn có** (638
-  dòng, đã có harness focus-wrap cho drawer) — trả focus khi đóng modal, focus
-  khi đổi route, focus khi validate lỗi. Không dựng công cụ mới.
+- Unit: `AccessibleField` composes `aria-describedby` from helper and error
+- Unit: `describeError`, including an unknown error passing through intact
+- Unit: the guard forbidding direct `message.*`
+- Runtime: **add scenarios to the existing `scripts/quality/keyboard.mjs`** (638
+  lines, already carrying a drawer focus-wrap harness) — focus returned on modal
+  close, focus on route change, focus on validation failure. No new tooling.
 
-## 8. Đợt 4 — Page pattern và Responsive
+## 8. Wave 4 — Page pattern and responsive
 
-### Page pattern
+### The page pattern
 
 ```
 PageHeader → summary → FilterBar → DataTable → detail drawer/modal
 ```
 
-Hiện thực bằng `WorkListPage` với slot có tên, **mặc định nhưng không bắt buộc**
-— báo cáo và settings có hình dạng khác một cách chính đáng. Guard test liệt kê
-màn hình danh sách chưa dùng. Pattern là mặc định, không phải khung bóp méo màn
-hình đặc thù.
+Implemented as `WorkListPage` with named slots, **the default but not mandatory**
+— reports and settings legitimately have a different shape. A guard test lists
+the list screens not using it. The pattern is a default, not a frame that
+distorts an unusual screen.
 
-### Responsive: ưu tiên dữ liệu, khai ngay trong định nghĩa cột
+### Responsive: data priority, declared in the column definition
 
-Chỉ khả thi vì đợt 2 đã gom cột về một chỗ. Mỗi cột khai thêm mức ưu tiên:
+Only possible because wave 2 centralised the columns. Each column declares a
+priority:
 
 ```ts
 moneyColumn({ title: "Balance", dataIndex: "balance_due_minor", priority: "primary" })
@@ -334,98 +361,105 @@ dateColumn({  title: "Due",     dataIndex: "due_date",          priority: "secon
 textColumn({  title: "Memo",    dataIndex: "memo",              priority: "detail" })
 ```
 
-Dưới 768px, `DataTable` tự dựng danh sách thẻ từ `primary` + `secondary`; phần
-`detail` đẩy vào drawer của dòng. Không có markup mobile riêng để trôi lệch — bố
-cục nhỏ **dẫn xuất** từ khai báo cột.
+Below 768px, `DataTable` renders a card list from `primary` and `secondary`, and
+pushes `detail` into the row's drawer. There is no separate mobile markup to
+drift — the small layout is **derived** from the column declarations.
 
-### Tách 13 component lớn
+### Splitting the 13 large components
 
-Làm **cùng lô với việc màn hình đó áp dụng pattern**, không tách thành đợt riêng,
-để mỗi PR là một màn hình trọn vẹn và review được.
+Done **in the same batch as that screen's adoption of the pattern**, not as a
+separate wave, so each pull request is one complete, reviewable screen.
 
-Quy tắc tách:
-- Màn hình giữ lại khung trang + đấu nối bảng
-- Mỗi modal/drawer ra file riêng, nạp bằng `next/dynamic`
-- Hàm thuần lỡ nằm trong component thì chuyển về `lib/domain/`
+Rules:
+- The screen keeps the page shell and the table wiring
+- Each modal or drawer moves to its own file, loaded with `next/dynamic`
+- Pure functions stranded inside a component move to `lib/domain/`
 
-Ghi chú trung thực: việc tách này cải thiện khả năng bảo trì và phạm vi
-re-render. Phần giảm bundle đến từ `next/dynamic` trên modal, không từ việc tách.
+Stated honestly: the split improves maintainability and narrows re-render scope.
+The bundle reduction comes from `next/dynamic` on the modals, not from the split.
 
-### Kiểm thử
+### Testing
 
-P0 đã chạy 4 viewport (375/768/1024/1440) trên 12 route trong `MATRIX_ROUTES`,
-với `viewport-clipping`, `fixed-shell-overlap`, `target-size`. Đợt này **mở rộng
-`MATRIX_ROUTES`** thay vì dựng công cụ mới. Thêm guard unit: mỗi bộ cột phải có
-ít nhất một cột `primary`.
+P0 already runs four viewports (375/768/1024/1440) over the 12 routes in
+`MATRIX_ROUTES`, with `viewport-clipping`, `fixed-shell-overlap` and
+`target-size`. This wave **widens `MATRIX_ROUTES`** rather than building new
+tooling. Add a unit guard: every column set must have at least one `primary`
+column.
 
-## 9. Đợt song song — Thu gọn shared bundle
+## 9. Parallel wave — shrinking the shared bundle
 
-Độc lập với bốn đợt trên và không tranh chấp file, nên chạy song song được. Kéo
-lên từ P2 vì nếu không có nó, trục Performance gần như đứng yên sau P1.
+Independent of the four waves and sharing no files with them, so it can run
+alongside. Pulled forward from P2 because without it the Performance axis barely
+moves after P1.
 
-### Việc đã xác định chắc chắn
+### Established with certainty
 
-**a. `jspdf` bị import tĩnh trên route lớn nhất.**
-`lib/client/invoice-pdf.ts` import `jsPDF` và `jspdf-autotable` ở đầu file;
-`InvoicesClient.tsx` import module đó. Chunk 121 KB gzip chỉ nằm trên `/invoices`
-chính là nó. `lib/client/report-export.ts` **đã** làm động đúng cách. Sửa theo
-mẫu đó là thắng lợi chắc chắn, đo được ngay bằng `npm run quality:bundle`.
+**a. `jspdf` is imported statically on the largest route.**
+`lib/client/invoice-pdf.ts` imports `jsPDF` and `jspdf-autotable` at the top of
+the file, and `InvoicesClient.tsx` imports that module. The 121 KB gzip chunk
+that sits only on `/invoices` is exactly this. `lib/client/report-export.ts`
+**already** does it dynamically. Following that pattern is a certain win,
+measurable immediately with `npm run quality:bundle`.
 
-**b. Toàn repo có 0 chỗ dùng `next/dynamic`.**
-Đòn bẩy lazy-load modal hoàn toàn chưa được khai thác. Kết hợp với đợt 4.
+**b. The repository contains zero `next/dynamic` usages.**
+The lazy-loaded-modal lever is entirely untapped. Combine with wave 4.
 
-### Việc cần đo trước khi quyết
+### To be measured before deciding
 
-**c. Chunk 136 KB chỉ trên `/banking`** — chưa rõ là gì, phải xác định trước.
+**c. The 136 KB chunk that sits only on `/banking`** — not yet identified.
 
-**d. 613 KB dùng chung trải trên 30 chunk, không có chunk nào áp đảo.**
-Bề mặt là 37 component antd và 20 icon trên 53 file. Cần kiểm tra
-`optimizePackageImports` có đang áp dụng cho `antd` và `@ant-design/icons` hay
-không — Next.js có danh sách mặc định, nên phải **đo trước khi cấu hình thêm**,
-tránh thêm một dòng config không làm gì cả.
+**d. 613 KB shared across 30 chunks, with no dominant chunk.**
+The surface is 37 antd components and 20 icons across 53 files. Check whether
+`optimizePackageImports` already applies to `antd` and `@ant-design/icons` —
+Next.js ships a default list, so **measure before configuring**, or the change is
+a config line that does nothing.
 
-### Nguyên tắc
+### Principle
 
-Mỗi thay đổi phải kèm số đo trước/sau từ `npm run quality:bundle`. Budget hiện
-tại là 10% hoặc 20 KB gzip.
+Every change carries before/after numbers from `npm run quality:bundle`. The
+current budget is 10% or 20 KB gzip.
 
-## 10. Tiêu chí nghiệm thu
+## 10. Acceptance criteria
 
-### Theo đợt
+### Per wave
 
-| Đợt | Xong khi |
+| Wave | Done when |
 |---|---|
-| 1 — Token | Allowlist no-hex rỗng; test tương phản WCAG AA xanh; `providers.tsx` không còn literal hex |
-| 2 — Table | Cả hai allowlist rỗng; mọi bảng đi qua `DataTable`/`ReportTable`; filter/sort/page khôi phục được từ URL |
-| 3 — Form/a11y | Allowlist `message.*` rỗng; kịch bản keyboard mới xanh; mọi vùng bấm ≥ 44×44 |
-| 4 — Pattern | Mọi màn hình danh sách dùng `WorkListPage`; mỗi bộ cột có cột `primary`; 13 component trên 400 dòng đã tách xong **hoặc** nằm trong allowlist kèm lý do |
-| Song song — Bundle | `/invoices` giảm ≥ 100 KB gzip; các mục c, d đã đo và có kết luận |
+| 1 — Tokens | No hex outside the two allowlisted stylesheets; the WCAG AA contrast test green; `providers.tsx` free of literals |
+| 2 — Table | Both allowlists empty; every table goes through `DataTable`/`ReportTable`; filter, sort and page restore from the URL |
+| 3 — Forms/a11y | The `message.*` allowlist empty; the new keyboard scenarios green; every touch target ≥ 44×44 |
+| 4 — Pattern | Every list screen uses `WorkListPage`; every column set has a `primary`; the 13 components over 400 lines are split **or** allowlisted with a reason |
+| Parallel — Bundle | `/invoices` down ≥ 100 KB gzip; items c and d measured and concluded |
 
-### Toàn P1
+### P1 overall
 
-- Bốn cổng bắt buộc xanh: `build` + `test` + `typecheck` + `lint`
-- `scripts/smoke-pages.mjs` xanh trên server đã build (48 trang)
-- `npm run quality:runtime` không phát sinh finding mới so với baseline
-- Không có allowlist nào còn sót
+- The four mandatory gates green: `build`, `test`, `typecheck`, `lint`
+- `scripts/smoke-pages.mjs` green against the built server
+- `npm run quality:runtime` raising no new findings against the baseline
+- No allowlist left behind except those explicitly deferred with a reason
 
-## 11. Điều KHÔNG thuộc phạm vi P1
+## 11. Explicitly NOT in P1's scope
 
-Ghi rõ để không ai hiểu nhầm là đã xong:
+Stated plainly so nobody reads it as finished:
 
-- **Server-side pagination.** Đợt 2 chỉ dọn đường bằng contract hai chế độ.
-- **Giảm 613 KB shared bundle xuống mức mục tiêu.** Đợt song song chỉ xử lý phần
-  đã xác định chắc chắn, cộng với việc đo phần còn lại.
-- **Virtualize danh sách lớn.**
-- **Web Worker cho parse CSV.**
-- **Chuyển trang khỏi `force-dynamic`.**
+- **Server-side pagination.** Wave 2 only clears the way with its two-mode
+  contract.
+- **Bringing the 613 KB shared bundle down to target.** The parallel wave handles
+  the certain part and measures the rest.
+- **Virtualising large lists.**
+- **A Web Worker for CSV parsing.**
+- **Moving pages off `force-dynamic`.**
+- **Converting the 309 hex literals in `globals.css` and
+  `WorkAreaOverview.module.css`**, which wave 1 recorded rather than fixed.
 
-### Kỳ vọng điểm số sau P1
+### Expected scores after P1
 
-| Trục | Hiện tại | Sau P1 (ước tính) |
+| Axis | Now | After P1 (estimate) |
 |---|---|---|
 | UX | 7.0 | ~7.8 |
 | Accessibility | 6.2 | ~8.0 |
-| Performance | 6.3 | ~7.0 với đợt song song (~6.6 nếu không có) |
+| Performance | 6.3 | ~7.0 with the parallel wave (~6.6 without) |
 
-Trục Performance cần P2 mới đạt 8.0. Đây là ước tính từ kiến trúc, sẽ được thay
-bằng số đo thật khi `npm run quality:runtime` chạy đủ chu kỳ.
+Performance needs P2 to reach 8.0. These are estimates derived from the
+architecture; they should be replaced with real numbers once
+`npm run quality:runtime` has run a full cycle.
