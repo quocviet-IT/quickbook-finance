@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Card, Form, Input, Typography } from "antd";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
+import { TOKENS } from "@/lib/design/tokens";
 
 interface LoginValues {
   email: string;
@@ -37,7 +38,7 @@ export default function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f5f5f5",
+        background: TOKENS.surface.muted,
       }}
     >
       <Card style={{ width: 380 }}>

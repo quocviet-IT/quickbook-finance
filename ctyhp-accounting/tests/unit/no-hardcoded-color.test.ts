@@ -5,20 +5,15 @@ import { describe, expect, it } from "vitest";
 /**
  * Colour belongs in lib/design/tokens.ts and nowhere else.
  *
- * Every hex below is a hand-copied duplicate of a value the theme already
- * defines, which is how three different reds all came to mean "error". The
- * allowlist is the work still outstanding: it shrinks with each migration
- * batch and is deleted with the last one. A file may not be added back.
+ * Every hex the migration removed was a hand-copied duplicate of a value the
+ * theme already defines, which is how three different reds all came to mean
+ * "error". This test now guards the finished state directly: no file under
+ * app/ or components/ may reintroduce one.
  *
  * Scope is app/ and components/. lib/client/invoice-pdf.ts and
  * lib/client/report-export.ts are excluded on purpose: colours inside a
  * generated PDF are not CSS and do not derive from the theme.
  */
-const ALLOWLIST = new Set([
-  "components/feedback/ReportDialog.tsx",
-  "app/(auth)/login/page.tsx",
-  "app/(app)/settings/import/ImportPreviewPanel.tsx",
-]);
 
 /**
  * Built fresh on each use, never shared.
@@ -48,20 +43,11 @@ describe("hard-coded colour", () => {
     expect(files.length).toBeGreaterThan(150);
   });
 
-  it("appears in no file outside the shrinking allowlist", () => {
+  it("appears in no file", () => {
     const offenders = files
       .map((file) => ({ path: relative(ROOT, file).replaceAll("\\", "/"), source: readFileSync(file, "utf8") }))
-      .filter(({ path }) => !ALLOWLIST.has(path))
       .filter(({ source }) => hexPattern().test(source))
       .map(({ path }) => path);
     expect(offenders).toEqual([]);
-  });
-
-  it("lists no file that has already been cleaned", () => {
-    const stale = [...ALLOWLIST].filter((path) => {
-      const source = readFileSync(join(ROOT, path), "utf8");
-      return !hexPattern().test(source);
-    });
-    expect(stale).toEqual([]);
   });
 });
