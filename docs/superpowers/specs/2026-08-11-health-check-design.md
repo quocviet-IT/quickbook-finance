@@ -65,11 +65,26 @@ alarm nobody reads.
 ## 5. Migration 0112
 
 ```sql
+-- Migration 0081 granted schema usage to authenticated and service_role only,
+-- so execute on the function alone is not enough: without usage on the schema
+-- the call fails with "permission denied for schema onebook" before it ever
+-- reaches the function. Verified against the live project.
+grant usage on schema onebook to anon;
+
 create or replace function onebook.health() returns text
 language sql stable as $$ select 'ok' $$;
 revoke all on function onebook.health() from public;
 grant execute on function onebook.health() to anon, authenticated, service_role;
 ```
+
+Granting `anon` usage on the schema is wider than granting execute on one
+function, so it is worth being precise about what it does and does not open.
+Usage lets a role *reference* objects in a schema; every object still needs its
+own grant. Migration 0081 revokes all on `onebook.company` and
+`onebook.company_member` from `anon`, and sets default privileges in the schema
+to revoke tables and functions from `anon`. So after this migration `anon` can
+reach exactly one function that takes no argument and returns a constant, and
+nothing else. The migration test asserts those revokes are still in place.
 
 It lives in `onebook` for two reasons. This is a question about the system rather
 than about any one company's books; and `scopeOf()` in
@@ -232,13 +247,26 @@ is what keeps history, and it keeps a better one than this could.
 
 ## 13. An incidental finding, recorded rather than fixed
 
-While probing, reading any table with the anon key returned:
+Asking PostgREST for a schema that does not exist, using only the anon key,
+returns this:
 
 ```
-permission denied for schema co_cascade_metals
+PGRST106  Invalid schema: <whatever was asked for>
+hint: Only the following schemas are exposed:
+      co_cascade_metals, co_harbor_gems, co_north_star, co_pc_49, onebook, public
 ```
 
-That discloses a company's schema name to an unauthenticated caller. The anon key
-ships in the browser bundle, so anyone can reproduce it. This predates the health
-check and is out of its scope, but it is a real information disclosure and should
-be looked at on its own.
+That is every company's schema name handed to an unauthenticated caller — and a
+schema name here is a customer name (`co_pc_49` is Pacific Four Nine). Reading
+any table with the same key leaks one of them the same way, through
+`permission denied for schema co_cascade_metals`.
+
+The anon key ships in the browser bundle and this repository is public, so
+reproducing it needs nothing but a terminal. No data is exposed — every table and
+function stays revoked — but the customer list is.
+
+This predates the health check and is outside its scope. It is recorded here
+because it was found while verifying this design, and it deserves its own piece
+of work: the fix is to narrow PostgREST's exposed-schema list, which is a
+Supabase project setting rather than a migration, and to check what the
+application actually needs exposed before narrowing it.
