@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PALETTE } from "@/lib/design/palette";
-import { TOKENS, cssVariableBlock, flattenTokens, resolveToken, TEXT_ON_SURFACE_PAIRS } from "@/lib/design/tokens";
+import { TOKENS, antdThemeTokens, cssVariableBlock, flattenTokens, resolveToken, TEXT_ON_SURFACE_PAIRS } from "@/lib/design/tokens";
 
 describe("design tokens", () => {
   it("resolves every semantic token to a palette entry", () => {
@@ -22,6 +22,20 @@ describe("design tokens", () => {
 
   it("throws on an unknown token path rather than returning undefined", () => {
     expect(() => resolveToken("money.sideways")).toThrow(/money\.sideways/);
+  });
+});
+
+describe("Ant Design theme", () => {
+  it("derives its colours from the tokens", () => {
+    const theme = antdThemeTokens();
+    expect(theme.token.colorPrimary).toBe(resolveToken("intent.primary"));
+    expect(theme.token.colorError).toBe(resolveToken("intent.danger"));
+    expect(theme.components.Layout.siderBg).toBe(resolveToken("surface.sider"));
+  });
+
+  it("leaves no literal colour in providers.tsx", () => {
+    const source = readFileSync(join(process.cwd(), "app", "providers.tsx"), "utf8");
+    expect(source.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).toEqual([]);
   });
 });
 

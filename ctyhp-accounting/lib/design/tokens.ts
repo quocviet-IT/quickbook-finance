@@ -132,3 +132,43 @@ export function cssVariableBlock(): string {
   );
   return `:root {\n${lines.join("\n")}\n}\n`;
 }
+
+/**
+ * The colour half of the Ant Design theme.
+ *
+ * Only colour lives here. Radius, font and size stay in providers.tsx because
+ * they are not tokens this module governs, and moving them would make this the
+ * home of settings it has nothing to say about.
+ */
+export function antdThemeTokens() {
+  return {
+    token: {
+      colorPrimary: TOKENS.intent.primary,
+      colorInfo: TOKENS.intent.primary,
+      colorSuccess: TOKENS.intent.success,
+      colorWarning: TOKENS.intent.warning,
+      colorError: TOKENS.intent.danger,
+      colorBgLayout: TOKENS.surface.page,
+      colorTextHeading: TOKENS.text.heading,
+    },
+    components: {
+      Layout: {
+        siderBg: TOKENS.surface.sider,
+        triggerBg: TOKENS.surface.sider,
+        headerBg: TOKENS.surface.card,
+      },
+      Menu: {
+        darkItemBg: TOKENS.surface.sider,
+        darkSubMenuItemBg: TOKENS.surface.sider,
+        darkItemSelectedBg: TOKENS.intent.primary,
+        darkItemColor: TOKENS.border.default,
+        darkItemHoverBg: TOKENS.text.secondary,
+      },
+      Table: {
+        headerBg: TOKENS.surface.muted,
+        headerColor: TOKENS.text.secondary,
+        borderColor: TOKENS.border.subtle,
+      },
+    },
+  };
+}
