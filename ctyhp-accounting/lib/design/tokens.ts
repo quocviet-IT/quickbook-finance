@@ -100,7 +100,7 @@ export function resolveToken(path: TokenPath): string {
  * strokes on a chart: holding them to a text contrast ratio would darken the
  * chart furniture without making anything more readable.
  */
-export const TEXT_ON_SURFACE_PAIRS: readonly [string, string][] = [
+export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["text.heading", "surface.page"],
   ["text.heading", "surface.card"],
   ["text.body", "surface.page"],

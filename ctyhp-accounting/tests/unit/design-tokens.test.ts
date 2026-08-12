@@ -39,7 +39,10 @@ describe("colour contrast", () => {
   it("meets WCAG AA 4.5:1 for every text-on-surface pair", () => {
     const failures = TEXT_ON_SURFACE_PAIRS.map(([textPath, surfacePath]) => {
       const ratio = contrastRatio(resolveToken(textPath), resolveToken(surfacePath));
-      return { pair: `${textPath} on ${surfacePath}`, ratio: Number(ratio.toFixed(2)) };
+      // Compare the true ratio and round only for the message. Rounding first
+      // would let a pair at 4.4951 read as 4.50 and pass, quietly lowering the
+      // one threshold this test exists to hold.
+      return { pair: `${textPath} on ${surfacePath}`, ratio, shown: ratio.toFixed(2) };
     }).filter((row) => row.ratio < 4.5);
     expect(failures).toEqual([]);
   });
