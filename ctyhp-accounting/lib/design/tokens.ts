@@ -92,3 +92,28 @@ export function resolveToken(path: TokenPath): string {
   if (!found) throw new Error(`Unknown design token: ${path}`);
   return found[1];
 }
+
+/**
+ * Which colours are read as text against which background.
+ *
+ * Only text belongs here. `series.axis` and `series.grid` are decorative
+ * strokes on a chart: holding them to a text contrast ratio would darken the
+ * chart furniture without making anything more readable.
+ */
+export const TEXT_ON_SURFACE_PAIRS: readonly [string, string][] = [
+  ["text.heading", "surface.page"],
+  ["text.heading", "surface.card"],
+  ["text.body", "surface.page"],
+  ["text.body", "surface.card"],
+  ["text.secondary", "surface.page"],
+  ["text.secondary", "surface.card"],
+  ["text.onDark", "surface.sider"],
+  ["money.positive", "surface.card"],
+  ["money.negative", "surface.card"],
+  ["money.zero", "surface.card"],
+  ["intent.primary", "surface.card"],
+  ["intent.success", "surface.card"],
+  ["intent.warning", "surface.card"],
+  ["intent.danger", "surface.card"],
+  ["intent.info", "surface.card"],
+];
