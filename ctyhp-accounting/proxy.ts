@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { skipsSession } from "@/lib/domain/public-routes";
 
 /**
  * Runs before every matched request: refreshes the Supabase auth session
@@ -8,9 +9,7 @@ import { createServerClient } from "@supabase/ssr";
  * (Next.js 16 renamed the middleware convention to `proxy`.)
  */
 export async function proxy(request: NextRequest) {
-  // Route Handlers are independent security boundaries. Cron endpoints verify
-  // CRON_SECRET themselves and have no browser session to refresh.
-  if (request.nextUrl.pathname.startsWith("/api/")) {
+  if (skipsSession(request.nextUrl.pathname)) {
     return NextResponse.next();
   }
 
