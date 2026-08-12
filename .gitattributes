@@ -1,1 +1,6 @@
 ctyhp-accounting/tests/quality/fixtures/bundle/** text eol=lf
+
+# The :root block in globals.css is asserted against cssVariableBlock(), which
+# emits \n. Pinning the file keeps the committed copy canonical; the test also
+# normalises newlines so a mis-configured checkout still passes.
+ctyhp-accounting/app/globals.css text eol=lf

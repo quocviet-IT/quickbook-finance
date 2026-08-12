@@ -63,8 +63,13 @@ describe("CSS custom properties", () => {
     expect(block.endsWith("}\n")).toBe(true);
   });
 
-  it("matches the block committed in globals.css character for character", () => {
+  it("matches the block committed in globals.css, value for value", () => {
     const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
-    expect(css).toContain(cssVariableBlock());
+    // Newlines are normalised before comparing. This repository is developed on
+    // Windows with core.autocrlf=true, so a fresh clone rewrites globals.css
+    // with CRLF while the emitter always produces \n — and the drift this guard
+    // exists to catch is a changed colour, not a changed line ending. The same
+    // platform difference has already broken tests here twice.
+    expect(css.replace(/\r\n/g, "\n")).toContain(cssVariableBlock());
   });
 });
