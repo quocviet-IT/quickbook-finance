@@ -12,6 +12,33 @@ const LABELS: Record<string, string> = {
   configuration: "Configuration",
 };
 
+interface Outcome {
+  payload: HealthPayload | null;
+  unreachable: boolean;
+}
+
+/**
+ * Ask the endpoint, and come back with an answer either way.
+ *
+ * Outside the component and holding no state, so the effect below can await it
+ * without setting state synchronously — which React refuses, because it
+ * cascades a second render before the first has painted.
+ *
+ * A 503 is data, not a failure: the endpoint answers with that status when
+ * something is down, and the body still describes which checks failed. Only a
+ * rejected fetch means One Book could not be reached at all.
+ */
+async function loadHealth(): Promise<Outcome> {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    return { payload: (await response.json()) as HealthPayload, unreachable: false };
+  } catch {
+    // Not hidden: this is the worst answer, and the page shows it rather than
+    // leaving the reader with a blank screen.
+    return { payload: null, unreachable: true };
+  }
+}
+
 /**
  * Whether the application is working, for a person rather than a monitor.
  *
@@ -28,25 +55,30 @@ export default function StatusPage() {
   const [unreachable, setUnreachable] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  const check = useCallback(async () => {
-    setChecking(true);
-    try {
-      const response = await fetch("/api/health", { cache: "no-store" });
-      setPayload((await response.json()) as HealthPayload);
-      setUnreachable(false);
-    } catch {
-      // The endpoint itself could not be reached. That is an answer, and the
-      // worst one, so it is shown rather than left as a blank page.
-      setPayload(null);
-      setUnreachable(true);
-    } finally {
-      setChecking(false);
-    }
+  const apply = useCallback((outcome: Outcome) => {
+    setPayload(outcome.payload);
+    setUnreachable(outcome.unreachable);
+    setChecking(false);
   }, []);
 
   useEffect(() => {
-    void check();
-  }, [check]);
+    // The guard matters on a page somebody opens while things are broken: a
+    // slow answer landing after they have navigated away would set state on a
+    // component that is gone.
+    let cancelled = false;
+    void loadHealth().then((outcome) => {
+      if (!cancelled) apply(outcome);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apply]);
+
+  /** The button's version. `checking` already starts raised for the first load. */
+  const recheck = useCallback(() => {
+    setChecking(true);
+    void loadHealth().then(apply);
+  }, [apply]);
 
   const down = unreachable || payload?.status === "down";
 
@@ -60,11 +92,22 @@ export default function StatusPage() {
         <Alert
           type={down ? "error" : "success"}
           showIcon
-          message={down ? "Some of One Book is not working" : "One Book is working"}
+          message={
+            // Being unable to reach One Book at all is not the same as finding
+            // part of it broken, and saying "some" of it would understate a
+            // total outage to the one person looking.
+            unreachable
+              ? "One Book could not be reached"
+              : down
+                ? "Some of One Book is not working"
+                : "One Book is working"
+          }
           description={
-            down
-              ? "If a screen is not behaving, this is why. Nothing you did caused it."
-              : "If a screen is not behaving, the problem is not with One Book itself."
+            unreachable
+              ? "Either One Book is down or this device has no connection to it. Nothing you did caused it."
+              : down
+                ? "If a screen is not behaving, this is why. Nothing you did caused it."
+                : "If a screen is not behaving, the problem is not with One Book itself."
           }
         />
 
@@ -93,7 +136,7 @@ export default function StatusPage() {
         </Card>
 
         <Space>
-          <Button icon={<ReloadOutlined />} loading={checking} onClick={() => void check()}>
+          <Button icon={<ReloadOutlined />} loading={checking} onClick={recheck}>
             Check again
           </Button>
           {payload && (
