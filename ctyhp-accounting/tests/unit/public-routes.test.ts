@@ -39,4 +39,15 @@ describe("the proxy still bounces a signed-in visitor off /login alone", () => {
     expect(source).toMatch(/isAuthRoute\s*=\s*path === "\/login"/);
     expect(source).not.toMatch(/isAuthRoute\s*=\s*skipsSession/);
   });
+
+  it("actually calls skipsSession, rather than testing a predicate nothing uses", () => {
+    // Without this, reverting the top of proxy() to its old inline
+    // `startsWith("/api/")` check would leave every test in this file green —
+    // skipsSession("/status") is still true on its own — while a signed-out
+    // visitor hitting /status during an outage got redirected to /login, which
+    // is the one thing this change exists to prevent.
+    const source = readFileSync(join(process.cwd(), "proxy.ts"), "utf8");
+    expect(source).toMatch(/skipsSession\(request\.nextUrl\.pathname\)/);
+    expect(source).not.toMatch(/pathname\.startsWith\("\/api\/"\)/);
+  });
 });
