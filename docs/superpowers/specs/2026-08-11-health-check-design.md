@@ -15,8 +15,17 @@ application or their own connection.
 ## 2. What "alive" has to mean here
 
 On Vercel the process does not meaningfully die — each request spins up a
-function. What actually breaks is Supabase becoming unreachable, an expired or
-missing environment variable, or a migration left half-applied.
+function. What actually breaks is Supabase becoming unreachable, or an expired
+or missing environment variable.
+
+**A migration left half-applied is a third way this application breaks, and this
+check does not see it.** The probe returns a constant and reads no table, by the
+design in §5 — which is the right call for something exposed to an
+unauthenticated caller, and it means a database whose company schemas are partly
+migrated reports `ok`. The endpoint never over-claims: it says "database: ok",
+which is true, the database answered. But it is not a migration check, and
+nobody should read it as one. That question already has an owner for people who
+are signed in: `acc_control_reconciliation` and `acc_gl_posting_report`.
 
 So a check that only answers "did the server respond" would return 200 while the
 application is unusable. That is worse than no check: it manufactures confidence.

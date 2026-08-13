@@ -10,8 +10,10 @@ describe("paths that skip the session", () => {
     }
   });
 
-  it("lets the status page through", () => {
+  it("lets the status page through, trailing slash or not", () => {
     expect(skipsSession("/status")).toBe(true);
+    expect(skipsSession("/status/")).toBe(true);
+    expect(skipsSession("/api/health/")).toBe(true);
   });
 
   it("holds everything else to the session", () => {

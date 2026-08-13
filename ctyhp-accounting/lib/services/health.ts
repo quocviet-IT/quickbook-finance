@@ -108,6 +108,7 @@ export async function probeHealth(deps: HealthDeps): Promise<HealthPayload> {
 }
 
 let cached: { at: number; payload: HealthPayload } | null = null;
+let inFlight: Promise<HealthPayload> | null = null;
 
 /**
  * The probes as the route calls them, with real dependencies and the cache.
@@ -119,12 +120,25 @@ export async function cachedHealth(): Promise<HealthPayload> {
   const elapsed = cached ? Date.now() - cached.at : Number.POSITIVE_INFINITY;
   if (cached && elapsed < CACHE_TTL_MS) return cached.payload;
 
-  const payload = await probeHealth({
+  // Share the run that is already happening rather than starting another.
+  // Consulting the cache before the await and writing it after leaves a window
+  // the width of a whole probe — so a burst arriving on a cold cache would each
+  // fire their own pair, and the cap this exists for would not apply under the
+  // one condition it was written for. During an outage each of those also holds
+  // the instance for the full timeout.
+  inFlight ??= probeHealth({
     fetch: globalThis.fetch,
     now: () => new Date(),
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  });
-  cached = { at: Date.now(), payload };
-  return payload;
+  })
+    .then((payload) => {
+      cached = { at: Date.now(), payload };
+      return payload;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+
+  return inFlight;
 }

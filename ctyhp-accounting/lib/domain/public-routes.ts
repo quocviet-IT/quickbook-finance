@@ -13,5 +13,9 @@
  * @supabase/ssr for the sake of one pure predicate.
  */
 export function skipsSession(pathname: string): boolean {
-  return pathname.startsWith("/api/") || pathname === "/status";
+  // A trailing slash is ordinary in a pasted or typed address, and `/status/`
+  // matching nothing would drop it through to the session gate and bounce a
+  // signed-out reader to /login — the one outcome this exists to prevent.
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return path.startsWith("/api/") || path === "/status";
 }

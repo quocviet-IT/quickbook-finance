@@ -41,6 +41,25 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.18",
+    date: "2026-08-13",
+    headline: "There is now a page that says whether One Book is working, so nobody has to ring and ask.",
+    changes: [
+      {
+        kind: "added",
+        title: "A page at /status that answers: is it One Book, or is it me",
+        detail:
+          "Open it and it says whether the database and the sign-in service are "
+          + "answering. It works while signed out and while One Book itself is "
+          + "having trouble, because those are the moments you would look. "
+          + "Until now the only way to find out was to telephone somebody.",
+        // No route: the changelog's route check only knows the pages inside the
+        // main application, and this one deliberately sits outside it so it can
+        // still load when the rest cannot.
+      },
+    ],
+  },
+  {
     version: "1.17",
     date: "2026-08-11",
     headline: "An overdue total no longer relies on being red, and the sidebar shows what you are pointing at.",

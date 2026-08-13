@@ -28,10 +28,37 @@ interface Outcome {
  * something is down, and the body still describes which checks failed. Only a
  * rejected fetch means One Book could not be reached at all.
  */
+/**
+ * Is this really the answer the endpoint promises, or something wearing its
+ * shape?
+ *
+ * A gateway or firewall in front of the app can return JSON of its own. That
+ * body parses, `status` comes back undefined, and a page that only asks "is it
+ * down?" concludes it is not — and says everything is fine. Anything that is
+ * not recognisably a health payload is treated as no answer at all.
+ */
+function isHealthPayload(value: unknown): value is HealthPayload {
+  const candidate = value as HealthPayload | null;
+  return (
+    !!candidate &&
+    (candidate.status === "ok" || candidate.status === "down") &&
+    Array.isArray(candidate.checks)
+  );
+}
+
 async function loadHealth(): Promise<Outcome> {
   try {
-    const response = await fetch("/api/health", { cache: "no-store" });
-    return { payload: (await response.json()) as HealthPayload, unreachable: false };
+    const response = await fetch("/api/health", {
+      cache: "no-store",
+      // Without this a hung endpoint never settles, and the page keeps showing
+      // whatever it showed before — which during an outage is the reassurance
+      // the reader must not be given.
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body: unknown = await response.json();
+    return isHealthPayload(body)
+      ? { payload: body, unreachable: false }
+      : { payload: null, unreachable: true };
   } catch {
     // Not hidden: this is the worst answer, and the page shows it rather than
     // leaving the reader with a blank screen.
@@ -80,7 +107,19 @@ export default function StatusPage() {
     void loadHealth().then(apply);
   }, [apply]);
 
-  const down = unreachable || payload?.status === "down";
+  /**
+   * Has anything actually been asked yet?
+   *
+   * This page is prerendered, so its first paint is served from a CDN before a
+   * single probe has run. Treating "no answer yet" as "not down" put the words
+   * "One Book is working" into that static HTML — so during an outage the one
+   * screen built to tell a reader it is not their fault told them it was.
+   *
+   * Nothing is claimed until an answer arrives, and the claim is `!== "ok"`
+   * rather than `=== "down"` so an unrecognised verdict fails towards caution.
+   */
+  const settled = payload !== null || unreachable;
+  const down = unreachable || (payload !== null && payload.status !== "ok");
 
   return (
     <main style={{ maxWidth: 560, margin: "0 auto", padding: 24 }}>
@@ -90,24 +129,28 @@ export default function StatusPage() {
         </Typography.Title>
 
         <Alert
-          type={down ? "error" : "success"}
+          type={!settled ? "info" : down ? "error" : "success"}
           showIcon
           message={
             // Being unable to reach One Book at all is not the same as finding
             // part of it broken, and saying "some" of it would understate a
             // total outage to the one person looking.
-            unreachable
-              ? "One Book could not be reached"
-              : down
-                ? "Some of One Book is not working"
-                : "One Book is working"
+            !settled
+              ? "Checking One Book…"
+              : unreachable
+                ? "One Book could not be reached"
+                : down
+                  ? "Some of One Book is not working"
+                  : "One Book is working"
           }
           description={
-            unreachable
-              ? "Either One Book is down or this device has no connection to it. Nothing you did caused it."
-              : down
-                ? "If a screen is not behaving, this is why. Nothing you did caused it."
-                : "If a screen is not behaving, the problem is not with One Book itself."
+            !settled
+              ? "Asking One Book whether it is working. This takes a moment."
+              : unreachable
+                ? "Either One Book is down or this device has no connection to it. Nothing you did caused it."
+                : down
+                  ? "If a screen is not behaving, this is why. Nothing you did caused it."
+                  : "If a screen is not behaving, the problem is not with One Book itself."
           }
         />
 
