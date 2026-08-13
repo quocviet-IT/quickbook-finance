@@ -160,6 +160,22 @@ describe("the cache", () => {
     expect(calls).toBe(4);
   });
 
+  it("shares one run between callers that arrive together", async () => {
+    // Without a single-flight guard the cache is consulted before the await and
+    // written after it, so a burst on a cold cache each fires its own pair —
+    // the cap does not exist under the one condition it was written for. The
+    // sequential tests here would all stay green with the guard deleted.
+    stubFetch(async (input) =>
+      String(input).includes("/rpc/health") ? respond(200, '"ok"') : respond(200),
+    );
+    const [first, second] = await Promise.all([cachedHealth(), cachedHealth()]);
+
+    expect(calls).toBe(2);
+    // The same object, not merely an equal one: the second caller joined the
+    // run rather than starting one that happened to agree.
+    expect(second).toBe(first);
+  });
+
   it("reuses a failure exactly as it reuses a success", async () => {
     // Caching only the good answer would let a flood arriving during an outage
     // bypass the cap entirely — the worst moment to remove it.

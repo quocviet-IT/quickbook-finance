@@ -18,6 +18,27 @@ interface Outcome {
 }
 
 /**
+ * Is this really the answer the endpoint promises, or something wearing its
+ * shape?
+ *
+ * A gateway or firewall in front of the app can return JSON of its own. That
+ * body parses, `status` comes back undefined, and a page that only asks "is it
+ * down?" concludes it is not — and says everything is fine. Anything that is
+ * not recognisably a health payload is treated as no answer at all, and an
+ * empty check list counts as unrecognisable: the endpoint can never produce
+ * one, because a verdict drawn from no checks reads as down.
+ */
+function isHealthPayload(value: unknown): value is HealthPayload {
+  const candidate = value as HealthPayload | null;
+  return (
+    !!candidate &&
+    (candidate.status === "ok" || candidate.status === "down") &&
+    Array.isArray(candidate.checks) &&
+    candidate.checks.length > 0
+  );
+}
+
+/**
  * Ask the endpoint, and come back with an answer either way.
  *
  * Outside the component and holding no state, so the effect below can await it
@@ -26,26 +47,9 @@ interface Outcome {
  *
  * A 503 is data, not a failure: the endpoint answers with that status when
  * something is down, and the body still describes which checks failed. Only a
- * rejected fetch means One Book could not be reached at all.
+ * rejected fetch, or a body that is not a health payload, means One Book could
+ * not be reached at all.
  */
-/**
- * Is this really the answer the endpoint promises, or something wearing its
- * shape?
- *
- * A gateway or firewall in front of the app can return JSON of its own. That
- * body parses, `status` comes back undefined, and a page that only asks "is it
- * down?" concludes it is not — and says everything is fine. Anything that is
- * not recognisably a health payload is treated as no answer at all.
- */
-function isHealthPayload(value: unknown): value is HealthPayload {
-  const candidate = value as HealthPayload | null;
-  return (
-    !!candidate &&
-    (candidate.status === "ok" || candidate.status === "down") &&
-    Array.isArray(candidate.checks)
-  );
-}
-
 async function loadHealth(): Promise<Outcome> {
   try {
     const response = await fetch("/api/health", {
@@ -101,8 +105,18 @@ export default function StatusPage() {
     };
   }, [apply]);
 
-  /** The button's version. `checking` already starts raised for the first load. */
+  /**
+   * The button's version. `checking` already starts raised for the first load.
+   *
+   * The old answer is cleared first, so the page returns to "Checking One Book…"
+   * rather than restating a verdict it no longer holds. Leaving it in place is
+   * the same fault the first paint had: a tab that was green when an outage
+   * began would keep saying so for the whole re-check, with only a spinner
+   * disagreeing.
+   */
   const recheck = useCallback(() => {
+    setPayload(null);
+    setUnreachable(false);
     setChecking(true);
     void loadHealth().then(apply);
   }, [apply]);

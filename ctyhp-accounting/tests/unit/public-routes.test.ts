@@ -14,6 +14,9 @@ describe("paths that skip the session", () => {
     expect(skipsSession("/status")).toBe(true);
     expect(skipsSession("/status/")).toBe(true);
     expect(skipsSession("/api/health/")).toBe(true);
+    // Trimming the trailing slash must not narrow the route-handler prefix:
+    // `/api/` trimmed is `/api`, which no longer carries it.
+    expect(skipsSession("/api/")).toBe(true);
   });
 
   it("holds everything else to the session", () => {

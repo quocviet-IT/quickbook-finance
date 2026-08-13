@@ -16,6 +16,11 @@ export function skipsSession(pathname: string): boolean {
   // A trailing slash is ordinary in a pasted or typed address, and `/status/`
   // matching nothing would drop it through to the session gate and bounce a
   // signed-out reader to /login — the one outcome this exists to prevent.
-  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return path.startsWith("/api/") || path === "/status";
+  //
+  // The route-handler prefix is tested against the original path, not the
+  // trimmed one: trimming turns the bare `/api/` into `/api`, which no longer
+  // carries the prefix, and a rule written to widen the gate would have
+  // narrowed it instead.
+  const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return pathname.startsWith("/api/") || trimmed === "/status";
 }

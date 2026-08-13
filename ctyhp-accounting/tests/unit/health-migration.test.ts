@@ -46,3 +46,46 @@ describe("health probe migration", () => {
     expect(plan.skipped.length).toBeGreaterThan(0);
   });
 });
+
+const hardeningFile = "0113_health_probe_hardening.sql";
+const hardening = readFileSync(
+  join(process.cwd(), "supabase", "migrations", hardeningFile),
+  "utf8",
+);
+
+/**
+ * The SQL with its prose removed.
+ *
+ * A migration's header explains why it exists, which means it names the very
+ * things the assertions forbid. Matching against the comments would fail a file
+ * for describing the hazard it closes.
+ */
+function code(sql: string): string {
+  return sql
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join("\n");
+}
+
+describe("health probe hardening migration", () => {
+  it("runs as its caller with a pinned search_path", () => {
+    // The only function an unauthenticated caller may execute. Running it as
+    // the owner instead is what would turn a later edit that reads something
+    // real into privilege escalation.
+    expect(code(hardening)).toMatch(/security invoker/i);
+    expect(code(hardening)).not.toMatch(/security definer/i);
+    expect(code(hardening)).toMatch(/set search_path\s*=/i);
+  });
+
+  it("still opens nothing beyond the one function", () => {
+    expect(hardening).not.toMatch(/grant[^;]*on\s+table[^;]*anon/i);
+    expect(hardening).not.toMatch(/grant[^;]*on\s+all\s+(tables|functions)[^;]*anon/i);
+    expect(hardening).not.toMatch(/onebook\.company/i);
+  });
+
+  it("is held back from company schemas, like the migration it amends", () => {
+    const plan = planCompanySchema([{ file: hardeningFile, sql: hardening }], "co_example");
+    expect(plan.statements).toEqual([]);
+    expect(plan.skipped.length).toBeGreaterThan(0);
+  });
+});

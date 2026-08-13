@@ -148,9 +148,17 @@ situation it exists for.
 Supabase hangs the endpoint, and the function burns its whole duration waiting
 for an answer that never arrives.
 
-**A ten-second cache.** This is a public endpoint that makes two outbound calls
-per request — a small amplifier. The cache caps a flood at one probe per ten
-seconds.
+**A ten-second cache, with a single-flight guard.** This is a public endpoint
+that makes two outbound calls per request — a small amplifier. Within one
+instance the cache holds an answer for ten seconds, and callers arriving while a
+run is already in flight join it rather than starting another.
+
+Said precisely, because the first draft of this section over-claimed: this is
+not a cap on a flood. The cache is per-instance and the platform scales
+instances on demand, so a large enough burst still costs one probe pair per
+instance. It bounds what a single instance does, and nothing more. A real cap
+would need either a shared cache — `Cache-Control: s-maxage` at the edge — or a
+rate limit, and neither is in this wave.
 
 The cache holds a failure exactly as it holds a success. Caching only the good
 answer would let a flood arriving during an outage bypass the cap entirely,
