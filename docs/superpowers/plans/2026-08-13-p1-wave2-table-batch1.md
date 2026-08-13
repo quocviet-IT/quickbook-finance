@@ -134,7 +134,16 @@ already does this; follow it. Do not add a DOM dependency for this.
 - Produces:
   - `type MoneySign = "negative" | "zero" | "positive"`
   - `interface MoneyDisplay { text: string; ariaLabel: string; sign: MoneySign }`
-  - `moneyDisplay(minor: number, currencyCode: string, decimals?: number): MoneyDisplay`
+  - `moneyDisplay(minor: number, currencyCode: string, decimals: number): MoneyDisplay`
+
+**`decimals` is required, deliberately.** `formatMoney` has no default either,
+and the reason is arithmetic: `formatMoney` computes `minor / 10 ** decimals`,
+so a wrong `decimals` moves the decimal point. Measured — `moneyDisplay(500,
+"VND")` under a default of 2 renders **`₫5.00`** where the truth is `₫500`:
+wrong by a factor of a hundred, with invented cents on a currency that has
+none, and no error, warning or type failure anywhere. This codebase supports
+`decimal_places = 0` (see `lib/domain/money.ts`), so that is a live case rather
+than a hypothetical. A caller must say what it means.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -149,33 +158,49 @@ describe("a money cell", () => {
     // The formatting itself is not being changed. What this adds is the reading
     // and the sign, so a column can align and colour without each screen
     // deciding for itself.
-    expect(moneyDisplay(123456, "USD").text).toBe("$1,234.56");
-    expect(moneyDisplay(-123456, "USD").text).toBe("-$1,234.56");
+    expect(moneyDisplay(123456, "USD", 2).text).toBe("$1,234.56");
+    expect(moneyDisplay(-123456, "USD", 2).text).toBe("-$1,234.56");
   });
 
   it("reports the sign, so a caller never has to test the string", () => {
-    expect(moneyDisplay(-1, "USD").sign).toBe("negative");
-    expect(moneyDisplay(0, "USD").sign).toBe("zero");
-    expect(moneyDisplay(1, "USD").sign).toBe("positive");
+    expect(moneyDisplay(-1, "USD", 2).sign).toBe("negative");
+    expect(moneyDisplay(0, "USD", 2).sign).toBe("zero");
+    expect(moneyDisplay(1, "USD", 2).sign).toBe("positive");
   });
 
   it("spells a negative out loud, because a leading dash is easy to miss", () => {
     // A screen reader announcing "$1,234.56" for a credit is the accounting
     // equivalent of dropping a minus sign, and colour is no help at all here.
-    expect(moneyDisplay(-123456, "USD").ariaLabel).toBe("negative $1,234.56");
-    expect(moneyDisplay(123456, "USD").ariaLabel).toBe("$1,234.56");
+    expect(moneyDisplay(-123456, "USD", 2).ariaLabel).toBe("negative $1,234.56");
+    expect(moneyDisplay(123456, "USD", 2).ariaLabel).toBe("$1,234.56");
   });
 
   it("honours a currency with no minor unit", () => {
     // Not every currency has cents; the decimal places come from the currency
-    // record, and defaulting to 2 everywhere would misstate those.
+    // record, which is why this argument is required rather than defaulted.
     expect(moneyDisplay(1234, "JPY", 0).text).toBe("¥1,234");
   });
 
   it("falls back to a readable string when the currency code is unknown", () => {
     // formatMoney already catches this; the point is that it does not throw and
     // a table cell never renders empty.
-    expect(moneyDisplay(123456, "ZZZ").text.length).toBeGreaterThan(0);
+    expect(moneyDisplay(123456, "ZZZ", 2).text.length).toBeGreaterThan(0);
+  });
+
+  it("treats negative zero as zero, in the text as well as the sign", () => {
+    // `Math.sign(v) * Math.round(...)` in lib/domain/money.ts yields -0 for any
+    // small negative amount that rounds to nothing, so this is a value the
+    // ledger really produces. Left alone it splits in two: `-0 < 0` is false so
+    // the sign says "zero", while Intl formats -0 as "-$0.00". The cell would
+    // then show a minus sign that nothing accounts for, and — because only a
+    // "negative" sign triggers the spoken word — read aloud as an unexplained
+    // dash. Whatever a reader concludes from that, it is not what the number
+    // means.
+    const negativeZero = moneyDisplay(-0, "USD", 2);
+    expect(negativeZero.sign).toBe("zero");
+    expect(negativeZero.text).toBe("$0.00");
+    expect(negativeZero.ariaLabel).toBe("$0.00");
+    expect(negativeZero).toEqual(moneyDisplay(0, "USD", 2));
   });
 });
 ```
@@ -212,10 +237,14 @@ export interface MoneyDisplay {
 export function moneyDisplay(
   minor: number,
   currencyCode: string,
-  decimals = 2,
+  decimals: number,
 ): MoneyDisplay {
-  const text = formatMoney(minor, currencyCode, decimals);
-  const sign: MoneySign = minor < 0 ? "negative" : minor > 0 ? "positive" : "zero";
+  // -0 collapsed to 0 before anything reads it. `-0 === 0` is true, so this
+  // changes no other input, but it keeps the sign and the string from
+  // disagreeing: `-0 < 0` is false while Intl still formats -0 as "-$0.00".
+  const amount = minor === 0 ? 0 : minor;
+  const text = formatMoney(amount, currencyCode, decimals);
+  const sign: MoneySign = amount < 0 ? "negative" : amount > 0 ? "positive" : "zero";
   return {
     text,
     // Spelled out rather than left to the leading dash. A dash is a single
@@ -230,7 +259,7 @@ export function moneyDisplay(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/money-display.test.ts`
-Expected: PASS — 5 tests
+Expected: PASS — 6 tests
 
 - [ ] **Step 5: Typecheck**
 
@@ -550,6 +579,7 @@ function pair(cell: ReactElement<CellProps>): [ReactNode, string] {
 interface Row {
   total_minor: number;
   currency_code: string;
+  currency_decimals: number;
   due_date: string | null;
   status: "paid" | "void";
   memo: string | null;
@@ -558,27 +588,43 @@ interface Row {
 const row: Row = {
   total_minor: -123456,
   currency_code: "USD",
+  currency_decimals: 2,
   due_date: "2026-08-13",
   status: "void",
   memo: null,
 };
 
+/** The per-row declaration, written once because five tests use it. */
+const perRow = { title: "Total", dataIndex: "total_minor", currency: "currency_code", decimals: "currency_decimals" } as const;
+
 describe("moneyColumn", () => {
   it("aligns right and uses tabular figures, so columns of money line up", () => {
-    const column = moneyColumn<Row>({ title: "Total", dataIndex: "total_minor", currency: "currency_code" });
+    const column = moneyColumn<Row>({ ...perRow });
     expect(column.align).toBe("right");
     const cell = asElement(column.render!(row.total_minor, row, 0), "moneyColumn");
     expect(cell.props.style?.fontVariantNumeric).toBe("tabular-nums");
   });
 
-  it("takes the currency off the row, because a ledger is not single-currency", () => {
-    const column = moneyColumn<Row>({ title: "Total", dataIndex: "total_minor", currency: "currency_code" });
-    const cell = asElement(column.render!(row.total_minor, { ...row, currency_code: "JPY" }, 0), "moneyColumn");
-    expect(cell.props.children).toContain("¥");
+  it("takes the currency AND its decimal places off the row", () => {
+    // Both come from the row because both belong to the currency. A column
+    // holding USD and JPY needs two places on one row and none on the next;
+    // one number pinned to the column would be wrong on whichever rows are not
+    // the majority, and wrong quietly.
+    const column = moneyColumn<Row>({ ...perRow });
+    const cell = asElement(
+      column.render!(123456, { ...row, currency_code: "JPY", currency_decimals: 0 }, 0),
+      "moneyColumn",
+    );
+    expect(cell.props.children).toBe("¥123,456");
   });
 
-  it("accepts a fixed currency where the screen has only one", () => {
-    const column = moneyColumn<Row>({ title: "Total", dataIndex: "total_minor", currency: { fixed: "USD" } });
+  it("accepts a fixed currency and fixed places where the screen has only one", () => {
+    const column = moneyColumn<Row>({
+      title: "Total",
+      dataIndex: "total_minor",
+      currency: { fixed: "USD" },
+      decimals: { fixed: 2 },
+    });
     const cell = asElement(column.render!(123456, row, 0), "moneyColumn");
     expect(cell.props.children).toBe("$1,234.56");
   });
@@ -586,7 +632,7 @@ describe("moneyColumn", () => {
   it("colours a negative from the money token, and says so out loud too", () => {
     // The minus sign is the signal that survives a printout and a colour-blind
     // reader; the colour and the spoken label reinforce it.
-    const column = moneyColumn<Row>({ title: "Total", dataIndex: "total_minor", currency: "currency_code" });
+    const column = moneyColumn<Row>({ ...perRow });
     const cell = asElement(column.render!(row.total_minor, row, 0), "moneyColumn");
     expect(cell.props.style?.color).toBe(TOKENS.money.negative);
     expect(cell.props["aria-label"]).toBe("negative $1,234.56");
@@ -594,7 +640,7 @@ describe("moneyColumn", () => {
   });
 
   it("leaves zero uncoloured, because nothing is being signalled", () => {
-    const column = moneyColumn<Row>({ title: "Total", dataIndex: "total_minor", currency: "currency_code" });
+    const column = moneyColumn<Row>({ ...perRow });
     const cell = asElement(column.render!(0, row, 0), "moneyColumn");
     expect(cell.props.style?.color).toBeUndefined();
   });
@@ -715,7 +761,15 @@ export interface MoneyColumnSpec<T> {
    * wrong wherever it mattered most.
    */
   currency: Key<T> | { fixed: string };
-  decimals?: number;
+  /**
+   * Where the decimal places come from, declared the same way as the currency
+   * and for the same reason: they are a property of the currency, not of the
+   * column. A column carrying USD and JPY rows needs two and zero on different
+   * rows, so pinning one number per column would be wrong on the rows that are
+   * not the majority. Required — `formatMoney` has no default either, and a
+   * silent fallback to 2 renders ₫500 as ₫5.00 with no error anywhere.
+   */
+  decimals: Key<T> | { fixed: number };
   width?: number;
 }
 
@@ -730,7 +784,11 @@ export function moneyColumn<T>(spec: MoneyColumnSpec<T>): ColumnType<T> {
         typeof spec.currency === "object"
           ? spec.currency.fixed
           : String(record[spec.currency] ?? "USD");
-      const { text, ariaLabel, sign } = moneyDisplay(value ?? 0, code, spec.decimals);
+      const places =
+        typeof spec.decimals === "object"
+          ? spec.decimals.fixed
+          : Number(record[spec.decimals] ?? 2);
+      const { text, ariaLabel, sign } = moneyDisplay(value ?? 0, code, places);
       return (
         <span
           aria-label={ariaLabel}
@@ -1700,7 +1758,8 @@ git commit -m "test(table): name the 47 screens still on a raw table, so the lis
 
 ## Batch 1 acceptance criteria
 
-- [ ] `moneyColumn` takes its currency from the row, aligns right, uses tabular figures, and gives a negative both a colour token and a spoken label
+- [ ] `moneyColumn` takes its currency **and its decimal places** from the row, aligns right, uses tabular figures, and gives a negative both a colour token and a spoken label
+- [ ] `moneyDisplay` requires `decimals` — no default — and `-0` reads identically to `0` in the sign, the text and the spoken label
 - [ ] `statusColumn` accepts a per-screen tone map, and shows an unmapped status rather than hiding it
 - [ ] `dateColumn` emits `<time dateTime>` and shows the same text these screens already showed
 - [ ] `DataTable` accepts `rows`, `page` or `dataSource`, and throws if given two at once
