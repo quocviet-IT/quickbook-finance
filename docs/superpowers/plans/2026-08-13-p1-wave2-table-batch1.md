@@ -553,7 +553,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { actionsColumn, dateColumn, moneyColumn, statusColumn, textColumn } from "@/components/ui/columns";
 import { TOKENS } from "@/lib/design/tokens";
-import { toneToken } from "@/lib/design/tone";
+import { ToneBadge, toneToken, type Tone } from "@/lib/design/tone";
 
 /** The props these cells actually carry. See constraint 2 above. */
 interface CellProps {
@@ -561,11 +561,16 @@ interface CellProps {
   children?: ReactNode;
   "aria-label"?: string;
   dateTime?: string;
+  tone?: Tone;
   [key: string]: unknown;
 }
 
 function asElement(node: unknown, what: string): ReactElement<CellProps> {
-  if (!isValidElement<CellProps>(node as {} | null | undefined)) {
+  // The cast target is read off `isValidElement` itself rather than written out
+  // as `{} | null | undefined`. Same type, but the literal form trips this
+  // repo's `no-empty-object-type` lint rule, and silencing a rule to restate a
+  // type the compiler can already name is the worse of the two.
+  if (!isValidElement<CellProps>(node as Parameters<typeof isValidElement>[0])) {
     throw new Error(`${what} rendered no element`);
   }
   return node as ReactElement<CellProps>;
@@ -671,8 +676,21 @@ describe("statusColumn", () => {
       tones: { paid: { tone: "positive", label: "Paid" }, void: { tone: "muted", label: "Void" } },
     });
     const cell = asElement(column.render!(row.status, row, 0), "statusColumn");
-    expect(cell.props.style?.color).toBe(toneToken("muted").color);
-    const [icon, label] = pair(cell);
+    // The column's own job is choosing the tone and the wording; the badge owns
+    // how that looks. Asserting the element IS the badge is what keeps the two
+    // from drifting into separate copies of the same markup.
+    expect(cell.type).toBe(ToneBadge);
+    expect(cell.props.tone).toBe("muted");
+    expect(cell.props.children).toBe("Void");
+
+    // And once through the badge, the chosen tone really does reach the colour —
+    // so the composition is proven, not just the wiring.
+    const rendered = asElement(
+      ToneBadge(cell.props as { tone: Tone; children: string }),
+      "ToneBadge",
+    );
+    expect(rendered.props.style?.color).toBe(toneToken("muted").color);
+    const [icon, label] = pair(rendered);
     expect(isValidElement(icon)).toBe(true);
     expect(label).toBe("Void");
   });
@@ -687,7 +705,8 @@ describe("statusColumn", () => {
       tones: { paid: { tone: "positive", label: "Paid" } },
     });
     const cell = asElement(column.render!("void" as Row["status"], row, 0), "statusColumn");
-    expect(pair(cell)[1]).toBe("void");
+    expect(cell.props.tone).toBe("muted");
+    expect(cell.props.children).toBe("void");
   });
 });
 
@@ -732,7 +751,7 @@ import type { ReactNode } from "react";
 import type { ColumnType } from "antd/es/table";
 import { moneyDisplay } from "@/lib/domain/money-display";
 import { TOKENS } from "@/lib/design/tokens";
-import { toneToken, type Tone } from "@/lib/design/tone";
+import { ToneBadge, type Tone } from "@/lib/design/tone";
 
 /**
  * The column builders.
@@ -855,13 +874,13 @@ export function statusColumn<T>(spec: StatusColumnSpec<T>): ColumnType<T> {
       // An unmapped status shows its raw value in the muted tone. Rendering
       // nothing would hide the row's state; this shows the state and the gap
       // in the screen's declaration at the same time.
-      const { color, icon } = toneToken(mapped?.tone ?? "muted");
-      return (
-        <span style={{ color, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          {icon}
-          {mapped?.label ?? value}
-        </span>
-      );
+      //
+      // Rendered through ToneBadge rather than by repeating its markup here.
+      // The two would be identical spans, and two copies of one appearance is
+      // exactly the drift this kit exists to end — a change to the badge that
+      // did not reach the column would leave a table looking unlike every
+      // other place the same status is shown.
+      return <ToneBadge tone={mapped?.tone ?? "muted"}>{mapped?.label ?? value}</ToneBadge>;
     },
   };
 }
