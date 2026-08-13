@@ -20,10 +20,14 @@ export interface MoneyDisplay {
 export function moneyDisplay(
   minor: number,
   currencyCode: string,
-  decimals = 2,
+  decimals: number,
 ): MoneyDisplay {
-  const text = formatMoney(minor, currencyCode, decimals);
-  const sign: MoneySign = minor < 0 ? "negative" : minor > 0 ? "positive" : "zero";
+  // -0 collapsed to 0 before anything reads it. `-0 === 0` is true, so this
+  // changes no other input, but it keeps the sign and the string from
+  // disagreeing: `-0 < 0` is false while Intl still formats -0 as "-$0.00".
+  const amount = minor === 0 ? 0 : minor;
+  const text = formatMoney(amount, currencyCode, decimals);
+  const sign: MoneySign = amount < 0 ? "negative" : amount > 0 ? "positive" : "zero";
   return {
     text,
     // Spelled out rather than left to the leading dash. A dash is a single
