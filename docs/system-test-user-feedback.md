@@ -1751,9 +1751,14 @@ account is put on hold even a $1 invoice is refused.
 
 ### Issue #7 — A report could not carry the file that proves it
 
-From the in-app queue (`/settings/feedback`, 2026-07-30 14:26): "Các suggestion
-và issues trong report a problem, phải cho người sử dụng bổ sung thêm
-attachment, hình ảnh, PDF, v.v."
+From the in-app queue (`/settings/feedback`, 2026-07-30 14:26), translated from
+the reporter's Vietnamese: "Suggestions and issues in Report a problem must let
+the user attach things as well — attachments, images, PDFs, and so on."
+
+The original is kept verbatim, because a report is evidence of what somebody
+actually wrote and a translation is an interpretation of it: "Các suggestion và
+issues trong report a problem, phải cho người sử dụng bổ sung thêm attachment,
+hình ảnh, PDF, v.v."
 
 The dialog captured a screenshot of the page — what the *reporter* was looking
 at. It could not carry the vendor's PDF that disagrees with the bill, a photo of

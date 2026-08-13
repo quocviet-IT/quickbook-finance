@@ -4,8 +4,15 @@ Date: 2026-08-06
 
 ## Where this came from
 
-A screenshot of the settings hub, and one sentence: *"Bạn nên phân quyền lại, phần
-này chỉ có admin thấy. Các người dùng khác không xem được."* The card in question:
+A screenshot of the settings hub, and one sentence: *"You should redo the
+permissions — only an administrator should see this part. Other users must not
+be able to view it."*
+
+(The reporter wrote in Vietnamese, and the original is kept because a report is
+evidence of what somebody actually said: *"Bạn nên phân quyền lại, phần này chỉ
+có admin thấy. Các người dùng khác không xem được."*)
+
+The card in question:
 
 > **Feedback triage** — Bug reports and suggestions filed by staff, with screenshots.
 

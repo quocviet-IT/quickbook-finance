@@ -9,13 +9,16 @@ Feedback filed 2026-08-06 from `/reports/transactions`:
 > Can we add a filter? Like filter it by vendor, filter it by account, something
 > like that for easily checking and review
 
-And, from the person asking for the fix:
+And, from the person asking for the fix, translated from Vietnamese:
 
-> nhớ là fix ở tất cả công ty, làm sau mà khi người dùng tạo công ty vẫn có thể
-> sử dụng, chứ không phải ở mỗi 1 công ty
+> Remember to fix it for every company — it has to keep working for a company
+> the user creates later too, not just for one company.
 
-— whatever this touches must work in every company that exists now *and* in
-every company created later, not only in the first one.
+Which is to say: whatever this touches must work in every company that exists
+now *and* in every company created later, not only in the first one. The
+original is kept because a request is evidence of what was actually asked:
+*"nhớ là fix ở tất cả công ty, làm sau mà khi người dùng tạo công ty vẫn có thể
+sử dụng, chứ không phải ở mỗi 1 công ty"*.
 
 ## What exists today
 
