@@ -1,12 +1,6 @@
 import type { ReactNode } from "react";
-import {
-  CheckCircleFilled,
-  ClockCircleFilled,
-  EditFilled,
-  ExclamationCircleFilled,
-  StopFilled,
-} from "@ant-design/icons";
-import { TOKENS } from "./tokens";
+import { EditFilled, StopFilled } from "@ant-design/icons";
+import { toneToken, type Tone } from "./tone";
 
 /**
  * A document status, and the three things a reader needs to tell it apart.
@@ -32,13 +26,28 @@ export interface StatusToken {
   label: string;
 }
 
-const STATUS: Record<StatusKey, StatusToken> = {
-  posted: { color: TOKENS.intent.success, icon: <CheckCircleFilled />, label: "Posted" },
-  void: { color: TOKENS.text.secondary, icon: <StopFilled />, label: "Void" },
-  draft: { color: TOKENS.text.secondary, icon: <EditFilled />, label: "Draft" },
-  overdue: { color: TOKENS.intent.danger, icon: <ExclamationCircleFilled />, label: "Overdue" },
-  pending: { color: TOKENS.intent.warning, icon: <ClockCircleFilled />, label: "Pending" },
+/**
+ * Each document status is one of the five tones, wearing its own word.
+ *
+ * Expressed this way rather than picking colours directly so the application
+ * has one visual vocabulary. A status and a tone that disagreed about what
+ * "danger" looks like would be the drift this whole wave exists to remove.
+ */
+const STATUS_TONE: Record<StatusKey, { tone: Tone; label: string; icon?: ReactNode }> = {
+  posted: { tone: "positive", label: "Posted" },
+  void: { tone: "muted", label: "Void", icon: <StopFilled /> },
+  draft: { tone: "muted", label: "Draft", icon: <EditFilled /> },
+  overdue: { tone: "danger", label: "Overdue" },
+  pending: { tone: "warning", label: "Pending" },
 };
+
+const STATUS: Record<StatusKey, StatusToken> = Object.fromEntries(
+  (Object.entries(STATUS_TONE) as [StatusKey, { tone: Tone; label: string; icon?: ReactNode }][])
+    .map(([key, { tone, label, icon }]) => {
+      const base = toneToken(tone);
+      return [key, { color: base.color, icon: icon ?? base.icon, label }];
+    }),
+) as Record<StatusKey, StatusToken>;
 
 export function statusToken(key: StatusKey): StatusToken {
   return STATUS[key];
