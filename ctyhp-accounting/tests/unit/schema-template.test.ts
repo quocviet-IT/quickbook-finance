@@ -185,7 +185,9 @@ describe("planCompanySchema against the real migrations", () => {
 function stripComments(sql: string): string {
   return sql
     .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
+    // `\r?\n`, not `\n`: on a Windows checkout the line ends `…\r`, and `.` in
+    // `--.*$` does not match `\r`, so nothing would be stripped at all.
+    .split(/\r?\n/)
     .map((line) => line.replace(/--.*$/, ""))
     .join("\n");
 }

@@ -59,10 +59,17 @@ const hardening = readFileSync(
  * A migration's header explains why it exists, which means it names the very
  * things the assertions forbid. Matching against the comments would fail a file
  * for describing the hazard it closes.
+ *
+ * Splitting on `\r?\n` rather than `\n` is what makes this work on a Windows
+ * checkout. `core.autocrlf` writes the file with CRLF; a line then ends `…\r`,
+ * and `.` in `--.*$` does not match `\r`, so the comment survives stripping and
+ * the file fails for the sentence explaining what it forbids. It passed on CI
+ * only because Linux checks the file out with LF — a test that is green on the
+ * server and red on the author's machine is one people learn to ignore.
  */
 function code(sql: string): string {
   return sql
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.replace(/--.*$/, ""))
     .join("\n");
 }
