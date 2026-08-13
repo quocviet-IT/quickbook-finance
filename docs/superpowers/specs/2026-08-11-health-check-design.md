@@ -245,6 +245,23 @@ are signed in.
 **History.** No uptime record is kept. The page reports now. An external monitor
 is what keeps history, and it keeps a better one than this could.
 
+## 12b. One thing whoever operates this has to know
+
+`NEXT_PUBLIC_SUPABASE_URL` is inlined into the bundle **at build time**, not read
+at runtime. Measured during verification: changing the environment variable and
+restarting the server left the check reporting `ok` against a host that does not
+exist, with a fresh `checkedAt` — it really did probe again, just at the old
+address. Only a rebuild changed the answer.
+
+The consequence is narrow but sharp: **change the Supabase URL in Vercel without
+redeploying, and this check will keep probing the old project and keep saying
+everything is fine.** The check is honest about the deployment it was built for,
+and silent about a configuration change made after it.
+
+This is how `NEXT_PUBLIC_*` works in Next.js rather than a defect in the check,
+and reading the value at runtime instead would mean not using a `NEXT_PUBLIC_`
+variable for it. Recorded so nobody discovers it during an incident.
+
 ## 13. An incidental finding, recorded rather than fixed
 
 Asking PostgREST for a schema that does not exist, using only the anon key,
