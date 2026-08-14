@@ -1128,12 +1128,15 @@ const PAGE_SIZES = [10, 20, 50, 100] as const;
  */
 const schema = z.object({
   page: z.coerce.number().int().positive().catch(DEFAULT_TABLE_STATE.page),
+  // Not a type predicate: the TableState interface above types pageSize as
+  // plain number, so narrowing this to the literal 10 | 20 | 50 | 100 union
+  // makes the .catch() fallback — DEFAULT_TABLE_STATE.pageSize — no longer
+  // assignable, and `npm run typecheck` fails. Nothing downstream reads the
+  // narrowed type, and the runtime check is the same either way.
   size: z.coerce
     .number()
     .int()
-    .refine((value): value is (typeof PAGE_SIZES)[number] =>
-      (PAGE_SIZES as readonly number[]).includes(value),
-    )
+    .refine((value) => (PAGE_SIZES as readonly number[]).includes(value))
     .catch(DEFAULT_TABLE_STATE.pageSize),
   sort: z.string().min(1).nullable().catch(null),
   order: z.enum(["ascend", "descend"]).nullable().catch(null),
