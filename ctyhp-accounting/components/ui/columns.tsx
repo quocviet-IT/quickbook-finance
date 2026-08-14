@@ -51,16 +51,37 @@ export function moneyColumn<T>(spec: MoneyColumnSpec<T>): ColumnType<T> {
     dataIndex: spec.dataIndex,
     width: spec.width,
     align: "right",
-    render: (value: number, record: T) => {
-      const code =
-        typeof spec.currency === "object"
-          ? spec.currency.fixed
-          : String(record[spec.currency] ?? "USD");
-      const places =
-        typeof spec.decimals === "object"
-          ? spec.decimals.fixed
-          : Number(record[spec.decimals] ?? 2);
-      const { text, ariaLabel, sign } = moneyDisplay(value ?? 0, code, places);
+    render: (value: unknown, record: T) => {
+      // `value` is `unknown` because that is the truth at this boundary: Ant
+      // Design hands the render whatever sits at `dataIndex`, and nothing
+      // upstream proves it is a number.
+      //
+      // A cell shows money only when the row carries all three facts it needs.
+      // Any one of them missing means the row is broken, and the honest cell is
+      // the em dash rather than a guess. An assumed currency puts a dollar sign
+      // on a dong amount; assumed places turn ₫500 into ₫5.00, off by a hundred
+      // with invented cents and nothing logged; and a missing amount is not a
+      // zero — the ledger tells those two apart, so the screen must as well.
+      //
+      // Every check asks whether the value is absent, never whether it is
+      // falsy: zero places is how JPY and VND are declared, and a zero amount
+      // is a real balance.
+      const code: unknown =
+        typeof spec.currency === "object" ? spec.currency.fixed : record[spec.currency];
+      const places: unknown =
+        typeof spec.decimals === "object" ? spec.decimals.fixed : record[spec.decimals];
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        typeof code !== "string" ||
+        code.trim() === "" ||
+        typeof places !== "number" ||
+        !Number.isInteger(places) ||
+        places < 0
+      ) {
+        return ABSENT;
+      }
+      const { text, ariaLabel, sign } = moneyDisplay(value, code, places);
       return (
         <span
           aria-label={ariaLabel}

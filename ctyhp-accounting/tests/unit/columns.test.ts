@@ -48,7 +48,7 @@ const row: Row = {
   memo: null,
 };
 
-/** The per-row declaration, written once because five tests use it. */
+/** The per-row declaration, written once because seven tests use it. */
 const perRow = { title: "Total", dataIndex: "total_minor", currency: "currency_code", decimals: "currency_decimals" } as const;
 
 describe("moneyColumn", () => {
@@ -97,6 +97,33 @@ describe("moneyColumn", () => {
     const column = moneyColumn<Row>({ ...perRow });
     const cell = asElement(column.render!(0, row, 0), "moneyColumn");
     expect(cell.props.style?.color).toBeUndefined();
+  });
+
+  it("shows an em dash for a missing amount, because absent is not zero", () => {
+    // The ledger tells "no amount recorded" and "zero" apart, so a screen
+    // reading from it must too. A rendered $0.00 here would state a fact the
+    // row never carried. The test above pins the other half: a real zero is
+    // still money and still renders.
+    const column = moneyColumn<Row>({ ...perRow });
+    expect(column.render!(null, row, 0)).toBe("—");
+  });
+
+  it("shows an em dash when the row carries no currency, rather than assuming dollars", () => {
+    // An assumed "USD" puts a dollar sign on a dong amount, and a dollar sign
+    // reads as a fact rather than as a gap in the data.
+    const column = moneyColumn<Row>({ ...perRow });
+    const broken = { ...row, currency_code: null as unknown as string };
+    expect(column.render!(123456, broken, 0)).toBe("—");
+  });
+
+  it("shows an em dash when the row carries no decimal places, rather than assuming two", () => {
+    // The assumption this replaces turned ₫500 into ₫5.00 — off by a hundred,
+    // with invented cents, and nothing logged anywhere. The JPY test above is
+    // the reason the guard asks whether the value is null and never whether it
+    // is falsy: zero places is a real declaration on a real currency.
+    const column = moneyColumn<Row>({ ...perRow });
+    const broken = { ...row, currency_decimals: null as unknown as number };
+    expect(column.render!(123456, broken, 0)).toBe("—");
   });
 });
 
