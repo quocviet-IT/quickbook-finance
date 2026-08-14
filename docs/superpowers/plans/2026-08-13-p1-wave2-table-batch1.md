@@ -2332,6 +2332,175 @@ readable on its own in the log.
 
 ---
 
+### Task 9: A test for the one thing that broke
+
+**Files:**
+- Modify: `lib/domain/table-url-state.ts`, `lib/client/use-table-url-state.ts`
+- Modify: `tests/unit/table-url-state.test.ts`, `tests/unit/table-change.test.ts`
+
+**Interfaces:**
+- Produces: `nextTableQuery(current, patch, defaults?): string`
+
+Task 8's review approved the Critical fix and then named what it lacked: **the
+one Critical in this batch has no committed test.** The verification that it
+works was a scratch file, deleted before the commit. Nothing stops someone
+simplifying `current` back to `state`, or a merge quietly reverting the ternary,
+and the failure it would restore is silent — a link that disagrees with the
+screen.
+
+The reason it went untested was thought to be structural: the hook needs a DOM
+and a router. It does not. **Only the choice of `current` touches the browser.**
+The merge-and-reset that follows is pure, and moving it into the module that is
+already pure — and already has a test file — makes the whole sequence testable
+on plain strings.
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `tests/unit/table-url-state.test.ts`:
+
+```ts
+describe("one update after another", () => {
+  it("keeps what earlier updates wrote, instead of erasing it", () => {
+    // The bug this exists to prevent, and it shipped once. In client mode the
+    // hook's state is frozen at the last real navigation, so an update that
+    // merged onto it rebuilt the whole query string from a stale reading and
+    // dropped whatever an earlier update had put there: set a page size, then
+    // type in a search box, and the size was gone from the address.
+    //
+    // Reading the address back each time is what fixes it, and chaining parse
+    // over the query each step produces is exactly what the hook does at
+    // runtime — with no DOM in sight.
+    let query = nextTableQuery(parseTableState(""), { pageSize: 50 });
+    expect(query).toBe("size=50");
+
+    query = nextTableQuery(parseTableState(query), { search: "acme" });
+    const afterSearch = parseTableState(query);
+    expect(afterSearch.pageSize).toBe(50);
+    expect(afterSearch.search).toBe("acme");
+
+    query = nextTableQuery(parseTableState(query), { sort: "due_date", order: "descend" });
+    query = nextTableQuery(parseTableState(query), { page: 2 });
+    expect(parseTableState(query)).toEqual({
+      page: 2,
+      pageSize: 50,
+      sort: "due_date",
+      order: "descend",
+      search: "acme",
+    });
+  });
+
+  it("returns to the first page when what is being shown changes", () => {
+    const onPageSeven: TableState = { ...DEFAULT_TABLE_STATE, page: 7 };
+    expect(parseTableState(nextTableQuery(onPageSeven, { search: "acme" })).page).toBe(1);
+    expect(parseTableState(nextTableQuery(onPageSeven, { sort: "due_date" })).page).toBe(1);
+    expect(parseTableState(nextTableQuery(onPageSeven, { pageSize: 50 })).page).toBe(1);
+  });
+
+  it("leaves the page alone when the page is what changed", () => {
+    const onPageSeven: TableState = { ...DEFAULT_TABLE_STATE, page: 7 };
+    expect(parseTableState(nextTableQuery(onPageSeven, { page: 8 })).page).toBe(8);
+  });
+});
+```
+
+And add to `tests/unit/table-change.test.ts` the three shapes Ant Design's own
+types allow that nothing pins yet:
+
+```ts
+  it("reads a cleared sort the same way whether the direction is null or absent", () => {
+    // Ant Design's own type is `'descend' | 'ascend' | null`, so null is the
+    // canonical cleared value and undefined is merely the property missing.
+    // Only one of the two was pinned.
+    const patch = tableStateFromAntdChange<Row>(
+      { current: 1, pageSize: 20 },
+      { columnKey: "due_date", field: "due_date", order: null },
+    );
+    expect(patch.sort).toBeNull();
+    expect(patch.order).toBeNull();
+  });
+
+  it("reads an empty sorter as no sort", () => {
+    const patch = tableStateFromAntdChange<Row>({ current: 1, pageSize: 20 }, []);
+    expect(patch.sort).toBeNull();
+    expect(patch.order).toBeNull();
+  });
+
+  it("drops a column name it cannot express, rather than inventing one", () => {
+    // `field` may be an array — Ant Design types it `Key | readonly Key[]`.
+    // A path like that has no single name, and TableState.sort holds a name.
+    const patch = tableStateFromAntdChange<Row>(
+      { current: 1, pageSize: 20 },
+      { field: ["nested", "due_date"], order: "ascend" },
+    );
+    expect(patch.sort).toBeNull();
+  });
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run tests/unit/table-url-state.test.ts tests/unit/table-change.test.ts`
+Expected: FAIL — `nextTableQuery` is not exported yet. The three
+`table-change.test.ts` cases should **pass** on arrival; they pin behaviour the
+code already has, and if any of them fails, say so rather than adjusting it.
+
+- [ ] **Step 3: Move the merge into the pure module**
+
+In `lib/domain/table-url-state.ts`, after `serialiseTableState`:
+
+```ts
+/**
+ * The address a change should produce, given the address it starts from.
+ *
+ * This lives here rather than in the hook because it is the half that has no
+ * browser in it. The hook's only irreducibly DOM-bound decision is *which*
+ * state to start from — the address in client mode, React's own in server
+ * mode. Everything after that is a merge and a rule, and keeping them here is
+ * what lets a test chain several updates together on plain strings and catch
+ * the erasure that shipped once.
+ */
+export function nextTableQuery(
+  current: TableState,
+  patch: Partial<TableState>,
+  defaults: TableState = DEFAULT_TABLE_STATE,
+): string {
+  const next = { ...current, ...patch };
+  // Any change to what is being shown returns to the first page. Leaving the
+  // reader on page 7 of a result set that now has two pages shows them an
+  // empty table and no reason for it.
+  if (patch.search !== undefined || patch.sort !== undefined || patch.pageSize !== undefined) {
+    next.page = patch.page ?? DEFAULT_TABLE_STATE.page;
+  }
+  return serialiseTableState(next, defaults);
+}
+```
+
+- [ ] **Step 4: Leave the hook with only the part that needs a browser**
+
+`lib/client/use-table-url-state.ts` — import `nextTableQuery`, drop
+`serialiseTableState`, and reduce `update`'s body to the choice plus the call.
+The comment above `current` stays exactly as it is; the merge, the page rule and
+the `serialiseTableState` call are deleted from here because they now live in
+the module above.
+
+```ts
+      const query = nextTableQuery(current, patch, defaults);
+      const url = query ? `${pathname}?${query}` : pathname;
+```
+
+`DEFAULT_TABLE_STATE` may become an unused import here — remove it if lint says
+so, and leave it if the file still uses it.
+
+- [ ] **Step 5: Run test to verify it passes**
+
+Run: `npx vitest run tests/unit/table-url-state.test.ts tests/unit/table-change.test.ts`
+Expected: PASS — 16 and 8 tests.
+
+- [ ] **Step 6: Gates and commit**
+
+Run: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
+
+Two commits: the extraction with its test, then the three Ant Design shapes.
+
 ## Batch 1 acceptance criteria
 
 - [ ] `moneyColumn` takes its currency **and its decimal places** from the row, aligns right, uses tabular figures, and gives a negative both a colour token and a spoken label
