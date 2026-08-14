@@ -1,4 +1,5 @@
 import type { TablePaginationConfig } from "antd/es/table";
+import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
 
 export interface ServerPage<RecordType> {
   rows: RecordType[];
@@ -28,6 +29,10 @@ export interface DataTableCoreProps<RecordType> {
  * The two modes exist so that moving a screen to server-side paging later
  * changes its data source and nothing else: the columns, the markup and the
  * URL state all stay as they are.
+ *
+ * A screen driving its table from the address owns the other half of this:
+ * pass `pagination={{ current: state.page, pageSize: state.pageSize }}`, or the
+ * table pages by this default while the address says something else.
  */
 export function resolveTableData<RecordType>(
   props: DataTableCoreProps<RecordType>,
@@ -55,7 +60,7 @@ export function resolveTableData<RecordType>(
         pageSize: props.page.pageSize,
         ...props.pagination,
       }
-    : { ...shared, pageSize: 20, ...props.pagination };
+    : { ...shared, pageSize: DEFAULT_TABLE_STATE.pageSize, ...props.pagination };
 
   return { data, pagination };
 }
