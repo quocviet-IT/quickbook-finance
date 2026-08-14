@@ -107,5 +107,23 @@ describe("a screen's own defaults", () => {
     const cleared: TableState = { ...screenDefaults, sort: null, order: null };
     const reread = parseTableState(serialiseTableState(cleared, screenDefaults), screenDefaults);
     expect(reread.sort).toBe("due_date");
+    expect(reread.order).toBe("ascend");
+  });
+
+  it("gives a sort with no direction the screen's direction, for the same reason", () => {
+    // The half of that limitation easier to miss, because it survives even when
+    // the column does change: the direction is written only when it differs, so
+    // a state carrying a column and no direction writes nothing for it, and an
+    // absent direction reads back as the screen's. A link naming another column
+    // therefore arrives sorted the way this screen sorts.
+    //
+    // Pinned because it is silent, not because it is wrong. The alternative is
+    // to drop a sort the address named outright, and no interface here produces
+    // a directionless sort anyway — Ant Design clears a column and its
+    // direction together.
+    const foreign: TableState = { ...screenDefaults, sort: "customer_name", order: null };
+    const reread = parseTableState(serialiseTableState(foreign, screenDefaults), screenDefaults);
+    expect(reread.sort).toBe("customer_name");
+    expect(reread.order).toBe("ascend");
   });
 });

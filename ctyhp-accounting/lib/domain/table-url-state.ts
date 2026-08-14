@@ -106,12 +106,23 @@ export function serialiseTableState(
   // written on its own: changing only the direction of a screen's default sort
   // should put one parameter in the address, not two.
   //
-  // The consequence, pinned by a test rather than left to be discovered: on a
+  // The consequence, pinned by tests rather than left to be discovered: on a
   // screen that declares a default sort, an address cannot say "no sort at
   // all", because an absent parameter already means the default. Clearing the
   // sort returns the reader to that default rather than to an unsorted list.
-  // No screen needs the difference today, and a sentinel value would make every
-  // ordinary link stranger to read for the sake of a case nobody has.
+  //
+  // The same holds for the direction on its own, which is the half easier to
+  // miss: a state naming a column but no direction writes no `order`, and an
+  // absent `order` reads back as the screen's. So a link naming another column
+  // arrives sorted the way this screen sorts. That is the friendlier of the two
+  // answers available — the alternative is to drop a sort the address asked for
+  // by name — and no interface here produces a directionless sort anyway, since
+  // Ant Design clears a column and its direction together.
+  //
+  // Both cases would need a sentinel value to express, which would make every
+  // ordinary link stranger to read for the sake of states nobody has. Page,
+  // size and search have no such gap: they compare with `!==` and nothing else,
+  // so even their empty values survive the round trip.
   if (state.sort && state.sort !== defaults.sort) params.set("sort", state.sort);
   if (state.sort && state.order && state.order !== defaults.order) {
     params.set("order", state.order);
