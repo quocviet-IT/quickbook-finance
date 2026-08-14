@@ -1749,28 +1749,41 @@ git commit -m "feat(table): let a table take its rows from the browser or from t
 - Consumes: nothing
 - Produces: one allowlist that batches 2 onward shrink
 
-The guard goes on now, while 47 files are still on a raw table, so the gate stays
+The guard goes on now, while 49 files are still on a raw table, so the gate stays
 green throughout and the remaining work is a readable list rather than a feeling.
 This is the same mechanism wave 1 used.
 
 **Match the generic form or the guard is a lie.** This codebase writes
 `<Table<InvoiceRow>` far more often than `<Table `, so a pattern of
-`<Table[\s/>]` finds 16 of the 47 and reports the other 31 as clean. The
-character class below therefore includes `<`. It must also *not* match
-`<TableOutlined`, which is an icon and appears in dozens of files that have no
-table at all. These two mistakes are why the figure in the wave 2 survey was
-wrong; the numbers in this task are the corrected ones.
+`<Table[\s/>]` finds 16 of them and reports the rest as clean. It must also
+*not* match `<TableOutlined`, which is an icon appearing in dozens of files with
+no table at all. Those two mistakes are why the wave 2 survey's figure was
+wrong.
+
+**And there is a third, which cost this task two files.** A survey pattern must
+match every character that can follow `Table` in a real element, not a list of
+the ones that came to mind. An earlier draft of the command below spelled the
+class `[[:space:]>/<]` and so missed `<Table.Summary.Row>` — two report screens
+that already use `DataTable` but hand-roll their totals row from raw
+`Table.Summary`. The guard's own pattern, `/<Table(?!\w)/`, caught them, because
+it says what it means: anything but a word character. The command below now says
+the same thing, so the human survey and the automated guard cannot disagree.
 
 - [ ] **Step 1: Confirm the inventory still matches**
 
 Run:
 
 ```bash
-grep -rlE '<Table([[:space:]>/<]|$)' --include=*.tsx app components | sort
+grep -rlE '<Table([^[:alnum:]_]|$)' --include=*.tsx app components | sort
 ```
 
-Expected: 48 paths — the 47 in `RAW_TABLE` below plus
-`components/ui/DataTable.tsx`, which is exempt by path.
+Expected: 51 paths — the 49 in `RAW_TABLE` below, plus `DataTable.tsx` and
+`ReportTable.tsx`, which are the implementations and are exempt by path.
+`ReportTable` matches because it is what owns `<Table.Summary>` on the app's
+behalf.
+
+Compare set to set, not by count: two lists of 49 can differ and still both
+have 49 entries.
 
 If the output differs, the tree has moved since this plan was written. Correct
 the list in Step 2 to the real output rather than the other way round; the
@@ -1803,7 +1816,7 @@ const OWN_IMPLEMENTATION = new Set([
 
 /**
  * Matches `<Table `, `<Table>`, `<Table/>`, `<Table` at end of line, and the
- * generic `<Table<Row>` this codebase mostly writes — but not `<TableOutlined`,
+ * generic `<Table<Row>` this codebase mostly writes â€” but not `<TableOutlined`,
  * which is an icon. Built fresh on each call: a `/g` regex carries `lastIndex`
  * between `.test()` calls and would report every other file clean.
  */
@@ -1811,7 +1824,15 @@ function tablePattern(): RegExp {
   return /<Table(?!\w)/;
 }
 
-/** Screens still rendering Ant Design's Table directly. 47 as of 2026-08-13. */
+/**
+ * Screens still rendering Ant Design's Table directly. 49 as of 2026-08-14.
+ *
+ * Two of these â€” ReportsClient.tsx and BudgetVsActualView.tsx â€” carry no bare
+ * `<Table `, only a hand-rolled `summary` built from `<Table.Summary.Row>` and
+ * `<Table.Summary.Cell>` bolted onto `DataTable`. That is still Ant Design's
+ * Table reached into directly, and it is exactly what ReportTable exists to
+ * own instead, so it belongs on this list like any other.
+ */
 const RAW_TABLE = new Set<string>([
   "app/(app)/approvals/ApprovalsClient.tsx",
   "app/(app)/banking/BankImportList.tsx",
@@ -1830,6 +1851,7 @@ const RAW_TABLE = new Set<string>([
   "app/(app)/purchase-orders/[id]/PurchaseOrderDetailClient.tsx",
   "app/(app)/purchase-orders/[id]/ReceiveModal.tsx",
   "app/(app)/reports/1099/Report1099Client.tsx",
+  "app/(app)/reports/ReportsClient.tsx",
   "app/(app)/reports/cash-flow-forecast/CashFlowForecastClient.tsx",
   "app/(app)/reports/gl-posting/GlPostingClient.tsx",
   "app/(app)/reports/inventory-review/InventoryReviewClient.tsx",
@@ -1859,6 +1881,7 @@ const RAW_TABLE = new Set<string>([
   "components/payables/PayRunPanel.tsx",
   "components/reports/AgingByPartyTable.tsx",
   "components/reports/AllowanceForDoubtfulAccounts.tsx",
+  "components/reports/BudgetVsActualView.tsx",
   "components/settlements/SettlementHistory.tsx",
 ]);
 
