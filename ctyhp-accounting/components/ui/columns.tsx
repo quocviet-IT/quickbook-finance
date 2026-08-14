@@ -143,7 +143,12 @@ export function statusColumn<T>(spec: StatusColumnSpec<T>): ColumnType<T> {
     title: spec.title,
     dataIndex: spec.dataIndex,
     width: spec.width,
-    render: (value: string) => {
+    render: (value: string | null) => {
+      // A row that carries no status has nothing to say, and the badge would
+      // say it with a grey icon and no word — colour and shape alone, which is
+      // what this tone vocabulary exists to prevent. The em dash is the same
+      // answer the date and text builders give.
+      if (value == null || value === "") return ABSENT;
       const mapped = spec.tones[value];
       // An unmapped status shows its raw value in the muted tone. Rendering
       // nothing would hide the row's state; this shows the state and the gap

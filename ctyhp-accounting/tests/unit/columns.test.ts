@@ -184,6 +184,16 @@ describe("statusColumn", () => {
     expect(cell.props.tone).toBe("muted");
     expect(cell.props.children).toBe("void");
   });
+
+  it("shows an em dash for a row with no status, rather than a wordless icon", () => {
+    const column = statusColumn<Row>({
+      title: "Status",
+      dataIndex: "status",
+      tones: { paid: { tone: "positive", label: "Paid" } },
+    });
+    expect(column.render!(null, row, 0)).toBe("—");
+    expect(column.render!("", row, 0)).toBe("—");
+  });
 });
 
 describe("textColumn", () => {
