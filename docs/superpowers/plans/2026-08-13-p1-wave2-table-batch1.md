@@ -1119,6 +1119,24 @@ describe("a screen's own defaults", () => {
     const cleared: TableState = { ...screenDefaults, sort: null, order: null };
     const reread = parseTableState(serialiseTableState(cleared, screenDefaults), screenDefaults);
     expect(reread.sort).toBe("due_date");
+    expect(reread.order).toBe("ascend");
+  });
+
+  it("gives a sort with no direction the screen's direction, for the same reason", () => {
+    // The half of that limitation easier to miss, because it survives even when
+    // the column does change: the direction is written only when it differs, so
+    // a state carrying a column and no direction writes nothing for it, and an
+    // absent direction reads back as the screen's. A link naming another column
+    // therefore arrives sorted the way this screen sorts.
+    //
+    // Pinned because it is silent, not because it is wrong. The alternative is
+    // to drop a sort the address named outright, and no interface here produces
+    // a directionless sort anyway — Ant Design clears a column and its
+    // direction together.
+    const foreign: TableState = { ...screenDefaults, sort: "customer_name", order: null };
+    const reread = parseTableState(serialiseTableState(foreign, screenDefaults), screenDefaults);
+    expect(reread.sort).toBe("customer_name");
+    expect(reread.order).toBe("ascend");
   });
 });
 ```
@@ -1241,12 +1259,23 @@ export function serialiseTableState(
   // written on its own: changing only the direction of a screen's default sort
   // should put one parameter in the address, not two.
   //
-  // The consequence, pinned by a test rather than left to be discovered: on a
+  // The consequence, pinned by tests rather than left to be discovered: on a
   // screen that declares a default sort, an address cannot say "no sort at
   // all", because an absent parameter already means the default. Clearing the
   // sort returns the reader to that default rather than to an unsorted list.
-  // No screen needs the difference today, and a sentinel value would make every
-  // ordinary link stranger to read for the sake of a case nobody has.
+  //
+  // The same holds for the direction on its own, which is the half easier to
+  // miss: a state naming a column but no direction writes no `order`, and an
+  // absent `order` reads back as the screen's. So a link naming another column
+  // arrives sorted the way this screen sorts. That is the friendlier of the two
+  // answers available — the alternative is to drop a sort the address asked for
+  // by name — and no interface here produces a directionless sort anyway, since
+  // Ant Design clears a column and its direction together.
+  //
+  // Both cases would need a sentinel value to express, which would make every
+  // ordinary link stranger to read for the sake of states nobody has. Page,
+  // size and search have no such gap: they compare with `!==` and nothing else,
+  // so even their empty values survive the round trip.
   if (state.sort && state.sort !== defaults.sort) params.set("sort", state.sort);
   if (state.sort && state.order && state.order !== defaults.order) {
     params.set("order", state.order);
@@ -1259,7 +1288,7 @@ export function serialiseTableState(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/table-url-state.test.ts`
-Expected: PASS — 12 tests
+Expected: PASS — 13 tests
 
 - [ ] **Step 5: Typecheck**
 
