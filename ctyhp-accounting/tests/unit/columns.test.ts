@@ -2,7 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { actionsColumn, dateColumn, moneyColumn, statusColumn, textColumn } from "@/components/ui/columns";
 import { TOKENS } from "@/lib/design/tokens";
-import { toneToken } from "@/lib/design/tone";
+import { ToneBadge, toneToken, type Tone } from "@/lib/design/tone";
 
 /** The props these cells actually carry. See constraint 2 above. */
 interface CellProps {
@@ -10,15 +10,16 @@ interface CellProps {
   children?: ReactNode;
   "aria-label"?: string;
   dateTime?: string;
+  tone?: Tone;
   [key: string]: unknown;
 }
 
 function asElement(node: unknown, what: string): ReactElement<CellProps> {
-  // Matches the parameter type of React's own `isValidElement<P>` exactly, so
-  // the cast lines up with the signature it satisfies rather than approximating
-  // it with `object`, which is narrower and not what is being asserted here.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  if (!isValidElement<CellProps>(node as {} | null | undefined)) {
+  // The cast target is read off `isValidElement` itself rather than written out
+  // as `{} | null | undefined`. Same type, but the literal form trips this
+  // repo's `no-empty-object-type` lint rule, and silencing a rule to restate a
+  // type the compiler can already name is the worse of the two.
+  if (!isValidElement<CellProps>(node as Parameters<typeof isValidElement>[0])) {
     throw new Error(`${what} rendered no element`);
   }
   return node as ReactElement<CellProps>;
@@ -124,8 +125,21 @@ describe("statusColumn", () => {
       tones: { paid: { tone: "positive", label: "Paid" }, void: { tone: "muted", label: "Void" } },
     });
     const cell = asElement(column.render!(row.status, row, 0), "statusColumn");
-    expect(cell.props.style?.color).toBe(toneToken("muted").color);
-    const [icon, label] = pair(cell);
+    // The column's own job is choosing the tone and the wording; the badge owns
+    // how that looks. Asserting the element IS the badge is what keeps the two
+    // from drifting into separate copies of the same markup.
+    expect(cell.type).toBe(ToneBadge);
+    expect(cell.props.tone).toBe("muted");
+    expect(cell.props.children).toBe("Void");
+
+    // And once through the badge, the chosen tone really does reach the colour —
+    // so the composition is proven, not just the wiring.
+    const rendered = asElement(
+      ToneBadge(cell.props as { tone: Tone; children: string }),
+      "ToneBadge",
+    );
+    expect(rendered.props.style?.color).toBe(toneToken("muted").color);
+    const [icon, label] = pair(rendered);
     expect(isValidElement(icon)).toBe(true);
     expect(label).toBe("Void");
   });
@@ -140,7 +154,8 @@ describe("statusColumn", () => {
       tones: { paid: { tone: "positive", label: "Paid" } },
     });
     const cell = asElement(column.render!("void" as Row["status"], row, 0), "statusColumn");
-    expect(pair(cell)[1]).toBe("void");
+    expect(cell.props.tone).toBe("muted");
+    expect(cell.props.children).toBe("void");
   });
 });
 

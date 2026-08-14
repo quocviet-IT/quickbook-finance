@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { ColumnType } from "antd/es/table";
 import { moneyDisplay } from "@/lib/domain/money-display";
 import { TOKENS } from "@/lib/design/tokens";
-import { toneToken, type Tone } from "@/lib/design/tone";
+import { ToneBadge, type Tone } from "@/lib/design/tone";
 
 /**
  * The column builders.
@@ -127,13 +127,13 @@ export function statusColumn<T>(spec: StatusColumnSpec<T>): ColumnType<T> {
       // An unmapped status shows its raw value in the muted tone. Rendering
       // nothing would hide the row's state; this shows the state and the gap
       // in the screen's declaration at the same time.
-      const { color, icon } = toneToken(mapped?.tone ?? "muted");
-      return (
-        <span style={{ color, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          {icon}
-          {mapped?.label ?? value}
-        </span>
-      );
+      //
+      // Rendered through ToneBadge rather than by repeating its markup here.
+      // The two would be identical spans, and two copies of one appearance is
+      // exactly the drift this kit exists to end — a change to the badge that
+      // did not reach the column would leave a table looking unlike every
+      // other place the same status is shown.
+      return <ToneBadge tone={mapped?.tone ?? "muted"}>{mapped?.label ?? value}</ToneBadge>;
     },
   };
 }
