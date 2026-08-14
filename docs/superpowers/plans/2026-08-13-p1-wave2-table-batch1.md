@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the column kit, the URL-state hook and the two-mode `DataTable` contract that the 47 files still using a raw Ant Design `Table` will later migrate onto — without changing a single screen in this batch.
+**Goal:** Build the column kit, the URL-state hook and the two-mode `DataTable` contract that the 49 files still using a raw Ant Design `Table` will later migrate onto — without changing a single screen in this batch.
 
 **Architecture:** The reuse lives in the columns, not the table. Rules that can be decided without JSX — how money reads, what a status tone means, what a URL parameter parses to — are pure modules under `lib/domain/`; the JSX builders are thin wrappers in `components/ui/columns.tsx`. `DataTable` gains a two-mode data contract so a later move to server-side paging changes the data source and not the screen.
 
@@ -43,7 +43,7 @@ not preferences; each one silently produces a wrong result if ignored.
 
 | Fact | Value |
 |---|---|
-| Files using a raw `<Table>` rather than `DataTable` | 47 |
+| Files using a raw `<Table>` rather than `DataTable` | 49 (measured as 47 here; the survey pattern missed `<Table.Summary>` — see Task 7) |
 | `formatMoney` call sites | 119, across 25 files |
 | `align: "right"` written by hand | 173 |
 | `<Tag color="…">` using Ant Design's preset scale | 64 |
@@ -1816,7 +1816,7 @@ const OWN_IMPLEMENTATION = new Set([
 
 /**
  * Matches `<Table `, `<Table>`, `<Table/>`, `<Table` at end of line, and the
- * generic `<Table<Row>` this codebase mostly writes â€” but not `<TableOutlined`,
+ * generic `<Table<Row>` this codebase mostly writes — but not `<TableOutlined`,
  * which is an icon. Built fresh on each call: a `/g` regex carries `lastIndex`
  * between `.test()` calls and would report every other file clean.
  */
@@ -1827,7 +1827,7 @@ function tablePattern(): RegExp {
 /**
  * Screens still rendering Ant Design's Table directly. 49 as of 2026-08-14.
  *
- * Two of these â€” ReportsClient.tsx and BudgetVsActualView.tsx â€” carry no bare
+ * Two of these — ReportsClient.tsx and BudgetVsActualView.tsx — carry no bare
  * `<Table `, only a hand-rolled `summary` built from `<Table.Summary.Row>` and
  * `<Table.Summary.Cell>` bolted onto `DataTable`. That is still Ant Design's
  * Table reached into directly, and it is exactly what ReportTable exists to
@@ -1975,7 +1975,7 @@ pass/fail line is usually at the end.
 
 ```bash
 git add tests/unit/table-adoption.test.ts
-git commit -m "test(table): name the 47 screens still on a raw table, so the list can only shrink"
+git commit -m "test(table): name the 49 screens still on a raw table, so the list can only shrink"
 ```
 
 ---
@@ -1989,6 +1989,6 @@ git commit -m "test(table): name the 47 screens still on a raw table, so the lis
 - [ ] `DataTable` accepts `rows`, `page` or `dataSource`, and throws if given two at once
 - [ ] `ReportTable` renders a summary row and does not paginate
 - [ ] `lib/design/status.tsx` sits on the tone vocabulary, and its six existing tests pass unchanged
-- [ ] The allowlist matches the real inventory at 47 files, its pattern matches the generic `<Table<Row>` form and not `<TableOutlined`, and the guard has been shown to fail when a new raw table appears
+- [ ] The allowlist matches the real inventory at 49 files, its pattern matches the generic `<Table<Row>` form and `<Table.Summary>` but not `<TableOutlined`, and the guard has been shown to fail when a new raw table appears
 - [ ] **No screen changed.** `git diff --stat main..HEAD` touches nothing under `app/` except the guard's own temporary probe, reverted
 - [ ] All four gates green, output pasted verbatim
