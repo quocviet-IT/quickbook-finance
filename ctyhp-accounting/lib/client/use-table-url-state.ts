@@ -13,8 +13,28 @@ export interface TableUrlStateOptions {
   /**
    * `client` when the whole list is already in the browser and the table
    * pages it locally; `server` when changing the page has to fetch.
+   *
+   * Know this before building on it: **in client mode the returned state is
+   * not re-derived after `update`.** The address is written with
+   * `history.replaceState`, which the router deliberately does not see, so
+   * `useSearchParams` never yields a new value and nothing schedules a render.
+   * A table rendering straight from the returned state would sit still while
+   * its own controls were clicked, and no test, lint rule or type would say
+   * why. In client mode this hook seeds a caller's own state and mirrors
+   * changes back into the address; it is not the state a client-mode table
+   * renders from. In server mode the returned state is live, because there the
+   * navigation is real.
    */
   mode?: "client" | "server";
+  /**
+   * The same object on every render — a module-level constant, or memoized.
+   *
+   * An inline object literal is a new identity each render, and both the parse
+   * and the updater below are memoized on that identity, so an inline one
+   * redoes the whole hook every render and quietly undoes the reason this file
+   * exists. Nothing catches it: React's exhaustive-deps rule checks dependency
+   * arrays, not the stability of a custom hook's own arguments.
+   */
   defaults?: TableState;
 }
 
@@ -31,6 +51,18 @@ export interface TableUrlStateOptions {
  * nothing is fetched.
  *
  * Server mode uses `router.replace`, because there the round trip is the point.
+ *
+ * The client-mode trick is load-bearing and narrower than it looks: passing the
+ * existing `window.history.state` back in is what keeps it invisible. Next marks
+ * its own history entries and its patched `replaceState` returns early on them,
+ * so reusing that state reaches the router as a no-op — whereas passing `null`
+ * or `{}` would resync `useSearchParams` and undo the whole point.
+ *
+ * When the first screen migrates in batch 2, that migration is the first real
+ * test of this file, and it has two halves. That no request fires is one.
+ * That the rows actually change when a control is clicked is the other, and it
+ * is the half this file cannot give a client-mode caller by itself — see the
+ * note on `mode` above.
  */
 export function useTableUrlState(
   options: TableUrlStateOptions = {},
