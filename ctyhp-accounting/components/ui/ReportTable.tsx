@@ -5,7 +5,7 @@ import { Table } from "antd";
 import DataTable, { type DataTableProps } from "./DataTable";
 
 export type ReportTableProps<RecordType extends object> = DataTableProps<RecordType> & {
-  /** The figures that close the report, rendered as a sticky summary row. */
+  /** The figures that close the report, rendered by Table.Summary. */
   summary?: (rows: readonly RecordType[]) => ReactNode;
 };
 
@@ -13,9 +13,9 @@ export type ReportTableProps<RecordType extends object> = DataTableProps<RecordT
  * A table that ends in a total.
  *
  * Six reports carry a summary row, and a report without its total is a list of
- * numbers rather than a statement. They also never paginate: a trial balance
- * split across pages does not add up on screen, which is the one thing a reader
- * is there to check.
+ * numbers rather than a statement. Pagination is off unless a caller turns it
+ * on: a trial balance split across pages does not add up on screen, which is
+ * the one thing a reader is there to check.
  *
  * Everything else — the columns, the empty state, the dense rows — is
  * DataTable's, so the two cannot drift apart.

@@ -33,7 +33,7 @@ export function moneyDisplay(
     // Spelled out rather than left to the leading dash. A dash is a single
     // character that several screen readers skip at speed, and a credit read
     // as a debit is the one mistake a ledger must not invite.
-    ariaLabel: sign === "negative" ? `negative ${text.replace("-", "")}` : text,
+    ariaLabel: sign === "negative" ? `negative ${text.replace(/^-/, "")}` : text,
     sign,
   };
 }

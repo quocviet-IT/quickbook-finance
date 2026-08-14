@@ -4,7 +4,11 @@ import { actionsColumn, dateColumn, moneyColumn, statusColumn, textColumn } from
 import { TOKENS } from "@/lib/design/tokens";
 import { ToneBadge, toneToken, type Tone } from "@/lib/design/tone";
 
-/** The props these cells actually carry. See constraint 2 above. */
+/**
+ * The props these cells actually carry. Named because React 19 narrows
+ * `isValidElement` to `props: unknown`, so reading `.props.style` after the
+ * guard needs a type the compiler can carry through it.
+ */
 interface CellProps {
   style?: { color?: string; fontVariantNumeric?: string };
   children?: ReactNode;
@@ -70,6 +74,7 @@ describe("moneyColumn", () => {
       "moneyColumn",
     );
     expect(cell.props.children).toBe("¥123,456");
+    expect(cell.props.style?.color).toBe(TOKENS.money.positive);
   });
 
   it("accepts a fixed currency and fixed places where the screen has only one", () => {

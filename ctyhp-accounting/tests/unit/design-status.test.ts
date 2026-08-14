@@ -31,6 +31,8 @@ describe("status tokens", () => {
   it("gives overdue the danger colour and void a muted one", () => {
     expect(statusToken("overdue").color).toBe(TOKENS.intent.danger);
     expect(statusToken("void").color).toBe(TOKENS.text.secondary);
+    expect(statusToken("posted").color).toBe(TOKENS.intent.success);
+    expect(statusToken("pending").color).toBe(TOKENS.intent.warning);
   });
 
   it("gives each status a distinct label so colour is never the only signal", () => {
