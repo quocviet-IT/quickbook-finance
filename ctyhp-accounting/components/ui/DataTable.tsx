@@ -2,18 +2,28 @@
 
 import type { ReactNode } from "react";
 import { Empty, Table, Typography, type TableProps } from "antd";
+import { resolveTableData, type ServerPage } from "./table-data";
+
+export type { ServerPage };
 
 export type DataTableProps<RecordType extends object> = TableProps<RecordType> & {
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: ReactNode;
+  /** Client mode: the whole list, paged in the browser. */
+  rows?: RecordType[];
+  /** Server mode: one page, and how many there are altogether. */
+  page?: ServerPage<RecordType>;
 };
 
 export default function DataTable<RecordType extends object>({
   emptyTitle = "No records yet",
   emptyDescription,
   emptyAction,
+  rows,
+  page,
   pagination,
+  dataSource,
   locale,
   scroll,
   // Accounting work means comparing many rows at once, so lists default to the
@@ -21,22 +31,15 @@ export default function DataTable<RecordType extends object>({
   size = "small",
   ...props
 }: DataTableProps<RecordType>) {
-  const normalizedPagination =
-    pagination === false
-      ? false
-      : {
-          pageSize: 20,
-          showSizeChanger: true,
-          showTotal: (total: number) => `${total.toLocaleString("en-US")} records`,
-          ...pagination,
-        };
+  const resolved = resolveTableData<RecordType>({ rows, page, dataSource, pagination });
 
   return (
     <div className="accounting-data-table">
       <Table<RecordType>
         {...props}
         size={size}
-        pagination={normalizedPagination}
+        dataSource={resolved.data as RecordType[]}
+        pagination={resolved.pagination}
         scroll={{ x: "max-content", ...scroll }}
         locale={{
           ...locale,
