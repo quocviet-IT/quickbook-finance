@@ -1980,6 +1980,339 @@ git commit -m "test(table): name the 49 screens still on a raw table, so the lis
 
 ---
 
+### Task 8: What the whole-branch review found
+
+**Files:**
+- Modify: `lib/client/use-table-url-state.ts`, `components/ui/columns.tsx`,
+  `components/ui/table-data.ts`, `components/ui/ReportTable.tsx`,
+  `lib/domain/money-display.ts`
+- Modify: `tests/unit/columns.test.ts`, `tests/unit/design-status.test.ts`,
+  `tests/unit/table-adoption.test.ts`
+- Create: `components/ui/table-change.ts`, `tests/unit/table-change.test.ts`
+
+**Interfaces:**
+- Produces: `tableStateFromAntdChange(pagination, sorter): Partial<TableState>`
+
+Added after Tasks 1–7 were each reviewed and approved. **Where this task's code
+touches a block pinned earlier in this plan, this task's version is the one that
+shipped.** Each change below is a finding a task-scoped review could not have
+seen, because each is about how two tasks meet.
+
+- [ ] **Step 1: The address is the live record in client mode**
+
+`lib/client/use-table-url-state.ts` — **the batch's one Critical.**
+
+The file already documents that in client mode the returned state is never
+re-derived: the address is written with `history.replaceState`, the router never
+updates, `useSearchParams` keeps its identity, and the `useMemo` returns its
+first value forever. The consequence recorded at the time was that a table
+rendering from that state would sit still.
+
+That was the smaller half. `update` merges its patch onto that frozen state and
+then rebuilds the **whole** query string from the result, so a second change to
+a different control does not merely fail to appear — it erases the first:
+
+```
+update({ pageSize: 50 })                     ?size=50
+update({ search: "acme" })                   ?q=acme          size=50 is gone
+update({ sort: "due_date", order: "desc" })  ?sort=…&order=…
+update({ page: 2 })                          ?page=2          the sort is gone
+```
+
+The link then disagrees with the screen, which is the exact failure this module
+exists to prevent — "going back, sharing a link and reloading all return the
+reader to what they were looking at" — in the mode that is the default.
+
+Replace the first line of `update`'s body:
+
+```ts
+      // In client mode the address is the only live record. `state` above is
+      // frozen at the last real navigation, because the router never sees the
+      // writes below — so merging onto it would rebuild the query string from
+      // a stale reading and drop whatever an earlier update wrote. Read the
+      // address back instead: it is what those updates actually changed.
+      const current =
+        mode === "client" && typeof window !== "undefined"
+          ? parseTableState(window.location.search, defaults)
+          : state;
+      const next = { ...current, ...patch };
+```
+
+`parseTableState` accepts the leading `?` — `URLSearchParams` strips it.
+
+Server mode keeps using `state`: there the navigation is real, so the state is
+already live and reading the address back would be the same value by a longer
+route.
+
+- [ ] **Step 2: A status a row does not carry**
+
+`components/ui/columns.tsx` — `statusColumn` is the one builder in the file with
+no absent path. `moneyColumn` has a six-clause guard, `dateColumn` has
+`if (!value) return ABSENT`, `textColumn` has `value?.trim() ? value : ABSENT`.
+`statusColumn` has none, so a null status renders `<ToneBadge tone="muted">` with
+`null` for children: a grey icon and **no word at all** — a status communicated
+by icon alone, in the file whose tone module exists to stop exactly that.
+
+This is not the settled `Key<T>` ruling, which is about a `dataIndex` pointing at
+the wrong *type*. This is a correctly typed, legitimately nullable column, and
+the schema has one: `last_run_status` is `RecurringRunStatus | null`, and
+`RecurringClient` renders it today behind an explicit null guard. That screen is
+already on `DataTable` and is a likely early adopter, so adopting `statusColumn`
+would silently delete its guard.
+
+Add, as the first line of `statusColumn`'s `render`:
+
+```ts
+      // A row that carries no status has nothing to say, and the badge would
+      // say it with a grey icon and no word — colour and shape alone, which is
+      // what this tone vocabulary exists to prevent. The em dash is the same
+      // answer the date and text builders give.
+      if (value == null || value === "") return ABSENT;
+```
+
+and a test beside the unmapped-status one:
+
+```ts
+  it("shows an em dash for a row with no status, rather than a wordless icon", () => {
+    const column = statusColumn<Row>({
+      title: "Status",
+      dataIndex: "status",
+      tones: { paid: { tone: "positive", label: "Paid" } },
+    });
+    expect(column.render!(null, row, 0)).toBe("—");
+    expect(column.render!("", row, 0)).toBe("—");
+  });
+```
+
+- [ ] **Step 3: One page size, declared once**
+
+`components/ui/table-data.ts` pins `pageSize: 20` and
+`lib/domain/table-url-state.ts` pins `pageSize: 20`, with nothing keeping them in
+step. A screen declaring `defaults = { ...DEFAULT_TABLE_STATE, pageSize: 50 }`
+and reading `state.pageSize` from the hook still gets a 20-row table, because
+`DataTable` never hears about it. Each task assumed the other owned the number.
+
+Import it instead of repeating it:
+
+```ts
+import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
+```
+
+```ts
+    pageSize: DEFAULT_TABLE_STATE.pageSize,
+```
+
+and add to the module's doc comment:
+
+```
+ * A screen driving its table from the address owns the other half of this:
+ * pass `pagination={{ current: state.page, pageSize: state.pageSize }}`, or the
+ * table pages by this default while the address says something else.
+```
+
+- [ ] **Step 4: The allowlist is a ratchet, not a list**
+
+`tests/unit/table-adoption.test.ts` says the allowlist "shrinks with each
+migration batch", and nothing makes that true. A new screen written with a raw
+`<Table>` turns the guard green again by adding one line, and the count in the
+comment goes stale without a word. Batches 2..n are run by different people, so
+that is a road, not a cliff.
+
+```ts
+  it("only ever shrinks, so a new raw table cannot be waved through", () => {
+    // The allowlist is the outstanding work. Adding to it is how a guard
+    // quietly stops guarding, and it reads in a diff exactly like a migration.
+    // Lowering this number is the migration; raising it has to be argued for.
+    expect(RAW_TABLE.size).toBeLessThanOrEqual(49);
+  });
+```
+
+- [ ] **Step 5: Three one-line corrections**
+
+`lib/domain/money-display.ts` — anchor the strip. `text.replace("-", "")` is
+unanchored and safe only because `formatMoney` hardcodes `en-US`, which never
+puts a hyphen anywhere but a leading minus. `text.replace(/^-/, "")` puts that
+invariant in the code rather than in a report.
+
+`tests/unit/design-status.test.ts` — pin all five statuses, not three. The file
+constrains `overdue` and `void` to a token directly and `draft` transitively;
+`posted` and `pending` are checked for structure only, so either could move
+silently. This module was just re-expressed onto a new foundation, which is
+precisely when that happens:
+
+```ts
+    expect(statusToken("posted").color).toBe(TOKENS.intent.success);
+    expect(statusToken("pending").color).toBe(TOKENS.intent.warning);
+```
+
+`tests/unit/columns.test.ts` — assert the positive branch, which nothing does:
+swapping `TOKENS.money.positive` for the negative token passes all 16 tests
+today. Add to the JPY test, which already renders a positive:
+
+```ts
+    expect(cell.props.style?.color).toBe(TOKENS.money.positive);
+```
+
+And replace the dangling `/** The props these cells actually carry. See
+constraint 2 above. */` — "constraint 2" lives in a brief, not in the committed
+file, so a reader has nothing to look at, and this plan tells batch-2 authors to
+copy this helper:
+
+```ts
+/**
+ * The props these cells actually carry. Named because React 19 narrows
+ * `isValidElement` to `props: unknown`, so reading `.props.style` after the
+ * guard needs a type the compiler can carry through it.
+ */
+```
+
+`components/ui/ReportTable.tsx` — the doc comment over-claims twice. It says the
+summary is "rendered as a sticky summary row", but `<Table.Summary fixed>` only
+sticks when `scroll.y` or `sticky` is set and `DataTable` sets only `scroll.x`;
+and it says reports "never paginate", which is a default a caller can override.
+Say what is true: the summary row is rendered by `Table.Summary`, and pagination
+is off unless a caller turns it on.
+
+- [ ] **Step 6: The adapter, so 47 screens do not each invent one**
+
+Create `components/ui/table-change.ts`. Spec §6 says sorting runs through
+`useTableUrlState`, and nothing in the batch converts Ant Design's `onChange`
+into a `TableState` — so the first sortable column in batch 2 gets a
+hand-written adapter, and the second screen copies it slightly differently.
+That is the duplication this wave exists to end.
+
+```ts
+import type { SorterResult } from "antd/es/table/interface";
+import type { TablePaginationConfig } from "antd/es/table";
+import { DEFAULT_TABLE_STATE, type TableState } from "@/lib/domain/table-url-state";
+
+/**
+ * What a table interaction means, in the vocabulary the address uses.
+ *
+ * Ant Design reports a page change and a sort change through the same
+ * `onChange`, in its own shapes. Converting that in one place is what keeps 47
+ * screens from each writing the same ten lines slightly differently.
+ *
+ * Ant Design is `import type` only, so a test of this file costs no runtime
+ * import — the same reason `table-data.ts` exists separately from `DataTable`.
+ */
+export function tableStateFromAntdChange<T>(
+  pagination: TablePaginationConfig,
+  sorter: SorterResult<T> | SorterResult<T>[],
+): Partial<TableState> {
+  // An array only arrives for a multi-column sort. These screens sort by one
+  // column, so the first entry is the whole story.
+  const single = Array.isArray(sorter) ? sorter[0] : sorter;
+
+  // A sort exists only where Ant Design reports a direction. This is the part
+  // worth stating: clearing a sort does NOT clear `field` — Ant Design empties
+  // `order` and `column` and leaves `field` and `columnKey` behind. Reading the
+  // column name on its own would keep a table sorted for good after the reader
+  // asked it to stop.
+  const order = single?.order ?? null;
+  const column = order ? (single?.columnKey ?? single?.field) : null;
+
+  return {
+    // The page comes from Ant Design rather than resetting to the first, and
+    // that is deliberate: it already recomputes the page when the size changes,
+    // and re-ordering a list does not change how many pages it has. The
+    // return-to-page-one rule exists for a search box, which narrows the list
+    // and does not come through here.
+    page: pagination.current ?? DEFAULT_TABLE_STATE.page,
+    pageSize: pagination.pageSize ?? DEFAULT_TABLE_STATE.pageSize,
+    sort: typeof column === "string" ? column : null,
+    order,
+  };
+}
+```
+
+Create `tests/unit/table-change.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { tableStateFromAntdChange } from "@/components/ui/table-change";
+import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
+
+interface Row {
+  due_date: string;
+}
+
+describe("reading a table interaction as table state", () => {
+  it("takes the page and the page size from the pager", () => {
+    const patch = tableStateFromAntdChange<Row>({ current: 3, pageSize: 50 }, {});
+    expect(patch.page).toBe(3);
+    expect(patch.pageSize).toBe(50);
+  });
+
+  it("takes the sorted column and its direction", () => {
+    const patch = tableStateFromAntdChange<Row>(
+      { current: 1, pageSize: 20 },
+      { columnKey: "due_date", field: "due_date", order: "descend" },
+    );
+    expect(patch.sort).toBe("due_date");
+    expect(patch.order).toBe("descend");
+  });
+
+  it("reads a cleared sort as no sort, even though the column name is still there", () => {
+    // This is the case that decides whether a table can ever stop being
+    // sorted. Ant Design empties `order` and leaves `field` behind, so a
+    // reading based on the column name would sort for good.
+    const patch = tableStateFromAntdChange<Row>(
+      { current: 1, pageSize: 20 },
+      { columnKey: "due_date", field: "due_date", order: undefined },
+    );
+    expect(patch.sort).toBeNull();
+    expect(patch.order).toBeNull();
+  });
+
+  it("takes the first column of a multi-column sort, because these screens sort by one", () => {
+    const patch = tableStateFromAntdChange<Row>({ current: 1, pageSize: 20 }, [
+      { columnKey: "due_date", order: "ascend" },
+      { columnKey: "amount", order: "descend" },
+    ]);
+    expect(patch.sort).toBe("due_date");
+    expect(patch.order).toBe("ascend");
+  });
+
+  it("falls back to the defaults when the pager says nothing", () => {
+    const patch = tableStateFromAntdChange<Row>({}, {});
+    expect(patch.page).toBe(DEFAULT_TABLE_STATE.page);
+    expect(patch.pageSize).toBe(DEFAULT_TABLE_STATE.pageSize);
+  });
+});
+```
+
+- [ ] **Step 7: Correct the record of what this batch deviated from**
+
+This plan lists four deliberate deviations from spec §6 and presents that list as
+complete. Three more exist and were never written down. Add them:
+
+- **`actionsColumn` does not route through `IconActionButton`.** The spec
+  promised it would, inheriting a 44×44 target from wave 3. The shipped shape —
+  `actions: (record) => ReactNode[]` — is the better design, because screens need
+  `Popconfirm`, `Dropdown` and plain buttons too. But it makes the 44×44
+  guarantee each caller's problem on 47 screens, and nothing said so. Remove
+  `IconActionButton` from Task 3's `Consumes` line, which names a dependency the
+  code never had.
+- **A negative amount is marked by sign and colour, not sign and icon.** The
+  spec asked for an icon. The minus sign in the text satisfies the underlying
+  rule — it survives a printout and a colour-blind reader — and an icon in every
+  money cell would be noise. Recorded, not changed.
+- **Sorting runs through `useTableUrlState` only as of Task 8.** Batch 1
+  originally shipped the URL vocabulary for sort with nothing to produce or
+  consume it; Step 6 above closes that.
+
+- [ ] **Step 8: Gates and commit**
+
+Run: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
+Expected: all green. The build binds — `DataTable` and `ReportTable` are on the
+graph of 33 screens.
+
+Commit each concern separately rather than as one wave, so the Critical is
+readable on its own in the log.
+
+---
+
 ## Batch 1 acceptance criteria
 
 - [ ] `moneyColumn` takes its currency **and its decimal places** from the row, aligns right, uses tabular figures, and gives a negative both a colour token and a spoken label
