@@ -91,7 +91,7 @@ exactly as it does now. Migration is batches 2 onward.
 
 ### Deliberate deviations from spec §6
 
-Four, each with its reason. None changes what the wave delivers; they change how
+Seven, each with its reason. None changes what the wave delivers; they change how
 the pieces are cut.
 
 1. **`statusColumn` takes a per-screen tone map, not `statusToken()`.** The spec
@@ -114,6 +114,25 @@ the pieces are cut.
    61 guesses. Batch 2 migrates those screens and can judge each one, so the
    guard lands with the judgement. Batch 1 lands the raw-`<Table>` guard, which
    needs no per-file reasoning.
+
+The last three were not written here when the batch was planned. The
+whole-branch review found them, and found this list presenting itself as
+complete while three more existed — which is the more useful finding of the two.
+
+5. **`actionsColumn` does not route through `IconActionButton`.** The spec
+   promised it would, inheriting a 44×44 target from wave 3. The shipped shape —
+   `actions: (record) => ReactNode[]` — is the better design, because screens
+   need `Popconfirm`, `Dropdown` and plain buttons too. But it makes the 44×44
+   guarantee each caller's problem on 47 screens, and nothing said so until now.
+   Task 3's `Consumes` line named `IconActionButton` as a dependency the code
+   never had; that line has been corrected.
+6. **A negative amount is marked by sign and colour, not sign and icon.** The
+   spec asked for an icon. The minus sign in the text satisfies the underlying
+   rule — it survives a printout and a colour-blind reader — and an icon in every
+   money cell would be noise. Recorded, not changed.
+7. **Sorting runs through `useTableUrlState` only as of Task 8.** Batch 1
+   originally shipped the URL vocabulary for sort with nothing to produce or
+   consume it; Task 8's Step 6 closes that.
 
 **Testing constraint that shapes every test below:** this project has no
 `jsdom`, no `happy-dom` and no `@testing-library/react` — Vitest runs with
@@ -521,7 +540,7 @@ git commit -m "feat(table): give the app one tone vocabulary instead of two"
 - Test: `tests/unit/columns.test.ts`
 
 **Interfaces:**
-- Consumes: `moneyDisplay` (Task 1), `toneToken`/`ToneBadge`/`Tone` (Task 2), `TOKENS` from `@/lib/design/tokens`, `IconActionButton` from `@/components/ui/IconActionButton`
+- Consumes: `moneyDisplay` (Task 1), `toneToken`/`ToneBadge`/`Tone` (Task 2), `TOKENS` from `@/lib/design/tokens`
 - Produces:
   - `moneyColumn<T>(spec): ColumnType<T>`
   - `dateColumn<T>(spec): ColumnType<T>`
