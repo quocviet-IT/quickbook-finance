@@ -129,6 +129,13 @@ describe("table adoption", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("only ever shrinks, so a new raw table cannot be waved through", () => {
+    // The allowlist is the outstanding work. Adding to it is how a guard
+    // quietly stops guarding, and it reads in a diff exactly like a migration.
+    // Lowering this number is the migration; raising it has to be argued for.
+    expect(RAW_TABLE.size).toBeLessThanOrEqual(49);
+  });
+
   it("lists no file that has already been migrated", () => {
     // Keeps the list honest. Migrate a screen and forget to delete its entry and
     // this fails, so the list cannot inflate into a record of work already done.
