@@ -79,7 +79,16 @@ export function useTableUrlState(
 
   const update = useCallback(
     (patch: Partial<TableState>) => {
-      const next = { ...state, ...patch };
+      // In client mode the address is the only live record. `state` above is
+      // frozen at the last real navigation, because the router never sees the
+      // writes below — so merging onto it would rebuild the query string from
+      // a stale reading and drop whatever an earlier update wrote. Read the
+      // address back instead: it is what those updates actually changed.
+      const current =
+        mode === "client" && typeof window !== "undefined"
+          ? parseTableState(window.location.search, defaults)
+          : state;
+      const next = { ...current, ...patch };
       // Any change to what is being shown returns to the first page. Leaving
       // the reader on page 7 of a result set that now has two pages shows them
       // an empty table and no reason for it.
