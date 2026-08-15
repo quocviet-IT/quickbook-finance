@@ -150,13 +150,33 @@ And one round trip that decides whether any of this is real: export a company
 that has data, restore it into a new one, and compare control totals on both
 sides. Without that test the feature is writing files to disk and hoping.
 
-## Open question, to be measured before the plan is final
+## The measurement that decides the job's shape
 
-The largest company reads 28,273 rows through PostgREST in pages of 1,000 —
-roughly 30 round trips, plus compression. Whether that fits inside a Vercel
-function's time limit is **not yet known**. It will be measured against a real
-export before the plan commits to a shape. If it does not fit, the job splits by
-table or moves to a background run; that changes the plan, not this design.
+Measured against the real company on 2026-08-15, reading every exported table
+through PostgREST in pages of 1,000:
+
+    28,549 rows · 42 round trips · 18.6 seconds · 10.2 MB of raw JSON
+
+That is **one company**, and it is already longer than a Vercel function's
+default limit. The limit is raisable, but a job that walks every company in one
+invocation is a design with an expiry date: this company holds three years of
+books and will not get smaller, and it is not the only company that will grow.
+
+So the job claims work rather than sweeping it. Each run takes the companies
+whose last snapshot is oldest, up to a batch limit, and leaves the rest for the
+next run — every company is covered within a few nights, and no invocation can
+be made to run long by one company's growth.
+
+This is not a new pattern here. `automation-jobs.ts` already states it outright:
+"Every quota below is per company. A busy company must not spend the budget",
+and the provisioning queue already "stops after the batch limit even if more are
+waiting". The backup job follows the shape the repository already uses.
+
+One consequence to accept deliberately: a company is not guaranteed a snapshot
+*every* night, only within the cycle. Given that snapshots are skipped anyway
+when nothing changed, and that this exists to recover from a mistake days rather
+than minutes old, that is the right trade. The screen shows each company's last
+snapshot date, so a company falling behind is visible rather than assumed.
 
 ## Explicitly out of scope
 
