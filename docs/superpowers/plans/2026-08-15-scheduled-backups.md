@@ -660,7 +660,16 @@ git commit -m "feat(backup): record every night a snapshot was considered"
 - Test: `tests/unit/backup-service.test.ts`
 
 **Interfaces:**
-- Consumes: `snapshotHash`, `shouldSkip`, `expiredBackups` (Task 2); `collectExportDatasets`, `readControlTotals`, `readSchemaVersion` (existing).
+- Consumes: `snapshotDescription`, `snapshotHash`, `shouldSkip`, `expiredBackups` (Task 2); `collectExportDatasets`, `readControlTotals`, `readSchemaVersion` (existing).
+- **Two changes Task 2 made that this task's code below predates.** `snapshotHash`
+  is `async` — it reuses the existing `sha256Hex`, so it must be awaited. And the
+  manifest is reduced to `{path: sha256}` by `snapshotDescription(manifest)`,
+  which is the one place `generatedAt` and the actor are excluded. **Call it —
+  do not build that record inline.** Nothing in the type system stops you: it
+  takes a plain `Record<string, string>`, so a hand-built object of the same
+  shape compiles. It would also silently reintroduce the defect the whole
+  feature turns on, because a hash that moves every night makes `shouldSkip`
+  never fire, and that failure raises no error at all.
 - Produces:
   - `BACKUP_BUCKET = "onebook-backups"`
   - `BACKUP_KEEP = 30`
@@ -789,7 +798,7 @@ knows how to build, so the button and the job cannot drift apart.
 ```ts
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { expiredBackups, shouldSkip, snapshotHash } from "@/lib/domain/backup";
+import { expiredBackups, shouldSkip, snapshotDescription, snapshotHash } from "@/lib/domain/backup";
 import {
   collectExportDatasets,
   readControlTotals,
@@ -819,7 +828,7 @@ export async function takeCompanyBackup(
   const controlTotals = await readControlTotals(sb, today);
   const schemaVersion = await readSchemaVersion(sb);
   const archive = buildExportArchive({ datasets, controlTotals, schemaVersion, asOf: today });
-  const hash = snapshotHash(archive.fileHashes);
+  const hash = await snapshotHash(snapshotDescription(archive.manifest));
 
   const previous = await sb
     .from("acc_backup")
