@@ -86,6 +86,8 @@ function companyClient(
       in: () => chain,
       order: () => chain,
       limit: () => chain,
+      // The hash lookup reads in pages; these fixtures fit in one.
+      range: () => chain,
       then: (resolve: (value: unknown) => unknown) =>
         Promise.resolve(
           table === "acc_account"

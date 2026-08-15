@@ -79,6 +79,10 @@ function companyClient(
       in: () => chain,
       order: () => chain,
       limit: () => chain,
+      // The hash lookup reads in pages, because PostgREST caps a select at a
+      // thousand rows without saying so. These fixtures are far short of a
+      // page, so one call answers and the loop ends there.
+      range: () => chain,
       then: (resolve: (value: unknown) => unknown) =>
         Promise.resolve(
           table === "acc_account"

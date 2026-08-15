@@ -88,11 +88,41 @@ async function bankTypeAccountIds(sb: SupabaseClient): Promise<Set<string>> {
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
 
-/** Hashes of what is already here, so a file imported twice adds nothing. */
-async function existingHashes(sb: SupabaseClient): Promise<Set<string>> {
-  const { data, error } = await sb.from("acc_bank_transaction").select("raw_hash");
-  if (error) throw new DataImportError(error.message);
-  return new Set(((data ?? []) as { raw_hash: string }[]).map((row) => row.raw_hash));
+/** How many rows PostgREST will return before it stops and says nothing. */
+const HASH_PAGE = 1000;
+
+/**
+ * Every bank line already in the books, read in pages.
+ *
+ * PostgREST caps a select at a thousand rows and reports no error when it does,
+ * so reading this in one go quietly stopped knowing about anything past the
+ * thousandth line. Measured on a real company: 1,466 rows in the table, 1,000
+ * visible, 466 invisible.
+ *
+ * What that costs is a silent shortfall rather than an error. A row the preview
+ * does not recognise as already imported is offered for import; the unique index
+ * on (bank_account_id, raw_hash) then refuses it on the server and the row is
+ * skipped whole, ledger included. The screen promises a number of rows, fewer
+ * arrive, and the difference surfaces weeks later as a balance that does not
+ * agree with the books it was brought across from.
+ */
+// Exported for the test rather than for any caller: the failure this guards
+// against only appears past a thousand rows, which is more than a test would
+// build through the public function.
+export async function existingHashes(sb: SupabaseClient): Promise<Set<string>> {
+  const hashes = new Set<string>();
+  for (let from = 0; ; from += HASH_PAGE) {
+    const { data, error } = await sb
+      .from("acc_bank_transaction")
+      .select("raw_hash")
+      .range(from, from + HASH_PAGE - 1);
+    if (error) throw new DataImportError(error.message);
+    const rows = (data ?? []) as { raw_hash: string }[];
+    for (const row of rows) hashes.add(row.raw_hash);
+    // A short page is the last page. Asking again would cost a round trip to
+    // be told the same thing.
+    if (rows.length < HASH_PAGE) return hashes;
+  }
 }
 
 export async function previewTransactionImport(
