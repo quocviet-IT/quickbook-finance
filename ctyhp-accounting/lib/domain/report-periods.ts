@@ -5,6 +5,7 @@
  * date code goes wrong: the prior month end of 31 March is 28 February, and a
  * year earlier than 29 February 2024 is 28 February 2023.
  */
+import { periodColumnLabel } from "./period-label";
 
 export const COMPARISON_BASES = [
   "prior_month",
@@ -123,4 +124,75 @@ export function trailingYearEnds(asOf: string, count: number): TrendColumn[] {
     columns.push({ date, label: back === 0 ? `${asOf}` : String(columnYear) });
   }
   return columns;
+}
+
+// --- Splitting a range into period columns (P&L "display columns by") ------
+
+/**
+ * One column of a range-based report: a slice of the requested date range,
+ * plus the heading it reads under.
+ */
+export interface RangeColumn {
+  from: string;
+  to: string;
+  label: string;
+}
+
+/** The calendar day after an ISO date, crossing month and year ends. */
+function nextDay(date: string): string {
+  const { year, month, day } = parts(date);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return iso(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+}
+
+/**
+ * Splits [from, to] into columns of `monthsPerUnit` calendar months.
+ *
+ * Columns snap to calendar boundaries — a "by quarter" split groups Apr-May-Jun
+ * together whatever day the report happens to run on, the same grouping a
+ * reader would draw by hand — rather than counting `monthsPerUnit` months
+ * forward from `from`. Only the first and last columns are ever partial,
+ * clipped to whatever range was actually asked for; every column in between
+ * is a whole unit. A range that is not a whole number of units therefore
+ * costs nothing extra: it just leaves the two end columns short, and
+ * `periodColumnLabel` already says so by falling back to the literal dates
+ * for whichever column that happens to.
+ */
+function splitByCalendarUnit(from: string, to: string, monthsPerUnit: number): RangeColumn[] {
+  if (new Date(`${to}T00:00:00.000Z`).getTime() < new Date(`${from}T00:00:00.000Z`).getTime()) {
+    throw new Error("Report end date must not be before its start date");
+  }
+
+  const columns: RangeColumn[] = [];
+  let columnFrom = from;
+  let cursor = (() => {
+    const { year, month } = parts(from);
+    return year * 12 + (month - 1);
+  })();
+
+  // A day can only ever belong to one column, so walking forward and clipping
+  // each unit to `to` cannot skip or double-count a day even when `from` and
+  // `to` land mid-unit.
+  for (;;) {
+    const unitStart = Math.floor(cursor / monthsPerUnit) * monthsPerUnit;
+    const unitEndAbs = unitStart + monthsPerUnit - 1;
+    const unitEndDate = monthEnd(Math.floor(unitEndAbs / 12), (unitEndAbs % 12) + 1);
+    const columnTo = unitEndDate < to ? unitEndDate : to;
+    columns.push({ from: columnFrom, to: columnTo, label: periodColumnLabel(columnFrom, columnTo) });
+    if (columnTo === to) break;
+    columnFrom = nextDay(columnTo);
+    const { year, month } = parts(columnFrom);
+    cursor = year * 12 + (month - 1);
+  }
+  return columns;
+}
+
+/** Splits a date range into one column per calendar month. */
+export function monthlyColumns(from: string, to: string): RangeColumn[] {
+  return splitByCalendarUnit(from, to, 1);
+}
+
+/** Splits a date range into one column per calendar quarter (Jan–Mar, Apr–Jun, …). */
+export function quarterlyColumns(from: string, to: string): RangeColumn[] {
+  return splitByCalendarUnit(from, to, 3);
 }

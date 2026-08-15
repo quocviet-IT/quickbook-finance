@@ -6,9 +6,13 @@ import {
   buildBudgetVsActual,
   buildStatementOfEquity,
   compareReportLines,
+  percentOfIncome,
+  pnlTrendRows,
   previousMonthEnd,
   previousPeriodRange,
+  sumProfitAndLoss,
   type LedgerBalance,
+  type ProfitAndLoss,
 } from "@/lib/domain/reports";
 
 // Cumulative balances after: issue $378.88 invoice (sub 350, tax 28.88) and
@@ -132,6 +136,90 @@ describe("Budget vs Actual", () => {
     expect(report.lines.find((line) => line.accountId === "expense")).toMatchObject({
       variance: 10000,
       favorable: false,
+    });
+  });
+});
+
+describe("percentOfIncome", () => {
+  it("expresses a figure as a percentage of that column's income", () => {
+    expect(percentOfIncome(25000, 100000)).toBe(25);
+  });
+
+  it("is null rather than Infinity or NaN when there is no income to divide by", () => {
+    expect(percentOfIncome(5000, 0)).toBeNull();
+    expect(percentOfIncome(0, 0)).toBeNull();
+    expect(percentOfIncome(-5000, 0)).toBeNull();
+  });
+
+  it("still divides cleanly when the column's income is negative", () => {
+    // A period where refunds or write-offs outran sales. The formula needs no
+    // special case for this: the sign is simply part of what happened.
+    expect(percentOfIncome(20000, -50000)).toBe(-40);
+  });
+
+  it("reports 100% for an income line that is the whole of income", () => {
+    expect(percentOfIncome(100000, 100000)).toBe(100);
+  });
+});
+
+describe("multi-period profit and loss", () => {
+  const jan: LedgerBalance[] = [
+    { accountId: "4000", accountCode: "4000", name: "Sales", accountType: "income", debitBase: 0, creditBase: 10000 },
+    { accountId: "6000", accountCode: "6000", name: "Rent", accountType: "expense", debitBase: 4000, creditBase: 0 },
+  ];
+  const feb: LedgerBalance[] = [
+    { accountId: "4000", accountCode: "4000", name: "Sales", accountType: "income", debitBase: 0, creditBase: 15000 },
+    { accountId: "6000", accountCode: "6000", name: "Rent", accountType: "expense", debitBase: 4000, creditBase: 0 },
+    { accountId: "6100", accountCode: "6100", name: "Advertising", accountType: "expense", debitBase: 2000, creditBase: 0 },
+  ];
+  const periods: ProfitAndLoss[] = [buildProfitAndLoss(jan), buildProfitAndLoss(feb)];
+
+  describe("pnlTrendRows", () => {
+    it("lays income, expenses, gross profit and net income out as one column per period", () => {
+      const rows = pnlTrendRows(periods);
+      const sales = rows.find((r) => r.label.startsWith("4000"))!;
+      expect(sales.amounts).toEqual([10000, 15000]);
+      const rent = rows.find((r) => r.label.startsWith("6000"))!;
+      expect(rent.amounts).toEqual([4000, 4000]);
+      const netIncome = rows.find((r) => r.key === "net-income")!;
+      expect(netIncome.amounts).toEqual([6000, 9000]);
+    });
+
+    it("keeps an expense that only appears in one period, as zero in the other", () => {
+      const advertising = pnlTrendRows(periods).find((r) => r.label.startsWith("6100"))!;
+      expect(advertising.amounts, "an expense that started in February must not vanish from January").toEqual([0, 2000]);
+    });
+
+    it("has nothing to lay out for no periods", () => {
+      expect(pnlTrendRows([])).toEqual([]);
+    });
+  });
+
+  describe("sumProfitAndLoss", () => {
+    it("adds accounts across periods to build the Total column", () => {
+      const total = sumProfitAndLoss(periods);
+      expect(total.income.total).toBe(25000);
+      expect(total.operatingExpenses.total).toBe(10000);
+      expect(total.netIncome).toBe(15000);
+      expect(total.operatingExpenses.lines.find((l) => l.accountCode === "6100")!.amount).toBe(2000);
+    });
+
+    it("gives the same totals a single query across the whole range would give", () => {
+      // A P&L account carries no opening balance, so summing two disjoint
+      // months' activity has to equal one query spanning both months — this
+      // is the fact that lets the Total column skip an extra query entirely.
+      const wholeRange = buildProfitAndLoss([...jan, ...feb]);
+      const summed = sumProfitAndLoss(periods);
+      expect(summed.netIncome).toBe(wholeRange.netIncome);
+      expect(summed.income.total).toBe(wholeRange.income.total);
+      expect(summed.operatingExpenses.total).toBe(wholeRange.operatingExpenses.total);
+    });
+
+    it("is all zero for no periods", () => {
+      const empty = sumProfitAndLoss([]);
+      expect(empty.income.total).toBe(0);
+      expect(empty.netIncome).toBe(0);
+      expect(empty.income.lines).toEqual([]);
     });
   });
 });

@@ -4,9 +4,11 @@ import {
   comparisonBasisLabel,
   comparisonDate,
   monthEnd,
+  monthlyColumns,
   priorMonthEnd,
   priorQuarterEnd,
   priorYearEnd,
+  quarterlyColumns,
   sameDayLastYear,
   trailingMonthEnds,
   trailingYearEnds,
@@ -115,6 +117,76 @@ describe("trailingYearEnds", () => {
       "2026-06-30",
     ]);
     expect(columns.map((column) => column.label)).toEqual(["2024", "2025", "2026-06-30"]);
+  });
+});
+
+describe("monthlyColumns", () => {
+  it("gives one column per calendar month for a whole year", () => {
+    const columns = monthlyColumns("2026-01-01", "2026-12-31");
+    expect(columns).toHaveLength(12);
+    expect(columns[0]).toEqual({ from: "2026-01-01", to: "2026-01-31", label: "Jan 2026" });
+    expect(columns[11]).toEqual({ from: "2026-12-01", to: "2026-12-31", label: "Dec 2026" });
+  });
+
+  it("clips only the first and last column when the range is not whole months", () => {
+    // A reader who picks 15 Jan to 10 Apr by hand still gets one column per
+    // month in between; only the two ends are short, and they say so by
+    // falling back to their literal dates rather than claiming a month they
+    // do not fully cover.
+    const columns = monthlyColumns("2026-01-15", "2026-04-10");
+    expect(columns).toEqual([
+      { from: "2026-01-15", to: "2026-01-31", label: "2026-01-15 – 2026-01-31" },
+      { from: "2026-02-01", to: "2026-02-28", label: "Feb 2026" },
+      { from: "2026-03-01", to: "2026-03-31", label: "Mar 2026" },
+      { from: "2026-04-01", to: "2026-04-10", label: "2026-04-01 – 2026-04-10" },
+    ]);
+  });
+
+  it("gives a single column for a range inside one month", () => {
+    expect(monthlyColumns("2026-06-05", "2026-06-20")).toEqual([
+      { from: "2026-06-05", to: "2026-06-20", label: "2026-06-05 – 2026-06-20" },
+    ]);
+  });
+
+  it("crosses a year boundary without losing a day", () => {
+    const columns = monthlyColumns("2025-12-01", "2026-02-28");
+    expect(columns.map((c) => c.label)).toEqual(["Dec 2025", "Jan 2026", "Feb 2026"]);
+  });
+
+  it("rejects a range that ends before it starts", () => {
+    expect(() => monthlyColumns("2026-03-01", "2026-01-01")).toThrow(
+      "Report end date must not be before its start date",
+    );
+  });
+});
+
+describe("quarterlyColumns", () => {
+  it("gives one column per calendar quarter for a whole year", () => {
+    const columns = quarterlyColumns("2026-01-01", "2026-12-31");
+    expect(columns).toEqual([
+      { from: "2026-01-01", to: "2026-03-31", label: "Q1 2026" },
+      { from: "2026-04-01", to: "2026-06-30", label: "Q2 2026" },
+      { from: "2026-07-01", to: "2026-09-30", label: "Q3 2026" },
+      { from: "2026-10-01", to: "2026-12-31", label: "Q4 2026" },
+    ]);
+  });
+
+  it("snaps to calendar quarters rather than counting three months from the start", () => {
+    // Starting mid-quarter must not invent a "Q1" that is missing January: the
+    // first column is Feb-Mar only, and says so instead of overclaiming.
+    const columns = quarterlyColumns("2026-02-01", "2026-11-30");
+    expect(columns).toEqual([
+      { from: "2026-02-01", to: "2026-03-31", label: "Feb–Mar 2026" },
+      { from: "2026-04-01", to: "2026-06-30", label: "Q2 2026" },
+      { from: "2026-07-01", to: "2026-09-30", label: "Q3 2026" },
+      { from: "2026-10-01", to: "2026-11-30", label: "Oct–Nov 2026" },
+    ]);
+  });
+
+  it("rejects a range that ends before it starts", () => {
+    expect(() => quarterlyColumns("2026-06-30", "2026-01-01")).toThrow(
+      "Report end date must not be before its start date",
+    );
   });
 });
 

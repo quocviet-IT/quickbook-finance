@@ -511,3 +511,116 @@ export function balanceTrendRows(sheets: readonly BalanceSheet[]): BalanceTrendR
     },
   ];
 }
+
+// --- Multi-period profit and loss --------------------------------------------
+
+/** The trend-row shape is not balance-sheet-specific — reused as-is for P&L. */
+export type PnlTrendRow = BalanceTrendRow;
+
+/**
+ * Accounts down the side, one column per period across the top — the profit
+ * and loss counterpart to `balanceTrendRows`. Gross Profit and Net Income get
+ * their own rows because those are the two figures a reader scans a column
+ * for first, the same way the single-period P&L view surfaces them as totals
+ * rather than making the reader add up sections by hand.
+ */
+export function pnlTrendRows(pnls: readonly ProfitAndLoss[]): PnlTrendRow[] {
+  if (pnls.length === 0) return [];
+  return [
+    ...trendSection("income", pnls.map((p) => p.income), pnls.map((p) => p.income.total), "Total Income"),
+    ...trendSection(
+      "cogs",
+      pnls.map((p) => p.costOfGoodsSold),
+      pnls.map((p) => p.costOfGoodsSold.total),
+      "Total Cost of Goods Sold",
+    ),
+    {
+      key: "gross-profit",
+      label: "Gross Profit",
+      kind: "total",
+      amounts: pnls.map((p) => p.grossProfit),
+    },
+    ...trendSection(
+      "opex",
+      pnls.map((p) => p.operatingExpenses),
+      pnls.map((p) => p.operatingExpenses.total),
+      "Total Operating Expenses",
+    ),
+    ...trendSection(
+      "other_income",
+      pnls.map((p) => p.otherIncome),
+      pnls.map((p) => p.otherIncome.total),
+      "Total Other Income",
+    ),
+    ...trendSection(
+      "other_expense",
+      pnls.map((p) => p.otherExpenses),
+      pnls.map((p) => p.otherExpenses.total),
+      "Total Other Expenses",
+    ),
+    {
+      key: "net-income",
+      label: "Net Income",
+      kind: "total",
+      amounts: pnls.map((p) => p.netIncome),
+    },
+  ];
+}
+
+/**
+ * Adds several profit and loss statements together, account by account.
+ *
+ * This is what a "Total" column means next to a period trend. A P&L account
+ * only ever holds the activity posted within the date range it was queried
+ * for and carries no opening balance, so the total for the whole range is
+ * exactly the sum of the period figures — unlike a balance sheet, where
+ * summing snapshots would double-count everything each later one already
+ * includes, which is why `balanceTrendRows` has no Total column at all.
+ */
+export function sumProfitAndLoss(pnls: readonly ProfitAndLoss[]): ProfitAndLoss {
+  const sumSection = (key: string, title: string, sections: readonly ReportSection[]): ReportSection => {
+    const order: string[] = [];
+    const byKey = new Map<string, ReportSection["lines"][number]>();
+    for (const section of sections) {
+      for (const line of section.lines) {
+        const lineKey = line.accountId ?? `${line.accountCode}:${line.name}`;
+        const existing = byKey.get(lineKey);
+        if (existing) {
+          existing.amount += line.amount;
+        } else {
+          byKey.set(lineKey, { ...line });
+          order.push(lineKey);
+        }
+      }
+    }
+    const lines = order.map((lineKey) => byKey.get(lineKey)!);
+    return { key, title, lines, total: lines.reduce((sum, l) => sum + l.amount, 0) };
+  };
+
+  const income = sumSection("income", "Income", pnls.map((p) => p.income));
+  const costOfGoodsSold = sumSection("cogs", "Cost of Goods Sold", pnls.map((p) => p.costOfGoodsSold));
+  const operatingExpenses = sumSection("opex", "Operating Expenses", pnls.map((p) => p.operatingExpenses));
+  const otherIncome = sumSection("other_income", "Other Income", pnls.map((p) => p.otherIncome));
+  const otherExpenses = sumSection("other_expense", "Other Expenses", pnls.map((p) => p.otherExpenses));
+  const grossProfit = income.total - costOfGoodsSold.total;
+  const netIncome = grossProfit - operatingExpenses.total + otherIncome.total - otherExpenses.total;
+  return { income, costOfGoodsSold, grossProfit, operatingExpenses, otherIncome, otherExpenses, netIncome };
+}
+
+/**
+ * A figure as a percentage of a column's total income — QuickBooks' "% of
+ * Income". Display-only: nothing here is ever stored, and the two arguments
+ * are plain minor-unit integers so the ratio is exact regardless of currency
+ * decimals.
+ *
+ * `null`, not `Infinity` or `NaN`, when income is zero: a column with no
+ * income has no scale to measure anything against, and a percentage nobody
+ * can act on is worse than an admission that there isn't one. A negative
+ * income figure (a period where refunds or write-offs outran sales) is not
+ * special-cased — the division is still well-defined and the sign is simply
+ * part of what happened that period.
+ */
+export function percentOfIncome(amountMinor: number, incomeMinor: number): number | null {
+  if (incomeMinor === 0) return null;
+  return (amountMinor / incomeMinor) * 100;
+}
