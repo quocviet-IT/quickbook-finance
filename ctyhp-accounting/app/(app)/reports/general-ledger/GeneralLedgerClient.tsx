@@ -125,17 +125,23 @@ export default function GeneralLedgerClient({
             loading={loading}
             emptyTitle="No ledger activity"
             emptyDescription="No posted entries were found for this account and date range."
-            // Every column but the memo is given a width, so the three money
-            // columns keep their place at the right edge. Without this the memo
-            // sets the table's width on its own: a bank memo carries the whole
-            // wire description, several hundred characters of it, and the
-            // amounts were pushed off the side of the screen. Zooming out did
-            // not help, because the memo simply took the extra room too — which
-            // is what a reader reported.
+            // The table is held to the width of the page rather than the width
+            // of its contents. `DataTable` asks for `x: "max-content"` by
+            // default, which suits a table whose columns all need their room —
+            // but here a bank memo carries the entire wire description, several
+            // hundred characters of it, so max-content meant the memo decided
+            // how wide the table was and pushed Debit, Credit and Running off
+            // the side of the screen. Zooming out did not help, because the
+            // memo took the extra room too.
             //
-            // `ellipsis` cuts the memo to its column and keeps the full text in
-            // the cell's title, so it is still there on hover. It also switches
-            // the table to a fixed layout, which is what makes the widths hold.
+            // Widths and `ellipsis` alone did not fix this: with max-content
+            // still asked for, a column left to size itself is free to grow,
+            // whatever the other columns are pinned to. Giving up the
+            // horizontal scroll is what makes the widths bind.
+            //
+            // `ellipsis` cuts the memo to its column and keeps the whole text in
+            // the cell's title, so it is still readable on hover.
+            scroll={{ x: undefined }}
             columns={[
               { title: "Date", dataIndex: "entryDate", width: 110 },
               {
