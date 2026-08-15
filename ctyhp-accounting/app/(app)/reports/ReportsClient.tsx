@@ -31,6 +31,7 @@ import BalanceSheetTrendView, {
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { formatMoney } from "@/lib/format";
 import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
+import { periodColumnLabel } from "@/lib/domain/period-label";
 import { fromMinor } from "@/lib/domain/money";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
@@ -662,8 +663,8 @@ function PnlComparisonView({
       : `${currentFrom} to ${currentTo}`,
     currencyCode: baseCurrency,
     baseDecimals,
-    currentLabel: "Current period",
-    priorLabel: "Prior period",
+    currentLabel: periodColumnLabel(currentFrom, currentTo),
+    priorLabel: periodColumnLabel(priorRange.from, priorRange.to),
     rows: comparisonRows,
     showPrior,
   });
@@ -681,8 +682,13 @@ function PnlComparisonView({
         numbers={
           <ComparisonTable
             rows={comparisonRows}
-            currentLabel="Current"
-            priorLabel="Prior"
+            // The periods themselves, not "Current" and "Prior". Those two say
+            // only which came first, leaving the reader to carry the dates from
+            // the subtitle in their head — and a printed page loses even that.
+            // The balance sheet beside this one has always headed its columns
+            // with the date they were struck at.
+            currentLabel={periodColumnLabel(currentFrom, currentTo)}
+            priorLabel={periodColumnLabel(priorRange.from, priorRange.to)}
             currentRange={{ from: currentFrom, to: currentTo }}
             priorRange={priorRange}
             money={money}
