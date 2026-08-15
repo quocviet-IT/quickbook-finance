@@ -125,11 +125,23 @@ export default function GeneralLedgerClient({
             loading={loading}
             emptyTitle="No ledger activity"
             emptyDescription="No posted entries were found for this account and date range."
+            // Every column but the memo is given a width, so the three money
+            // columns keep their place at the right edge. Without this the memo
+            // sets the table's width on its own: a bank memo carries the whole
+            // wire description, several hundred characters of it, and the
+            // amounts were pushed off the side of the screen. Zooming out did
+            // not help, because the memo simply took the extra room too — which
+            // is what a reader reported.
+            //
+            // `ellipsis` cuts the memo to its column and keeps the full text in
+            // the cell's title, so it is still there on hover. It also switches
+            // the table to a fixed layout, which is what makes the widths hold.
             columns={[
-              { title: "Date", dataIndex: "entryDate" },
+              { title: "Date", dataIndex: "entryDate", width: 110 },
               {
                 title: "Entry",
                 dataIndex: "entryNumber",
+                width: 130,
                 render: (number, row) => (
                   <Link href={`/reports/journal?entry=${row.entryId}`}>{number}</Link>
                 ),
@@ -137,15 +149,26 @@ export default function GeneralLedgerClient({
               {
                 title: "Source",
                 dataIndex: "sourceType",
+                width: 120,
                 render: (source, row) => {
                   const href = sourceHref(row.sourceType, row.sourceId);
                   return href ? <Link href={href}>{source}</Link> : source;
                 },
               },
-              { title: "Memo", dataIndex: "memo" },
-              { title: "Debit", align: "right", render: (_, r) => (r.debitMinor ? fmt(r.debitMinor) : "") },
-              { title: "Credit", align: "right", render: (_, r) => (r.creditMinor ? fmt(r.creditMinor) : "") },
-              { title: "Running", align: "right", render: (_, r) => fmt(r.runningMinor) },
+              { title: "Memo", dataIndex: "memo", ellipsis: true },
+              {
+                title: "Debit",
+                align: "right",
+                width: 140,
+                render: (_, r) => (r.debitMinor ? fmt(r.debitMinor) : ""),
+              },
+              {
+                title: "Credit",
+                align: "right",
+                width: 140,
+                render: (_, r) => (r.creditMinor ? fmt(r.creditMinor) : ""),
+              },
+              { title: "Running", align: "right", width: 150, render: (_, r) => fmt(r.runningMinor) },
             ]}
           />
         </>
