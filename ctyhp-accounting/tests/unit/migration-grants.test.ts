@@ -61,7 +61,43 @@ function tablesCreatedIn(body: string): string[] {
 }
 
 /**
- * Whether some grant or revoke statement in this file names `table`.
+ * The role list after a grant statement's `to`, with `public` and `anon` set
+ * aside.
+ *
+ * Those two are never a legitimate holder of access to one of these tables:
+ * every table in scope sits behind RLS keyed to a signed-in company member
+ * (0080's whole reason for existing is to make that the default, not an
+ * opt-in), so a grant naming only `public`/`anon` is not a developer
+ * connecting the table to its consumers — it is the same missing-grant defect
+ * wearing grant-shaped SQL. Deliberately not pinned to `authenticated` and
+ * `service_role` by name: those are the two roles every table in this
+ * codebase happens to use today (checked against 0081, 0098, 0101, 0102,
+ * 0114), but enumerating them here would make this test start failing the
+ * day a legitimate third role — a read-only reporting role, say — is
+ * introduced. "Not public, not anon" is the invariant this test can actually
+ * defend without being rewritten each time a new table's access pattern
+ * varies.
+ */
+function grantsUsableRole(statement: string): boolean {
+  const match = /\bto\s+([\s\S]+)$/i.exec(statement);
+  if (!match) return false;
+  return match[1]
+    .split(",")
+    .map((role) => role.trim().toLowerCase())
+    .some((role) => role.length > 0 && role !== "public" && role !== "anon");
+}
+
+/**
+ * Whether some `grant` statement in this file gives `table` to a role that
+ * can actually reach it.
+ *
+ * A `revoke` naming the table is not evidence of anything: 0080 already
+ * revokes everything from every future table by default, so a migration that
+ * only revokes leaves the table exactly as unreachable as one that says
+ * nothing at all — and a table that ships with `revoke all ... from public,
+ * anon` reads, at a glance, like the developer handled grants, when nothing
+ * was actually granted to a role that can use it. Only a `grant` counts, and
+ * only when grantsUsableRole says the role list is more than `public`/`anon`.
  *
  * A table grant in this codebase is always a top-level `grant`/`revoke`
  * statement, one per line, never assembled inside a `do $$ ... $$` block —
@@ -82,9 +118,10 @@ function grantsName(body: string, table: string): boolean {
   return body
     .split(";")
     .map((statement) => statement.trim())
-    .filter((statement) => /^(grant|revoke)\s/i.test(statement))
+    .filter((statement) => /^grant\s/i.test(statement))
     .filter((statement) => !/\bfunction\b/i.test(statement) && !/\bsequence\b/i.test(statement))
-    .some((statement) => namesTable.test(statement));
+    .filter((statement) => namesTable.test(statement))
+    .some((statement) => grantsUsableRole(statement));
 }
 
 /**
@@ -124,6 +161,72 @@ function findFailClosedBoundary(files: readonly string[]): string {
 }
 
 /**
+ * Whether `body` (a table-creating migration's own text) contains a
+ * `security definer` function whose body names `table`.
+ *
+ * This is the one category EXEMPT_TABLES actually uses: a table nothing but
+ * a security-definer function ever touches needs no grant of its own,
+ * because that function runs with its owner's privileges, not the caller's —
+ * a grant-checked path never reaches the table at all. That is a checkable
+ * claim, so this checks it instead of trusting the prose next to it.
+ *
+ * Matches `create [or replace] function ... security definer ... as $$
+ * ...body... $$` and requires `security definer` in the header (the part
+ * before `as $$`) and `table` inside the body (the part between `$$`s) —
+ * not just anywhere in the whole statement, so a function merely named after
+ * the table, or one whose only mention is in a comment already stripped by
+ * stripComments, does not count. This codebase's functions after the
+ * fail-closed boundary are always `$$`-quoted (checked against every
+ * migration after 0080, 2026-08-15); the `$tag$` form used for dynamic SQL
+ * elsewhere in this repository appears only before that boundary, a shape
+ * this check does not need to understand.
+ */
+function hasSecurityDefinerFunctionNaming(body: string, table: string): boolean {
+  const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const namesTable = new RegExp(`\\b${escaped}\\b`, "i");
+  const functionRe = /create\s+(?:or\s+replace\s+)?function\s+([\s\S]*?)\bas\s+\$\$([\s\S]*?)\$\$/gi;
+  let match: RegExpExecArray | null;
+  while ((match = functionRe.exec(body))) {
+    const [, header, functionBody] = match;
+    if (/\bsecurity\s+definer\b/i.test(header) && namesTable.test(functionBody)) return true;
+  }
+  return false;
+}
+
+/**
+ * The one exemption reason this test knows how to check for itself. Adding a
+ * second requires writing its own verification function alongside a new
+ * member of this union — a developer cannot get a new category of exemption
+ * past this test by editing a string; the type only accepts the kind this
+ * file already knows how to verify, so any other claim is rejected by the
+ * compiler before the test even runs.
+ */
+type Exemption = {
+  kind: "security-definer-only";
+  reason: string;
+};
+
+/**
+ * Whether `exemption`'s claim actually holds for the migration that created
+ * `table`. A reason long enough to read as considered is necessary but not
+ * sufficient — see the false-claim case in the describe block below, which
+ * this line alone used to let through.
+ */
+function exemptionIsVerified(body: string, table: string, exemption: Exemption): boolean {
+  if (exemption.reason.length <= 20) return false;
+  switch (exemption.kind) {
+    case "security-definer-only":
+      return hasSecurityDefinerFunctionNaming(body, table);
+    default: {
+      // Exhaustiveness guard: a new `kind` added to the Exemption union
+      // without a matching case here fails to compile, not silently passes.
+      const unreachable: never = exemption.kind;
+      throw new Error(`no verification wired up for exemption kind ${String(unreachable)}`);
+    }
+  }
+}
+
+/**
  * Tables created after the boundary that legitimately carry no grant of their
  * own in the same migration.
  *
@@ -132,15 +235,18 @@ function findFailClosedBoundary(files: readonly string[]): string {
  * real miss gets buried instead of caught, which is exactly the failure mode
  * this test exists to close off.
  */
-const EXEMPT_TABLES: Readonly<Record<string, string>> = {
-  acc_afda_rate:
-    "Read and written only inside acc_afda_evaluation, acc_afda_balance and " +
-    'acc_post_afda_adjustment (0093), all `security definer` — those run with the function ' +
-    "owner's privileges, not the caller's, so no application code ever reaches this table " +
-    'through a grant-checked path. Confirmed: no `.from("acc_afda_rate")` anywhere under ' +
-    "app/ or lib/ (grep, 2026-08-15). Its own two RLS policies (acc_afda_rate_read, " +
-    "acc_afda_rate_write) are consequently unreachable through PostgREST too, which is a " +
-    "separate, smaller finding — not one this test is scoped to fix.",
+const EXEMPT_TABLES: Readonly<Record<string, Exemption>> = {
+  acc_afda_rate: {
+    kind: "security-definer-only",
+    reason:
+      "Read and written only inside acc_afda_evaluation, acc_afda_balance and " +
+      'acc_post_afda_adjustment (0093), all `security definer` — those run with the function ' +
+      "owner's privileges, not the caller's, so no application code ever reaches this table " +
+      'through a grant-checked path. Confirmed: no `.from("acc_afda_rate")` anywhere under ' +
+      "app/ or lib/ (grep, 2026-08-15). Its own two RLS policies (acc_afda_rate_read, " +
+      "acc_afda_rate_write) are consequently unreachable through PostgREST too, which is a " +
+      "separate, smaller finding — not one this test is scoped to fix.",
+  },
 };
 
 describe("a table-creating migration carries its own grants", () => {
@@ -173,7 +279,13 @@ describe("a table-creating migration carries its own grants", () => {
   it.each(cases)("$table ($file) grants a role, or is explicitly exempted", ({ file, table }) => {
     const exemption = EXEMPT_TABLES[table];
     if (exemption !== undefined) {
-      expect(exemption.length, `the exemption for ${table} needs a real reason`).toBeGreaterThan(20);
+      const body = readBody(file);
+      expect(
+        exemptionIsVerified(body, table, exemption),
+        `the exemption for ${table} (kind "${exemption.kind}") does not hold up against ` +
+          `${file} — either the claim was never true, or the migration changed under it. ` +
+          "A long reason is not enough; this test checks the claim itself.",
+      ).toBe(true);
       return;
     }
     const body = readBody(file);
@@ -195,5 +307,111 @@ describe("a table-creating migration carries its own grants", () => {
         true,
       );
     }
+  });
+});
+
+// RED CHECKPOINT (hole 1): with grantsName unchanged, both cases below fail —
+// a revoke-only statement and a grant to anon/public alone both read as
+// "names the table" under the presence-only check, which is exactly the
+// mistake acc_backup shipped with. Left in as a permanent regression test.
+describe("grantsName requires real evidence of access, not just a mention", () => {
+  it("does not count a table named only in a revoke statement", () => {
+    const body = "create table acc_foo (id uuid primary key); " +
+      "revoke all on table acc_foo from public, anon;";
+    expect(grantsName(body, "acc_foo")).toBe(false);
+  });
+
+  it("does not count a grant naming only anon", () => {
+    const body = "grant select on table acc_foo to anon;";
+    expect(grantsName(body, "acc_foo")).toBe(false);
+  });
+
+  it("does not count a grant naming only public and anon together", () => {
+    const body = "grant select on table acc_foo to public, anon;";
+    expect(grantsName(body, "acc_foo")).toBe(false);
+  });
+
+  it("counts a grant naming a role that can actually use the table", () => {
+    const body = "revoke all on table acc_foo from public, anon; " +
+      "grant select on table acc_foo to authenticated;";
+    expect(grantsName(body, "acc_foo")).toBe(true);
+  });
+
+  it("still excludes a function grant that happens to share the table's name", () => {
+    const body = "grant execute on function acc_foo(text) to authenticated;";
+    expect(grantsName(body, "acc_foo")).toBe(false);
+  });
+});
+
+// RED CHECKPOINT (hole 2): a reason gate that only measures string length
+// lets this false claim through — the migration below never mentions
+// `security definer` at all, so the exemption is simply wrong, and nothing
+// caught that before exemptionIsVerified checked the claim itself. Left in
+// as a permanent regression test.
+describe("an exemption's reason is checked against the migration, not just present", () => {
+  it("rejects a security-definer-only claim the migration does not back up", () => {
+    const body = "create table acc_foo (id uuid primary key);";
+    const falseExemption: Exemption = {
+      kind: "security-definer-only",
+      reason: "Only ever touched by a security definer function, nothing to worry about here.",
+    };
+    expect(exemptionIsVerified(body, "acc_foo", falseExemption)).toBe(false);
+  });
+
+  it("rejects a security definer function that never actually mentions the table", () => {
+    const body = `
+      create table acc_foo (id uuid primary key);
+      create or replace function unrelated() returns void
+      language sql security definer as $$
+        select 1;
+      $$;
+    `;
+    const falseExemption: Exemption = {
+      kind: "security-definer-only",
+      reason: "Only ever touched by a security definer function, nothing to worry about here.",
+    };
+    expect(exemptionIsVerified(body, "acc_foo", falseExemption)).toBe(false);
+  });
+
+  it("rejects a function that names the table but is not security definer", () => {
+    const body = `
+      create table acc_foo (id uuid primary key);
+      create or replace function reads_foo() returns void
+      language sql as $$
+        select 1 from acc_foo;
+      $$;
+    `;
+    const falseExemption: Exemption = {
+      kind: "security-definer-only",
+      reason: "Only ever touched by a security definer function, nothing to worry about here.",
+    };
+    expect(exemptionIsVerified(body, "acc_foo", falseExemption)).toBe(false);
+  });
+
+  it("rejects a reason too short to count as considered, even if it happened to be true", () => {
+    const body = `
+      create table acc_foo (id uuid primary key);
+      create or replace function reads_foo() returns void
+      language sql security definer as $$
+        select 1 from acc_foo;
+      $$;
+    `;
+    const tooShort: Exemption = { kind: "security-definer-only", reason: "trust me" };
+    expect(exemptionIsVerified(body, "acc_foo", tooShort)).toBe(false);
+  });
+
+  it("accepts a security-definer-only claim the migration actually backs up", () => {
+    const body = `
+      create table acc_foo (id uuid primary key);
+      create or replace function touches_foo() returns void
+      language sql security definer as $$
+        select 1 from acc_foo;
+      $$;
+    `;
+    const trueExemption: Exemption = {
+      kind: "security-definer-only",
+      reason: "Only touched by touches_foo(), which is security definer and reads this table directly.",
+    };
+    expect(exemptionIsVerified(body, "acc_foo", trueExemption)).toBe(true);
   });
 });
