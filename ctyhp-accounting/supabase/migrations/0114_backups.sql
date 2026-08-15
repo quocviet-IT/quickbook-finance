@@ -23,8 +23,24 @@ create table if not exists acc_backup (
 
 alter table acc_backup enable row level security;
 
+-- Re-applying this migration by hand (the SQL Editor path this repository
+-- falls back to when the Postgres port is blocked) must not fail on a policy
+-- that is already there.
+drop policy if exists acc_backup_read on acc_backup;
 create policy acc_backup_read on acc_backup
   for select using (acc_has_permission('company.export'));
+
+-- 0080 made every future table unreachable until its own migration says
+-- otherwise, and a bare `create table` grants nothing on its own — so without
+-- this, every company that already exists gets a register nothing can read.
+-- The nightly job and retention both write as service_role (lib/services/
+-- backup.ts opens a service-role connection); nothing in the application ever
+-- inserts, updates or deletes this table as the signed-in user, only reads
+-- it, and the RLS policy above already narrows that read to company.export.
+-- So authenticated gets select and nothing more.
+revoke all on table acc_backup from public, anon;
+grant select on table acc_backup to authenticated;
+grant all    on table acc_backup to service_role;
 
 comment on table acc_backup is
   'Nightly snapshots of this company''s books: what was taken, what it hashed to, and where it was put.';

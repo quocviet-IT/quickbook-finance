@@ -55,4 +55,24 @@ describe("the backups migration", () => {
   it("enables row-level security, like every other company table", () => {
     expect(body).toMatch(/alter table acc_backup enable row level security/i);
   });
+
+  it("guards the policy so a second application does not fail", () => {
+    // Postgres has no `create policy if not exists`. Without the drop, an
+    // operator re-applying this file by hand through the SQL Editor — the
+    // fallback path this repository uses when the Postgres port is blocked —
+    // gets "policy already exists" instead of a clean no-op.
+    expect(body).toMatch(/drop policy if exists acc_backup_read on acc_backup/i);
+  });
+
+  it("grants the register to the roles that read and write it, and nobody else", () => {
+    // 0080 revoked default privileges on every future table in this schema, so
+    // a bare `create table` leaves authenticated and service_role with nothing
+    // — the table exists but every query against it fails "permission denied".
+    // A new company's blanket grant sweep papers over this for companies
+    // created after this ships; every company that already exists does not
+    // get that sweep and stays locked out until this migration grants it.
+    expect(body).toMatch(/revoke all on table acc_backup from public,\s*anon/i);
+    expect(body).toMatch(/grant select on table acc_backup to authenticated/i);
+    expect(body).toMatch(/grant all\s+on table acc_backup to service_role/i);
+  });
 });
