@@ -4,8 +4,24 @@ import {
   expiredBackups,
   restoreCompatibility,
   shouldSkip,
+  snapshotDescription,
   snapshotHash,
 } from "@/lib/domain/backup";
+
+describe("what a manifest is reduced to before hashing", () => {
+  it("keeps only each file's path and content hash", () => {
+    const manifest = {
+      files: [
+        { path: "data/acc_account.csv", sha256: "aa" },
+        { path: "data/acc_journal_line.csv", sha256: "bb" },
+      ],
+    };
+    expect(snapshotDescription(manifest)).toEqual({
+      "data/acc_account.csv": "aa",
+      "data/acc_journal_line.csv": "bb",
+    });
+  });
+});
 
 describe("the hash that decides whether a night is worth keeping", () => {
   it("is the same for the same files, whatever order they are given in", async () => {
@@ -64,14 +80,16 @@ describe("the hash that decides whether a night is worth keeping", () => {
         }),
       ) as { files: Array<{ path: string; sha256: string }> };
 
-    const fileHashesOf = (manifest: { files: Array<{ path: string; sha256: string }> }) =>
-      Object.fromEntries(manifest.files.map((f) => [f.path, f.sha256]));
-
     const tonight = manifestOf("2026-08-15T02:00:00.000Z", "cron@ctyhp.example");
     const lastNight = manifestOf("2026-08-14T02:00:00.000Z", "someone-else@ctyhp.example");
 
-    expect(await snapshotHash(fileHashesOf(tonight))).toBe(
-      await snapshotHash(fileHashesOf(lastNight)),
+    // Whole manifests, not a hand-picked `{path: sha256}` object — the
+    // exclusion of `generatedAt`/`generatedBy` has to happen inside
+    // `snapshotDescription` for this test to mean anything. A test-local
+    // helper that already stripped them would make this pass no matter what
+    // `snapshotDescription` did.
+    expect(await snapshotHash(snapshotDescription(tonight))).toBe(
+      await snapshotHash(snapshotDescription(lastNight)),
     );
   });
 });
@@ -117,6 +135,19 @@ describe("choosing what retention deletes", () => {
   it("orders by when it was taken, not by the order it was handed", () => {
     const shuffled = [made(3)[2], made(3)[0], made(3)[1]];
     expect(expiredBackups(shuffled, 2).map((b) => b.id)).toEqual(["b0"]);
+  });
+
+  it("breaks a tie in takenAt by id, not by input order", () => {
+    // `sort` is stable, so two snapshots sharing a `takenAt` would otherwise
+    // be deleted in whatever order the caller's query happened to return
+    // them in — database query order, not a decision. Handed in both
+    // orderings here so a stability-only implementation can't pass by luck.
+    const tied = [
+      { id: "b1", takenAt: "2026-08-10" },
+      { id: "b2", takenAt: "2026-08-10" },
+    ];
+    expect(expiredBackups(tied, 1).map((b) => b.id)).toEqual(["b1"]);
+    expect(expiredBackups([...tied].reverse(), 1).map((b) => b.id)).toEqual(["b1"]);
   });
 });
 

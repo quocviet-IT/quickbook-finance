@@ -9,16 +9,31 @@
 import { sha256Hex } from "@/lib/domain/company-export";
 
 /**
+ * Turns a parsed export manifest into the `path -> sha256` record
+ * `snapshotHash` below compares.
+ *
+ * The manifest carries `generatedAt` and `generatedBy` alongside `files[]`,
+ * and a ZIP's own bytes embed timestamps too — both change on every run
+ * whatever the books did. This function is the one place that keeps them out
+ * of a snapshot's identity: it takes only `files` from the manifest, so a
+ * caller cannot reintroduce the timestamp or the actor by building the
+ * record a different way, because this is the only way offered. Takes the
+ * narrowest shape that does the job, not a full manifest type, so it works
+ * on anything shaped like one.
+ */
+export function snapshotDescription(manifest: {
+  files: Array<{ path: string; sha256: string }>;
+}): Record<string, string> {
+  return Object.fromEntries(manifest.files.map((file) => [file.path, file.sha256]));
+}
+
+/**
  * What decides whether tonight's books differ from last night's.
  *
- * Built from the per-file hashes the export manifest already carries (its
- * `files[].sha256`), rather than from the ZIP bytes or the manifest JSON
- * itself: a ZIP embeds timestamps, and the manifest carries `generatedAt` and
- * `generatedBy`, both of which change on every run whatever the books did. A
- * caller that fed either of those in would find no two nights ever equal, and
- * the skip rule below would never fire. Passing in only the `path -> sha256`
- * pairs is what keeps this comparable across two exports of an unchanged
- * company.
+ * Takes the `path -> sha256` pairs `snapshotDescription` above produces, not
+ * a manifest or ZIP bytes directly — that function is what keeps a
+ * timestamp or an actor's email from ever reaching here and making two
+ * exports of an unchanged company hash differently.
  *
  * Sorted before hashing so the answer depends on the content and not on the
  * order the files happened to be built in. Hashed with `sha256Hex` — the same
@@ -50,7 +65,15 @@ export function expiredBackups<T extends { id: string; takenAt: string }>(
   backups: readonly T[],
   keep: number,
 ): T[] {
-  const newestFirst = [...backups].sort((a, b) => b.takenAt.localeCompare(a.takenAt));
+  const newestFirst = [...backups].sort((a, b) => {
+    // Two snapshots can share a `takenAt` (same-second cron overlap, or test
+    // fixtures). `sort` is stable, so without a tiebreaker the survivor would
+    // be decided by whatever order the caller's query happened to return
+    // them in — not a real ordering. `id` makes the choice deterministic
+    // instead of an accident of database query order.
+    const byTime = b.takenAt.localeCompare(a.takenAt);
+    return byTime !== 0 ? byTime : b.id.localeCompare(a.id);
+  });
   // `slice(keep)` on the newest-first list is everything past the limit;
   // reversing puts them oldest-first, which is the order they should be
   // deleted in so an interrupted run leaves the newest ones intact.
