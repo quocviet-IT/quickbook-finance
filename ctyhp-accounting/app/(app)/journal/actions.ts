@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { manualJournalSchema, reverseEntrySchema } from "@/lib/domain/schemas";
-import { createManualJournal, reverseEntry, listJournalEntries, listReversedEntries, JournalError, type JournalFilters, type JournalEntrySummary, type ReversedEntryRow } from "@/lib/services/journal";
+import { createManualJournal, reverseEntry, listJournalEntries, countJournalEntries, JOURNAL_LIST_LIMIT, listReversedEntries, JournalError, type JournalFilters, type JournalEntrySummary, type ReversedEntryRow } from "@/lib/services/journal";
 import {
   executeOrSubmitForApproval,
   toControlledActionResponse,
@@ -69,10 +69,20 @@ export async function reverseEntryAction(raw: unknown): Promise<ActionResult<{ i
   } catch (err) { return { ok: false, error: msg(err) }; }
 }
 
-export async function listJournalAction(filters: JournalFilters): Promise<ActionResult<JournalEntrySummary[]>> {
+export async function listJournalAction(
+  filters: JournalFilters,
+): Promise<ActionResult<{ entries: JournalEntrySummary[]; total: number; limit: number }>> {
   try {
     const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listJournalEntries(sb, filters) };
+    // The count is asked for beside the rows so the screen can say how many it
+    // is not showing. Without it a truncated list is indistinguishable from a
+    // complete one, which is how three years of entries went missing in
+    // silence.
+    const [entries, total] = await Promise.all([
+      listJournalEntries(sb, filters),
+      countJournalEntries(sb, filters),
+    ]);
+    return { ok: true, data: { entries, total, limit: JOURNAL_LIST_LIMIT } };
   } catch (err) { return { ok: false, error: msg(err) }; }
 }
 

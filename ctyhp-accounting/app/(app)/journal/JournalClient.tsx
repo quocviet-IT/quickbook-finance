@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import type { Dayjs } from "dayjs";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
@@ -59,12 +60,31 @@ export default function JournalClient({
   );
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
-  const load = async () => {
+  /**
+   * How many entries match the dates on screen, and how many were read.
+   *
+   * A journal that quietly shows its newest thousand looks exactly like one
+   * that is showing everything. This company had 7,532 entries and could reach
+   * 1,000 of them; the ones it could not reach were the opening balances, which
+   * is precisely what somebody goes looking for.
+   */
+  const [total, setTotal] = useState(0);
+  const [limit, setLimit] = useState(0);
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+
+  const load = async (dates: [Dayjs, Dayjs] | null = range) => {
     setLoading(true);
-    const r = await listJournalAction({ entryId: initialEntryId ?? null });
+    const r = await listJournalAction({
+      entryId: initialEntryId ?? null,
+      from: dates ? dates[0].format("YYYY-MM-DD") : null,
+      to: dates ? dates[1].format("YYYY-MM-DD") : null,
+    });
     setLoading(false);
-    if (r.ok && r.data) setEntries(r.data);
-    else message.error(r.error ?? "Failed to load journal entries");
+    if (r.ok && r.data) {
+      setEntries(r.data.entries);
+      setTotal(r.data.total);
+      setLimit(r.data.limit);
+    } else message.error(r.error ?? "Failed to load journal entries");
   };
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -147,10 +167,33 @@ export default function JournalClient({
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      {canWrite && (
-        <Button type="primary" onClick={() => setOpen(true)}>
-          New Journal Entry
-        </Button>
+      <Space wrap>
+        {canWrite && (
+          <Button type="primary" onClick={() => setOpen(true)}>
+            New Journal Entry
+          </Button>
+        )}
+        <DatePicker.RangePicker
+          aria-label="Entry date range"
+          value={range}
+          onChange={(value) => {
+            const next = value && value[0] && value[1] ? ([value[0], value[1]] as [Dayjs, Dayjs]) : null;
+            setRange(next);
+            void load(next);
+          }}
+        />
+      </Space>
+      {total > entries.length && (
+        <Alert
+          type="warning"
+          showIcon
+          message={`Showing the ${entries.length.toLocaleString("en-US")} most recent of ${total.toLocaleString("en-US")} entries`}
+          description={
+            "One read carries at most " +
+            limit.toLocaleString("en-US") +
+            " entries. Narrow the dates above to reach the rest — an entry outside this list cannot be found by scrolling, however far you page."
+          }
+        />
       )}
       <Table<JournalEntrySummary>
         rowKey="id"

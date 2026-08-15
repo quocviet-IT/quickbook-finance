@@ -117,6 +117,34 @@ type EntryRow = {
     acc_account: { account_code: string; name: string } | null }[];
 };
 
+/**
+ * The most entries one read of the journal will carry.
+ *
+ * PostgREST stops at a thousand rows and says nothing, so this used to be the
+ * real limit while the screen behaved as though it had everything: a company
+ * with 7,532 entries showed the newest 1,000 and hid the rest, and an entry
+ * from three years ago simply could not be reached. Naming the number here lets
+ * `countJournalEntries` say how many were left out, which is the difference
+ * between a list that is short and a list that lies.
+ */
+export const JOURNAL_LIST_LIMIT = 1000;
+
+/** How many entries match, whether or not they fit in one read. */
+export async function countJournalEntries(
+  sb: SupabaseClient,
+  filters: JournalFilters,
+): Promise<number> {
+  let q = sb.from("acc_journal_entry").select("id", { count: "exact", head: true });
+  if (filters.from) q = q.gte("entry_date", filters.from);
+  if (filters.to) q = q.lte("entry_date", filters.to);
+  if (filters.entryId) q = q.eq("id", filters.entryId);
+  if (filters.sourceType) q = q.eq("source_type", filters.sourceType);
+  if (filters.status) q = q.eq("status", filters.status);
+  const { count, error } = await q;
+  if (error) throw new JournalError(error.message);
+  return count ?? 0;
+}
+
 export async function listJournalEntries(sb: SupabaseClient, filters: JournalFilters): Promise<JournalEntrySummary[]> {
   let q = sb
     .from("acc_journal_entry")
@@ -125,7 +153,10 @@ export async function listJournalEntries(sb: SupabaseClient, filters: JournalFil
         "acc_journal_line(account_id,debit_minor,credit_minor,memo,line_order,acc_account(account_code,name))",
     )
     .order("entry_date", { ascending: false })
-    .order("entry_number", { ascending: false });
+    .order("entry_number", { ascending: false })
+    // Asked for rather than left to the server's own cap, so the number is in
+    // this file where it can be read, compared against, and reported.
+    .limit(JOURNAL_LIST_LIMIT);
   if (filters.from) q = q.gte("entry_date", filters.from);
   if (filters.to) q = q.lte("entry_date", filters.to);
   if (filters.entryId) q = q.eq("id", filters.entryId);
