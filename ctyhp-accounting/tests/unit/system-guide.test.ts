@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -85,7 +85,20 @@ describe("guide notices", () => {
       "version",
       "test-data",
       "provenance",
+      "status",
     ]);
+  });
+
+  it("points at the status page only while that page is really there", () => {
+    // The notice gives an address rather than a link, because /status sits
+    // outside app/(app) on purpose — it must still load when the session
+    // cannot, which is exactly when somebody looks for it. That also puts it
+    // outside the route check at the top of this file, so it gets its own:
+    // renaming the page would otherwise leave the guide naming nothing, which
+    // is the one failure this file exists to prevent.
+    const status = GUIDE_NOTICES.find((notice) => notice.id === "status");
+    expect(status?.body).toContain("/status");
+    expect(existsSync(join(process.cwd(), "app", "status", "page.tsx"))).toBe(true);
   });
 
   it("says plainly that the figures on screen are not real", () => {
