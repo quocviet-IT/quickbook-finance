@@ -519,6 +519,7 @@ export default function ReportsClient({
               periods={trendPeriods}
               companyName={companyName}
               baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
               money={money}
             />
           )}

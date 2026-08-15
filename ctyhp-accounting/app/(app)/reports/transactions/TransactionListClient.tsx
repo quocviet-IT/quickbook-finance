@@ -88,6 +88,7 @@ export default function TransactionListClient({
     from,
     to,
     currencyCode: baseCurrency,
+    baseDecimals,
   });
 
   return (

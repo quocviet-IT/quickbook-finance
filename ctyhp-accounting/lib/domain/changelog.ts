@@ -79,6 +79,52 @@ export const RELEASES: Release[] = [
           "The exported file carries the same percentages the screen shows.",
         route: "/reports",
       },
+      {
+        kind: "fixed",
+        title: "The Balance Sheet Trend's exported figures were 100 times too large",
+        detail:
+          "Its PDF and Excel export skipped the conversion from the ledger's " +
+          "internal cents to dollars, so every figure in the file read 100 " +
+          "times the real balance — $1,000 exported as $100,000. The on-screen " +
+          "table was correct the entire time, which is exactly why nothing " +
+          "gave it away. If you have already sent one of these exported files " +
+          "to a bank, an accountant, or anyone else, resend it — the export is " +
+          "now correct.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "AR and AP Aging summary exports were also 100 times too large",
+        detail:
+          "The same missing conversion was hiding in the aging summary " +
+          "grid's export: every party's column and the Total column both came " +
+          "out 100 times the real balance, on both the AR Aging and AP Aging " +
+          "pages. The on-screen grid was correct throughout. Resend any aging " +
+          "summary file already sent out.",
+        route: "/reports/ar-aging",
+      },
+      {
+        kind: "fixed",
+        title: "General Ledger Posting export was 100 times too large",
+        detail:
+          "The same bug, one more place it was hiding: the Amount column in " +
+          "the General Ledger Posting export skipped the same conversion the " +
+          "on-screen table applied. Resend any exported file from this report; " +
+          "the screen itself was never wrong.",
+        route: "/reports/gl-posting",
+      },
+      {
+        kind: "fixed",
+        title: "Transaction List export no longer assumes every currency has two decimal places",
+        detail:
+          "The Transaction List export divided every amount by a fixed 100 " +
+          "instead of by the company's own currency scale. That happened to " +
+          "read correctly for a two-decimal currency like USD, but would have " +
+          "silently misreported a currency with a different number of decimal " +
+          "places — VND, for one, uses none. Nothing to resend for a " +
+          "USD company; caught and fixed alongside the others above.",
+        route: "/reports/transactions",
+      },
     ],
   },
   {

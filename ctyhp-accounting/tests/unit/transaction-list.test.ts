@@ -61,6 +61,7 @@ describe("buildTransactionListSheet", () => {
     from: "2026-08-01",
     to: "2026-08-31",
     currencyCode: "USD",
+    baseDecimals: 2,
   });
 
   it("carries the seven columns the report is asked for, in order", () => {
@@ -99,5 +100,20 @@ describe("buildTransactionListSheet", () => {
     expect(sheet.subtitle).toContain("2026-08-01");
     expect(sheet.subtitle).toContain("2026-08-31");
     expect(sheet.title).toBe("Transaction List by Date");
+  });
+
+  it("uses the currency's own decimal scale rather than a hard-coded 100", () => {
+    // VND has decimal_places = 0. A hard-coded "divide by 100" would export
+    // 1,250 đồng as 12.50, silently shrinking every figure by two orders of
+    // magnitude for that currency's books.
+    const vndSheet = buildTransactionListSheet({
+      rows: [row({ amountMinor: -125_000 })],
+      companyName: "Aurora Fine Jewelry LLC",
+      from: "2026-08-01",
+      to: "2026-08-31",
+      currencyCode: "VND",
+      baseDecimals: 0,
+    });
+    expect(vndSheet.rows[0].amount).toBe(-125_000);
   });
 });

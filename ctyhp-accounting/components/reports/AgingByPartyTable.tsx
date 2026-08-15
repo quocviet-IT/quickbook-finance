@@ -9,7 +9,7 @@ import {
   type PartyAgingRow,
 } from "@/lib/domain/aging";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
-import type { ReportExportSheet } from "@/lib/domain/report-export";
+import { exportRowsFromMinorAmounts, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { AgingReportRow } from "@/lib/services/aging";
 
 export type AgingGrouping = "grid" | "party" | "document";
@@ -35,6 +35,7 @@ export default function AgingByPartyTable({
   companyName,
   asOf,
   currencyCode,
+  baseDecimals,
 }: {
   rows: AgingReportRow[];
   /** "Customer" or "Vendor" — the heading of the first column. */
@@ -50,6 +51,7 @@ export default function AgingByPartyTable({
   companyName: string;
   asOf: string;
   currencyCode: string;
+  baseDecimals: number;
 }) {
   const pivot = pivotAgingByParty(rows);
   const grid = agingSummaryGrid(pivot);
@@ -69,13 +71,15 @@ export default function AgingByPartyTable({
       })),
       { key: "total", header: "Total", kind: "money" as const },
     ],
-    rows: grid.rows.map((row) => ({
-      label: row.label,
-      ...Object.fromEntries(
-        grid.columns.map((column, index) => [column.entityId, row.amounts[index] ?? 0]),
-      ),
-      total: row.totalMinor,
-    })),
+    // grid.rows carry integer minor units, same as row.totalMinor below; the
+    // Total column is folded in as one more entry per row so the same
+    // minor-to-major conversion covers it too, rather than being left as a
+    // raw minor-unit figure beside converted ones.
+    rows: exportRowsFromMinorAmounts(
+      grid.rows.map((row) => ({ label: row.label, amounts: [...row.amounts, row.totalMinor] })),
+      [...grid.columns.map((column) => column.entityId), "total"],
+      baseDecimals,
+    ),
   };
 
   return (
