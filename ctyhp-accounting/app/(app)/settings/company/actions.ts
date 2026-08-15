@@ -86,7 +86,15 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
   }
 
   try {
-    const asOf = new Date().toISOString().slice(0, 10);
+    // One clock reading for the whole export: `asOf`, its date portion, is
+    // what readControlTotals below filters by, and the identical
+    // `generatedAt` is what the manifest gets stamped with. A second reading
+    // taken after the four-way Promise.all — which can itself straddle
+    // midnight on the company with 42 round trips — is exactly what let the
+    // manifest disagree with itself; buildExportArchive no longer reads its
+    // own clock, so this is the only reading left to keep in sync.
+    const generatedAt = new Date().toISOString();
+    const asOf = generatedAt.slice(0, 10);
     const [datasets, controlTotals, schemaVersion, versions] = await Promise.all([
       collectExportDatasets(sb),
       readControlTotals(sb, asOf),
@@ -99,7 +107,7 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
       datasets,
       controlTotals,
       schemaVersion,
-      asOf,
+      generatedAt,
       actorEmail: user.email ?? "unknown",
     });
 

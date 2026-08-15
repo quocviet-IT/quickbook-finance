@@ -36,7 +36,16 @@ export async function takeCompanyBackup(
   const datasets = await collectExportDatasets(sb);
   const controlTotals = await readControlTotals(sb, today);
   const schemaVersion = await readSchemaVersion(sb);
-  const archive = await buildExportArchive({ datasets, controlTotals, schemaVersion, asOf: today });
+  // `today` is the one clock reading this whole snapshot is built from — not
+  // a fresh one taken here. Stamping the manifest at midnight UTC on `today`
+  // keeps `generatedAt`'s date portion equal to `today` by construction, the
+  // same day `readControlTotals` above was just asked for.
+  const archive = await buildExportArchive({
+    datasets,
+    controlTotals,
+    schemaVersion,
+    generatedAt: `${today}T00:00:00.000Z`,
+  });
 
   // `archive.manifest` still carries `generatedAt`/`generatedBy` — a ZIP built
   // from unchanged books embeds a new timestamp every night regardless.
@@ -95,7 +104,17 @@ export async function takeCompanyBackup(
     after_json: { storage_path: path, content_hash: hash, included_sensitive: true },
   });
   if (audit.error) {
-    await sb.storage.from(BACKUP_BUCKET).remove([path]);
+    const cleanup = await sb.storage.from(BACKUP_BUCKET).remove([path]);
+    if (cleanup.error) {
+      // The upload already happened; the row that would have proven it did
+      // not. If cleanup also fails, the file is now sitting in the bucket
+      // with no audit row and no acc_backup row pointing at it — the only
+      // way anyone finds it is if this message says so, in exact terms,
+      // rather than asserting the removal that just failed.
+      throw new BackupError(
+        `The backup was not recorded (${audit.error.message}), and the file could not be removed from storage (${cleanup.error.message}). A copy of taxpayer data was left behind at ${BACKUP_BUCKET}/${path} — it must be deleted by hand.`,
+      );
+    }
     throw new BackupError(`The backup was not recorded, so it was not kept: ${audit.error.message}`);
   }
 
@@ -127,9 +146,31 @@ async function applyRetention(sb: SupabaseClient): Promise<void> {
   const rows = ((data ?? []) as Array<{ id: string; taken_at: string; storage_path: string }>).map(
     (row) => ({ id: row.id, takenAt: row.taken_at, storagePath: row.storage_path }),
   );
+  // A path whose blob removal fails keeps its acc_backup row on purpose: that
+  // row is the only record of the path, and dropping it here — the way an
+  // unchecked remove() used to let happen — makes the leak permanent, since
+  // no later retention pass reads a path that has no row.
+  //
+  // One failure does not stop the pass, though. The expired snapshots are
+  // independent of each other, and refusing every other deletion because one
+  // path could not be removed would leave a company re-accumulating the
+  // noise BACKUP_KEEP exists to prevent, night after night, until a human
+  // clears that one path by hand. So the loop keeps going and reports every
+  // stuck path at the end — never silently, per the same rule the cleanup
+  // failure above follows.
+  const stuck: string[] = [];
   for (const expired of expiredBackups(rows, BACKUP_KEEP)) {
-    await sb.storage.from(BACKUP_BUCKET).remove([expired.storagePath]);
-    const removal = await sb.from("acc_backup").delete().eq("id", expired.id);
-    if (removal.error) throw new BackupError(removal.error.message);
+    const removal = await sb.storage.from(BACKUP_BUCKET).remove([expired.storagePath]);
+    if (removal.error) {
+      stuck.push(expired.storagePath);
+      continue;
+    }
+    const deletion = await sb.from("acc_backup").delete().eq("id", expired.id);
+    if (deletion.error) throw new BackupError(deletion.error.message);
+  }
+  if (stuck.length > 0) {
+    throw new BackupError(
+      `${stuck.length} expired backup file(s) could not be removed from ${BACKUP_BUCKET} and were left in place; their acc_backup rows were kept so a later run can retry: ${stuck.join(", ")}`,
+    );
   }
 }

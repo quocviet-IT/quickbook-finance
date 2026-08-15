@@ -143,10 +143,16 @@ export async function buildExportArchive(input: {
   datasets: ExportDataset[];
   controlTotals: ExportControlTotals;
   schemaVersion: string;
-  asOf: string;
+  /**
+   * The single clock reading this archive is built from. `controlTotals`
+   * above must already have been read as of this same date — the manifest's
+   * `controlTotalsAsOf` is derived from this value below, not accepted as a
+   * second input, so the two can never name different days no matter when
+   * the caller assembled everything else around them.
+   */
+  generatedAt: string;
   actorEmail?: string;
 }): Promise<ExportArchive> {
-  const generatedAt = new Date().toISOString();
   const entries: Record<string, Uint8Array> = {};
   const files: Array<{ path: string; sha256: string; rowCount: number }> = [];
   let totalRows = 0;
@@ -163,9 +169,9 @@ export async function buildExportArchive(input: {
     datasets: input.datasets,
     files,
     totals: input.controlTotals,
-    controlTotalsAsOf: input.asOf,
+    controlTotalsAsOf: input.generatedAt.slice(0, 10),
     schemaVersion: input.schemaVersion,
-    generatedAt,
+    generatedAt: input.generatedAt,
     actorEmail: input.actorEmail ?? "system",
   });
   entries["manifest.json"] = strToU8(manifestJson);
@@ -173,7 +179,7 @@ export async function buildExportArchive(input: {
     [
       "One Book — company data export",
       "",
-      `Generated ${generatedAt} under schema ${input.schemaVersion}.`,
+      `Generated ${input.generatedAt} under schema ${input.schemaVersion}.`,
       "",
       "data/        one CSV per table, header row = column names",
       "sensitive/   vendor tax profiles, including taxpayer identification numbers",
