@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "antd";
+import { App, Button, DatePicker, Select, Space, Statistic, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
@@ -121,7 +121,15 @@ export default function GeneralLedgerClient({
           <DataTable<GeneralLedgerRow>
             rowKey="lineId"
             dataSource={gl.rows}
-            pagination={false}
+            // A ledger runs to thousands of lines on a real bank account, and
+            // rendering them all at once is what made this page slow to open
+            // and impossible to find anything in. Fifty to a page, with the
+            // size changer for anybody who wants the whole run.
+            //
+            // Paging is safe here because the running balance is worked out
+            // over the entire range on the server, not across the rows on
+            // screen — page 4 carries on from page 3 rather than restarting.
+            pagination={{ pageSize: 50 }}
             loading={loading}
             emptyTitle="No ledger activity"
             emptyDescription="No posted entries were found for this account and date range."
@@ -161,7 +169,24 @@ export default function GeneralLedgerClient({
                   return href ? <Link href={href}>{source}</Link> : source;
                 },
               },
-              { title: "Memo", dataIndex: "memo", ellipsis: true },
+              {
+                title: "Memo",
+                dataIndex: "memo",
+                // `showTitle: false` turns off the browser's own tooltip, which
+                // is slow to appear and renders a wire description as one
+                // unbroken line. The Ant Design one replaces it: it opens at
+                // once and wraps, which is the only way several hundred
+                // characters are readable.
+                ellipsis: { showTitle: false },
+                render: (memo: string | null) =>
+                  memo ? (
+                    <Tooltip title={memo} placement="topLeft" styles={{ root: { maxWidth: 640 } }}>
+                      <span>{memo}</span>
+                    </Tooltip>
+                  ) : (
+                    ""
+                  ),
+              },
               {
                 title: "Debit",
                 align: "right",
