@@ -89,10 +89,25 @@ export default function ReportsClient({
   // Balance sheet presentation: what it is compared with, whether the
   // variance columns are shown, and whether it runs as a period trend.
   const [comparisonBasis, setComparisonBasis] = useState<ComparisonBasis>("prior_month");
-  const [balanceColumns, setBalanceColumns] = useState<"comparison" | "months" | "years">(
+  // `single` and `comparison` are one balance sheet read; `months` and `years`
+  // are a trend, which is a different query and a different view. Anything
+  // added here has to be sorted into one of those two families below, not
+  // tested for by "is not comparison".
+  const [balanceColumns, setBalanceColumns] = useState<
+    "single" | "comparison" | "months" | "years"
+  >(
     "comparison",
   );
   const [showVariance, setShowVariance] = useState(false);
+  /**
+   * Whether the profit and loss carries a comparison at all.
+   *
+   * Defaults to the comparison, which is what this report has always shown, so
+   * nobody's saved link changes meaning. A reader who wants the statement on
+   * its own — to hand to a bank, or to read without four columns of arithmetic
+   * — asks for one period and gets one column.
+   */
+  const [pnlColumns, setPnlColumns] = useState<"single" | "comparison">("comparison");
   const [trendPeriods, setTrendPeriods] = useState<TrendPeriod[]>([]);
   const [budgetReport, setBudgetReport] = useState<BudgetVsActual | null>(null);
   const [equityReport, setEquityReport] = useState<StatementOfEquity | null>(null);
@@ -144,7 +159,7 @@ export default function ReportsClient({
         return;
       }
 
-      if (type === "balance" && balanceColumns !== "comparison") {
+      if (type === "balance" && (balanceColumns === "months" || balanceColumns === "years")) {
         // A trend runs one balance sheet per column; they are independent
         // reads, so they go out together.
         const asOfIso = asOf.format("YYYY-MM-DD");
@@ -168,11 +183,14 @@ export default function ReportsClient({
       const currentTo = type === "pnl" ? range[1].format("YYYY-MM-DD") : asOf.format("YYYY-MM-DD");
       let priorFrom: string | null = null;
       let priorTo: string | null = null;
-      if (type === "pnl") {
+      // A report asked for on its own reads one period. Leaving priorTo null is
+      // what skips the second query below, so asking for one period costs one
+      // read rather than two.
+      if (type === "pnl" && pnlColumns === "comparison") {
         const prior = previousPeriodRange(currentFrom!, currentTo);
         priorFrom = prior.from;
         priorTo = prior.to;
-      } else if (type === "balance") {
+      } else if (type === "balance" && balanceColumns === "comparison") {
         priorTo = comparisonDate(currentTo, comparisonBasis);
       }
       const [currentResult, priorResult] = await Promise.all([
@@ -198,6 +216,7 @@ export default function ReportsClient({
     asOf,
     comparisonBasis,
     balanceColumns,
+    pnlColumns,
     fiscalYear,
     budgetFromPeriod,
     budgetToPeriod,
@@ -260,6 +279,18 @@ export default function ReportsClient({
             onChange={(value) => value && setRange([value[0]!, value[1]!])}
           />
         )}
+        {type === "pnl" && (
+          <Select
+            aria-label="Profit and loss columns"
+            value={pnlColumns}
+            style={{ width: 185 }}
+            onChange={setPnlColumns}
+            options={[
+              { value: "single", label: "One period" },
+              { value: "comparison", label: "Two periods" },
+            ]}
+          />
+        )}
         {(type === "trial" || type === "balance") && (
           <Space>
             <Typography.Text type="secondary">As of</Typography.Text>
@@ -274,6 +305,7 @@ export default function ReportsClient({
               style={{ width: 185 }}
               onChange={setBalanceColumns}
               options={[
+                { value: "single", label: "One period" },
                 { value: "comparison", label: "Two periods" },
                 { value: "months", label: "Last 12 months" },
                 { value: "years", label: "Last 3 years" },
@@ -355,9 +387,10 @@ export default function ReportsClient({
               baseCurrency={baseCurrency}
               baseDecimals={baseDecimals}
               money={money}
+              showPrior={pnlColumns === "comparison"}
             />
           )}
-          {type === "balance" && balanceColumns === "comparison" && (
+          {type === "balance" && (balanceColumns === "comparison" || balanceColumns === "single") && (
             <BalanceSheetComparisonView
               rows={rows}
               priorRows={priorRows}
@@ -368,9 +401,10 @@ export default function ReportsClient({
               baseCurrency={baseCurrency}
               baseDecimals={baseDecimals}
               money={money}
+              showPrior={balanceColumns === "comparison"}
             />
           )}
-          {type === "balance" && balanceColumns !== "comparison" && (
+          {type === "balance" && (balanceColumns === "months" || balanceColumns === "years") && (
             <BalanceSheetTrendView
               periods={trendPeriods}
               companyName={companyName}
@@ -590,6 +624,7 @@ function PnlComparisonView({
   companyName,
   baseCurrency,
   baseDecimals,
+  showPrior,
 }: {
   rows: LedgerBalance[];
   priorRows: LedgerBalance[];
@@ -598,6 +633,7 @@ function PnlComparisonView({
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  showPrior: boolean;
 }) {
   const current = buildProfitAndLoss(rows);
   const prior = buildProfitAndLoss(priorRows);
@@ -613,23 +649,32 @@ function PnlComparisonView({
     ...sectionRows(current.otherExpenses, prior.otherExpenses),
     totalRow("net-income", "Net Income", current.netIncome, prior.netIncome),
   ];
+  const title = showPrior ? "Profit & Loss Comparison" : "Profit & Loss";
+  const period = `${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")}`;
   const exportSheet = comparisonExportSheet({
-    fileName: `profit-and-loss-comparison-${currentFrom}-${currentTo}`,
+    fileName: showPrior
+      ? `profit-and-loss-comparison-${currentFrom}-${currentTo}`
+      : `profit-and-loss-${currentFrom}-${currentTo}`,
     companyName,
-    title: "Profit & Loss Comparison",
-    subtitle: `${currentFrom} to ${currentTo} compared with ${priorRange.from} to ${priorRange.to}`,
+    title,
+    subtitle: showPrior
+      ? `${currentFrom} to ${currentTo} compared with ${priorRange.from} to ${priorRange.to}`
+      : `${currentFrom} to ${currentTo}`,
     currencyCode: baseCurrency,
     baseDecimals,
     currentLabel: "Current period",
     priorLabel: "Prior period",
     rows: comparisonRows,
+    showPrior,
   });
   return (
     <div className="report-result">
       <ReportHeading
         companyName={companyName}
-        title="Profit & Loss Comparison"
-        subtitle={`${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")} · Prior ${priorRange.from} – ${priorRange.to}`}
+        title={title}
+        subtitle={
+          showPrior ? `${period} · Prior ${priorRange.from} – ${priorRange.to}` : period
+        }
         exportSheet={exportSheet}
       />
       <ReportBody
@@ -641,6 +686,7 @@ function PnlComparisonView({
             currentRange={{ from: currentFrom, to: currentTo }}
             priorRange={priorRange}
             money={money}
+            showPrior={showPrior}
           />
         }
         chart={
@@ -671,6 +717,7 @@ function BalanceSheetComparisonView({
   companyName,
   baseCurrency,
   baseDecimals,
+  showPrior,
 }: {
   rows: LedgerBalance[];
   priorRows: LedgerBalance[];
@@ -681,29 +728,36 @@ function BalanceSheetComparisonView({
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  showPrior: boolean;
 }) {
   const current = buildBalanceSheet(rows);
   const prior = buildBalanceSheet(priorRows);
   const currentTo = asOf.format("YYYY-MM-DD");
   const priorTo = comparisonDate(currentTo, comparisonBasis);
   const comparisonRows = balanceComparisonRows(current, prior);
+  const title = showPrior ? "Balance Sheet Comparison" : "Balance Sheet";
   const exportSheet = comparisonExportSheet({
-    fileName: `balance-sheet-comparison-${currentTo}`,
+    fileName: showPrior ? `balance-sheet-comparison-${currentTo}` : `balance-sheet-${currentTo}`,
     companyName,
-    title: "Balance Sheet Comparison",
-    subtitle: `As of ${currentTo} compared with ${priorTo}`,
+    title,
+    subtitle: showPrior ? `As of ${currentTo} compared with ${priorTo}` : `As of ${currentTo}`,
     currencyCode: baseCurrency,
     baseDecimals,
     currentLabel: currentTo,
     priorLabel: priorTo,
     rows: comparisonRows,
+    showPrior,
   });
   return (
     <div className="report-result">
       <ReportHeading
         companyName={companyName}
-        title="Balance Sheet Comparison"
-        subtitle={`As of ${asOf.format("MMM D, YYYY")} · ${comparisonBasisLabel(comparisonBasis)} ${priorTo}`}
+        title={title}
+        subtitle={
+          showPrior
+            ? `As of ${asOf.format("MMM D, YYYY")} · ${comparisonBasisLabel(comparisonBasis)} ${priorTo}`
+            : `As of ${asOf.format("MMM D, YYYY")}`
+        }
         exportSheet={exportSheet}
       />
       <ReportBody
@@ -717,6 +771,7 @@ function BalanceSheetComparisonView({
               priorRange={{ from: "", to: priorTo }}
               money={money}
               showVariance={showVariance}
+              showPrior={showPrior}
             />
             <div className="report-balance-status">
               <Tag color={current.balanced ? "green" : "red"}>
@@ -765,6 +820,7 @@ function ComparisonTable({
   priorRange,
   money,
   showVariance = true,
+  showPrior = true,
 }: {
   rows: ComparisonRow[];
   currentLabel: string;
@@ -774,6 +830,14 @@ function ComparisonTable({
   money: (value: number) => string;
   /** Off by default on the balance sheet: the reader can subtract two columns. */
   showVariance?: boolean;
+  /**
+   * Off when the reader asked for one period. The prior figures are still in
+   * `rows` — they are simply all zero, because nothing was fetched for them —
+   * so the columns are dropped here rather than the rows being rebuilt. The
+   * variance columns go with them: a variance against nothing is the current
+   * figure repeated, which would read as a fact rather than as a blank.
+   */
+  showPrior?: boolean;
 }) {
   return (
     <DataTable
@@ -808,18 +872,22 @@ function ComparisonTable({
                 ? <LedgerAmountLink accountId={row.accountId} range={currentRange} label={money(row.current)} />
                 : money(row.current),
         },
-        {
-          title: priorLabel,
-          width: 145,
-          align: "right",
-          render: (_, row) =>
-            row.kind === "section"
-              ? ""
-              : row.accountId
-                ? <LedgerAmountLink accountId={row.accountId} range={priorRange} label={money(row.prior)} />
-                : money(row.prior),
-        },
-        ...(showVariance
+        ...(showPrior
+          ? [
+              {
+                title: priorLabel,
+                width: 145,
+                align: "right" as const,
+                render: (_: unknown, row: ComparisonRow) =>
+                  row.kind === "section"
+                    ? ""
+                    : row.accountId
+                      ? <LedgerAmountLink accountId={row.accountId} range={priorRange} label={money(row.prior)} />
+                      : money(row.prior),
+              },
+            ]
+          : []),
+        ...(showPrior && showVariance
           ? [
               {
                 title: "Variance",
@@ -878,6 +946,7 @@ function comparisonExportSheet({
   currentLabel,
   priorLabel,
   rows,
+  showPrior = true,
 }: {
   fileName: string;
   companyName: string;
@@ -888,6 +957,8 @@ function comparisonExportSheet({
   currentLabel: string;
   priorLabel: string;
   rows: ComparisonRow[];
+  /** Matches the table on screen: one period exports one column of figures. */
+  showPrior?: boolean;
 }): ReportExportSheet {
   return {
     fileName,
@@ -898,9 +969,13 @@ function comparisonExportSheet({
     columns: [
       { key: "account", header: "Account", width: 40 },
       { key: "current", header: currentLabel, kind: "money", width: 18 },
-      { key: "prior", header: priorLabel, kind: "money", width: 18 },
-      { key: "variance", header: "Variance", kind: "money", width: 18 },
-      { key: "variancePercent", header: "Variance %", kind: "percent", width: 14 },
+      ...(showPrior
+        ? ([
+            { key: "prior", header: priorLabel, kind: "money", width: 18 },
+            { key: "variance", header: "Variance", kind: "money", width: 18 },
+            { key: "variancePercent", header: "Variance %", kind: "percent", width: 14 },
+          ] as const)
+        : []),
     ],
     rows: rows.map((row) => ({
       account: row.label,
