@@ -53,7 +53,7 @@ Do not re-derive these.
 - `lib/services/backup-restore.ts` — new. Loads a snapshot into a freshly provisioned company and reports whether the control totals came back.
 - `app/api/backups/run/route.ts` — new. The cron entry point.
 - `app/(app)/settings/backups/page.tsx`, `BackupsClient.tsx`, `actions.ts` — new. The screen.
-- `supabase/migrations/0112_backups.sql` — new. `acc_backup` and the `company.restore` permission.
+- `supabase/migrations/0114_backups.sql` — new. `acc_backup` and the `company.restore` permission.
 - `vercel.json` — modified. A fifth cron entry.
 
 ---
@@ -367,7 +367,7 @@ git commit -m "feat(backup): the rules that decide what is kept and what can be 
 ### Task 3: Where a backup is recorded
 
 **Files:**
-- Create: `supabase/migrations/0112_backups.sql`
+- Create: `supabase/migrations/0114_backups.sql`
 - Test: `tests/unit/backup-migration.test.ts`
 
 **Interfaces:**
@@ -382,7 +382,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync(join(process.cwd(), "supabase/migrations/0112_backups.sql"), "utf8");
+const sql = readFileSync(join(process.cwd(), "supabase/migrations/0114_backups.sql"), "utf8");
 // A Windows checkout ends lines with \r\n, and `.` does not match \r — a
 // comment stripper written as /--.*$/ removes nothing here and every assertion
 // below passes on a sentence in a comment. This has bitten this repository
@@ -441,7 +441,7 @@ Expected: FAIL — `ENOENT`, the migration does not exist.
 
 - [ ] **Step 3: Write the migration**
 
-Create `supabase/migrations/0112_backups.sql`:
+Create `supabase/migrations/0114_backups.sql`:
 
 ```sql
 -- One row per night a backup was considered, whether or not it produced a file.
@@ -504,7 +504,7 @@ Expected: passes, and reports the new migration in the count.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/0112_backups.sql tests/unit/backup-migration.test.ts
+git add supabase/migrations/0114_backups.sql tests/unit/backup-migration.test.ts
 git commit -m "feat(backup): record every night a snapshot was considered"
 ```
 
@@ -568,7 +568,7 @@ function stub(options: StubOptions = {}) {
                 ? options.previousHash === undefined
                   ? null
                   : { content_hash: options.previousHash }
-                : { filename: "0112_backups.sql" },
+                : { filename: "0114_backups.sql" },
             error: null,
           }),
         insert: (row: Record<string, unknown>) => {
@@ -1005,17 +1005,28 @@ Expected: FAIL — `ENOENT`, the client does not exist.
 
 - [ ] **Step 3: Build the screen**
 
-`app/(app)/settings/backups/actions.ts`:
+`app/(app)/settings/backups/actions.ts`. Note the permission check: this
+repository has no `requirePermission` helper — a server action asks the database
+directly through `acc_has_permission`, exactly as `exportCompanyDataAction` does
+at `app/(app)/settings/company/actions.ts:87`, and returns the refusal in the
+result rather than throwing:
 
 ```ts
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { requirePermission } from "@/lib/db/permissions";
 import { createBackupStorageClient, BACKUP_BUCKET } from "@/lib/services/backup";
 
-/** Long enough to click, short enough that a copied link is not a spare key. */
+/** Long enough to click, short enough that a copied link is a spare key for long. */
 const LINK_SECONDS = 300;
+
+/** The shape the settings actions in this repository already return. */
+export interface ActionResult<T = undefined> {
+  ok: boolean;
+  error?: string;
+  data?: T;
+}
 
 export interface BackupRow {
   id: string;
@@ -1026,29 +1037,44 @@ export interface BackupRow {
   journalLineCount: number | null;
 }
 
-export async function listBackupsAction(): Promise<BackupRow[]> {
-  await requirePermission("company.export");
+async function mayExport(sb: SupabaseClient): Promise<boolean> {
+  const { data, error } = await sb.rpc("acc_has_permission", { p_key: "company.export" });
+  // A permission lookup that failed is not a permission granted.
+  return !error && data === true;
+}
+
+export async function listBackupsAction(): Promise<ActionResult<BackupRow[]>> {
   const sb = await createSupabaseServerClient();
+  if (!(await mayExport(sb))) {
+    return { ok: false, error: "You do not have permission to read this company's backups" };
+  }
   const { data, error } = await sb
     .from("acc_backup")
     .select("id,taken_on,status,skip_reason,size_bytes,control_totals")
     .order("taken_on", { ascending: false })
     .limit(60);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    takenOn: row.taken_on as string,
-    status: row.status as BackupRow["status"],
-    skipReason: (row.skip_reason as string | null) ?? null,
-    sizeBytes: (row.size_bytes as number | null) ?? null,
-    journalLineCount:
-      (row.control_totals as { journalLineCount?: number } | null)?.journalLineCount ?? null,
-  }));
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    data: (data ?? []).map((row) => ({
+      id: row.id as string,
+      takenOn: row.taken_on as string,
+      status: row.status as BackupRow["status"],
+      skipReason: (row.skip_reason as string | null) ?? null,
+      sizeBytes: (row.size_bytes as number | null) ?? null,
+      journalLineCount:
+        (row.control_totals as { journalLineCount?: number } | null)?.journalLineCount ?? null,
+    })),
+  };
 }
 
-export async function downloadBackupAction(id: string): Promise<{ url: string; fileName: string }> {
-  await requirePermission("company.export");
+export async function downloadBackupAction(
+  id: string,
+): Promise<ActionResult<{ url: string; fileName: string }>> {
   const sb = await createSupabaseServerClient();
+  if (!(await mayExport(sb))) {
+    return { ok: false, error: "You do not have permission to download this company's backups" };
+  }
   // Read the row through the caller's own client first. The admin client below
   // ignores row-level security, so the row must be proven readable by the
   // person asking before it is used to mint a link.
@@ -1057,8 +1083,8 @@ export async function downloadBackupAction(id: string): Promise<{ url: string; f
     .select("storage_path")
     .eq("id", id)
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data?.storage_path) throw new Error("That snapshot has no stored file.");
+  if (error) return { ok: false, error: error.message };
+  if (!data?.storage_path) return { ok: false, error: "That snapshot has no stored file." };
   const path = data.storage_path as string;
   const fileName = path.split("/").pop() ?? "backup.zip";
   const admin = createBackupStorageClient();
@@ -1066,9 +1092,9 @@ export async function downloadBackupAction(id: string): Promise<{ url: string; f
     .from(BACKUP_BUCKET)
     .createSignedUrl(path, LINK_SECONDS, { download: fileName });
   if (signed.error || !signed.data) {
-    throw new Error(signed.error?.message ?? "Could not prepare the download");
+    return { ok: false, error: signed.error?.message ?? "Could not prepare the download" };
   }
-  return { url: signed.data.signedUrl, fileName };
+  return { ok: true, data: { url: signed.data.signedUrl, fileName } };
 }
 ```
 
@@ -1084,7 +1110,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BackupsPage() {
   await requireSettingsAccess("/settings/backups");
-  const [backups, access] = await Promise.all([listBackupsAction(), currentAccess()]);
+  const [result, access] = await Promise.all([listBackupsAction(), currentAccess()]);
   return (
     <div>
       <PageHeader
@@ -1092,7 +1118,8 @@ export default async function BackupsPage() {
         description="A snapshot of this company's books, taken on a schedule. Download one, or restore it into a new company to compare the two side by side."
       />
       <BackupsClient
-        backups={backups}
+        backups={result.ok ? (result.data ?? []) : []}
+        loadError={result.ok ? null : (result.error ?? "Could not read the backups")}
         canRestore={(access.permissionKeys ?? []).includes("company.restore")}
       />
     </div>
@@ -1121,9 +1148,11 @@ function readableSize(bytes: number | null): string {
 
 export default function BackupsClient({
   backups,
+  loadError,
   canRestore,
 }: {
   backups: BackupRow[];
+  loadError: string | null;
   canRestore: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -1131,8 +1160,9 @@ export default function BackupsClient({
   async function download(row: BackupRow) {
     setBusy(row.id);
     try {
-      const { url } = await downloadBackupAction(row.id);
-      window.location.href = url;
+      const result = await downloadBackupAction(row.id);
+      if (!result.ok || !result.data) throw new Error(result.error ?? "Could not prepare the download");
+      window.location.href = result.data.url;
     } catch (error) {
       message.error(error instanceof Error ? error.message : "Could not prepare the download");
     } finally {
@@ -1196,6 +1226,7 @@ export default function BackupsClient({
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+      {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
       <Alert
         type="info"
         showIcon
@@ -1317,7 +1348,7 @@ describe("proving a restore came back whole", () => {
   });
 
   it("refuses a snapshot newer than the code reading it", () => {
-    expect(restoreCompatibility("0200_later.sql", "0112_backups.sql")).toBe("snapshot-is-newer");
+    expect(restoreCompatibility("0200_later.sql", "0114_backups.sql")).toBe("snapshot-is-newer");
   });
 });
 ```
@@ -1419,6 +1450,7 @@ shipped change reaches the Guide in the same piece of work.
 **Files:**
 - Modify: `lib/domain/changelog.ts`
 - Modify: `lib/domain/system-guide.ts`
+- Modify: `../docs/operations/backup-and-restore.md` (repository root, outside `ctyhp-accounting/`)
 
 - [ ] **Step 1: Add the release**
 
@@ -1568,17 +1600,76 @@ beside the other Settings-rooted flows:
   },
 ```
 
-- [ ] **Step 3: Run the tests that guard both**
+- [ ] **Step 3: Correct the operations runbook**
+
+`docs/operations/backup-and-restore.md` is not incidental documentation. The
+README written into every export archive ends with "Restore procedure:
+docs/operations/backup-and-restore.md", so this is the page an operator opens
+during an incident — the worst moment to read something untrue.
+
+Three things in it stop being true when this ships.
+
+Replace the paragraph at lines 32-34:
+
+```markdown
+The archive is not a substitute for a database backup. It cannot be loaded back
+into the application — there is no importer. Its job is to be readable by any
+tool, forever, and to let you prove a restore is correct.
+```
+
+with:
+
+```markdown
+The archive is not a substitute for a database backup: it holds one company, not
+the database, and it does not carry the bytes of any attachment. But it is no
+longer a dead end. Settings → Backups can load one back into a **new** company
+and report whether the control totals came back — see section 4a. Restoring
+*over* a damaged company is still not possible; the way back is to restore
+beside it and compare.
+```
+
+Then add section 4a after section 4, and a line to section 5 saying the quarterly
+drill can now be a restore rather than only a manifest comparison:
+
+```markdown
+### 4a. Restoring one company beside the running books
+
+When one company's books are wrong and the rest of the database is healthy, a
+Supabase restore is the wrong tool — it would replace every company to rescue
+one. Instead:
+
+1. **Settings → Backups** in the affected company. Pick the last snapshot before
+   the damage. A row marked *skipped* means the books had not changed that day,
+   so the figures are the ones in the row above it.
+2. **Restore as a new company.** The running company is not written to.
+3. Read the control-total result the restore reports. All five figures matching
+   is the evidence the copy is faithful; a mismatch names the figure and both
+   values.
+4. Open the same report on both companies and compare. The difference tells you
+   which account moved and by how much — which is the question an incident
+   actually asks.
+5. Correct the running books with a journal entry. Do not delete and re-import:
+   the restored copy is evidence, and a closed period cannot be edited anyway.
+
+The restored company holds vendor tax profiles. Delete it when the comparison is
+done, and treat it as tax records until then.
+```
+
+Leave section 2 blank where it is blank. It asks for the Supabase plan's backup
+retention, which is visible only to the project owner in billing, and filling it
+in with a guess would be worse than the honest gap the runbook already flags.
+
+- [ ] **Step 4: Run the tests that guard both**
 
 Run: `npx vitest run tests/unit/changelog.test.ts tests/unit/system-guide.test.ts`
 Expected: PASS. Both files assert every route named actually exists.
 
-- [ ] **Step 4: Gates and commit**
+- [ ] **Step 5: Gates and commit**
 
 Run: `npm test && npm run typecheck && npm run lint && npm run build`
 
 ```bash
-git add lib/domain/changelog.ts lib/domain/system-guide.ts
+git add lib/domain/changelog.ts lib/domain/system-guide.ts ../docs/operations/backup-and-restore.md
 git commit -m "docs: tell people the backups exist, and what they do not cover"
 ```
 
@@ -1599,4 +1690,5 @@ git commit -m "docs: tell people the backups exist, and what they do not cover"
 - [ ] A restore reports control totals that match — demonstrated once against a real sample company, with the output recorded
 - [ ] The screen says attachments are not included
 - [ ] `changelog.ts` and `system-guide.ts` both carry the feature
+- [ ] `docs/operations/backup-and-restore.md` no longer says there is no importer
 - [ ] All four gates green, output pasted verbatim
