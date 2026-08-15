@@ -230,3 +230,28 @@ export function trendColumnLimitMessage(unit: "month" | "quarter", from: string,
     quarters.length <= MAX_TREND_COLUMNS ? `, or show it by quarter (${quarters.length} columns)` : "";
   return `That range is ${columns.length} monthly columns. Narrow the range${alternative}.`;
 }
+
+/**
+ * The plain range a period-by-period report spans: one label alone for a
+ * single period, "first to last" once there is more than one.
+ *
+ * A single period's "range" is just itself — writing it as "X to X" states
+ * the same period twice, as though a trend had started and ended on the same
+ * day rather than never having a second point to span at all.
+ */
+export function trendPeriodRangeText(labels: readonly string[]): string {
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels[0]} to ${labels[labels.length - 1]}`;
+}
+
+/**
+ * The heading for a period-by-period report: how many periods, and the range
+ * they span. Grammar follows the count for the same reason the range itself
+ * does not repeat a single period — "1 periods" reads as a typo, and reads
+ * worse once it is followed by a range that repeats itself too.
+ */
+export function trendPeriodHeading(labels: readonly string[]): string {
+  if (labels.length === 0) return "No periods";
+  const count = labels.length === 1 ? "1 period" : `${labels.length} periods`;
+  return `${count}, ${trendPeriodRangeText(labels)}`;
+}

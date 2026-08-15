@@ -6,7 +6,10 @@ import {
   buildBudgetVsActual,
   buildStatementOfEquity,
   compareReportLines,
+  nextShowPercentOfIncome,
   percentOfIncome,
+  pnlTrendColumns,
+  pnlTrendExportRows,
   pnlTrendRows,
   previousMonthEnd,
   previousPeriodRange,
@@ -221,6 +224,115 @@ describe("multi-period profit and loss", () => {
       expect(empty.netIncome).toBe(0);
       expect(empty.income.lines).toEqual([]);
     });
+  });
+
+  describe("pnlTrendColumns", () => {
+    it("does not append a Total column for a single period", () => {
+      // The bug the review caught: a one-period range must not render a
+      // second, duplicate column that just repeats the same figures.
+      const single = pnlTrendColumns([periods[0]], ["Jan 2026"]);
+      expect(single.hasTotal).toBe(false);
+      expect(single.columnLabels).toEqual(["Jan 2026"]);
+      expect(single.incomeTotals).toEqual([10000]);
+      expect(single.rows.find((r) => r.key === "net-income")!.amounts).toEqual([6000]);
+    });
+
+    it("appends a Total column, and only a Total column, once there is more than one period", () => {
+      const trend = pnlTrendColumns(periods, ["Jan 2026", "Feb 2026"]);
+      expect(trend.hasTotal).toBe(true);
+      expect(trend.columnLabels).toEqual(["Jan 2026", "Feb 2026", "Total"]);
+      expect(trend.incomeTotals).toEqual([10000, 15000, 25000]);
+      expect(trend.rows.find((r) => r.key === "net-income")!.amounts).toEqual([6000, 9000, 15000]);
+    });
+
+    it("has nothing to lay out, and no Total, for no periods", () => {
+      const empty = pnlTrendColumns([], []);
+      expect(empty.hasTotal).toBe(false);
+      expect(empty.columnLabels).toEqual([]);
+      expect(empty.rows).toEqual([]);
+    });
+  });
+
+  describe("pnlTrendExportRows", () => {
+    // MinorAmountRow-shaped fixtures, independent of buildProfitAndLoss, so
+    // the export-row conversion is exercised directly rather than through a
+    // whole P&L. Income totals are deliberately not equal to the row
+    // amounts, so a percent cell computed against the wrong divisor (or not
+    // computed at all) would not coincidentally look right.
+    const exportRows = [
+      { key: "income-4000", label: "4000 — Sales", kind: "line" as const, amounts: [10000, 15000, 25000] },
+      { key: "income", label: "Income", kind: "section" as const, amounts: [] },
+    ];
+    const incomeTotals = [40000, 30000, 50000];
+
+    it("converts each column's minor-unit amount to major units", () => {
+      // This is the seam this branch's review found bypassed: PnlTrendView
+      // used to call fromMinor inline, right beside a percent entry that
+      // must not be converted the same way — easy to drop by accident. This
+      // test fails if that conversion is ever skipped again.
+      const exported = pnlTrendExportRows(exportRows, 3, 2, incomeTotals, false);
+      expect(exported[0]).toEqual({
+        label: "4000 — Sales",
+        "amount-0": 100,
+        "amount-1": 150,
+        "amount-2": 250,
+      });
+      // A section row carries no amounts at all — blank cells, not $0.00.
+      expect(exported[1]).toEqual({
+        label: "Income",
+        "amount-0": null,
+        "amount-1": null,
+        "amount-2": null,
+      });
+    });
+
+    it("does not divide by 100 for a currency with zero decimal places", () => {
+      // Exactly what exportRowsFromMinorAmounts exists to prevent: a fixed
+      // "divide by 100" would silently shrink every figure two orders of
+      // magnitude for a currency like VND.
+      const exported = pnlTrendExportRows(exportRows, 3, 0, incomeTotals, false);
+      expect(exported[0]).toEqual({
+        label: "4000 — Sales",
+        "amount-0": 10000,
+        "amount-1": 15000,
+        "amount-2": 25000,
+      });
+    });
+
+    it("leaves the percent columns out entirely when % of Income is off", () => {
+      const exported = pnlTrendExportRows(exportRows, 3, 2, incomeTotals, false);
+      expect(Object.keys(exported[0])).toEqual(["label", "amount-0", "amount-1", "amount-2"]);
+    });
+
+    it("adds a percent cell beside the money cell, against the income total, without converting it the same way", () => {
+      const exported = pnlTrendExportRows(exportRows, 3, 2, incomeTotals, true);
+      expect(exported[0]).toEqual({
+        label: "4000 — Sales",
+        "amount-0": 100,
+        "amount-1": 150,
+        "amount-2": 250,
+        "percent-0": 25,
+        "percent-1": 50,
+        "percent-2": 50,
+      });
+    });
+  });
+});
+
+describe("nextShowPercentOfIncome", () => {
+  it("applies the new mode's default when the reader has not touched the switch", () => {
+    expect(nextShowPercentOfIncome("month", true, false)).toBe(false);
+    expect(nextShowPercentOfIncome("quarter", false, false)).toBe(false);
+    expect(nextShowPercentOfIncome("comparison", false, false)).toBe(true);
+    expect(nextShowPercentOfIncome("single", false, false)).toBe(true);
+  });
+
+  it("keeps the reader's own choice once they have touched the switch, whatever mode they switch to", () => {
+    // The scenario the review caught: turn % of Income on in "By month",
+    // then ask for "By quarter" from the limit notice — the reader's "on"
+    // must survive, not fall back to the trend mode's off default.
+    expect(nextShowPercentOfIncome("quarter", true, true)).toBe(true);
+    expect(nextShowPercentOfIncome("single", false, true)).toBe(false);
   });
 });
 

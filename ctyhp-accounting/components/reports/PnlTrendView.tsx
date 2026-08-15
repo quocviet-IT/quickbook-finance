@@ -5,14 +5,13 @@ import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { ReportBody } from "@/components/reports/ReportAudience";
 import { formatPercent } from "@/lib/format";
-import { fromMinor } from "@/lib/domain/money";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
-import type { RangeColumn } from "@/lib/domain/report-periods";
+import { trendPeriodHeading, trendPeriodRangeText, type RangeColumn } from "@/lib/domain/report-periods";
 import {
   percentOfIncome,
   PERCENT_OF_INCOME_TOOLTIP,
-  pnlTrendRows,
-  sumProfitAndLoss,
+  pnlTrendColumns,
+  pnlTrendExportRows,
   type PnlTrendRow,
   type ProfitAndLoss,
 } from "@/lib/domain/reports";
@@ -39,15 +38,12 @@ export default function PnlTrendView({
   if (periods.length === 0) return null;
 
   const pnls = periods.map((period) => period.pnl);
-  // Appending the sum as one more "period" is what lines the Total column up
-  // account-for-account with the rest of the table for free: pnlTrendRows
-  // already matches lines across periods by account, and sumProfitAndLoss's
-  // lines carry the same account codes, so the Total simply falls into place
-  // as the last column instead of needing its own lookup.
-  const total = sumProfitAndLoss(pnls);
-  const rows = pnlTrendRows([...pnls, total]);
-  const incomeTotals = [...pnls.map((pnl) => pnl.income.total), total.income.total];
-  const columnLabels = [...periods.map((period) => period.label), "Total"];
+  const labels = periods.map((period) => period.label);
+  // pnlTrendColumns is the one place that decides whether a Total column
+  // exists (only once there is more than one period to sum) — the table, the
+  // export sheet, and the heading below all read that decision from here
+  // rather than each guarding it separately.
+  const { hasTotal, columnLabels, rows, incomeTotals } = pnlTrendColumns(pnls, labels);
 
   const percentText = (amount: number, income: number): string => {
     const pct = percentOfIncome(amount, income);
@@ -59,7 +55,7 @@ export default function PnlTrendView({
     fileName: `profit-and-loss-by-period-${last.to}`,
     companyName,
     title: "Profit and Loss by Period",
-    subtitle: `${periods[0].label} to ${last.label}`,
+    subtitle: trendPeriodRangeText(labels),
     currencyCode: baseCurrency,
     columns: [
       { key: "label", header: "Account", kind: "text" },
@@ -70,24 +66,10 @@ export default function PnlTrendView({
           : []),
       ]),
     ],
-    rows: rows.map((row) => ({
-      label: row.label,
-      ...Object.fromEntries(
-        columnLabels.flatMap((_, index) => {
-          const amount = row.kind === "section" ? null : (row.amounts[index] ?? 0);
-          const entries: [string, string | number | null][] = [
-            [`amount-${index}`, amount === null ? null : fromMinor(amount, baseDecimals)],
-          ];
-          if (showPercentOfIncome) {
-            entries.push([
-              `percent-${index}`,
-              amount === null ? null : percentOfIncome(amount, incomeTotals[index]),
-            ]);
-          }
-          return entries;
-        }),
-      ),
-    })),
+    // Money is routed through the shared minor-to-major seam, not divided
+    // inline — see pnlTrendExportRows for why that matters right next to a
+    // percent column that must *not* go through the same conversion.
+    rows: pnlTrendExportRows(rows, columnLabels.length, baseDecimals, incomeTotals, showPercentOfIncome),
   };
 
   return (
@@ -96,9 +78,7 @@ export default function PnlTrendView({
         <div>
           <div className="report-result__entity">{companyName}</div>
           <h3>Profit and Loss by Period</h3>
-          <p>
-            {periods.length} periods, {periods[0].label} to {last.label}
-          </p>
+          <p>{trendPeriodHeading(labels)}</p>
         </div>
         <ReportExportButtons sheet={exportSheet} />
       </div>
@@ -119,7 +99,7 @@ export default function PnlTrendView({
                   row.kind === "section" ? <strong>{row.label}</strong> : row.label,
               },
               ...columnLabels.flatMap((label, index) => {
-                const isTotal = index === columnLabels.length - 1;
+                const isTotal = hasTotal && index === columnLabels.length - 1;
                 const moneyColumn = {
                   title: isTotal ? <strong>Total</strong> : label,
                   width: 130,

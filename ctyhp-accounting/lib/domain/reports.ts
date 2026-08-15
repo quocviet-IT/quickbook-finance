@@ -5,6 +5,7 @@
  * cannot disagree with the chart of accounts.
  */
 import { type AccountType, type NormalBalance, naturalBalance, statementSectionOf } from "./accounts";
+import { exportRowsFromMinorAmounts, type MinorAmountRow } from "./report-export";
 
 export interface LedgerBalance {
   accountId: string;
@@ -607,6 +608,50 @@ export function sumProfitAndLoss(pnls: readonly ProfitAndLoss[]): ProfitAndLoss 
   return { income, costOfGoodsSold, grossProfit, operatingExpenses, otherIncome, otherExpenses, netIncome };
 }
 
+/** What `pnlTrendColumns` hands the view: one column per period, a Total
+ *  appended only when there is more than one, and everything else needed to
+ *  render or export that same set of columns without recomputing it. */
+export interface PnlTrendColumns {
+  /** True once a "Total" column has been appended to `columnLabels`/`rows`/`incomeTotals`. */
+  hasTotal: boolean;
+  columnLabels: string[];
+  rows: PnlTrendRow[];
+  /** Each column's income total, minor units — what a "% of Income" cell divides by. */
+  incomeTotals: number[];
+}
+
+/**
+ * The columns a period-by-period P&L renders: the periods themselves, plus a
+ * "Total" appended after them — in one call, so the table, its export sheet,
+ * and its heading cannot disagree about whether that last column exists.
+ *
+ * A Total column sums the periods beside it. For a single period that sum is
+ * the period itself, so appending one would not summarize anything — it
+ * would print the same figure a second time under a heading that claims to
+ * be different from the first. `sumProfitAndLoss` is only called, and the
+ * label only appended, once there is more than one period to add together.
+ */
+export function pnlTrendColumns(
+  pnls: readonly ProfitAndLoss[],
+  labels: readonly string[],
+): PnlTrendColumns {
+  if (pnls.length <= 1) {
+    return {
+      hasTotal: false,
+      columnLabels: [...labels],
+      rows: pnlTrendRows(pnls),
+      incomeTotals: pnls.map((pnl) => pnl.income.total),
+    };
+  }
+  const total = sumProfitAndLoss(pnls);
+  return {
+    hasTotal: true,
+    columnLabels: [...labels, "Total"],
+    rows: pnlTrendRows([...pnls, total]),
+    incomeTotals: [...pnls.map((pnl) => pnl.income.total), total.income.total],
+  };
+}
+
 /**
  * A figure as a percentage of a column's total income — QuickBooks' "% of
  * Income". Display-only: nothing here is ever stored, and the two arguments
@@ -634,3 +679,60 @@ export function percentOfIncome(amountMinor: number, incomeMinor: number): numbe
  */
 export const PERCENT_OF_INCOME_TOOLTIP =
   "Percentage of Total Income for this column — Other Income is not included.";
+
+/**
+ * Builds a period-by-period P&L export sheet's `rows`, keyed the way
+ * `PnlTrendView` keys its columns: `amount-<index>` for the money, and
+ * `percent-<index>` beside it once % of Income is on.
+ *
+ * Routes the money half through `exportRowsFromMinorAmounts` — the seam that
+ * exists specifically so a multi-column money export can never divide by a
+ * hard-coded 100 — instead of converting inline. Converting inline is what
+ * this branch's own review flagged: it sat one line away from the percent
+ * entry, which must *not* go through the same conversion, and that
+ * resemblance is exactly what would let a later edit drop the money
+ * conversion without anything failing to compile. Building the whole row
+ * here, rather than in the view, is also what lets a test call it directly
+ * without a React tree.
+ */
+export function pnlTrendExportRows(
+  rows: readonly MinorAmountRow[],
+  columnCount: number,
+  baseDecimals: number,
+  incomeTotalsMinor: readonly number[],
+  showPercentOfIncome: boolean,
+): Record<string, string | number | null>[] {
+  const moneyKeys = Array.from({ length: columnCount }, (_, index) => `amount-${index}`);
+  const moneyRows = exportRowsFromMinorAmounts(rows, moneyKeys, baseDecimals);
+  if (!showPercentOfIncome) return moneyRows;
+  return rows.map((row, rowIndex) => ({
+    ...moneyRows[rowIndex],
+    ...Object.fromEntries(
+      Array.from({ length: columnCount }, (_, index) => {
+        const minor = row.amounts[index];
+        return [
+          `percent-${index}`,
+          minor === undefined ? null : percentOfIncome(minor, incomeTotalsMinor[index]),
+        ];
+      }),
+    ),
+  }));
+}
+
+/**
+ * The % of Income switch's value after the P&L column layout changes.
+ *
+ * The switch defaults differently per layout — on for one or two periods, off
+ * for a period-by-period trend — but a default is only what applies *before*
+ * the reader has said anything. `touched` is true from the moment they flip
+ * the switch themselves; past that point the mode change must leave their
+ * choice alone, or turning it on and then asking for quarters instead of
+ * months would silently turn it back off.
+ */
+export function nextShowPercentOfIncome(
+  nextColumns: "single" | "comparison" | "month" | "quarter",
+  current: boolean,
+  touched: boolean,
+): boolean {
+  return touched ? current : nextColumns === "single" || nextColumns === "comparison";
+}

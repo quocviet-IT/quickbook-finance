@@ -14,6 +14,8 @@ import {
   trailingMonthEnds,
   trailingYearEnds,
   trendColumnLimitMessage,
+  trendPeriodHeading,
+  trendPeriodRangeText,
 } from "@/lib/domain/report-periods";
 import { balanceTrendRows, type BalanceSheet } from "@/lib/domain/reports";
 
@@ -221,6 +223,37 @@ describe("trendColumnLimitMessage", () => {
   it("never suggests coarsening quarters further, since there is nothing coarser on offer", () => {
     const message = trendColumnLimitMessage("quarter", "1926-01-01", "2030-12-31");
     expect(message).toBe("That range is 420 quarterly columns. Narrow the range.");
+  });
+});
+
+describe("trendPeriodRangeText", () => {
+  it("is the label itself for a single period, not the label repeated", () => {
+    // The exact case the review caught: a range inside one calendar month
+    // (monthlyColumns gives it a literal-dates label) read back as
+    // "2026-06-05 – 2026-06-20 to 2026-06-05 – 2026-06-20".
+    expect(trendPeriodRangeText(["2026-06-05 – 2026-06-20"])).toBe("2026-06-05 – 2026-06-20");
+  });
+
+  it("spans first to last once there is more than one period", () => {
+    expect(trendPeriodRangeText(["Jan 2026", "Feb 2026", "Mar 2026"])).toBe("Jan 2026 to Mar 2026");
+  });
+
+  it("is empty for no periods", () => {
+    expect(trendPeriodRangeText([])).toBe("");
+  });
+});
+
+describe("trendPeriodHeading", () => {
+  it("uses singular grammar and does not repeat the one period it has", () => {
+    expect(trendPeriodHeading(["2026-06-05 – 2026-06-20"])).toBe("1 period, 2026-06-05 – 2026-06-20");
+  });
+
+  it("counts and spans multiple periods", () => {
+    expect(trendPeriodHeading(["Jan 2026", "Feb 2026"])).toBe("2 periods, Jan 2026 to Feb 2026");
+  });
+
+  it("says so plainly when there is nothing to show", () => {
+    expect(trendPeriodHeading([])).toBe("No periods");
   });
 });
 

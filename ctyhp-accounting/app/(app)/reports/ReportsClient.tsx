@@ -42,6 +42,7 @@ import {
   buildProfitAndLoss,
   buildTrialBalance,
   compareReportLines,
+  nextShowPercentOfIncome,
   percentOfIncome,
   PERCENT_OF_INCOME_TOOLTIP,
   previousPeriodRange,
@@ -132,6 +133,13 @@ export default function ReportsClient({
    * both.
    */
   const [showPercentOfIncome, setShowPercentOfIncome] = useState(true);
+  /**
+   * Whether the reader has flipped the % of Income switch themselves. Before
+   * that, `handlePnlColumnsChange` is free to move the switch to the new
+   * mode's default; after it, the mode change must leave the reader's own
+   * choice alone — see `nextShowPercentOfIncome`.
+   */
+  const [percentOfIncomeTouched, setPercentOfIncomeTouched] = useState(false);
   const [trendPeriods, setTrendPeriods] = useState<TrendPeriod[]>([]);
   const [pnlTrendPeriods, setPnlTrendPeriods] = useState<PnlTrendPeriod[]>([]);
   /**
@@ -163,7 +171,7 @@ export default function ReportsClient({
 
   function handlePnlColumnsChange(next: "single" | "comparison" | "month" | "quarter") {
     setPnlColumns(next);
-    setShowPercentOfIncome(next === "single" || next === "comparison");
+    setShowPercentOfIncome((current) => nextShowPercentOfIncome(next, current, percentOfIncomeTouched));
   }
 
   const money = useCallback(
@@ -368,7 +376,10 @@ export default function ReportsClient({
               <Switch
                 size="small"
                 checked={showPercentOfIncome}
-                onChange={setShowPercentOfIncome}
+                onChange={(checked) => {
+                  setPercentOfIncomeTouched(true);
+                  setShowPercentOfIncome(checked);
+                }}
                 aria-label="Show % of Income"
               />
               <Typography.Text type="secondary">% of Income</Typography.Text>
