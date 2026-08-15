@@ -41,6 +41,61 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.20",
+    date: "2026-08-15",
+    headline:
+      "The journal reaches every entry and says when it cannot, a long note no longer pushes the buttons off the screen, and a re-imported file stops losing rows.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Importing the same file again no longer drops rows without saying so",
+        detail:
+          "The check for what had already been brought across only read the "
+          + "first thousand bank lines, and reported nothing when it stopped "
+          + "there. Anything past that was offered again, refused on the way in, "
+          + "and left out of the books — the screen promising a number of rows "
+          + "and fewer arriving. If you have imported the same file twice, it is "
+          + "worth checking the account totals against where they came from.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "Journal Entries can reach an entry from any year, and says how many it is not showing",
+        detail:
+          "The list read the newest thousand entries and behaved as though that "
+          + "were all of them, so an entry from an earlier year could not be "
+          + "found however far you paged. It now says \"showing the 1,000 most "
+          + "recent of 7,533\" when it is holding back, and a date range beside "
+          + "the New Journal Entry button narrows the list to reach the rest.",
+        route: "/journal",
+      },
+      {
+        kind: "changed",
+        title: "A report column is headed with the period it covers",
+        detail:
+          "Profit and loss columns said Current and Prior, which tells you only "
+          + "which came first. They now carry the period itself — 2024, Aug 2026, "
+          + "Q1 2026 — so the figures can be read without holding the dates from "
+          + "the subtitle in your head, and a printed page still says what it is. "
+          + "The exported file takes the same headings.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "A long note no longer pushes the buttons off the side of the screen",
+        detail:
+          "A memo, a description or a reason has no length limit, and one long "
+          + "enough was deciding how wide its whole table had to be — leaving the "
+          + "amounts on the general ledger, and the Reverse button on Journal "
+          + "Entries, reachable only by scrolling sideways on a page that gives "
+          + "no sign it scrolls. Those columns are now cut to fit; hover to read "
+          + "the whole of one. The same is done on approvals, stock movements, "
+          + "users, vendor tax history and the purchase order screens.",
+        route: "/journal",
+      },
+    ],
+  },
+  {
     version: "1.19",
     date: "2026-08-15",
     headline:
