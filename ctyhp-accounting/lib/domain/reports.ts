@@ -150,12 +150,65 @@ export interface DateRange {
   to: string;
 }
 
-/** Immediately preceding range with the same inclusive number of calendar days. */
+/** Last day of the month a date falls in, as a UTC date. */
+function monthEnd(year: number, month: number): Date {
+  // Day 0 of the next month is the last day of this one, which is also how
+  // February gets its leap day without anybody writing the rule down.
+  return new Date(Date.UTC(year, month + 1, 0));
+}
+
+/** True when a range covers whole calendar months, first day to last day. */
+function coversWholeMonths(start: Date, end: Date): boolean {
+  return (
+    start.getUTCDate() === 1 &&
+    end.getUTCDate() === monthEnd(end.getUTCFullYear(), end.getUTCMonth()).getUTCDate()
+  );
+}
+
+/**
+ * The period a report should be compared against.
+ *
+ * A whole month, quarter or year is compared with the same period before it —
+ * the quarter before, the year before — because that is what the comparison
+ * means to the person reading it, and because it is the only answer that lands
+ * on the calendar boundaries the books are kept on.
+ *
+ * This used to count days and step back that many, which sounds equivalent and
+ * is not. Months and years are not all the same length, so the count landed a
+ * day or two inside the period before the one intended: comparing 2024 reached
+ * back to 2022-12-31, because 2024 has 366 days and 2023 has 365, folding a day
+ * of 2022 into a column labelled as the prior year. Comparing 2025 started the
+ * prior column on 2 January, so anything posted on New Year's Day 2024 was
+ * missing from it and nothing said so.
+ *
+ * A range that is not whole months — someone picked two dates by hand — has no
+ * calendar period to step back through, so the day count remains the only rule
+ * available and is kept for exactly that case.
+ */
 export function previousPeriodRange(from: string, to: string): DateRange {
   const start = new Date(`${from}T00:00:00.000Z`);
   const end = new Date(`${to}T00:00:00.000Z`);
+  if (end.getTime() < start.getTime()) {
+    throw new Error("Report end date must not be before its start date");
+  }
+
+  if (coversWholeMonths(start, end)) {
+    const months =
+      (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+      (end.getUTCMonth() - start.getUTCMonth()) +
+      1;
+    const priorStart = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - months, 1));
+    const priorEnd = monthEnd(
+      priorStart.getUTCFullYear(),
+      priorStart.getUTCMonth() + months - 1,
+    );
+    return {
+      from: priorStart.toISOString().slice(0, 10),
+      to: priorEnd.toISOString().slice(0, 10),
+    };
+  }
+
   const days = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
-  if (days <= 0) throw new Error("Report end date must not be before its start date");
   const priorEnd = new Date(start);
   priorEnd.setUTCDate(priorEnd.getUTCDate() - 1);
   const priorStart = new Date(priorEnd);

@@ -56,12 +56,46 @@ describe("balance sheet", () => {
 });
 
 describe("period comparison", () => {
-  it("uses the immediately preceding inclusive range", () => {
+  it("compares a whole month, quarter or year with the same period before it", () => {
+    // A reader comparing a quarter means the quarter before, not the 91 days
+    // before. Counting days is what this used to do, and it put the start of
+    // every comparison a day or two inside the period before the one intended.
     expect(previousPeriodRange("2026-04-01", "2026-06-30")).toEqual({
-      from: "2025-12-31",
+      from: "2026-01-01",
       to: "2026-03-31",
     });
+    expect(previousPeriodRange("2024-02-01", "2024-02-29")).toEqual({
+      from: "2024-01-01",
+      to: "2024-01-31",
+    });
     expect(previousMonthEnd("2026-07-25")).toBe("2026-06-30");
+  });
+
+  it("compares a year with the year before, even across a leap year", () => {
+    // The case a user reported. 2024 has 366 days, so counting days reached
+    // back to 2022-12-31 — a comparison spanning two financial years, with an
+    // extra day of 2022 folded into it.
+    expect(previousPeriodRange("2024-01-01", "2024-12-31")).toEqual({
+      from: "2023-01-01",
+      to: "2023-12-31",
+    });
+    // And the other direction: 2025 has 365 days, so counting days started the
+    // comparison on 2 January and dropped New Year's Day out of the prior year
+    // altogether. Anything posted that day was missing from the column and
+    // nothing said so.
+    expect(previousPeriodRange("2025-01-01", "2025-12-31")).toEqual({
+      from: "2024-01-01",
+      to: "2024-12-31",
+    });
+  });
+
+  it("still counts days for a range that is not whole months", () => {
+    // A hand-picked range has no calendar period to step back through, so the
+    // old rule is the only one available and stays.
+    expect(previousPeriodRange("2026-03-15", "2026-04-20")).toEqual({
+      from: "2026-02-06",
+      to: "2026-03-14",
+    });
   });
 
   it("aligns account lines and calculates variance", () => {
