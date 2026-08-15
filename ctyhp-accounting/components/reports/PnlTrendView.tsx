@@ -10,6 +10,7 @@ import type { ReportExportSheet } from "@/lib/domain/report-export";
 import type { RangeColumn } from "@/lib/domain/report-periods";
 import {
   percentOfIncome,
+  PERCENT_OF_INCOME_TOOLTIP,
   pnlTrendRows,
   sumProfitAndLoss,
   type PnlTrendRow,
@@ -19,14 +20,6 @@ import {
 export interface PnlTrendPeriod extends RangeColumn {
   pnl: ProfitAndLoss;
 }
-
-/**
- * Same wording wherever the % of Income header appears — on screen and, one
- * day, wherever an export gets a chance to carry it. QuickBooks' Total Income
- * excludes Other Income, and this matches that, but a column headed only
- * "% of Income" does not say so on its own.
- */
-const PERCENT_TOOLTIP = "Percentage of Total Income for this column — Other Income is not included.";
 
 export default function PnlTrendView({
   periods,
@@ -140,7 +133,7 @@ export default function PnlTrendView({
                 if (!showPercentOfIncome) return [moneyColumn];
                 const percentColumn = {
                   title: (
-                    <Tooltip title={PERCENT_TOOLTIP}>
+                    <Tooltip title={PERCENT_OF_INCOME_TOOLTIP}>
                       <span>{isTotal ? "Total %" : "% of Income"}</span>
                     </Tooltip>
                   ),

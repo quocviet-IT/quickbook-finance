@@ -624,3 +624,13 @@ export function percentOfIncome(amountMinor: number, incomeMinor: number): numbe
   if (incomeMinor === 0) return null;
   return (amountMinor / incomeMinor) * 100;
 }
+
+/**
+ * One sentence, shared by every screen that heads a column "% of Income", so
+ * the explanation cannot drift out of sync between them. QuickBooks' Total
+ * Income excludes Other Income, and this matches that, but a header reading
+ * only "% of Income" does not say so on its own — this is what the tooltip
+ * says instead.
+ */
+export const PERCENT_OF_INCOME_TOOLTIP =
+  "Percentage of Total Income for this column — Other Income is not included.";

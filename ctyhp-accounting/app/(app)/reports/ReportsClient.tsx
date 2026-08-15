@@ -43,6 +43,7 @@ import {
   buildTrialBalance,
   compareReportLines,
   percentOfIncome,
+  PERCENT_OF_INCOME_TOOLTIP,
   previousPeriodRange,
   type BalanceSheet,
   type BudgetVsActual,
@@ -987,13 +988,6 @@ function balanceComparisonRows(current: BalanceSheet, prior: BalanceSheet): Comp
     ),
   ];
 }
-
-/**
- * Same wording everywhere a % of Income header appears, on screen or in an
- * export. QuickBooks' Total Income excludes Other Income, and this matches
- * that, but a column headed only "% of Income" does not say so on its own.
- */
-const PERCENT_OF_INCOME_TOOLTIP = "Percentage of Total Income for this column — Other Income is not included.";
 
 function ComparisonTable({
   rows,
