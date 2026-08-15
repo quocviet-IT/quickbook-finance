@@ -96,6 +96,17 @@ export const GUIDE_NOTICES = [
       "make after this test round: tell us through the Report button and it becomes " +
       "a tracked item.",
   },
+  {
+    id: "status",
+    title: "If something looks broken, One Book will tell you whether it is",
+    body:
+      "Open /status and it says whether One Book itself is answering: the database, " +
+      "the sign-in service and the configuration, each on its own line, with a Check " +
+      "again button. It works while you are signed out and while One Book is in " +
+      "trouble, because those are the two moments you would go looking. If it says " +
+      "One Book is working and a screen still misbehaves, the problem is not with " +
+      "One Book — worth knowing before anybody telephones.",
+  },
 ] as const;
 
 export const GUIDE_FLOWS: GuideFlow[] = [
