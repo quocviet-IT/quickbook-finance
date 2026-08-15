@@ -41,6 +41,63 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.19",
+    date: "2026-08-15",
+    headline:
+      "A report can be read on its own now, the general ledger fits the page, and a comparison covers the period it says it does.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A comparison covers the period named at the top of it",
+        detail:
+          "The prior column was worked out by counting back the same number of "
+          + "days, which is not the same as the period before. Comparing 2024 "
+          + "reached back into 2022, because 2024 is a leap year and the count "
+          + "ran a day past the start of 2023. Comparing 2025 began the prior "
+          + "column on 2 January, so anything posted on New Year's Day was "
+          + "missing from it. A month is now compared with the month before, a "
+          + "quarter with the quarter before and a year with the year before. "
+          + "Figures in a comparison column will change, because they were "
+          + "wrong.",
+        route: "/reports",
+      },
+      {
+        kind: "added",
+        title: "A balance sheet or profit and loss on its own, with no comparison",
+        detail:
+          "Both reports offer One period beside the column choices. The prior "
+          + "column and the two variance columns go with it, the heading drops "
+          + "the word Comparison, and the exported file matches what is on "
+          + "screen. Two periods is still what you get unless you ask "
+          + "otherwise, so a link somebody saved still shows what it showed.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "The general ledger keeps its amounts on the screen",
+        detail:
+          "Debit, Credit and Running sat off the right-hand edge, reachable "
+          + "only by a scrollbar at the foot of a page thousands of lines long, "
+          + "and zooming out did not help. A bank memo carries the whole wire "
+          + "description, and it was deciding how wide the table had to be. The "
+          + "memo is now cut to its column and the amounts stay where they can "
+          + "be read.",
+        route: "/reports/general-ledger",
+      },
+      {
+        kind: "added",
+        title: "Hover a memo to read all of it, and the ledger turns pages",
+        detail:
+          "The full memo opens beside the pointer, wrapped so a long wire "
+          + "description is readable. The ledger now shows fifty lines to a "
+          + "page with the count beside it, rather than every line at once. The "
+          + "running balance is worked out over the whole date range, so it "
+          + "carries on from page to page rather than starting again.",
+        route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
     version: "1.18",
     date: "2026-08-13",
     headline: "There is now a page that says whether One Book is working, so nobody has to ring and ask.",
