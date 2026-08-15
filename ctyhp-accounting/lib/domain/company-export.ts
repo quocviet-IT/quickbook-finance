@@ -77,6 +77,33 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_audit_log",
 ];
 
+/**
+ * How each exported table is ordered when it is read.
+ *
+ * `readTable` pages with `.range()`, and Postgres does not have to answer two
+ * unordered queries the same way — so without this, page two of a large table
+ * can repeat rows page one already returned and drop others in their place. The
+ * largest company here holds 20,740 journal lines, twenty-one pages of them.
+ *
+ * Most tables key on `id`, which is the default. These eight key on text and
+ * have no `id` column at all; ordering them by one would not drift quietly, it
+ * would throw, because Postgres validates the column even on an empty table.
+ */
+export const ORDER_COLUMNS: Record<string, string[]> = {
+  acc_schema_migrations: ["filename"],
+  acc_currency: ["code"],
+  acc_permission: ["key"],
+  acc_role_permission: ["role", "permission_key"],
+  acc_approval_policy: ["action_key"],
+  acc_sequence: ["key"],
+  acc_purchasing_config: ["singleton"],
+  acc_1099_box: ["code"],
+};
+
+export function orderColumnsFor(table: string): string[] {
+  return ORDER_COLUMNS[table] ?? ["id"];
+}
+
 export interface ExportDataset {
   table: string;
   columns: string[];

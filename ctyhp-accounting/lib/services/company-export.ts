@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   EXPORT_TABLES,
+  orderColumnsFor,
   SENSITIVE_TABLE,
   type ExportControlTotals,
   type ExportDataset,
@@ -15,8 +16,15 @@ async function readTable(
   table: string,
 ): Promise<Array<Record<string, unknown>>> {
   const rows: Array<Record<string, unknown>> = [];
+  const orderBy = orderColumnsFor(table);
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb.from(table).select("*").range(from, from + PAGE - 1);
+    // Postgres makes no promise about order without one, so an unordered paged
+    // read can hand back page 2 with rows page 1 already had and drop others
+    // in their place. Every exported table has a declared order column (see
+    // ORDER_COLUMNS) so two reads of unchanged books agree.
+    let query = sb.from(table).select("*");
+    for (const column of orderBy) query = query.order(column);
+    const { data, error } = await query.range(from, from + PAGE - 1);
     if (error) throw new CompanyExportError(`Reading ${table} failed: ${error.message}`);
     rows.push(...((data ?? []) as Array<Record<string, unknown>>));
     if (!data || data.length < PAGE) return rows;
