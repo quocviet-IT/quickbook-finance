@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { App, Modal, Table, Tag } from "antd";
 import type { InventoryTxnRow, ItemRow } from "@/lib/db/types";
 import { listItemMovementsAction } from "./inventory-actions";
+import { longTextColumn } from "@/components/ui/long-text-column";
 
 const SOURCE_COLOR: Record<string, string> = {
   receipt: "green",
@@ -70,7 +71,7 @@ function ItemMovementsModalBody({ item, onClose }: Props & { item: ItemRow }) {
             align: "right",
             render: (v: number) => money(Number(v)),
           },
-          { title: "Memo", dataIndex: "memo", render: (v: string | null) => v ?? "—" },
+          { title: "Memo", dataIndex: "memo", ...longTextColumn() },
         ]}
       />
     </Modal>

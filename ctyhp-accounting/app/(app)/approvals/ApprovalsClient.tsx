@@ -7,6 +7,7 @@ import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/li
 import { canDecide } from "@/lib/domain/access";
 import { fromMinor } from "@/lib/domain/money";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
+import { longTextColumn } from "@/components/ui/long-text-column";
 
 const STATUS_COLOR: Record<ApprovalStatus, string> = {
   pending: "gold",
@@ -120,7 +121,7 @@ export default function ApprovalsClient({
       align: "right" as const,
       render: (v: number) => (v ? money(Number(v)) : "—"),
     },
-    { title: "Reason", dataIndex: "reason" },
+    { title: "Reason", dataIndex: "reason", ...longTextColumn() },
     { title: "Requested", dataIndex: "requested_at", render: (v: string) => v.slice(0, 16).replace("T", " ") },
   ];
 
@@ -240,7 +241,7 @@ export default function ApprovalsClient({
               render: (v: ApprovalStatus) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
             },
             { title: "Decided", dataIndex: "decided_at", render: (v: string | null) => (v ? v.slice(0, 16).replace("T", " ") : "—") },
-            { title: "Note", dataIndex: "decision_note", render: (v: string | null) => v ?? "—" },
+            { title: "Note", dataIndex: "decision_note", ...longTextColumn() },
           ]}
         />
       </Card>

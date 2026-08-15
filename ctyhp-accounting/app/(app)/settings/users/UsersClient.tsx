@@ -7,6 +7,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
 import { createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
+import { longTextColumn } from "@/components/ui/long-text-column";
 
 const STATUS_COLOR: Record<UserStatus, string> = {
   invited: "blue",
@@ -196,7 +197,7 @@ export default function UsersClient({
             dataIndex: "last_sign_in",
             render: (v: string | null) => (v ? v.slice(0, 16).replace("T", " ") : "never"),
           },
-          { title: "Reason", dataIndex: "status_reason", render: (v: string | null) => v ?? "—" },
+          { title: "Reason", dataIndex: "status_reason", ...longTextColumn() },
           {
             title: "Actions",
             key: "actions",

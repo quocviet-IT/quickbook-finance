@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import type { PurchaseOrderLineRow, PurchasingConfigRow } from "@/lib/db/types";
 import { threeWayMatchLine, type ThreeWayMatchResult } from "@/lib/domain/purchasing";
 import { createBillFromPoAction } from "../actions";
+import { longTextColumn } from "@/components/ui/long-text-column";
 
 interface LineState {
   quantity: number;
@@ -149,7 +150,7 @@ function BillFromPoModalBody({
           locale={{ emptyText: "Nothing received is waiting to be billed" }}
           columns={[
             { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
-            { title: "Description", dataIndex: "description", render: (v: string) => v || "—" },
+            { title: "Description", dataIndex: "description", ...longTextColumn() },
             { title: "Received", dataIndex: "qty_received", align: "right", render: (v: number) => Number(v) },
             { title: "Already billed", dataIndex: "qty_billed", align: "right", render: (v: number) => Number(v) },
             {

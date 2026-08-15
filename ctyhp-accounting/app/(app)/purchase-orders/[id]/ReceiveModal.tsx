@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import type { PurchaseOrderLineRow } from "@/lib/db/types";
 import { remainingQty } from "@/lib/domain/purchasing";
 import { receivePurchaseOrderAction } from "../actions";
+import { longTextColumn } from "@/components/ui/long-text-column";
 
 interface Props {
   open: boolean;
@@ -88,7 +89,7 @@ function ReceiveModalBody({ onClose, onDone, purchaseOrderId, lines }: Props) {
           locale={{ emptyText: "Nothing outstanding to receive" }}
           columns={[
             { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
-            { title: "Description", dataIndex: "description", render: (v: string) => v || "—" },
+            { title: "Description", dataIndex: "description", ...longTextColumn() },
             { title: "Ordered", dataIndex: "quantity", align: "right", render: (v: number) => Number(v) },
             {
               title: "Outstanding",

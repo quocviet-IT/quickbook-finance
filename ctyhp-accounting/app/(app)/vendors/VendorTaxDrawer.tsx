@@ -21,6 +21,7 @@ import type { Box1099Row, VendorRow, VendorTaxProfileRow } from "@/lib/db/types"
 import { maskTin } from "@/lib/domain/vendorTax";
 import { TAX_CLASSIFICATIONS, TIN_TYPES, W9_STATUSES } from "@/lib/domain/schemas";
 import { listVendorTaxVersionsAction, saveVendorTaxProfileAction } from "./tax-actions";
+import { longTextColumn } from "@/components/ui/long-text-column";
 
 const W9_COLOR: Record<string, string> = {
   not_requested: "default",
@@ -261,7 +262,7 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
             dataIndex: "is_1099_eligible",
             render: (v: boolean, r) => (v ? <Tag color="blue">{r.box_code}</Tag> : <Tag>no</Tag>),
           },
-          { title: "Reason", dataIndex: "change_reason" },
+          { title: "Reason", dataIndex: "change_reason", ...longTextColumn() },
           { title: "Saved", dataIndex: "created_at", render: (v: string) => v.slice(0, 10) },
         ]}
       />

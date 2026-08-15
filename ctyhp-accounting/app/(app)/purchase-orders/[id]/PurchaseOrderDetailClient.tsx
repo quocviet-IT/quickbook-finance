@@ -10,6 +10,7 @@ import { remainingQty } from "@/lib/domain/purchasing";
 import PurchaseOrderFormModal from "../PurchaseOrderFormModal";
 import ReceiveModal from "./ReceiveModal";
 import BillFromPoModal from "./BillFromPoModal";
+import { longTextColumn } from "@/components/ui/long-text-column";
 import {
   approvePurchaseOrderAction,
   cancelPurchaseOrderAction,
@@ -223,7 +224,7 @@ export default function PurchaseOrderDetailClient({
           scroll={{ x: "max-content" }}
           columns={[
             { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
-            { title: "Description", dataIndex: "description", render: (v: string) => v || "—" },
+            { title: "Description", dataIndex: "description", ...longTextColumn() },
             { title: "Ordered", dataIndex: "quantity", align: "right", render: (v: number) => Number(v) },
             { title: "Received", dataIndex: "qty_received", align: "right", render: (v: number) => Number(v) },
             { title: "Billed", dataIndex: "qty_billed", align: "right", render: (v: number) => Number(v) },
@@ -336,7 +337,7 @@ export default function PurchaseOrderDetailClient({
                 align: "right",
                 render: (v: number) => `${(v / 100).toFixed(2)}%`,
               },
-              { title: "Reason", dataIndex: "reason" },
+              { title: "Reason", dataIndex: "reason", ...longTextColumn() },
               { title: "Recorded", dataIndex: "created_at", render: (v: string) => v.slice(0, 10) },
             ]}
           />
