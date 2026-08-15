@@ -41,6 +41,47 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.21",
+    date: "2026-08-15",
+    headline:
+      "The Profit and Loss can be read one month or one quarter at a time, and each line can show its share of income.",
+    changes: [
+      {
+        kind: "added",
+        title: "Profit and Loss columns by month or by quarter",
+        detail:
+          "Profit and loss columns now offers By month and By quarter beside " +
+          "One period and Two periods, laying the range out with one column per " +
+          "period and a Total at the right — the way a month that lost money, " +
+          "or a cost that has been climbing all year, actually shows up. Only " +
+          "the first and last column are ever partial, when the range picked " +
+          "does not start or end on a period boundary; every column between " +
+          "them is a whole month or quarter. A range that would need more than " +
+          "24 columns is refused rather than fetched — the screen says how " +
+          "many columns it would be and offers to narrow the range or show it " +
+          "by quarter instead, and never switches that for you on its own.",
+        route: "/reports",
+      },
+      {
+        kind: "added",
+        title: "% of Income on the Profit and Loss",
+        detail:
+          "A switch beside the column choice adds each line's share of that " +
+          "column's Total Income — Other Income is not part of it, which the " +
+          "column's tooltip says. It is on by default for one or two periods " +
+          "and off by default for a month-by-month or quarter-by-quarter view, " +
+          "where a percent beside every column would double an already wide " +
+          "table, but it is never disabled there: turn it on and it stays on. " +
+          "The Total column's percentage is worked out from the Total column's " +
+          "own income, not averaged from the periods beside it — averaging " +
+          "percentages across columns of different sizes is not the same " +
+          "number as the percentage of the total, and would have been wrong. " +
+          "The exported file carries the same percentages the screen shows.",
+        route: "/reports",
+      },
+    ],
+  },
+  {
     version: "1.20",
     date: "2026-08-15",
     headline:

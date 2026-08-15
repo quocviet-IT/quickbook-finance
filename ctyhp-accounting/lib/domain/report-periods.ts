@@ -196,3 +196,37 @@ export function monthlyColumns(from: string, to: string): RangeColumn[] {
 export function quarterlyColumns(from: string, to: string): RangeColumn[] {
   return splitByCalendarUnit(from, to, 3);
 }
+
+/**
+ * Above this many columns, a period-by-period P&L stops being something a
+ * reader can scan and starts being a wall of numbers nobody reads column by
+ * column anyway. The limit is about that, not about query cost — the queries
+ * stay cheap into the hundreds of columns — which is why refusing outright
+ * beats quietly running them anyway.
+ */
+export const MAX_TREND_COLUMNS = 24;
+
+/**
+ * The refusal message for a range that would need more than
+ * `MAX_TREND_COLUMNS` columns at the requested granularity, or `null` when
+ * the range fits and the report should just run.
+ *
+ * Names the fix instead of only the limit, and never picks one for the
+ * reader: a "by month" request that quietly came back "by quarter" would be
+ * a different report than the one that was asked for, read off a column
+ * header that no longer tells the truth. So the quarter figure offered here
+ * is a suggestion, computed fresh so it can be left out — when quarters
+ * would *also* miss the limit, the only real fix is a narrower range.
+ */
+export function trendColumnLimitMessage(unit: "month" | "quarter", from: string, to: string): string | null {
+  const columns = unit === "month" ? monthlyColumns(from, to) : quarterlyColumns(from, to);
+  if (columns.length <= MAX_TREND_COLUMNS) return null;
+
+  if (unit === "quarter") {
+    return `That range is ${columns.length} quarterly columns. Narrow the range.`;
+  }
+  const quarters = quarterlyColumns(from, to);
+  const alternative =
+    quarters.length <= MAX_TREND_COLUMNS ? `, or show it by quarter (${quarters.length} columns)` : "";
+  return `That range is ${columns.length} monthly columns. Narrow the range${alternative}.`;
+}

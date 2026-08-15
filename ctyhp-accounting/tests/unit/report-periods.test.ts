@@ -3,6 +3,7 @@ import {
   COMPARISON_BASES,
   comparisonBasisLabel,
   comparisonDate,
+  MAX_TREND_COLUMNS,
   monthEnd,
   monthlyColumns,
   priorMonthEnd,
@@ -12,6 +13,7 @@ import {
   sameDayLastYear,
   trailingMonthEnds,
   trailingYearEnds,
+  trendColumnLimitMessage,
 } from "@/lib/domain/report-periods";
 import { balanceTrendRows, type BalanceSheet } from "@/lib/domain/reports";
 
@@ -187,6 +189,38 @@ describe("quarterlyColumns", () => {
     expect(() => quarterlyColumns("2026-06-30", "2026-01-01")).toThrow(
       "Report end date must not be before its start date",
     );
+  });
+});
+
+describe("trendColumnLimitMessage", () => {
+  it("is null when the range fits comfortably inside the limit", () => {
+    expect(trendColumnLimitMessage("month", "2026-01-01", "2026-12-31")).toBeNull();
+    expect(MAX_TREND_COLUMNS).toBeGreaterThanOrEqual(12);
+  });
+
+  it("is null exactly at the limit, not just under it", () => {
+    // MAX_TREND_COLUMNS whole months starting January land the boundary case
+    // on a real calendar rather than a round number that happens to work.
+    const to = monthEnd(2026 + Math.floor((MAX_TREND_COLUMNS - 1) / 12), ((MAX_TREND_COLUMNS - 1) % 12) + 1);
+    expect(trendColumnLimitMessage("month", "2026-01-01", to)).toBeNull();
+  });
+
+  it("names the fix, with a computed quarter count, when months would overflow", () => {
+    // 2026-01-01 to 2030-12-31 is 60 monthly columns, 20 quarterly ones.
+    const message = trendColumnLimitMessage("month", "2026-01-01", "2030-12-31");
+    expect(message).toBe("That range is 60 monthly columns. Narrow the range, or show it by quarter (20 columns).");
+  });
+
+  it("drops the quarter suggestion when quarters would also overflow", () => {
+    // A century of months is also well over a century of quarters — quarterly
+    // is not a real way out, so the message must not pretend it is.
+    const message = trendColumnLimitMessage("month", "1926-01-01", "2030-12-31");
+    expect(message).toBe("That range is 1260 monthly columns. Narrow the range.");
+  });
+
+  it("never suggests coarsening quarters further, since there is nothing coarser on offer", () => {
+    const message = trendColumnLimitMessage("quarter", "1926-01-01", "2030-12-31");
+    expect(message).toBe("That range is 420 quarterly columns. Narrow the range.");
   });
 });
 
