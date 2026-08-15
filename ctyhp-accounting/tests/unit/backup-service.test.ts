@@ -14,6 +14,8 @@ interface RetentionRow {
 interface StubOptions {
   previousHash?: string | null;
   auditFails?: boolean;
+  /** Fails the final `acc_backup` insert that records tonight's stored snapshot. */
+  registerFails?: boolean;
   /**
    * Which storage paths should fail to `remove()`. `true` fails every
    * removal call regardless of path — enough for tests that only ever
@@ -23,6 +25,13 @@ interface StubOptions {
   removeFails?: true | Set<string>;
   /** Rows `applyRetention`'s `status = stored` query hands back. */
   retentionRows?: RetentionRow[];
+  /**
+   * Which `acc_backup` row ids should fail `delete()`. Same shape as
+   * `removeFails` — `true` fails every row-delete, a `Set` fails only the
+   * named ids, so one row can fail while an earlier one already failed its
+   * blob removal.
+   */
+  deleteFails?: true | Set<string>;
 }
 
 /** `BACKUP_KEEP` snapshots that are not expired, plus `expiredCount` older ones that are. */
@@ -72,16 +81,34 @@ function stub(options: StubOptions = {}) {
           }),
         insert: (row: Record<string, unknown>) => {
           inserted.push({ table, ...row });
-          return Promise.resolve({
-            error: table === "acc_audit_log" && options.auditFails ? { message: "no" } : null,
-          });
+          // Distinctive per failure mode on purpose: a message like "no" is a
+          // substring of ordinary English ("not recorded", "onebook-backups")
+          // and would still be found by a broken assertion, hiding the very
+          // regression the test claims to catch.
+          const error =
+            table === "acc_audit_log" && options.auditFails
+              ? { message: "audit-boom" }
+              : table === "acc_backup" && options.registerFails && row.status === "stored"
+                ? { message: "register-boom" }
+                : null;
+          return Promise.resolve({ error });
         },
         // `applyRetention`'s `delete().eq("id", ...)` is its own chain, not
         // the generic `then` below, so the id it targets can be recorded —
         // the retention tests assert on exactly which rows survive.
         delete: () => ({
           eq: (column: string, value: unknown) => {
-            if (table === "acc_backup" && column === "id") deletedIds.push(String(value));
+            if (table === "acc_backup" && column === "id") {
+              deletedIds.push(String(value));
+              const df = options.deleteFails;
+              const failed = df === true || (df instanceof Set && df.has(String(value)));
+              if (failed) {
+                return Promise.resolve({
+                  data: null,
+                  error: { message: `simulated row-delete failure for ${value}` },
+                });
+              }
+            }
             return Promise.resolve({ data: [], error: null });
           },
         }),
@@ -176,7 +203,33 @@ describe("taking a company's nightly snapshot", () => {
     expect(message).toContain(BACKUP_BUCKET);
     expect(message).toMatch(/company-1\/2026-08-16-[0-9a-f]{8}\.zip/);
     // Keeps the original cause too — the audit failure that started this.
-    expect(message).toMatch(/no/);
+    // `/audit-boom/` is the stub's distinctive audit-error message, not a
+    // fragment like `/no/` that ordinary prose ("not recorded", the bucket
+    // name "onebook-backups") would also satisfy on its own.
+    expect(message).toMatch(/audit-boom/);
+  });
+
+  it("names the bucket and path when the register row fails after the audit row already exists", async () => {
+    // Upload succeeds, the audit row is written, and only then does the
+    // acc_backup register insert fail — a transient PostgREST error on a
+    // night whose books changed. Retention only ever reads acc_backup, so
+    // that file is invisible to every future retention pass; the error text
+    // is where a person looks first, and it must say the file and the audit
+    // row exist while the register row does not.
+    const { sb } = stub({ previousHash: undefined, registerFails: true });
+    let caught: unknown;
+    try {
+      await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(BackupError);
+    const message = (caught as Error).message;
+    expect(message).toContain(BACKUP_BUCKET);
+    expect(message).toMatch(/company-1\/2026-08-16-[0-9a-f]{8}\.zip/);
+    // Says plainly what does and does not exist, not just the raw DB error.
+    expect(message).toMatch(/audit/i);
+    expect(message).toMatch(/register-boom/);
   });
 });
 
@@ -185,13 +238,18 @@ describe("retention", () => {
     // If the blob removal fails but the row is deleted anyway, the row —
     // the only record of that storage path — is gone forever, and no later
     // retention pass can ever find the orphaned blob again.
+    //
+    // Tonight's snapshot itself still stores fine here, so the call resolves
+    // rather than rejects (see the "runs into trouble" describe block below)
+    // — the trouble shows up as `retentionWarning` instead.
     const expiredPath = "company-1/2026-01-01-abc.zip";
     const { sb, deletedIds } = stub({
       previousHash: undefined,
       retentionRows: retentionFixture(1),
       removeFails: new Set([expiredPath]),
     });
-    await expect(takeCompanyBackup(sb, "company-1", "2026-08-16")).rejects.toThrow(BackupError);
+    const result = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    expect(result.retentionWarning).toBeDefined();
     expect(deletedIds).not.toContain("id-0");
   });
 
@@ -205,7 +263,8 @@ describe("retention", () => {
       retentionRows: retentionFixture(2),
       removeFails: new Set([failingPath]),
     });
-    await expect(takeCompanyBackup(sb, "company-1", "2026-08-16")).rejects.toThrow(BackupError);
+    const result = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    expect(result.retentionWarning).toBeDefined();
     // Both removals were attempted...
     expect(removed).toContain("company-1/2026-01-01-abc.zip");
     expect(removed).toContain("company-1/2026-01-02-abc.zip");
@@ -214,21 +273,77 @@ describe("retention", () => {
     expect(deletedIds).toContain("id-1");
   });
 
-  it("names the stuck path in the error instead of swallowing the failure", async () => {
+  it("names the stuck path in the retention warning instead of swallowing the failure", async () => {
     const { sb } = stub({
       previousHash: undefined,
       retentionRows: retentionFixture(1),
       removeFails: new Set(["company-1/2026-01-01-abc.zip"]),
     });
-    let caught: unknown;
-    try {
-      await takeCompanyBackup(sb, "company-1", "2026-08-16");
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(BackupError);
-    const message = (caught as Error).message;
+    const result = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    const message = result.retentionWarning;
+    expect(message).toBeDefined();
     expect(message).toContain(BACKUP_BUCKET);
     expect(message).toContain("company-1/2026-01-01-abc.zip");
+  });
+
+  it("does not drop the earlier stuck path when a later row-delete also fails", async () => {
+    // Deletion runs oldest-first. The oldest expired snapshot's blob removal
+    // fails and is pushed to `stuck`; the next one's blob removes cleanly but
+    // its row delete then errors, which throws immediately inside
+    // applyRetention. That throw must not forget the first path just because
+    // it was recorded earlier in the loop — otherwise the one nightly report
+    // of "what's stuck" silently loses whatever failed before the row-delete
+    // that ended the pass.
+    const stuckPath = "company-1/2026-01-01-abc.zip"; // oldest, id-0
+    const laterId = "id-1"; // next oldest, whose row-delete fails
+    const { sb } = stub({
+      previousHash: undefined,
+      retentionRows: retentionFixture(2),
+      removeFails: new Set([stuckPath]),
+      deleteFails: new Set([laterId]),
+    });
+    const result = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    const message = result.retentionWarning;
+    expect(message).toBeDefined();
+    // The row-delete failure that actually threw.
+    expect(message).toMatch(/simulated row-delete failure for id-1/);
+    // The earlier stuck blob must still be named, not silently dropped.
+    expect(message).toContain(stuckPath);
+  });
+});
+
+describe("when retention runs into trouble after tonight's snapshot was already stored", () => {
+  it("reports the trouble on the result instead of rejecting a call that succeeded", async () => {
+    // Tonight's snapshot uploaded, was audited, and was registered — it is
+    // stored. Retention afterwards gets stuck on an expired blob it cannot
+    // remove. Rejecting here would tell a caller tonight's backup failed,
+    // which did not happen; the cron route (next in line) would then record
+    // a false failure for a night that in fact succeeded.
+    const { sb } = stub({
+      previousHash: undefined,
+      retentionRows: retentionFixture(1),
+      removeFails: true,
+    });
+    const result = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    expect(result.status).toBe("stored");
+    expect(result.path).not.toBeNull();
+    expect(result.retentionWarning).toBeDefined();
+    expect(result.retentionWarning).toMatch(/could not be removed/i);
+  });
+
+  it("still logs the retention failure loudly instead of only setting a field nobody reads", async () => {
+    // A caught error turned into a quiet return value is swallowing unless
+    // it is also surfaced somewhere a human or monitor will see it. This
+    // pins the log call so a future edit that drops it fails the suite,
+    // rather than only being noticed the night the field goes unread.
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { sb } = stub({
+      previousHash: undefined,
+      retentionRows: retentionFixture(1),
+      removeFails: true,
+    });
+    await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

@@ -32,6 +32,15 @@ export async function takeCompanyBackup(
   hash: string;
   path: string | null;
   sizeBytes: number | null;
+  /**
+   * Set only when tonight's snapshot was stored but the retention pass that
+   * ran after it got stuck. Tonight's backup did not fail — the caller
+   * (the nightly cron route) must not record the night itself as a failure
+   * over this — but the trouble is real and still needs to reach a human,
+   * which is why `takeCompanyBackup` also logs it (see below) rather than
+   * relying on this field being read.
+   */
+  retentionWarning?: string;
 }> {
   const datasets = await collectExportDatasets(sb);
   const controlTotals = await readControlTotals(sb, today);
@@ -129,10 +138,46 @@ export async function takeCompanyBackup(
     status: "stored",
     skip_reason: null,
   });
-  if (error) throw new BackupError(error.message);
+  if (error) {
+    // Milder than the audit-write failure above: the audit row already names
+    // this path (`after_json.storage_path`), so "no audit row, no stored
+    // file" still holds — a person digging through acc_audit_log can find
+    // it. But retention only ever reads acc_backup, never acc_audit_log, so
+    // without this row the file is invisible to every future retention pass,
+    // and the path embeds today's date and content hash, so no later nightly
+    // run recomputes it either. The error text is where someone looks first,
+    // so it has to say what the audit row alone does not: bucket and path,
+    // and that the register row specifically is what's missing.
+    //
+    // This one case partially self-heals: a same-day retry over unchanged
+    // books hashes to this same path, and the upload above is `upsert: true`,
+    // so a retried insert lands on the same row this attempt failed to write.
+    // Only the once-nightly cadence turns the gap into a standing orphan.
+    throw new BackupError(
+      `The backup file and its audit row were written (record ${backupId} at ${BACKUP_BUCKET}/${path}), ` +
+        `but the acc_backup register row was not: ${error.message}. Until a later run with identical books ` +
+        `retries this same path, retention cannot see this file to ever delete it.`,
+    );
+  }
 
-  await applyRetention(sb);
-  return { status: "stored", hash, path, sizeBytes: archive.bytes.byteLength };
+  // Tonight's snapshot is already stored and audited by this point — that
+  // succeeded. A retention pass getting stuck afterwards is a different,
+  // milder problem (an old blob or row left behind, not tonight's data at
+  // risk), and must not turn into the same rejection a real backup failure
+  // would: the cron route this feeds would otherwise record tonight as
+  // failed when it in fact succeeded. The error still has to reach a human
+  // rather than vanish into a field nobody reads, so it goes to the log —
+  // same shape as lib/services/health.ts's probe() — in addition to being
+  // carried on the result for whatever later reads it.
+  let retentionWarning: string | undefined;
+  try {
+    await applyRetention(sb);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Backup retention for company ${companyId} got stuck after tonight's snapshot was stored:`, message);
+    retentionWarning = message;
+  }
+  return { status: "stored", hash, path, sizeBytes: archive.bytes.byteLength, retentionWarning };
 }
 
 /** Delete oldest-first, so an interrupted run never eats the newest snapshot. */
@@ -166,7 +211,18 @@ async function applyRetention(sb: SupabaseClient): Promise<void> {
       continue;
     }
     const deletion = await sb.from("acc_backup").delete().eq("id", expired.id);
-    if (deletion.error) throw new BackupError(deletion.error.message);
+    if (deletion.error) {
+      // A path already in `stuck` from an earlier iteration is not yet
+      // reported anywhere else — the loop only reports `stuck` at the end,
+      // which this throw skips past. Folding it in here is what keeps the
+      // "every stuck path is reported" comment above true even when a
+      // row-delete, not just a blob removal, is what ends the pass.
+      const alsoStuck =
+        stuck.length > 0
+          ? ` ${stuck.length} earlier expired file(s) also could not be removed from ${BACKUP_BUCKET} and were left in place: ${stuck.join(", ")}.`
+          : "";
+      throw new BackupError(`${deletion.error.message}.${alsoStuck}`);
+    }
   }
   if (stuck.length > 0) {
     throw new BackupError(
