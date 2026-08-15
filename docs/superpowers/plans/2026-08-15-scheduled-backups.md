@@ -43,7 +43,15 @@ Do not re-derive these.
   snapshot does not restore documents; the inventory only lets a separate
   restore of object storage be checked.
 - `readTable` in `lib/services/company-export.ts` pages with `.range()` and
-  **no `.order()`**.
+  **no `.order()`**. On 2026-08-15 the live database held 20,740 journal
+  lines and 7,533 journal entries in `co_pc_49` — twenty-one and eight pages
+  respectively, read unordered. This is a live defect, not only a blocker
+  for the hash; see Task 1.
+- **Eight of the 74 exported tables have no `id` column.** They key on text:
+  `acc_schema_migrations`, `acc_currency`, `acc_permission`,
+  `acc_role_permission` (composite), `acc_approval_policy`, `acc_sequence`,
+  `acc_purchasing_config`, `acc_1099_box`. Verified against all 114
+  migrations. An unconditional `.order("id")` throws on every one of them.
 
 ## File Structure
 
@@ -58,44 +66,95 @@ Do not re-derive these.
 
 ---
 
-### Task 1: Make the export deterministic
+### Task 1: Make the export deterministic — and fix the paged read it is hiding
 
-Without this the snapshot hash is meaningless: Postgres does not promise an
-order without `ORDER BY`, so the same books can hash differently on two runs and
-the skip rule silently never fires.
+This was written as housekeeping for the snapshot hash. It is not. Measured
+against the live database on 2026-08-15:
+
+```
+co_pc_49   acc_journal_line   20,740 rows
+co_pc_49   acc_journal_entry   7,533 rows
+```
+
+`readTable` pages those in requests of 1,000 (`PAGE` at
+`lib/services/company-export.ts:11`) with no `ORDER BY`. Postgres makes no
+promise about the order of an unordered query, and it does not have to answer
+two of them the same way, so page 2 can repeat rows page 1 already returned and
+omit others entirely. **The export of the one company that has data can already
+be silently wrong** — the same total row count, with duplicates standing in for
+what went missing.
+
+That matters more than the hash. `docs/operations/backup-and-restore.md` calls
+this export the verification control: the thing you compare a recovered database
+against. A control that can quietly disagree with the truth is worse than none,
+because it is believed.
+
+The drill log entry dated 2026-07-29 records 957 rows across every table. The
+defect was latent then. It became live when the company's ledger was imported.
+
+**The premise this task was written on was false.** The first attempt at it
+verified, against all 114 migrations, that 8 of the 74 exported tables have no
+`id` column — they key on text instead:
+
+| Table | Primary key |
+|---|---|
+| `acc_schema_migrations` | `filename` |
+| `acc_currency` | `code` |
+| `acc_permission` | `key` |
+| `acc_role_permission` | `role, permission_key` (composite) |
+| `acc_approval_policy` | `action_key` |
+| `acc_sequence` | `key` |
+| `acc_purchasing_config` | `singleton` |
+| `acc_1099_box` | `code` |
+
+An unconditional `.order("id")` would throw on every one of them, because
+Postgres validates the column whether or not the table has rows. So the order
+column is per table, and the third test below is the one that would have caught
+this: it reads the `create table` statement out of the migrations and refuses an
+order column the table does not declare.
 
 **Files:**
-- Modify: `lib/services/company-export.ts`
+- Modify: `lib/domain/company-export.ts` — the order-column map lives beside `EXPORT_TABLES`, which it must stay in step with
+- Modify: `lib/services/company-export.ts` — `readTable` applies it
 - Test: `tests/unit/company-export-order.test.ts`
 
 **Interfaces:**
-- Produces: `readTable` ordering behaviour relied on by Task 2's hash.
+- Produces: `ORDER_COLUMNS: Record<string, string[]>` and `orderColumnsFor(table: string): string[]`, both exported from `lib/domain/company-export.ts`. Task 2's snapshot hash relies on the ordering they cause, not on the names.
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/unit/company-export-order.test.ts`:
 
 ```ts
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  EXPORT_TABLES,
+  SENSITIVE_TABLE,
+  ORDER_COLUMNS,
+  orderColumnsFor,
+} from "@/lib/domain/company-export";
 import { collectExportDatasets } from "@/lib/services/company-export";
+
+const EXPORTED = [...EXPORT_TABLES, SENSITIVE_TABLE];
 
 /**
  * Records what the export asked the database for.
  *
- * The point of this test is not the rows that come back — it is that an order
- * was requested at all. Two exports of unchanged books must produce the same
- * bytes, and without an ORDER BY the database is free to answer in a different
- * order each time.
+ * The point is not the rows that come back — it is that an order was requested
+ * at all. `readTable` pages with `.range()`, and an unordered paged read can
+ * hand back page 2 with rows page 1 already had.
  */
-function recordingClient(): { sb: SupabaseClient; ordered: () => string[] } {
-  const ordered: string[] = [];
+function recordingClient(): { sb: SupabaseClient; ordered: () => Record<string, string[]> } {
+  const ordered: Record<string, string[]> = {};
   const sb = {
     from(table: string) {
       const chain = {
         select: () => chain,
         order: (column: string) => {
-          ordered.push(`${table}.${column}`);
+          (ordered[table] ??= []).push(column);
           return chain;
         },
         range: () => Promise.resolve({ data: [], error: null }),
@@ -107,12 +166,49 @@ function recordingClient(): { sb: SupabaseClient; ordered: () => string[] } {
 }
 
 describe("reading a table for the export", () => {
-  it("asks for an order, so two exports of the same books agree", async () => {
+  it("asks for an order on every table it reads", async () => {
     const { sb, ordered } = recordingClient();
     await collectExportDatasets(sb);
-    expect(ordered().length).toBeGreaterThan(0);
-    for (const call of ordered()) {
-      expect(call.endsWith(".id"), `${call} was read without an order`).toBe(true);
+    for (const table of EXPORTED) {
+      expect(ordered()[table], `${table} was read without an order`).toEqual(
+        orderColumnsFor(table),
+      );
+    }
+  });
+
+  it("orders every exported table by something, defaulting to id", () => {
+    for (const table of EXPORTED) {
+      expect(orderColumnsFor(table).length, `${table} has no order column`).toBeGreaterThan(0);
+    }
+    expect(orderColumnsFor("acc_journal_line")).toEqual(["id"]);
+  });
+
+  it("never names a column the table does not declare", () => {
+    // The test that would have caught the original mistake. Eight exported
+    // tables key on text and have no `id` at all, and Postgres validates an
+    // ORDER BY column whether or not the table has rows — so a wrong name here
+    // is not a subtle drift, it is an export that throws.
+    const dir = join(process.cwd(), "supabase/migrations");
+    const sql = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .map((name) => readFileSync(join(dir, name), "utf8"))
+      .join("\n");
+
+    for (const [table, columns] of Object.entries(ORDER_COLUMNS)) {
+      expect(EXPORTED, `${table} is in ORDER_COLUMNS but is not exported`).toContain(table);
+      // `create table x (` or `create table if not exists x (`, then everything
+      // up to the closing paren of the statement.
+      const match = new RegExp(
+        String.raw`create table (?:if not exists )?${table}\s*\(([\s\S]*?)\n\);`,
+        "i",
+      ).exec(sql);
+      expect(match, `no create table statement found for ${table}`).not.toBeNull();
+      for (const column of columns) {
+        expect(
+          match?.[1],
+          `${table} is ordered by ${column}, which it does not declare`,
+        ).toMatch(new RegExp(String.raw`^\s*${column}\b`, "m"));
+      }
     }
   });
 });
@@ -121,39 +217,86 @@ describe("reading a table for the export", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/company-export-order.test.ts`
-Expected: FAIL — `sb.from(...).select(...).range is not a function`, because the
-current code never calls `.order()` and the stub only offers `range` after it.
+Expected: FAIL — `ORDER_COLUMNS` and `orderColumnsFor` are not exported yet, so
+the import fails before any assertion runs.
 
-- [ ] **Step 3: Add the order**
+- [ ] **Step 3: Add the order-column map**
 
-In `lib/services/company-export.ts`, in `readTable`, change the query to:
+In `lib/domain/company-export.ts`, below `EXPORT_TABLES` and `SENSITIVE_TABLE`:
 
 ```ts
-    const { data, error } = await sb
-      .from(table)
-      .select("*")
-      // Postgres makes no promise about order without one, so two exports of
-      // unchanged books could come back in different orders and hash
-      // differently. Every exported table carries `id`.
-      .order("id")
-      .range(from, from + PAGE - 1);
+/**
+ * How each exported table is ordered when it is read.
+ *
+ * `readTable` pages with `.range()`, and Postgres does not have to answer two
+ * unordered queries the same way — so without this, page two of a large table
+ * can repeat rows page one already returned and drop others in their place. The
+ * largest company here holds 20,740 journal lines, twenty-one pages of them.
+ *
+ * Most tables key on `id`, which is the default. These eight key on text and
+ * have no `id` column at all; ordering them by one would not drift quietly, it
+ * would throw, because Postgres validates the column even on an empty table.
+ */
+export const ORDER_COLUMNS: Record<string, string[]> = {
+  acc_schema_migrations: ["filename"],
+  acc_currency: ["code"],
+  acc_permission: ["key"],
+  acc_role_permission: ["role", "permission_key"],
+  acc_approval_policy: ["action_key"],
+  acc_sequence: ["key"],
+  acc_purchasing_config: ["singleton"],
+  acc_1099_box: ["code"],
+};
+
+export function orderColumnsFor(table: string): string[] {
+  return ORDER_COLUMNS[table] ?? ["id"];
+}
 ```
+
+In `lib/services/company-export.ts`, import `orderColumnsFor` and apply it in
+`readTable`:
+
+```ts
+async function readTable(
+  sb: SupabaseClient,
+  table: string,
+): Promise<Array<Record<string, unknown>>> {
+  const rows: Array<Record<string, unknown>> = [];
+  const orderBy = orderColumnsFor(table);
+  for (let from = 0; ; from += PAGE) {
+    let query = sb.from(table).select("*");
+    for (const column of orderBy) query = query.order(column);
+    const { data, error } = await query.range(from, from + PAGE - 1);
+    if (error) throw new CompanyExportError(`Reading ${table} failed: ${error.message}`);
+    rows.push(...((data ?? []) as Array<Record<string, unknown>>));
+    if (!data || data.length < PAGE) return rows;
+  }
+}
+```
+
+If TypeScript objects to reassigning `query` across the `.order()` chain, give
+it the type Supabase's builder returns rather than casting to `any` — a cast
+here would hide exactly the kind of mistake this task exists to fix.
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/company-export-order.test.ts`
-Expected: PASS — 1 test.
+Expected: PASS — 3 tests.
+
+If the third test cannot find a `create table` statement for some table, do not
+weaken the test to make it pass. Report which table, and stop: a table nobody
+can find the definition of is worth a person looking at.
 
 - [ ] **Step 5: Prove nothing else broke**
 
-Run: `npm test`
-Expected: every test passes. Paste the output whole.
+Run: `npm test && npm run typecheck && npm run lint && npm run build`
+Expected: all four green. Paste each output whole — never trimmed.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/services/company-export.ts tests/unit/company-export-order.test.ts
-git commit -m "fix(export): read every table in a fixed order"
+git add lib/domain/company-export.ts lib/services/company-export.ts tests/unit/company-export-order.test.ts
+git commit -m "fix(export): read every table in a fixed order, so a paged read cannot repeat or drop rows"
 ```
 
 ---
@@ -1678,6 +1821,7 @@ git commit -m "docs: tell people the backups exist, and what they do not cover"
 ## Acceptance criteria
 
 - [ ] Every exported table is read with an explicit order, and a test proves it
+- [ ] No order column names a column its table does not declare — checked against the migrations, not asserted
 - [ ] The snapshot hash is stable across two runs over the same data
 - [ ] A night whose books have not changed records a `skipped` row and writes no file
 - [ ] A company with no previous snapshot is never skipped
