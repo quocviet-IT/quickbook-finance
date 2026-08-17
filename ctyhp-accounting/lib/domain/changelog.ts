@@ -41,7 +41,7 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "1.23",
+    version: "1.24",
     date: "2026-08-17",
     headline: "Bank Transactions and the General Ledger can now be searched by keyword and filtered by amount.",
     changes: [
@@ -70,6 +70,25 @@ export const RELEASES: Release[] = [
           "shown — the Opening, Closing, and each line's running balance " +
           "stay exactly as posted.",
         route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
+    version: "1.23",
+    date: "2026-08-17",
+    headline: "Choosing 100 rows a page on Bank Transactions now actually shows 100 rows.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The page size you chose on Bank Transactions was ignored",
+        detail:
+          "Picking 50 or 100 rows a page moved the dropdown but left the " +
+          "table showing 25 — the size you picked was thrown away on the " +
+          "next redraw. All three sizes now take effect, the page count " +
+          "recalculates, and if the size you picked would leave you past the " +
+          "last page, you land on the last valid page instead of an empty " +
+          "one.",
+        route: "/banking",
       },
     ],
   },

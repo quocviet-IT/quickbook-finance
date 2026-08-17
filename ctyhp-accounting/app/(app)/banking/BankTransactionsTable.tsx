@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Button, Space, Tag, Typography, type TableColumnsType } from "antd";
 import { DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
@@ -10,6 +11,7 @@ import CategoriseCell from "./CategoriseCell";
 import type { AccountRow } from "@/lib/db/types";
 import type { BankPostingRow } from "@/lib/services/banking";
 import { TOKENS } from "@/lib/design/tokens";
+import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -65,6 +67,11 @@ export default function BankTransactionsTable({
   onAttachments,
   onDelete,
 }: BankTransactionsTableProps) {
+  // Held here, not written as a literal on the pagination prop: see
+  // bank-transactions-pagination.ts for why a literal `pageSize` pins Ant
+  // Design's table back to that number on every render (RQ-04).
+  const [pageSize, setPageSize] = useState<number>(BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE);
+
   const columns: TableColumnsType<BankReviewTableRow> = [
     { title: "Date", dataIndex: ["transaction", "txn_date"], width: 115 },
     {
@@ -247,7 +254,7 @@ export default function BankTransactionsTable({
       rowClassName={(row: BankReviewTableRow) =>
         row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
       }
-      pagination={{ pageSize: 25 }}
+      pagination={bankTransactionsPagination(pageSize, setPageSize)}
       sticky
       loading={loading}
       emptyTitle="No bank transactions"
