@@ -32,7 +32,19 @@ interface StubOptions {
    * blob removal.
    */
   deleteFails?: true | Set<string>;
+  /** Fails the skip-branch insert for a reason that is not a duplicate key. */
+  skipInsertFails?: boolean;
+  /** Simulates the migration's `unique (taken_at, content_hash)` firing on the skip-branch insert. */
+  skipInsertConflicts?: boolean;
+  /** Simulates the same unique violation on the final stored-branch insert instead. */
+  registerInsertConflicts?: boolean;
 }
+
+/** Shape of the error Postgres reports for a unique-constraint violation, SQLSTATE 23505. */
+const DUPLICATE_KEY_ERROR = {
+  code: "23505",
+  message: 'duplicate key value violates unique constraint "acc_backup_taken_at_content_hash_key"',
+};
 
 /** `BACKUP_KEEP` snapshots that are not expired, plus `expiredCount` older ones that are. */
 function retentionFixture(expiredCount: number): RetentionRow[] {
@@ -81,6 +93,8 @@ function stub(options: StubOptions = {}) {
           }),
         insert: (row: Record<string, unknown>) => {
           inserted.push({ table, ...row });
+          const isSkipInsert = table === "acc_backup" && row.status === "skipped";
+          const isStoredInsert = table === "acc_backup" && row.status === "stored";
           // Distinctive per failure mode on purpose: a message like "no" is a
           // substring of ordinary English ("not recorded", "onebook-backups")
           // and would still be found by a broken assertion, hiding the very
@@ -88,9 +102,15 @@ function stub(options: StubOptions = {}) {
           const error =
             table === "acc_audit_log" && options.auditFails
               ? { message: "audit-boom" }
-              : table === "acc_backup" && options.registerFails && row.status === "stored"
+              : isStoredInsert && options.registerFails
                 ? { message: "register-boom" }
-                : null;
+                : isStoredInsert && options.registerInsertConflicts
+                  ? DUPLICATE_KEY_ERROR
+                  : isSkipInsert && options.skipInsertFails
+                    ? { message: "skip-insert-boom" }
+                    : isSkipInsert && options.skipInsertConflicts
+                      ? DUPLICATE_KEY_ERROR
+                      : null;
           return Promise.resolve({ error });
         },
         // `applyRetention`'s `delete().eq("id", ...)` is its own chain, not
@@ -152,6 +172,71 @@ function stub(options: StubOptions = {}) {
     },
   } as unknown as SupabaseClient;
   return { sb, uploaded, removed, inserted, deletedIds };
+}
+
+interface LiveRow {
+  taken_at: string;
+  content_hash: string;
+  status: string;
+}
+
+/**
+ * A fake `acc_backup` table that actually enforces the migration's own
+ * `unique (taken_at, content_hash)`, instead of a stand-in error flag like
+ * `stub()`'s `registerInsertConflicts`/`skipInsertConflicts` options above.
+ *
+ * One test needs this: calling `takeCompanyBackup` twice against the *same*
+ * store, the way an operator re-invoking the endpoint tonight actually
+ * would, so the conflict it hits is the real one production produces, not a
+ * simulation of it.
+ */
+function liveBackupClient(rows: LiveRow[]): SupabaseClient {
+  return {
+    from(table: string) {
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        order: () => chain,
+        eq: () => chain,
+        limit: () => chain,
+        range: () => Promise.resolve({ data: [], error: null }),
+        maybeSingle: () => {
+          if (table !== "acc_backup") {
+            return Promise.resolve({ data: { filename: "0114_backups.sql" }, error: null });
+          }
+          const stored = rows
+            .filter((row) => row.status === "stored")
+            .sort((a, b) => b.taken_at.localeCompare(a.taken_at));
+          return Promise.resolve({
+            data: stored[0] ? { content_hash: stored[0].content_hash } : null,
+            error: null,
+          });
+        },
+        insert: (row: Record<string, unknown>) => {
+          if (table !== "acc_backup") return Promise.resolve({ error: null });
+          const takenAt = row.taken_at as string;
+          const hash = row.content_hash as string;
+          const conflict = rows.some((r) => r.taken_at === takenAt && r.content_hash === hash);
+          if (conflict) return Promise.resolve({ error: DUPLICATE_KEY_ERROR });
+          rows.push({ taken_at: takenAt, content_hash: hash, status: row.status as string });
+          return Promise.resolve({ error: null });
+        },
+        delete: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }),
+        // Retention's own `status = stored` read. Nothing in this fixture is
+        // ever old enough to expire, and that pass is not what the one test
+        // using this client is about.
+        then: (resolve: (value: unknown) => unknown) =>
+          Promise.resolve({ data: [], error: null }).then(resolve),
+      };
+      return chain;
+    },
+    rpc: () => Promise.resolve({ data: [], error: null }),
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ error: null }),
+        remove: () => Promise.resolve({ error: null }),
+      }),
+    },
+  } as unknown as SupabaseClient;
 }
 
 describe("taking a company's nightly snapshot", () => {
@@ -345,5 +430,78 @@ describe("when retention runs into trouble after tonight's snapshot was already 
     await takeCompanyBackup(sb, "company-1", "2026-08-16");
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+describe("a second run on the same night", () => {
+  it("comes back as skipped rather than failed, the operator's own verification re-run", async () => {
+    // The earlier fix claimed a re-run is harmless because of `upsert: true`
+    // on the storage upload alone. That claim never covered the acc_backup
+    // insert, which migration 0114 deliberately guards with
+    // `unique (taken_at, content_hash)`. This uses a fake table that
+    // enforces that same constraint for real, across two real calls against
+    // one shared store, rather than an injected error flag — so it
+    // reproduces the actual conflict a second same-night run hits.
+    const rows: LiveRow[] = [];
+    const sb = liveBackupClient(rows);
+
+    const first = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    expect(first.status).toBe("stored");
+
+    const second = await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    expect(second.status).toBe("skipped");
+    expect(second.path).toBeNull();
+  });
+});
+
+describe("a duplicate-key error on the skip insert", () => {
+  it("is treated as tonight already being covered, not a failure", async () => {
+    // shouldSkip only routes into the skip branch when the freshly computed
+    // hash matches `previousHash`, so learn what hash this fixture actually
+    // produces first — the same trick the "skips a night" test above uses —
+    // rather than guessing a value that would fall through to the stored
+    // branch and never exercise this insert at all.
+    const learn = stub({ previousHash: undefined });
+    const seen = await takeCompanyBackup(learn.sb, "company-1", "2026-08-16");
+
+    const { sb } = stub({ previousHash: seen.hash, skipInsertConflicts: true });
+    const result = await takeCompanyBackup(sb, "company-1", "2026-08-17");
+    expect(result.status).toBe("skipped");
+    expect(result.path).toBeNull();
+  });
+
+  it("still throws when the skip insert fails for a reason that is not a duplicate key", async () => {
+    // The fix must check the error code, not swallow every skip-insert
+    // failure outright — a real, unrelated failure here (permissions,
+    // network) must still surface as a failed night.
+    const learn = stub({ previousHash: undefined });
+    const seen = await takeCompanyBackup(learn.sb, "company-1", "2026-08-16");
+
+    const { sb } = stub({ previousHash: seen.hash, skipInsertFails: true });
+    await expect(takeCompanyBackup(sb, "company-1", "2026-08-17")).rejects.toThrow(/skip-insert-boom/);
+  });
+});
+
+describe("a duplicate-key error on the stored insert", () => {
+  it("still throws, unlike the skip branch, because this run's own audit row already claims a backupId no acc_backup row will carry", async () => {
+    // Deliberately not mirrored from the skip branch: by the time this
+    // insert runs, takeCompanyBackup has already written a real,
+    // non-idempotent acc_audit_log row under a freshly generated backupId.
+    // A same-day duplicate here means another run raced this one and its
+    // acc_backup row already exists — the content itself is safe (same path,
+    // same bytes, the upload above is upsert: true) — but folding this into
+    // a quiet "stored" would hide that this run's own audit row now names an
+    // id no acc_backup row will ever carry. That mismatch belongs in front
+    // of a human, so it stays an error.
+    const { sb } = stub({ previousHash: undefined, registerInsertConflicts: true });
+    let caught: unknown;
+    try {
+      await takeCompanyBackup(sb, "company-1", "2026-08-16");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(BackupError);
+    const message = (caught as Error).message;
+    expect(message).toMatch(/already exists/i);
   });
 });

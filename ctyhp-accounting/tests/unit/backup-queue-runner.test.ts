@@ -314,6 +314,46 @@ describe("wiring", () => {
     expect(automationMocks.createSupabaseAutomationClient).toHaveBeenCalledWith("co_a");
     expect(automationMocks.createSupabaseAutomationClient).toHaveBeenCalledWith("co_b");
   });
+
+  it("hands takeBackup the exact client the automation factory built for that company's write, not merely a same-shaped one", async () => {
+    // The read phase (readLastBackup, used to rank who is due) already calls
+    // the factory for every company on its own — so a `toHaveBeenCalledWith`
+    // assertion on the factory alone, like the test above, is satisfied by
+    // that read-phase call and says nothing about what `takeBackup` itself
+    // is handed. An edit that kept the read phase wired to the factory while
+    // building a differently-sourced client for the write call — same
+    // `{schema}` shape, wrong origin — would still pass every assertion
+    // above. This instead captures the object `takeBackup` actually receives
+    // and checks it is the exact instance the factory returned for that
+    // write, by reference, not merely one that looks like it.
+    automationMocks.listActiveAutomationCompanies
+      .mockReset()
+      .mockResolvedValue([company("1", "a", "co_a"), company("2", "b", "co_b")]);
+    const builtByFactory: Record<string, SupabaseClient> = {};
+    automationMocks.createSupabaseAutomationClient.mockReset().mockImplementation((schema: string) => {
+      const client = clientFor(schema);
+      // Called once per company for the read phase, then again per due
+      // company for the write phase — the later call is the one that
+      // matters here, and it overwrites the earlier one before takeBackup
+      // for that company ever runs (the loop below is sequential).
+      builtByFactory[schema] = client;
+      return client;
+    });
+    const receivedByTakeBackup: Record<string, SupabaseClient> = {};
+
+    await runDueCompanyBackups({
+      readLastBackup: async () => null,
+      takeBackup: async (sb, companyId) => {
+        const schema = companyId === "1" ? "co_a" : "co_b";
+        receivedByTakeBackup[schema] = sb;
+        return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-08-15",
+    });
+
+    expect(receivedByTakeBackup.co_a).toBe(builtByFactory.co_a);
+    expect(receivedByTakeBackup.co_b).toBe(builtByFactory.co_b);
+  });
 });
 
 describe("app/api/backups/run/route.ts", () => {
@@ -390,5 +430,37 @@ describe("app/api/backups/run/route.ts", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  it("logs before answering 500 when the run itself throws, so an empty Vercel function log does not read as a per-company failure that got lost", async () => {
+    // Vercel's cron log keeps path, status and duration and discards the
+    // body — the same fact the run's own non-200 status exists to work
+    // around. Without a console.error here, a register-read failure (every
+    // company skipped, nothing attempted) is indistinguishable in the log
+    // from a per-company failure that was logged and lost some other way;
+    // an operator can only tell them apart by re-invoking the endpoint by
+    // hand with CRON_SECRET in hand.
+    const secret = "c".repeat(32);
+    process.env.CRON_SECRET = secret;
+    vi.resetModules();
+    vi.doMock("@/lib/services/backup-queue-runner", () => ({
+      runDueCompanyBackups: vi.fn(async () => {
+        throw new Error("Company register unavailable: permission denied");
+      }),
+    }));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { POST } = await import("@/app/api/backups/run/route");
+    const response = await POST(
+      new Request("http://localhost/api/backups/run", {
+        method: "POST",
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    const logged = consoleError.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(logged).toContain("Company register unavailable: permission denied");
+    consoleError.mockRestore();
   });
 });

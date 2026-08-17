@@ -34,10 +34,16 @@ export async function POST(request: Request) {
     const status = result.failed > 0 ? 500 : 200;
     return Response.json({ processedAt: new Date().toISOString(), ...result }, { status });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Backups failed" },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : "Backups failed";
+    // The response body is where this message lives for a caller, but
+    // Vercel's cron log keeps only path, status and duration and discards
+    // the body — the same fact the 500-on-failed-company branch above
+    // already accounts for. Without this line, a failure this early (the
+    // company register itself unreadable, nothing attempted) leaves an empty
+    // function log behind a bare 500, indistinguishable from a per-company
+    // failure logged and lost some other way.
+    console.error("Nightly backup run failed before it could produce a result:", message);
+    return Response.json({ error: message }, { status: 500 });
   }
 }
 

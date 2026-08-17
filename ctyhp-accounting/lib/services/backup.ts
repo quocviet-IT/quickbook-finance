@@ -87,7 +87,15 @@ export async function takeCompanyBackup(
       status: "skipped",
       skip_reason: "The books have not changed since the last snapshot",
     });
-    if (error) throw new BackupError(error.message);
+    if (error && error.code !== "23505") throw new BackupError(error.message);
+    // SQLSTATE 23505 here means the migration's own `unique (taken_at,
+    // content_hash)` already holds a row for tonight's exact content —
+    // written by an earlier run tonight, or by a concurrent one that landed
+    // first. Nothing before this insert touched storage or the audit log, so
+    // there is nothing this call could have orphaned by not writing its own
+    // row: tonight is covered either way, which is success, not failure. An
+    // operator re-invoking the job to check an earlier fix must not have
+    // that re-run itself read as the fix failing.
     return { status: "skipped", hash, path: null, sizeBytes: null };
   }
 
@@ -139,6 +147,24 @@ export async function takeCompanyBackup(
     skip_reason: null,
   });
   if (error) {
+    if (error.code === "23505") {
+      // Unlike the skip branch above, this call already wrote a real,
+      // non-idempotent row to acc_audit_log under `backupId` before ever
+      // reaching this insert. A same-day duplicate this late can only mean
+      // another run for this same company, same day, same content raced
+      // this one and its acc_backup row landed first — the content itself is
+      // safe (same path, same bytes; the upload above is `upsert: true`, so
+      // it just overwrote the same object) — but this call's own audit row
+      // still names a `backupId` that no acc_backup row will ever carry.
+      // That mismatch is worth a human's attention, not a quiet "stored":
+      // deliberately, this stays an error rather than mirroring the skip
+      // branch's swallow above.
+      throw new BackupError(
+        `A stored backup for ${today} with this exact content already exists, most likely because another run ` +
+          `raced this one. This run's own audit row (record ${backupId} at ${BACKUP_BUCKET}/${path}) has no ` +
+          `matching acc_backup row and should be checked by hand.`,
+      );
+    }
     // Milder than the audit-write failure above: the audit row already names
     // this path (`after_json.storage_path`), so "no audit row, no stored
     // file" still holds — a person digging through acc_audit_log can find
