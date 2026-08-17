@@ -252,6 +252,7 @@ describe("settingsHubForAccess", () => {
       "audit.read",
       "period.close",
       "feedback.read",
+      "company.export",
     ],
   };
 
@@ -329,6 +330,7 @@ describe("settingsHubForAccess", () => {
       "audit.read",
       "period.close",
       "feedback.read",
+      "company.export",
     ]);
     for (const group of SETTINGS_HUB) {
       for (const item of group.items) {
