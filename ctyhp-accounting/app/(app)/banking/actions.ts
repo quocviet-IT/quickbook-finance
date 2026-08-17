@@ -11,7 +11,7 @@ import {
   type BankPostingRow,
   listBankStatementImports,
   undoBankStatementImport,
-  deleteBankTransaction,
+  deleteBankTransactionWithVoid,
   type BankStatementImportRow,
   listBankTransactions,
   generateSuggestions,
@@ -132,6 +132,13 @@ export async function undoStatementImportAction(
   }
 }
 
+/**
+ * Delete a bank line — Correction to RQ-06, 2026-08-17. When the line still
+ * carries the journal entry categorising it posted, this voids that entry
+ * first, so the control works on a `matched` row, not only `unmatched`. See
+ * `deleteBankTransactionWithVoid` for what runs and why it is two calls
+ * rather than one atomic database function.
+ */
 export async function deleteBankTransactionAction(
   id: string,
   reason: string,
@@ -140,8 +147,9 @@ export async function deleteBankTransactionAction(
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    await deleteBankTransaction(sb, id, reason);
+    await deleteBankTransactionWithVoid(sb, id, reason);
     revalidatePath("/banking");
+    revalidatePath("/reports");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: msg(err) };

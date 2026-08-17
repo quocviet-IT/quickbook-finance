@@ -12,6 +12,10 @@ import type { AccountRow } from "@/lib/db/types";
 import type { BankPostingRow } from "@/lib/services/banking";
 import { TOKENS } from "@/lib/design/tokens";
 import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
+import {
+  evaluateBankTransactionDelete,
+  type BankTransactionDeleteEligibility,
+} from "@/lib/domain/bank-transaction-delete";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -39,8 +43,12 @@ export interface BankTransactionsTableProps {
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
   onAttachments: (row: BankReviewTableRow) => void;
-  /** Remove a line that should never have been imported. Unmatched lines only. */
-  onDelete: (row: BankReviewTableRow) => void;
+  /** Remove a line that should never have been imported — every row carries
+   *  the control now (Correction to RQ-06); `eligibility` says whether this
+   *  click deletes outright, voids an entry first, or was blocked before it
+   *  could fire (a blocked row's control is disabled, so this only ever
+   *  arrives as "delete_only" or "void_then_delete" in practice). */
+  onDelete: (row: BankReviewTableRow, eligibility: BankTransactionDeleteEligibility) => void;
   /** RQ-03: already pruned against `rows` by the caller, so this is always a
    *  subset of what is currently in the filtered result — never a row that
    *  has dropped out of it. */
@@ -223,17 +231,38 @@ export default function BankTransactionsTable({
             key: "delete",
             width: 56,
             fixed: "right" as const,
-            render: (_value: unknown, row: BankReviewTableRow) =>
-              // Only an unmatched line. Once the ledger cites one, removing it
-              // would leave an entry pointing at a transaction that is gone.
-              row.transaction.status === "unmatched" ? (
+            render: (_value: unknown, row: BankReviewTableRow) => {
+              // Every row carries the control now (Correction to RQ-06): a
+              // company where every line is already categorised must still
+              // see a way to remove one, not a button that only ever
+              // appears on the status nobody has left. Where the books
+              // genuinely refuse, the control stays visible but disabled,
+              // with the real reason in its tooltip — see
+              // lib/domain/bank-transaction-delete.ts for every case.
+              const posting = postings.get(row.transaction.id);
+              const eligibility = evaluateBankTransactionDelete({
+                status: row.transaction.status,
+                transactionBatchId: row.transaction.transaction_batch_id,
+                posting: posting
+                  ? {
+                      ownEntry: posting.own_entry,
+                      entryNumber: posting.entry_number,
+                      sourceType: posting.source_type,
+                    }
+                  : null,
+                hasOpenSuggestion: row.suggestion !== null,
+              });
+              const blocked = eligibility.kind === "blocked";
+              return (
                 <IconActionButton
                   danger
-                  label="Delete this bank transaction"
+                  label={blocked ? eligibility.reason : "Delete this bank transaction"}
                   icon={<DeleteOutlined />}
-                  onClick={() => onDelete(row)}
+                  disabled={blocked}
+                  onClick={() => onDelete(row, eligibility)}
                 />
-              ) : null,
+              );
+            },
           } as TableColumnsType<BankReviewTableRow>[number],
         ]
       : []),

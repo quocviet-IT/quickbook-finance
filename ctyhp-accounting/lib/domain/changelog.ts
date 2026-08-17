@@ -41,6 +41,33 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.27",
+    date: "2026-08-17",
+    headline: "Delete now works on a categorized Bank Transaction, not only an unreviewed one.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Delete a categorized bank transaction",
+        detail:
+          "Correction to a same-day decision: Delete used to appear only on " +
+          "a line still awaiting review, because categorizing posts a " +
+          "journal entry and a posted line could not be removed. On a " +
+          "company where every line had already been categorized, that " +
+          "left no row with a Delete button at all. Delete now appears on " +
+          "every row; on a categorized line it voids the journal entry " +
+          "categorizing it posted, then deletes the line — one confirmed " +
+          "click, with both effects named before anything happens and the " +
+          "entry's own number when one is known. Where the books genuinely " +
+          "refuse — a closed period, a line settled against an invoice or " +
+          "bill, a line matched by a transactions import or by something " +
+          "else — the button stays visible but disabled, with the real " +
+          "reason in its tooltip instead of a hidden control or a generic " +
+          "failure after the click.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.26",
     date: "2026-08-17",
     headline: "Select transactions on Bank Transactions and set their Category or Account all at once.",
