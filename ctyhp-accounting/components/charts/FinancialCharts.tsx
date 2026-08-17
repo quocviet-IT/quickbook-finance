@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Card, Empty, Typography } from "antd";
 import { TOKENS } from "@/lib/design/tokens";
+import { axisTicks } from "@/lib/domain/chart-axis";
 import type {
   AgingSnapshot,
   CashMovementSnapshot,
@@ -89,9 +90,7 @@ export function PerformanceChart({
       return `${center},${y(point.netIncomeMinor)}`;
     })
     .join(" ");
-  const ticks = Array.from({ length: 5 }, (_, index) =>
-    domainMax - (domainSpan * index) / 4,
-  );
+  const ticks = axisTicks(domainMax, domainSpan);
   const hasData = values.some((value) => value !== 0);
 
   return (
@@ -116,8 +115,10 @@ export function PerformanceChart({
               role="img"
               aria-label={`Monthly income, expenses, and net income for the last ${periodMonths} months`}
             >
-              {ticks.map((tick) => (
-                <g key={tick}>
+              {ticks.map((tick, tickIndex) => (
+                // Rounding can make adjacent ticks collide (see axisTicks),
+                // so the key must be the tick's position, not its value.
+                <g key={tickIndex}>
                   <line
                     x1={plot.left}
                     x2={width - plot.right}

@@ -41,6 +41,25 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.22",
+    date: "2026-08-17",
+    headline: "The dashboard could fail to load; that is fixed.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The dashboard could crash instead of loading",
+        detail:
+          "The income and expense trend chart could fail to render for a " +
+          "company whose six-, three-, or twelve-month window landed on " +
+          "certain totals, taking the whole dashboard down with it — the " +
+          "page showed its \"could not load\" screen instead of your numbers. " +
+          "The chart's axis labels are fixed; nothing about your figures was " +
+          "ever wrong.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "1.21",
     date: "2026-08-15",
     headline:
