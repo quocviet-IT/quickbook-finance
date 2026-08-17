@@ -41,6 +41,28 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.28",
+    date: "2026-08-17",
+    headline: "Drag a column header on Bank Transactions to put it wherever you can see it.",
+    changes: [
+      {
+        kind: "added",
+        title: "Drag and drop to reorder Bank Transactions columns",
+        detail:
+          "Press and drag any column heading — Date, Description, Account " +
+          "source, Reference, Amount, Category, Match, or Status — to put " +
+          "it next to whatever you are comparing it against, the way a " +
+          "spreadsheet does. Every row's data moves with its column, so an " +
+          "amount can never land under the wrong heading. The " +
+          "row-selection checkbox and the Delete/attachment buttons at the " +
+          "right edge cannot be dragged and cannot be dropped on — only " +
+          "the eight data columns reorder. The order lasts for the " +
+          "current session only and resets the next time you sign in.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.26",
     date: "2026-08-17",
     headline: "Select transactions on Bank Transactions and set their Category or Account all at once.",

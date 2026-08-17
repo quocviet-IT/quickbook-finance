@@ -4,6 +4,8 @@ import { Button, Space, Tag, Typography, type TableColumnsType } from "antd";
 import { DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import IconActionButton from "@/components/ui/IconActionButton";
+import { DraggableHeaderCell } from "@/components/ui/DraggableHeaderCell";
+import { useColumnDrag } from "@/components/ui/useColumnDrag";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
 import type { BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
@@ -14,6 +16,28 @@ import { TOKENS } from "@/lib/design/tokens";
 import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
+
+/**
+ * RQ-01: the reorderable data columns, in the order they ship today.
+ *
+ * Deliberately just these eight — never "delete" or "attachments". Those two
+ * are built separately below, always `fixed: "right"`, and are never given
+ * to `useColumnDrag`, so there is no key here a reader could drag them to:
+ * the drag mechanism only ever sees the columns in this list, and only ever
+ * reorders among them.
+ */
+const DATA_COLUMN_KEYS = [
+  "date",
+  "description",
+  "account",
+  "reference",
+  "amount",
+  "category",
+  "match",
+  "status",
+] as const;
+
+type BankColumnKey = (typeof DATA_COLUMN_KEYS)[number];
 
 const TXN_STATUS: Record<BankTxnStatus, { text: string; color: string }> = {
   unmatched: { text: "For review", color: "orange" },
@@ -82,8 +106,14 @@ export default function BankTransactionsTable({
   // Design's table back to that number on every render (RQ-04).
   const [pageSize, setPageSize] = useState<number>(BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE);
 
-  const columns: TableColumnsType<BankReviewTableRow> = [
-    { title: "Date", dataIndex: ["transaction", "txn_date"], width: 115 },
+  // RQ-01: the current session's column order. Starts as DATA_COLUMN_KEYS,
+  // exactly the shipped order, and lives only in this component's state —
+  // section 8 of the change request settled that a reorder does not survive
+  // a reload or a fresh login.
+  const { order: columnOrder, headerCellProps } = useColumnDrag<BankColumnKey>(DATA_COLUMN_KEYS);
+
+  const dataColumns: TableColumnsType<BankReviewTableRow> = [
+    { title: "Date", key: "date", dataIndex: ["transaction", "txn_date"], width: 115 },
     {
       title: "Description",
       key: "description",
@@ -110,6 +140,7 @@ export default function BankTransactionsTable({
     },
     {
       title: "Reference",
+      key: "reference",
       dataIndex: ["transaction", "reference"],
       width: 135,
       render: (reference: string | null) => reference ?? "—",
@@ -216,6 +247,15 @@ export default function BankTransactionsTable({
         </Space>
       ),
     },
+  ];
+
+  // RQ-01: never draggable, never a drop target. These two are built apart
+  // from dataColumns and appended after the reorder is applied, so there is
+  // no key of theirs in DATA_COLUMN_KEYS for a reader to drag a data column
+  // onto, and no onHeaderCell on either that would make them draggable
+  // themselves — see DraggableHeaderCell's module comment for what that
+  // omission actually enforces.
+  const pinnedColumns: TableColumnsType<BankReviewTableRow> = [
     ...(canWrite
       ? [
           {
@@ -256,6 +296,20 @@ export default function BankTransactionsTable({
       : []),
   ];
 
+  const dataColumnsByKey = new Map(dataColumns.map((column) => [column.key as BankColumnKey, column]));
+
+  // The session's drag order applied to the actual column definitions. A key
+  // in columnOrder with no matching entry can only happen if DATA_COLUMN_KEYS
+  // and this table's own columns ever drift apart — skipped rather than
+  // crashed, the same "a stale key does nothing" choice reorderColumns makes.
+  const columns: TableColumnsType<BankReviewTableRow> = [
+    ...columnOrder.flatMap((key) => {
+      const column = dataColumnsByKey.get(key);
+      return column ? [{ ...column, onHeaderCell: () => headerCellProps(key) }] : [];
+    }),
+    ...pinnedColumns,
+  ];
+
   return (
     <>
       {/* RQ-03 batch-action bar: only ever shown once a row is checked, and
@@ -275,6 +329,12 @@ export default function BankTransactionsTable({
       <DataTable
         rowKey={(row: BankReviewTableRow) => row.transaction.id}
         columns={columns}
+        // RQ-01: the only header-cell override on this table. Every header
+        // cell renders through this — including the row-selection checkbox
+        // and the pinned action columns above — but only a column whose own
+        // onHeaderCell supplies drag props (set above, only for the eight
+        // data columns) ever looks or behaves differently.
+        components={{ header: { cell: DraggableHeaderCell } }}
         dataSource={rows}
         rowClassName={(row: BankReviewTableRow) =>
           row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
