@@ -17,6 +17,11 @@ import {
 } from "@/lib/domain/transaction-list";
 import { formatMoney } from "@/lib/format";
 import { TOKENS } from "@/lib/design/tokens";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const TRANSACTION_LIST_DEFAULT_PAGE_SIZE = 50;
 
 const NO_FILTER: TransactionListFilter = {
   party: null,
@@ -51,6 +56,7 @@ export default function TransactionListClient({
   const router = useRouter();
   const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs(from), dayjs(to)]);
   const [filter, setFilter] = useState<TransactionListFilter>(NO_FILTER);
+  const [pageSize, setPageSize] = useState<number>(TRANSACTION_LIST_DEFAULT_PAGE_SIZE);
 
   const choices = useMemo(() => transactionListChoices(rows), [rows]);
   const visible = useMemo(() => filterTransactionList(rows, filter), [rows, filter]);
@@ -199,7 +205,7 @@ export default function TransactionListClient({
       <DataTable<TransactionListRow>
         rowKey="entryId"
         dataSource={visible}
-        pagination={{ pageSize: 50 }}
+        pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(TRANSACTION_LIST_DEFAULT_PAGE_SIZE))}
         sticky
         emptyTitle={narrowed ? "Nothing matches these filters" : "No transactions in this range"}
         emptyDescription={

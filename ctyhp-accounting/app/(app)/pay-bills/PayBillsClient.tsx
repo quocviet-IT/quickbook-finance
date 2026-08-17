@@ -21,6 +21,11 @@ import { allocateAcrossBills } from "@/lib/domain/payables";
 import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
 import PayRunPanel from "@/components/payables/PayRunPanel";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const PAYMENTS_DEFAULT_PAGE_SIZE = 20;
 
 export default function PayBillsClient({
   payments,
@@ -44,6 +49,7 @@ export default function PayBillsClient({
   /** Bills whose early payment discount is being taken, by bill id. */
   const [discounts, setDiscounts] = useState<Record<string, number>>({});
   const [alloc, setAlloc] = useState<Record<string, number>>({}); // bill_id -> decimal amount
+  const [paymentsPageSize, setPaymentsPageSize] = useState<number>(PAYMENTS_DEFAULT_PAGE_SIZE);
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -179,7 +185,14 @@ export default function PayBillsClient({
         rowKey="id"
         dataSource={payments}
         scroll={{ x: "max-content" }}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        pagination={{
+          // Explicit, unlike the rest of this sweep's default DataTable/Table
+          // behaviour: this screen wants the size changer shown regardless of
+          // row count, not only once the list passes Ant Design's own
+          // 50-row threshold.
+          ...clientTablePagination(paymentsPageSize, setPaymentsPageSize, pageSizeOptionsFor(PAYMENTS_DEFAULT_PAGE_SIZE)),
+          showSizeChanger: true,
+        }}
         columns={[
           { title: "Payment Number", dataIndex: "payment_number", render: (v) => v ?? "—" },
           { title: "Vendor", dataIndex: "vendor_name" },

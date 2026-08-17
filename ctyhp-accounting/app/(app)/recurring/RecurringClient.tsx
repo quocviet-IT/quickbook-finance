@@ -64,6 +64,12 @@ import {
   postRecurringDraftAction,
   setRecurringTemplateStatusAction,
 } from "./actions";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// Rows a page for the two tables on this screen. See table-pagination.ts for
+// why these have to live in state rather than as literals on `pagination`.
+const TEMPLATES_DEFAULT_PAGE_SIZE = 15;
+const RUNS_DEFAULT_PAGE_SIZE = 15;
 
 const TEMPLATE_STATUS: Record<RecurringTemplateStatus, { label: string; color: string }> = {
   active: { label: "Active", color: "green" },
@@ -177,6 +183,8 @@ export default function RecurringClient({
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<RecurringDocumentType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<RecurringTemplateStatus | "all">("all");
+  const [templatesPageSize, setTemplatesPageSize] = useState<number>(TEMPLATES_DEFAULT_PAGE_SIZE);
+  const [runsPageSize, setRunsPageSize] = useState<number>(RUNS_DEFAULT_PAGE_SIZE);
 
   // A vendor created from inside this dialog has to appear in the picker now;
   // the page's own list will not refresh until the template is saved. The page
@@ -625,7 +633,11 @@ export default function RecurringClient({
           dataSource={filtered}
           emptyTitle="No recurring schedules"
           emptyDescription="Create a schedule for work that repeats weekly, monthly, quarterly, or yearly."
-          pagination={{ pageSize: 15 }}
+          pagination={clientTablePagination(
+            templatesPageSize,
+            setTemplatesPageSize,
+            pageSizeOptionsFor(TEMPLATES_DEFAULT_PAGE_SIZE),
+          )}
           scroll={{ x: 1120 }}
         />
       </section>
@@ -638,7 +650,11 @@ export default function RecurringClient({
           dataSource={runs}
           emptyTitle="No occurrences yet"
           emptyDescription="Generated drafts and review items will appear here."
-          pagination={{ pageSize: 15 }}
+          pagination={clientTablePagination(
+            runsPageSize,
+            setRunsPageSize,
+            pageSizeOptionsFor(RUNS_DEFAULT_PAGE_SIZE),
+          )}
           scroll={{ x: 860 }}
         />
       </section>

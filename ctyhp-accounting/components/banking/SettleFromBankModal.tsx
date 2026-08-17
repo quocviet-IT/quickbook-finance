@@ -25,9 +25,14 @@ import {
   settleFromBankTransactionAction,
   type SettlementCandidatesView,
 } from "@/app/(app)/banking/actions";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 /** Ranked, but still carrying the customer or vendor name the service fetched. */
 type RankedRow = RankedCandidate<SettlementCandidateRow>;
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const CANDIDATES_DEFAULT_PAGE_SIZE = 8;
 
 export interface SettleTarget {
   id: string;
@@ -67,6 +72,7 @@ export default function SettleFromBankModal({
   const [alloc, setAlloc] = useState<Record<string, number>>({});
   const [method, setMethod] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
+  const [pageSize, setPageSize] = useState<number>(CANDIDATES_DEFAULT_PAGE_SIZE);
 
   const targetId = target.id;
 
@@ -170,7 +176,7 @@ export default function SettleFromBankModal({
           rowKey={(row) => row.candidate.documentId}
           size="small"
           loading={loading}
-          pagination={{ pageSize: 8 }}
+          pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(CANDIDATES_DEFAULT_PAGE_SIZE))}
           dataSource={ranked}
           locale={{
             emptyText:

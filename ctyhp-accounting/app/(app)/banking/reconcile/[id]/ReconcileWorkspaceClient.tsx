@@ -40,6 +40,11 @@ import {
   summariseStatementLines,
   STATEMENT_LINE_STATES,
 } from "@/lib/domain/bankrec";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const STATEMENT_LINES_DEFAULT_PAGE_SIZE = 10;
 
 interface Offset {
   id: string;
@@ -73,6 +78,9 @@ export default function ReconcileWorkspaceClient({
   const [importing, setImporting] = useState(false);
   const [adjOpen, setAdjOpen] = useState(false);
   const [form] = Form.useForm();
+  const [statementLinesPageSize, setStatementLinesPageSize] = useState<number>(
+    STATEMENT_LINES_DEFAULT_PAGE_SIZE,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -260,7 +268,15 @@ export default function ReconcileWorkspaceClient({
         <Table<StatementLineView>
           rowKey="id"
           size="small"
-          pagination={statementLines.length > 10 ? { pageSize: 10 } : false}
+          pagination={
+            statementLines.length > 10
+              ? clientTablePagination(
+                  statementLinesPageSize,
+                  setStatementLinesPageSize,
+                  pageSizeOptionsFor(STATEMENT_LINES_DEFAULT_PAGE_SIZE),
+                )
+              : false
+          }
           dataSource={statementLines}
           locale={{ emptyText: "No statement lines imported for this period" }}
           columns={[

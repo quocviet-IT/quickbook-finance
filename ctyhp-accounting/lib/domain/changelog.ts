@@ -41,6 +41,71 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.25",
+    date: "2026-08-17",
+    headline:
+      "The page-size bug fixed on Bank Transactions last release was also hiding on nine other screens — now fixed there too.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The page size you chose on the General Ledger report was ignored",
+        detail:
+          "Same bug as Bank Transactions in 1.23, on the report where a long " +
+          "run of activity matters most: picking 100 rows a page moved the " +
+          "dropdown but the table kept showing 50. All the size-changer " +
+          "choices now take effect.",
+        route: "/reports/general-ledger",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Fixed Assets was ignored",
+        detail:
+          "Both the asset register and the depreciation-schedule dialog you " +
+          "open from it kept the dropdown and the table out of sync the same " +
+          "way Bank Transactions did.",
+        route: "/fixed-assets",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on the Fixed Assets report was ignored",
+        detail: "Both the asset register and the depreciation views on this report.",
+        route: "/reports/fixed-assets",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Recurring was ignored",
+        detail: "Both the schedule list and its occurrence history below it.",
+        route: "/recurring",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on the Transactions report was ignored",
+        route: "/reports/transactions",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Pay Bills was ignored",
+        route: "/pay-bills",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on the Audit Trail was ignored",
+        route: "/settings/audit",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Approvals was ignored",
+        detail: "The Decided list, which is the one that grows.",
+        route: "/approvals",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Payments was ignored",
+        route: "/payments",
+      },
+    ],
+  },
+  {
     version: "1.24",
     date: "2026-08-17",
     headline: "Bank Transactions and the General Ledger can now be searched by keyword and filtered by amount.",

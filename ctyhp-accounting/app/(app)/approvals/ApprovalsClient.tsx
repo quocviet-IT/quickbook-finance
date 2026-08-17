@@ -8,6 +8,11 @@ import { canDecide } from "@/lib/domain/access";
 import { fromMinor } from "@/lib/domain/money";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+/** Rows a page for the decided-requests table. See table-pagination.ts for
+ * why this has to live in state rather than as a literal on `pagination`. */
+const DECIDED_DEFAULT_PAGE_SIZE = 20;
 
 const STATUS_COLOR: Record<ApprovalStatus, string> = {
   pending: "gold",
@@ -38,6 +43,7 @@ export default function ApprovalsClient({
   const { message, modal } = App.useApp();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [decidedPageSize, setDecidedPageSize] = useState<number>(DECIDED_DEFAULT_PAGE_SIZE);
 
   const policyOf = (key: string) => policies.find((p) => p.action_key === key);
   const money = (m: number) =>
@@ -230,7 +236,11 @@ export default function ApprovalsClient({
         <Table<ApprovalRequestRow>
           rowKey="id"
           dataSource={history}
-          pagination={{ pageSize: 20 }}
+          pagination={clientTablePagination(
+            decidedPageSize,
+            setDecidedPageSize,
+            pageSizeOptionsFor(DECIDED_DEFAULT_PAGE_SIZE),
+          )}
           scroll={{ x: "max-content" }}
           locale={{ emptyText: "No decisions yet" }}
           columns={[

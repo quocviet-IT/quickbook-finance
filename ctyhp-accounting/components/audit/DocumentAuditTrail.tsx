@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Alert, Descriptions, Space, Table, Tag, Typography } from "antd";
 import type { AuditEntryRow } from "@/lib/db/types";
 import {
@@ -11,6 +12,11 @@ import {
   type AttributionSource,
   type AuditFieldChange,
 } from "@/lib/domain/audit";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const CHANGE_HISTORY_DEFAULT_PAGE_SIZE = 10;
 
 /**
  * Who made a document, who touched it last, and every change the database
@@ -32,6 +38,7 @@ export default function DocumentAuditTrail({
   canReadAudit: boolean;
 }) {
   const attribution = documentAttribution(record, directory);
+  const [pageSize, setPageSize] = useState<number>(CHANGE_HISTORY_DEFAULT_PAGE_SIZE);
 
   return (
     <Space direction="vertical" size="middle" style={{ display: "flex", marginBottom: 16 }}>
@@ -65,7 +72,15 @@ export default function DocumentAuditTrail({
             style={{ marginTop: 8 }}
             loading={loading}
             dataSource={entries}
-            pagination={entries.length > 10 ? { pageSize: 10 } : false}
+            pagination={
+              entries.length > 10
+                ? clientTablePagination(
+                    pageSize,
+                    setPageSize,
+                    pageSizeOptionsFor(CHANGE_HISTORY_DEFAULT_PAGE_SIZE),
+                  )
+                : false
+            }
             locale={{ emptyText: "No recorded change" }}
             expandable={{
               rowExpandable: (entry) => diffAuditEntry(entry).length > 0,

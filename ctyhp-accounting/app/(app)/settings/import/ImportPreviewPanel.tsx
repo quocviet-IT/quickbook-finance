@@ -1,10 +1,16 @@
 "use client";
+import { useState } from "react";
 import { Alert, Button, Checkbox, DatePicker, Space, Statistic, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
 import type { ImportPreview } from "@/lib/services/data-import";
 import { DownloadOutlined } from "@ant-design/icons";
 import { TOKENS } from "@/lib/design/tokens";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const PREVIEW_DEFAULT_PAGE_SIZE = 10;
 
 export interface ImportPreviewPanelProps {
   preview: ImportPreview;
@@ -40,6 +46,7 @@ export default function ImportPreviewPanel({
   onImport,
   onDownloadExcluded,
 }: ImportPreviewPanelProps) {
+  const [pageSize, setPageSize] = useState<number>(PREVIEW_DEFAULT_PAGE_SIZE);
   const blocked =
     (preview.missingAccounts?.length ?? 0) > 0 ||
     (preview.unbankedAccounts?.length ?? 0) > 0 ||
@@ -174,7 +181,7 @@ export default function ImportPreviewPanel({
       <Table
         size="small"
         rowKey={(row) => `${row.action}-${row.key}`}
-        pagination={{ pageSize: 10 }}
+        pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PREVIEW_DEFAULT_PAGE_SIZE))}
         dataSource={preview.rows}
         columns={[
           {

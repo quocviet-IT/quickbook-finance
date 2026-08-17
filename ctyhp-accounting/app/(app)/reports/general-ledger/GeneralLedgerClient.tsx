@@ -13,6 +13,11 @@ import {
 } from "@/lib/domain/transaction-filter";
 import { generalLedgerAction } from "./actions";
 import type { GeneralLedger, GeneralLedgerRow } from "@/lib/services/journal";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const GENERAL_LEDGER_DEFAULT_PAGE_SIZE = 50;
 
 interface Account {
   id: string;
@@ -79,6 +84,7 @@ export default function GeneralLedgerClient({
   const [exactAmountText, setExactAmountText] = useState("");
   const [minAmountText, setMinAmountText] = useState("");
   const [maxAmountText, setMaxAmountText] = useState("");
+  const [pageSize, setPageSize] = useState<number>(GENERAL_LEDGER_DEFAULT_PAGE_SIZE);
 
   const run = useCallback(async () => {
     if (!accountId || !range) {
@@ -206,7 +212,13 @@ export default function GeneralLedgerClient({
             // remain, so a filtered view still shows each line's real,
             // whole-range running balance rather than one recomputed over
             // just the visible subset.
-            pagination={{ pageSize: 50 }}
+            //
+            // "the size changer for anybody who wants the whole run" above
+            // did not actually hold: a literal `{ pageSize: 50 }` here pinned
+            // the table back to 50 the instant anything re-rendered it, no
+            // matter what the size changer reported (RQ-04's bug, found again
+            // on this screen). See table-pagination.ts for the mechanism.
+            pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(GENERAL_LEDGER_DEFAULT_PAGE_SIZE))}
             loading={loading}
             emptyTitle={hasKeywordOrAmountFilter ? "Nothing matches these filters" : "No ledger activity"}
             emptyDescription={

@@ -36,8 +36,13 @@ import ReceivePaymentModal, { type ReceivePaymentBasis } from "./ReceivePaymentM
 import VoidPaymentModal from "./VoidPaymentModal";
 import DeletePaymentModal from "./DeletePaymentModal";
 import RefundModal from "../settlements/RefundModal";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 export type PaymentListRow = PaymentRow & { customer_name: string };
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const PAYMENTS_DEFAULT_PAGE_SIZE = 20;
 
 const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
   unapplied: { text: "Unapplied", color: "orange" },
@@ -88,6 +93,7 @@ export default function PaymentsClient({
   const [voidFor, setVoidFor] = useState<PaymentListRow | null>(null);
   const [refundFor, setRefundFor] = useState<PaymentListRow | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+  const [pageSize, setPageSize] = useState<number>(PAYMENTS_DEFAULT_PAGE_SIZE);
 
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
 
@@ -237,7 +243,7 @@ export default function PaymentsClient({
         columns={columns}
         dataSource={payments}
         size="small"
-        pagination={{ pageSize: 20 }}
+        pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAYMENTS_DEFAULT_PAGE_SIZE))}
         scroll={{ x: "max-content" }}
         sticky
       />
