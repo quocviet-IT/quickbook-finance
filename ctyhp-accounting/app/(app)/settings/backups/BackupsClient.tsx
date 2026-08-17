@@ -19,14 +19,18 @@ export default function BackupsClient({
   loadError: string | null;
   canRestore: boolean;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
+  // A set, not a single id: downloading row A and then row B while A is
+  // still in flight must not clear A's spinner when B's `finally` runs (or
+  // vice versa) — each row's own request is what should own its own row's
+  // loading state.
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
 
   // Wrapped the same way app/(app)/reports/saved/SavedReportViewer.tsx wraps
   // its own download handler: this assigns window.location.href, and the
   // compiler's lint rule reads that mutation of an outside variable as a
   // render-time side effect unless it happens inside a recognised callback.
   const download = useCallback(async (row: BackupRow) => {
-    setBusy(row.id);
+    setBusyIds((prev) => new Set(prev).add(row.id));
     try {
       const result = await downloadBackupAction(row.id);
       if (!result.ok || !result.data) {
@@ -36,7 +40,11 @@ export default function BackupsClient({
     } catch (error) {
       message.error(error instanceof Error ? error.message : "Could not prepare the download");
     } finally {
-      setBusy(null);
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
     }
   }, []);
 
@@ -81,7 +89,7 @@ export default function BackupsClient({
           key="download"
           size="small"
           disabled={row.status !== "stored"}
-          loading={busy === row.id}
+          loading={busyIds.has(row.id)}
           onClick={() => download(row)}
         >
           Download
@@ -104,7 +112,7 @@ export default function BackupsClient({
         type="info"
         showIcon
         message="What a snapshot holds"
-        description="A snapshot holds every table in this company's books, including vendor tax profiles. Attachments — document scans and other uploaded files — are not included: the snapshot lists them, but their contents are not part of it, and a restore will not bring them back. A night with no new file is one where the books have not changed since the previous snapshot; that is expected, not a failure."
+        description="A snapshot holds every table in this company's books, including vendor tax profiles. Attachments — document scans and other uploaded files — are not included: the snapshot lists them, but their contents are not part of it, and a restore will not bring them back. A Skipped row means the books have not changed since the previous snapshot — expected, not a failure. A missing date is different: it is not proof a snapshot was taken that night, since a failed run leaves no row at all and a routine night may not reach every company — check with an administrator if a specific date matters."
       />
       <DataTable<BackupRow>
         rowKey="id"
