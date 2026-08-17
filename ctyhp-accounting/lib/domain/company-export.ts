@@ -119,7 +119,10 @@ export interface ExportControlTotals {
   journalLineCount: number;
 }
 
-const FORMULA_LEAD = new Set(["=", "+", "-", "@"]);
+// Exported because the restore parser must strip exactly the guard this set
+// applies; a second list of these four characters would be free to drift and
+// silently corrupt every value that starts with one of them.
+export const FORMULA_LEAD = new Set(["=", "+", "-", "@"]);
 
 function cell(value: unknown): string {
   if (value === null || value === undefined) return "";

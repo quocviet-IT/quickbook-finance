@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.23",
+    date: "2026-08-17",
+    headline:
+      "Every company's books are snapshotted on a schedule, and a snapshot can be restored into a new company that proves itself.",
+    changes: [
+      {
+        kind: "added",
+        title: "Backups",
+        detail:
+          "Settings gained a Backups screen: a nightly snapshot of this " +
+          "company's books, taken automatically and kept for thirty " +
+          "changes. A night the books did not move is recorded as Skipped " +
+          "rather than stored again. Each stored snapshot can be downloaded " +
+          "as the same portable archive the export button produces. " +
+          "Attachments — document scans and other uploaded files — are " +
+          "listed in a snapshot but their contents are not part of it.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "added",
+        title: "Restore a snapshot as a new company",
+        detail:
+          "A stored snapshot can be loaded into a brand-new company beside " +
+          "the running books — nothing in the source company changes. When " +
+          "the restore finishes, the copy's trial balance, receivables, " +
+          "payables and journal line count are checked against the " +
+          "snapshot's own figures, and any difference is named rather than " +
+          "summarized. The person who runs the restore is the copy's only " +
+          "user; the snapshot's user list and role assignments are " +
+          "deliberately not carried over.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "1.22",
     date: "2026-08-17",
     headline: "The dashboard could fail to load; that is fixed.",

@@ -219,10 +219,18 @@ describe("findActivePage", () => {
 describe("SETTINGS_HUB", () => {
   const hubHrefs = SETTINGS_HUB.flatMap((g) => g.items.map((i) => i.href));
 
-  it("covers every settings route the app serves", () => {
-    const settingsRoutes = ROUTES.filter((r) => r.startsWith("/settings/"));
+  it("covers every static settings route the app serves", () => {
+    // A dynamic route (one page per record id) has no static href to put on a
+    // card, so it cannot appear here; the guard tests below hold it to the
+    // permission-gate contract instead.
+    const settingsRoutes = ROUTES.filter((r) => r.startsWith("/settings/") && !r.includes("["));
     const missing = settingsRoutes.filter((r) => !hubHrefs.includes(r));
     expect(missing).toEqual([]);
+  });
+
+  it("keeps dynamic routes out of the catalog — they are not destinations", () => {
+    const dynamicHrefs = hubHrefs.filter((href) => href.includes("["));
+    expect(dynamicHrefs).toEqual([]);
   });
 
   it("points every card at a route that exists", () => {
@@ -388,30 +396,49 @@ describe("settings pages guard themselves", () => {
     "/settings/feedback", // a reporter goes here to see their own reports
   ]);
 
-  it("awaits requireSettingsAccess with its own href on every gated page", () => {
+  const pageSource = (route: string) =>
+    readFileSync(join(process.cwd(), "app", "(app)", route, "page.tsx"), "utf8");
+  const settingsRoutes = ROUTES.filter((r) => r.startsWith("/settings") && !UNGUARDED.has(r));
+  // A dynamic route cannot use the catalog guard — settingsGateFor matches
+  // hrefs exactly and throws for one it has never heard of — so it must gate
+  // itself on a named permission through requireSettingsPermission.
+  const staticRoutes = settingsRoutes.filter((r) => !r.includes("["));
+  const dynamicRoutes = settingsRoutes.filter((r) => r.includes("["));
+
+  it("awaits requireSettingsAccess with its own href on every gated static page", () => {
     // The `await` is the whole guard. Without it redirect() throws inside a
     // detached promise, Next never sees a redirect, and the page renders in full
     // to someone who was supposed to be turned away — while a substring check
     // for the call alone stays green.
     const missing: string[] = [];
-    for (const route of ROUTES.filter((r) => r.startsWith("/settings"))) {
-      if (UNGUARDED.has(route)) continue;
-      const file = join(process.cwd(), "app", "(app)", route, "page.tsx");
-      const source = readFileSync(file, "utf8");
+    for (const route of staticRoutes) {
+      const source = pageSource(route);
       if (!source.includes(`await requireSettingsAccess("${route}")`)) missing.push(route);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("gates every dynamic settings route on a named permission key", () => {
+    // The regex demands a literal dotted key ("company.restore") inside the
+    // call, so a page passing an empty list — a gate that refuses nobody —
+    // fails here rather than in production.
+    const missing: string[] = [];
+    for (const route of dynamicRoutes) {
+      const source = pageSource(route);
+      if (!/await requireSettingsPermission\(\s*\[\s*"[a-z]+\.[a-z]+"/.test(source)) {
+        missing.push(route);
+      }
     }
     expect(missing).toEqual([]);
   });
 
   it("guards before reading anything, so a refusal cannot render a page body", () => {
     const late: string[] = [];
-    for (const route of ROUTES.filter((r) => r.startsWith("/settings"))) {
-      if (UNGUARDED.has(route)) continue;
-      const file = join(process.cwd(), "app", "(app)", route, "page.tsx");
-      const source = readFileSync(file, "utf8");
+    for (const route of settingsRoutes) {
+      const source = pageSource(route);
       const body = source.slice(source.indexOf("export default"));
-      const guardAt = body.indexOf("await requireSettingsAccess(");
-      const firstOtherAwait = body.search(/await (?!requireSettingsAccess\()/);
+      const guardAt = body.search(/await requireSettings(?:Access|Permission)\(/);
+      const firstOtherAwait = body.search(/await (?!requireSettings(?:Access|Permission)\()/);
       if (guardAt < 0 || (firstOtherAwait >= 0 && firstOtherAwait < guardAt)) late.push(route);
     }
     expect(late).toEqual([]);
