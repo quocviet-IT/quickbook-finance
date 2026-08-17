@@ -41,6 +41,39 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.23",
+    date: "2026-08-17",
+    headline: "Bank Transactions and the General Ledger can now be searched by keyword and filtered by amount.",
+    changes: [
+      {
+        kind: "added",
+        title: "Search and amount filters on Bank Transactions",
+        detail:
+          "A search box and three amount fields — Exact amount, Min amount, " +
+          "and Max amount — sit beside the account, status, and posted-to " +
+          "filters. Search matches Description and Reference. The amount " +
+          "fields match a transaction's size regardless of whether it was " +
+          "money in or money out — typing 1250 finds a $1,250.00 line " +
+          "whichever direction it moved, the same way the amount reads on a " +
+          "printed statement. All four filters combine, and clearing them " +
+          "returns the list to what it showed before.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Search and amount filters on the General Ledger report",
+        detail:
+          "The same search and amount filters are now available when " +
+          "reviewing an account's activity: search matches Entry number, " +
+          "Memo, and Source, and the amount fields match whichever of Debit " +
+          "or Credit a line carries. Filtering only changes which lines are " +
+          "shown — the Opening, Closing, and each line's running balance " +
+          "stay exactly as posted.",
+        route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
     version: "1.22",
     date: "2026-08-17",
     headline: "The dashboard could fail to load; that is fixed.",

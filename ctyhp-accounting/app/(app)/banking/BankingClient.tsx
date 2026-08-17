@@ -57,6 +57,11 @@ import type {
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
+import {
+  filterBankTransactions,
+  parseAmountFilterInput,
+  type AmountFilter,
+} from "@/lib/domain/transaction-filter";
 import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import {
@@ -182,6 +187,13 @@ export default function BankingClient({
   const [transactionStatus, setTransactionStatus] = useState<"all" | BankTxnStatus>(
     initialQueueStatus ?? "all",
   );
+  // Keyword and amount (RQ-02): raw text kept separate from the parsed
+  // AmountFilter so a half-typed number ("12" on the way to "125.00") shows
+  // in the box as typed rather than fighting a parse failure every keystroke.
+  const [keyword, setKeyword] = useState("");
+  const [exactAmountText, setExactAmountText] = useState("");
+  const [minAmountText, setMinAmountText] = useState("");
+  const [maxAmountText, setMaxAmountText] = useState("");
   const [txns, setTxns] = useState<BankTransactionRow[]>([]);
   // What each matched line was posted to. Fetched beside the transactions so
   // the Category column can show the answer instead of asking over the top of
@@ -230,6 +242,19 @@ export default function BankingClient({
   );
   const decimalsOf = (code: string) => currencies.find((currency) => currency.code === code)?.decimal_places ?? 2;
   const decimalPlaces = selected ? decimalsOf(selected.currency_code) : 2;
+  // The amount boxes are parsed with the selected account's own currency
+  // decimals (2 for USD, which is every account this product supports today
+  // — see decimalPlaces above). The all-accounts queue can in principle mix
+  // currencies with different decimal places; this filter does not attempt
+  // cross-currency amount matching, the same simplification the CSV importer
+  // above already makes with this same decimalPlaces value.
+  const amountFilter: AmountFilter = {
+    exactMinor: parseAmountFilterInput(exactAmountText, decimalPlaces),
+    minMinor: parseAmountFilterInput(minAmountText, decimalPlaces),
+    maxMinor: parseAmountFilterInput(maxAmountText, decimalPlaces),
+  };
+  const hasKeywordOrAmountFilter =
+    keyword.trim() !== "" || exactAmountText.trim() !== "" || minAmountText.trim() !== "" || maxAmountText.trim() !== "";
   /**
    * A row's own currency, not the screen's. The all-accounts queue holds several
    * at once, and a card line formatted as dollars is a wrong number on screen.
@@ -532,11 +557,18 @@ export default function BankingClient({
     return postings.get(transaction.id)?.account_id === postedToFilter;
   });
 
+  // RQ-02: keyword (Description, Reference) and amount, composed with the
+  // account/status/posted-to filters above rather than replacing them — all
+  // four narrow the same in-browser `txns` array, which holds every
+  // transaction for the selection, not just the rows the paginator currently
+  // shows.
+  const keywordAndAmountFiltered = filterBankTransactions(categorized, keyword, amountFilter);
+
   // Each row carries the account it came from, that account's currency, and its
   // best suggested match — so one table can answer what a line is and where it
   // came from without sending anyone to a second screen.
   const reviewRows = buildBankReviewRows(
-    categorized,
+    keywordAndAmountFiltered,
     suggestions,
     bankAccounts.map((account) => ({
       id: account.id,
@@ -687,6 +719,50 @@ export default function BankingClient({
                 })),
             ]}
           />
+          <Input.Search
+            allowClear
+            aria-label="Search bank transactions by description or reference"
+            placeholder="Search description or reference"
+            style={{ width: 240 }}
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+          />
+          <Input
+            allowClear
+            aria-label="Filter bank transactions by exact amount"
+            placeholder="Exact amount"
+            style={{ width: 130 }}
+            value={exactAmountText}
+            onChange={(event) => setExactAmountText(event.target.value)}
+          />
+          <Input
+            allowClear
+            aria-label="Filter bank transactions by minimum amount"
+            placeholder="Min amount"
+            style={{ width: 120 }}
+            value={minAmountText}
+            onChange={(event) => setMinAmountText(event.target.value)}
+          />
+          <Input
+            allowClear
+            aria-label="Filter bank transactions by maximum amount"
+            placeholder="Max amount"
+            style={{ width: 120 }}
+            value={maxAmountText}
+            onChange={(event) => setMaxAmountText(event.target.value)}
+          />
+          {hasKeywordOrAmountFilter ? (
+            <Button
+              onClick={() => {
+                setKeyword("");
+                setExactAmountText("");
+                setMinAmountText("");
+                setMaxAmountText("");
+              }}
+            >
+              Clear filters
+            </Button>
+          ) : null}
           {suggestions.length ? (
             <Typography.Text type="secondary">
               {suggestions.length} suggested match{suggestions.length > 1 ? "es" : ""} in the Match column

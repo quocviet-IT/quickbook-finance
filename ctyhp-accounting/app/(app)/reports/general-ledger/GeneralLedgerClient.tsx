@@ -1,11 +1,16 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { App, Button, DatePicker, Select, Space, Statistic, Tooltip, Typography } from "antd";
+import { App, Button, DatePicker, Input, Select, Space, Statistic, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
+import {
+  filterGeneralLedgerRows,
+  parseAmountFilterInput,
+  type AmountFilter,
+} from "@/lib/domain/transaction-filter";
 import { generalLedgerAction } from "./actions";
 import type { GeneralLedger, GeneralLedgerRow } from "@/lib/services/journal";
 
@@ -67,6 +72,13 @@ export default function GeneralLedgerClient({
   );
   const [gl, setGl] = useState<GeneralLedger | null>(null);
   const [loading, setLoading] = useState(false);
+  // RQ-02: keyword (Entry number, Memo, Source) and amount, applied to the
+  // full set of posted lines the server already returned for this account and
+  // date range — not just whichever page the table is currently showing.
+  const [keyword, setKeyword] = useState("");
+  const [exactAmountText, setExactAmountText] = useState("");
+  const [minAmountText, setMinAmountText] = useState("");
+  const [maxAmountText, setMaxAmountText] = useState("");
 
   const run = useCallback(async () => {
     if (!accountId || !range) {
@@ -87,10 +99,27 @@ export default function GeneralLedgerClient({
   }, [validInitialAccount, initialTo, run]);
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
 
+  // The report itself is always in base currency (see getGeneralLedger), so
+  // baseDecimals is the correct — and only — decimal count to parse an
+  // amount box against; there is no per-row currency ambiguity here the way
+  // there can be on the all-accounts Bank Transactions queue.
+  const amountFilter: AmountFilter = {
+    exactMinor: parseAmountFilterInput(exactAmountText, baseDecimals),
+    minMinor: parseAmountFilterInput(minAmountText, baseDecimals),
+    maxMinor: parseAmountFilterInput(maxAmountText, baseDecimals),
+  };
+  const hasKeywordOrAmountFilter =
+    keyword.trim() !== "" || exactAmountText.trim() !== "" || minAmountText.trim() !== "" || maxAmountText.trim() !== "";
+  // Filtering the already-fetched rows, not the page the table currently
+  // shows: `gl.rows` is every posted line the server matched for this account
+  // and date range (DataTable pages it at 50/page in the browser), so this
+  // narrows the real result set the same way the account/date filters do.
+  const visibleRows = gl ? filterGeneralLedgerRows(gl.rows, keyword, amountFilter) : [];
+
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <FilterBar
-        resultCount={gl?.rows.length}
+        resultCount={gl ? visibleRows.length : undefined}
         ariaLabel="General Ledger filters"
         actions={
           <Button type="primary" loading={loading} onClick={() => void run()}>
@@ -108,6 +137,50 @@ export default function GeneralLedgerClient({
           onChange={setAccountId}
         />
         <DatePicker.RangePicker value={range} onChange={(v) => v && setRange([v[0]!, v[1]!])} />
+        <Input.Search
+          allowClear
+          aria-label="Search the General Ledger by entry number, memo, or source"
+          placeholder="Search entry number, memo, or source"
+          style={{ width: 260 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Input
+          allowClear
+          aria-label="Filter the General Ledger by exact amount"
+          placeholder="Exact amount"
+          style={{ width: 130 }}
+          value={exactAmountText}
+          onChange={(event) => setExactAmountText(event.target.value)}
+        />
+        <Input
+          allowClear
+          aria-label="Filter the General Ledger by minimum amount"
+          placeholder="Min amount"
+          style={{ width: 120 }}
+          value={minAmountText}
+          onChange={(event) => setMinAmountText(event.target.value)}
+        />
+        <Input
+          allowClear
+          aria-label="Filter the General Ledger by maximum amount"
+          placeholder="Max amount"
+          style={{ width: 120 }}
+          value={maxAmountText}
+          onChange={(event) => setMaxAmountText(event.target.value)}
+        />
+        {hasKeywordOrAmountFilter ? (
+          <Button
+            onClick={() => {
+              setKeyword("");
+              setExactAmountText("");
+              setMinAmountText("");
+              setMaxAmountText("");
+            }}
+          >
+            Clear filters
+          </Button>
+        ) : null}
       </FilterBar>
       {gl && (
         <>
@@ -120,7 +193,7 @@ export default function GeneralLedgerClient({
           </Space>
           <DataTable<GeneralLedgerRow>
             rowKey="lineId"
-            dataSource={gl.rows}
+            dataSource={visibleRows}
             // A ledger runs to thousands of lines on a real bank account, and
             // rendering them all at once is what made this page slow to open
             // and impossible to find anything in. Fifty to a page, with the
@@ -129,10 +202,18 @@ export default function GeneralLedgerClient({
             // Paging is safe here because the running balance is worked out
             // over the entire range on the server, not across the rows on
             // screen — page 4 carries on from page 3 rather than restarting.
+            // Filtering above does not touch runningMinor on the rows that
+            // remain, so a filtered view still shows each line's real,
+            // whole-range running balance rather than one recomputed over
+            // just the visible subset.
             pagination={{ pageSize: 50 }}
             loading={loading}
-            emptyTitle="No ledger activity"
-            emptyDescription="No posted entries were found for this account and date range."
+            emptyTitle={hasKeywordOrAmountFilter ? "Nothing matches these filters" : "No ledger activity"}
+            emptyDescription={
+              hasKeywordOrAmountFilter
+                ? "Clear a filter, or widen the search."
+                : "No posted entries were found for this account and date range."
+            }
             // The table is held to the width of the page rather than the width
             // of its contents. `DataTable` asks for `x: "max-content"` by
             // default, which suits a table whose columns all need their room —
