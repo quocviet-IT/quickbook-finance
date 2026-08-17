@@ -41,6 +41,112 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.22",
+    date: "2026-08-17",
+    headline: "The dashboard could fail to load; that is fixed.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The dashboard could crash instead of loading",
+        detail:
+          "The income and expense trend chart could fail to render for a " +
+          "company whose six-, three-, or twelve-month window landed on " +
+          "certain totals, taking the whole dashboard down with it — the " +
+          "page showed its \"could not load\" screen instead of your numbers. " +
+          "The chart's axis labels are fixed; nothing about your figures was " +
+          "ever wrong.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
+    version: "1.21",
+    date: "2026-08-15",
+    headline:
+      "The Profit and Loss can be read one month or one quarter at a time, and each line can show its share of income.",
+    changes: [
+      {
+        kind: "added",
+        title: "Profit and Loss columns by month or by quarter",
+        detail:
+          "Profit and loss columns now offers By month and By quarter beside " +
+          "One period and Two periods, laying the range out with one column per " +
+          "period and a Total at the right — the way a month that lost money, " +
+          "or a cost that has been climbing all year, actually shows up. Only " +
+          "the first and last column are ever partial, when the range picked " +
+          "does not start or end on a period boundary; every column between " +
+          "them is a whole month or quarter. A range that would need more than " +
+          "24 columns is refused rather than fetched — the screen says how " +
+          "many columns it would be and offers to narrow the range or show it " +
+          "by quarter instead, and never switches that for you on its own.",
+        route: "/reports",
+      },
+      {
+        kind: "added",
+        title: "% of Income on the Profit and Loss",
+        detail:
+          "A switch beside the column choice adds each line's share of that " +
+          "column's Total Income — Other Income is not part of it, which the " +
+          "column's tooltip says. It is on by default for one or two periods " +
+          "and off by default for a month-by-month or quarter-by-quarter view, " +
+          "where a percent beside every column would double an already wide " +
+          "table, but it is never disabled there: turn it on and it stays on. " +
+          "The Total column's percentage is worked out from the Total column's " +
+          "own income, not averaged from the periods beside it — averaging " +
+          "percentages across columns of different sizes is not the same " +
+          "number as the percentage of the total, and would have been wrong. " +
+          "The exported file carries the same percentages the screen shows.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "The Balance Sheet Trend's exported figures were 100 times too large",
+        detail:
+          "Its PDF and Excel export skipped the conversion from the ledger's " +
+          "internal cents to dollars, so every figure in the file read 100 " +
+          "times the real balance — $1,000 exported as $100,000. The on-screen " +
+          "table was correct the entire time, which is exactly why nothing " +
+          "gave it away. If you have already sent one of these exported files " +
+          "to a bank, an accountant, or anyone else, resend it — the export is " +
+          "now correct.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "AR and AP Aging summary exports were also 100 times too large",
+        detail:
+          "The same missing conversion was hiding in the aging summary " +
+          "grid's export: every party's column and the Total column both came " +
+          "out 100 times the real balance, on both the AR Aging and AP Aging " +
+          "pages. The on-screen grid was correct throughout. Resend any aging " +
+          "summary file already sent out.",
+        route: "/reports/ar-aging",
+      },
+      {
+        kind: "fixed",
+        title: "General Ledger Posting export was 100 times too large",
+        detail:
+          "The same bug, one more place it was hiding: the Amount column in " +
+          "the General Ledger Posting export skipped the same conversion the " +
+          "on-screen table applied. Resend any exported file from this report; " +
+          "the screen itself was never wrong.",
+        route: "/reports/gl-posting",
+      },
+      {
+        kind: "fixed",
+        title: "Transaction List export no longer assumes every currency has two decimal places",
+        detail:
+          "The Transaction List export divided every amount by a fixed 100 " +
+          "instead of by the company's own currency scale. That happened to " +
+          "read correctly for a two-decimal currency like USD, but would have " +
+          "silently misreported a currency with a different number of decimal " +
+          "places — VND, for one, uses none. Nothing to resend for a " +
+          "USD company; caught and fixed alongside the others above.",
+        route: "/reports/transactions",
+      },
+    ],
+  },
+  {
     version: "1.20",
     date: "2026-08-15",
     headline:

@@ -1,3 +1,5 @@
+import { fromMinor } from "./money";
+
 export type ExportCellKind = "text" | "number" | "money" | "percent";
 
 export interface ReportExportColumn {
@@ -43,6 +45,46 @@ export function formatExportCell(
   }
   if (kind === "percent") return `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
   return value.toLocaleString("en-US");
+}
+
+/** One export-sheet row's worth of amounts, before they are keyed by column. */
+export interface MinorAmountRow {
+  label: string;
+  /** Integer minor units, one per column, in the same order as `columnKeys`. */
+  amounts: readonly number[];
+}
+
+/**
+ * Turn per-column minor-unit amounts into the major-unit values a
+ * `ReportExportSheet` row expects, keyed the same way its `kind: "money"`
+ * columns are keyed.
+ *
+ * Money stays integer minor units everywhere in the domain; an export sheet
+ * is a display edge exactly like the on-screen table, so this is the one
+ * place a multi-column money export (a trend across periods, an aging grid
+ * across parties) has to divide by the currency's own decimal scale. It is
+ * pulled out into one function, rather than written inline in each view,
+ * specifically so that scale can never be hard-coded to 100 or forgotten —
+ * `baseDecimals` is 0 for a currency like VND, and dividing by 100 anyway
+ * would silently shrink every figure by two orders of magnitude.
+ *
+ * A row shorter than `columnKeys` (a section header, which carries no
+ * amounts) reads as a blank cell for the missing columns, not as $0.00.
+ */
+export function exportRowsFromMinorAmounts(
+  rows: readonly MinorAmountRow[],
+  columnKeys: readonly string[],
+  baseDecimals: number,
+): Record<string, string | number | null>[] {
+  return rows.map((row) => ({
+    label: row.label,
+    ...Object.fromEntries(
+      columnKeys.map((key, index) => {
+        const minor = row.amounts[index];
+        return [key, minor === undefined ? null : fromMinor(minor, baseDecimals)];
+      }),
+    ),
+  }));
 }
 
 /**

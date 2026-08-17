@@ -106,6 +106,7 @@ export default function ArAgingClient({
                 companyName={companyName}
                 asOf={asOf!.format("YYYY-MM-DD")}
                 currencyCode={baseCurrency}
+                baseDecimals={baseDecimals}
                 emptyTitle="No open receivables"
                 emptyDescription="There are no customer balances outstanding as of this date."
                 documentColumns={[

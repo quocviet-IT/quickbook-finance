@@ -14,6 +14,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import { EditOutlined } from "@ant-design/icons";
@@ -28,8 +29,9 @@ import StatementOfEquityView from "@/components/reports/StatementOfEquityView";
 import BalanceSheetTrendView, {
   type TrendPeriod,
 } from "@/components/reports/BalanceSheetTrendView";
+import PnlTrendView, { type PnlTrendPeriod } from "@/components/reports/PnlTrendView";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatPercent } from "@/lib/format";
 import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import { periodColumnLabel } from "@/lib/domain/period-label";
 import { fromMinor } from "@/lib/domain/money";
@@ -40,6 +42,9 @@ import {
   buildProfitAndLoss,
   buildTrialBalance,
   compareReportLines,
+  nextShowPercentOfIncome,
+  percentOfIncome,
+  PERCENT_OF_INCOME_TOOLTIP,
   previousPeriodRange,
   type BalanceSheet,
   type BudgetVsActual,
@@ -51,8 +56,12 @@ import {
   COMPARISON_BASES,
   comparisonBasisLabel,
   comparisonDate,
+  MAX_TREND_COLUMNS,
+  monthlyColumns,
+  quarterlyColumns,
   trailingMonthEnds,
   trailingYearEnds,
+  trendColumnLimitMessage,
   type ComparisonBasis,
 } from "@/lib/domain/report-periods";
 import {
@@ -101,15 +110,44 @@ export default function ReportsClient({
   );
   const [showVariance, setShowVariance] = useState(false);
   /**
-   * Whether the profit and loss carries a comparison at all.
+   * How the profit and loss lays its columns out.
    *
    * Defaults to the comparison, which is what this report has always shown, so
    * nobody's saved link changes meaning. A reader who wants the statement on
    * its own — to hand to a bank, or to read without four columns of arithmetic
-   * — asks for one period and gets one column.
+   * — asks for one period and gets one column. `month`/`quarter` are a
+   * different query shape entirely (one read per column, like the balance
+   * sheet trend below), which is why they get their own state — `pnlRows` —
+   * rather than reusing `rows`/`priorRows`.
    */
-  const [pnlColumns, setPnlColumns] = useState<"single" | "comparison">("comparison");
+  const [pnlColumns, setPnlColumns] = useState<"single" | "comparison" | "month" | "quarter">(
+    "comparison",
+  );
+  /**
+   * Whether each P&L line also carries its share of that column's income.
+   *
+   * Defaults on for one or two columns, where a percent beside each figure
+   * costs nothing to read. Defaults off for a period-by-period view, where it
+   * would double an already-wide table — but stays a click away rather than
+   * being disabled there, because a reader who wants both may still ask for
+   * both.
+   */
+  const [showPercentOfIncome, setShowPercentOfIncome] = useState(true);
+  /**
+   * Whether the reader has flipped the % of Income switch themselves. Before
+   * that, `handlePnlColumnsChange` is free to move the switch to the new
+   * mode's default; after it, the mode change must leave the reader's own
+   * choice alone — see `nextShowPercentOfIncome`.
+   */
+  const [percentOfIncomeTouched, setPercentOfIncomeTouched] = useState(false);
   const [trendPeriods, setTrendPeriods] = useState<TrendPeriod[]>([]);
+  const [pnlTrendPeriods, setPnlTrendPeriods] = useState<PnlTrendPeriod[]>([]);
+  /**
+   * Set instead of running the query, when the chosen range would need more
+   * columns than a reader could scan. Refusing and naming the fix beats
+   * fetching sixty columns nobody will read one at a time.
+   */
+  const [pnlTrendLimitMessage, setPnlTrendLimitMessage] = useState<string | null>(null);
   const [budgetReport, setBudgetReport] = useState<BudgetVsActual | null>(null);
   const [equityReport, setEquityReport] = useState<StatementOfEquity | null>(null);
   const [fiscalYear, setFiscalYear] = useState(initialFiscalYear);
@@ -129,6 +167,11 @@ export default function ReportsClient({
   function handleReportTypeChange(nextType: InternalReportId) {
     setType(nextType);
     router.replace(`/reports?report=${nextType}`, { scroll: false });
+  }
+
+  function handlePnlColumnsChange(next: "single" | "comparison" | "month" | "quarter") {
+    setPnlColumns(next);
+    setShowPercentOfIncome((current) => nextShowPercentOfIncome(next, current, percentOfIncomeTouched));
   }
 
   const money = useCallback(
@@ -175,6 +218,39 @@ export default function ReportsClient({
           columns.map((column, index) => ({
             ...column,
             sheet: buildBalanceSheet(results[index].data ?? []),
+          })),
+        );
+        return;
+      }
+
+      if (type === "pnl" && (pnlColumns === "month" || pnlColumns === "quarter")) {
+        // A period-by-period P&L is the same shape as the balance sheet trend
+        // above: one independent read per column, run together. The one thing
+        // it adds is the column count itself can be unbounded — a hand-picked
+        // range, not a fixed trailing count — so it gets checked before any
+        // query goes out rather than after.
+        const currentFrom = range[0].format("YYYY-MM-DD");
+        const currentTo = range[1].format("YYYY-MM-DD");
+        const limitMessage = trendColumnLimitMessage(pnlColumns, currentFrom, currentTo);
+        if (limitMessage) {
+          setPnlTrendLimitMessage(limitMessage);
+          setPnlTrendPeriods([]);
+          return;
+        }
+        setPnlTrendLimitMessage(null);
+        const columns =
+          pnlColumns === "month"
+            ? monthlyColumns(currentFrom, currentTo)
+            : quarterlyColumns(currentFrom, currentTo);
+        const results = await Promise.all(
+          columns.map((column) => getLedgerBalancesAction(column.from, column.to)),
+        );
+        const failed = results.find((result) => !result.ok || !result.data);
+        if (failed) throw new Error(failed.error ?? "Failed to load the period columns");
+        setPnlTrendPeriods(
+          columns.map((column, index) => ({
+            ...column,
+            pnl: buildProfitAndLoss(results[index].data ?? []),
           })),
         );
         return;
@@ -236,7 +312,9 @@ export default function ReportsClient({
       ? budgetReport?.lines.length
       : type === "equity"
         ? equityReport?.lines.length
-        : rows.length;
+        : type === "pnl" && (pnlColumns === "month" || pnlColumns === "quarter")
+          ? pnlTrendPeriods.length
+          : rows.length;
   const budgetFrom = months[budgetFromPeriod - 1]?.start ?? months[0].start;
   const budgetTo = months[budgetToPeriod - 1]?.end ?? months[11].end;
 
@@ -281,16 +359,32 @@ export default function ReportsClient({
           />
         )}
         {type === "pnl" && (
-          <Select
-            aria-label="Profit and loss columns"
-            value={pnlColumns}
-            style={{ width: 185 }}
-            onChange={setPnlColumns}
-            options={[
-              { value: "single", label: "One period" },
-              { value: "comparison", label: "Two periods" },
-            ]}
-          />
+          <>
+            <Select
+              aria-label="Profit and loss columns"
+              value={pnlColumns}
+              style={{ width: 185 }}
+              onChange={handlePnlColumnsChange}
+              options={[
+                { value: "single", label: "One period" },
+                { value: "comparison", label: "Two periods" },
+                { value: "month", label: "By month" },
+                { value: "quarter", label: "By quarter" },
+              ]}
+            />
+            <Space>
+              <Switch
+                size="small"
+                checked={showPercentOfIncome}
+                onChange={(checked) => {
+                  setPercentOfIncomeTouched(true);
+                  setShowPercentOfIncome(checked);
+                }}
+                aria-label="Show % of Income"
+              />
+              <Typography.Text type="secondary">% of Income</Typography.Text>
+            </Space>
+          </>
         )}
         {(type === "trial" || type === "balance") && (
           <Space>
@@ -379,7 +473,7 @@ export default function ReportsClient({
               money={money}
             />
           )}
-          {type === "pnl" && (
+          {type === "pnl" && (pnlColumns === "single" || pnlColumns === "comparison") && (
             <PnlComparisonView
               rows={rows}
               priorRows={priorRows}
@@ -389,8 +483,34 @@ export default function ReportsClient({
               baseDecimals={baseDecimals}
               money={money}
               showPrior={pnlColumns === "comparison"}
+              showPercentOfIncome={showPercentOfIncome}
             />
           )}
+          {type === "pnl" &&
+            (pnlColumns === "month" || pnlColumns === "quarter") &&
+            (pnlTrendLimitMessage ? (
+              <PnlTrendLimitNotice
+                message={pnlTrendLimitMessage}
+                companyName={companyName}
+                baseCurrency={baseCurrency}
+                onSwitchToQuarter={
+                  pnlColumns === "month" &&
+                  quarterlyColumns(range[0].format("YYYY-MM-DD"), range[1].format("YYYY-MM-DD"))
+                    .length <= MAX_TREND_COLUMNS
+                    ? () => handlePnlColumnsChange("quarter")
+                    : undefined
+                }
+              />
+            ) : (
+              <PnlTrendView
+                periods={pnlTrendPeriods}
+                showPercentOfIncome={showPercentOfIncome}
+                companyName={companyName}
+                baseCurrency={baseCurrency}
+                baseDecimals={baseDecimals}
+                money={money}
+              />
+            ))}
           {type === "balance" && (balanceColumns === "comparison" || balanceColumns === "single") && (
             <BalanceSheetComparisonView
               rows={rows}
@@ -410,6 +530,7 @@ export default function ReportsClient({
               periods={trendPeriods}
               companyName={companyName}
               baseCurrency={baseCurrency}
+              baseDecimals={baseDecimals}
               money={money}
             />
           )}
@@ -485,6 +606,61 @@ function ReportHeading({
         <Typography.Text type="secondary">{subtitle}</Typography.Text>
       </div>
       <ReportExportButtons sheet={exportSheet} disabled={disabled} />
+    </div>
+  );
+}
+
+/**
+ * What a period-by-period P&L shows instead of a table, when the chosen
+ * range would need more columns than `MAX_TREND_COLUMNS`.
+ *
+ * Refuses rather than fetching and rendering a table nobody would read
+ * column by column, and names both ways out — narrowing the range is always
+ * an option, switching to quarters only when `onSwitchToQuarter` is given,
+ * which the caller only does once it has confirmed quarters would actually
+ * fit under the same limit. Never switches on its own: a reader who asked
+ * for months and got quarters without being told has been handed a
+ * different report than the one they think they are reading.
+ */
+function PnlTrendLimitNotice({
+  message,
+  companyName,
+  baseCurrency,
+  onSwitchToQuarter,
+}: {
+  message: string;
+  companyName: string;
+  baseCurrency: string;
+  onSwitchToQuarter?: () => void;
+}) {
+  return (
+    <div className="report-result">
+      <ReportHeading
+        companyName={companyName}
+        title="Profit and Loss by Period"
+        subtitle="Choose a narrower range to see the columns"
+        exportSheet={{
+          fileName: "profit-and-loss-by-period",
+          companyName,
+          title: "Profit and Loss by Period",
+          subtitle: "",
+          currencyCode: baseCurrency,
+          columns: [],
+          rows: [],
+        }}
+        disabled
+      />
+      <DataTable
+        rowKey="key"
+        dataSource={[]}
+        pagination={false}
+        columns={[{ title: "Account", dataIndex: "label" }]}
+        emptyTitle="That range has too many columns to read at once"
+        emptyDescription={message}
+        emptyAction={
+          onSwitchToQuarter ? <Button onClick={onSwitchToQuarter}>Show it by quarter</Button> : undefined
+        }
+      />
     </div>
   );
 }
@@ -626,6 +802,7 @@ function PnlComparisonView({
   baseCurrency,
   baseDecimals,
   showPrior,
+  showPercentOfIncome,
 }: {
   rows: LedgerBalance[];
   priorRows: LedgerBalance[];
@@ -635,6 +812,7 @@ function PnlComparisonView({
   baseCurrency: string;
   baseDecimals: number;
   showPrior: boolean;
+  showPercentOfIncome: boolean;
 }) {
   const current = buildProfitAndLoss(rows);
   const prior = buildProfitAndLoss(priorRows);
@@ -650,6 +828,9 @@ function PnlComparisonView({
     ...sectionRows(current.otherExpenses, prior.otherExpenses),
     totalRow("net-income", "Net Income", current.netIncome, prior.netIncome),
   ];
+  const percentOfIncomeTotals = showPercentOfIncome
+    ? { current: current.income.total, prior: prior.income.total }
+    : undefined;
   const title = showPrior ? "Profit & Loss Comparison" : "Profit & Loss";
   const period = `${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")}`;
   const exportSheet = comparisonExportSheet({
@@ -667,6 +848,7 @@ function PnlComparisonView({
     priorLabel: periodColumnLabel(priorRange.from, priorRange.to),
     rows: comparisonRows,
     showPrior,
+    percentOfIncomeTotals,
   });
   return (
     <div className="report-result">
@@ -693,6 +875,7 @@ function PnlComparisonView({
             priorRange={priorRange}
             money={money}
             showPrior={showPrior}
+            percentOfIncomeTotals={percentOfIncomeTotals}
           />
         }
         chart={
@@ -827,6 +1010,7 @@ function ComparisonTable({
   money,
   showVariance = true,
   showPrior = true,
+  percentOfIncomeTotals,
 }: {
   rows: ComparisonRow[];
   currentLabel: string;
@@ -844,7 +1028,23 @@ function ComparisonTable({
    * figure repeated, which would read as a fact rather than as a blank.
    */
   showPrior?: boolean;
+  /**
+   * The income each column's % of Income is measured against. Undefined
+   * turns the feature off entirely — this table is shared with the balance
+   * sheet, where a percentage of income has no meaning at all.
+   */
+  percentOfIncomeTotals?: { current: number; prior: number };
 }) {
+  const percentCell = (amount: number, income: number) => {
+    const pct = percentOfIncome(amount, income);
+    return pct === null ? "—" : formatPercent(pct);
+  };
+  const percentHeader = (
+    <Tooltip title={PERCENT_OF_INCOME_TOOLTIP}>
+      <span>% of Income</span>
+    </Tooltip>
+  );
+
   return (
     <DataTable
       rowKey="key"
@@ -878,6 +1078,17 @@ function ComparisonTable({
                 ? <LedgerAmountLink accountId={row.accountId} range={currentRange} label={money(row.current)} />
                 : money(row.current),
         },
+        ...(percentOfIncomeTotals
+          ? [
+              {
+                title: percentHeader,
+                width: 100,
+                align: "right" as const,
+                render: (_: unknown, row: ComparisonRow) =>
+                  row.kind === "section" ? "" : percentCell(row.current, percentOfIncomeTotals.current),
+              },
+            ]
+          : []),
         ...(showPrior
           ? [
               {
@@ -890,6 +1101,17 @@ function ComparisonTable({
                     : row.accountId
                       ? <LedgerAmountLink accountId={row.accountId} range={priorRange} label={money(row.prior)} />
                       : money(row.prior),
+              },
+            ]
+          : []),
+        ...(showPrior && percentOfIncomeTotals
+          ? [
+              {
+                title: percentHeader,
+                width: 100,
+                align: "right" as const,
+                render: (_: unknown, row: ComparisonRow) =>
+                  row.kind === "section" ? "" : percentCell(row.prior, percentOfIncomeTotals.prior),
               },
             ]
           : []),
@@ -909,7 +1131,7 @@ function ComparisonTable({
                 render: (_: unknown, row: ComparisonRow) =>
                   row.kind === "section" || row.variancePercent === null
                     ? ""
-                    : `${row.variancePercent.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`,
+                    : formatPercent(row.variancePercent),
               },
             ]
           : []),
@@ -953,6 +1175,7 @@ function comparisonExportSheet({
   priorLabel,
   rows,
   showPrior = true,
+  percentOfIncomeTotals,
 }: {
   fileName: string;
   companyName: string;
@@ -965,7 +1188,11 @@ function comparisonExportSheet({
   rows: ComparisonRow[];
   /** Matches the table on screen: one period exports one column of figures. */
   showPrior?: boolean;
+  /** Matches the table on screen: present only when the % of Income switch is on. */
+  percentOfIncomeTotals?: { current: number; prior: number };
 }): ReportExportSheet {
+  const percentCell = (amount: number, income: number, isSection: boolean) =>
+    isSection ? null : percentOfIncome(amount, income);
   return {
     fileName,
     companyName,
@@ -975,20 +1202,35 @@ function comparisonExportSheet({
     columns: [
       { key: "account", header: "Account", width: 40 },
       { key: "current", header: currentLabel, kind: "money", width: 18 },
+      ...(percentOfIncomeTotals
+        ? ([{ key: "currentPercentOfIncome", header: "% of Income", kind: "percent", width: 14 }] as const)
+        : []),
       ...(showPrior
         ? ([
             { key: "prior", header: priorLabel, kind: "money", width: 18 },
+            ...(percentOfIncomeTotals
+              ? ([{ key: "priorPercentOfIncome", header: "% of Income", kind: "percent", width: 14 }] as const)
+              : []),
             { key: "variance", header: "Variance", kind: "money", width: 18 },
             { key: "variancePercent", header: "Variance %", kind: "percent", width: 14 },
           ] as const)
         : []),
     ],
-    rows: rows.map((row) => ({
-      account: row.label,
-      current: row.kind === "section" ? null : fromMinor(row.current, baseDecimals),
-      prior: row.kind === "section" ? null : fromMinor(row.prior, baseDecimals),
-      variance: row.kind === "section" ? null : fromMinor(row.variance, baseDecimals),
-      variancePercent: row.variancePercent,
-    })),
+    rows: rows.map((row) => {
+      const isSection = row.kind === "section";
+      return {
+        account: row.label,
+        current: isSection ? null : fromMinor(row.current, baseDecimals),
+        ...(percentOfIncomeTotals
+          ? { currentPercentOfIncome: percentCell(row.current, percentOfIncomeTotals.current, isSection) }
+          : {}),
+        prior: isSection ? null : fromMinor(row.prior, baseDecimals),
+        ...(percentOfIncomeTotals
+          ? { priorPercentOfIncome: percentCell(row.prior, percentOfIncomeTotals.prior, isSection) }
+          : {}),
+        variance: isSection ? null : fromMinor(row.variance, baseDecimals),
+        variancePercent: row.variancePercent,
+      };
+    }),
   };
 }

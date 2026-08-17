@@ -17,3 +17,8 @@ export function formatMoney(minor: number, currencyCode: string, decimals: numbe
 export function toMinorUnits(amount: number, decimals: number): number {
   return Math.round(amount * 10 ** decimals);
 }
+
+/** Format a percentage that is already ×100 (e.g. `12.5` → `"12.5%"`). */
+export function formatPercent(value: number): string {
+  return `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
+}

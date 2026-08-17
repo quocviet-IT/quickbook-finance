@@ -3,13 +3,19 @@ import {
   COMPARISON_BASES,
   comparisonBasisLabel,
   comparisonDate,
+  MAX_TREND_COLUMNS,
   monthEnd,
+  monthlyColumns,
   priorMonthEnd,
   priorQuarterEnd,
   priorYearEnd,
+  quarterlyColumns,
   sameDayLastYear,
   trailingMonthEnds,
   trailingYearEnds,
+  trendColumnLimitMessage,
+  trendPeriodHeading,
+  trendPeriodRangeText,
 } from "@/lib/domain/report-periods";
 import { balanceTrendRows, type BalanceSheet } from "@/lib/domain/reports";
 
@@ -115,6 +121,139 @@ describe("trailingYearEnds", () => {
       "2026-06-30",
     ]);
     expect(columns.map((column) => column.label)).toEqual(["2024", "2025", "2026-06-30"]);
+  });
+});
+
+describe("monthlyColumns", () => {
+  it("gives one column per calendar month for a whole year", () => {
+    const columns = monthlyColumns("2026-01-01", "2026-12-31");
+    expect(columns).toHaveLength(12);
+    expect(columns[0]).toEqual({ from: "2026-01-01", to: "2026-01-31", label: "Jan 2026" });
+    expect(columns[11]).toEqual({ from: "2026-12-01", to: "2026-12-31", label: "Dec 2026" });
+  });
+
+  it("clips only the first and last column when the range is not whole months", () => {
+    // A reader who picks 15 Jan to 10 Apr by hand still gets one column per
+    // month in between; only the two ends are short, and they say so by
+    // falling back to their literal dates rather than claiming a month they
+    // do not fully cover.
+    const columns = monthlyColumns("2026-01-15", "2026-04-10");
+    expect(columns).toEqual([
+      { from: "2026-01-15", to: "2026-01-31", label: "2026-01-15 – 2026-01-31" },
+      { from: "2026-02-01", to: "2026-02-28", label: "Feb 2026" },
+      { from: "2026-03-01", to: "2026-03-31", label: "Mar 2026" },
+      { from: "2026-04-01", to: "2026-04-10", label: "2026-04-01 – 2026-04-10" },
+    ]);
+  });
+
+  it("gives a single column for a range inside one month", () => {
+    expect(monthlyColumns("2026-06-05", "2026-06-20")).toEqual([
+      { from: "2026-06-05", to: "2026-06-20", label: "2026-06-05 – 2026-06-20" },
+    ]);
+  });
+
+  it("crosses a year boundary without losing a day", () => {
+    const columns = monthlyColumns("2025-12-01", "2026-02-28");
+    expect(columns.map((c) => c.label)).toEqual(["Dec 2025", "Jan 2026", "Feb 2026"]);
+  });
+
+  it("rejects a range that ends before it starts", () => {
+    expect(() => monthlyColumns("2026-03-01", "2026-01-01")).toThrow(
+      "Report end date must not be before its start date",
+    );
+  });
+});
+
+describe("quarterlyColumns", () => {
+  it("gives one column per calendar quarter for a whole year", () => {
+    const columns = quarterlyColumns("2026-01-01", "2026-12-31");
+    expect(columns).toEqual([
+      { from: "2026-01-01", to: "2026-03-31", label: "Q1 2026" },
+      { from: "2026-04-01", to: "2026-06-30", label: "Q2 2026" },
+      { from: "2026-07-01", to: "2026-09-30", label: "Q3 2026" },
+      { from: "2026-10-01", to: "2026-12-31", label: "Q4 2026" },
+    ]);
+  });
+
+  it("snaps to calendar quarters rather than counting three months from the start", () => {
+    // Starting mid-quarter must not invent a "Q1" that is missing January: the
+    // first column is Feb-Mar only, and says so instead of overclaiming.
+    const columns = quarterlyColumns("2026-02-01", "2026-11-30");
+    expect(columns).toEqual([
+      { from: "2026-02-01", to: "2026-03-31", label: "Feb–Mar 2026" },
+      { from: "2026-04-01", to: "2026-06-30", label: "Q2 2026" },
+      { from: "2026-07-01", to: "2026-09-30", label: "Q3 2026" },
+      { from: "2026-10-01", to: "2026-11-30", label: "Oct–Nov 2026" },
+    ]);
+  });
+
+  it("rejects a range that ends before it starts", () => {
+    expect(() => quarterlyColumns("2026-06-30", "2026-01-01")).toThrow(
+      "Report end date must not be before its start date",
+    );
+  });
+});
+
+describe("trendColumnLimitMessage", () => {
+  it("is null when the range fits comfortably inside the limit", () => {
+    expect(trendColumnLimitMessage("month", "2026-01-01", "2026-12-31")).toBeNull();
+    expect(MAX_TREND_COLUMNS).toBeGreaterThanOrEqual(12);
+  });
+
+  it("is null exactly at the limit, not just under it", () => {
+    // MAX_TREND_COLUMNS whole months starting January land the boundary case
+    // on a real calendar rather than a round number that happens to work.
+    const to = monthEnd(2026 + Math.floor((MAX_TREND_COLUMNS - 1) / 12), ((MAX_TREND_COLUMNS - 1) % 12) + 1);
+    expect(trendColumnLimitMessage("month", "2026-01-01", to)).toBeNull();
+  });
+
+  it("names the fix, with a computed quarter count, when months would overflow", () => {
+    // 2026-01-01 to 2030-12-31 is 60 monthly columns, 20 quarterly ones.
+    const message = trendColumnLimitMessage("month", "2026-01-01", "2030-12-31");
+    expect(message).toBe("That range is 60 monthly columns. Narrow the range, or show it by quarter (20 columns).");
+  });
+
+  it("drops the quarter suggestion when quarters would also overflow", () => {
+    // A century of months is also well over a century of quarters — quarterly
+    // is not a real way out, so the message must not pretend it is.
+    const message = trendColumnLimitMessage("month", "1926-01-01", "2030-12-31");
+    expect(message).toBe("That range is 1260 monthly columns. Narrow the range.");
+  });
+
+  it("never suggests coarsening quarters further, since there is nothing coarser on offer", () => {
+    const message = trendColumnLimitMessage("quarter", "1926-01-01", "2030-12-31");
+    expect(message).toBe("That range is 420 quarterly columns. Narrow the range.");
+  });
+});
+
+describe("trendPeriodRangeText", () => {
+  it("is the label itself for a single period, not the label repeated", () => {
+    // The exact case the review caught: a range inside one calendar month
+    // (monthlyColumns gives it a literal-dates label) read back as
+    // "2026-06-05 – 2026-06-20 to 2026-06-05 – 2026-06-20".
+    expect(trendPeriodRangeText(["2026-06-05 – 2026-06-20"])).toBe("2026-06-05 – 2026-06-20");
+  });
+
+  it("spans first to last once there is more than one period", () => {
+    expect(trendPeriodRangeText(["Jan 2026", "Feb 2026", "Mar 2026"])).toBe("Jan 2026 to Mar 2026");
+  });
+
+  it("is empty for no periods", () => {
+    expect(trendPeriodRangeText([])).toBe("");
+  });
+});
+
+describe("trendPeriodHeading", () => {
+  it("uses singular grammar and does not repeat the one period it has", () => {
+    expect(trendPeriodHeading(["2026-06-05 – 2026-06-20"])).toBe("1 period, 2026-06-05 – 2026-06-20");
+  });
+
+  it("counts and spans multiple periods", () => {
+    expect(trendPeriodHeading(["Jan 2026", "Feb 2026"])).toBe("2 periods, Jan 2026 to Feb 2026");
+  });
+
+  it("says so plainly when there is nothing to show", () => {
+    expect(trendPeriodHeading([])).toBe("No periods");
   });
 });
 

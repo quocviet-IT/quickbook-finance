@@ -4,7 +4,7 @@ import DataTable from "@/components/ui/DataTable";
 import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { ReportBody } from "@/components/reports/ReportAudience";
-import type { ReportExportSheet } from "@/lib/domain/report-export";
+import { exportRowsFromMinorAmounts, type ReportExportSheet } from "@/lib/domain/report-export";
 import { balanceTrendRows, type BalanceSheet, type BalanceTrendRow } from "@/lib/domain/reports";
 import type { TrendColumn } from "@/lib/domain/report-periods";
 
@@ -17,11 +17,13 @@ export default function BalanceSheetTrendView({
   money,
   companyName,
   baseCurrency,
+  baseDecimals,
 }: {
   periods: TrendPeriod[];
   money: (value: number) => string;
   companyName: string;
   baseCurrency: string;
+  baseDecimals: number;
 }) {
   if (periods.length === 0) return null;
 
@@ -42,12 +44,15 @@ export default function BalanceSheetTrendView({
         kind: "money" as const,
       })),
     ],
-    rows: rows.map((row) => ({
-      label: row.label,
-      ...Object.fromEntries(
-        periods.map((period, index) => [period.date, row.amounts[index] ?? null]),
-      ),
-    })),
+    // row.amounts are integer minor units, same as every other domain value;
+    // an export cell is the display edge, exactly where money.ts says the
+    // conversion belongs — see exportRowsFromMinorAmounts for why this is a
+    // shared function rather than an inline division.
+    rows: exportRowsFromMinorAmounts(
+      rows,
+      periods.map((period) => period.date),
+      baseDecimals,
+    ),
   };
 
   return (

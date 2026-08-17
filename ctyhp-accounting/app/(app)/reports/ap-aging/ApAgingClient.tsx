@@ -96,6 +96,7 @@ export default function ApAgingClient({
                 companyName={companyName}
                 asOf={asOf!.format("YYYY-MM-DD")}
                 currencyCode={baseCurrency}
+                baseDecimals={baseDecimals}
                 emptyTitle="No open payables"
                 emptyDescription="There are no vendor balances outstanding as of this date."
                 documentColumns={[

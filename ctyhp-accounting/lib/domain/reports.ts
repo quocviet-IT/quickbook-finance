@@ -5,6 +5,7 @@
  * cannot disagree with the chart of accounts.
  */
 import { type AccountType, type NormalBalance, naturalBalance, statementSectionOf } from "./accounts";
+import { exportRowsFromMinorAmounts, type MinorAmountRow } from "./report-export";
 
 export interface LedgerBalance {
   accountId: string;
@@ -510,4 +511,228 @@ export function balanceTrendRows(sheets: readonly BalanceSheet[]): BalanceTrendR
       amounts: sheets.map((sheet) => sheet.totalLiabilities + sheet.totalEquity),
     },
   ];
+}
+
+// --- Multi-period profit and loss --------------------------------------------
+
+/** The trend-row shape is not balance-sheet-specific — reused as-is for P&L. */
+export type PnlTrendRow = BalanceTrendRow;
+
+/**
+ * Accounts down the side, one column per period across the top — the profit
+ * and loss counterpart to `balanceTrendRows`. Gross Profit and Net Income get
+ * their own rows because those are the two figures a reader scans a column
+ * for first, the same way the single-period P&L view surfaces them as totals
+ * rather than making the reader add up sections by hand.
+ */
+export function pnlTrendRows(pnls: readonly ProfitAndLoss[]): PnlTrendRow[] {
+  if (pnls.length === 0) return [];
+  return [
+    ...trendSection("income", pnls.map((p) => p.income), pnls.map((p) => p.income.total), "Total Income"),
+    ...trendSection(
+      "cogs",
+      pnls.map((p) => p.costOfGoodsSold),
+      pnls.map((p) => p.costOfGoodsSold.total),
+      "Total Cost of Goods Sold",
+    ),
+    {
+      key: "gross-profit",
+      label: "Gross Profit",
+      kind: "total",
+      amounts: pnls.map((p) => p.grossProfit),
+    },
+    ...trendSection(
+      "opex",
+      pnls.map((p) => p.operatingExpenses),
+      pnls.map((p) => p.operatingExpenses.total),
+      "Total Operating Expenses",
+    ),
+    ...trendSection(
+      "other_income",
+      pnls.map((p) => p.otherIncome),
+      pnls.map((p) => p.otherIncome.total),
+      "Total Other Income",
+    ),
+    ...trendSection(
+      "other_expense",
+      pnls.map((p) => p.otherExpenses),
+      pnls.map((p) => p.otherExpenses.total),
+      "Total Other Expenses",
+    ),
+    {
+      key: "net-income",
+      label: "Net Income",
+      kind: "total",
+      amounts: pnls.map((p) => p.netIncome),
+    },
+  ];
+}
+
+/**
+ * Adds several profit and loss statements together, account by account.
+ *
+ * This is what a "Total" column means next to a period trend. A P&L account
+ * only ever holds the activity posted within the date range it was queried
+ * for and carries no opening balance, so the total for the whole range is
+ * exactly the sum of the period figures — unlike a balance sheet, where
+ * summing snapshots would double-count everything each later one already
+ * includes, which is why `balanceTrendRows` has no Total column at all.
+ */
+export function sumProfitAndLoss(pnls: readonly ProfitAndLoss[]): ProfitAndLoss {
+  const sumSection = (key: string, title: string, sections: readonly ReportSection[]): ReportSection => {
+    const order: string[] = [];
+    const byKey = new Map<string, ReportSection["lines"][number]>();
+    for (const section of sections) {
+      for (const line of section.lines) {
+        const lineKey = line.accountId ?? `${line.accountCode}:${line.name}`;
+        const existing = byKey.get(lineKey);
+        if (existing) {
+          existing.amount += line.amount;
+        } else {
+          byKey.set(lineKey, { ...line });
+          order.push(lineKey);
+        }
+      }
+    }
+    const lines = order.map((lineKey) => byKey.get(lineKey)!);
+    return { key, title, lines, total: lines.reduce((sum, l) => sum + l.amount, 0) };
+  };
+
+  const income = sumSection("income", "Income", pnls.map((p) => p.income));
+  const costOfGoodsSold = sumSection("cogs", "Cost of Goods Sold", pnls.map((p) => p.costOfGoodsSold));
+  const operatingExpenses = sumSection("opex", "Operating Expenses", pnls.map((p) => p.operatingExpenses));
+  const otherIncome = sumSection("other_income", "Other Income", pnls.map((p) => p.otherIncome));
+  const otherExpenses = sumSection("other_expense", "Other Expenses", pnls.map((p) => p.otherExpenses));
+  const grossProfit = income.total - costOfGoodsSold.total;
+  const netIncome = grossProfit - operatingExpenses.total + otherIncome.total - otherExpenses.total;
+  return { income, costOfGoodsSold, grossProfit, operatingExpenses, otherIncome, otherExpenses, netIncome };
+}
+
+/** What `pnlTrendColumns` hands the view: one column per period, a Total
+ *  appended only when there is more than one, and everything else needed to
+ *  render or export that same set of columns without recomputing it. */
+export interface PnlTrendColumns {
+  /** True once a "Total" column has been appended to `columnLabels`/`rows`/`incomeTotals`. */
+  hasTotal: boolean;
+  columnLabels: string[];
+  rows: PnlTrendRow[];
+  /** Each column's income total, minor units — what a "% of Income" cell divides by. */
+  incomeTotals: number[];
+}
+
+/**
+ * The columns a period-by-period P&L renders: the periods themselves, plus a
+ * "Total" appended after them — in one call, so the table, its export sheet,
+ * and its heading cannot disagree about whether that last column exists.
+ *
+ * A Total column sums the periods beside it. For a single period that sum is
+ * the period itself, so appending one would not summarize anything — it
+ * would print the same figure a second time under a heading that claims to
+ * be different from the first. `sumProfitAndLoss` is only called, and the
+ * label only appended, once there is more than one period to add together.
+ */
+export function pnlTrendColumns(
+  pnls: readonly ProfitAndLoss[],
+  labels: readonly string[],
+): PnlTrendColumns {
+  if (pnls.length <= 1) {
+    return {
+      hasTotal: false,
+      columnLabels: [...labels],
+      rows: pnlTrendRows(pnls),
+      incomeTotals: pnls.map((pnl) => pnl.income.total),
+    };
+  }
+  const total = sumProfitAndLoss(pnls);
+  return {
+    hasTotal: true,
+    columnLabels: [...labels, "Total"],
+    rows: pnlTrendRows([...pnls, total]),
+    incomeTotals: [...pnls.map((pnl) => pnl.income.total), total.income.total],
+  };
+}
+
+/**
+ * A figure as a percentage of a column's total income — QuickBooks' "% of
+ * Income". Display-only: nothing here is ever stored, and the two arguments
+ * are plain minor-unit integers so the ratio is exact regardless of currency
+ * decimals.
+ *
+ * `null`, not `Infinity` or `NaN`, when income is zero: a column with no
+ * income has no scale to measure anything against, and a percentage nobody
+ * can act on is worse than an admission that there isn't one. A negative
+ * income figure (a period where refunds or write-offs outran sales) is not
+ * special-cased — the division is still well-defined and the sign is simply
+ * part of what happened that period.
+ */
+export function percentOfIncome(amountMinor: number, incomeMinor: number): number | null {
+  if (incomeMinor === 0) return null;
+  return (amountMinor / incomeMinor) * 100;
+}
+
+/**
+ * One sentence, shared by every screen that heads a column "% of Income", so
+ * the explanation cannot drift out of sync between them. QuickBooks' Total
+ * Income excludes Other Income, and this matches that, but a header reading
+ * only "% of Income" does not say so on its own — this is what the tooltip
+ * says instead.
+ */
+export const PERCENT_OF_INCOME_TOOLTIP =
+  "Percentage of Total Income for this column — Other Income is not included.";
+
+/**
+ * Builds a period-by-period P&L export sheet's `rows`, keyed the way
+ * `PnlTrendView` keys its columns: `amount-<index>` for the money, and
+ * `percent-<index>` beside it once % of Income is on.
+ *
+ * Routes the money half through `exportRowsFromMinorAmounts` — the seam that
+ * exists specifically so a multi-column money export can never divide by a
+ * hard-coded 100 — instead of converting inline. Converting inline is what
+ * this branch's own review flagged: it sat one line away from the percent
+ * entry, which must *not* go through the same conversion, and that
+ * resemblance is exactly what would let a later edit drop the money
+ * conversion without anything failing to compile. Building the whole row
+ * here, rather than in the view, is also what lets a test call it directly
+ * without a React tree.
+ */
+export function pnlTrendExportRows(
+  rows: readonly MinorAmountRow[],
+  columnCount: number,
+  baseDecimals: number,
+  incomeTotalsMinor: readonly number[],
+  showPercentOfIncome: boolean,
+): Record<string, string | number | null>[] {
+  const moneyKeys = Array.from({ length: columnCount }, (_, index) => `amount-${index}`);
+  const moneyRows = exportRowsFromMinorAmounts(rows, moneyKeys, baseDecimals);
+  if (!showPercentOfIncome) return moneyRows;
+  return rows.map((row, rowIndex) => ({
+    ...moneyRows[rowIndex],
+    ...Object.fromEntries(
+      Array.from({ length: columnCount }, (_, index) => {
+        const minor = row.amounts[index];
+        return [
+          `percent-${index}`,
+          minor === undefined ? null : percentOfIncome(minor, incomeTotalsMinor[index]),
+        ];
+      }),
+    ),
+  }));
+}
+
+/**
+ * The % of Income switch's value after the P&L column layout changes.
+ *
+ * The switch defaults differently per layout — on for one or two periods, off
+ * for a period-by-period trend — but a default is only what applies *before*
+ * the reader has said anything. `touched` is true from the moment they flip
+ * the switch themselves; past that point the mode change must leave their
+ * choice alone, or turning it on and then asking for quarters instead of
+ * months would silently turn it back off.
+ */
+export function nextShowPercentOfIncome(
+  nextColumns: "single" | "comparison" | "month" | "quarter",
+  current: boolean,
+  touched: boolean,
+): boolean {
+  return touched ? current : nextColumns === "single" || nextColumns === "comparison";
 }

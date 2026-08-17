@@ -173,7 +173,9 @@ export default function GlPostingClient({
                     date: row.documentDate,
                     party: row.partyName,
                     status: row.documentStatus,
-                    amount: row.amountMinor,
+                    // row.amountMinor is integer minor units; the export cell
+                    // is the display edge, same as the `money` callback above.
+                    amount: fromMinor(row.amountMinor, baseDecimals),
                     entry: row.entryNumber ?? "",
                     verdict: POSTING_VERDICT_LABEL[row.verdict],
                   })),

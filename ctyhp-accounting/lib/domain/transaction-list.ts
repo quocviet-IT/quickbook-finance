@@ -8,7 +8,7 @@
  * which is worth having testable because a total nobody can reproduce is worse
  * than no total.
  */
-import type { Minor } from "./money";
+import { fromMinor, type Minor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 
 export interface TransactionListRow {
@@ -158,8 +158,9 @@ export function buildTransactionListSheet(input: {
   from: string;
   to: string;
   currencyCode: string;
+  /** The base currency's own decimal_places — 0 for a currency like VND. */
+  baseDecimals: number;
 }): ReportExportSheet {
-  const decimalsDivisor = 100;
   return {
     fileName: sanitizeExportFileName(`transaction-list-${input.from}-to-${input.to}`),
     companyName: input.companyName,
@@ -181,7 +182,7 @@ export function buildTransactionListSheet(input: {
       description: row.description,
       category: row.categoryLabel ?? "",
       money: row.moneyLabel ?? "",
-      amount: row.amountMinor / decimalsDivisor,
+      amount: fromMinor(row.amountMinor, input.baseDecimals),
       reconciled: row.reconciled ? "Yes" : "No",
     })),
   };
