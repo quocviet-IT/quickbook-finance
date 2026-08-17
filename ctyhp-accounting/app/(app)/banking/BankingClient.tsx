@@ -805,14 +805,19 @@ export default function BankingClient({
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}
-        onDelete={(row) =>
+        onDelete={(row, eligibility) => {
+          // The control is disabled whenever eligibility.kind is "blocked",
+          // so this only fires for "delete_only" or "void_then_delete" in
+          // practice; the check is defense in depth, not the real gate.
+          if (eligibility.kind === "blocked") return;
           setDeleteTarget({
             id: row.transaction.id,
             txnDate: row.transaction.txn_date,
             description: row.transaction.description,
             amount: rowMoney(row),
-          })
-        }
+            eligibility,
+          });
+        }}
         onAttachments={(row) =>
           setAttachmentTarget({
             entityType: "bank_transaction",
