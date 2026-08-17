@@ -29,12 +29,25 @@ export async function restoreBackupAction(
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Your session has expired. Sign in again." };
 
-  const { data: allowed, error: permissionError } = await sb.rpc("acc_has_permission", {
-    p_key: "company.restore",
-  });
+  const [restoreAllowed, exportAllowed] = await Promise.all([
+    sb.rpc("acc_has_permission", { p_key: "company.restore" }),
+    sb.rpc("acc_has_permission", { p_key: "company.export" }),
+  ]);
   // A permission lookup that failed is not a permission granted.
-  if (permissionError || allowed !== true) {
+  if (restoreAllowed.error || restoreAllowed.data !== true) {
     return { ok: false, error: "You do not have permission to restore a backup" };
+  }
+  // Reading the acc_backup register is admitted by company.export (its RLS
+  // policy, migration 0114), so restore-without-export makes that read come
+  // back empty and the service would answer "That snapshot does not exist in
+  // this company's register" — the wrong explanation for what is actually a
+  // permission refusal. Refuse here, naming the permission that is missing.
+  if (exportAllowed.error || exportAllowed.data !== true) {
+    return {
+      ok: false,
+      error:
+        "Restoring a backup also needs the company.export permission, which is what grants reading the snapshot register.",
+    };
   }
 
   const trimmed = name.trim();

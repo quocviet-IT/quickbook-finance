@@ -12,7 +12,11 @@ import {
   type ExportControlTotals,
   type ExportDataset,
 } from "@/lib/domain/company-export";
-import { buildExportArchive, type ExportArchive } from "@/lib/services/company-export";
+import {
+  buildExportArchive,
+  type ExportArchive,
+  type ExportManifest,
+} from "@/lib/services/company-export";
 import {
   RESTORE_EXCLUDED_TABLES,
   RestoreError,
@@ -291,14 +295,28 @@ function columnFixture(): Record<string, Array<{ name: string; nullable: boolean
   return fixture;
 }
 
+/**
+ * Failures the fake connection can be told to produce. `rollback` models a
+ * connection that died mid-transaction — the rollback itself then rejects too.
+ * `matching` rejects the first statement whose text matches the pattern, which
+ * is how the verdict-write failure below is staged.
+ */
+interface ProvisioningFaults {
+  rollback?: Error;
+  matching?: { pattern: RegExp; error: Error };
+}
+
 function fakeProvisioningClient(
   columns: Record<string, Array<{ name: string; nullable: boolean }>>,
+  faults: ProvisioningFaults = {},
 ) {
   const calls: PgCall[] = [];
   let ended = false;
   const client = {
     async query(text: string, params?: unknown[]) {
       calls.push({ text, params });
+      if (text === "rollback" && faults.rollback) throw faults.rollback;
+      if (faults.matching?.pattern.test(text)) throw faults.matching.error;
       if (/information_schema\.columns/.test(text)) {
         return {
           rows: Object.entries(columns).flatMap(([table, cols]) =>
@@ -329,6 +347,9 @@ interface RunOverrides {
     sources: readonly MigrationSource[],
   ) => Promise<ProvisionCompanyResult>;
   totals?: ExportControlTotals;
+  /** Makes reading the restored totals fail — the post-commit failure path. */
+  totalsError?: Error;
+  faults?: ProvisioningFaults;
 }
 
 async function runRestore(overrides: RunOverrides = {}) {
@@ -347,7 +368,7 @@ async function runRestore(overrides: RunOverrides = {}) {
           ...overrides.row,
         };
   const source = stubSourceClient(row);
-  const pg = fakeProvisioningClient(overrides.columns ?? columnFixture());
+  const pg = fakeProvisioningClient(overrides.columns ?? columnFixture(), overrides.faults);
   const provisionInputs: ProvisionCompanyInput[] = [];
   const provisionSources: Array<readonly MigrationSource[]> = [];
   const totalsCalls: Array<{ schema: string; asOf: string }> = [];
@@ -383,6 +404,7 @@ async function runRestore(overrides: RunOverrides = {}) {
     },
     readTotals: async (schema, asOf) => {
       totalsCalls.push({ schema, asOf });
+      if (overrides.totalsError) throw overrides.totalsError;
       return overrides.totals ?? { ...CONTROL_TOTALS };
     },
   });
@@ -399,6 +421,34 @@ async function runRestore(overrides: RunOverrides = {}) {
     downloads,
     clientRequests: () => clientRequests,
   };
+}
+
+/**
+ * Rezips the fixture archive with its manifest.json edited. The per-file
+ * hashes in `files[]` stay untouched, so the register's content hash still
+ * matches — which is exactly the hole these tests close: everything outside
+ * `files[]` used to be writable without any check noticing.
+ */
+async function tamperedArchiveBytes(
+  archive: ExportArchive,
+  mutate: (manifest: ExportManifest) => void,
+): Promise<Uint8Array> {
+  const entries = unzipSync(archive.bytes);
+  const manifest = JSON.parse(strFromU8(entries["manifest.json"])) as ExportManifest;
+  mutate(manifest);
+  entries["manifest.json"] = strToU8(JSON.stringify(manifest, null, 2));
+  return zipSync(entries);
+}
+
+/** The verdict row's call and parsed payload, or nulls when it was never written. */
+function verdictWrite(calls: PgCall[]): {
+  index: number;
+  payload: Record<string, unknown> | null;
+} {
+  const index = calls.findIndex((call) => /company\.restore\.verify/.test(call.text));
+  if (index < 0) return { index, payload: null };
+  const params = calls[index].params as unknown[];
+  return { index, payload: JSON.parse(params[2] as string) as Record<string, unknown> };
 }
 
 /** The table each data-load statement targets, in the order they ran. */
@@ -419,7 +469,7 @@ describe("restoring a snapshot into a new company", () => {
     const outcome = await run.outcome;
 
     expect(outcome.companyId).toBe("company-copy");
-    expect(outcome.controlTotalsMatch).toBe(true);
+    expect(outcome.verdict).toBe("matched");
     expect(outcome.differences).toEqual([]);
     expect(outcome.legalName).toBe("Books Rebuilt");
 
@@ -506,6 +556,26 @@ describe("restoring a snapshot into a new company", () => {
       /^(delete from|insert into) "co_copy"/.test(call.text),
     );
     expect(firstDisable).toBeLessThan(firstMutation);
+    // The far end of the window, which the assertions above cannot see: moving
+    // the enable loop above the insert loop keeps the counts equal and the
+    // first disable first, yet in production the actor-stamp triggers
+    // (0064_transaction_actor_stamps.sql, before insert or update) would then
+    // rewrite every historical actor and the closed-period guards would refuse
+    // the very entries the disable exists to admit. Scoped to the transaction
+    // — everything before "commit" — because the verdict row is deliberately
+    // written after the commit with the triggers live again, and the last
+    // in-transaction mutation is the provenance insert, which must also land
+    // inside the window.
+    const commitAt = run.pg.calls.findIndex((call) => call.text === "commit");
+    expect(commitAt).toBeGreaterThan(-1);
+    const inTransaction = run.pg.calls.slice(0, commitAt);
+    const lastEnable = inTransaction.findLastIndex((call) =>
+      / enable trigger user$/.test(call.text),
+    );
+    const lastMutation = inTransaction.findLastIndex((call) =>
+      /^(delete from|insert into) "co_copy"/.test(call.text),
+    );
+    expect(lastEnable).toBeGreaterThan(lastMutation);
   });
 
   it("undoes the CSV formula guard and empty-cell encoding on the way in", async () => {
@@ -556,7 +626,7 @@ describe("restoring a snapshot into a new company", () => {
     const run = await runRestore({ totals: { ...CONTROL_TOTALS, journalLineCount: 1 } });
     const outcome = await run.outcome;
     expect(outcome.companyId).toBe("company-copy");
-    expect(outcome.controlTotalsMatch).toBe(false);
+    expect(outcome.verdict).toBe("mismatched");
     expect(outcome.differences.join(" ")).toMatch(/journalLineCount.*2.*1/);
     expect(run.pg.calls.some((call) => call.text === "commit")).toBe(true);
     expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(false);
@@ -615,6 +685,112 @@ describe("what a restore refuses to load at all", () => {
     expect(run.clientRequests()).toBe(0);
   });
 
+  it("refuses a manifest whose control totals disagree with the register's copy", async () => {
+    // manifest.controlTotals sits outside the hashed file list, so anyone who
+    // can write to the bucket can edit it to whatever a broken restore happens
+    // to produce — the register hash still matches, every per-file digest
+    // still matches, and the screen would announce the books came back whole
+    // against forged figures. The register row's own copy (written by the
+    // nightly job, behind row-level security) is the one the bucket cannot
+    // touch, so a manifest that disagrees with it is refused outright.
+    // Production edit that makes this fail: comparing against
+    // manifest.controlTotals again instead of the register's copy.
+    const { archive } = await fixtureArchive();
+    const forged = { ...CONTROL_TOTALS, journalLineCount: 1 };
+    const bytes = await tamperedArchiveBytes(archive, (manifest) => {
+      manifest.controlTotals = forged;
+    });
+    // The broken restore the forgery was written to excuse: totals that match
+    // the forged figures exactly.
+    const run = await runRestore({ bytes, totals: forged });
+    let caught: unknown;
+    try {
+      await run.outcome;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RestoreError);
+    expect((caught as Error).message).toMatch(/journalLineCount/);
+    expect((caught as Error).message).toMatch(/register/i);
+    // Refused before anything was built.
+    expect(run.clientRequests()).toBe(0);
+  });
+
+  it("refuses a manifest whose measurement date disagrees with the register's taken_at", async () => {
+    // controlTotalsAsOf is outside the hashed set too, and it decides the date
+    // the comparison is measured at. A forged date moves the measurement to a
+    // day whose balances differ — or happen to agree — for reasons that say
+    // nothing about the restore. The register's taken_at is the verified copy
+    // of the same clock reading (the nightly job derives both from `today`).
+    // Production edit that makes this fail: reading comparedAsOf from the
+    // manifest again without checking it against the register.
+    const { archive } = await fixtureArchive();
+    const bytes = await tamperedArchiveBytes(archive, (manifest) => {
+      manifest.controlTotalsAsOf = "2026-08-15";
+    });
+    const run = await runRestore({ bytes });
+    let caught: unknown;
+    try {
+      await run.outcome;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RestoreError);
+    expect((caught as Error).message).toContain("2026-08-15");
+    expect(run.clientRequests()).toBe(0);
+  });
+
+  it("refuses a register row whose totals are missing figures the manifest carries", async () => {
+    // The agreement check walks the union of both sides' keys. Walking only
+    // the register's keys (production edit: replacing the union walk with
+    // compareControlTotals, which iterates the expected side alone) would let
+    // a register row somehow written without figures agree with any manifest
+    // vacuously — and the restore would then be "proved" against nothing.
+    const run = await runRestore({ row: { control_totals: {} as ExportControlTotals } });
+    let caught: unknown;
+    try {
+      await run.outcome;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RestoreError);
+    expect((caught as Error).message).toMatch(/journalLineCount/);
+    expect(run.clientRequests()).toBe(0);
+  });
+
+  it("refuses a zip entry that no line of the manifest vouches for", async () => {
+    // The digest loop walks manifest.files, and the loader reads
+    // entries[archivePathFor(table)] for every restorable table — so a CSV
+    // added to the stored zip for a table the manifest never listed has no
+    // digest, gets no check, and its rows would load. The concrete shape:
+    // a snapshot taken under 0113, a later migration adds acc_customer to
+    // EXPORT_TABLES, someone adds data/acc_customer.csv to the stored file.
+    // Production edit that makes this fail: dropping the unlisted-entry check,
+    // which restores the exact load-unverified behaviour this pins down.
+    const { archive } = await fixtureArchive();
+    const entries = unzipSync(archive.bytes);
+    entries["data/acc_customer.csv"] = strToU8("id,display_name\r\nc-1,Mallory");
+    const columns = {
+      ...columnFixture(),
+      // Today's schema knows the table, so the column gate would wave it in.
+      acc_customer: [
+        { name: "id", nullable: false },
+        { name: "display_name", nullable: true },
+      ],
+    };
+    const run = await runRestore({ bytes: zipSync(entries), columns });
+    let caught: unknown;
+    try {
+      await run.outcome;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RestoreError);
+    expect((caught as Error).message).toContain("data/acc_customer.csv");
+    expect((caught as Error).message).toMatch(/manifest/i);
+    expect(run.clientRequests()).toBe(0);
+  });
+
   it("refuses a snapshot column today's schema has no place for, and rolls back", async () => {
     // An older snapshot can carry a column a later migration removed. Loading
     // the rest and dropping that column would lose data in silence — the very
@@ -635,5 +811,98 @@ describe("what a restore refuses to load at all", () => {
     expect((caught as Error).message).toContain("memo");
     expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
     expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
+  });
+
+  it("keeps the original failure when the rollback itself dies with the connection", async () => {
+    // If the connection died, client.query("rollback") rejects too — and
+    // without its own try, that rejection replaces the error that named the
+    // statement which actually failed. Production edit that makes this fail:
+    // removing the try around the rollback, which is exactly the code this
+    // replaced.
+    const run = await runRestore({
+      provision: async () => {
+        throw new Error("schema exploded");
+      },
+      faults: { rollback: new Error("Connection terminated unexpectedly") },
+    });
+    await expect(run.outcome).rejects.toThrow(/schema exploded/);
+    expect(run.pg.isEnded()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The verdict must outlive the browser tab, and a failure after the commit
+// must never claim the restore did not happen.
+// ---------------------------------------------------------------------------
+
+describe("what survives of the verdict", () => {
+  it("writes the verdict into the copy's own audit log, after the commit", async () => {
+    // Nothing durable used to record whether a restored company was verified:
+    // show a mismatch once, close the tab, and no record anywhere would
+    // distinguish that copy from a clean one. Production edits that make this
+    // fail: not writing the verdict row at all (the code this pins replaced),
+    // or writing it inside the transaction next to the provenance row — where
+    // it would exist before the totals it claims to report.
+    const run = await runRestore();
+    const outcome = await run.outcome;
+    expect(outcome.verdict).toBe("matched");
+    expect(outcome.verdictRecorded).toBe(true);
+    const commitAt = run.pg.calls.findIndex((call) => call.text === "commit");
+    const verdict = verdictWrite(run.pg.calls);
+    expect(verdict.index).toBeGreaterThan(commitAt);
+    expect(verdict.payload).toMatchObject({
+      verdict: "matched",
+      compared_as_of: "2026-08-01",
+      differences: [],
+    });
+  });
+
+  it("records durably which figures differed, when the books did not add up", async () => {
+    // Production edit that makes this fail: writing the verdict row before the
+    // comparison ran, so it could only ever say "matched" or carry nothing.
+    const run = await runRestore({ totals: { ...CONTROL_TOTALS, journalLineCount: 1 } });
+    const outcome = await run.outcome;
+    expect(outcome.verdict).toBe("mismatched");
+    expect(outcome.verdictRecorded).toBe(true);
+    const verdict = verdictWrite(run.pg.calls);
+    expect(verdict.payload?.verdict).toBe("mismatched");
+    expect((verdict.payload?.differences as string[]).join(" ")).toMatch(
+      /journalLineCount.*2.*1/,
+    );
+  });
+
+  it("tells the truth when verification fails after the commit: the company exists", async () => {
+    // The transaction has committed and the company is fully loaded by the
+    // time the totals are read — a thrown error here used to surface as "the
+    // restore did not finish", whose natural response is to retry and build a
+    // second copy. Production edit that makes this fail: rethrowing the
+    // readTotals failure instead of carrying it on the outcome.
+    const run = await runRestore({
+      totalsError: new Error("PGRST106: schema must be one of the following"),
+    });
+    const outcome = await run.outcome;
+    expect(outcome.companyId).toBe("company-copy");
+    expect(outcome.verdict).toBe("unverified");
+    expect(outcome.actual).toBeNull();
+    expect(outcome.unverifiedReason).toContain("PGRST106");
+    // The unproven state is itself durable: the verdict row says unverified.
+    const verdict = verdictWrite(run.pg.calls);
+    expect(verdict.payload?.verdict).toBe("unverified");
+    expect(run.pg.calls.some((call) => call.text === "commit")).toBe(true);
+  });
+
+  it("surfaces a verdict row that could not be written, instead of failing the restore", async () => {
+    // Two wrong shapes, both pinned here: swallowing the write failure would
+    // report verdictRecorded true with no row behind it, and rethrowing it
+    // would turn a fully loaded company into "the restore did not finish".
+    const run = await runRestore({
+      faults: {
+        matching: { pattern: /company\.restore\.verify/, error: new Error("connection reset") },
+      },
+    });
+    const outcome = await run.outcome;
+    expect(outcome.verdict).toBe("matched");
+    expect(outcome.verdictRecorded).toBe(false);
+    expect(outcome.verdictRecordError).toContain("connection reset");
   });
 });

@@ -190,16 +190,37 @@ export function parseCsvTable(content: string): ParsedCsvTable {
 // The restore.
 // ---------------------------------------------------------------------------
 
+/**
+ * What the post-restore check concluded. "unverified" is not a fourth kind of
+ * success or failure — it means the copy exists and is fully loaded, but its
+ * figures could not be read, so nothing has been proved either way.
+ */
+export type RestoreVerdict = "matched" | "mismatched" | "unverified";
+
 export interface RestoreOutcome {
   companyId: string;
-  controlTotalsMatch: boolean;
-  differences: string[];
   slug: string;
   legalName: string;
-  /** The snapshot's own reporting date — the date both sides were measured at. */
+  /**
+   * The register row's own reporting date — the date both sides were measured
+   * at. Taken from `acc_backup.taken_at`, not the manifest: the manifest's
+   * copy sits outside the hashed file list and is only accepted after it has
+   * been checked against this one.
+   */
   comparedAsOf: string;
+  /** The register row's control totals — the copy row-level security protects. */
   expected: ExportControlTotals;
-  actual: ExportControlTotals;
+  /** The restored company's totals, or null when reading them failed. */
+  actual: ExportControlTotals | null;
+  verdict: RestoreVerdict;
+  /** Each figure that disagreed, named. Empty unless the verdict is "mismatched". */
+  differences: string[];
+  /** Why the figures remain unproven, when the verdict is "unverified". */
+  unverifiedReason: string | null;
+  /** Whether the verdict row landed durably in the copy's own audit log. */
+  verdictRecorded: boolean;
+  /** Why it did not, when it did not. */
+  verdictRecordError: string | null;
 }
 
 export interface RestoreDependencies {
@@ -406,6 +427,12 @@ interface BackupRegisterRow {
  * A control-totals mismatch is a *finding*, not a failure: the copy is kept
  * and handed back with each disagreeing figure named, because the whole point
  * of restoring beside the books is seeing which figures moved and by how much.
+ * The verdict — matched, mismatched, or unverified — is also written into the
+ * copy's own audit log, so it outlives the browser tab that watched the
+ * restore; and once the transaction has committed, nothing here throws:
+ * a verification problem after that point rides on the outcome, because the
+ * company exists and "the restore did not finish" would be a lie that invites
+ * a retry and a second copy.
  */
 export async function restoreBackupIntoNewCompany(
   sb: SupabaseClient,
@@ -485,6 +512,49 @@ export async function restoreBackupIntoNewCompany(
         `hashes to ${actualHash}, but the register says ${row.content_hash}.`,
     );
   }
+  // The hash above covers only manifest.files — the path→sha256 pairs. The
+  // control totals and their measurement date sit outside that hashed set, so
+  // anyone able to write to the bucket could edit them to whatever a broken
+  // restore happens to produce, and every check so far would still pass. The
+  // register row carries the nightly job's own copy of both, written behind
+  // row-level security where the bucket cannot reach (`control_totals` and
+  // `taken_at` are NOT NULL since the table's creation in 0114, so that copy
+  // always exists). The two copies must agree; a file that disagrees with its
+  // register row is refused rather than trusted over it — the disagreement
+  // means the stored file was altered after the register recorded it, or the
+  // job that wrote both is broken, and either one is worth a refusal, not a
+  // proof run against figures nothing vouches for.
+  // Compared over the union of both sides' keys, not compareControlTotals:
+  // that helper walks only the expected side's keys, so a copy missing a
+  // figure entirely (a tampered manifest with controlTotals deleted, or a
+  // job bug writing a partial register row) would slip through a one-sided
+  // walk without a word.
+  const manifestTotals: Partial<ExportControlTotals> = manifest.controlTotals ?? {};
+  const registerTotals: Partial<ExportControlTotals> = row.control_totals ?? {};
+  const totalKeys = new Set<keyof ExportControlTotals>([
+    ...(Object.keys(registerTotals) as Array<keyof ExportControlTotals>),
+    ...(Object.keys(manifestTotals) as Array<keyof ExportControlTotals>),
+  ]);
+  const registerDisagreements: string[] = [];
+  for (const key of totalKeys) {
+    if (registerTotals[key] !== manifestTotals[key]) {
+      registerDisagreements.push(
+        `${key}: the register says ${registerTotals[key]}, the manifest says ${manifestTotals[key]}`,
+      );
+    }
+  }
+  if (manifest.controlTotalsAsOf !== row.taken_at) {
+    registerDisagreements.push(
+      `controlTotalsAsOf: the register's taken_at says ${row.taken_at}, the manifest says ${manifest.controlTotalsAsOf}`,
+    );
+  }
+  if (registerDisagreements.length > 0) {
+    throw new RestoreError(
+      `The archive's manifest does not agree with this snapshot's register row — ` +
+        `${registerDisagreements.join("; ")}. The register's copy is the one the storage bucket ` +
+        `cannot touch, so a manifest that contradicts it cannot be trusted, and the restore is refused.`,
+    );
+  }
   // And prove the bytes match the manifest that hash was derived from.
   for (const file of manifest.files) {
     const entry = entries[file.path];
@@ -497,6 +567,23 @@ export async function restoreBackupIntoNewCompany(
         `${file.path} does not match the checksum the manifest recorded for it — the archive is corrupt.`,
       );
     }
+  }
+  // The loop above walks the manifest's list; this one walks the zip's. The
+  // loader below reads entries[archivePathFor(table)] for every restorable
+  // table, so an entry the manifest never listed would load with no digest
+  // ever checked — the exact shape of a data/T.csv smuggled into the stored
+  // file after a later migration added T to EXPORT_TABLES. Only manifest.json
+  // and README.txt legitimately live outside files[].
+  const vouchedFor = new Set(manifest.files.map((file) => file.path));
+  const unlisted = Object.keys(entries).filter(
+    (path) => path !== "manifest.json" && path !== "README.txt" && !vouchedFor.has(path),
+  );
+  if (unlisted.length > 0) {
+    throw new RestoreError(
+      `The archive holds files its own manifest does not list, so nothing vouches for their ` +
+        `content: ${unlisted.join(", ")}. They can only have been added after the snapshot was ` +
+        `taken, and the restore refuses to load anything unverified.`,
+    );
   }
 
   // A table the snapshot holds but this list no longer restores would vanish
@@ -535,9 +622,24 @@ export async function restoreBackupIntoNewCompany(
     }
   }
 
+  // Measured at the snapshot's own reporting date: balances move with the
+  // date (a future-dated entry is excluded until its date arrives), so any
+  // other date would report a difference that says nothing about the restore.
+  // Both the date and the expected side come from the register row — the
+  // copies row-level security protects — which the agreement check above
+  // proved the manifest matches.
+  const comparedAsOf = row.taken_at;
+  const expected = row.control_totals;
+
   const client = await createClient();
   let provisioned: ProvisionCompanyResult;
   let slug: string;
+  let verdict: RestoreVerdict = "unverified";
+  let actual: ExportControlTotals | null = null;
+  let differences: string[] = [];
+  let unverifiedReason: string | null = null;
+  let verdictRecorded = false;
+  let verdictRecordError: string | null = null;
   try {
     slug = await claimSlug(client, legalName);
     await client.query("begin");
@@ -607,28 +709,83 @@ export async function restoreBackupIntoNewCompany(
       }
       await client.query("commit");
     } catch (cause) {
-      await client.query("rollback");
+      try {
+        await client.query("rollback");
+      } catch {
+        // A rollback can only reject here because the connection itself has
+        // died — and a dead connection's transaction never commits, the
+        // server aborts it on its own. The error worth surfacing is `cause`
+        // below, the statement that actually failed; letting the rollback's
+        // rejection replace it would report "connection closed" and bury the
+        // real failure.
+      }
       throw cause;
+    }
+
+    // Everything past this point runs after the commit: the company exists
+    // and is fully loaded, whatever happens below. A failure here must never
+    // be reported as the restore not finishing — the natural response to that
+    // message is to retry, which builds a second copy — so it is carried on
+    // the outcome instead of thrown.
+    try {
+      actual = await readTotals(provisioned.schema, comparedAsOf);
+      const comparison = compareControlTotals(expected, actual);
+      verdict = comparison.controlTotalsMatch ? "matched" : "mismatched";
+      differences = comparison.differences;
+    } catch (cause) {
+      // Not swallowed: the reason travels on the outcome, into the alert the
+      // restorer reads, and into the verdict row written below.
+      unverifiedReason = `Reading the restored company's control totals failed: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`;
+    }
+
+    // The verdict must outlive the browser tab. Without this row, showing a
+    // mismatch once and closing the tab would leave no record anywhere that
+    // distinguishes that copy from a clean one — so the conclusion, whichever
+    // it is, goes into the copy's own audit log, right after the provenance
+    // row that says where the books came from. Written with the triggers live
+    // again, deliberately: this is an ordinary post-restore write, not part of
+    // the byte-faithful load.
+    try {
+      await client.query(
+        `insert into ${ident(provisioned.schema)}.${ident("acc_audit_log")}
+           (table_name, record_id, action, actor_id, after_json)
+         values ('acc_backup', $1, 'company.restore.verify', $2, $3::jsonb)`,
+        [
+          row.id,
+          user.id,
+          JSON.stringify({
+            verdict,
+            compared_as_of: comparedAsOf,
+            expected,
+            actual,
+            differences,
+            unverified_reason: unverifiedReason,
+          }),
+        ],
+      );
+      verdictRecorded = true;
+    } catch (cause) {
+      // Post-commit again: reported on the outcome, never thrown as a restore
+      // failure and never claimed as recorded.
+      verdictRecordError = cause instanceof Error ? cause.message : String(cause);
     }
   } finally {
     await client.end();
   }
 
-  // Measured at the snapshot's own reporting date: balances move with the
-  // date (a future-dated entry is excluded until its date arrives), so any
-  // other date would report a difference that says nothing about the restore.
-  const comparedAsOf = manifest.controlTotalsAsOf ?? row.taken_at;
-  const actual = await readTotals(provisioned.schema, comparedAsOf);
-  const comparison = compareControlTotals(manifest.controlTotals, actual);
-
   return {
     companyId: provisioned.companyId,
-    controlTotalsMatch: comparison.controlTotalsMatch,
-    differences: comparison.differences,
     slug,
     legalName,
     comparedAsOf,
-    expected: manifest.controlTotals,
+    expected,
     actual,
+    verdict,
+    differences,
+    unverifiedReason,
+    verdictRecorded,
+    verdictRecordError,
   };
 }

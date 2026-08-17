@@ -16,8 +16,14 @@ export default async function RestoreBackupPage({
 }) {
   // The guard runs before params is even read: a refusal must not depend on
   // anything about the request. The denied marker names the parent screen —
-  // that is the card the person can actually be sent back to.
+  // that is the card the person can actually be sent back to. Two gates, not
+  // one, because this screen genuinely needs both: company.restore for the
+  // act itself, and company.export because that is what acc_backup's RLS
+  // policy (migration 0114) admits for reading the register — without it the
+  // read below comes back empty and the page would claim the snapshot does
+  // not exist, the wrong explanation for a permission refusal.
   await requireSettingsPermission(["company.restore"], "/settings/backups");
+  await requireSettingsPermission(["company.export"], "/settings/backups");
   const { id } = await params;
 
   const sb = await createSupabaseServerClient();

@@ -83,6 +83,17 @@ export async function requireSettingsPermission(
   anyPermissions: readonly string[],
   deniedHref: string,
 ): Promise<void> {
+  // canShowNavItem reads an empty anyPermissions list as "no gate", so an
+  // empty call here would refuse nobody — and the only thing catching that
+  // today would be a test's regex over page sources. A gate is misconfigured,
+  // not merely permissive, when it names no permission at all, so it fails
+  // closed by construction: thrown before any lookup, so the refusal does not
+  // depend on the database being reachable.
+  if (anyPermissions.length === 0) {
+    throw new Error(
+      "requireSettingsPermission needs at least one permission key; an empty list would gate nothing.",
+    );
+  }
   const access = await currentAccess();
   const strict: NavigationAccess = {
     role: access.role,

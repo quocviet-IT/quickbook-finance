@@ -166,14 +166,14 @@ export default function RestoreClient({
 
       {outcome ? (
         <>
-          {outcome.controlTotalsMatch ? (
+          {outcome.verdict === "matched" ? (
             <Alert
               type="success"
               showIcon
               message="The books came back whole"
               description={`Every control total of "${outcome.legalName}" matches the snapshot, measured as of ${outcome.comparedAsOf}. Open it from the company menu to work with the two sets of books side by side.`}
             />
-          ) : (
+          ) : outcome.verdict === "mismatched" ? (
             <Alert
               type="error"
               showIcon
@@ -193,6 +193,38 @@ export default function RestoreClient({
                 </>
               }
             />
+          ) : (
+            // The one thing this state must never say is "the restore did not
+            // finish": it did. The company is fully loaded — a retry would
+            // build a second copy — its figures just have not been proved.
+            <Alert
+              type="warning"
+              showIcon
+              message="The company was created, but its figures are unproven"
+              description={
+                <>
+                  <p style={{ marginTop: 0 }}>
+                    &quot;{outcome.legalName}&quot; exists and is fully loaded — do not run the
+                    restore again. Checking its figures failed after the load finished:{" "}
+                    {outcome.unverifiedReason}
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    To check them yourself, open &quot;{outcome.legalName}&quot; from the company
+                    menu, run the Trial Balance and the AR and AP aging reports as of{" "}
+                    {outcome.comparedAsOf}, and compare each total against the snapshot figures
+                    below.
+                  </p>
+                </>
+              }
+            />
+          )}
+          {outcome.verdictRecorded ? null : (
+            <Alert
+              type="warning"
+              showIcon
+              message="This verdict could not be written into the copy's audit log"
+              description={`The result above is shown here only; recording it in "${outcome.legalName}" failed: ${outcome.verdictRecordError}`}
+            />
           )}
           <Descriptions
             bordered
@@ -202,9 +234,11 @@ export default function RestoreClient({
             items={FIGURE_LABELS.map(({ key, label }) => ({
               key,
               label,
-              children: `${outcome.expected[key].toLocaleString("en-US")} in the snapshot · ${outcome.actual[
-                key
-              ].toLocaleString("en-US")} restored`,
+              children: `${outcome.expected[key].toLocaleString("en-US")} in the snapshot · ${
+                outcome.actual === null
+                  ? "could not be read"
+                  : `${outcome.actual[key].toLocaleString("en-US")} restored`
+              }`,
             }))}
           />
         </>
