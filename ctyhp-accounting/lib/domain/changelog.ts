@@ -68,10 +68,29 @@ export const RELEASES: Release[] = [
           "the restore finishes, the copy's trial balance, receivables, " +
           "payables and journal line count are checked against the " +
           "snapshot's own figures, and any difference is named rather than " +
-          "summarized. The person who runs the restore is the copy's only " +
-          "user; the snapshot's user list and role assignments are " +
-          "deliberately not carried over.",
+          "summarized. The copy carries vendor tax profiles — taxpayer " +
+          "identification numbers included — the same as every other table " +
+          "in the books, so it is a company like any other and deserves the " +
+          "same care over who can open it. The person who runs the restore " +
+          "is the copy's only user; the snapshot's user list and role " +
+          "assignments are deliberately not carried over.",
         route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title:
+          "A large export could repeat or drop a row; two exports of the same books now come back identical",
+        detail:
+          "Company data export — the same reader a Backups snapshot runs — " +
+          "reads a big table a page at a time, and without a fixed reading " +
+          "order Postgres does not promise page two agrees with page one: a " +
+          "table past a thousand rows could have a row repeated or a row " +
+          "left out without either export saying so. Every exported table " +
+          "now has a declared order, so a paged read is complete, and " +
+          "exporting the same books twice — nothing changed in between — " +
+          "gives back two identical files. That sameness is what lets a " +
+          "Backups snapshot prove a restore came back whole.",
+        route: "/settings/company",
       },
     ],
   },

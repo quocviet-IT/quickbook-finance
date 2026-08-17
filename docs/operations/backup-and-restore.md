@@ -29,9 +29,12 @@ end is the evidence that this one works.
 Only `acc_bank_connection_secret` is excluded: those tokens are encrypted with
 an environment key, so a copy is a live secret and a useless restore.
 
-The archive is not a substitute for a database backup. It cannot be loaded back
-into the application — there is no importer. Its job is to be readable by any
-tool, forever, and to let you prove a restore is correct.
+The archive is not a substitute for a database backup: it holds one company, not
+the database, and it does not carry the bytes of any attachment. But it is no
+longer a dead end. Settings → Backups can load one back into a **new** company
+and report whether the control totals came back — see section 4a. Restoring
+*over* a damaged company is still not possible; the way back is to restore
+beside it and compare.
 
 ### Handling
 
@@ -130,12 +133,35 @@ Then check attachments: `attachments.csv` lists every file with its storage
 path and sha256. Object storage is restored separately from the database, so
 confirm a sample of paths still resolves in the Storage browser.
 
+### 4a. Restoring one company beside the running books
+
+When one company's books are wrong and the rest of the database is healthy, a
+Supabase restore is the wrong tool — it would replace every company to rescue
+one. Instead:
+
+1. **Settings → Backups** in the affected company. Pick the last snapshot before
+   the damage. A row marked *skipped* means the books had not changed that day,
+   so the figures are the ones in the row above it.
+2. **Restore as new company.** The running company is not written to.
+3. Read the control-total result the restore reports. All five figures matching
+   is the evidence the copy is faithful; a mismatch names the figure and both
+   values.
+4. Open the same report on both companies and compare. The difference tells you
+   which account moved and by how much — which is the question an incident
+   actually asks.
+5. Correct the running books with a journal entry. Do not delete and re-import:
+   the restored copy is evidence, and a closed period cannot be edited anyway.
+
+The restored company holds vendor tax profiles. Delete it when the comparison is
+done, and treat it as tax records until then.
+
 ## 5. Drill cadence
 
 Run a verification drill quarterly and after any migration that adds a table.
 A drill is: take a fresh export, compare its manifest against the live database
 using section 4, and record the result below. A full restore-into-a-new-project
-drill should run at least once a year.
+drill should run at least once a year — a same-company restore (section 4a) run
+against a real sample company satisfies this without touching Supabase itself.
 
 The comparison is automated as an end-to-end test:
 

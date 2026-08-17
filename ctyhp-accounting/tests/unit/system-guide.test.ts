@@ -114,6 +114,61 @@ describe("guide notices", () => {
   });
 });
 
+describe("the restore-a-backup flow", () => {
+  const flow = GUIDE_FLOWS.find((candidate) => candidate.id === "restore-a-backup");
+
+  it("exists, rooted at the Backups screen", () => {
+    // Renaming the flow's id or pointing it at a different route (production
+    // edit) fails this directly, rather than through a route-existence check
+    // that would pass against any page.
+    expect(flow).toBeDefined();
+    expect(flow?.route).toBe("/settings/backups");
+  });
+
+  it("warns that a restore will not bring attachment files back, not merely that attachments are 'listed'", () => {
+    // Scoped to the one caution about attachments, not the whole flow's text,
+    // so a stray "attachment" elsewhere (e.g. an import statement) cannot
+    // satisfy this the way it once did for a sibling screen's test. Deleting
+    // this caution, or softening it to only say attachments are "listed"
+    // without saying a restore won't bring the files back, makes this fail.
+    const caution = flow?.cautions?.find((c) => /attachment/i.test(c.title));
+    expect(caution, "no caution mentions attachments").toBeDefined();
+    expect(caution?.body).toMatch(/restor\w*[^.]{0,80}will not bring[^.]{0,80}back/i);
+  });
+
+  it("warns that the restored copy carries taxpayer identification numbers", () => {
+    // Scoped to the specific caution's title+body, so this fails only if that
+    // caution is removed or reworded to drop the taxpayer-ID fact — not if
+    // the phrase merely survives somewhere else in the file.
+    const caution = flow?.cautions?.find((c) => /taxpayer identification/i.test(`${c.title} ${c.body}`));
+    expect(caution, "no caution names taxpayer identification numbers").toBeDefined();
+    expect(caution?.body.toLowerCase()).toContain("vendor tax profiles");
+  });
+
+  it("warns that only the person who restores gets access to the copy", () => {
+    const caution = flow?.cautions?.find((c) => /only user/i.test(c.body));
+    expect(caution, "no caution says the restoring user is the copy's only user").toBeDefined();
+    expect(caution?.title.toLowerCase()).toContain("not copied");
+  });
+
+  it("names the actual restore control and ties it to the source company being untouched", () => {
+    // "Restore as new company" is BackupsClient.tsx's literal button text
+    // (app/(app)/settings/backups/BackupsClient.tsx). Renaming that button
+    // without updating this step, or dropping the "not touched" guarantee
+    // from its note, makes this fail.
+    const step = flow?.steps.find((s) => s.control === "Restore as new company");
+    expect(step, "no step names the Restore as new company control").toBeDefined();
+    expect(step?.note ?? "").toMatch(/not touched/i);
+  });
+
+  it("names the control-totals check the restore reports", () => {
+    const step = flow?.steps.find((s) => s.control === "Control totals");
+    expect(step, "no step covers checking the control totals").toBeDefined();
+    expect(step?.note ?? "").toMatch(/trial balance/i);
+    expect(step?.note ?? "").toMatch(/journal.{0,20}line/i);
+  });
+});
+
 describe("the transactions import flow", () => {
   const flow = GUIDE_FLOWS.find((candidate) => candidate.id === "import-transactions");
 

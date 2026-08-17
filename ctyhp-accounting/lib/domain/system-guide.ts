@@ -435,6 +435,82 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: "restore-a-backup",
+    title: "Find a backup, and open it as a second company to compare against",
+    purpose:
+      "Your books are copied on a schedule. When a figure looks wrong, open the copy from before "
+      + "it went wrong as a separate company, and read the two side by side.",
+    route: "/settings/backups",
+    cautions: [
+      {
+        title: "A snapshot does not include your attachments",
+        body:
+          "It holds every table in the books — accounts, entries, invoices, bills, customers, "
+          + "vendors, vendor tax profiles. It does not hold the files: document scans, bill "
+          + "attachments and feedback images live in storage and are not copied. The snapshot "
+          + "lists them, so you can tell what was attached, but restoring will not bring the "
+          + "files themselves back.",
+      },
+      {
+        title: "The restored copy holds taxpayer identification numbers",
+        body:
+          "Vendor tax profiles come across with everything else. The copy is a company like any "
+          + "other, so anybody you later give access to it can see them. Restore when you need "
+          + "to, and delete the copy once the comparison is done.",
+      },
+      {
+        title: "The people are not copied, only the books",
+        body:
+          "You are the restored company's only user. Nobody else gains access to a set of books "
+          + "just because a copy of them was made.",
+      },
+    ],
+    steps: [
+      {
+        action: "Find the day you want to go back to",
+        control: "Backups",
+        route: "/settings/backups",
+        note:
+          "One row per snapshot, newest first. A row saying Skipped means the books had not "
+          + "changed since the previous snapshot, so that day's figures are the ones in the row "
+          + "above it. Only a Stored row can be downloaded or restored.",
+      },
+      {
+        action: "Take a copy of the file for yourself",
+        control: "Download",
+        note:
+          "A single ZIP holding one CSV per table, plus a manifest listing the row counts and "
+          + "the totals recorded when it was taken — the same file Company settings' Export "
+          + "button produces. The link is good for five minutes.",
+      },
+      {
+        action: "Open that day's books as a separate company",
+        control: "Restore as new company",
+        note:
+          "Opens a page to name the new company. Confirm with Restore into a new company: it "
+          + "creates the company and loads the snapshot into it. The company you are working in "
+          + "is not touched, and cannot be — no part of this writes back to it.",
+      },
+      {
+        action: "Check the copy came back whole",
+        control: "Control totals",
+        note:
+          "After loading, the trial balance, the receivable and payable totals and the journal "
+          + "line count are recalculated from the restored books and compared with the ones "
+          + "recorded in the snapshot. A match is the evidence the copy is faithful. A mismatch "
+          + "names the figure and both values rather than failing quietly.",
+      },
+      {
+        action: "Read the two side by side",
+        control: "The company switcher",
+        note:
+          "Switch between the restored copy and the running books and open the same report on "
+          + "each. Comparing a balance sheet on both is the fastest way to see which account "
+          + "moved and by how much.",
+      },
+    ],
+  },
+  {
     id: "import-transactions",
     title: "Bring across a list of transactions you have already categorized",
     purpose:
