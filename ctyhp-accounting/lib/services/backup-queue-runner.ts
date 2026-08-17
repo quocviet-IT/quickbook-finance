@@ -79,6 +79,13 @@ async function lastBackupDate(sb: SupabaseClient): Promise<string | null> {
  * outside every isolation this function offers — a register nobody can read
  * means we do not know who the companies are, and a run that quietly
  * skipped everyone would look identical to a quiet, uneventful night.
+ *
+ * Every failure caught below is also logged where it is caught, and the run
+ * logs once more if any of them did. Nothing else in this job persists a run
+ * record or reads acc_backup back out, and the cron route this feeds answers
+ * every night with HTTP 200 regardless — so without these lines a company
+ * stuck here (missing grants, an unreachable bucket, anything) fails the
+ * same way, silently, for as long as the condition lasts.
  */
 export async function runDueCompanyBackups(
   deps: BackupQueueDependencies = {},
@@ -100,6 +107,13 @@ export async function runDueCompanyBackups(
     if (read.ok) {
       candidates.push({ slug: read.company.slug, lastBackup: read.result, company: read.company });
     } else {
+      // Excluded from tonight's ranking below, and — without this line —
+      // from every other trace of the run too: this result field is the
+      // only other place the failure is recorded, and nothing reads it back.
+      console.error(
+        `Nightly backup: could not read company ${read.company.slug}'s last snapshot date, so it was left out of tonight's ranking:`,
+        read.error,
+      );
       results.push({ slug: read.company.slug, ok: false, error: read.error });
     }
   }
@@ -119,19 +133,37 @@ export async function runDueCompanyBackups(
         retentionWarning: outcome.retentionWarning,
       });
     } catch (error) {
-      results.push({
-        slug: candidate.slug,
-        ok: false,
-        error: error instanceof Error ? error.message : "Backup failed",
-      });
+      const message = error instanceof Error ? error.message : "Backup failed";
+      // Same reasoning as the read failure above, and the one gap Task 4's
+      // own retention log does not cover: that log only ever fires from
+      // inside a night that already got as far as `stored`. A night that
+      // never reached that point — takeBackup itself threw — has nothing
+      // else naming which company it was.
+      console.error(`Nightly backup failed for company ${candidate.slug}:`, message);
+      results.push({ slug: candidate.slug, ok: false, error: message });
     }
   }
 
-  return {
+  const result: BackupRunResult = {
     attempted: due.length,
     stored: results.filter((r) => r.ok && r.status === "stored").length,
     skipped: results.filter((r) => r.ok && r.status === "skipped").length,
     failed: results.filter((r) => !r.ok).length,
     results,
   };
+
+  if (result.failed > 0) {
+    // Each failure above already named its own company; this line is for
+    // the reader who never gets that far down the log, and for the route
+    // below, which turns this same count into a status code — Vercel's own
+    // cron log keeps path, status and duration and discards the body, so
+    // the status code is the only thing a glance at that log will show.
+    const failedSlugs = results.filter((r) => !r.ok).map((r) => r.slug);
+    const noun = results.length === 1 ? "company" : "companies";
+    console.error(
+      `Nightly backup run: ${result.failed} of ${results.length} ${noun} touched tonight failed: ${failedSlugs.join(", ")}`,
+    );
+  }
+
+  return result;
 }

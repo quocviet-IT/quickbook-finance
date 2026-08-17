@@ -24,7 +24,15 @@ export async function POST(request: Request) {
   }
   try {
     const result = await runDueCompanyBackups();
-    return Response.json({ processedAt: new Date().toISOString(), ...result });
+    // Vercel's cron log keeps path, status and duration and discards the
+    // body — the same fact /api/health's httpStatusFor is built on. A run
+    // that touched every company but failed some of them must not read as
+    // identical, by status code alone, to a clean night: each per-company
+    // failure is already logged where it happened (see
+    // backup-queue-runner.ts), and this status is what makes the run itself
+    // visible to whoever only ever looks at the status column.
+    const status = result.failed > 0 ? 500 : 200;
+    return Response.json({ processedAt: new Date().toISOString(), ...result }, { status });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Backups failed" },

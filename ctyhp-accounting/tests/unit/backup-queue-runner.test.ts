@@ -1,9 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+
+// Only the one behavioural "wiring" test below touches these — every other
+// test in this file injects both `listCompanies` and `createClient`
+// explicitly and never reaches the real default, so it never sees these
+// mocks either.
+const automationMocks = vi.hoisted(() => ({
+  createSupabaseAutomationClient: vi.fn(),
+  listActiveAutomationCompanies: vi.fn(),
+}));
+vi.mock("@/lib/db/automation", () => automationMocks);
 
 import type { AutomationCompany } from "@/lib/domain/company-automation";
 import { BACKUP_BATCH_LIMIT } from "@/lib/services/backup-queue";
@@ -178,6 +188,87 @@ describe("runDueCompanyBackups", () => {
       }),
     ).rejects.toThrow(/register unavailable/i);
   });
+
+  it("still logs which company's last-snapshot read failed, not only the run result", async () => {
+    // The review of the previous commit found this exact failure invisible:
+    // `run.results` already names the company, but nothing before this line
+    // ever read that field — no screen, no persisted row, no log. A caught
+    // error turned into a quiet return value is swallowing unless it also
+    // reaches a human somewhere, so this pins the log call and that it names
+    // the company, not just that a company somewhere failed.
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const companies = [company("1", "brokenreader", "co_brokenreader"), company("2", "ok", "co_ok")];
+    await runDueCompanyBackups({
+      listCompanies: async () => companies,
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async (sb) => {
+        if (schemaOf(sb) === "co_brokenreader") throw new Error("permission denied for table acc_backup");
+        return null;
+      },
+      takeBackup: async () => ({ status: "stored", hash: "h", path: "p", sizeBytes: 1 }),
+      today: "2026-08-15",
+    });
+    const logged = consoleError.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(logged).toContain("brokenreader");
+    expect(logged).toContain("permission denied for table acc_backup");
+    consoleError.mockRestore();
+  });
+
+  it("still logs which company's takeCompanyBackup call failed, not only the run result", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const companies = [company("1", "failingwriter", "co_failingwriter"), company("2", "ok", "co_ok")];
+    await runDueCompanyBackups({
+      listCompanies: async () => companies,
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async () => null,
+      takeBackup: async (_sb, companyId) => {
+        if (companyId === "1") throw new Error("storage unreachable");
+        return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-08-15",
+    });
+    const logged = consoleError.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(logged).toContain("failingwriter");
+    expect(logged).toContain("storage unreachable");
+    consoleError.mockRestore();
+  });
+
+  it("also logs a run-level summary when any company failed, once per failure plus one for the run", async () => {
+    // Per-company lines alone still require someone to already be grepping
+    // for them. This second line is what a run-level reader (or an
+    // alert rule keyed on this job's log output) can key off directly,
+    // and it is the same count the route below turns into a non-200 status.
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const companies = [company("1", "a", "co_a"), company("2", "b", "co_b")];
+    const run = await runDueCompanyBackups({
+      listCompanies: async () => companies,
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async () => null,
+      takeBackup: async (_sb, companyId) => {
+        if (companyId === "1") throw new Error("storage unreachable");
+        return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-08-15",
+    });
+    expect(run.failed).toBe(1);
+    // One call for the failed company itself, one more for the run as a whole.
+    expect(consoleError).toHaveBeenCalledTimes(2);
+    consoleError.mockRestore();
+  });
+
+  it("does not log a run-level summary on a night nothing failed", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const run = await runDueCompanyBackups({
+      listCompanies: async () => [company("1", "a", "co_a")],
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async () => null,
+      takeBackup: async () => ({ status: "stored", hash: "h", path: "p", sizeBytes: 1 }),
+      today: "2026-08-15",
+    });
+    expect(run.failed).toBe(0);
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
 });
 
 describe("wiring", () => {
@@ -197,6 +288,32 @@ describe("wiring", () => {
     );
     expect(source).not.toMatch(/createSupabaseServerClient/);
   });
+
+  it("actually calls the automation-client factory for each company schema when no client is injected", async () => {
+    // The assertion above is textual: it would still pass if `createClient`
+    // stopped defaulting to `createSupabaseAutomationClient` and called
+    // something built inline instead, so long as the import line stayed in
+    // the file for some unrelated reason. This drives the real default path
+    // — no `createClient` or `listCompanies` in deps — and checks the one
+    // thing that actually matters: the imported factory is what gets called,
+    // once per company schema, not a stand-in for it.
+    automationMocks.listActiveAutomationCompanies
+      .mockReset()
+      .mockResolvedValue([company("1", "a", "co_a"), company("2", "b", "co_b")]);
+    automationMocks.createSupabaseAutomationClient
+      .mockReset()
+      .mockImplementation((schema: string) => clientFor(schema));
+
+    await runDueCompanyBackups({
+      readLastBackup: async () => null,
+      takeBackup: async () => ({ status: "stored", hash: "h", path: "p", sizeBytes: 1 }),
+      today: "2026-08-15",
+    });
+
+    expect(automationMocks.listActiveAutomationCompanies).toHaveBeenCalled();
+    expect(automationMocks.createSupabaseAutomationClient).toHaveBeenCalledWith("co_a");
+    expect(automationMocks.createSupabaseAutomationClient).toHaveBeenCalledWith("co_b");
+  });
 });
 
 describe("app/api/backups/run/route.ts", () => {
@@ -212,5 +329,66 @@ describe("app/api/backups/run/route.ts", () => {
     // or service-role client of its own.
     expect(source).not.toContain("for (const");
     expect(source).not.toContain("createSupabaseAutomationClient");
+  });
+
+  afterEach(() => {
+    vi.doUnmock("@/lib/services/backup-queue-runner");
+    vi.resetModules();
+    delete process.env.CRON_SECRET;
+  });
+
+  it("answers with a non-200 status when the run reports a failed company, since Vercel's cron log keeps only the status code and discards the body", async () => {
+    const secret = "a".repeat(32);
+    process.env.CRON_SECRET = secret;
+    vi.resetModules();
+    vi.doMock("@/lib/services/backup-queue-runner", () => ({
+      runDueCompanyBackups: vi.fn(async () => ({
+        attempted: 2,
+        stored: 1,
+        skipped: 0,
+        failed: 1,
+        results: [
+          { slug: "a", ok: true, status: "stored" },
+          { slug: "b", ok: false, error: "storage unreachable" },
+        ],
+      })),
+    }));
+
+    const { POST } = await import("@/app/api/backups/run/route");
+    const response = await POST(
+      new Request("http://localhost/api/backups/run", {
+        method: "POST",
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+    );
+
+    expect(response.status).not.toBe(200);
+    const body = await response.json();
+    expect(body.failed).toBe(1);
+  });
+
+  it("answers 200 when the run reports no failures", async () => {
+    const secret = "b".repeat(32);
+    process.env.CRON_SECRET = secret;
+    vi.resetModules();
+    vi.doMock("@/lib/services/backup-queue-runner", () => ({
+      runDueCompanyBackups: vi.fn(async () => ({
+        attempted: 1,
+        stored: 1,
+        skipped: 0,
+        failed: 0,
+        results: [{ slug: "a", ok: true, status: "stored" }],
+      })),
+    }));
+
+    const { POST } = await import("@/app/api/backups/run/route");
+    const response = await POST(
+      new Request("http://localhost/api/backups/run", {
+        method: "POST",
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+    );
+
+    expect(response.status).toBe(200);
   });
 });
