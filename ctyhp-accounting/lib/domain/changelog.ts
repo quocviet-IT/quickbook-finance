@@ -41,6 +41,29 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.26",
+    date: "2026-08-17",
+    headline: "Select transactions on Bank Transactions and set their Category or Account all at once.",
+    changes: [
+      {
+        kind: "added",
+        title: "Select bank transactions and batch-assign Category or Account",
+        detail:
+          "A checkbox on each row and a Select all in the header (Select " +
+          "all covers the current page after filters, not every page). With " +
+          "one or more rows selected, Set Category and Set Account post the " +
+          "same account against every selected line that is still awaiting " +
+          "review. A row already matched or settled is left untouched and " +
+          "counted separately — the confirmation states how many rows will " +
+          "change and how many will be skipped and why before anything " +
+          "saves, and the result afterward names successes, failures, and " +
+          "skips, with the real reason behind each failure rather than a " +
+          "generic error.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.25",
     date: "2026-08-17",
     headline:

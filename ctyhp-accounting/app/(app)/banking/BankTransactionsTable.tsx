@@ -41,6 +41,13 @@ export interface BankTransactionsTableProps {
   onAttachments: (row: BankReviewTableRow) => void;
   /** Remove a line that should never have been imported. Unmatched lines only. */
   onDelete: (row: BankReviewTableRow) => void;
+  /** RQ-03: already pruned against `rows` by the caller, so this is always a
+   *  subset of what is currently in the filtered result — never a row that
+   *  has dropped out of it. */
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+  /** RQ-05: opens the batch Category/Account dialog for the current selection. */
+  onBatchAssign: (kind: "category" | "account") => void;
 }
 
 /**
@@ -66,6 +73,9 @@ export default function BankTransactionsTable({
   onReject,
   onAttachments,
   onDelete,
+  selectedIds,
+  onSelectionChange,
+  onBatchAssign,
 }: BankTransactionsTableProps) {
   // Held here, not written as a literal on the pagination prop: see
   // bank-transactions-pagination.ts for why a literal `pageSize` pins Ant
@@ -247,18 +257,42 @@ export default function BankTransactionsTable({
   ];
 
   return (
-    <DataTable
-      rowKey={(row: BankReviewTableRow) => row.transaction.id}
-      columns={columns}
-      dataSource={rows}
-      rowClassName={(row: BankReviewTableRow) =>
-        row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
-      }
-      pagination={bankTransactionsPagination(pageSize, setPageSize)}
-      sticky
-      loading={loading}
-      emptyTitle="No bank transactions"
-      emptyDescription="Synchronize a bank feed or import a statement to start the review workflow."
-    />
+    <>
+      {/* RQ-03 batch-action bar: only ever shown once a row is checked, and
+          only offered to a reader who can write — matching every other
+          write-gated control on this table. */}
+      {canWrite && selectedIds.length > 0 ? (
+        <Space style={{ marginBottom: 12 }} wrap>
+          <Typography.Text strong>{selectedIds.length} selected</Typography.Text>
+          <Button size="small" onClick={() => onBatchAssign("category")}>
+            Set Category
+          </Button>
+          <Button size="small" onClick={() => onBatchAssign("account")}>
+            Set Account
+          </Button>
+        </Space>
+      ) : null}
+      <DataTable
+        rowKey={(row: BankReviewTableRow) => row.transaction.id}
+        columns={columns}
+        dataSource={rows}
+        rowClassName={(row: BankReviewTableRow) =>
+          row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""
+        }
+        rowSelection={
+          canWrite
+            ? {
+                selectedRowKeys: selectedIds,
+                onChange: (keys) => onSelectionChange(keys as string[]),
+              }
+            : undefined
+        }
+        pagination={bankTransactionsPagination(pageSize, setPageSize)}
+        sticky
+        loading={loading}
+        emptyTitle="No bank transactions"
+        emptyDescription="Synchronize a bank feed or import a statement to start the review workflow."
+      />
+    </>
   );
 }

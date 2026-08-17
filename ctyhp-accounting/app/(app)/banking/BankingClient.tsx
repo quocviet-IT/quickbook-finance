@@ -31,6 +31,8 @@ import BankImportList from "./BankImportList";
 import DeleteBankLineModal, {
   type DeleteBankLineTarget,
 } from "./DeleteBankLineModal";
+import BatchAssignAccountModal, { type BatchAssignTarget } from "./BatchAssignAccountModal";
+import { pruneSelection } from "@/lib/domain/bank-transaction-batch";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
@@ -208,6 +210,12 @@ export default function BankingClient({
   // Bumped after an import so the register below picks the new batch up.
   const [importsKey, setImportsKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<DeleteBankLineTarget | null>(null);
+  // RQ-03: the raw picks a reader has made. Never read directly — always
+  // through the `selectedIds` projection below, which is what stays true to
+  // "must not keep rows that have dropped out of the filtered set" on every
+  // render rather than only after some effect catches up.
+  const [rawSelectedIds, setRawSelectedIds] = useState<string[]>([]);
+  const [batchTarget, setBatchTarget] = useState<BatchAssignTarget | null>(null);
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
@@ -577,6 +585,18 @@ export default function BankingClient({
     })),
   );
 
+  // RQ-03: dropped the instant a row is no longer reachable through the
+  // current account/status/posted-to/keyword/amount filters, kept if it is
+  // merely on a different page of the same filtered set — see
+  // lib/domain/bank-transaction-batch.ts for why turning the page is not
+  // treated the same as narrowing a filter. Recomputed on every render
+  // rather than synced through an effect, so there is never a render where a
+  // filtered-out id is still counted as selected.
+  const selectedIds = pruneSelection(
+    rawSelectedIds,
+    reviewRows.map((row) => row.transaction.id),
+  );
+
   return (
     <div>
       <Script
@@ -800,6 +820,22 @@ export default function BankingClient({
             label: `${row.transaction.txn_date} · ${row.transaction.description}`,
           })
         }
+        selectedIds={selectedIds}
+        onSelectionChange={setRawSelectedIds}
+        onBatchAssign={(kind) =>
+          setBatchTarget({
+            kind,
+            rows: reviewRows
+              .filter((row) => selectedIds.includes(row.transaction.id))
+              .map((row) => ({
+                id: row.transaction.id,
+                status: row.transaction.status,
+                txnDate: row.transaction.txn_date,
+                description: row.transaction.description,
+                amount: rowMoney(row),
+              })),
+          })
+        }
       />
 
       <Card
@@ -822,6 +858,21 @@ export default function BankingClient({
         onDeleted={() => {
           setDeleteTarget(null);
           setImportsKey((count) => count + 1);
+          reload();
+        }}
+      />
+
+      <BatchAssignAccountModal
+        target={batchTarget}
+        accounts={postableAccounts}
+        onClose={() => setBatchTarget(null)}
+        onDone={(succeededIds) => {
+          setBatchTarget(null);
+          // Only the rows that actually changed drop out of the selection —
+          // a skipped or failed row stays checked, so a partial result leaves
+          // something to act on rather than a count nobody can trace back to
+          // a row.
+          setRawSelectedIds((current) => current.filter((id) => !succeededIds.includes(id)));
           reload();
         }}
       />
