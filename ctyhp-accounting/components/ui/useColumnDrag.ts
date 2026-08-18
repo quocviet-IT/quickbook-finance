@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import type { DragEvent } from "react";
 import { reorderColumns } from "@/lib/domain/column-order";
-import type { DraggableHeaderCellProps } from "./DraggableHeaderCell";
+import type { ColumnHeaderCellProps } from "./ColumnHeaderCell";
 
 /**
  * RQ-01: the state and DOM event wiring behind dragging a column header.
@@ -29,9 +29,9 @@ export interface UseColumnDragResult<K extends string> {
    * Props to spread onto a reorderable column's `onHeaderCell`. A column
    * that never calls this — the row-selection checkbox, any `fixed: "right"`
    * action column — is never a drag source and never accepts a drop; see
-   * DraggableHeaderCell's module comment for why that alone is enough.
+   * ColumnHeaderCell's module comment for why that alone is enough.
    */
-  headerCellProps: (key: K) => DraggableHeaderCellProps;
+  headerCellProps: (key: K) => ColumnHeaderCellProps;
 }
 
 export function useColumnDrag<K extends string>(defaultOrder: readonly K[]): UseColumnDragResult<K> {
@@ -40,7 +40,7 @@ export function useColumnDrag<K extends string>(defaultOrder: readonly K[]): Use
   const [overKey, setOverKey] = useState<K | null>(null);
 
   const headerCellProps = useCallback(
-    (key: K): DraggableHeaderCellProps => ({
+    (key: K): ColumnHeaderCellProps => ({
       draggable: true,
       "data-dragging": draggingKey === key,
       "data-drop-target": draggingKey !== null && draggingKey !== key && overKey === key,

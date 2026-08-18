@@ -41,6 +41,40 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.29",
+    date: "2026-08-18",
+    headline: "Drag the edge of a column heading on Bank Transactions to make that column narrower or wider.",
+    changes: [
+      {
+        kind: "added",
+        title: "Resize a Bank Transactions column, the way a spreadsheet does",
+        detail:
+          "Put the pointer on the line between two column headings and it " +
+          "turns into a resize cursor; drag it left or right and only that " +
+          "column changes width. Description is the one this is for — it " +
+          "used to stretch to fit the longest bank description in the " +
+          "account, which pushed Amount, Category and Status off the right " +
+          "of the screen. Narrow it and they come back: the table itself " +
+          "gets narrower, so there is less to scroll past, not just a " +
+          "smaller column. Your widths are remembered on this computer and " +
+          "are still there the next time you sign in. Dragging the heading " +
+          "itself still moves the column, as it did before — the edge " +
+          "resizes, the middle moves.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Long descriptions and references are now cut to their column",
+        detail:
+          "A description or a reference longer than its column ends in an " +
+          "ellipsis, and hovering shows the whole thing. Before this, a " +
+          "36-character payment reference wrapped onto three lines and made " +
+          "every row in the table taller.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.28",
     date: "2026-08-17",
     headline: "Drag a column header on Bank Transactions to put it wherever you can see it.",
