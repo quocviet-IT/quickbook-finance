@@ -63,6 +63,13 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_bank_feed_account",
   "acc_bank_feed_sync_run",
   "acc_bank_import_batch",
+  // The general-ledger and transactions import register (0102/0108) —
+  // acc_bank_transaction.transaction_batch_id references it. Listed here,
+  // before that table, for the same reason acc_bank_import_batch is: the
+  // live restore proved this list matters as a readable approximation of
+  // dependency order even though the actual load order is derived from the
+  // schema's own foreign keys at restore time, not from this list.
+  "acc_import_batch",
   "acc_bank_transaction",
   "acc_reconciliation",
   "acc_reconciliation_line",

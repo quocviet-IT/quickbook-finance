@@ -226,6 +226,25 @@ export default function RestoreClient({
               description={`The result above is shown here only; recording it in "${outcome.legalName}" failed: ${outcome.verdictRecordError}`}
             />
           )}
+          {outcome.nulledReferences.length === 0 ? null : (
+            <Alert
+              type="info"
+              showIcon
+              message="Some references came back without their link"
+              description={
+                <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
+                  {outcome.nulledReferences.map((nulled) => (
+                    <li key={`${nulled.table}.${nulled.column}`}>
+                      {nulled.rowsAffected.toLocaleString("en-US")} row
+                      {nulled.rowsAffected === 1 ? "" : "s"} in {nulled.table} came back without
+                      their {nulled.column} link to {nulled.referencedTable}, because{" "}
+                      {nulled.reason}.
+                    </li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
           <Descriptions
             bordered
             size="small"

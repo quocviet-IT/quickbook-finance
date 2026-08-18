@@ -198,6 +198,27 @@ export function parseCsvTable(content: string): ParsedCsvTable {
  */
 export type RestoreVerdict = "matched" | "mismatched" | "unverified";
 
+/**
+ * One column a restore nulled because its snapshot value named a row in a
+ * table this restore never loaded — an old snapshot missing a table added
+ * since, or a table the export never carries at all. Named on the outcome
+ * rather than dropped in silence: silently discarding a reference is the
+ * quiet data loss the byte-faithful restore exists to prevent, arriving
+ * through a different door.
+ */
+export interface NulledReferenceOutcome {
+  /** The table the nulled column belongs to. */
+  table: string;
+  /** The column (columns, comma-joined, for a composite key) that was nulled. */
+  column: string;
+  /** The table the column names as its parent, which this restore never loaded. */
+  referencedTable: string;
+  /** How many rows had a value here that could not be kept. */
+  rowsAffected: number;
+  /** Why the parent table was never loaded. */
+  reason: string;
+}
+
 export interface RestoreOutcome {
   companyId: string;
   slug: string;
@@ -222,6 +243,8 @@ export interface RestoreOutcome {
   verdictRecorded: boolean;
   /** Why it did not, when it did not. */
   verdictRecordError: string | null;
+  /** Every reference this restore nulled rather than drop in silence. Empty when nothing needed it. */
+  nulledReferences: NulledReferenceOutcome[];
 }
 
 export interface RestoreDependencies {
@@ -407,6 +430,13 @@ async function readNullability(
 interface SchemaForeignKey extends ForeignKeyConstraint {
   /** pg_constraint.confdeltype: 'a' no action, 'r' restrict, 'c' cascade, 'n' set null, 'd' set default. */
   onDelete: string;
+  /**
+   * The referenced columns on `toTable`, same order as `columns`. Not always
+   * `id`: acc_tax_code.state_code references acc_us_state(code). Needed to
+   * check a dangling edge's columns against the parent's actual rows (see
+   * nullDanglingReferences) without assuming the primary key's name.
+   */
+  referencedColumns: string[];
 }
 
 /**
@@ -414,7 +444,9 @@ interface SchemaForeignKey extends ForeignKeyConstraint {
  * catalog of the copy the transaction just built — the exact constraint set
  * the deletes and inserts below must satisfy, seen on the same connection so
  * the uncommitted DDL is visible. Edges into other schemas (auth.users) are
- * left out: their parent rows are never touched here.
+ * left out: their parent rows are never touched here — auth.users is a
+ * single project-wide table, so the original actor's row is still there
+ * regardless of which company schema is being restored.
  */
 async function readSchemaForeignKeys(client: PgLike, schema: string): Promise<SchemaForeignKey[]> {
   const { rows } = await client.query(
@@ -425,6 +457,10 @@ async function readSchemaForeignKeys(client: PgLike, schema: string): Promise<Sc
                from unnest(con.conkey) with ordinality as u(attnum, ord)
                join pg_attribute att on att.attrelid = con.conrelid and att.attnum = u.attnum
             ) as columns,
+            (select array_agg(att.attname::text order by u.ord)
+               from unnest(con.confkey) with ordinality as u(attnum, ord)
+               join pg_attribute att on att.attrelid = con.confrelid and att.attnum = u.attnum
+            ) as referenced_columns,
             (select bool_and(not att.attnotnull)
                from unnest(con.conkey) as k(attnum)
                join pg_attribute att on att.attrelid = con.conrelid and att.attnum = k.attnum
@@ -446,6 +482,7 @@ async function readSchemaForeignKeys(client: PgLike, schema: string): Promise<Sc
     fromTable: row.from_table as string,
     toTable: row.to_table as string,
     columns: row.columns as string[],
+    referencedColumns: (row.referenced_columns as string[] | null) ?? (row.columns as string[]),
     allNullable: row.all_nullable as boolean,
     onDelete: row.on_delete as string,
   }));
@@ -772,6 +809,7 @@ export async function restoreBackupIntoNewCompany(
   let unverifiedReason: string | null = null;
   let verdictRecorded = false;
   let verdictRecordError: string | null = null;
+  const nulledReferences: NulledReferenceOutcome[] = [];
   try {
     slug = await claimSlug(client, legalName);
     await client.query("begin");
@@ -854,6 +892,74 @@ export async function restoreBackupIntoNewCompany(
       const preservedTables = [
         ...new Set(outsideEdges.filter((fk) => fk.onDelete === "c").map((fk) => fk.fromTable)),
       ];
+
+      // The reverse direction: a foreign key from a table this restore *is*
+      // loading to one it never will — an old snapshot missing a table added
+      // since (acc_import_batch, added after this snapshot was taken), or a
+      // table the export never carries at all by design (acc_saved_report's
+      // files live in a deployment-wide bucket the company archive does not
+      // carry). Checked against the parent's *actual* rows in the copy, read
+      // here after provisioning ran — not against plan membership alone: a
+      // lookup table provisioning always seeds identically (acc_us_state,
+      // acc_tax_code.state_code) resolves every one of these edges without
+      // any help, and nulling a reference that already resolves would throw
+      // away real data over a table that merely was not restored. A NOT NULL
+      // edge here cannot be satisfied by nulling, and the archive itself
+      // cannot vouch for a substitute, so the restore is refused rather than
+      // guessing.
+      const outOfPlanEdges = foreignKeys.filter(
+        (fk) => planTables.has(fk.fromTable) && !planTables.has(fk.toTable),
+      );
+      const mustRefuse = outOfPlanEdges.filter((fk) => !fk.allNullable);
+      if (mustRefuse.length > 0) {
+        throw new RestoreError(
+          `This snapshot has rows that reference a table this restore cannot load, through a column ` +
+            `that must not be null: ${mustRefuse
+              .map((fk) => `${fk.fromTable}.${fk.columns.join(", ")} -> ${fk.toTable}`)
+              .join("; ")}. The archive cannot produce a faithful copy of these rows, so the restore ` +
+            `is refused rather than inventing a value.`,
+        );
+      }
+      for (const fk of outOfPlanEdges) {
+        const plan = planByTable.get(fk.fromTable);
+        if (!plan) continue;
+        const indices = fk.columns.map((column) => plan.columns.indexOf(column));
+        // The archive never carried this column at all — an even older
+        // snapshot, predating the column itself. Nothing to null: the
+        // column is simply absent from the INSERT and the schema default
+        // (null, for every such column today) applies, the same as any
+        // column added since the snapshot was taken.
+        if (indices.some((index) => index === -1)) continue;
+        const refSelect = fk.referencedColumns
+          .map((column, i) => `${ident(column)}::text as ${ident(`r${i}`)}`)
+          .join(", ");
+        const { rows: parentRows } = await client.query(
+          `select ${refSelect} from ${ident(schema)}.${ident(fk.toTable)}`,
+        );
+        const existing = new Set(
+          parentRows.map((row) =>
+            fk.referencedColumns.map((_, i) => row[`r${i}`] as string | null).join("|"),
+          ),
+        );
+        let rowsAffected = 0;
+        for (const row of plan.rows) {
+          if (indices.every((index) => row[index] === null)) continue;
+          const key = indices.map((index) => row[index]).join("|");
+          if (existing.has(key)) continue;
+          for (const index of indices) row[index] = null;
+          rowsAffected += 1;
+        }
+        if (rowsAffected === 0) continue;
+        nulledReferences.push({
+          table: fk.fromTable,
+          column: fk.columns.join(", "),
+          referencedTable: fk.toTable,
+          rowsAffected,
+          reason: restorable.includes(fk.toTable)
+            ? `this snapshot predates ${fk.toTable} being included in the export`
+            : `${fk.toTable} is not part of the company export`,
+        });
+      }
 
       // The schema's own triggers — closed-period guards, actor stamps, audit
       // writers — are all correct for bookkeeping and all wrong for a
@@ -948,6 +1054,7 @@ export async function restoreBackupIntoNewCompany(
             restored_into_slug: slug,
             excluded_tables: RESTORE_EXCLUDED_TABLES,
             included_sensitive: true,
+            nulled_references: nulledReferences,
           }),
         ],
       );
@@ -1034,5 +1141,6 @@ export async function restoreBackupIntoNewCompany(
     unverifiedReason,
     verdictRecorded,
     verdictRecordError,
+    nulledReferences,
   };
 }

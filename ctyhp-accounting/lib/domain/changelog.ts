@@ -92,6 +92,27 @@ export const RELEASES: Release[] = [
           "Backups snapshot prove a restore came back whole.",
         route: "/settings/company",
       },
+      {
+        kind: "added",
+        title: "A snapshot now carries the transactions import register",
+        detail:
+          "The general-ledger and bank-transaction import register is part " +
+          "of the company export and every Backups snapshot from now on, " +
+          "the same as every other table in the books.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title: "Restoring a snapshot taken before this could fail on its bank transactions",
+        detail:
+          "A bank transaction that names which import brought it in could " +
+          "point at an import record the snapshot never carried, and the " +
+          "restore refused the whole company over it. A restore now sets " +
+          "that link null when its snapshot predates it, and says so on the " +
+          "result — which rows, which link, and why — rather than either " +
+          "failing the restore or dropping the loss without a word.",
+        route: "/settings/backups",
+      },
     ],
   },
   {

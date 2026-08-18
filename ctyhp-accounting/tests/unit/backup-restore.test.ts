@@ -429,6 +429,13 @@ interface ProvisioningFaults {
 interface CatalogFixture {
   foreignKeys?: Array<Record<string, unknown>>;
   primaryKeys?: Array<Record<string, unknown>>;
+  /**
+   * What a dangling-reference check finds already sitting in a table this
+   * restore never loads — keyed by table name, each row shaped like the
+   * `r0`, `r1`… aliases readSchemaForeignKeys' existence query uses. Absent
+   * tables answer empty, the same as a table nothing seeded.
+   */
+  existingRows?: Record<string, Array<Record<string, string>>>;
 }
 
 function fakeProvisioningClient(
@@ -465,6 +472,13 @@ function fakeProvisioningClient(
       if (/^select .+ from "co_copy"\."acc_number_source"$/.test(text)) {
         return { rows: FIXTURE_NUMBER_SOURCE_ROWS };
       }
+      // The dangling-reference existence check: `select "col"::text as "r0",
+      // … from "co_copy"."<table>"`, distinguished from the capture above by
+      // its `as "r0"` aliasing.
+      const existenceMatch = /^select .+ as "r0".* from "co_copy"\."([a-z0-9_]+)"$/.exec(text);
+      if (existenceMatch) {
+        return { rows: catalog.existingRows?.[existenceMatch[1]] ?? [] };
+      }
       return { rows: [] };
     },
     async end() {
@@ -489,6 +503,8 @@ interface RunOverrides {
   /** Makes reading the restored totals fail — the post-commit failure path. */
   totalsError?: Error;
   faults?: ProvisioningFaults;
+  /** What a dangling-reference existence check finds already in the copy. */
+  existingRows?: Record<string, Array<Record<string, string>>>;
 }
 
 async function runRestore(overrides: RunOverrides = {}) {
@@ -509,6 +525,7 @@ async function runRestore(overrides: RunOverrides = {}) {
   const source = stubSourceClient(row);
   const pg = fakeProvisioningClient(overrides.columns ?? columnFixture(), overrides.faults, {
     foreignKeys: overrides.foreignKeys,
+    existingRows: overrides.existingRows,
   });
   const provisionInputs: ProvisionCompanyInput[] = [];
   const provisionSources: Array<readonly MigrationSource[]> = [];
@@ -613,6 +630,9 @@ describe("restoring a snapshot into a new company", () => {
     expect(outcome.verdict).toBe("matched");
     expect(outcome.differences).toEqual([]);
     expect(outcome.legalName).toBe("Books Rebuilt");
+    // Quiet by default: nothing in this fixture references a table outside
+    // the restore's plan, so nothing should be reported as nulled.
+    expect(outcome.nulledReferences).toEqual([]);
 
     const inserted = mutationTargets(run.pg.calls, "insert");
     // The whole books, including the two files that do not live under data/:
@@ -876,6 +896,195 @@ describe("restoring a snapshot into a new company", () => {
     expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
     expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
     expect(run.pg.isEnded()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A reference whose parent table this restore never loads — either because
+// this particular archive predates the child column's export (the live
+// gap: an acc_import_batch snapshot taken before it joined EXPORT_TABLES) or
+// because the parent sits outside the export by design. The live schema's
+// own such edge, acc_tax_code.state_code -> acc_us_state, is what makes the
+// "existing rows" check load-bearing: acc_us_state is never restored either,
+// but provisioning seeds it identically every time, so that edge must be
+// left alone rather than nulled.
+// ---------------------------------------------------------------------------
+
+describe("tolerating a reference whose parent this restore never loads", () => {
+  function orphanDatasets(extra: ExportDataset[]): ExportDataset[] {
+    return [...fixtureDatasets(), ...extra];
+  }
+
+  async function orphanArchive(extra: ExportDataset[]) {
+    const archive = await buildExportArchive({
+      datasets: orphanDatasets(extra),
+      controlTotals: CONTROL_TOTALS,
+      schemaVersion: "0113_earlier.sql",
+      generatedAt: "2026-08-01T00:00:00.000Z",
+    });
+    return { archive, contentHash: await snapshotHash(snapshotDescription(archive.manifest)) };
+  }
+
+  const BANK_TXN_ROWS = [
+    // References a batch id nothing seeds and this archive does not carry —
+    // the shape of pc_49's 289 rows against a snapshot taken before 0115.
+    { id: "bt-1", txn_date: "2026-07-15", transaction_batch_id: "missing-batch" },
+    // No reference at all: must be left alone and not counted.
+    { id: "bt-2", txn_date: "2026-07-16", transaction_batch_id: null },
+    // References a batch id the fake catalog says already exists in the copy
+    // (provisioning-seeded, the acc_us_state shape) — must survive untouched.
+    { id: "bt-3", txn_date: "2026-07-17", transaction_batch_id: "existing-batch" },
+  ];
+
+  const BANK_TXN_COLUMNS = [
+    { name: "id", nullable: false },
+    { name: "txn_date", nullable: false },
+    { name: "transaction_batch_id", nullable: true },
+  ];
+
+  function bankTxnForeignKey(allNullable: boolean) {
+    return {
+      constraint_name: "acc_bank_transaction_transaction_batch_id_fkey",
+      from_table: "acc_bank_transaction",
+      to_table: "acc_import_batch",
+      columns: ["transaction_batch_id"],
+      referenced_columns: ["id"],
+      all_nullable: allNullable,
+      on_delete: "a",
+    };
+  }
+
+  it("nulls only the row whose reference truly does not resolve, and reports it", async () => {
+    // Production edit that makes this fail: nulling every reference to a
+    // table outside the plan without checking the copy's actual rows first
+    // (the naive version of this fix) — it would also strip bt-3's
+    // 'existing-batch', which the acc_us_state precedent forbids.
+    const { archive, contentHash } = await orphanArchive([
+      { table: "acc_bank_transaction", columns: Object.keys(BANK_TXN_ROWS[0]), rows: BANK_TXN_ROWS, sensitive: false },
+    ]);
+    const run = await runRestore({
+      bytes: archive.bytes,
+      row: { content_hash: contentHash },
+      columns: { ...columnFixture(), acc_bank_transaction: BANK_TXN_COLUMNS },
+      foreignKeys: [...FIXTURE_FOREIGN_KEYS, bankTxnForeignKey(true)],
+      existingRows: { acc_import_batch: [{ r0: "existing-batch" }] },
+    });
+    const outcome = await run.outcome;
+
+    expect(outcome.verdict).toBe("matched");
+    expect(outcome.nulledReferences).toEqual([
+      {
+        table: "acc_bank_transaction",
+        column: "transaction_batch_id",
+        referencedTable: "acc_import_batch",
+        rowsAffected: 1,
+        reason: "this snapshot predates acc_import_batch being included in the export",
+      },
+    ]);
+    const insert = run.pg.calls.find(
+      (call) =>
+        call.params === undefined &&
+        /^insert into "co_copy"\."acc_bank_transaction"/.test(call.text),
+    );
+    expect(insert?.text).not.toContain("missing-batch");
+    expect(insert?.text).toContain("existing-batch");
+  });
+
+  it("names a table the export never carries, distinctly from one this archive merely predates", async () => {
+    const { archive, contentHash } = await orphanArchive([
+      {
+        table: "acc_bank_transaction",
+        columns: Object.keys(BANK_TXN_ROWS[0]),
+        rows: [BANK_TXN_ROWS[0]],
+        sensitive: false,
+      },
+    ]);
+    const run = await runRestore({
+      bytes: archive.bytes,
+      row: { content_hash: contentHash },
+      columns: { ...columnFixture(), acc_bank_transaction: BANK_TXN_COLUMNS },
+      foreignKeys: [
+        ...FIXTURE_FOREIGN_KEYS,
+        {
+          ...bankTxnForeignKey(true),
+          to_table: "acc_saved_report",
+        },
+      ],
+    });
+    const outcome = await run.outcome;
+    expect(outcome.nulledReferences).toEqual([
+      expect.objectContaining({
+        referencedTable: "acc_saved_report",
+        reason: "acc_saved_report is not part of the company export",
+      }),
+    ]);
+  });
+
+  it("refuses outright when the dangling column must not be null", async () => {
+    // A NOT NULL column pointing at a table this restore never loads cannot
+    // be satisfied by nulling, and the archive cannot vouch for a
+    // substitute — the restore must refuse rather than guess.
+    const { archive, contentHash } = await orphanArchive([
+      {
+        table: "acc_bank_transaction",
+        columns: Object.keys(BANK_TXN_ROWS[0]),
+        rows: [BANK_TXN_ROWS[0]],
+        sensitive: false,
+      },
+    ]);
+    const run = await runRestore({
+      bytes: archive.bytes,
+      row: { content_hash: contentHash },
+      columns: {
+        ...columnFixture(),
+        acc_bank_transaction: BANK_TXN_COLUMNS.map((column) =>
+          column.name === "transaction_batch_id" ? { ...column, nullable: false } : column,
+        ),
+      },
+      foreignKeys: [...FIXTURE_FOREIGN_KEYS, bankTxnForeignKey(false)],
+    });
+    let caught: unknown;
+    try {
+      await run.outcome;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(RestoreError);
+    expect((caught as Error).message).toContain("acc_bank_transaction");
+    expect((caught as Error).message).toContain("acc_import_batch");
+    expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
+    expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
+  });
+
+  it("leaves a reference alone when the copy's actual rows already satisfy it", async () => {
+    // The acc_us_state precedent, in miniature: a table outside the restore's
+    // plan can still hold the referenced row, because provisioning seeded it
+    // — not because the archive did. Production edit that makes this fail:
+    // treating "the table is not in the plan" alone as grounds to null,
+    // instead of checking the copy's actual rows.
+    const { archive, contentHash } = await orphanArchive([
+      {
+        table: "acc_bank_transaction",
+        columns: Object.keys(BANK_TXN_ROWS[0]),
+        rows: [BANK_TXN_ROWS[2]],
+        sensitive: false,
+      },
+    ]);
+    const run = await runRestore({
+      bytes: archive.bytes,
+      row: { content_hash: contentHash },
+      columns: { ...columnFixture(), acc_bank_transaction: BANK_TXN_COLUMNS },
+      foreignKeys: [...FIXTURE_FOREIGN_KEYS, bankTxnForeignKey(true)],
+      existingRows: { acc_import_batch: [{ r0: "existing-batch" }] },
+    });
+    const outcome = await run.outcome;
+    expect(outcome.nulledReferences).toEqual([]);
+    const insert = run.pg.calls.find(
+      (call) =>
+        call.params === undefined &&
+        /^insert into "co_copy"\."acc_bank_transaction"/.test(call.text),
+    );
+    expect(insert?.text).toContain("existing-batch");
   });
 });
 
