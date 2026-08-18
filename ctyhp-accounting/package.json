@@ -26,6 +26,7 @@
     "verify:saved-report-bucket": "node --env-file=.env.local scripts/verify-saved-report-bucket.mjs",
     "verify:ledger-import": "node --env-file=.env.local scripts/verify-ledger-import.mjs",
     "verify:column-resize": "node --env-file=.env.local scripts/verify-column-resize.mjs",
+    "verify:theme": "node --env-file=.env.local scripts/verify-theme.mjs",
     "verify:transaction-filters": "node --env-file=.env.local scripts/verify-transaction-filters.mjs",
     "guide:shots": "node --env-file=.env.local scripts/capture-guide-shots.mjs",
     "verify:feedback-access": "node --env-file=.env.local scripts/verify-feedback-access.mjs",
