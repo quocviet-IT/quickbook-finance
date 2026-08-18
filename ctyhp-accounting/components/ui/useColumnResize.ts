@@ -8,6 +8,7 @@ import {
   resizedWidth,
   serializeColumnWidths,
 } from "@/lib/domain/column-width";
+import type { ColumnHeaderCellProps } from "./ColumnHeaderCell";
 
 /**
  * RQ-01-REV: dragging the edge of a column heading to change its width.
@@ -41,8 +42,14 @@ export interface UseColumnResizeResult<K extends string> {
    * Props for a resizable column's `onHeaderCell`. A column that never calls
    * this grows no handle, which is how the pinned action columns and the
    * selection checkbox stay unresizable — see ColumnHeaderCell.
+   *
+   * Typed as the header cell's own props rather than as the bare handler:
+   * Ant Design's `onHeaderCell` is declared to return `HTMLAttributes`, and an
+   * object holding nothing but `onResizeStart` has no property in common with
+   * that, so it is rejected outright. `ColumnHeaderCellProps` extends
+   * `HTMLAttributes`, which is exactly the relationship that makes it fit.
    */
-  resizeHandleProps: (key: K) => { onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void };
+  resizeHandleProps: (key: K) => ColumnHeaderCellProps;
   /**
    * Wraps a column's drag props so a pointer press on the resize handle
    * cannot also start a reorder. Both interactions live on the same heading —
@@ -105,7 +112,7 @@ export function useColumnResize<K extends string>(
   }, [hydrated, widths, storageKey]);
 
   const resizeHandleProps = useCallback(
-    (key: K) => ({
+    (key: K): ColumnHeaderCellProps => ({
       onResizeStart: (event: ReactPointerEvent<HTMLElement>) => {
         // Stops the browser turning this press into a text selection or into
         // the native header drag; `guardHeaderDrag` below is the second half

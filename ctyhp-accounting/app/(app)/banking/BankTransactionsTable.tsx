@@ -358,6 +358,12 @@ export default function BankTransactionsTable({
         // which is what makes the horizontal scrollbar actually get shorter.
         tableLayout="fixed"
         scroll={{ x: totalColumnWidth(widths, pinnedColumns.length * PINNED_COLUMN_WIDTH) }}
+        // Holds the table to exactly the widths above rather than letting it
+        // stretch to fill a wide screen — on a stretched table the spare room
+        // is shared across every column, so narrowing one widens the rest.
+        // Invisible here at the default widths, which already overflow a
+        // laptop; it matters on a large monitor. See app/globals.css.
+        className="accounting-table--exact-widths"
         dataSource={rows}
         rowClassName={(row: BankReviewTableRow) =>
           row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""

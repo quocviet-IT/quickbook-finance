@@ -584,6 +584,30 @@ body {
   border-radius: 10px;
 }
 
+/*
+ * Tables whose column widths the reader drags for themselves.
+ *
+ * rc-table writes `min-width: 100%` inline on the table element whenever
+ * horizontal scrolling is on, so a table narrower than its container is
+ * stretched to fill it — and under `table-layout: fixed` the browser shares
+ * that extra room out across every column in proportion. The effect is that
+ * narrowing one column widens all the others, which is the opposite of what
+ * REQ-01 asks for ("only the width of the intended column changes") and the
+ * opposite of the spreadsheet the reviewer was comparing us to.
+ *
+ * It has to be `!important`: the rule it overrides is an inline style, and
+ * the value is not configurable through any prop rc-table exposes.
+ *
+ * Opt-in, never global. A table sized by its contents should still fill the
+ * page; only one whose widths somebody chose on purpose should be held to
+ * exactly those numbers.
+ */
+.accounting-table--exact-widths .ant-table-header table,
+.accounting-table--exact-widths .ant-table-body table,
+.accounting-table--exact-widths .ant-table-content table {
+  min-width: 0 !important;
+}
+
 .accounting-data-table .ant-table-container {
   border-start-start-radius: 10px;
   border-start-end-radius: 10px;

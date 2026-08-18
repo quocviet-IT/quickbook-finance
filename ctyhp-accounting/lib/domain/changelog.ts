@@ -41,6 +41,28 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.31",
+    date: "2026-08-18",
+    headline: "The General Ledger report now has the same draggable column edges as Bank Transactions.",
+    changes: [
+      {
+        kind: "added",
+        title: "Resize the General Ledger columns",
+        detail:
+          "Drag the line between two column headings to make a column wider " +
+          "or narrower — Memo especially, which holds the whole bank " +
+          "description and used to take whatever room was left after the " +
+          "other six columns. Narrow it and Debit, Credit and the running " +
+          "balance come into view instead of sitting off the right-hand " +
+          "edge. Widen it and the report scrolls sideways so you can read a " +
+          "long memo in full. Only the column you drag changes width; the " +
+          "others stay exactly where they were. Your widths are remembered " +
+          "on this computer.",
+        route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
     version: "1.30",
     date: "2026-08-18",
     headline: "A bank transaction delete that fails now leaves the books untouched.",
