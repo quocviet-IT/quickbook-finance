@@ -21,6 +21,7 @@ import {
   RESTORE_EXCLUDED_TABLES,
   RestoreError,
   compareControlTotals,
+  isSchemaCacheWarming,
   parseCsvTable,
   restoreBackupIntoNewCompany,
 } from "@/lib/services/backup-restore";
@@ -97,6 +98,28 @@ describe("proving a restore came back whole", () => {
   it("refuses a snapshot newer than the code reading it", () => {
     expect(restoreCompatibility("0200_later.sql", "0114_backups.sql")).toBe("snapshot-is-newer");
   });
+
+  it("recognises both shapes of a PostgREST still warming up to the new schema", () => {
+    // The commit's NOTIFY makes PostgREST reload asynchronously, in two
+    // steps, and the first verification request can land between them. Before
+    // the config reload the schema is refused outright (PGRST106); after it,
+    // the schema is served from a cache that has not learned its functions
+    // yet (PGRST202, "Could not find the function"). The first live
+    // verification hit the second shape and surfaced it as a failure instead
+    // of retrying — a fully restored copy reported unverified for a condition
+    // that clears itself in seconds.
+    expect(isSchemaCacheWarming("The schema must be one of the following: co_a, co_b")).toBe(true);
+    expect(isSchemaCacheWarming("PGRST106")).toBe(true);
+    expect(
+      isSchemaCacheWarming(
+        "Trial balance failed: Could not find the function co_copy.acc_ledger_balances(p_from, p_to) in the schema cache",
+      ),
+    ).toBe(true);
+    expect(isSchemaCacheWarming("PGRST202")).toBe(true);
+    // A genuinely broken read must still surface immediately.
+    expect(isSchemaCacheWarming("permission denied for schema co_copy")).toBe(false);
+    expect(isSchemaCacheWarming("connection refused")).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -171,11 +194,26 @@ function fixtureDatasets(): ExportDataset[] {
     ]),
     // Child before parent on purpose: acc_account references itself, and only
     // a single INSERT statement per table survives that order (FKs are checked
-    // at end of statement).
+    // at end of statement). The default_tax_code_id closes the live schema's
+    // one real cycle with acc_tax_code below.
     make("acc_account", [
-      { id: "acc-child", account_code: "1010", name: "Checking", parent_account_id: "acc-parent" },
-      { id: "acc-parent", account_code: "1000", name: "Assets", parent_account_id: null },
+      {
+        id: "acc-child",
+        account_code: "1010",
+        name: "Checking",
+        parent_account_id: "acc-parent",
+        default_tax_code_id: "tax-1",
+      },
+      {
+        id: "acc-parent",
+        account_code: "1000",
+        name: "Assets",
+        parent_account_id: null,
+        default_tax_code_id: null,
+      },
     ]),
+    // acc_number_source (not exported) cascades from this table's rows.
+    make("acc_sequence", [{ key: "invoice", prefix: "INV-", next_value: 7 }]),
     make("acc_journal_entry", [
       { id: "je-1", entry_number: "JE-000001", entry_date: "2026-07-31", status: "posted" },
     ]),
@@ -198,6 +236,12 @@ function fixtureDatasets(): ExportDataset[] {
         amount_base_minor: -42,
         memo: 'has "quotes", a comma,\r\nand a line break',
       },
+    ]),
+    // Listed in EXPORT_TABLES *after* the acc_account that references it —
+    // the exact contradiction the live restore fell over. tax_account_id
+    // points back at acc_account, closing the cycle.
+    make("acc_tax_code", [
+      { id: "tax-1", code: "TX", name: "Sales Tax", rate_bp: 825, tax_account_id: "acc-parent" },
     ]),
     make("acc_document_attachment", [
       { id: "att-1", file_name: "receipt.pdf", storage_path: "docs/receipt.pdf", size_bytes: 123 },
@@ -292,8 +336,84 @@ function columnFixture(): Record<string, Array<{ name: string; nullable: boolean
       nullable: !(dataset.table === "acc_currency" && name === "symbol"),
     }));
   }
+  // Not a dataset: the snapshot does not carry this table. It exists in the
+  // schema and cascades from acc_sequence, which is what the preservation
+  // tests below are about.
+  fixture["acc_number_source"] = [
+    { name: "sequence_key", nullable: false },
+    { name: "label", nullable: false },
+  ];
   return fixture;
 }
+
+/**
+ * The copy schema's foreign keys, as the catalog would report them — the
+ * restore derives its whole load order from these, not from EXPORT_TABLES.
+ * The account↔tax_code pair mirrors the live schema's one real cycle, both
+ * sides nullable; acc_number_source mirrors the live registry that cascades
+ * from acc_sequence without being exported.
+ */
+const FIXTURE_FOREIGN_KEYS: Array<Record<string, unknown>> = [
+  {
+    constraint_name: "acc_account_parent_account_id_fkey",
+    from_table: "acc_account",
+    to_table: "acc_account",
+    columns: ["parent_account_id"],
+    all_nullable: true,
+    on_delete: "a",
+  },
+  {
+    constraint_name: "acc_account_default_tax_fk",
+    from_table: "acc_account",
+    to_table: "acc_tax_code",
+    columns: ["default_tax_code_id"],
+    all_nullable: true,
+    on_delete: "a",
+  },
+  {
+    constraint_name: "acc_tax_code_tax_account_id_fkey",
+    from_table: "acc_tax_code",
+    to_table: "acc_account",
+    columns: ["tax_account_id"],
+    all_nullable: true,
+    on_delete: "a",
+  },
+  {
+    constraint_name: "acc_journal_line_journal_entry_id_fkey",
+    from_table: "acc_journal_line",
+    to_table: "acc_journal_entry",
+    columns: ["journal_entry_id"],
+    all_nullable: false,
+    on_delete: "c",
+  },
+  {
+    constraint_name: "acc_journal_line_account_id_fkey",
+    from_table: "acc_journal_line",
+    to_table: "acc_account",
+    columns: ["account_id"],
+    all_nullable: false,
+    on_delete: "a",
+  },
+  {
+    constraint_name: "acc_number_source_sequence_key_fkey",
+    from_table: "acc_number_source",
+    to_table: "acc_sequence",
+    columns: ["sequence_key"],
+    all_nullable: false,
+    on_delete: "c",
+  },
+];
+
+const FIXTURE_PRIMARY_KEYS: Array<Record<string, unknown>> = [
+  { table_name: "acc_account", columns: ["id"] },
+  { table_name: "acc_tax_code", columns: ["id"] },
+  { table_name: "acc_sequence", columns: ["key"] },
+];
+
+/** What a fresh provisioning seeded into the non-exported registry. */
+const FIXTURE_NUMBER_SOURCE_ROWS: Array<Record<string, unknown>> = [
+  { sequence_key: "invoice", label: "Invoices" },
+];
 
 /**
  * Failures the fake connection can be told to produce. `rollback` models a
@@ -306,9 +426,15 @@ interface ProvisioningFaults {
   matching?: { pattern: RegExp; error: Error };
 }
 
+interface CatalogFixture {
+  foreignKeys?: Array<Record<string, unknown>>;
+  primaryKeys?: Array<Record<string, unknown>>;
+}
+
 function fakeProvisioningClient(
   columns: Record<string, Array<{ name: string; nullable: boolean }>>,
   faults: ProvisioningFaults = {},
+  catalog: CatalogFixture = {},
 ) {
   const calls: PgCall[] = [];
   let ended = false;
@@ -328,6 +454,17 @@ function fakeProvisioningClient(
           ),
         };
       }
+      if (/contype = 'f'/.test(text)) {
+        return { rows: catalog.foreignKeys ?? FIXTURE_FOREIGN_KEYS };
+      }
+      if (/contype = 'p'/.test(text)) {
+        return { rows: catalog.primaryKeys ?? FIXTURE_PRIMARY_KEYS };
+      }
+      // The preservation capture: reading the non-exported registry's rows
+      // before the cascade from acc_sequence's delete can take them.
+      if (/^select .+ from "co_copy"\."acc_number_source"$/.test(text)) {
+        return { rows: FIXTURE_NUMBER_SOURCE_ROWS };
+      }
       return { rows: [] };
     },
     async end() {
@@ -341,6 +478,8 @@ interface RunOverrides {
   row?: Partial<SourceRow> | null;
   bytes?: Uint8Array;
   columns?: Record<string, Array<{ name: string; nullable: boolean }>>;
+  /** What the copy schema's catalog reports — the load order's one source. */
+  foreignKeys?: Array<Record<string, unknown>>;
   provision?: (
     client: PgLike,
     input: ProvisionCompanyInput,
@@ -368,7 +507,9 @@ async function runRestore(overrides: RunOverrides = {}) {
           ...overrides.row,
         };
   const source = stubSourceClient(row);
-  const pg = fakeProvisioningClient(overrides.columns ?? columnFixture(), overrides.faults);
+  const pg = fakeProvisioningClient(overrides.columns ?? columnFixture(), overrides.faults, {
+    foreignKeys: overrides.foreignKeys,
+  });
   const provisionInputs: ProvisionCompanyInput[] = [];
   const provisionSources: Array<readonly MigrationSource[]> = [];
   const totalsCalls: Array<{ schema: string; asOf: string }> = [];
@@ -512,18 +653,111 @@ describe("restoring a snapshot into a new company", () => {
     expect(run.provisionSources[0]).toHaveLength(2);
   });
 
-  it("clears seeded rows before loading, dependents first, and loads in dependency order", async () => {
+  it("clears and loads in the order the schema's own foreign keys dictate", async () => {
     const run = await runRestore();
     await run.outcome;
     const deletes = mutationTargets(run.pg.calls, "delete");
     const inserts = mutationTargets(run.pg.calls, "insert");
-    // Deletion order is exactly the load order reversed — the same dependency
-    // ordering EXPORT_TABLES already encodes, read backwards so a dependent
-    // row never blocks its parent's delete.
-    expect(deletes).toEqual([...inserts].reverse());
+    const before = (list: string[], first: string, second: string) => {
+      expect(
+        list.indexOf(first),
+        `${first} must come before ${second} in: ${list.join(", ")}`,
+      ).toBeLessThan(list.indexOf(second));
+    };
+    // Loads put every referenced table before the table that references it.
+    // acc_tax_code sits AFTER acc_account in EXPORT_TABLES, so the list order
+    // this replaced could never have satisfied acc_tax_code_tax_account_id_fkey
+    // and acc_account_default_tax_fk at once — the live restore's first run
+    // fell over exactly that pair.
+    before(inserts, "acc_journal_entry", "acc_journal_line");
+    before(inserts, "acc_account", "acc_journal_line");
+    before(inserts, "acc_account", "acc_tax_code");
+    // Deletes are the same order read backwards — one sort serves both
+    // directions, so they cannot drift apart. (acc_number_source is put back
+    // by the preservation pass, not loaded from the snapshot, so it appears
+    // among the inserts with no delete.)
+    const loaded = inserts.filter((table) => table !== "acc_number_source");
+    expect(deletes).toEqual([...loaded].reverse());
+    before(deletes, "acc_journal_line", "acc_journal_entry");
+    before(deletes, "acc_journal_line", "acc_account");
+    before(deletes, "acc_tax_code", "acc_account");
     const lastDelete = run.pg.calls.findLastIndex((call) => /^delete from/.test(call.text));
     const firstInsert = run.pg.calls.findIndex((call) => /^insert into/.test(call.text));
     expect(lastDelete).toBeLessThan(firstInsert);
+  });
+
+  it("suspends the account↔tax-code cycle: nulls the column, loads, writes the value back", async () => {
+    // The live schema's one real cycle: acc_account.default_tax_code_id ->
+    // acc_tax_code and acc_tax_code.tax_account_id -> acc_account. No table
+    // order satisfies both, so the nullable side is carried around the load:
+    // nulled before the seed rows are cleared (a delete inside a cycle is as
+    // stuck as an insert), loaded as null, then written back where the
+    // constraint itself checks it against the now-present acc_tax_code row.
+    const run = await runRestore();
+    await run.outcome;
+    const calls = run.pg.calls;
+    const firstDelete = calls.findIndex((call) => /^delete from "co_copy"/.test(call.text));
+    const suspendNull = calls.findIndex((call) =>
+      /^update "co_copy"\."acc_account" set "default_tax_code_id" = null$/.test(call.text),
+    );
+    expect(suspendNull).toBeGreaterThan(-1);
+    expect(suspendNull).toBeLessThan(firstDelete);
+    // The load itself must not carry the value — it would point at a row that
+    // does not exist yet.
+    const accountInsert = calls.find(
+      (call) =>
+        call.params === undefined && /^insert into "co_copy"\."acc_account"/.test(call.text),
+    );
+    expect(accountInsert?.text).not.toContain("'tax-1'");
+    // The cycle's other side is honoured by ordering, never nulled: the tax
+    // code loads with its account reference intact.
+    const taxInsertAt = calls.findIndex(
+      (call) =>
+        call.params === undefined && /^insert into "co_copy"\."acc_tax_code"/.test(call.text),
+    );
+    expect(calls[taxInsertAt]?.text).toContain("'acc-parent'");
+    // And the snapshot's value comes back, addressed by primary key.
+    const writeBack = calls.findIndex((call) =>
+      /^update "co_copy"\."acc_account" set "default_tax_code_id" = 'tax-1' where "id" = 'acc-child'$/.test(
+        call.text,
+      ),
+    );
+    const commitAt = calls.findIndex((call) => call.text === "commit");
+    expect(writeBack).toBeGreaterThan(taxInsertAt);
+    expect(writeBack).toBeLessThan(commitAt);
+  });
+
+  it("puts back the seeded rows a cascade sweeps out of tables the snapshot does not carry", async () => {
+    // acc_number_source — the registry document numbering reads — cascades
+    // from acc_sequence and is not exported. Clearing acc_sequence would
+    // silently empty it, and a copy without it cannot number an invoice. So
+    // its rows are captured before the clear and put back after the load,
+    // where their own foreign key checks them against the snapshot's rows.
+    const run = await runRestore();
+    await run.outcome;
+    const calls = run.pg.calls;
+    const firstDelete = calls.findIndex((call) => /^delete from "co_copy"/.test(call.text));
+    const capture = calls.findIndex((call) =>
+      /^select .+ from "co_copy"\."acc_number_source"$/.test(call.text),
+    );
+    expect(capture).toBeGreaterThan(-1);
+    expect(capture).toBeLessThan(firstDelete);
+    // Held inside the byte-faithful window with everything else.
+    expect(
+      calls.some((call) => /"acc_number_source" disable trigger user$/.test(call.text)),
+    ).toBe(true);
+    const putBack = calls.findIndex(
+      (call) =>
+        call.params === undefined &&
+        /^insert into "co_copy"\."acc_number_source"/.test(call.text),
+    );
+    const commitAt = calls.findIndex((call) => call.text === "commit");
+    expect(putBack).toBeGreaterThan(firstDelete);
+    expect(putBack).toBeLessThan(commitAt);
+    expect(calls[putBack].text).toContain("'invoice'");
+    expect(calls[putBack].text).toContain("'Invoices'");
+    // Never deleted: the table is not the restore's to manage.
+    expect(mutationTargets(calls, "delete")).not.toContain("acc_number_source");
   });
 
   it("loads each table in a single statement, so a child row may precede its parent", async () => {
@@ -809,6 +1043,39 @@ describe("what a restore refuses to load at all", () => {
     expect(caught).toBeInstanceOf(RestoreError);
     expect((caught as Error).message).toContain("acc_journal_line");
     expect((caught as Error).message).toContain("memo");
+    expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
+    expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
+  });
+
+  it("refuses to guess an order when the catalog reports no foreign keys at all", async () => {
+    // A 65-table accounting schema always has foreign keys; zero of them
+    // means the catalog was misread. Proceeding would silently order the load
+    // by list position — the exact bug the catalog-derived order replaced.
+    const run = await runRestore({ foreignKeys: [] });
+    await expect(run.outcome).rejects.toThrow(/foreign key/i);
+    expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
+    expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
+  });
+
+  it("refuses a schema where clearing would silently rewrite a table it does not manage", async () => {
+    // `on delete cascade` from an outside table empties it, and the
+    // preservation pass puts the rows back. `on delete set null` would
+    // instead quietly rewrite rows the restore never touches again — no such
+    // edge exists today, and one appearing must be a loud stop.
+    const run = await runRestore({
+      foreignKeys: [
+        ...FIXTURE_FOREIGN_KEYS,
+        {
+          constraint_name: "acc_shadow_sequence_key_fkey",
+          from_table: "acc_shadow",
+          to_table: "acc_sequence",
+          columns: ["sequence_key"],
+          all_nullable: true,
+          on_delete: "n",
+        },
+      ],
+    });
+    await expect(run.outcome).rejects.toThrow(/acc_shadow/);
     expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
     expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
   });

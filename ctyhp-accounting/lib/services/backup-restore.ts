@@ -10,6 +10,7 @@ import {
   sha256Hex,
   type ExportControlTotals,
 } from "@/lib/domain/company-export";
+import { restoreOrder, type ForeignKeyConstraint } from "@/lib/domain/restore-order";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import { loadMigrationSources, type MigrationSource } from "@/lib/db/migration-sources";
 import { createProvisioningClient } from "@/lib/db/provisioning-client";
@@ -253,12 +254,26 @@ async function downloadBackupArchive(path: string): Promise<Uint8Array> {
 }
 
 /**
- * Control totals for the freshly committed schema.
+ * Whether a failed read is PostgREST still warming up to a schema that was
+ * just committed, rather than anything wrong with the schema itself.
  *
- * PostgREST learns about a new schema from the NOTIFY that provisioning sends,
- * and it reloads asynchronously — the first request can arrive before the
- * reload lands. Only that specific refusal is retried; any other failure
- * surfaces immediately, because retrying it would just repeat it slower.
+ * The commit's NOTIFY makes PostgREST reload asynchronously, in two steps,
+ * and a request can land between them: before the config reload the schema
+ * is refused outright (PGRST106, "schema must be one of…"); after it, the
+ * schema is served from a cache that has not learned its functions yet
+ * (PGRST202, "Could not find the function … in the schema cache"). The first
+ * live restore hit the second shape — the copy was complete and correct, and
+ * verification reported it unverified over a condition that clears itself in
+ * seconds. Both shapes are worth the same retry; anything else surfaces
+ * immediately, because retrying it would just repeat it slower.
+ */
+export function isSchemaCacheWarming(message: string): boolean {
+  return /schema must be one of|PGRST106|Could not find the function|PGRST202/i.test(message);
+}
+
+/**
+ * Control totals for the freshly committed schema, retried while PostgREST
+ * warms up to it (see isSchemaCacheWarming), up to a 30-second ceiling.
  */
 async function readRestoredTotals(schema: string, asOf: string): Promise<ExportControlTotals> {
   const sb = createSupabaseAutomationClient(schema);
@@ -268,8 +283,7 @@ async function readRestoredTotals(schema: string, asOf: string): Promise<ExportC
       return await readControlTotals(sb, asOf);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const schemaNotExposedYet = /schema must be one of|PGRST106/i.test(message);
-      if (!schemaNotExposedYet || Date.now() >= deadline) throw error;
+      if (!isSchemaCacheWarming(message) || Date.now() >= deadline) throw error;
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
   }
@@ -303,20 +317,70 @@ function cellSql(cell: string | null, nullable: boolean): string {
  * parent. Foreign keys are checked at the end of the statement, which makes
  * the one-statement load order-proof; splitting it would make the restore
  * depend on an order the data never promised.
+ *
+ * Columns in `suspendedColumns` load as null whatever the snapshot says:
+ * they belong to a constraint caught in a reference cycle, and their values
+ * point at rows that do not exist yet. suspendedWriteBack restores them once
+ * every table is in place.
  */
 function insertStatement(
   schema: string,
   plan: TablePlan,
   nullability: Map<string, boolean>,
+  suspendedColumns?: ReadonlySet<string>,
 ): string {
   const columnList = plan.columns.map(ident).join(", ");
   const values = plan.rows
     .map(
       (row) =>
-        `(${row.map((cell, i) => cellSql(cell, nullability.get(plan.columns[i]) ?? true)).join(", ")})`,
+        `(${row
+          .map((cell, i) =>
+            suspendedColumns?.has(plan.columns[i])
+              ? "null"
+              : cellSql(cell, nullability.get(plan.columns[i]) ?? true),
+          )
+          .join(", ")})`,
     )
     .join(",\n");
   return `insert into ${ident(schema)}.${ident(plan.table)} (${columnList})\nvalues\n${values}`;
+}
+
+/**
+ * The snapshot's values for a suspended constraint's columns, written back
+ * row by row once every table is loaded — where the constraint itself checks
+ * them. Returns null when the snapshot never carried the columns (they then
+ * keep the schema default, same as any column added since the snapshot).
+ */
+function suspendedWriteBack(
+  schema: string,
+  plan: TablePlan,
+  primaryKey: string[] | undefined,
+  suspendedColumns: string[],
+): string | null {
+  const columnIndex = new Map(plan.columns.map((column, i) => [column, i]));
+  const present = suspendedColumns.filter((column) => columnIndex.has(column));
+  if (present.length === 0 || plan.rows.length === 0) return null;
+  if (!primaryKey || primaryKey.some((column) => !columnIndex.has(column))) {
+    throw new RestoreError(
+      `${plan.table} needs ${suspendedColumns.join(", ")} written back after the load, but its ` +
+        `primary key (${primaryKey?.join(", ") ?? "none found"}) is not among the snapshot's ` +
+        `columns, so its rows cannot be addressed.`,
+    );
+  }
+  const statements: string[] = [];
+  for (const row of plan.rows) {
+    const sets = present
+      .filter((column) => row[columnIndex.get(column)!] !== null)
+      .map((column) => `${ident(column)} = ${sqlLiteral(row[columnIndex.get(column)!]!)}`);
+    if (sets.length === 0) continue;
+    const where = primaryKey
+      .map((column) => `${ident(column)} = ${cellSql(row[columnIndex.get(column)!], false)}`)
+      .join(" and ");
+    statements.push(
+      `update ${ident(schema)}.${ident(plan.table)} set ${sets.join(", ")} where ${where}`,
+    );
+  }
+  return statements.length > 0 ? statements.join(";\n") : null;
 }
 
 async function readNullability(
@@ -326,7 +390,8 @@ async function readNullability(
   const { rows } = await client.query(
     `select table_name, column_name, is_nullable
        from information_schema.columns
-      where table_schema = $1`,
+      where table_schema = $1
+      order by table_name, ordinal_position`,
     [schema],
   );
   const bySchema = new Map<string, Map<string, boolean>>();
@@ -337,6 +402,73 @@ async function readNullability(
     bySchema.set(table, columns);
   }
   return bySchema;
+}
+
+interface SchemaForeignKey extends ForeignKeyConstraint {
+  /** pg_constraint.confdeltype: 'a' no action, 'r' restrict, 'c' cascade, 'n' set null, 'd' set default. */
+  onDelete: string;
+}
+
+/**
+ * Every foreign key whose two sides both live in `schema`, read from the
+ * catalog of the copy the transaction just built — the exact constraint set
+ * the deletes and inserts below must satisfy, seen on the same connection so
+ * the uncommitted DDL is visible. Edges into other schemas (auth.users) are
+ * left out: their parent rows are never touched here.
+ */
+async function readSchemaForeignKeys(client: PgLike, schema: string): Promise<SchemaForeignKey[]> {
+  const { rows } = await client.query(
+    `select con.conname as constraint_name,
+            child.relname as from_table,
+            parent.relname as to_table,
+            (select array_agg(att.attname::text order by u.ord)
+               from unnest(con.conkey) with ordinality as u(attnum, ord)
+               join pg_attribute att on att.attrelid = con.conrelid and att.attnum = u.attnum
+            ) as columns,
+            (select bool_and(not att.attnotnull)
+               from unnest(con.conkey) as k(attnum)
+               join pg_attribute att on att.attrelid = con.conrelid and att.attnum = k.attnum
+            ) as all_nullable,
+            con.confdeltype as on_delete
+       from pg_constraint con
+       join pg_class child on child.oid = con.conrelid
+       join pg_namespace child_ns on child_ns.oid = child.relnamespace
+       join pg_class parent on parent.oid = con.confrelid
+       join pg_namespace parent_ns on parent_ns.oid = parent.relnamespace
+      where con.contype = 'f'
+        and child_ns.nspname = $1
+        and parent_ns.nspname = $1
+      order by child.relname, con.conname`,
+    [schema],
+  );
+  return rows.map((row) => ({
+    constraintName: row.constraint_name as string,
+    fromTable: row.from_table as string,
+    toTable: row.to_table as string,
+    columns: row.columns as string[],
+    allNullable: row.all_nullable as boolean,
+    onDelete: row.on_delete as string,
+  }));
+}
+
+/** Primary-key columns per table, for addressing rows in the write-back. */
+async function readPrimaryKeyColumns(
+  client: PgLike,
+  schema: string,
+): Promise<Map<string, string[]>> {
+  const { rows } = await client.query(
+    `select rel.relname as table_name,
+            (select array_agg(att.attname::text order by u.ord)
+               from unnest(con.conkey) with ordinality as u(attnum, ord)
+               join pg_attribute att on att.attrelid = con.conrelid and att.attnum = u.attnum
+            ) as columns
+       from pg_constraint con
+       join pg_class rel on rel.oid = con.conrelid
+       join pg_namespace ns on ns.oid = rel.relnamespace
+      where con.contype = 'p' and ns.nspname = $1`,
+    [schema],
+  );
+  return new Map(rows.map((row) => [row.table_name as string, row.columns as string[]]));
 }
 
 /**
@@ -662,24 +794,139 @@ export async function restoreBackupIntoNewCompany(
       const nullability = await readNullability(client, schema);
       refuseUnknownColumns(plans, nullability, row.schema_version);
 
+      // The load order comes from the copy's own catalog, not from
+      // EXPORT_TABLES: that list is maintained by hand, and the schema's real
+      // graph holds over two hundred foreign keys — the first live restore
+      // proved the two disagree (acc_account is listed before the
+      // acc_tax_code it references, one of twelve such contradictions).
+      // pg_constraint is read here, on this connection, because it is the
+      // exact constraint set the statements below must satisfy and the only
+      // view that sees the schema this transaction just built. One sort
+      // serves both directions: inserts run top-down, deletes bottom-up.
+      const foreignKeys = await readSchemaForeignKeys(client, schema);
+      if (foreignKeys.length === 0) {
+        throw new RestoreError(
+          `The catalog reports no foreign keys at all in ${schema}. This schema always has ` +
+            `them, so the catalog was misread — and loading in an unchecked order could corrupt ` +
+            `the copy, so the restore stops here.`,
+        );
+      }
+      const planByTable = new Map(plans.map((plan) => [plan.table, plan]));
+      const { order, suspended } = restoreOrder(
+        plans.map((plan) => plan.table),
+        foreignKeys,
+      );
+      const orderedPlans = order.map((table) => planByTable.get(table)!);
+      const primaryKeys =
+        suspended.length > 0 ? await readPrimaryKeyColumns(client, schema) : new Map();
+      const suspendedColumnsByTable = new Map<string, Set<string>>();
+      for (const constraint of suspended) {
+        const set = suspendedColumnsByTable.get(constraint.fromTable) ?? new Set<string>();
+        for (const column of constraint.columns) set.add(column);
+        suspendedColumnsByTable.set(constraint.fromTable, set);
+      }
+
+      // Clearing a restored table can reach outside the restore set: a table
+      // the snapshot does not carry may reference a restored one with
+      // `on delete cascade`, and the delete would then sweep away rows
+      // provisioning just seeded. acc_number_source — the registry document
+      // numbering reads — cascades from acc_sequence exactly this way, and a
+      // copy without it cannot number an invoice. Such tables' rows are
+      // captured before the clear and put back after the load, where their
+      // own foreign keys check them against the snapshot's rows (loudly, if
+      // an old snapshot lacks a key today's seed refers to). A `set null` or
+      // `set default` edge would rewrite such a table silently instead of
+      // emptying it; none exists today, and one appearing must be a loud
+      // stop, not a quiet mutation.
+      const planTables = new Set(plans.map((plan) => plan.table));
+      const outsideEdges = foreignKeys.filter(
+        (fk) => !planTables.has(fk.fromTable) && planTables.has(fk.toTable),
+      );
+      const mutating = outsideEdges.filter((fk) => fk.onDelete === "n" || fk.onDelete === "d");
+      if (mutating.length > 0) {
+        throw new RestoreError(
+          `Clearing the restored tables would silently rewrite rows in tables the snapshot does ` +
+            `not carry: ${mutating
+              .map((fk) => `${fk.fromTable} (${fk.constraintName})`)
+              .join(", ")}. The restore refuses rather than mutate what it does not manage.`,
+        );
+      }
+      const preservedTables = [
+        ...new Set(outsideEdges.filter((fk) => fk.onDelete === "c").map((fk) => fk.fromTable)),
+      ];
+
       // The schema's own triggers — closed-period guards, actor stamps, audit
       // writers — are all correct for bookkeeping and all wrong for a
       // byte-faithful restore: they would refuse entries in closed periods,
       // stamp the restorer over every historical actor, and bury the restored
       // audit log under fabricated rows. Foreign keys are system triggers and
       // stay on. Owner privilege makes this possible; the DDL is transactional,
-      // so a failure re-enables everything by rollback.
-      for (const plan of plans) {
-        await client.query(`alter table ${ident(schema)}.${ident(plan.table)} disable trigger user`);
+      // so a failure re-enables everything by rollback. The preserved cascade
+      // tables sit inside the same window: putting their rows back is part of
+      // the byte-faithful load, not bookkeeping.
+      for (const table of [...planTables, ...preservedTables]) {
+        await client.query(`alter table ${ident(schema)}.${ident(table)} disable trigger user`);
+      }
+      const preserved: TablePlan[] = [];
+      for (const table of preservedTables) {
+        const columns = [...(nullability.get(table)?.keys() ?? [])];
+        if (columns.length === 0) continue;
+        const selectList = columns
+          .map((column) => `${ident(column)}::text as ${ident(column)}`)
+          .join(", ");
+        const { rows: keptRows } = await client.query(
+          `select ${selectList} from ${ident(schema)}.${ident(table)}`,
+        );
+        preserved.push({
+          table,
+          columns,
+          rows: keptRows.map((kept) =>
+            columns.map((column) => (kept[column] === null ? null : String(kept[column]))),
+          ),
+        });
+      }
+      // A suspended constraint's columns are nulled before the clear as well:
+      // a delete inside a reference cycle is as stuck as an insert, and these
+      // rows are about to be emptied anyway.
+      for (const constraint of suspended) {
+        await client.query(
+          `update ${ident(schema)}.${ident(constraint.fromTable)} set ${constraint.columns
+            .map((column) => `${ident(column)} = null`)
+            .join(", ")}`,
+        );
       }
       // Provisioning seeds reference rows (currencies, sequences, approval
       // policies…). The copy's books must be exactly the snapshot's, so every
       // restored table is emptied first — dependents before what they
-      // reference, which is the export's dependency order read backwards.
-      for (const plan of [...plans].reverse()) {
+      // reference, the catalog-derived order read backwards.
+      for (const plan of [...orderedPlans].reverse()) {
         await client.query(`delete from ${ident(schema)}.${ident(plan.table)}`);
       }
-      for (const plan of plans) {
+      for (const plan of orderedPlans) {
+        if (plan.rows.length === 0) continue;
+        await client.query(
+          insertStatement(
+            schema,
+            plan,
+            nullability.get(plan.table)!,
+            suspendedColumnsByTable.get(plan.table),
+          ),
+        );
+      }
+      // Write back what the suspended constraints were loaded without; their
+      // referenced rows all exist now, and the constraints check every value.
+      for (const constraint of suspended) {
+        const writeBack = suspendedWriteBack(
+          schema,
+          planByTable.get(constraint.fromTable)!,
+          primaryKeys.get(constraint.fromTable),
+          constraint.columns,
+        );
+        if (writeBack !== null) await client.query(writeBack);
+      }
+      // Put back what the cascade took from the tables the restore does not
+      // manage, now that the rows they reference are loaded.
+      for (const plan of preserved) {
         if (plan.rows.length === 0) continue;
         await client.query(insertStatement(schema, plan, nullability.get(plan.table)!));
       }
@@ -704,8 +951,8 @@ export async function restoreBackupIntoNewCompany(
           }),
         ],
       );
-      for (const plan of plans) {
-        await client.query(`alter table ${ident(schema)}.${ident(plan.table)} enable trigger user`);
+      for (const table of [...planTables, ...preservedTables]) {
+        await client.query(`alter table ${ident(schema)}.${ident(table)} enable trigger user`);
       }
       await client.query("commit");
     } catch (cause) {
