@@ -24,7 +24,7 @@ import {
   PlusOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import FilterBar from "@/components/ui/FilterBar";
+import BankTransactionsFilters, { ALL_ACCOUNTS } from "./BankTransactionsFilters";
 import { EmptyState } from "@/components/ui/PageStates";
 import BankTransactionsTable from "./BankTransactionsTable";
 import BankImportList from "./BankImportList";
@@ -115,9 +115,6 @@ declare global {
     };
   }
 }
-
-/** Sentinel account id for the queue that spans every connected account. */
-const ALL_ACCOUNTS = "__all__";
 
 type ReviewRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -640,7 +637,7 @@ export default function BankingClient({
         ) : null}
       </Card>
 
-      <FilterBar
+      <BankTransactionsFilters
         resultCount={reviewRows.length}
         actions={
           canWrite ? (
@@ -693,103 +690,33 @@ export default function BankingClient({
             </Space>
           ) : null
         }
-      >
-        <Space wrap>
-          <Select
-            style={{ minWidth: 280 }}
-            value={selectedId}
-            onChange={setSelectedId}
-            options={[
-              { value: ALL_ACCOUNTS, label: `All accounts (${bankAccounts.length})` },
-              ...bankAccounts.map((account) => ({
-                value: account.id,
-                label: `${account.bank_name || account.account_name} · ${account.account_code} (${account.currency_code})`,
-              })),
-            ]}
-          />
-          <Select
-            aria-label="Filter bank transactions by status"
-            value={transactionStatus}
-            onChange={(value) => setTransactionStatus(value)}
-            style={{ minWidth: 150 }}
-            options={[
-              { value: "all", label: "All statuses" },
-              { value: "unmatched", label: `For review${unmatchedCount ? ` (${unmatchedCount})` : ""}` },
-              { value: "matched", label: "Matched" },
-              { value: "ignored", label: "Excluded" },
-            ]}
-          />
-          <Select
-            showSearch
-            aria-label="Filter bank transactions by the account they were posted to"
-            value={postedToFilter}
-            onChange={setPostedToFilter}
-            style={{ minWidth: 220 }}
-            optionFilterProp="label"
-            options={[
-              { value: "all", label: "All accounts posted to" },
-              { value: "none", label: "Not categorised yet" },
-              // Only accounts these lines actually use: the whole chart here
-              // would be a list of things that filter to nothing.
-              ...[...new Map([...postings.values()].map((p) => [p.account_id, p])).values()]
-                .sort((a, b) => a.account_code.localeCompare(b.account_code))
-                .map((p) => ({
-                  value: p.account_id,
-                  label: `${p.account_code} — ${p.account_name}`,
-                })),
-            ]}
-          />
-          <Input.Search
-            allowClear
-            aria-label="Search bank transactions by description or reference"
-            placeholder="Search description or reference"
-            style={{ width: 240 }}
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
-          <Input
-            allowClear
-            aria-label="Filter bank transactions by exact amount"
-            placeholder="Exact amount"
-            style={{ width: 130 }}
-            value={exactAmountText}
-            onChange={(event) => setExactAmountText(event.target.value)}
-          />
-          <Input
-            allowClear
-            aria-label="Filter bank transactions by minimum amount"
-            placeholder="Min amount"
-            style={{ width: 120 }}
-            value={minAmountText}
-            onChange={(event) => setMinAmountText(event.target.value)}
-          />
-          <Input
-            allowClear
-            aria-label="Filter bank transactions by maximum amount"
-            placeholder="Max amount"
-            style={{ width: 120 }}
-            value={maxAmountText}
-            onChange={(event) => setMaxAmountText(event.target.value)}
-          />
-          {hasKeywordOrAmountFilter ? (
-            <Button
-              onClick={() => {
-                setKeyword("");
-                setExactAmountText("");
-                setMinAmountText("");
-                setMaxAmountText("");
-              }}
-            >
-              Clear filters
-            </Button>
-          ) : null}
-          {suggestions.length ? (
-            <Typography.Text type="secondary">
-              {suggestions.length} suggested match{suggestions.length > 1 ? "es" : ""} in the Match column
-            </Typography.Text>
-          ) : null}
-        </Space>
-      </FilterBar>
+        bankAccounts={bankAccounts}
+        selectedId={selectedId}
+        onSelectedId={setSelectedId}
+        transactionStatus={transactionStatus}
+        onTransactionStatus={setTransactionStatus}
+        unmatchedCount={unmatchedCount}
+        postedToFilter={postedToFilter}
+        onPostedTo={setPostedToFilter}
+        postings={postings}
+        keyword={keyword}
+        onKeyword={setKeyword}
+        suggestionRows={categorized}
+        exactAmountText={exactAmountText}
+        onExactAmount={setExactAmountText}
+        minAmountText={minAmountText}
+        onMinAmount={setMinAmountText}
+        maxAmountText={maxAmountText}
+        onMaxAmount={setMaxAmountText}
+        hasFindFilter={hasKeywordOrAmountFilter}
+        onClearFind={() => {
+          setKeyword("");
+          setExactAmountText("");
+          setMinAmountText("");
+          setMaxAmountText("");
+        }}
+        suggestedMatchCount={suggestions.length}
+      />
 
       <BankTransactionsTable
         rows={reviewRows}

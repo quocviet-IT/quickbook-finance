@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.33",
+    date: "2026-08-18",
+    headline: "Bank Transactions: the search box suggests as you type, and the filter bar is laid out in two clear rows.",
+    changes: [
+      {
+        kind: "added",
+        title: "The search box suggests what is actually there",
+        detail:
+          "Start typing and a list drops down of descriptions and " +
+          "references that really are in the list you are looking at, each " +
+          "with the number of lines behind it. Pick one and it fills the " +
+          "box. Nothing is ever suggested that would leave you with an " +
+          "empty table, because the suggestions come from the lines already " +
+          "narrowed by the account, status and posted-to filters. " +
+          "Descriptions shared by several lines come first — those are the " +
+          "ones that narrow anything; a wire description carries its own " +
+          "date and time and belongs to one line only.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "The filter bar is two rows instead of three ragged ones",
+        detail:
+          "Which lines you are looking at — account, status, posted to — is " +
+          "the first row. Finding one within them is the second: search, " +
+          "and an Amount button holding the exact and min/max boxes that " +
+          "used to sit out in the open. The Amount button carries a small " +
+          "count when it is filtering. The result count no longer floats in " +
+          "the middle of the bar, and the whole thing is shorter than it " +
+          "was.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.32",
     date: "2026-08-18",
     headline: "The Documents & Attachments heading no longer breaks apart on a long bank description.",
