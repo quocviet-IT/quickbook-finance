@@ -31,10 +31,10 @@ export interface DeleteBankLineModalProps {
  * it, because categorising posts a journal entry and every one of theirs had
  * been categorised. One confirmed click now does both steps when a row needs
  * both — void, then delete — and this dialog names both effects before
- * either happens, with the entry's own number when one is known. What
- * actually runs, and the two-call trade made under a deadline to ship this
- * without a live migration, is documented on `deleteBankTransactionWithVoid`
- * in lib/services/banking.ts.
+ * either happens, with the entry's own number when one is known. Both steps
+ * run inside one database transaction (migration 0114), so the two effects
+ * named here either both happen or neither does; what actually runs is
+ * documented on `deleteBankTransactionWithVoid` in lib/services/banking.ts.
  */
 export default function DeleteBankLineModal({
   target,

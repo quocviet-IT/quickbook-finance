@@ -41,6 +41,30 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.30",
+    date: "2026-08-18",
+    headline: "A bank transaction delete that fails now leaves the books untouched.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Deleting a categorized bank transaction is now all or nothing",
+        detail:
+          "Deleting a categorized line does two things: it voids the journal " +
+          "entry the categorizing posted, then removes the line. Until now " +
+          "those were two separate steps, and if the second was refused — a " +
+          "closed period, someone else editing the same line at that moment " +
+          "— the first had already happened: the entry stayed voided and the " +
+          "line came back as awaiting review. The message said so and asked " +
+          "you to press Delete again, but the books had still moved after a " +
+          "delete that failed. Both steps now happen together, so a refusal " +
+          "leaves the entry posted and the line exactly where it was. " +
+          "Nothing changes when the delete succeeds, and every refusal still " +
+          "names its own reason.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.29",
     date: "2026-08-18",
     headline: "Drag the edge of a column heading on Bank Transactions to make that column narrower or wider.",

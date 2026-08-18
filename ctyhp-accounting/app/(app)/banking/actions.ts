@@ -134,10 +134,11 @@ export async function undoStatementImportAction(
 
 /**
  * Delete a bank line — Correction to RQ-06, 2026-08-17. When the line still
- * carries the journal entry categorising it posted, this voids that entry
- * first, so the control works on a `matched` row, not only `unmatched`. See
- * `deleteBankTransactionWithVoid` for what runs and why it is two calls
- * rather than one atomic database function.
+ * carries the journal entry categorising it posted, the void of that entry and
+ * the removal of the line happen together in one database transaction
+ * (migration 0114), so the control works on a `matched` row, not only
+ * `unmatched`, and a refusal at any point leaves the books exactly as they
+ * were. See `deleteBankTransactionWithVoid`.
  */
 export async function deleteBankTransactionAction(
   id: string,

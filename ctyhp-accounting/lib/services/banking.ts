@@ -180,98 +180,40 @@ export async function undoBankStatementImport(
   return Number(data ?? 0);
 }
 
-/** Remove a single unmatched bank line. Same refusal, one line at a time. */
-export async function deleteBankTransaction(
-  sb: SupabaseClient,
-  id: string,
-  reason: string,
-): Promise<void> {
-  const { error } = await sb.rpc("acc_delete_bank_transaction", { p_id: id, p_reason: reason });
-  if (error) throw new BankingError(error.message);
-}
-
 /**
  * Delete a bank line, voiding the journal entry categorising it posted
  * first — Correction to RQ-06, 2026-08-17.
  *
  * `acc_delete_bank_transaction` only ever accepted an `unmatched` row, so
  * Delete was invisible on every row of a company where every line had been
- * categorised (categorising posts an entry — migration 0111). This composes
- * the existing, already-audited `acc_uncategorise_bank_transaction` and
- * `acc_delete_bank_transaction` in one server action rather than one line.
+ * categorised (categorising posts an entry — migration 0111). Voiding that
+ * entry and removing the line is one act to the person pressing the button,
+ * so it is one call here and one transaction in the database.
  *
- * Two RPC calls, not one atomic database function, by deliberate choice
- * under a deadline: a new migration needed `verify:company-provisioning`
- * and a schema change nobody could apply to the live database before this
- * had to ship. `acc_delete_payment` (migration 0106) shows the atomic
- * shape this would take if that trade were made later — one plpgsql
- * function calling `perform acc_void_payment(...)` before its own delete,
- * so a mid-way refusal rolls back everything. That is not what this does.
+ * It was two calls when it first shipped, decided in this function: read the
+ * status, void, then delete. Two calls are two transactions, and a delete
+ * that refused after the void had already committed left the entry voided and
+ * the line alive — data changed by a failed delete, which is exactly what
+ * RQ-06 says must not happen ("If deletion fails, the data must remain
+ * unchanged"). Migration 0114 closes that by composing the same two audited
+ * functions inside one `acc_delete_bank_transaction_with_void`, the shape
+ * `acc_delete_payment` (0106) already uses for a customer receipt.
  *
- * The window this leaves: if the void below succeeds and the delete that
- * follows then fails — realistically only a concurrent edit to this exact
- * row in the instant between the two calls — the entry stays voided and the
- * line survives as `unmatched` rather than the pre-click state. That is
- * disclosed, not hidden: the thrown message says so, and the row is left
- * exactly where a deliberate "Remove category" click already leaves it
- * today, so pressing Delete again finishes the job. Every other failure
- * path (permission, a closed period, a settlement, an import batch, a
- * short reason) fails inside the first call or before either runs, so nothing
- * changes.
+ * Every refusal now arrives from there in its own words — a settlement, a
+ * transactions-import batch, an entry something else owns, a closed period,
+ * a reason too short, an `ignored` line, a suggested match still open — so
+ * nothing is reworded on the way out.
  */
 export async function deleteBankTransactionWithVoid(
   sb: SupabaseClient,
   id: string,
   reason: string,
 ): Promise<void> {
-  const { data: txn, error: txnError } = await sb
-    .from("acc_bank_transaction")
-    .select("status")
-    .eq("id", id)
-    .single();
-  if (txnError) throw new BankingError(txnError.message);
-  const status = (txn as { status: string } | null)?.status;
-
-  if (status !== "matched") {
-    // Unmatched (nothing to void) or ignored (acc_delete_bank_transaction's
-    // own status check names it) both go straight to the existing delete.
-    await deleteBankTransaction(sb, id, reason);
-    return;
-  }
-
-  // A line settled against an invoice or bill carries an approved
-  // reconciliation with no journal_line_id at all — acc_uncategorise_bank_transaction
-  // only knows lines *it* can take back, and would answer "not categorised",
-  // which reads as if nothing had ever happened to this line. It has:
-  // naming the real reason is what a refusal owes the reader.
-  const { data: settled, error: settledError } = await sb
-    .from("acc_reconciliation")
-    .select("id")
-    .eq("bank_transaction_id", id)
-    .eq("status", "approved")
-    .is("journal_line_id", null)
-    .maybeSingle();
-  if (settledError) throw new BankingError(settledError.message);
-  if (settled) {
-    throw new BankingError(
-      "This line was settled against an invoice or bill. Remove that payment first, then delete the line.",
-    );
-  }
-
-  // Every other refusal — a transactions-import batch, a match owned by
-  // something else, a closed period — is already this function's own
-  // message; none of it is repeated here.
-  await uncategoriseBankTransaction(sb, id, reason);
-
-  try {
-    await deleteBankTransaction(sb, id, reason);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : "an unexpected error";
-    throw new BankingError(
-      `The journal entry was voided, but the line itself could not be deleted: ${detail} ` +
-        "The line is now unmatched and awaiting review — press Delete again once that is resolved.",
-    );
-  }
+  const { error } = await sb.rpc("acc_delete_bank_transaction_with_void", {
+    p_id: id,
+    p_reason: reason,
+  });
+  if (error) throw new BankingError(error.message);
 }
 
 export interface BankPostingRow {
