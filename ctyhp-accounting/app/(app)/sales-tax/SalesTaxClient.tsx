@@ -18,6 +18,11 @@ import {
   liabilityAction, recordTaxPaymentAction, voidTaxPaymentAction,
   createTaxCodeAction, updateTaxCodeAction, setTaxCodeActiveAction,
 } from "./actions";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const TAX_PAYMENTS_DEFAULT_PAGE_SIZE = 20;
 
 interface Props {
   initialFrom: string;
@@ -44,6 +49,7 @@ export default function SalesTaxClient(props: Props) {
   const [range, setRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs(props.initialFrom), dayjs(props.initialTo)]);
   const [liability, setLiability] = useState<SalesTaxLiability>(props.initialLiability);
   const [loading, setLoading] = useState(false);
+  const [paymentsPageSize, setPaymentsPageSize] = useState<number>(TAX_PAYMENTS_DEFAULT_PAGE_SIZE);
 
   async function reloadLiability(r: [dayjs.Dayjs, dayjs.Dayjs]) {
     setLoading(true);
@@ -221,7 +227,11 @@ export default function SalesTaxClient(props: Props) {
               rowKey="id"
               dataSource={props.payments}
               scroll={{ x: "max-content" }}
-              pagination={{ pageSize: 20 }}
+              pagination={clientTablePagination(
+                paymentsPageSize,
+                setPaymentsPageSize,
+                pageSizeOptionsFor(TAX_PAYMENTS_DEFAULT_PAGE_SIZE),
+              )}
               columns={[
                 { title: "Number", dataIndex: "payment_number", render: (v) => v ?? "—" },
                 { title: "Date", dataIndex: "payment_date" },

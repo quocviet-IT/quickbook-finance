@@ -519,7 +519,15 @@ body {
   padding: 10px 12px;
   margin-bottom: 16px;
   display: flex;
-  align-items: center;
+  /*
+   * Top, not centre.
+   *
+   * Centred, a one-row block of buttons is placed against the middle of a
+   * control block that has wrapped to three rows — which is how "157 results"
+   * came to sit in the middle of the second row on Bank Transactions, reading
+   * as though it belonged to the search box next to it.
+   */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   background: #ffffff;
@@ -538,6 +546,32 @@ body {
 .accounting-filter-bar__controls {
   min-width: 0;
   flex: 1 1 auto;
+}
+
+/*
+ * Two full-width tiers, for a bar with too many controls to sit beside its
+ * own buttons. Scope on the first row, finding within it on the second, and
+ * the actions beside the second — where there is room for them.
+ */
+.accounting-filter-bar--tiered {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.accounting-filter-bar__tier {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* Keeps the buttons level with the first row of controls rather than with
+   the top of the bar's padding. */
+.accounting-filter-bar__actions {
+  min-height: 32px;
+  align-items: center;
 }
 
 .accounting-filter-bar__actions {
@@ -582,6 +616,30 @@ body {
 
 .accounting-data-table .ant-table {
   border-radius: 10px;
+}
+
+/*
+ * Tables whose column widths the reader drags for themselves.
+ *
+ * rc-table writes `min-width: 100%` inline on the table element whenever
+ * horizontal scrolling is on, so a table narrower than its container is
+ * stretched to fill it — and under `table-layout: fixed` the browser shares
+ * that extra room out across every column in proportion. The effect is that
+ * narrowing one column widens all the others, which is the opposite of what
+ * REQ-01 asks for ("only the width of the intended column changes") and the
+ * opposite of the spreadsheet the reviewer was comparing us to.
+ *
+ * It has to be `!important`: the rule it overrides is an inline style, and
+ * the value is not configurable through any prop rc-table exposes.
+ *
+ * Opt-in, never global. A table sized by its contents should still fill the
+ * page; only one whose widths somebody chose on purpose should be held to
+ * exactly those numbers.
+ */
+.accounting-table--exact-widths .ant-table-header table,
+.accounting-table--exact-widths .ant-table-body table,
+.accounting-table--exact-widths .ant-table-content table {
+  min-width: 0 !important;
 }
 
 .accounting-data-table .ant-table-container {

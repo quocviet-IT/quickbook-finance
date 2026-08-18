@@ -11,7 +11,7 @@ import {
   type BankPostingRow,
   listBankStatementImports,
   undoBankStatementImport,
-  deleteBankTransaction,
+  deleteBankTransactionWithVoid,
   type BankStatementImportRow,
   listBankTransactions,
   generateSuggestions,
@@ -132,6 +132,14 @@ export async function undoStatementImportAction(
   }
 }
 
+/**
+ * Delete a bank line — Correction to RQ-06, 2026-08-17. When the line still
+ * carries the journal entry categorising it posted, the void of that entry and
+ * the removal of the line happen together in one database transaction
+ * (migration 0114), so the control works on a `matched` row, not only
+ * `unmatched`, and a refusal at any point leaves the books exactly as they
+ * were. See `deleteBankTransactionWithVoid`.
+ */
 export async function deleteBankTransactionAction(
   id: string,
   reason: string,
@@ -140,8 +148,9 @@ export async function deleteBankTransactionAction(
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    await deleteBankTransaction(sb, id, reason);
+    await deleteBankTransactionWithVoid(sb, id, reason);
     revalidatePath("/banking");
+    revalidatePath("/reports");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: msg(err) };
@@ -366,9 +375,59 @@ export async function settleFromBankTransactionAction(input: {
   }
 }
 
+// --- Batch Category / Account assignment (RQ-03 + RQ-05) --------------------
+
+export interface BatchCategoriseOutcome {
+  id: string;
+  ok: boolean;
+  entry_number?: string | null;
+  error?: string;
+}
+
 /**
- * Create a label, or reuse the one that already has this name.
+ * Post the same account against every eligible id in a selection, one line at
+ * a time, and report what happened to each.
  *
- * The name is trimmed here so the screen and the database agree on what was
- * typed; everything else about uniqueness belongs to `acc_upsert_bank_category`.
+ * There is no batch RPC and none is added here: `acc_categorise_bank_transaction`
+ * already does exactly what a batch action needs to do to a single line, and
+ * the review video asked for a fast way to run that over many lines, not a new
+ * posting rule. `categoriseBankTransaction` re-validates every row against the
+ * live database regardless of what the caller believed when the confirmation
+ * dialog opened, so a row categorised, matched, or deleted in the time between
+ * opening that dialog and clicking Save surfaces here as its own failure with
+ * its own real database message — not as a skip, and not swallowed.
+ *
+ * Sequential rather than concurrent: `acc_post_entry` assigns the next entry
+ * number from a shared sequence per call, and posting up to a hundred entries
+ * from one click is a few real seconds of work, not something to hide behind
+ * parallel requests racing that sequence.
+ *
+ * The permission check happens once here, not once per row inside a shared
+ * per-row action — a missing permission is a property of the caller, not of
+ * any one transaction, and checking it a hundred times would only slow the
+ * one failure every row would report identically.
  */
+export async function batchCategoriseBankTransactionsAction(
+  transactionIds: string[],
+  accountId: string,
+): Promise<ActionResult<{ outcomes: BatchCategoriseOutcome[] }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  if (!transactionIds.length) return { ok: false, error: "Select at least one transaction" };
+  if (!accountId) return { ok: false, error: "Select an account" };
+
+  const sb = await createSupabaseServerClient();
+  const outcomes: BatchCategoriseOutcome[] = [];
+  for (const id of transactionIds) {
+    try {
+      const posted = await categoriseBankTransaction(sb, id, accountId);
+      outcomes.push({ id, ok: true, entry_number: posted.entry_number });
+    } catch (err) {
+      outcomes.push({ id, ok: false, error: msg(err) });
+    }
+  }
+
+  revalidatePath("/banking");
+  revalidatePath("/reports");
+  return { ok: true, data: { outcomes } };
+}

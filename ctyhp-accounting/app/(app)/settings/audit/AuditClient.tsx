@@ -17,8 +17,13 @@ import {
 } from "@/lib/domain/audit";
 import { downloadCsvFile } from "@/lib/client/report-export";
 import { searchAuditAction } from "./actions";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 const ACTIONS = ["insert", "update", "delete", "post", "void"];
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const AUDIT_DEFAULT_PAGE_SIZE = 25;
 
 /**
  * A month is the unit an audit trail is reviewed in, so both the current and
@@ -45,6 +50,7 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
   const [recordId, setRecordId] = useState("");
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [includeHousekeeping, setIncludeHousekeeping] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(AUDIT_DEFAULT_PAGE_SIZE);
 
   const from = range ? range[0].format("YYYY-MM-DD") : null;
   const to = range ? range[1].format("YYYY-MM-DD") : null;
@@ -151,7 +157,7 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
         rowKey="id"
         dataSource={rows}
         loading={loading}
-        pagination={{ pageSize: 25 }}
+        pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(AUDIT_DEFAULT_PAGE_SIZE))}
         scroll={{ x: "max-content" }}
         locale={{ emptyText: ran ? "No matching audit entries" : "Set a filter and search" }}
         expandable={{

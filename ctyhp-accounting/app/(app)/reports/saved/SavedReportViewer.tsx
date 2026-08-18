@@ -8,6 +8,11 @@ import {
 } from "@/lib/domain/saved-reports";
 import type { SavedReportRow } from "@/lib/services/saved-reports";
 import { savedReportDownloadUrlAction, savedReportPreviewAction } from "./actions";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const PREVIEW_DEFAULT_PAGE_SIZE = 25;
 
 export interface SavedReportViewerProps {
   report: SavedReportRow | null;
@@ -42,6 +47,7 @@ interface LoadedPreview {
 export default function SavedReportViewer({ report, onClose }: SavedReportViewerProps) {
   const { message } = App.useApp();
   const [loaded, setLoaded] = useState<LoadedPreview | null>(null);
+  const [pageSize, setPageSize] = useState<number>(PREVIEW_DEFAULT_PAGE_SIZE);
   const tabular = Boolean(report) && isTabularSavedReport(report?.mime_type ?? "");
 
   useEffect(() => {
@@ -123,7 +129,7 @@ export default function SavedReportViewer({ report, onClose }: SavedReportViewer
               <Table<PreviewRow>
                 size="small"
                 rowKey={(item) => String(item.index)}
-                pagination={{ pageSize: 25 }}
+                pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PREVIEW_DEFAULT_PAGE_SIZE))}
                 scroll={{ x: true }}
                 dataSource={current.preview.rows.map((row, index) => ({ index, row }))}
                 columns={current.preview.headers.map((header, column) => ({

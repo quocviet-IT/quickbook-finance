@@ -287,6 +287,11 @@ export interface BankTransactionRow {
   id: string;
   bank_account_id: string;
   import_batch_id: string | null;
+  /** Set only by the Import Transactions feature (migration 0108); null for
+   *  every other line. That import's own Undo owns the entry it posted, so
+   *  Delete on Bank Transactions refuses a line that carries this rather
+   *  than voiding an entry something else is responsible for. */
+  transaction_batch_id: string | null;
   txn_date: string;
   description: string;
   reference: string | null;

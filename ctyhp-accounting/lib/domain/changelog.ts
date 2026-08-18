@@ -41,7 +41,7 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "1.23",
+    version: "1.34",
     date: "2026-08-17",
     headline:
       "Every company's books are snapshotted on a schedule, and a snapshot can be restored into a new company that proves itself.",
@@ -91,6 +91,330 @@ export const RELEASES: Release[] = [
           "gives back two identical files. That sameness is what lets a " +
           "Backups snapshot prove a restore came back whole.",
         route: "/settings/company",
+      },
+    ],
+  },
+  {
+    version: "1.33",
+    date: "2026-08-18",
+    headline: "Bank Transactions: the search box suggests as you type, and the filter bar is laid out in two clear rows.",
+    changes: [
+      {
+        kind: "added",
+        title: "The search box suggests what is actually there",
+        detail:
+          "Start typing and a list drops down of descriptions and " +
+          "references that really are in the list you are looking at, each " +
+          "with the number of lines behind it. Pick one and it fills the " +
+          "box. Nothing is ever suggested that would leave you with an " +
+          "empty table, because the suggestions come from the lines already " +
+          "narrowed by the account, status and posted-to filters. " +
+          "Descriptions shared by several lines come first — those are the " +
+          "ones that narrow anything; a wire description carries its own " +
+          "date and time and belongs to one line only.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "The filter bar is two rows instead of three ragged ones",
+        detail:
+          "Which lines you are looking at — account, status, posted to — is " +
+          "the first row. Finding one within them is the second: search, " +
+          "and an Amount button holding the exact and min/max boxes that " +
+          "used to sit out in the open. The Amount button carries a small " +
+          "count when it is filtering. The result count no longer floats in " +
+          "the middle of the bar, and the whole thing is shorter than it " +
+          "was.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.32",
+    date: "2026-08-18",
+    headline: "The Documents & Attachments heading no longer breaks apart on a long bank description.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A long transaction description broke the attachments heading",
+        detail:
+          "Opening the paperclip on a bank line whose description is a full " +
+          "wire message left the heading in pieces — the words " +
+          '"Documents", "&" and "Attachments" split across three lines with ' +
+          "the transaction text printed over the top of them. The " +
+          "description now sits on its own line under the heading, cut to " +
+          "the width of the panel, and hovering it shows the whole thing. " +
+          "This affects every screen with a paperclip, not only Banking.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.31",
+    date: "2026-08-18",
+    headline: "The General Ledger report now has the same draggable column edges as Bank Transactions.",
+    changes: [
+      {
+        kind: "added",
+        title: "Resize the General Ledger columns",
+        detail:
+          "Drag the line between two column headings to make a column wider " +
+          "or narrower — Memo especially, which holds the whole bank " +
+          "description and used to take whatever room was left after the " +
+          "other six columns. Narrow it and Debit, Credit and the running " +
+          "balance come into view instead of sitting off the right-hand " +
+          "edge. Widen it and the report scrolls sideways so you can read a " +
+          "long memo in full. Only the column you drag changes width; the " +
+          "others stay exactly where they were. Your widths are remembered " +
+          "on this computer.",
+        route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
+    version: "1.30",
+    date: "2026-08-18",
+    headline: "A bank transaction delete that fails now leaves the books untouched.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Deleting a categorized bank transaction is now all or nothing",
+        detail:
+          "Deleting a categorized line does two things: it voids the journal " +
+          "entry the categorizing posted, then removes the line. Until now " +
+          "those were two separate steps, and if the second was refused — a " +
+          "closed period, someone else editing the same line at that moment " +
+          "— the first had already happened: the entry stayed voided and the " +
+          "line came back as awaiting review. The message said so and asked " +
+          "you to press Delete again, but the books had still moved after a " +
+          "delete that failed. Both steps now happen together, so a refusal " +
+          "leaves the entry posted and the line exactly where it was. " +
+          "Nothing changes when the delete succeeds, and every refusal still " +
+          "names its own reason.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.29",
+    date: "2026-08-18",
+    headline: "Drag the edge of a column heading on Bank Transactions to make that column narrower or wider.",
+    changes: [
+      {
+        kind: "added",
+        title: "Resize a Bank Transactions column, the way a spreadsheet does",
+        detail:
+          "Put the pointer on the line between two column headings and it " +
+          "turns into a resize cursor; drag it left or right and only that " +
+          "column changes width. Description is the one this is for — it " +
+          "used to stretch to fit the longest bank description in the " +
+          "account, which pushed Amount, Category and Status off the right " +
+          "of the screen. Narrow it and they come back: the table itself " +
+          "gets narrower, so there is less to scroll past, not just a " +
+          "smaller column. Your widths are remembered on this computer and " +
+          "are still there the next time you sign in. Dragging the heading " +
+          "itself still moves the column, as it did before — the edge " +
+          "resizes, the middle moves.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Long descriptions and references are now cut to their column",
+        detail:
+          "A description or a reference longer than its column ends in an " +
+          "ellipsis, and hovering shows the whole thing. Before this, a " +
+          "36-character payment reference wrapped onto three lines and made " +
+          "every row in the table taller.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.28",
+    date: "2026-08-17",
+    headline: "Drag a column header on Bank Transactions to put it wherever you can see it.",
+    changes: [
+      {
+        kind: "added",
+        title: "Drag and drop to reorder Bank Transactions columns",
+        detail:
+          "Press and drag any column heading — Date, Description, Account " +
+          "source, Reference, Amount, Category, Match, or Status — to put " +
+          "it next to whatever you are comparing it against, the way a " +
+          "spreadsheet does. Every row's data moves with its column, so an " +
+          "amount can never land under the wrong heading. The " +
+          "row-selection checkbox and the Delete/attachment buttons at the " +
+          "right edge cannot be dragged and cannot be dropped on — only " +
+          "the eight data columns reorder. The order lasts for the " +
+          "current session only and resets the next time you sign in.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.27",
+    date: "2026-08-17",
+    headline: "Delete now works on a categorized Bank Transaction, not only an unreviewed one.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Delete a categorized bank transaction",
+        detail:
+          "Correction to a same-day decision: Delete used to appear only on " +
+          "a line still awaiting review, because categorizing posts a " +
+          "journal entry and a posted line could not be removed. On a " +
+          "company where every line had already been categorized, that " +
+          "left no row with a Delete button at all. Delete now appears on " +
+          "every row; on a categorized line it voids the journal entry " +
+          "categorizing it posted, then deletes the line — one confirmed " +
+          "click, with both effects named before anything happens and the " +
+          "entry's own number when one is known. Where the books genuinely " +
+          "refuse — a closed period, a line settled against an invoice or " +
+          "bill, a line matched by a transactions import or by something " +
+          "else — the button stays visible but disabled, with the real " +
+          "reason in its tooltip instead of a hidden control or a generic " +
+          "failure after the click.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.26",
+    date: "2026-08-17",
+    headline: "Select transactions on Bank Transactions and set their Category or Account all at once.",
+    changes: [
+      {
+        kind: "added",
+        title: "Select bank transactions and batch-assign Category or Account",
+        detail:
+          "A checkbox on each row and a Select all in the header (Select " +
+          "all covers the current page after filters, not every page). With " +
+          "one or more rows selected, Set Category and Set Account post the " +
+          "same account against every selected line that is still awaiting " +
+          "review. A row already matched or settled is left untouched and " +
+          "counted separately — the confirmation states how many rows will " +
+          "change and how many will be skipped and why before anything " +
+          "saves, and the result afterward names successes, failures, and " +
+          "skips, with the real reason behind each failure rather than a " +
+          "generic error.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.25",
+    date: "2026-08-17",
+    headline:
+      "The page-size bug fixed on Bank Transactions last release was also hiding on nine other screens — now fixed there too.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The page size you chose on the General Ledger report was ignored",
+        detail:
+          "Same bug as Bank Transactions in 1.23, on the report where a long " +
+          "run of activity matters most: picking 100 rows a page moved the " +
+          "dropdown but the table kept showing 50. All the size-changer " +
+          "choices now take effect.",
+        route: "/reports/general-ledger",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Fixed Assets was ignored",
+        detail:
+          "Both the asset register and the depreciation-schedule dialog you " +
+          "open from it kept the dropdown and the table out of sync the same " +
+          "way Bank Transactions did.",
+        route: "/fixed-assets",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on the Fixed Assets report was ignored",
+        detail: "Both the asset register and the depreciation views on this report.",
+        route: "/reports/fixed-assets",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Recurring was ignored",
+        detail: "Both the schedule list and its occurrence history below it.",
+        route: "/recurring",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on the Transactions report was ignored",
+        route: "/reports/transactions",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Pay Bills was ignored",
+        route: "/pay-bills",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on the Audit Trail was ignored",
+        route: "/settings/audit",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Approvals was ignored",
+        detail: "The Decided list, which is the one that grows.",
+        route: "/approvals",
+      },
+      {
+        kind: "fixed",
+        title: "The page size you chose on Payments was ignored",
+        route: "/payments",
+      },
+    ],
+  },
+  {
+    version: "1.24",
+    date: "2026-08-17",
+    headline: "Bank Transactions and the General Ledger can now be searched by keyword and filtered by amount.",
+    changes: [
+      {
+        kind: "added",
+        title: "Search and amount filters on Bank Transactions",
+        detail:
+          "A search box and three amount fields — Exact amount, Min amount, " +
+          "and Max amount — sit beside the account, status, and posted-to " +
+          "filters. Search matches Description and Reference. The amount " +
+          "fields match a transaction's size regardless of whether it was " +
+          "money in or money out — typing 1250 finds a $1,250.00 line " +
+          "whichever direction it moved, the same way the amount reads on a " +
+          "printed statement. All four filters combine, and clearing them " +
+          "returns the list to what it showed before.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Search and amount filters on the General Ledger report",
+        detail:
+          "The same search and amount filters are now available when " +
+          "reviewing an account's activity: search matches Entry number, " +
+          "Memo, and Source, and the amount fields match whichever of Debit " +
+          "or Credit a line carries. Filtering only changes which lines are " +
+          "shown — the Opening, Closing, and each line's running balance " +
+          "stay exactly as posted.",
+        route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
+    version: "1.23",
+    date: "2026-08-17",
+    headline: "Choosing 100 rows a page on Bank Transactions now actually shows 100 rows.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The page size you chose on Bank Transactions was ignored",
+        detail:
+          "Picking 50 or 100 rows a page moved the dropdown but left the " +
+          "table showing 25 — the size you picked was thrown away on the " +
+          "next redraw. All three sizes now take effect, the page count " +
+          "recalculates, and if the size you picked would leave you past the " +
+          "last page, you land on the last valid page instead of an empty " +
+          "one.",
+        route: "/banking",
       },
     ],
   },

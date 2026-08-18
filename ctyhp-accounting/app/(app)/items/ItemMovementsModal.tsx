@@ -4,6 +4,7 @@ import { App, Modal, Table, Tag } from "antd";
 import type { InventoryTxnRow, ItemRow } from "@/lib/db/types";
 import { listItemMovementsAction } from "./inventory-actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 const SOURCE_COLOR: Record<string, string> = {
   receipt: "green",
@@ -12,6 +13,10 @@ const SOURCE_COLOR: Record<string, string> = {
   adjustment: "purple",
   reversal: "red",
 };
+
+// See table-pagination.ts for why this has to live in state rather than as a
+// literal on `pagination`.
+const MOVEMENTS_DEFAULT_PAGE_SIZE = 20;
 
 interface Props {
   open: boolean;
@@ -29,6 +34,7 @@ function ItemMovementsModalBody({ item, onClose }: Props & { item: ItemRow }) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<InventoryTxnRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageSize, setPageSize] = useState<number>(MOVEMENTS_DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +58,7 @@ function ItemMovementsModalBody({ item, onClose }: Props & { item: ItemRow }) {
         size="small"
         loading={loading}
         dataSource={rows}
-        pagination={{ pageSize: 20 }}
+        pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(MOVEMENTS_DEFAULT_PAGE_SIZE))}
         scroll={{ x: "max-content" }}
         locale={{ emptyText: "No movements yet" }}
         columns={[

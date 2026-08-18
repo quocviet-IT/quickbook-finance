@@ -63,10 +63,12 @@ describe("the banking category column", () => {
   });
 
   it("lets the list be narrowed by the account posted to, and to the lines with none", () => {
-    const client = read("BankingClient.tsx");
-    expect(client).toContain("All accounts posted to");
-    expect(client).toContain("Not categorised yet");
-    expect(client).toContain("getBankPostingsAction");
+    // The control moved into BankTransactionsFilters when the bar was rebuilt
+    // in two tiers; the data it filters on is still fetched by the client.
+    const filters = read("BankTransactionsFilters.tsx");
+    expect(filters).toContain("All accounts posted to");
+    expect(filters).toContain("Not categorised yet");
+    expect(read("BankingClient.tsx")).toContain("getBankPostingsAction");
   });
 
   it("never touches the feed's own category through this column", () => {

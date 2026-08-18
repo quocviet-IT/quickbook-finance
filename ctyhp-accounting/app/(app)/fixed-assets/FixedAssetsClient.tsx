@@ -61,6 +61,7 @@ import { calculateAssetDisposal } from "@/lib/domain/fixed-assets";
 import { parseCsv } from "@/lib/csv";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { TOKENS } from "@/lib/design/tokens";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import {
   disposeFixedAssetAction,
   getAssetScheduleAction,
@@ -94,6 +95,11 @@ const SCHEDULE_STATUS: Record<string, { label: string; color: string }> = {
   posted: { label: "Posted", color: "green" },
   cancelled: { label: "Cancelled", color: "default" },
 };
+
+// Rows a page for the two tables on this screen. See table-pagination.ts for
+// why these have to live in state rather than as literals on `pagination`.
+const ASSET_REGISTER_DEFAULT_PAGE_SIZE = 20;
+const DEPRECIATION_SCHEDULE_DEFAULT_PAGE_SIZE = 12;
 
 interface AssetFormValues {
   name: string;
@@ -240,6 +246,10 @@ export default function FixedAssetsClient({
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<FixedAssetStatus | "all">("all");
+  const [registerPageSize, setRegisterPageSize] = useState<number>(ASSET_REGISTER_DEFAULT_PAGE_SIZE);
+  const [schedulePageSize, setSchedulePageSize] = useState<number>(
+    DEPRECIATION_SCHEDULE_DEFAULT_PAGE_SIZE,
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [billLoading, setBillLoading] = useState(false);
@@ -943,7 +953,11 @@ export default function FixedAssetsClient({
         }
         columns={columns}
         dataSource={filteredAssets}
-        pagination={{ pageSize: 20 }}
+        pagination={clientTablePagination(
+          registerPageSize,
+          setRegisterPageSize,
+          pageSizeOptionsFor(ASSET_REGISTER_DEFAULT_PAGE_SIZE),
+        )}
         scroll={{ x: 1450 }}
         sticky
         emptyTitle="No fixed assets"
@@ -1209,7 +1223,11 @@ export default function FixedAssetsClient({
           columns={scheduleColumns}
           dataSource={schedule}
           loading={scheduleLoading}
-          pagination={{ pageSize: 12 }}
+          pagination={clientTablePagination(
+            schedulePageSize,
+            setSchedulePageSize,
+            pageSizeOptionsFor(DEPRECIATION_SCHEDULE_DEFAULT_PAGE_SIZE),
+          )}
           scroll={{ x: 780 }}
           emptyTitle="No depreciation schedule"
           emptyDescription="This asset is configured as non-depreciable."

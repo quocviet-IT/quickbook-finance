@@ -2,12 +2,18 @@
 import { useState } from "react";
 import { App, Alert, Input, Modal, Space } from "antd";
 import { deleteBankTransactionAction } from "./actions";
+import type { BankTransactionDeleteEligibility } from "@/lib/domain/bank-transaction-delete";
 
 export interface DeleteBankLineTarget {
   id: string;
   txnDate: string;
   description: string;
   amount: string;
+  /** Computed by the table when the control was clicked — see
+   *  lib/domain/bank-transaction-delete.ts. Only "delete_only" and
+   *  "void_then_delete" ever reach here; a "blocked" row's control is
+   *  disabled rather than wired to open this dialog. */
+  eligibility: BankTransactionDeleteEligibility;
 }
 
 export interface DeleteBankLineModalProps {
@@ -17,13 +23,18 @@ export interface DeleteBankLineModalProps {
 }
 
 /**
- * Removing one bank line for good.
+ * Removing one bank line for good — and, when the line was categorised,
+ * taking back the journal entry categorising it posted, first.
  *
- * A bank line is not a document and has no number, so deleting one leaves no
- * hole in a sequence — but it is still the only delete in this screen, and the
- * reason is kept in the audit log rather than thrown away. The database refuses
- * anything that is not `unmatched`; this dialog does not try to guess ahead of
- * it, it reports what it is told.
+ * Correction to RQ-06, 2026-08-17: a Delete that only ever worked on an
+ * `unmatched` row was invisible on every row for the company that asked for
+ * it, because categorising posts a journal entry and every one of theirs had
+ * been categorised. One confirmed click now does both steps when a row needs
+ * both — void, then delete — and this dialog names both effects before
+ * either happens, with the entry's own number when one is known. Both steps
+ * run inside one database transaction (migration 0114), so the two effects
+ * named here either both happen or neither does; what actually runs is
+ * documented on `deleteBankTransactionWithVoid` in lib/services/banking.ts.
  */
 export default function DeleteBankLineModal({
   target,
@@ -33,6 +44,9 @@ export default function DeleteBankLineModal({
   const { message } = App.useApp();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const willVoid = target?.eligibility.kind === "void_then_delete";
+  const entryNumber = target?.eligibility.kind === "void_then_delete" ? target.eligibility.entryNumber : null;
 
   const close = () => {
     setReason("");
@@ -48,7 +62,11 @@ export default function DeleteBankLineModal({
       message.error(result.error ?? "Could not delete this line");
       return;
     }
-    message.success("Bank transaction deleted");
+    message.success(
+      willVoid
+        ? `Voided ${entryNumber ?? "the journal entry"} and deleted the bank transaction`
+        : "Bank transaction deleted",
+    );
     setReason("");
     onDeleted();
   };
@@ -70,7 +88,13 @@ export default function DeleteBankLineModal({
           type="warning"
           showIcon
           message="This cannot be undone"
-          description="The line is removed from the bank register. Nothing in the ledger changes — an unmatched line has not been posted — and the deletion is recorded in the audit log."
+          description={
+            willVoid
+              ? `This voids ${entryNumber ?? "the journal entry"} this line posted, and removes ` +
+                "the line from the bank register. Both steps are recorded in the audit log."
+              : "The line is removed from the bank register. Nothing in the ledger changes — an " +
+                "unmatched line has not been posted — and the deletion is recorded in the audit log."
+          }
         />
         <Input.TextArea
           rows={2}

@@ -27,6 +27,7 @@ import type {
 import type { ReportExportSheet } from "@/lib/domain/report-export";
 import { formatMoney } from "@/lib/format";
 import { TOKENS } from "@/lib/design/tokens";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 type ReportView = "register" | "depreciation";
 type DateRange = [Dayjs | null, Dayjs | null] | null;
@@ -43,6 +44,11 @@ const SCHEDULE_STATUS: Record<string, { label: string; color: string }> = {
   posted: { label: "Posted", color: "green" },
   cancelled: { label: "Cancelled", color: "default" },
 };
+
+// Rows a page for the two tables on this screen. See table-pagination.ts for
+// why these have to live in state rather than as literals on `pagination`.
+const ASSET_REGISTER_DEFAULT_PAGE_SIZE = 25;
+const DEPRECIATION_DEFAULT_PAGE_SIZE = 25;
 
 export default function FixedAssetReportClient({
   assets,
@@ -61,6 +67,10 @@ export default function FixedAssetReportClient({
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState<FixedAssetStatus | "all">("all");
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  const [assetsPageSize, setAssetsPageSize] = useState<number>(ASSET_REGISTER_DEFAULT_PAGE_SIZE);
+  const [depreciationPageSize, setDepreciationPageSize] = useState<number>(
+    DEPRECIATION_DEFAULT_PAGE_SIZE,
+  );
   const money = (value: number) => formatMoney(value, currencyCode, currencyDecimals);
 
   const categories = useMemo(
@@ -421,7 +431,11 @@ export default function FixedAssetReportClient({
             rowKey="id"
             columns={assetColumns}
             dataSource={filteredAssets}
-            pagination={{ pageSize: 25 }}
+            pagination={clientTablePagination(
+              assetsPageSize,
+              setAssetsPageSize,
+              pageSizeOptionsFor(ASSET_REGISTER_DEFAULT_PAGE_SIZE),
+            )}
             scroll={{ x: 1280 }}
             emptyTitle="No assets match the report filters"
           />
@@ -453,7 +467,11 @@ export default function FixedAssetReportClient({
             rowKey="id"
             columns={depreciationColumns}
             dataSource={filteredDepreciation}
-            pagination={{ pageSize: 25 }}
+            pagination={clientTablePagination(
+              depreciationPageSize,
+              setDepreciationPageSize,
+              pageSizeOptionsFor(DEPRECIATION_DEFAULT_PAGE_SIZE),
+            )}
             scroll={{ x: 980 }}
             emptyTitle="No depreciation rows match the report filters"
           />

@@ -24,13 +24,15 @@ import {
   PlusOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import FilterBar from "@/components/ui/FilterBar";
+import BankTransactionsFilters, { ALL_ACCOUNTS } from "./BankTransactionsFilters";
 import { EmptyState } from "@/components/ui/PageStates";
 import BankTransactionsTable from "./BankTransactionsTable";
 import BankImportList from "./BankImportList";
 import DeleteBankLineModal, {
   type DeleteBankLineTarget,
 } from "./DeleteBankLineModal";
+import BatchAssignAccountModal, { type BatchAssignTarget } from "./BatchAssignAccountModal";
+import { pruneSelection } from "@/lib/domain/bank-transaction-batch";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
@@ -57,6 +59,11 @@ import type {
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
+import {
+  filterBankTransactions,
+  parseAmountFilterInput,
+  type AmountFilter,
+} from "@/lib/domain/transaction-filter";
 import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import {
@@ -108,9 +115,6 @@ declare global {
     };
   }
 }
-
-/** Sentinel account id for the queue that spans every connected account. */
-const ALL_ACCOUNTS = "__all__";
 
 type ReviewRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -182,6 +186,13 @@ export default function BankingClient({
   const [transactionStatus, setTransactionStatus] = useState<"all" | BankTxnStatus>(
     initialQueueStatus ?? "all",
   );
+  // Keyword and amount (RQ-02): raw text kept separate from the parsed
+  // AmountFilter so a half-typed number ("12" on the way to "125.00") shows
+  // in the box as typed rather than fighting a parse failure every keystroke.
+  const [keyword, setKeyword] = useState("");
+  const [exactAmountText, setExactAmountText] = useState("");
+  const [minAmountText, setMinAmountText] = useState("");
+  const [maxAmountText, setMaxAmountText] = useState("");
   const [txns, setTxns] = useState<BankTransactionRow[]>([]);
   // What each matched line was posted to. Fetched beside the transactions so
   // the Category column can show the answer instead of asking over the top of
@@ -196,6 +207,12 @@ export default function BankingClient({
   // Bumped after an import so the register below picks the new batch up.
   const [importsKey, setImportsKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<DeleteBankLineTarget | null>(null);
+  // RQ-03: the raw picks a reader has made. Never read directly — always
+  // through the `selectedIds` projection below, which is what stays true to
+  // "must not keep rows that have dropped out of the filtered set" on every
+  // render rather than only after some effect catches up.
+  const [rawSelectedIds, setRawSelectedIds] = useState<string[]>([]);
+  const [batchTarget, setBatchTarget] = useState<BatchAssignTarget | null>(null);
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
@@ -230,6 +247,19 @@ export default function BankingClient({
   );
   const decimalsOf = (code: string) => currencies.find((currency) => currency.code === code)?.decimal_places ?? 2;
   const decimalPlaces = selected ? decimalsOf(selected.currency_code) : 2;
+  // The amount boxes are parsed with the selected account's own currency
+  // decimals (2 for USD, which is every account this product supports today
+  // — see decimalPlaces above). The all-accounts queue can in principle mix
+  // currencies with different decimal places; this filter does not attempt
+  // cross-currency amount matching, the same simplification the CSV importer
+  // above already makes with this same decimalPlaces value.
+  const amountFilter: AmountFilter = {
+    exactMinor: parseAmountFilterInput(exactAmountText, decimalPlaces),
+    minMinor: parseAmountFilterInput(minAmountText, decimalPlaces),
+    maxMinor: parseAmountFilterInput(maxAmountText, decimalPlaces),
+  };
+  const hasKeywordOrAmountFilter =
+    keyword.trim() !== "" || exactAmountText.trim() !== "" || minAmountText.trim() !== "" || maxAmountText.trim() !== "";
   /**
    * A row's own currency, not the screen's. The all-accounts queue holds several
    * at once, and a card line formatted as dollars is a wrong number on screen.
@@ -532,17 +562,36 @@ export default function BankingClient({
     return postings.get(transaction.id)?.account_id === postedToFilter;
   });
 
+  // RQ-02: keyword (Description, Reference) and amount, composed with the
+  // account/status/posted-to filters above rather than replacing them — all
+  // four narrow the same in-browser `txns` array, which holds every
+  // transaction for the selection, not just the rows the paginator currently
+  // shows.
+  const keywordAndAmountFiltered = filterBankTransactions(categorized, keyword, amountFilter);
+
   // Each row carries the account it came from, that account's currency, and its
   // best suggested match — so one table can answer what a line is and where it
   // came from without sending anyone to a second screen.
   const reviewRows = buildBankReviewRows(
-    categorized,
+    keywordAndAmountFiltered,
     suggestions,
     bankAccounts.map((account) => ({
       id: account.id,
       name: `${account.bank_name || account.account_name} · ${account.account_code}`,
       currency_code: account.currency_code,
     })),
+  );
+
+  // RQ-03: dropped the instant a row is no longer reachable through the
+  // current account/status/posted-to/keyword/amount filters, kept if it is
+  // merely on a different page of the same filtered set — see
+  // lib/domain/bank-transaction-batch.ts for why turning the page is not
+  // treated the same as narrowing a filter. Recomputed on every render
+  // rather than synced through an effect, so there is never a render where a
+  // filtered-out id is still counted as selected.
+  const selectedIds = pruneSelection(
+    rawSelectedIds,
+    reviewRows.map((row) => row.transaction.id),
   );
 
   return (
@@ -588,7 +637,7 @@ export default function BankingClient({
         ) : null}
       </Card>
 
-      <FilterBar
+      <BankTransactionsFilters
         resultCount={reviewRows.length}
         actions={
           canWrite ? (
@@ -641,59 +690,33 @@ export default function BankingClient({
             </Space>
           ) : null
         }
-      >
-        <Space wrap>
-          <Select
-            style={{ minWidth: 280 }}
-            value={selectedId}
-            onChange={setSelectedId}
-            options={[
-              { value: ALL_ACCOUNTS, label: `All accounts (${bankAccounts.length})` },
-              ...bankAccounts.map((account) => ({
-                value: account.id,
-                label: `${account.bank_name || account.account_name} · ${account.account_code} (${account.currency_code})`,
-              })),
-            ]}
-          />
-          <Select
-            aria-label="Filter bank transactions by status"
-            value={transactionStatus}
-            onChange={(value) => setTransactionStatus(value)}
-            style={{ minWidth: 150 }}
-            options={[
-              { value: "all", label: "All statuses" },
-              { value: "unmatched", label: `For review${unmatchedCount ? ` (${unmatchedCount})` : ""}` },
-              { value: "matched", label: "Matched" },
-              { value: "ignored", label: "Excluded" },
-            ]}
-          />
-          <Select
-            showSearch
-            aria-label="Filter bank transactions by the account they were posted to"
-            value={postedToFilter}
-            onChange={setPostedToFilter}
-            style={{ minWidth: 220 }}
-            optionFilterProp="label"
-            options={[
-              { value: "all", label: "All accounts posted to" },
-              { value: "none", label: "Not categorised yet" },
-              // Only accounts these lines actually use: the whole chart here
-              // would be a list of things that filter to nothing.
-              ...[...new Map([...postings.values()].map((p) => [p.account_id, p])).values()]
-                .sort((a, b) => a.account_code.localeCompare(b.account_code))
-                .map((p) => ({
-                  value: p.account_id,
-                  label: `${p.account_code} — ${p.account_name}`,
-                })),
-            ]}
-          />
-          {suggestions.length ? (
-            <Typography.Text type="secondary">
-              {suggestions.length} suggested match{suggestions.length > 1 ? "es" : ""} in the Match column
-            </Typography.Text>
-          ) : null}
-        </Space>
-      </FilterBar>
+        bankAccounts={bankAccounts}
+        selectedId={selectedId}
+        onSelectedId={setSelectedId}
+        transactionStatus={transactionStatus}
+        onTransactionStatus={setTransactionStatus}
+        unmatchedCount={unmatchedCount}
+        postedToFilter={postedToFilter}
+        onPostedTo={setPostedToFilter}
+        postings={postings}
+        keyword={keyword}
+        onKeyword={setKeyword}
+        suggestionRows={categorized}
+        exactAmountText={exactAmountText}
+        onExactAmount={setExactAmountText}
+        minAmountText={minAmountText}
+        onMinAmount={setMinAmountText}
+        maxAmountText={maxAmountText}
+        onMaxAmount={setMaxAmountText}
+        hasFindFilter={hasKeywordOrAmountFilter}
+        onClearFind={() => {
+          setKeyword("");
+          setExactAmountText("");
+          setMinAmountText("");
+          setMaxAmountText("");
+        }}
+        suggestedMatchCount={suggestions.length}
+      />
 
       <BankTransactionsTable
         rows={reviewRows}
@@ -709,19 +732,40 @@ export default function BankingClient({
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}
-        onDelete={(row) =>
+        onDelete={(row, eligibility) => {
+          // The control is disabled whenever eligibility.kind is "blocked",
+          // so this only fires for "delete_only" or "void_then_delete" in
+          // practice; the check is defense in depth, not the real gate.
+          if (eligibility.kind === "blocked") return;
           setDeleteTarget({
             id: row.transaction.id,
             txnDate: row.transaction.txn_date,
             description: row.transaction.description,
             amount: rowMoney(row),
-          })
-        }
+            eligibility,
+          });
+        }}
         onAttachments={(row) =>
           setAttachmentTarget({
             entityType: "bank_transaction",
             entityId: row.transaction.id,
             label: `${row.transaction.txn_date} · ${row.transaction.description}`,
+          })
+        }
+        selectedIds={selectedIds}
+        onSelectionChange={setRawSelectedIds}
+        onBatchAssign={(kind) =>
+          setBatchTarget({
+            kind,
+            rows: reviewRows
+              .filter((row) => selectedIds.includes(row.transaction.id))
+              .map((row) => ({
+                id: row.transaction.id,
+                status: row.transaction.status,
+                txnDate: row.transaction.txn_date,
+                description: row.transaction.description,
+                amount: rowMoney(row),
+              })),
           })
         }
       />
@@ -746,6 +790,21 @@ export default function BankingClient({
         onDeleted={() => {
           setDeleteTarget(null);
           setImportsKey((count) => count + 1);
+          reload();
+        }}
+      />
+
+      <BatchAssignAccountModal
+        target={batchTarget}
+        accounts={postableAccounts}
+        onClose={() => setBatchTarget(null)}
+        onDone={(succeededIds) => {
+          setBatchTarget(null);
+          // Only the rows that actually changed drop out of the selection —
+          // a skipped or failed row stays checked, so a partial result leaves
+          // something to act on rather than a count nobody can trace back to
+          // a row.
+          setRawSelectedIds((current) => current.filter((id) => !succeededIds.includes(id)));
           reload();
         }}
       />

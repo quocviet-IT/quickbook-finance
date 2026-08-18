@@ -7,8 +7,11 @@ import Link from "next/link";
 import DataTable from "@/components/ui/DataTable";
 import { dateColumn, statusColumn, actionsColumn } from "@/components/ui/columns";
 import { longTextColumn } from "@/components/ui/long-text-column";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
 import { downloadBackupAction, type BackupRow } from "./actions";
+
+const BACKUPS_DEFAULT_PAGE_SIZE = 30;
 
 export default function BackupsClient({
   backups,
@@ -24,6 +27,11 @@ export default function BackupsClient({
   // vice versa) — each row's own request is what should own its own row's
   // loading state.
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  // Held in state, never written as a literal on the pagination prop:
+  // Ant Design treats a defined pageSize as controlled, so a literal pins
+  // the table back to that number on every render — the size changer moves
+  // and the table does not.
+  const [pageSize, setPageSize] = useState<number>(BACKUPS_DEFAULT_PAGE_SIZE);
 
   // Wrapped the same way app/(app)/reports/saved/SavedReportViewer.tsx wraps
   // its own download handler: this assigns window.location.href, and the
@@ -118,7 +126,11 @@ export default function BackupsClient({
         rowKey="id"
         columns={columns}
         dataSource={backups}
-        pagination={{ pageSize: 30 }}
+        pagination={clientTablePagination(
+          pageSize,
+          setPageSize,
+          pageSizeOptionsFor(BACKUPS_DEFAULT_PAGE_SIZE),
+        )}
       />
     </Space>
   );

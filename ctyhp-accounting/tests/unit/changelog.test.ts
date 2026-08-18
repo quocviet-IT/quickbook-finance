@@ -107,9 +107,14 @@ describe("RELEASES", () => {
     // Scoped to the specific "Restore a snapshot as a new company" entry, so
     // this fails only if that entry drops the fact — not if the phrase
     // happens to survive somewhere unrelated in the file.
-    const release = RELEASES.find((r) => r.version === "1.23");
-    const change = release?.changes.find((c) => c.title === "Restore a snapshot as a new company");
-    expect(change, "1.23 has no 'Restore a snapshot as a new company' entry").toBeDefined();
+    // Found by its own title across every release, not by a version number:
+    // the number this shipped under moved once already when the branch was
+    // brought up to date with main, and a test that breaks on a renumber is
+    // guarding the wrong thing.
+    const change = RELEASES.flatMap((r) => r.changes).find(
+      (c) => c.title === "Restore a snapshot as a new company",
+    );
+    expect(change, "no 'Restore a snapshot as a new company' entry in any release").toBeDefined();
     expect(change?.detail ?? "").toMatch(/taxpayer identification/i);
   });
 
@@ -117,9 +122,10 @@ describe("RELEASES", () => {
     // Ties to the specific fix entry by its route, not a text search over the
     // whole release, so renaming or deleting this particular change (the
     // production edit that matters) is what makes this fail.
-    const release = RELEASES.find((r) => r.version === "1.23");
-    const change = release?.changes.find((c) => c.route === "/settings/company");
-    expect(change, "1.23 has no change routed at /settings/company").toBeDefined();
+    const change = RELEASES.flatMap((r) => r.changes).find(
+      (c) => c.route === "/settings/company" && /identical/i.test(c.title),
+    );
+    expect(change, "no /settings/company change about identical exports").toBeDefined();
     expect(change?.title ?? "").toMatch(/identical/i);
     expect(change?.detail ?? "").toMatch(/declared order|fixed reading order|fixed order/i);
   });
