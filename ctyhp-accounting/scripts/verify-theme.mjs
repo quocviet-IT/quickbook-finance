@@ -209,6 +209,14 @@ for (const route of ROUTES) {
   checked += 1;
 
   if (mode === "dark") {
+    // Ask for dark the same way the toggle will, rather than relying on the
+    // browser's colour-scheme preference. The stylesheet selects dark on
+    // `:root[data-theme="dark"]` and on nothing else — deliberately, so a
+    // reader's choice can beat the operating system's — which means an audit
+    // that only set `colorScheme: dark` would measure the light theme and
+    // report no progress however much had been converted.
+    await page.evaluate(`document.documentElement.setAttribute("data-theme", "dark")`);
+    await page.waitForTimeout(200);
     const found = await auditDark(page);
     if (found.length) {
       problems += found.length;
