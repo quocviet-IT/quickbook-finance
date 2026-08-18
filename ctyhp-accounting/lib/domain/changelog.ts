@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.32",
+    date: "2026-08-18",
+    headline: "The Documents & Attachments heading no longer breaks apart on a long bank description.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A long transaction description broke the attachments heading",
+        detail:
+          "Opening the paperclip on a bank line whose description is a full " +
+          "wire message left the heading in pieces — the words " +
+          '"Documents", "&" and "Attachments" split across three lines with ' +
+          "the transaction text printed over the top of them. The " +
+          "description now sits on its own line under the heading, cut to " +
+          "the width of the panel, and hovering it shows the whole thing. " +
+          "This affects every screen with a paperclip, not only Banking.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.31",
     date: "2026-08-18",
     headline: "The General Ledger report now has the same draggable column edges as Bank Transactions.",

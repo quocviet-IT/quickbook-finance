@@ -350,13 +350,51 @@ export default function AttachmentDrawer({
         onClose={closeDrawer}
         width={600}
         destroyOnHidden
+        /*
+         * The record's label belongs under the heading, not opposite it.
+         *
+         * It used to be this drawer's `extra`, and a bank line whose
+         * description is a 240-character wire message broke the header
+         * outright — reported with a screenshot reading "Documents", then the
+         * wire text, then "&", then "Attachments", the heading in pieces with
+         * the label printed across it. Ant Design styles `.ant-drawer-extra`
+         * as `flex: none` and `.ant-drawer-header-title` as `flex: 1;
+         * min-width: 0`, so inside a 600px drawer the label took all 1,729px
+         * it asked for and the heading was left with none.
+         *
+         * Under the heading it has the drawer's full width: one line, cut
+         * with an ellipsis, whole text on hover.
+         *
+         * `styles.title` is load-bearing and has to be on that element, not
+         * on anything inside it. `.ant-drawer-title` is a flex item that
+         * Ant Design gives `flex: 1` and no `min-width`, so it inherits
+         * `min-width: auto` — the min-content width of its contents. A
+         * `white-space: nowrap` label makes that the label's full length, so
+         * the element refuses to shrink and the ellipsis inside it never has
+         * anything to clip against. Measured with the override one level too
+         * deep: the heading recovered to 552px but `.ant-drawer-title` still
+         * measured 1,605px and the header still overflowed by 1,061px.
+         */
+        styles={{ title: { minWidth: 0 } }}
         title={
-          <Space>
-            <PaperClipOutlined />
-            <span>Documents & Attachments</span>
-          </Space>
+          <div>
+            <Space>
+              <PaperClipOutlined />
+              <span>Documents & Attachments</span>
+            </Space>
+            {target ? (
+              <Tooltip title={target.label} placement="bottomLeft" styles={{ root: { maxWidth: 640 } }}>
+                <Typography.Text
+                  type="secondary"
+                  ellipsis
+                  style={{ display: "block", fontSize: 13, fontWeight: 400, lineHeight: 1.5 }}
+                >
+                  {target.label}
+                </Typography.Text>
+              </Tooltip>
+            ) : null}
+          </div>
         }
-        extra={target ? <Typography.Text type="secondary">{target.label}</Typography.Text> : null}
         className="document-attachment-drawer"
       >
         <Alert
