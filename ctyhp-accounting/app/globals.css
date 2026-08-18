@@ -36,6 +36,41 @@
   --ob-series-grid: #e2e8f0;
 }
 
+:root[data-theme="dark"] {
+  --ob-money-positive: #4ade80;
+  --ob-money-negative: #f87171;
+  --ob-money-zero: #94a3b8;
+  --ob-intent-primary: #2dd4bf;
+  --ob-intent-success: #4ade80;
+  --ob-intent-warning: #fbbf24;
+  --ob-intent-danger: #f87171;
+  --ob-intent-info: #60a5fa;
+  --ob-text-heading: #f1f5f9;
+  --ob-text-body: #e2e8f0;
+  --ob-text-secondary: #94a3b8;
+  --ob-text-onDark: #ffffff;
+  --ob-surface-page: #0b1220;
+  --ob-surface-card: #131c2e;
+  --ob-surface-muted: #1b2740;
+  --ob-surface-sider: #0a101c;
+  --ob-border-default: #2a3854;
+  --ob-border-subtle: #1b2740;
+  --ob-series-sales: #2dd4bf;
+  --ob-series-purchases: #c4b5fd;
+  --ob-series-inventory: #38bdf8;
+  --ob-series-banking: #60a5fa;
+  --ob-series-close: #fb923c;
+  --ob-series-governance: #94a3b8;
+  --ob-series-other: #94a3b8;
+  --ob-series-income: #2dd4bf;
+  --ob-series-expense: #fb923c;
+  --ob-series-net: #60a5fa;
+  --ob-series-receivable: #2dd4bf;
+  --ob-series-payable: #c4b5fd;
+  --ob-series-axis: #94a3b8;
+  --ob-series-grid: #2a3854;
+}
+
 html,
 body {
   padding: 0;

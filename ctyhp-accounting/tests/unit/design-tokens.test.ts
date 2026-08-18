@@ -79,15 +79,36 @@ function contrastRatio(a: string, b: string): number {
 }
 
 describe("colour contrast", () => {
-  it("meets WCAG AA 4.5:1 for every text-on-surface pair", () => {
-    const failures = TEXT_ON_SURFACE_PAIRS.map(([textPath, surfacePath]) => {
-      const ratio = contrastRatio(resolveToken(textPath), resolveToken(surfacePath));
-      // Compare the true ratio and round only for the message. Rounding first
-      // would let a pair at 4.4951 read as 4.50 and pass, quietly lowering the
-      // one threshold this test exists to hold.
-      return { pair: `${textPath} on ${surfacePath}`, ratio, shown: ratio.toFixed(2) };
-    }).filter((row) => row.ratio < 4.5);
-    expect(failures).toEqual([]);
+  // Both themes, from one list. The dark values exist precisely because the
+  // light ones cannot be reused — `intent.primary` is 5.4:1 on white and
+  // 2.3:1 on a dark card — so a dark set that were never held to the same
+  // threshold would be a guess wearing a type.
+  for (const theme of ["light", "dark"] as const) {
+    it(`meets WCAG AA 4.5:1 for every text-on-surface pair in ${theme}`, () => {
+      const failures = TEXT_ON_SURFACE_PAIRS.map(([textPath, surfacePath]) => {
+        const ratio = contrastRatio(
+          resolveToken(textPath, theme),
+          resolveToken(surfacePath, theme),
+        );
+        // Compare the true ratio and round only for the message. Rounding first
+        // would let a pair at 4.4951 read as 4.50 and pass, quietly lowering the
+        // one threshold this test exists to hold.
+        return { pair: `${textPath} on ${surfacePath}`, ratio, shown: ratio.toFixed(2) };
+      }).filter((row) => row.ratio < 4.5);
+      expect(failures).toEqual([]);
+    });
+  }
+
+  it("gives every token a dark value, and a different one where it matters", () => {
+    // A dark map that silently fell back to a light value would pass the
+    // contrast test for anything not in TEXT_ON_SURFACE_PAIRS and paint a
+    // white card in a dark theme. Surfaces are the ones that must move.
+    for (const [path] of flattenTokens()) {
+      expect(resolveToken(path, "dark"), path).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+    for (const path of ["surface.page", "surface.card", "surface.muted", "text.heading"]) {
+      expect(resolveToken(path, "dark"), path).not.toBe(resolveToken(path, "light"));
+    }
   });
 
   it("checks a meaningful number of pairs", () => {

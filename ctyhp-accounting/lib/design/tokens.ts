@@ -1,8 +1,20 @@
 import { PALETTE } from "./palette";
 
 /**
- * What each colour is *for*. This is the single definition the Ant Design
- * theme, the CSS custom properties and every component all derive from.
+ * What each colour is *for*, in both themes. This is the single definition the
+ * Ant Design theme, the CSS custom properties and every component all derive
+ * from.
+ *
+ * Every token carries a `light` and a `dark` value. They are not computed from
+ * one another: a dark theme is not an inverted light one. `intent.primary`
+ * reads at 5.4:1 on white and would be 2.3:1 on a dark surface — under AA —
+ * so dark names a lighter teal instead. Which pairs must clear AA is asserted
+ * in TEXT_ON_SURFACE_PAIRS below, for both themes.
+ *
+ * **Every light value is unchanged from before the theme switch.** The light
+ * theme works; a conversion that shifted it would have traded a feature for a
+ * defect. `scripts/verify-theme.mjs --compare` holds that to the colours the
+ * app actually paints, route by route.
  *
  * The three groups answer different questions and must not be collapsed:
  *   * `money` / `intent` / `text` / `surface` / `border` carry meaning, so two
@@ -43,7 +55,9 @@ export const TOKENS = {
   },
   // Chart series. Values are carried across unchanged from the two maps that
   // previously defined them by hand (DashboardClient and FinancialCharts);
-  // choosing a validated categorical scale is a separate decision.
+  // choosing a validated categorical scale is a separate decision. The dark
+  // entries lift each hue off a dark canvas without changing which hue means
+  // what, so a reader who learned the light chart can read the dark one.
   series: {
     sales: PALETTE.teal700,
     purchases: PALETTE.violet600,
@@ -62,7 +76,68 @@ export const TOKENS = {
   },
 } as const;
 
+/**
+ * What each token becomes in the dark theme.
+ *
+ * A separate map rather than a second field on every token, because `TOKENS`
+ * has to keep handing out a plain string. Two callers need a real colour and
+ * cannot take a CSS variable: Ant Design derives a whole palette from
+ * `colorPrimary` and needs a value it can compute on, and Recharts passes
+ * `fill` as an SVG presentation attribute, where `var()` is not resolved.
+ *
+ * Same keys as TOKENS, enforced by the type — a token added without a dark
+ * value fails to compile rather than falling back to its light one.
+ */
+export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: string } } = {
+  money: {
+    positive: PALETTE.green400,
+    negative: PALETTE.red400,
+    zero: PALETTE.mist400,
+  },
+  intent: {
+    primary: PALETTE.teal400,
+    success: PALETTE.green400,
+    warning: PALETTE.amber400,
+    danger: PALETTE.red400,
+    info: PALETTE.blue400,
+  },
+  text: {
+    heading: PALETTE.mist100,
+    body: PALETTE.mist200,
+    secondary: PALETTE.mist400,
+    // The sider is dark in both themes, so what reads on it does not change.
+    onDark: PALETTE.white,
+  },
+  surface: {
+    page: PALETTE.ink900,
+    card: PALETTE.ink800,
+    muted: PALETTE.ink700,
+    sider: PALETTE.ink950,
+  },
+  border: {
+    default: PALETTE.ink600,
+    subtle: PALETTE.ink700,
+  },
+  series: {
+    sales: PALETTE.teal400,
+    purchases: PALETTE.violet400,
+    inventory: PALETTE.sky400,
+    banking: PALETTE.blue400,
+    close: PALETTE.orange400,
+    governance: PALETTE.mist400,
+    other: PALETTE.mist400,
+    income: PALETTE.teal400,
+    expense: PALETTE.orange400,
+    net: PALETTE.blue400,
+    receivable: PALETTE.teal400,
+    payable: PALETTE.violet400,
+    axis: PALETTE.mist400,
+    grid: PALETTE.ink600,
+  },
+};
+
 export type Tokens = typeof TOKENS;
+export type ThemeName = "light" | "dark";
 
 /**
  * The dotted form a token is looked up by, such as `"money.negative"`. A bare
@@ -82,13 +157,18 @@ export function flattenTokens(tokens: Tokens = TOKENS): [string, string][] {
   return out;
 }
 
+/** The same paths, valued for whichever theme is asked for. */
+export function flattenTheme(theme: ThemeName): [string, string][] {
+  return flattenTokens(theme === "dark" ? (DARK_TOKENS as unknown as Tokens) : TOKENS);
+}
+
 /**
  * Look a token up by its dotted path. Throws rather than returning undefined:
  * an unknown path is a typo, and a silent `undefined` reaches the DOM as a
  * missing colour that nobody notices until a screenshot looks wrong.
  */
-export function resolveToken(path: TokenPath): string {
-  const found = flattenTokens().find(([key]) => key === path);
+export function resolveToken(path: TokenPath, theme: ThemeName = "light"): string {
+  const found = flattenTheme(theme).find(([key]) => key === path);
   if (!found) throw new Error(`Unknown design token: ${path}`);
   return found[1];
 }
@@ -99,6 +179,10 @@ export function resolveToken(path: TokenPath): string {
  * Only text belongs here. `series.axis` and `series.grid` are decorative
  * strokes on a chart: holding them to a text contrast ratio would darken the
  * chart furniture without making anything more readable.
+ *
+ * Every pair is checked in both themes, which is the point of the dark entries
+ * existing at all — a token set that named dark colours without proving they
+ * could be read would be a guess wearing a type.
  */
 export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["text.heading", "surface.page"],
@@ -119,55 +203,63 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
 ];
 
 /**
- * The tokens as a `:root` block.
+ * The tokens as CSS, one block per theme.
  *
  * Emitted into globals.css as static text rather than injected at runtime: a
  * runtime style block costs bytes on every response and cannot be inspected in
  * a diff. A unit test asserts the committed CSS still matches this output, so
  * editing one without the other fails the build instead of drifting quietly.
+ *
+ * Dark is selected by `:root[data-theme="dark"]` and nothing else. Not a media
+ * query: the reader's choice has to be able to beat the operating system's,
+ * and a media query cannot be overridden by a click. Following the system is
+ * done by writing `dark` into that attribute, so there is exactly one thing
+ * that decides which block applies.
  */
 export function cssVariableBlock(): string {
-  const lines = flattenTokens().map(
-    ([path, value]) => `  --ob-${path.replace(".", "-")}: ${value};`,
-  );
-  return `:root {\n${lines.join("\n")}\n}\n`;
+  const declare = (theme: ThemeName) =>
+    flattenTheme(theme)
+      .map(([path, value]) => `  --ob-${path.replace(".", "-")}: ${value};`)
+      .join("\n");
+  return `:root {\n${declare("light")}\n}\n\n:root[data-theme="dark"] {\n${declare("dark")}\n}\n`;
 }
 
 /**
- * The colour half of the Ant Design theme.
+ * The colour half of the Ant Design theme, for one theme.
  *
  * Only colour lives here. Radius, font and size stay in providers.tsx because
  * they are not tokens this module governs, and moving them would make this the
  * home of settings it has nothing to say about.
  */
-export function antdThemeTokens() {
+export function antdThemeTokens(theme: ThemeName = "light") {
+  const t = (path: TokenPath) => resolveToken(path, theme);
   return {
     token: {
-      colorPrimary: TOKENS.intent.primary,
-      colorInfo: TOKENS.intent.primary,
-      colorSuccess: TOKENS.intent.success,
-      colorWarning: TOKENS.intent.warning,
-      colorError: TOKENS.intent.danger,
-      colorBgLayout: TOKENS.surface.page,
-      colorTextHeading: TOKENS.text.heading,
+      colorPrimary: t("intent.primary"),
+      colorInfo: t("intent.primary"),
+      colorSuccess: t("intent.success"),
+      colorWarning: t("intent.warning"),
+      colorError: t("intent.danger"),
+      colorBgLayout: t("surface.page"),
+      colorTextHeading: t("text.heading"),
     },
     components: {
       Layout: {
-        siderBg: TOKENS.surface.sider,
-        triggerBg: TOKENS.surface.sider,
-        headerBg: TOKENS.surface.card,
+        siderBg: t("surface.sider"),
+        triggerBg: t("surface.sider"),
+        headerBg: t("surface.card"),
       },
       Menu: {
-        darkItemBg: TOKENS.surface.sider,
-        darkSubMenuItemBg: TOKENS.surface.sider,
-        darkItemSelectedBg: TOKENS.intent.primary,
-        darkItemColor: TOKENS.border.default,
-        darkItemHoverBg: TOKENS.text.secondary,
+        darkItemBg: t("surface.sider"),
+        darkSubMenuItemBg: t("surface.sider"),
+        darkItemSelectedBg: t("intent.primary"),
+        darkItemColor: t("border.default"),
+        darkItemHoverBg: t("text.secondary"),
       },
       Table: {
-        headerBg: TOKENS.surface.muted,
-        headerColor: TOKENS.text.secondary,
-        borderColor: TOKENS.border.subtle,
+        headerBg: t("surface.muted"),
+        headerColor: t("text.secondary"),
+        borderColor: t("border.subtle"),
       },
     },
   };
