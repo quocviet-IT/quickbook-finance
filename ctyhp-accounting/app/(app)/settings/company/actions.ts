@@ -12,15 +12,9 @@ import {
 import { activeSchema } from "@/lib/db/company";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import type { CompanySettingRow } from "@/lib/db/types";
-import { strToU8, zipSync } from "fflate";
+import { exportFileName } from "@/lib/domain/company-export";
 import {
-  archivePathFor,
-  buildManifest,
-  exportFileName,
-  sha256Hex,
-  toCsv,
-} from "@/lib/domain/company-export";
-import {
+  buildExportArchive,
   collectExportDatasets,
   readControlTotals,
   readSchemaVersion,
@@ -92,9 +86,16 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
   }
 
   try {
+    // One clock reading for the whole export: `asOf`, its date portion, is
+    // what readControlTotals below filters by, and the identical
+    // `generatedAt` is what the manifest gets stamped with. A second reading
+    // taken after the four-way Promise.all — which can itself straddle
+    // midnight on the company with 42 round trips — is exactly what let the
+    // manifest disagree with itself; buildExportArchive no longer reads its
+    // own clock, so this is the only reading left to keep in sync.
     const generatedAt = new Date().toISOString();
     const asOf = generatedAt.slice(0, 10);
-    const [datasets, totals, schemaVersion, versions] = await Promise.all([
+    const [datasets, controlTotals, schemaVersion, versions] = await Promise.all([
       collectExportDatasets(sb),
       readControlTotals(sb, asOf),
       readSchemaVersion(sb),
@@ -102,56 +103,21 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
     ]);
     const legalName = versions[0]?.legal_name ?? "company";
 
-    const entries: Record<string, Uint8Array> = {};
-    const files: Array<{ path: string; sha256: string; rowCount: number }> = [];
-    let totalRows = 0;
-
-    for (const dataset of datasets) {
-      const path = archivePathFor(dataset.table);
-      const csv = toCsv(dataset.rows, dataset.columns);
-      entries[path] = strToU8(csv);
-      files.push({ path, sha256: await sha256Hex(csv), rowCount: dataset.rows.length });
-      totalRows += dataset.rows.length;
-    }
-
-    const manifest = buildManifest({
+    const archive = await buildExportArchive({
       datasets,
-      files,
-      totals,
-      controlTotalsAsOf: asOf,
+      controlTotals,
       schemaVersion,
       generatedAt,
       actorEmail: user.email ?? "unknown",
     });
-    const manifestSha256 = await sha256Hex(manifest);
-    entries["manifest.json"] = strToU8(manifest);
-    entries["README.txt"] = strToU8(
-      [
-        "One Book — company data export",
-        "",
-        `Generated ${generatedAt} under schema ${schemaVersion}.`,
-        "",
-        "data/        one CSV per table, header row = column names",
-        "sensitive/   vendor tax profiles, including taxpayer identification numbers",
-        "attachments.csv  the attachment inventory — file bytes are NOT included;",
-        "             each row carries the storage path, size, sha256 and scan status",
-        "             so a restore of object storage can be verified against it",
-        "manifest.json carries row counts, per-file sha256 and the control totals",
-        "             a restored database must reproduce.",
-        "",
-        "Restore procedure: docs/operations/backup-and-restore.md",
-      ].join("\n"),
-    );
-
-    const zip = zipSync(entries, { level: 6 });
 
     const { error: auditError } = await sb.rpc("acc_log_company_export", {
       p_summary: {
-        generated_at: generatedAt,
+        generated_at: archive.manifest.generatedAt,
         schema_version: schemaVersion,
-        manifest_sha256: manifestSha256,
+        manifest_sha256: archive.manifestSha256,
         table_count: datasets.length,
-        total_rows: totalRows,
+        total_rows: archive.totalRows,
         included_sensitive: datasets.some((dataset) => dataset.sensitive),
       },
     });
@@ -164,10 +130,10 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
     return {
       ok: true,
       data: {
-        fileName: exportFileName(legalName, generatedAt),
-        zipBase64: Buffer.from(zip).toString("base64"),
-        manifestSha256,
-        totalRows,
+        fileName: exportFileName(legalName, archive.manifest.generatedAt),
+        zipBase64: Buffer.from(archive.bytes).toString("base64"),
+        manifestSha256: archive.manifestSha256,
+        totalRows: archive.totalRows,
       },
     };
   } catch (e) {

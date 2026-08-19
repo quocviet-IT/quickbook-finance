@@ -41,7 +41,7 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "1.34",
+    version: "1.35",
     date: "2026-08-19",
     headline: "One Book now has a dark theme, and follows your computer unless you tell it otherwise.",
     changes: [
@@ -69,6 +69,81 @@ export const RELEASES: Release[] = [
           "shades that differed by a byte or two and not to the eye were " +
           "collapsed onto the colour they were imitating.",
         route: "/dashboard",
+      },
+    ],
+  },
+  {
+    version: "1.34",
+    date: "2026-08-17",
+    headline:
+      "Every company's books are snapshotted on a schedule, and a snapshot can be restored into a new company that proves itself.",
+    changes: [
+      {
+        kind: "added",
+        title: "Backups",
+        detail:
+          "Settings gained a Backups screen: a nightly snapshot of this " +
+          "company's books, taken automatically and kept for thirty " +
+          "changes. A night the books did not move is recorded as Skipped " +
+          "rather than stored again. Each stored snapshot can be downloaded " +
+          "as the same portable archive the export button produces. " +
+          "Attachments — document scans and other uploaded files — are " +
+          "listed in a snapshot but their contents are not part of it.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "added",
+        title: "Restore a snapshot as a new company",
+        detail:
+          "A stored snapshot can be loaded into a brand-new company beside " +
+          "the running books — nothing in the source company changes. When " +
+          "the restore finishes, the copy's trial balance, receivables, " +
+          "payables and journal line count are checked against the " +
+          "snapshot's own figures, and any difference is named rather than " +
+          "summarized. The copy carries vendor tax profiles — taxpayer " +
+          "identification numbers included — the same as every other table " +
+          "in the books, so it is a company like any other and deserves the " +
+          "same care over who can open it. The person who runs the restore " +
+          "is the copy's only user; the snapshot's user list and role " +
+          "assignments are deliberately not carried over.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title:
+          "A large export could repeat or drop a row; two exports of the same books now come back identical",
+        detail:
+          "Company data export — the same reader a Backups snapshot runs — " +
+          "reads a big table a page at a time, and without a fixed reading " +
+          "order Postgres does not promise page two agrees with page one: a " +
+          "table past a thousand rows could have a row repeated or a row " +
+          "left out without either export saying so. Every exported table " +
+          "now has a declared order, so a paged read is complete, and " +
+          "exporting the same books twice — nothing changed in between — " +
+          "gives back two identical files. That sameness is what lets a " +
+          "Backups snapshot prove a restore came back whole.",
+        route: "/settings/company",
+      },
+      {
+        kind: "added",
+        title: "A snapshot now carries the transactions import register",
+        detail:
+          "The general-ledger and bank-transaction import register is part " +
+          "of the company export and every Backups snapshot from now on, " +
+          "the same as every other table in the books.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title: "Restoring a snapshot taken before this could fail on its bank transactions",
+        detail:
+          "A bank transaction that names which import brought it in could " +
+          "point at an import record the snapshot never carried, and the " +
+          "restore refused the whole company over it. A restore now sets " +
+          "that link null when its snapshot predates it, and says so on the " +
+          "result — which rows, which link, and why — rather than either " +
+          "failing the restore or dropping the loss without a word.",
+        route: "/settings/backups",
       },
     ],
   },

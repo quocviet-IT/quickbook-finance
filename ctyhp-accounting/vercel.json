@@ -15,6 +15,10 @@
     {
       "path": "/api/companies/provision",
       "schedule": "45 11 * * *"
+    },
+    {
+      "path": "/api/backups/run",
+      "schedule": "0 12 * * *"
     }
   ]
 }

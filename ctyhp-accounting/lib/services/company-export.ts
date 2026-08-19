@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { strToU8, zipSync } from "fflate";
 import {
+  archivePathFor,
+  buildManifest,
   EXPORT_TABLES,
+  orderColumnsFor,
+  sha256Hex,
   SENSITIVE_TABLE,
+  toCsv,
   type ExportControlTotals,
   type ExportDataset,
 } from "@/lib/domain/company-export";
@@ -15,8 +21,15 @@ async function readTable(
   table: string,
 ): Promise<Array<Record<string, unknown>>> {
   const rows: Array<Record<string, unknown>> = [];
+  const orderBy = orderColumnsFor(table);
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb.from(table).select("*").range(from, from + PAGE - 1);
+    // Postgres makes no promise about order without one, so an unordered paged
+    // read can hand back page 2 with rows page 1 already had and drop others
+    // in their place. Every exported table has a declared order column (see
+    // ORDER_COLUMNS) so two reads of unchanged books agree.
+    let query = sb.from(table).select("*");
+    for (const column of orderBy) query = query.order(column);
+    const { data, error } = await query.range(from, from + PAGE - 1);
     if (error) throw new CompanyExportError(`Reading ${table} failed: ${error.message}`);
     rows.push(...((data ?? []) as Array<Record<string, unknown>>));
     if (!data || data.length < PAGE) return rows;
@@ -87,4 +100,106 @@ export async function readSchemaVersion(sb: SupabaseClient): Promise<string> {
     .maybeSingle();
   if (error) throw new CompanyExportError(`Reading the schema version failed: ${error.message}`);
   return data?.filename ?? "unknown";
+}
+
+/**
+ * The parsed shape of `manifest.json`, kept as an object rather than only the
+ * string that ends up inside the ZIP. A caller that needs to compare two
+ * archives (the scheduled backup) works from `.files`; a caller that only
+ * needs to report on this one (the export action) can read `generatedAt`
+ * back out of it instead of keeping a second clock of its own that could
+ * disagree with what actually shipped inside the archive.
+ */
+export interface ExportManifest {
+  format: string;
+  formatVersion: number;
+  generatedAt: string;
+  generatedBy: string;
+  schemaVersion: string;
+  containsSensitiveData: boolean;
+  excludedTables: readonly string[];
+  controlTotals: ExportControlTotals;
+  controlTotalsAsOf: string;
+  files: Array<{ path: string; sha256: string; rowCount: number }>;
+  tables: Array<{ table: string; rowCount: number; columns: string[]; sensitive: boolean }>;
+}
+
+export interface ExportArchive {
+  bytes: Uint8Array;
+  manifest: ExportManifest;
+  manifestSha256: string;
+  totalRows: number;
+}
+
+/**
+ * Builds the portable ZIP — one CSV per table, a manifest, a README — the
+ * same bytes the export button hands the browser. A scheduled backup calls
+ * this too, so the button and the unattended job cannot drift into packaging
+ * things differently. `actorEmail` is optional because a cron tick has no
+ * signed-in user to name; it defaults to the same label the audit trail
+ * already uses for actions nobody personally took (see `formatActor`).
+ */
+export async function buildExportArchive(input: {
+  datasets: ExportDataset[];
+  controlTotals: ExportControlTotals;
+  schemaVersion: string;
+  /**
+   * The single clock reading this archive is built from. `controlTotals`
+   * above must already have been read as of this same date — the manifest's
+   * `controlTotalsAsOf` is derived from this value below, not accepted as a
+   * second input, so the two can never name different days no matter when
+   * the caller assembled everything else around them.
+   */
+  generatedAt: string;
+  actorEmail?: string;
+}): Promise<ExportArchive> {
+  const entries: Record<string, Uint8Array> = {};
+  const files: Array<{ path: string; sha256: string; rowCount: number }> = [];
+  let totalRows = 0;
+
+  for (const dataset of input.datasets) {
+    const path = archivePathFor(dataset.table);
+    const csv = toCsv(dataset.rows, dataset.columns);
+    entries[path] = strToU8(csv);
+    files.push({ path, sha256: await sha256Hex(csv), rowCount: dataset.rows.length });
+    totalRows += dataset.rows.length;
+  }
+
+  const manifestJson = buildManifest({
+    datasets: input.datasets,
+    files,
+    totals: input.controlTotals,
+    controlTotalsAsOf: input.generatedAt.slice(0, 10),
+    schemaVersion: input.schemaVersion,
+    generatedAt: input.generatedAt,
+    actorEmail: input.actorEmail ?? "system",
+  });
+  entries["manifest.json"] = strToU8(manifestJson);
+  entries["README.txt"] = strToU8(
+    [
+      "One Book — company data export",
+      "",
+      `Generated ${input.generatedAt} under schema ${input.schemaVersion}.`,
+      "",
+      "data/        one CSV per table, header row = column names",
+      "sensitive/   vendor tax profiles, including taxpayer identification numbers",
+      "attachments.csv  the attachment inventory — file bytes are NOT included;",
+      "             each row carries the storage path, size, sha256 and scan status",
+      "             so a restore of object storage can be verified against it",
+      "manifest.json carries row counts, per-file sha256 and the control totals",
+      "             a restored database must reproduce.",
+      "",
+      "Restore procedure: docs/operations/backup-and-restore.md",
+    ].join("\n"),
+  );
+
+  return {
+    bytes: zipSync(entries, { level: 6 }),
+    // Parsed back out of the exact bytes just written into manifest.json,
+    // rather than a second object assembled from the same inputs by hand —
+    // so this can never disagree with what the archive itself says.
+    manifest: JSON.parse(manifestJson) as ExportManifest,
+    manifestSha256: await sha256Hex(manifestJson),
+    totalRows,
+  };
 }

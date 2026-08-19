@@ -263,6 +263,12 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         anyPermissions: ["audit.read"],
       },
       {
+        href: "/settings/backups",
+        title: "Backups",
+        description: "Snapshots of this company's books, and restoring one into a new company.",
+        anyPermissions: ["company.export"],
+      },
+      {
         href: "/settings/feedback",
         title: "Feedback triage",
         description: "Bug reports and suggestions filed by staff, with screenshots.",

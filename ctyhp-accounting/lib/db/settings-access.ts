@@ -66,3 +66,40 @@ export async function requireSettingsAccess(href: string): Promise<void> {
     redirect(`/settings?denied=${encodeURIComponent(href)}`);
   }
 }
+
+/**
+ * The same fail-closed refusal, for a settings route that cannot have a
+ * catalog entry.
+ *
+ * `requireSettingsAccess` above guards a screen through its settings-hub card,
+ * and `settingsGateFor` throws for an href with no card — deliberately. A
+ * dynamic route (one page per record id) can never appear in that catalog:
+ * there is no static href to match and no card to show. Its gate is declared
+ * here instead, through the same single predicate the hub, the sidebar and
+ * the catalog guard all share, with the same fail-closed reading of a broken
+ * permission lookup.
+ */
+export async function requireSettingsPermission(
+  anyPermissions: readonly string[],
+  deniedHref: string,
+): Promise<void> {
+  // canShowNavItem reads an empty anyPermissions list as "no gate", so an
+  // empty call here would refuse nobody — and the only thing catching that
+  // today would be a test's regex over page sources. A gate is misconfigured,
+  // not merely permissive, when it names no permission at all, so it fails
+  // closed by construction: thrown before any lookup, so the refusal does not
+  // depend on the database being reachable.
+  if (anyPermissions.length === 0) {
+    throw new Error(
+      "requireSettingsPermission needs at least one permission key; an empty list would gate nothing.",
+    );
+  }
+  const access = await currentAccess();
+  const strict: NavigationAccess = {
+    role: access.role,
+    permissionKeys: access.permissionKeys ?? [],
+  };
+  if (!access.role || !canShowNavItem({ anyPermissions: [...anyPermissions] }, strict)) {
+    redirect(`/settings?denied=${encodeURIComponent(deniedHref)}`);
+  }
+}

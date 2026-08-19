@@ -63,6 +63,13 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_bank_feed_account",
   "acc_bank_feed_sync_run",
   "acc_bank_import_batch",
+  // The general-ledger and transactions import register (0102/0108) —
+  // acc_bank_transaction.transaction_batch_id references it. Listed here,
+  // before that table, for the same reason acc_bank_import_batch is: the
+  // live restore proved this list matters as a readable approximation of
+  // dependency order even though the actual load order is derived from the
+  // schema's own foreign keys at restore time, not from this list.
+  "acc_import_batch",
   "acc_bank_transaction",
   "acc_reconciliation",
   "acc_reconciliation_line",
@@ -76,6 +83,33 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_document_access_log",
   "acc_audit_log",
 ];
+
+/**
+ * How each exported table is ordered when it is read.
+ *
+ * `readTable` pages with `.range()`, and Postgres does not have to answer two
+ * unordered queries the same way — so without this, page two of a large table
+ * can repeat rows page one already returned and drop others in their place. The
+ * largest company here holds 20,740 journal lines, twenty-one pages of them.
+ *
+ * Most tables key on `id`, which is the default. These eight key on text and
+ * have no `id` column at all; ordering them by one would not drift quietly, it
+ * would throw, because Postgres validates the column even on an empty table.
+ */
+export const ORDER_COLUMNS: Record<string, string[]> = {
+  acc_schema_migrations: ["filename"],
+  acc_currency: ["code"],
+  acc_permission: ["key"],
+  acc_role_permission: ["role", "permission_key"],
+  acc_approval_policy: ["action_key"],
+  acc_sequence: ["key"],
+  acc_purchasing_config: ["singleton"],
+  acc_1099_box: ["code"],
+};
+
+export function orderColumnsFor(table: string): string[] {
+  return ORDER_COLUMNS[table] ?? ["id"];
+}
 
 export interface ExportDataset {
   table: string;
@@ -92,7 +126,10 @@ export interface ExportControlTotals {
   journalLineCount: number;
 }
 
-const FORMULA_LEAD = new Set(["=", "+", "-", "@"]);
+// Exported because the restore parser must strip exactly the guard this set
+// applies; a second list of these four characters would be free to drift and
+// silently corrupt every value that starts with one of them.
+export const FORMULA_LEAD = new Set(["=", "+", "-", "@"]);
 
 function cell(value: unknown): string {
   if (value === null || value === undefined) return "";
