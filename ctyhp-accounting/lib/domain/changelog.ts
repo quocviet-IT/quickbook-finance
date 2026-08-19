@@ -41,6 +41,37 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.37",
+    date: "2026-08-19",
+    headline: "Company Settings reads properly again, and the three sample companies are gone.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Company Settings was breaking its own values apart",
+        detail:
+          "The settings were laid out in two columns with the label beside " +
+          "the value, and the labels here are long — \"Employer " +
+          "Identification Number\" is twenty-nine characters. That left the " +
+          "values almost no room, so they wrapped inside themselves: the " +
+          "masked EIN came out one digit per line, the time zone split as " +
+          "\"America/New_Yo\" and \"rk\". Each label now sits above its " +
+          "value, and the inventory policy — which is several paragraphs of " +
+          "accounting standard, not a one-line fact — has its own place " +
+          "below rather than a cell in the grid.",
+        route: "/settings/company",
+      },
+      {
+        kind: "changed",
+        title: "The three sample companies were removed",
+        detail:
+          "North Star Bridal, Harbor Gems Trading and Cascade Precious " +
+          "Metals were demonstration books and are gone from the company " +
+          "switcher. Your own companies are untouched.",
+        route: "/settings/companies",
+      },
+    ],
+  },
+  {
     version: "1.36",
     date: "2026-08-19",
     headline: "The dark navigation is readable, and the theme control is one button instead of three.",

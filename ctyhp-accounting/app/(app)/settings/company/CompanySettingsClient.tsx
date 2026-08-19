@@ -83,28 +83,69 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
           extra={canEdit ? <Button type="primary" onClick={startEdit}>Edit</Button> : null}
         >
           {current ? (
-            <Descriptions column={2} size="small">
-              <Descriptions.Item label="Legal name">{current.legal_name}</Descriptions.Item>
-              <Descriptions.Item label="Doing Business As">{current.dba_name ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="Employer Identification Number">{maskEin(current.ein_ref)}</Descriptions.Item>
-              <Descriptions.Item label="Fiscal year start">{MONTHS[(current.fiscal_year_start_month ?? 1) - 1]}</Descriptions.Item>
-              <Descriptions.Item label="Accounting basis">{current.accounting_basis}</Descriptions.Item>
-              <Descriptions.Item label="Base currency">{current.base_currency_code}</Descriptions.Item>
-              <Descriptions.Item label="Time zone">{current.time_zone}</Descriptions.Item>
-              <Descriptions.Item label="Default terms (days)">{current.default_payment_terms_days}</Descriptions.Item>
-              <Descriptions.Item label="Inventory cost basis">
-                {METHOD_LABEL[current.inventory_valuation_method] ?? current.inventory_valuation_method}
-              </Descriptions.Item>
-              <Descriptions.Item label="Inventory policy" span={3}>
+            <>
+              {/*
+                Vertical, and that is the fix rather than a preference.
+
+                These were laid out horizontally in a two-column grid, and the
+                labels here are long — "Employer Identification Number" is
+                twenty-nine characters. A horizontal Descriptions sizes its
+                label column to the longest label, so the value column
+                collapsed, and the values broke inside themselves: the masked
+                EIN came out one character per line, "America/New_York" split
+                as "America/New_Yo / rk", "Weighted average cost" as "Weight /
+                ed average cost".
+
+                Stacking the label above the value gives every value the full
+                width of its column, which is all any of them needed.
+              */}
+              <Descriptions
+                layout="vertical"
+                column={{ xs: 1, sm: 2, lg: 3 }}
+                size="small"
+                colon={false}
+              >
+                <Descriptions.Item label="Legal name">{current.legal_name}</Descriptions.Item>
+                <Descriptions.Item label="Doing Business As">{current.dba_name ?? "—"}</Descriptions.Item>
+                <Descriptions.Item label="Employer Identification Number">
+                  {maskEin(current.ein_ref)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Fiscal year start">
+                  {MONTHS[(current.fiscal_year_start_month ?? 1) - 1]}
+                </Descriptions.Item>
+                <Descriptions.Item label="Accounting basis">{current.accounting_basis}</Descriptions.Item>
+                <Descriptions.Item label="Base currency">{current.base_currency_code}</Descriptions.Item>
+                <Descriptions.Item label="Time zone">{current.time_zone}</Descriptions.Item>
+                <Descriptions.Item label="Default terms (days)">
+                  {current.default_payment_terms_days}
+                </Descriptions.Item>
+                <Descriptions.Item label="Inventory cost basis">
+                  {METHOD_LABEL[current.inventory_valuation_method] ?? current.inventory_valuation_method}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/*
+                The policy is prose — several paragraphs of accounting
+                standard — and it was the tenth cell of a grid built for
+                one-line facts, carrying `span={3}` on a two-column layout,
+                which is not a span that exists. Out of the grid it can simply
+                be what it is: a paragraph with a heading.
+              */}
+              <div className="company-settings__policy">
+                <Typography.Text type="secondary" className="company-settings__policy-label">
+                  Inventory policy
+                </Typography.Text>
                 {current.inventory_policy_memo ? (
-                  <span style={{ whiteSpace: "pre-line" }}>{current.inventory_policy_memo}</span>
+                  <Typography.Paragraph style={{ whiteSpace: "pre-line", marginBottom: 0 }}>
+                    {current.inventory_policy_memo}
+                  </Typography.Paragraph>
                 ) : (
                   <Typography.Text type="warning">
                     Not recorded. GAAP asks for the cost basis to be disclosed.
                   </Typography.Text>
                 )}
-              </Descriptions.Item>
-            </Descriptions>
+              </div>
+            </>
           ) : (
             <p>No company settings yet.{canEdit ? " Click Edit to create them." : ""}</p>
           )}

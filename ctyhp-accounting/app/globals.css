@@ -1978,6 +1978,26 @@ body {
  * and a little more air is the whole fix — the grouping does the work that
  * separating them by distance alone could not.
  */
+/*
+ * The inventory policy, which is prose rather than a fact.
+ *
+ * It sits under the grid of one-line settings above it, separated by a rule
+ * and given a reading measure — a paragraph of accounting standard set across
+ * the full width of a wide screen is a line nobody's eye can track back from.
+ */
+.company-settings__policy {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ob-border-subtle);
+  max-width: 78ch;
+}
+
+.company-settings__policy-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
 .app-shell__header-preference {
   display: inline-flex;
   align-items: center;
