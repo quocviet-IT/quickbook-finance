@@ -102,6 +102,9 @@ export const TOKENS = {
    * stylesheet that no token could name.
    */
   panel: {
+    ink: PALETTE.sage950,
+    borderStrong: PALETTE.sage250,
+    soft: PALETTE.sage75,
     bg: PALETTE.sage50,
     border: PALETTE.sage100,
     borderSoft: PALETTE.sage150,
@@ -212,6 +215,9 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     deep: PALETTE.teal900,
   },
   panel: {
+    ink: PALETTE.mist100,
+    borderStrong: PALETTE.ink600,
+    soft: PALETTE.ink700,
     bg: PALETTE.ink800,
     border: PALETTE.ink700,
     borderSoft: PALETTE.ink700,

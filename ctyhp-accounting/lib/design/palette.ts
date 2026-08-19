@@ -66,9 +66,12 @@ export const PALETTE = {
   sage100: "#edf1f0",
   sage150: "#e6edeb",
   sage200: "#e1e9e7",
+  sage75: "#f4f8f7",
+  sage250: "#dbe5e3",
   sage500: "#7a8988",
   sage600: "#607170",
   sage700: "#526361",
+  sage950: "#102a2a",
 
   // Tinted state colours.
   red600: "#b42318",
