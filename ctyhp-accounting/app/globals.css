@@ -85,6 +85,7 @@
   --ob-feedback-negativeBorder: #fecaca;
   --ob-feedback-negativeBg: #fef2f2;
   --ob-feedback-positiveOnDark: #a7f3d0;
+  --ob-feedback-negativeOnDark: #fecaca;
   --ob-feedback-infoBorder: #d6e4ff;
   --ob-feedback-infoBg: #f0f5ff;
   --ob-feedback-warning: #b54708;
@@ -198,6 +199,7 @@
   --ob-feedback-negativeBorder: #7f1d1d;
   --ob-feedback-negativeBg: #2a1416;
   --ob-feedback-positiveOnDark: #a7f3d0;
+  --ob-feedback-negativeOnDark: #fecaca;
   --ob-feedback-infoBorder: #1e3a5f;
   --ob-feedback-infoBg: #152a45;
   --ob-feedback-warning: #fbbf24;
@@ -2457,7 +2459,7 @@ body {
 }
 
 .dashboard-summary--featured .dashboard-trend--negative {
-  color: var(--ob-feedback-negativeBorder);
+  color: var(--ob-feedback-negativeOnDark);
 }
 
 .dashboard-summary--featured .dashboard-trend--neutral {

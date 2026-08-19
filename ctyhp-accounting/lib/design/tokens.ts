@@ -169,6 +169,15 @@ export const TOKENS = {
     negativeBorder: PALETTE.red100,
     negativeBg: PALETTE.red50,
     positiveOnDark: PALETTE.green200,
+    /**
+     * The falling half of a trend, on a surface that is dark in both themes.
+     *
+     * Its neighbour `positiveOnDark` already had to exist for the same
+     * reason; this one was reaching for `negativeBorder` instead, which is a
+     * light pink in light and a deep red in dark — unreadable on the featured
+     * card, which is the same dark teal either way.
+     */
+    negativeOnDark: PALETTE.red100,
     infoBorder: PALETTE.blue100,
     infoBg: PALETTE.blue50,
     warning: PALETTE.orange600,
@@ -323,6 +332,9 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     negativeBorder: PALETTE.red900,
     negativeBg: PALETTE.red950,
     positiveOnDark: PALETTE.green200,
+    // Unchanged between themes, like its positive counterpart: what it is
+    // drawn on does not change either.
+    negativeOnDark: PALETTE.red100,
     infoBorder: PALETTE.blue950,
     infoBg: PALETTE.blue900,
     warning: PALETTE.amber400,
@@ -427,6 +439,16 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
    * read *as* text and was still being used as the thing *behind* text.
    */
   ["text.onDark", "intent.primarySolid"],
+  /**
+   * The featured dashboard card is the same deep teal in both themes, so what
+   * is written on it has to be readable in both without inverting. Both
+   * halves of its trend are here because the falling one was not: it borrowed
+   * `feedback.negativeBorder`, which inverts, and went to a deep red on a
+   * deep teal card.
+   */
+  ["feedback.positiveOnDark", "accent.deep"],
+  ["feedback.negativeOnDark", "accent.deep"],
+  ["panel.onDeep", "accent.deep"],
 ];
 
 /**
