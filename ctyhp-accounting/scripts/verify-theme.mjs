@@ -87,7 +87,26 @@ const LUMINANCE = `
     const parts = m[1].split(",").map((p) => parseFloat(p.trim()));
     // Fully transparent paints nothing, so it is not this element's colour.
     if (parts.length > 3 && parts[3] === 0) return null;
-    return parts.slice(0, 3);
+    return { rgb: parts.slice(0, 3), alpha: parts.length > 3 ? parts[3] : 1 };
+  }
+  /**
+   * What a background actually looks like, which is not what it declares.
+   * rgba(255,255,255,0.25) reads as white to a naive check and is a dark grey
+   * once composited over a dark card — 56 of the first run's 160 findings
+   * were that single mistake, repeated on every route.
+   */
+  function effectiveBackground(el) {
+    let top = null;
+    for (let node = el; node; node = node.parentElement) {
+      const c = parse(getComputedStyle(node).backgroundColor);
+      if (!c) continue;
+      if (top === null) top = c;
+      if (c.alpha >= 1) {
+        if (top.alpha >= 1) return top.rgb;
+        return top.rgb.map((v, i) => v * top.alpha + c.rgb[i] * (1 - top.alpha));
+      }
+    }
+    return top ? top.rgb : null;
   }
 `;
 
@@ -132,7 +151,8 @@ async function auditDark(page) {
       const style = getComputedStyle(el);
       if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
 
-      const bg = parse(style.backgroundColor);
+      const own = parse(style.backgroundColor);
+      const bg = own ? effectiveBackground(el) : null;
       if (bg) {
         const lum = luminance(bg);
         if (lum > 0.6) {
@@ -150,7 +170,8 @@ async function auditDark(page) {
         const ownText = [...el.childNodes].some(
           (n) => n.nodeType === 3 && n.textContent.trim() !== "",
         );
-        const fg = parse(style.color);
+        const fgc = parse(style.color);
+        const fg = fgc ? fgc.rgb : null;
         if (fg && ownText) {
           const l1 = Math.max(luminance(fg), lum) + 0.05;
           const l2 = Math.min(luminance(fg), lum) + 0.05;
@@ -181,6 +202,16 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   colorScheme: mode === "dark" ? "dark" : "light",
 });
+if (mode === "dark") {
+  // Stored before the first navigation, which is the only way React learns
+  // about it. Setting `data-theme` after load — what this used to do —
+  // switches the CSS variables and leaves Ant Design's algorithm on light,
+  // so every Table header still measured #f1f5f9 and the audit reported ten
+  // component bugs that did not exist.
+  await context.addInitScript(
+    `try{localStorage.setItem("onebook.theme","dark")}catch(e){}`,
+  );
+}
 const host = new URL(base).hostname;
 await context.addCookies(sessionCookies(session.session, session.user, session.supabaseUrl, host));
 const page = await context.newPage();
@@ -209,14 +240,6 @@ for (const route of ROUTES) {
   checked += 1;
 
   if (mode === "dark") {
-    // Ask for dark the same way the toggle will, rather than relying on the
-    // browser's colour-scheme preference. The stylesheet selects dark on
-    // `:root[data-theme="dark"]` and on nothing else — deliberately, so a
-    // reader's choice can beat the operating system's — which means an audit
-    // that only set `colorScheme: dark` would measure the light theme and
-    // report no progress however much had been converted.
-    await page.evaluate(`document.documentElement.setAttribute("data-theme", "dark")`);
-    await page.waitForTimeout(200);
     const found = await auditDark(page);
     if (found.length) {
       problems += found.length;

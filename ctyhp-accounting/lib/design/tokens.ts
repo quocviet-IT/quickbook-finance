@@ -32,6 +32,17 @@ export const TOKENS = {
   },
   intent: {
     primary: PALETTE.teal700,
+    /**
+     * The primary teal as a solid fill behind white text, which is a
+     * different job from the primary teal as a colour to write in.
+     *
+     * `primary` has to lighten for a dark background or it cannot be read on
+     * one — 2.3:1. A block filled with that light teal and lettered in white
+     * fails in the opposite direction: the app's own logo measured 1.86:1
+     * once dark shipped. This one stays dark in both themes, because what is
+     * behind white text has to.
+     */
+    primarySolid: PALETTE.teal700,
     success: PALETTE.green700,
     warning: PALETTE.amber700,
     danger: PALETTE.red700,
@@ -204,6 +215,7 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
   },
   intent: {
     primary: PALETTE.teal400,
+    primarySolid: PALETTE.teal700,
     success: PALETTE.green400,
     warning: PALETTE.amber400,
     danger: PALETTE.red400,
@@ -395,6 +407,14 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["intent.warning", "surface.card"],
   ["intent.danger", "surface.card"],
   ["intent.info", "surface.card"],
+  /**
+   * White on the solid brand fill. Not a text-on-surface pair like the rest —
+   * it is text on a *block* — but it belongs here for the same reason they do:
+   * it is read, and it failed. The app's own logo shipped at 1.86:1 the moment
+   * dark went live, because `intent.primary` had been lightened so it could be
+   * read *as* text and was still being used as the thing *behind* text.
+   */
+  ["text.onDark", "intent.primarySolid"],
 ];
 
 /**

@@ -6,6 +6,7 @@
   --ob-money-negative: #b91c1c;
   --ob-money-zero: #475569;
   --ob-intent-primary: #0f766e;
+  --ob-intent-primarySolid: #0f766e;
   --ob-intent-success: #15803d;
   --ob-intent-warning: #b45309;
   --ob-intent-danger: #b91c1c;
@@ -117,6 +118,7 @@
   --ob-money-negative: #f87171;
   --ob-money-zero: #94a3b8;
   --ob-intent-primary: #2dd4bf;
+  --ob-intent-primarySolid: #0f766e;
   --ob-intent-success: #4ade80;
   --ob-intent-warning: #fbbf24;
   --ob-intent-danger: #f87171;
@@ -485,7 +487,8 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: var(--ob-intent-primary);
+  /* Solid, not the accent: this block is lettered in white. */
+  background: var(--ob-intent-primarySolid);
   color: var(--ob-text-onDark);
   font-size: 13px;
   font-weight: 700;
