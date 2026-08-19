@@ -50,11 +50,16 @@ export const TOKENS = {
     page: PALETTE.slate50,
     card: PALETTE.white,
     muted: PALETTE.slate100,
+    subtle: PALETTE.slate25,
     sider: PALETTE.slate900,
+    siderFocus: PALETTE.ink850,
   },
   border: {
     default: PALETTE.slate200,
     subtle: PALETTE.slate100,
+    muted: PALETTE.mist250,
+    soft: PALETTE.mist350,
+    softAlt: PALETTE.mist360,
   },
   /**
    * The application shell's own furniture: the sider, and the header rule
@@ -74,6 +79,44 @@ export const TOKENS = {
     scrollbar: PALETTE.slate700,
     submenu: PALETTE.slate800Blue,
     headerBorder: PALETTE.mist300,
+  },
+  /**
+   * Brand tints: the washes, rings and glows drawn *from* the primary teal
+   * rather than in it. Light uses near-white teals; dark cannot, because a
+   * near-white wash on a dark card is a white box. Each one answers with a
+   * deep teal of its own.
+   */
+  accent: {
+    wash: PALETTE.teal50,
+    hover: PALETTE.teal100,
+    tint: PALETTE.teal150,
+    bright: PALETTE.teal200,
+    softRing: PALETTE.teal250,
+    ring: PALETTE.teal300,
+    line: PALETTE.teal350,
+    deep: PALETTE.teal900,
+  },
+  /**
+   * The dashboard's own green-tinted greys. They are in neither the slate ramp
+   * nor the teal one, and they were the largest group of colour in the
+   * stylesheet that no token could name.
+   */
+  panel: {
+    bg: PALETTE.sage50,
+    border: PALETTE.sage100,
+    borderSoft: PALETTE.sage150,
+    line: PALETTE.sage200,
+    text: PALETTE.sage600,
+    textStrong: PALETTE.sage700,
+    textSoft: PALETTE.sage500,
+  },
+  /** Tinted backgrounds and borders for a state, as opposed to its text. */
+  feedback: {
+    negative: PALETTE.red600,
+    negativeBorder: PALETTE.red100,
+    negativeBg: PALETTE.red50,
+    positiveOnDark: PALETTE.green200,
+    infoBorder: PALETTE.blue100,
   },
   // Chart series. Values are carried across unchanged from the two maps that
   // previously defined them by hand (DashboardClient and FinancialCharts);
@@ -136,11 +179,16 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     page: PALETTE.ink900,
     card: PALETTE.ink800,
     muted: PALETTE.ink700,
+    subtle: PALETTE.ink700,
     sider: PALETTE.ink950,
+    siderFocus: PALETTE.ink850,
   },
   border: {
     default: PALETTE.ink600,
     subtle: PALETTE.ink700,
+    muted: PALETTE.ink600,
+    soft: PALETTE.ink600,
+    softAlt: PALETTE.ink600,
   },
   chrome: {
     // The sider is dark in both themes, so its furniture does not move.
@@ -151,6 +199,33 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     submenu: PALETTE.slate800Blue,
     // Drawn on the header, which does invert.
     headerBorder: PALETTE.ink600,
+  },
+  accent: {
+    wash: PALETTE.teal950,
+    hover: PALETTE.teal900,
+    tint: PALETTE.teal850,
+    // Bright tints already read on a dark surface; they were built for one.
+    bright: PALETTE.teal200,
+    softRing: PALETTE.teal250,
+    ring: PALETTE.teal300,
+    line: PALETTE.teal800,
+    deep: PALETTE.teal900,
+  },
+  panel: {
+    bg: PALETTE.ink800,
+    border: PALETTE.ink700,
+    borderSoft: PALETTE.ink700,
+    line: PALETTE.ink600,
+    text: PALETTE.mist400,
+    textStrong: PALETTE.mist200,
+    textSoft: PALETTE.mist400,
+  },
+  feedback: {
+    negative: PALETTE.red400,
+    negativeBorder: PALETTE.red900,
+    negativeBg: PALETTE.red950,
+    positiveOnDark: PALETTE.green200,
+    infoBorder: PALETTE.blue950,
   },
   series: {
     sales: PALETTE.teal400,

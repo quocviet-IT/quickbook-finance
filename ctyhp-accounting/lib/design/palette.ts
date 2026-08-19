@@ -31,6 +31,10 @@ export const PALETTE = {
   slate800: "#1e293b",
   slate800Blue: "#263449",
   mist300: "#e5eaf0",
+  mist250: "#cbd5e1",
+  mist350: "#dbe4e8",
+  mist360: "#dbe4ea",
+  slate25: "#f8fafc",
   white: "#ffffff",
 
   // Intent
@@ -41,6 +45,41 @@ export const PALETTE = {
   blue700: "#1d4ed8",
   violet600: "#7c3aed",
   sky700: "#0369a1",
+
+  // Brand tints. The stylesheet already used every one; naming them is what
+  // lets the dark theme answer each with a tint of its own instead of a
+  // near-white wash on a dark card.
+  teal50: "#f0fdfa",
+  teal100: "#edf7f5",
+  teal150: "#ecfdf9",
+  teal200: "#99f6e4",
+  teal250: "#99e6dc",
+  teal300: "#5eead4",
+  teal350: "#b8d7d3",
+  teal900: "#123f3c",
+  teal950: "#0b2b28",
+  teal850: "#0f2e2b",
+  teal800: "#1e4b46",
+
+  // The dashboard's green-tinted greys, which are in neither ramp above.
+  sage50: "#f7faf9",
+  sage100: "#edf1f0",
+  sage150: "#e6edeb",
+  sage200: "#e1e9e7",
+  sage500: "#7a8988",
+  sage600: "#607170",
+  sage700: "#526361",
+
+  // Tinted state colours.
+  red600: "#b42318",
+  red100: "#fecaca",
+  red50: "#fef2f2",
+  red950: "#2a1416",
+  red900: "#7f1d1d",
+  green200: "#a7f3d0",
+  blue100: "#d6e4ff",
+  blue950: "#1e3a5f",
+  ink850: "#121d31",
 
   // --- Dark theme -----------------------------------------------------------
   // Surfaces, darkest first. The sider is darker than the page and the page is
