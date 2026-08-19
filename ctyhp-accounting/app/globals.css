@@ -34,6 +34,7 @@
   --ob-border-coolSoft: #edf1f4;
   --ob-border-coolTint: #eef2f6;
   --ob-chrome-text: #f8fafc;
+  --ob-chrome-textAccent: #f0fdfa;
   --ob-chrome-textMuted: #94a3b8;
   --ob-chrome-border: #1e293b;
   --ob-chrome-scrollbar: #334155;
@@ -146,6 +147,7 @@
   --ob-border-coolSoft: #1b2740;
   --ob-border-coolTint: #1b2740;
   --ob-chrome-text: #f8fafc;
+  --ob-chrome-textAccent: #f0fdfa;
   --ob-chrome-textMuted: #94a3b8;
   --ob-chrome-border: #1e293b;
   --ob-chrome-scrollbar: #334155;
@@ -398,7 +400,7 @@ body {
 }
 
 .app-shell__navigation-menu.ant-menu-dark .ant-menu-item-selected {
-  color: var(--ob-accent-wash);
+  color: var(--ob-chrome-textAccent);
   background: rgba(15, 118, 110, 0.32);
   box-shadow: inset 3px 0 0 var(--ob-accent-glow);
 }
@@ -2020,7 +2022,7 @@ body {
 }
 
 .app-shell__approvals--navigation.app-shell__approvals--active {
-  color: var(--ob-accent-wash);
+  color: var(--ob-chrome-textAccent);
   background: rgba(15, 118, 110, 0.32);
   box-shadow: inset 3px 0 0 var(--ob-accent-glow);
 }

@@ -90,6 +90,17 @@ export const TOKENS = {
    */
   chrome: {
     text: PALETTE.slate50Bright,
+    /**
+     * The tealed text of a selected navigation item.
+     *
+     * `accent.wash` was doing this job and is a *background* wash everywhere
+     * else — near-white on a light card, and correctly a deep teal in dark.
+     * Here it was the text on the sider, which is dark in both themes, so
+     * inverting it turned the selected item almost invisible on every page.
+     * The fourth instance of one value doing two jobs, and the second to be
+     * solved by moving the text half into this group.
+     */
+    textAccent: PALETTE.teal50,
     textMuted: PALETTE.slate400,
     border: PALETTE.slate800,
     scrollbar: PALETTE.slate700,
@@ -253,6 +264,7 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
   chrome: {
     // The sider is dark in both themes, so its furniture does not move.
     text: PALETTE.slate50Bright,
+    textAccent: PALETTE.teal50,
     textMuted: PALETTE.slate400,
     border: PALETTE.slate800,
     scrollbar: PALETTE.slate700,
