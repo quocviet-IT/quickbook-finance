@@ -30,6 +30,7 @@ import {
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
   type AttachmentTarget,
@@ -244,6 +245,15 @@ export default function InvoicesClient({
     };
   }, [watchedCustomerId, creditByCustomer, previewTotals.totalMinor]);
 
+  // What the reader types and picks. "Overdue" is the option this register
+  // exists to answer — QuickBooks and Xero both lead their invoice queues
+  // with it — and it reuses the exact rule the dashboard's work queue already
+  // applies, via the shared helper, so the two can never disagree.
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "overdue" | InvoiceStatus>("all");
+  // `today` above is the one the Age column already uses; the Overdue filter
+  // reads the same clock so a row aged "12 days late" can never be outside it.
+
   const visibleInvoices = useMemo(() => {
     if (!initialQueue) return invoices;
     const filtered = invoices.filter(
@@ -259,6 +269,20 @@ export default function InvoicesClient({
       return (left.due_date ?? "").localeCompare(right.due_date ?? "");
     });
   }, [initialQueue, invoices]);
+
+  const filteredInvoices = visibleInvoices.filter((invoice) => {
+    if (!matchesDocumentKeyword([invoice.invoice_number, invoice.customer_name], keyword)) {
+      return false;
+    }
+    if (statusFilter === "all") return true;
+    if (statusFilter === "overdue") {
+      return isOverdueDocument(
+        { status: invoice.status, dueDate: invoice.due_date, balanceDueMinor: invoice.balance_due_minor },
+        today,
+      );
+    }
+    return invoice.status === statusFilter;
+  });
 
   function openCreate() {
     form.resetFields();
@@ -621,7 +645,7 @@ export default function InvoicesClient({
       ) : null}
 
       <FilterBar
-        resultCount={visibleInvoices.length}
+        resultCount={filteredInvoices.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -637,17 +661,46 @@ export default function InvoicesClient({
             <Button onClick={() => router.push("/invoices")}>Show all</Button>
           </div>
         ) : null}
+        <Input.Search
+          allowClear
+          aria-label="Search invoices by number or customer"
+          placeholder="Search number or customer"
+          style={{ width: 260 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter invoices by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          style={{ minWidth: 150 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "overdue", label: "Overdue" },
+            { value: "draft", label: "Draft" },
+            { value: "issued", label: "Issued" },
+            { value: "partial", label: "Partially paid" },
+            { value: "paid", label: "Paid" },
+            { value: "void", label: "Void" },
+          ]}
+        />
       </FilterBar>
 
       <DataTable<InvoiceWithCustomer>
         rowKey="id"
         columns={columns}
-        dataSource={visibleInvoices}
+        dataSource={filteredInvoices}
         rowClassName={(invoice) =>
           invoice.id === initialQueue?.focusId ? "accounting-data-row--focused" : ""
         }
         sticky
-        emptyTitle={initialQueue ? "No overdue invoices" : "No invoices yet"}
+        emptyTitle={
+          keyword || statusFilter !== "all"
+            ? "No invoices match these filters"
+            : initialQueue
+              ? "No overdue invoices"
+              : "No invoices yet"
+        }
         emptyDescription={
           initialQueue
             ? "Customer balances are current as of the selected work queue date."

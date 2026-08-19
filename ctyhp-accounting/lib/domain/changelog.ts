@@ -41,6 +41,43 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.40",
+    date: "2026-08-19",
+    headline: "Invoices, Bills and Payments can be searched — and filtered to the money that needs chasing.",
+    changes: [
+      {
+        kind: "added",
+        title: "Search and an Overdue filter on Invoices",
+        detail:
+          "Search by number or customer, filter by status — and \"Overdue\" " +
+          "shows exactly the invoices still owed money past their due " +
+          "date, by the same rule the dashboard's work queue uses. Due " +
+          "today counts as due, not late.",
+        route: "/invoices",
+      },
+      {
+        kind: "added",
+        title: "The same on Bills, including the vendor's own reference",
+        detail:
+          "Search covers the bill number, the vendor, and the vendor's " +
+          "reference — the string in your hand when a vendor calls about " +
+          "an invoice of theirs. Overdue filters to what is still unpaid " +
+          "past its due date.",
+        route: "/bills",
+      },
+      {
+        kind: "added",
+        title: "Search and a status filter on Payments",
+        detail:
+          "Search by number, customer or reference. The status filter " +
+          "leads with Unapplied — a receipt still carrying money that has " +
+          "not been applied to an invoice is work someone has not " +
+          "finished.",
+        route: "/payments",
+      },
+    ],
+  },
+  {
     version: "1.39",
     date: "2026-08-19",
     headline: "Dark mode stops flashing light, and four smaller things sit where they should.",

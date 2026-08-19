@@ -18,11 +18,12 @@ import {
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
-import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
+import type { BillStatus, AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { withVendor } from "@/lib/domain/vendors";
@@ -127,6 +128,10 @@ export default function BillsClient({
     [currencies, currency],
   );
 
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "overdue" | BillStatus>("all");
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   const visibleBills = useMemo(() => {
     if (!initialQueue) return bills;
     const filtered = bills.filter(
@@ -142,6 +147,23 @@ export default function BillsClient({
       return (left.due_date ?? "").localeCompare(right.due_date ?? "");
     });
   }, [bills, initialQueue]);
+
+  // On top of the queue narrowing, never instead of it. The keyword covers
+  // the vendor reference too — that is the string in a bookkeeper's hand
+  // when the vendor calls about it.
+  const filteredBills = visibleBills.filter((bill) => {
+    if (!matchesDocumentKeyword([bill.bill_number, bill.vendor_name, bill.vendor_ref], keyword)) {
+      return false;
+    }
+    if (statusFilter === "all") return true;
+    if (statusFilter === "overdue") {
+      return isOverdueDocument(
+        { status: bill.status, dueDate: bill.due_date, balanceDueMinor: bill.balance_due_minor },
+        today,
+      );
+    }
+    return bill.status === statusFilter;
+  });
 
   function decimalsOf(code: string): number {
     return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
@@ -213,7 +235,7 @@ export default function BillsClient({
   return (
     <>
       <FilterBar
-        resultCount={visibleBills.length}
+        resultCount={filteredBills.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
@@ -229,14 +251,43 @@ export default function BillsClient({
             <Button onClick={() => router.push("/bills")}>Show all</Button>
           </div>
         ) : null}
+        <Input.Search
+          allowClear
+          aria-label="Search bills by number, vendor, or vendor reference"
+          placeholder="Search number, vendor, or reference"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter bills by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          style={{ minWidth: 150 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "overdue", label: "Overdue" },
+            { value: "draft", label: "Draft" },
+            { value: "open", label: "Open" },
+            { value: "partial", label: "Partially paid" },
+            { value: "paid", label: "Paid" },
+            { value: "void", label: "Void" },
+          ]}
+        />
       </FilterBar>
       <DataTable<BillWithVendor>
         rowKey="id"
-        dataSource={visibleBills}
+        dataSource={filteredBills}
         rowClassName={(bill) =>
           bill.id === initialQueue?.focusId ? "accounting-data-row--focused" : ""
         }
-        emptyTitle={initialQueue ? "No bills due" : "No bills yet"}
+        emptyTitle={
+          keyword || statusFilter !== "all"
+            ? "No bills match these filters"
+            : initialQueue
+              ? "No bills due"
+              : "No bills yet"
+        }
         emptyDescription={
           initialQueue
             ? "No open vendor bills are due within the selected work queue window."

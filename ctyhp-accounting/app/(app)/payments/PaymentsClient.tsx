@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import {
   Button,
   Dropdown,
+  Input,
+  Select,
   Space,
   Table,
   Tag,
@@ -11,6 +13,8 @@ import {
   type MenuProps,
   type TableColumnsType,
 } from "antd";
+import FilterBar from "@/components/ui/FilterBar";
+import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import {
   DeleteOutlined,
   MoreOutlined,
@@ -94,6 +98,14 @@ export default function PaymentsClient({
   const [refundFor, setRefundFor] = useState<PaymentListRow | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
   const [pageSize, setPageSize] = useState<number>(PAYMENTS_DEFAULT_PAGE_SIZE);
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | PaymentStatus>("all");
+
+  const visiblePayments = payments.filter(
+    (payment) =>
+      matchesDocumentKeyword([payment.payment_number, payment.customer_name, payment.reference], keyword) &&
+      (statusFilter === "all" || payment.status === statusFilter),
+  );
 
   const decimalsOf = (code: string) => currencies.find((c) => c.code === code)?.decimal_places ?? 2;
 
@@ -230,18 +242,45 @@ export default function PaymentsClient({
 
   return (
     <div>
-      {canWrite && (
-        <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openReceive(null)}>
-            Receive payment
-          </Button>
-        </Space>
-      )}
+      <FilterBar
+        resultCount={visiblePayments.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openReceive(null)}>
+              Receive payment
+            </Button>
+          ) : null
+        }
+      >
+        <Input.Search
+          allowClear
+          aria-label="Search payments by number, customer, or reference"
+          placeholder="Search number, customer, or reference"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter payments by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          style={{ minWidth: 170 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            // The money question first: a receipt still carrying unapplied
+            // cash is work someone has not finished.
+            { value: "unapplied", label: "Unapplied" },
+            { value: "partial", label: "Partially applied" },
+            { value: "applied", label: "Applied" },
+            { value: "void", label: "Void" },
+          ]}
+        />
+      </FilterBar>
 
       <Table
         rowKey="id"
         columns={columns}
-        dataSource={payments}
+        dataSource={visiblePayments}
         size="small"
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAYMENTS_DEFAULT_PAGE_SIZE))}
         scroll={{ x: "max-content" }}
