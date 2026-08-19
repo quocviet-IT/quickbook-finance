@@ -1153,7 +1153,7 @@ body {
 .comparison-bars__track {
   height: 10px;
   overflow: hidden;
-  background: #eef2f6;
+  background: var(--ob-surface-muted);
   border-radius: 999px;
 }
 
@@ -1827,7 +1827,7 @@ body {
   color: var(--ob-text-strong);
   font-size: 14px;
   line-height: 1.5;
-  border-color: #dbe2ea;
+  border-color: var(--ob-border-softAlt);
   border-radius: 8px;
   background: var(--ob-surface-subtle);
   box-shadow: none;
@@ -2140,7 +2140,7 @@ body {
 .dashboard-context .ant-tag {
   margin-inline-end: 0;
   color: #3f5654;
-  border-color: #d7e2e0;
+  border-color: var(--ob-panel-borderStrong);
   background: var(--ob-panel-bg);
 }
 
@@ -2211,7 +2211,7 @@ body {
   min-height: 44px;
   align-items: center;
   padding: 3px;
-  background: #e4ecea;
+  background: var(--ob-panel-borderSoft);
 }
 
 .dashboard-filter-bar__control .ant-segmented-item {
@@ -2316,7 +2316,7 @@ body {
   flex: 0 0 auto;
   color: var(--ob-intent-primary);
   border-radius: 8px;
-  background: #e9f5f3;
+  background: var(--ob-accent-hover);
 }
 
 .dashboard-summary--featured .dashboard-summary__icon {
@@ -2474,7 +2474,7 @@ body {
   gap: 14px;
   margin-bottom: 24px;
   padding: 14px;
-  border: 1px solid #dfe8e6;
+  border: 1px solid var(--ob-panel-line);
   border-radius: 9px;
   background: var(--ob-panel-bg);
 }
@@ -2530,7 +2530,7 @@ body {
   height: 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: #edf2f1;
+  background: var(--ob-panel-border);
 }
 
 .cash-flow-component__axis {
@@ -2602,7 +2602,7 @@ body {
 
 .dashboard-work-queue__filters button:hover {
   color: var(--ob-intent-primary);
-  background: #f3f8f7;
+  background: var(--ob-panel-soft);
 }
 
 .dashboard-work-queue__filters button:focus-visible {
@@ -2612,8 +2612,8 @@ body {
 
 .dashboard-work-queue__filters button.is-active {
   color: #0f625b;
-  border-color: #b9d8d4;
-  background: #eaf6f4;
+  border-color: var(--ob-accent-line);
+  background: var(--ob-accent-hover);
 }
 
 .dashboard-work-queue__filters button strong {
@@ -2832,7 +2832,7 @@ body {
   gap: 8px;
   margin-top: 12px;
   padding: 10px 11px;
-  color: #536765;
+  color: var(--ob-panel-textStrong);
   border-radius: 8px;
   background: var(--dashboard-soft);
   font-size: 12px;
@@ -2855,7 +2855,7 @@ body {
 
 .dashboard-inventory-summary > div {
   padding: 12px;
-  background: #f8faf9;
+  background: var(--ob-panel-bg);
 }
 
 .dashboard-inventory-summary span,
@@ -2927,7 +2927,7 @@ body {
   height: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e9efee;
+  background: var(--ob-panel-borderSoft);
 }
 
 .inventory-holding__track span {
@@ -3000,7 +3000,7 @@ body {
 
 .dashboard-timeline-filters button:hover {
   color: var(--ob-intent-primary);
-  background: #f2f7f6;
+  background: var(--ob-panel-soft);
 }
 
 .dashboard-timeline-filters button.is-active {
@@ -3015,7 +3015,7 @@ body {
   color: var(--ob-panel-text);
   text-align: center;
   border-radius: 999px;
-  background: #e7eeec;
+  background: var(--ob-panel-borderSoft);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
@@ -3037,7 +3037,7 @@ body {
   gap: 9px;
   padding: 10px 12px;
   color: #677876;
-  border: 1px solid #e2eae8;
+  border: 1px solid var(--ob-panel-line);
   border-radius: 8px;
   background: var(--ob-panel-bg);
   font-size: 12px;
@@ -3061,9 +3061,9 @@ body {
 .dashboard-loading__panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid #e0e8e6;
+  border: 1px solid var(--ob-panel-line);
   border-radius: 12px;
-  background: #f5f8f7;
+  background: var(--ob-panel-soft);
 }
 
 .dashboard-loading__heading {
@@ -3462,7 +3462,7 @@ body {
 }
 .system-guide__shot .ant-image {
   width: 100%;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--ob-panel-border);
   border-radius: 8px;
   overflow: hidden;
 }
