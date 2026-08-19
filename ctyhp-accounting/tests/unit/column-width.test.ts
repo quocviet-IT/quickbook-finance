@@ -136,3 +136,34 @@ describe("totalColumnWidth", () => {
     expect(totalColumnWidth(DEFAULTS, 0)).toBe(575);
   });
 });
+
+describe("per-column minimums", () => {
+  it("clamps to a caller's own floor when one is given", () => {
+    // The Match column holds a tag, a description and three buttons; at the
+    // global 60px floor those stack into a broken pile, which is exactly what
+    // a reader screenshotted. A column may declare it needs more room than
+    // the global floor guarantees.
+    expect(clampColumnWidth(100, 240)).toBe(240);
+    expect(clampColumnWidth(300, 240)).toBe(300);
+  });
+
+  it("resizes against the caller's floor, not the global one", () => {
+    expect(resizedWidth(300, -200, 240)).toBe(240);
+  });
+
+  it("re-clamps a stored width that predates the floor", () => {
+    // The width store is older than the rule: somebody narrowed Match to 60
+    // last week and that number is still in localStorage. The floor must
+    // apply on the way in, or the broken layout survives the fix.
+    expect(parseStoredWidths('{"match":60}', ["match"], { match: 240 })).toEqual({
+      match: 240,
+    });
+  });
+
+  it("leaves keys without a declared floor on the global one", () => {
+    expect(parseStoredWidths('{"date":10,"match":60}', ["date", "match"], { match: 240 })).toEqual({
+      date: MIN_COLUMN_WIDTH,
+      match: 240,
+    });
+  });
+});

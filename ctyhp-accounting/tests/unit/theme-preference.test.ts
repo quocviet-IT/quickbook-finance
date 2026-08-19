@@ -6,6 +6,7 @@ import {
   noFlashScript,
   parseThemeMode,
   resolveTheme,
+  themeCookie,
 } from "@/lib/domain/theme";
 
 describe("theme modes", () => {
@@ -111,5 +112,30 @@ describe("noFlashScript", () => {
       () => ({ matches: false }),
     );
     expect(attributes[THEME_ATTRIBUTE]).toBe("light");
+  });
+});
+
+describe("themeCookie", () => {
+  it("carries the mode under the same name the rest of the system uses", () => {
+    // The cookie exists so the SERVER can know the theme: localStorage never
+    // leaves the browser, so with only it the server always rendered light
+    // and a dark reader watched every reload arrive light and then turn —
+    // for seconds, on a heavy page. One name for cookie and storage, or the
+    // two copies drift.
+    expect(themeCookie("dark")).toContain(`${THEME_STORAGE_KEY}=dark`);
+  });
+
+  it("lives long enough to outlast a session, scoped to the whole app", () => {
+    const cookie = themeCookie("dark");
+    expect(cookie).toContain("path=/");
+    expect(cookie).toContain("max-age=31536000");
+    expect(cookie.toLowerCase()).toContain("samesite=lax");
+  });
+
+  it("round-trips through the same parser storage uses", () => {
+    for (const mode of THEME_MODES) {
+      const value = themeCookie(mode).split(";")[0].split("=")[1];
+      expect(parseThemeMode(value)).toBe(mode);
+    }
   });
 });

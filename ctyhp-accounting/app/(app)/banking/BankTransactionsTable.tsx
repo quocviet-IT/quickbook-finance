@@ -83,6 +83,17 @@ const COLUMN_WIDTH_STORAGE_KEY = "onebook.bank-transactions.column-widths";
  */
 const PINNED_COLUMN_WIDTH = 56;
 
+/**
+ * Floors above the global 60px. Match holds a tag, a description and up to
+ * three buttons; at the global floor those stacked into the broken pile a
+ * reader screenshotted. A stored width already under the floor is re-clamped
+ * on load, so the fix reaches layouts broken before it existed.
+ */
+const MIN_COLUMN_WIDTHS: Partial<Record<BankColumnKey, number>> = {
+  match: 240,
+  category: 150,
+};
+
 const TXN_STATUS: Record<BankTxnStatus, { text: string; color: string }> = {
   unmatched: { text: "For review", color: "orange" },
   matched: { text: "Matched", color: "green" },
@@ -167,6 +178,7 @@ export default function BankTransactionsTable({
   const { widths, resizeHandleProps, guardHeaderDrag } = useColumnResize<BankColumnKey>(
     DEFAULT_COLUMN_WIDTHS,
     COLUMN_WIDTH_STORAGE_KEY,
+    MIN_COLUMN_WIDTHS,
   );
 
   const dataColumns: TableColumnsType<BankReviewTableRow> = [

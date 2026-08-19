@@ -69,3 +69,19 @@ export function noFlashScript(): string {
     "}catch(e){}"
   );
 }
+
+/**
+ * The preference as a cookie, which is what lets the SERVER know the theme.
+ *
+ * localStorage never leaves the browser. With only it, the server always
+ * rendered the light theme and corrected after hydration — so a dark reader
+ * watched every reload, and every company switch, arrive light and then turn
+ * dark, for seconds on a heavy page. The cookie rides the request, the layout
+ * reads it, and the first server-rendered byte is already the right theme.
+ *
+ * Same name as the storage key on purpose: two names would be two copies of
+ * the preference with no rule for which one wins.
+ */
+export function themeCookie(mode: ThemeMode): string {
+  return `${THEME_STORAGE_KEY}=${mode}; path=/; max-age=31536000; SameSite=Lax`;
+}

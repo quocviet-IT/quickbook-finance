@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import Providers from "./providers";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { noFlashScript } from "@/lib/domain/theme";
+import { noFlashScript, parseThemeMode, THEME_STORAGE_KEY } from "@/lib/domain/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,11 +11,19 @@ export const metadata: Metadata = {
   description: "One Book accounting operations webapp",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The theme, from the cookie the toggle writes. This is what lets the
+  // FIRST server-rendered byte carry the right Ant Design palette — without
+  // it a dark reader watched every reload and company switch arrive light
+  // and turn dark once React caught up, seconds later on a heavy page. A
+  // reader with no cookie yet gets "system", and the inline script below
+  // still sets the attribute correctly before anything paints.
+  const jar = await cookies();
+  const initialMode = parseThemeMode(jar.get(THEME_STORAGE_KEY)?.value);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -37,7 +46,7 @@ export default function RootLayout({
         <AntdRegistry>
           {/* Outside Providers, which reads the resolved theme from it to
               choose Ant Design's algorithm. */}
-          <ThemeProvider>
+          <ThemeProvider initialMode={initialMode}>
             <Providers>{children}</Providers>
           </ThemeProvider>
         </AntdRegistry>

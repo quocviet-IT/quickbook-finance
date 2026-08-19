@@ -159,7 +159,13 @@ export default function BankTransactionsFilters({
             // Ant Design filter them again would drop a reference whose match
             // sits in a part of the string it does not look at.
             filterOption={false}
-            style={{ width: 380 }}
+            // Flexible, not fixed. The action block beside this row varies by
+            // company — one with an unlinked ledger account carries an extra
+            // Add account button — and at a fixed 380px the actions wrapped
+            // onto a third line there while another company got two. The box
+            // gives its width back before the row breaks, down to 240px,
+            // which still fits its own placeholder.
+            style={{ flex: "1 1 240px", minWidth: 240, maxWidth: 380 }}
             popupMatchSelectWidth={420}
           >
             <Input
@@ -175,11 +181,6 @@ export default function BankTransactionsFilters({
             </Badge>
           </Popover>
           {hasFindFilter ? <Button onClick={onClearFind}>Clear filters</Button> : null}
-          {suggestedMatchCount ? (
-            <Typography.Text type="secondary">
-              {suggestedMatchCount} suggested match{suggestedMatchCount > 1 ? "es" : ""} in the Match column
-            </Typography.Text>
-          ) : null}
         </>
       }
     >
@@ -228,6 +229,16 @@ export default function BankTransactionsFilters({
             })),
         ]}
       />
+      {/* On the scope row, which has room to spare, not the find row, which
+          does not. This note only appears when the matcher has suggestions,
+          and on the company that had ten of them it was the straw that
+          wrapped the actions onto a third line — so the bar's shape depended
+          on the books, and two companies got two different layouts. */}
+      {suggestedMatchCount ? (
+        <Typography.Text type="secondary">
+          {suggestedMatchCount} suggested match{suggestedMatchCount > 1 ? "es" : ""} in the Match column
+        </Typography.Text>
+      ) : null}
     </FilterBar>
   );
 }

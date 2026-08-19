@@ -2,7 +2,11 @@
 // data-table-contract.test.ts: importing antd's runtime costs about 55
 // seconds against this file's fraction of a second.
 import { describe, expect, it, vi } from "vitest";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import {
+  clientTablePagination,
+  fallbackPagination,
+  pageSizeOptionsFor,
+} from "@/components/ui/table-pagination";
 
 describe("clientTablePagination (the mechanism behind the RQ-04 sweep)", () => {
   it("hands back whatever pageSize the caller is holding, not a fixed number", () => {
@@ -71,5 +75,48 @@ describe("pageSizeOptionsFor (keeping a screen's own default reachable)", () => 
     for (const defaultPageSize of [5, 8, 10, 12, 15, 20, 25, 30, 50, 75, 100, 200]) {
       expect(pageSizeOptionsFor(defaultPageSize)).toContain(defaultPageSize);
     }
+  });
+});
+
+describe("fallbackPagination", () => {
+  it("takes over the page size when the caller left it out", () => {
+    // The RQ-04 bug's last hiding place: a table given no pagination at all
+    // received a literal default from resolveTableData on every render, and
+    // a defined pageSize is a controlled one — the size changer moved, the
+    // table did not. Chart of Accounts was reported; at least eight screens
+    // shared it.
+    const set = vi.fn();
+    const result = fallbackPagination(undefined, 50, set);
+    expect(result && result.pageSize).toBe(50);
+  });
+
+  it("reports a size change back into the fallback state", () => {
+    const set = vi.fn();
+    const result = fallbackPagination(undefined, 20, set);
+    if (!result) throw new Error("expected a config");
+    result.onChange?.(1, 100);
+    expect(set).toHaveBeenCalledWith(100);
+  });
+
+  it("stands aside when the caller controls the page size", () => {
+    // Screens that already hold their own state (bank transactions, the
+    // general ledger) must keep exactly the behaviour they have.
+    const callers = { pageSize: 25, onChange: vi.fn() };
+    const set = vi.fn();
+    expect(fallbackPagination(callers, 20, set)).toBe(callers);
+  });
+
+  it("keeps a caller's own onChange in the loop", () => {
+    const callerChange = vi.fn();
+    const set = vi.fn();
+    const result = fallbackPagination({ onChange: callerChange }, 20, set);
+    if (!result) throw new Error("expected a config");
+    result.onChange?.(2, 50);
+    expect(set).toHaveBeenCalledWith(50);
+    expect(callerChange).toHaveBeenCalledWith(2, 50);
+  });
+
+  it("leaves pagination switched off alone", () => {
+    expect(fallbackPagination(false, 20, vi.fn())).toBe(false);
   });
 });

@@ -72,6 +72,10 @@ interface ActiveResize<K> {
 export function useColumnResize<K extends string>(
   defaults: Record<K, number>,
   storageKey: string,
+  /** Floors above the global 60px, for columns whose content cannot shrink
+   *  that far — a cell of buttons stacks into a broken pile at 60. Applied to
+   *  the drag and to widths read back from storage alike. */
+  mins: Partial<Record<K, number>> = {},
 ): UseColumnResizeResult<K> {
   const [widths, setWidths] = useState<Record<K, number>>(defaults);
   // Storage is read after mount, never during render: the server has no
@@ -92,7 +96,7 @@ export function useColumnResize<K extends string>(
     }
     const keys = Object.keys(defaults) as K[];
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWidths(mergeColumnWidths(defaults, parseStoredWidths(stored, keys)));
+    setWidths(mergeColumnWidths(defaults, parseStoredWidths(stored, keys, mins)));
     setHydrated(true);
     // `defaults` is a module constant at every call site; listing it would
     // re-read storage on every render for a value that never changes.
@@ -127,7 +131,11 @@ export function useColumnResize<K extends string>(
         const move = (moveEvent: PointerEvent) => {
           const active = dragRef.current;
           if (!active) return;
-          const next = resizedWidth(active.startWidth, moveEvent.clientX - active.startX);
+          const next = resizedWidth(
+            active.startWidth,
+            moveEvent.clientX - active.startX,
+            mins[active.key],
+          );
           setWidths((current) =>
             current[active.key] === next ? current : { ...current, [active.key]: next },
           );
@@ -147,7 +155,10 @@ export function useColumnResize<K extends string>(
         window.addEventListener("pointercancel", end);
       },
     }),
-    [widths],
+    // `mins` is a module constant at both call sites, so listing it is free;
+    // a caller building it inline would re-create these props per render,
+    // which costs nothing worse than the render itself.
+    [widths, mins],
   );
 
   const guardHeaderDrag = useCallback(

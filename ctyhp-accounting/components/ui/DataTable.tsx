@@ -1,8 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Empty, Table, Typography, type TableProps } from "antd";
 import { resolveTableData, type ServerPage } from "./table-data";
+import { fallbackPagination } from "./table-pagination";
+import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
 
 export type { ServerPage };
 
@@ -31,7 +33,19 @@ export default function DataTable<RecordType extends object>({
   size = "small",
   ...props
 }: DataTableProps<RecordType>) {
-  const resolved = resolveTableData<RecordType>({ rows, page, dataSource, pagination });
+  // The size changer for callers who never mention pagination. Without this,
+  // resolveTableData's shared default reached antd as a defined — controlled —
+  // pageSize rebuilt every render, and picking 50 rows a page did nothing on
+  // every screen that passed no pagination prop at all (see
+  // fallbackPagination). Server-paged tables are excluded: their size lives in
+  // the caller's own state, usually the address bar.
+  const [fallbackSize, setFallbackSize] = useState<number>(DEFAULT_TABLE_STATE.pageSize);
+  const resolved = resolveTableData<RecordType>({
+    rows,
+    page,
+    dataSource,
+    pagination: page ? pagination : fallbackPagination(pagination, fallbackSize, setFallbackSize),
+  });
 
   return (
     <div className="accounting-data-table">

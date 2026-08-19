@@ -41,6 +41,56 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.39",
+    date: "2026-08-19",
+    headline: "Dark mode stops flashing light, and four smaller things sit where they should.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Reloading no longer flashes the light theme at you",
+        detail:
+          "With dark chosen, a reload or a company switch arrived light and " +
+          "turned dark once the page caught up — seconds, on a heavy " +
+          "screen. Your choice now travels with the request, so the very " +
+          "first thing the server sends is already in your theme.",
+        route: "/dashboard",
+      },
+      {
+        kind: "fixed",
+        title: "The Banking filter bar keeps one shape on every company",
+        detail:
+          "On a company with more buttons — or with match suggestions " +
+          "waiting — the actions wrapped onto a third line, so two " +
+          "companies got two different bars. The suggestions note moved up " +
+          "beside the account filters where there is room, and the search " +
+          "box now gives back width before the row breaks.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "The Match column can no longer be squeezed into a broken pile",
+        detail:
+          "Dragged narrow enough, the Match column stacked its tag, " +
+          "description and buttons into an unreadable column of fragments. " +
+          "It now stops at a width its content actually fits, and a " +
+          "too-narrow width remembered from before this rule is corrected " +
+          "the next time the page opens.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Rows per page works on Chart of Accounts — and seven more screens",
+        detail:
+          "Picking 50 or 100 rows a page moved the dropdown and nothing " +
+          "else. Chart of Accounts was reported; the same defect sat on " +
+          "every screen that never mentions paging at all — Bills, " +
+          "Expenses, Items, Purchase Orders and others — and one fix in " +
+          "the shared table covers them all.",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
     version: "1.38",
     date: "2026-08-19",
     headline: "Search comes to Customers and Vendors, the feedback queue reads properly, and the tab gets the One Book mark.",

@@ -48,9 +48,9 @@ export const MAX_COLUMN_WIDTH = 800;
  * anything. `NaN` collapses to the minimum rather than propagating into a
  * style attribute, where it would silently drop the width entirely.
  */
-export function clampColumnWidth(px: number): number {
-  if (Number.isNaN(px)) return MIN_COLUMN_WIDTH;
-  return Math.round(Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, px)));
+export function clampColumnWidth(px: number, min: number = MIN_COLUMN_WIDTH): number {
+  if (Number.isNaN(px)) return min;
+  return Math.round(Math.min(MAX_COLUMN_WIDTH, Math.max(min, px)));
 }
 
 /**
@@ -62,8 +62,12 @@ export function clampColumnWidth(px: number): number {
  * deltas drifts against the pointer once the clamp starts discarding
  * movement, and the column ends up somewhere the pointer is not.
  */
-export function resizedWidth(startWidth: number, deltaX: number): number {
-  return clampColumnWidth(startWidth + deltaX);
+export function resizedWidth(
+  startWidth: number,
+  deltaX: number,
+  min: number = MIN_COLUMN_WIDTH,
+): number {
+  return clampColumnWidth(startWidth + deltaX, min);
 }
 
 /**
@@ -78,6 +82,12 @@ export function resizedWidth(startWidth: number, deltaX: number): number {
 export function parseStoredWidths<K extends string>(
   raw: string | null,
   allowedKeys: readonly K[],
+  /**
+   * Floors above the global one, per column. A stored width predating a floor
+   * is re-clamped on the way in — the store is older than the rule, and a
+   * layout the rule exists to prevent must not survive it.
+   */
+  mins: Partial<Record<K, number>> = {},
 ): Partial<Record<K, number>> {
   if (!raw) return {};
   let parsed: unknown;
@@ -98,7 +108,7 @@ export function parseStoredWidths<K extends string>(
     if (typeof value !== "number" || !Number.isFinite(value)) continue;
     // Clamped, not rejected: a stored width is a preference, and bounds can
     // tighten between releases without making the preference meaningless.
-    widths[key] = clampColumnWidth(value);
+    widths[key] = clampColumnWidth(value, mins[key] ?? MIN_COLUMN_WIDTH);
   }
   return widths;
 }

@@ -65,3 +65,36 @@ export function clientTablePagination(
     onChange: (_page, nextPageSize) => setPageSize(nextPageSize),
   };
 }
+
+/**
+ * The page size for a table whose caller never mentioned pagination at all.
+ *
+ * This was the RQ-04 controlled-prop bug's last hiding place. A screen that
+ * passed nothing received `{ pageSize: 20 }` from resolveTableData, rebuilt on
+ * every render — and a *defined* pageSize is a controlled one, so the size
+ * changer moved while the table stayed at twenty. The 1.25 sweep fixed every
+ * screen that wrote a literal itself; the screens that wrote nothing inherited
+ * the same literal from the shared default and were missed. Chart of Accounts
+ * was the one reported; at least eight screens shared it.
+ *
+ * DataTable holds one piece of state and routes it through here, so the fix
+ * lands once instead of eight more times. A caller that supplies its own
+ * `pageSize` is left entirely alone — those screens already hold their own
+ * state and must keep exactly the behaviour they have.
+ */
+export function fallbackPagination(
+  callerPagination: TablePaginationConfig | false | undefined,
+  pageSize: number,
+  setPageSize: (pageSize: number) => void,
+): TablePaginationConfig | false | undefined {
+  if (callerPagination === false) return false;
+  if (callerPagination?.pageSize !== undefined) return callerPagination;
+  return {
+    ...callerPagination,
+    pageSize,
+    onChange: (page, nextPageSize) => {
+      setPageSize(nextPageSize);
+      callerPagination?.onChange?.(page, nextPageSize);
+    },
+  };
+}
