@@ -12,7 +12,9 @@
   --ob-intent-info: #1d4ed8;
   --ob-text-heading: #0f172a;
   --ob-text-body: #0f172a;
+  --ob-text-strong: #334155;
   --ob-text-secondary: #475569;
+  --ob-text-faint: #64748b;
   --ob-text-onDark: #ffffff;
   --ob-surface-page: #f6f7f9;
   --ob-surface-card: #ffffff;
@@ -20,6 +22,12 @@
   --ob-surface-sider: #0f172a;
   --ob-border-default: #e2e8f0;
   --ob-border-subtle: #f1f5f9;
+  --ob-chrome-text: #f8fafc;
+  --ob-chrome-textMuted: #94a3b8;
+  --ob-chrome-border: #1e293b;
+  --ob-chrome-scrollbar: #334155;
+  --ob-chrome-submenu: #263449;
+  --ob-chrome-headerBorder: #e5eaf0;
   --ob-series-sales: #0f766e;
   --ob-series-purchases: #7c3aed;
   --ob-series-inventory: #0369a1;
@@ -47,7 +55,9 @@
   --ob-intent-info: #60a5fa;
   --ob-text-heading: #f1f5f9;
   --ob-text-body: #e2e8f0;
+  --ob-text-strong: #e2e8f0;
   --ob-text-secondary: #94a3b8;
+  --ob-text-faint: #94a3b8;
   --ob-text-onDark: #ffffff;
   --ob-surface-page: #0b1220;
   --ob-surface-card: #131c2e;
@@ -55,6 +65,12 @@
   --ob-surface-sider: #0a101c;
   --ob-border-default: #2a3854;
   --ob-border-subtle: #1b2740;
+  --ob-chrome-text: #f8fafc;
+  --ob-chrome-textMuted: #94a3b8;
+  --ob-chrome-border: #1e293b;
+  --ob-chrome-scrollbar: #334155;
+  --ob-chrome-submenu: #263449;
+  --ob-chrome-headerBorder: #2a3854;
   --ob-series-sales: #2dd4bf;
   --ob-series-purchases: #c4b5fd;
   --ob-series-inventory: #38bdf8;
@@ -180,7 +196,7 @@ body {
  */
 .app-shell__sider {
   align-self: stretch;
-  border-inline-end: 1px solid #1e293b;
+  border-inline-end: 1px solid var(--ob-chrome-border);
 }
 
 .app-shell__sidebar-frame {
@@ -201,7 +217,7 @@ body {
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: var(--ob-chrome-scrollbar) transparent;
 }
 
 .app-shell__navigation-scroll::-webkit-scrollbar {
@@ -209,7 +225,7 @@ body {
 }
 
 .app-shell__navigation-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--ob-chrome-scrollbar);
   border-radius: 999px;
 }
 
@@ -257,7 +273,7 @@ body {
 
 .app-shell__navigation-menu.ant-menu-dark .ant-menu-item:active,
 .app-shell__navigation-menu.ant-menu-dark .ant-menu-submenu-title:active {
-  background: #263449;
+  background: var(--ob-chrome-submenu);
 }
 
 .app-shell__navigation-menu .ant-menu-title-content {
@@ -275,7 +291,7 @@ body {
 .app-shell__sidebar-footer {
   flex: 0 0 auto;
   padding: 6px 0 8px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--ob-chrome-border);
   background: var(--ob-surface-sider);
 }
 
@@ -292,14 +308,14 @@ body {
   min-height: 44px;
   margin: 2px 8px 0;
   padding-inline: 16px;
-  color: #94a3b8;
+  color: var(--ob-chrome-textMuted);
   border-radius: 7px;
 }
 
 .app-shell__collapse-button.ant-btn:hover,
 .app-shell__collapse-button.ant-btn:focus-visible {
-  color: #f8fafc !important;
-  background: #1e293b !important;
+  color: var(--ob-chrome-text) !important;
+  background: var(--ob-chrome-border) !important;
 }
 
 .ant-layout-sider-collapsed .app-shell__collapse-button.ant-btn {
@@ -315,7 +331,7 @@ body {
   flex: 0 0 auto;
   padding: 0 16px;
   color: inherit;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--ob-chrome-border);
   transition: background-color 160ms ease-out;
 }
 
@@ -345,7 +361,7 @@ body {
 
 .app-shell__brand-name {
   display: block;
-  color: #f8fafc !important;
+  color: var(--ob-chrome-text) !important;
   font-size: 15px;
   line-height: 1.2;
   white-space: nowrap;
@@ -359,7 +375,7 @@ body {
 }
 
 .app-shell__brand-subtitle {
-  color: #94a3b8;
+  color: var(--ob-chrome-textMuted);
   font-size: 11px;
   line-height: 1.2;
   letter-spacing: 0.03em;
@@ -380,7 +396,7 @@ body {
   align-items: center;
   justify-content: flex-start;
   gap: 16px;
-  border-bottom: 1px solid #e5eaf0;
+  border-bottom: 1px solid var(--ob-chrome-headerBorder);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -406,7 +422,7 @@ body {
   justify-content: flex-start;
   gap: 9px;
   padding: 4px 8px !important;
-  color: #334155;
+  color: var(--ob-chrome-scrollbar);
   border-radius: 8px;
 }
 
@@ -432,7 +448,7 @@ body {
   display: block;
   max-width: 164px;
   overflow: hidden;
-  color: #334155;
+  color: var(--ob-chrome-scrollbar);
   font-size: 13px;
   font-weight: 500;
   text-overflow: ellipsis;
@@ -473,14 +489,14 @@ body {
 }
 
 .app-shell__mobile-drawer .ant-drawer-title {
-  color: #f8fafc;
+  color: var(--ob-chrome-text);
 }
 
 .app-shell__mobile-drawer .ant-drawer-header {
   min-height: 64px;
   padding: 0 12px 0 0;
   background: var(--ob-surface-sider);
-  border-bottom-color: #1e293b;
+  border-bottom-color: var(--ob-chrome-border);
 }
 
 .app-shell__mobile-drawer .ant-drawer-body {
@@ -1860,8 +1876,8 @@ body {
 
 .app-shell__approvals--navigation:hover,
 .app-shell__approvals--navigation:focus-visible {
-  color: #f8fafc;
-  background: #1e293b;
+  color: var(--ob-chrome-text);
+  background: var(--ob-chrome-border);
 }
 
 .app-shell__approvals--navigation.app-shell__approvals--active {

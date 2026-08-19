@@ -40,7 +40,10 @@ export const TOKENS = {
   text: {
     heading: PALETTE.slate900,
     body: PALETTE.slate900,
+    // Between body and secondary. The shell's buttons and account name use it.
+    strong: PALETTE.slate700,
     secondary: PALETTE.slate600,
+    faint: PALETTE.slate500,
     onDark: PALETTE.white,
   },
   surface: {
@@ -52,6 +55,25 @@ export const TOKENS = {
   border: {
     default: PALETTE.slate200,
     subtle: PALETTE.slate100,
+  },
+  /**
+   * The application shell's own furniture: the sider, and the header rule
+   * beneath it.
+   *
+   * A group of its own because the sider is dark in BOTH themes. What reads
+   * on it does not change when the rest of the app inverts, so these tokens
+   * mostly carry the same value twice — and saying that once, here, is what
+   * stops someone "fixing" them later by darkening a surface that was never
+   * light. `headerBorder` is the exception: it is drawn on the header, which
+   * does invert.
+   */
+  chrome: {
+    text: PALETTE.slate50Bright,
+    textMuted: PALETTE.slate400,
+    border: PALETTE.slate800,
+    scrollbar: PALETTE.slate700,
+    submenu: PALETTE.slate800Blue,
+    headerBorder: PALETTE.mist300,
   },
   // Chart series. Values are carried across unchanged from the two maps that
   // previously defined them by hand (DashboardClient and FinancialCharts);
@@ -104,7 +126,9 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
   text: {
     heading: PALETTE.mist100,
     body: PALETTE.mist200,
+    strong: PALETTE.mist200,
     secondary: PALETTE.mist400,
+    faint: PALETTE.mist400,
     // The sider is dark in both themes, so what reads on it does not change.
     onDark: PALETTE.white,
   },
@@ -117,6 +141,16 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
   border: {
     default: PALETTE.ink600,
     subtle: PALETTE.ink700,
+  },
+  chrome: {
+    // The sider is dark in both themes, so its furniture does not move.
+    text: PALETTE.slate50Bright,
+    textMuted: PALETTE.slate400,
+    border: PALETTE.slate800,
+    scrollbar: PALETTE.slate700,
+    submenu: PALETTE.slate800Blue,
+    // Drawn on the header, which does invert.
+    headerBorder: PALETTE.ink600,
   },
   series: {
     sales: PALETTE.teal400,

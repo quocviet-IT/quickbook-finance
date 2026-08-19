@@ -23,6 +23,14 @@ export const PALETTE = {
   slate200: "#e2e8f0",
   slate100: "#f1f5f9",
   slate50: "#f6f7f9",
+  // Added with the shell conversion. The stylesheet already used every one of
+  // these; they were literals repeated by hand, not new colour.
+  slate50Bright: "#f8fafc",
+  slate500: "#64748b",
+  slate700: "#334155",
+  slate800: "#1e293b",
+  slate800Blue: "#263449",
+  mist300: "#e5eaf0",
   white: "#ffffff",
 
   // Intent

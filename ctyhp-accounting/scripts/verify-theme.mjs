@@ -254,7 +254,18 @@ for (const route of ROUTES) {
   }
 }
 
-writeFileSync(join(outDir, `${mode === "compare" ? "current" : "baseline"}.json`), JSON.stringify(snapshot, null, 1));
+// Never in dark mode. That branch `continue`s before a snapshot is taken, so
+// its `snapshot` is empty — and this line used to write it to baseline.json
+// anyway, because the filename was chosen by "compare or not". Every dark
+// audit therefore wiped the light baseline, and the next `--compare` reported
+// "0 with a colour change" over nothing at all. A gate that cannot fail is
+// worse than no gate: it reports success.
+if (mode !== "dark") {
+  writeFileSync(
+    join(outDir, `${mode === "compare" ? "current" : "baseline"}.json`),
+    JSON.stringify(snapshot, null, 1),
+  );
+}
 
 await browser.close();
 
