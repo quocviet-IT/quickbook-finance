@@ -2,6 +2,7 @@
 import { App, ConfigProvider, theme as antdTheme } from "antd";
 import enUS from "antd/locale/en_US";
 import { antdThemeTokens } from "@/lib/design/tokens";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 const SANS =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -14,14 +15,20 @@ const SANS =
  * Every colour comes from lib/design/tokens.ts. A literal here would be a
  * second source of truth for a colour the rest of the app reads from there,
  * and a unit test refuses one.
+ *
+ * The theme comes from ThemeProvider above, and both halves have to move
+ * together: `darkAlgorithm` recolours every Ant Design component, while the
+ * tokens recolour everything the stylesheet draws. One without the other is
+ * the half-converted app this whole piece of work exists to avoid.
  */
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const { token, components } = antdThemeTokens();
+  const { theme } = useTheme();
+  const { token, components } = antdThemeTokens(theme);
   return (
     <ConfigProvider
       locale={enUS}
       theme={{
-        algorithm: antdTheme.defaultAlgorithm,
+        algorithm: theme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: { ...token, borderRadius: 8, fontFamily: SANS, fontSize: 14, wireframe: false },
         components: {
           ...components,

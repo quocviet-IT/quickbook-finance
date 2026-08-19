@@ -41,6 +41,7 @@ import {
   type NavItem,
 } from "@/lib/domain/navigation";
 import CompanySwitcher, { type CompanyChoice } from "./CompanySwitcher";
+import ThemeToggle from "./theme/ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
 import NewMenu from "./NewMenu";
 import AssistantLauncher from "./assistant/AssistantLauncher";
@@ -434,6 +435,10 @@ export default function AppShell({
           {canCreate && <NewMenu />}
 
           <div className="app-shell__header-end">
+            {/* Before the approvals count and the account menu: this is a
+                display preference, not an action, and it should not sit
+                between a reader and the two controls they came here for. */}
+            {!isMobile ? <ThemeToggle /> : null}
             <ApprovalsLink
               pendingApprovals={pendingApprovals}
               active={pathname.startsWith("/approvals")}
