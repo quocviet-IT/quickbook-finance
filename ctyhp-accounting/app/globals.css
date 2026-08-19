@@ -35,6 +35,8 @@
   --ob-border-coolTint: #eef2f6;
   --ob-chrome-text: #f8fafc;
   --ob-chrome-textAccent: #f0fdfa;
+  --ob-chrome-menuItem: #e2e8f0;
+  --ob-chrome-menuHover: #475569;
   --ob-chrome-textMuted: #94a3b8;
   --ob-chrome-border: #1e293b;
   --ob-chrome-scrollbar: #334155;
@@ -149,6 +151,8 @@
   --ob-border-coolTint: #1b2740;
   --ob-chrome-text: #f8fafc;
   --ob-chrome-textAccent: #f0fdfa;
+  --ob-chrome-menuItem: #e2e8f0;
+  --ob-chrome-menuHover: #475569;
   --ob-chrome-textMuted: #94a3b8;
   --ob-chrome-border: #1e293b;
   --ob-chrome-scrollbar: #334155;
@@ -1960,9 +1964,25 @@ body {
 .app-shell__header-end {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex: 0 0 auto;
   margin-inline-start: auto;
+}
+
+/*
+ * The display preference, held apart from the work controls beside it.
+ *
+ * The header carries a company switcher, a search field, New transaction,
+ * approvals and the account menu; the theme sat among them as a third
+ * equal-weight control and the bar read as one undifferentiated run. A rule
+ * and a little more air is the whole fix — the grouping does the work that
+ * separating them by distance alone could not.
+ */
+.app-shell__header-preference {
+  display: inline-flex;
+  align-items: center;
+  padding-inline-end: 14px;
+  border-inline-end: 1px solid var(--ob-chrome-border);
 }
 
 .app-shell__new-button.ant-btn {

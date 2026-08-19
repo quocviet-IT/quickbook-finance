@@ -41,6 +41,36 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.36",
+    date: "2026-08-19",
+    headline: "The dark navigation is readable, and the theme control is one button instead of three.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The sidebar menu was too dim to read in dark",
+        detail:
+          "Every menu item that was not the page you were on came out a " +
+          "dark grey on a near-black sidebar. The sidebar is dark in both " +
+          "themes, so its text should never have changed with the theme in " +
+          "the first place; it now reads the same in dark as it always has " +
+          "in light.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "The theme control is one button",
+        detail:
+          "It was three buttons sitting permanently in the top bar, which " +
+          "was already carrying the company switcher, search, New " +
+          "transaction, approvals and your account. It is now a single " +
+          "icon showing the theme you are in — a sun or a moon — that " +
+          "opens the three choices when you click it, with a line " +
+          "separating it from the controls beside it.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "1.35",
     date: "2026-08-19",
     headline: "One Book now has a dark theme, and follows your computer unless you tell it otherwise.",

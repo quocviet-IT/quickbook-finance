@@ -435,10 +435,14 @@ export default function AppShell({
           {canCreate && <NewMenu />}
 
           <div className="app-shell__header-end">
-            {/* Before the approvals count and the account menu: this is a
-                display preference, not an action, and it should not sit
-                between a reader and the two controls they came here for. */}
-            {!isMobile ? <ThemeToggle /> : null}
+            {/* A display preference, not an action. It sits before the
+                approvals count and the account menu, with a rule after it,
+                so the eye reads two groups rather than one run of five
+                controls — which is how the bar came to feel crowded. One
+                button now, not three, so it earns a place on mobile too. */}
+            <span className="app-shell__header-preference">
+              <ThemeToggle />
+            </span>
             <ApprovalsLink
               pendingApprovals={pendingApprovals}
               active={pathname.startsWith("/approvals")}

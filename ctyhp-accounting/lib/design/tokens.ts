@@ -101,6 +101,18 @@ export const TOKENS = {
      * solved by moving the text half into this group.
      */
     textAccent: PALETTE.teal50,
+    /**
+     * A navigation item that is not the current page, and the row highlight
+     * as the pointer passes over it.
+     *
+     * Both were reaching for tokens that invert — `border.default` for the
+     * text, `text.secondary` for the hover — and the sider does not invert.
+     * In dark that made the menu a dark blue-grey on near-black, about
+     * 1.5:1, and gave it a *light* grey hover panel. Reported as "the menu
+     * is too dim to read", which it was.
+     */
+    menuItem: PALETTE.slate200,
+    menuHover: PALETTE.slate600,
     textMuted: PALETTE.slate400,
     border: PALETTE.slate800,
     scrollbar: PALETTE.slate700,
@@ -274,6 +286,18 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     // The sider is dark in both themes, so its furniture does not move.
     text: PALETTE.slate50Bright,
     textAccent: PALETTE.teal50,
+    /**
+     * A navigation item that is not the current page, and the row highlight
+     * as the pointer passes over it.
+     *
+     * Both were reaching for tokens that invert — `border.default` for the
+     * text, `text.secondary` for the hover — and the sider does not invert.
+     * In dark that made the menu a dark blue-grey on near-black, about
+     * 1.5:1, and gave it a *light* grey hover panel. Reported as "the menu
+     * is too dim to read", which it was.
+     */
+    menuItem: PALETTE.slate200,
+    menuHover: PALETTE.slate600,
     textMuted: PALETTE.slate400,
     border: PALETTE.slate800,
     scrollbar: PALETTE.slate700,
@@ -449,6 +473,14 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["feedback.positiveOnDark", "accent.deep"],
   ["feedback.negativeOnDark", "accent.deep"],
   ["panel.onDeep", "accent.deep"],
+  /**
+   * The navigation. The sider is the one surface that is dark in both themes,
+   * so what is written on it is the easiest thing to get wrong twice — and it
+   * was got wrong: the menu spent a release at roughly 1.5:1.
+   */
+  ["chrome.menuItem", "surface.sider"],
+  ["chrome.textAccent", "surface.sider"],
+  ["chrome.text", "surface.sider"],
 ];
 
 /**
@@ -502,8 +534,8 @@ export function antdThemeTokens(theme: ThemeName = "light") {
         darkItemBg: t("surface.sider"),
         darkSubMenuItemBg: t("surface.sider"),
         darkItemSelectedBg: t("intent.primary"),
-        darkItemColor: t("border.default"),
-        darkItemHoverBg: t("text.secondary"),
+        darkItemColor: t("chrome.menuItem"),
+        darkItemHoverBg: t("chrome.menuHover"),
       },
       Table: {
         headerBg: t("surface.muted"),
