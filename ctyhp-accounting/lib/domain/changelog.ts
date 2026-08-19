@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.41",
+    date: "2026-08-19",
+    headline: "The Bills actions column is one tidy menu instead of a row of coloured links.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Bill actions live behind one ⋯ menu",
+        detail:
+          "Each bill used to spread up to five coloured text links across " +
+          "the row — a different set per status, so no two rows lined up " +
+          "and Void sat mid-sentence in red. Every row now shows the " +
+          "paperclip, a Post button while the bill is still a draft, and " +
+          "one ⋯ menu holding the rest — Payments, Write off, Register " +
+          "asset, and Void set apart at the bottom in red. The same " +
+          "arrangement Payments already uses, so the two screens read the " +
+          "same way.",
+        route: "/bills",
+      },
+    ],
+  },
+  {
     version: "1.40",
     date: "2026-08-19",
     headline: "Invoices, Bills and Payments can be searched — and filtered to the money that needs chasing.",

@@ -8,14 +8,16 @@ import {
   Button,
   DatePicker,
   Form,
+  Dropdown,
   Input,
   InputNumber,
   Modal,
   Select,
   Space,
   Tag,
+  type MenuProps,
 } from "antd";
-import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, MoreOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document-filter";
@@ -330,8 +332,41 @@ export default function BillsClient({
           {
             title: "Actions",
             key: "actions",
-            render: (_, r) =>
-              canReadDocuments || canWrite || canRegisterAsset ? (
+            width: 140,
+            // The same shape Payments settled on: the paperclip, the one
+            // state-advancing action a draft has, and everything else behind
+            // one ⋯ menu. This column used to spread up to five coloured
+            // text links across the row — a different set per status, so no
+            // two rows lined up and Void sat mid-sentence in red.
+            render: (_, r) => {
+              const menu: MenuProps["items"] = [
+                ...(r.status !== "draft"
+                  ? [{ key: "payments", label: "Payments", onClick: () => openHistory(r) }]
+                  : []),
+                ...(canWrite && (r.status === "open" || r.status === "partial")
+                  ? [{ key: "writeoff", label: "Write off", onClick: () => setWriteOffFor(r) }]
+                  : []),
+                ...(canRegisterAsset &&
+                r.status !== "draft" &&
+                r.status !== "void" &&
+                r.journal_entry_id
+                  ? [
+                      {
+                        key: "asset",
+                        label: "Register asset",
+                        onClick: () => router.push(`/fixed-assets?bill=${r.id}`),
+                      },
+                    ]
+                  : []),
+              ];
+              // Last, and separated — but only separated when there is
+              // something to separate from: a draft's menu holds Void alone,
+              // and a divider above a menu's only item is an orphaned line.
+              if (canWrite && r.status !== "void" && r.status !== "paid") {
+                if (menu.length) menu.push({ type: "divider" as const, key: "before-void" });
+                menu.push({ key: "void", label: "Void bill", danger: true, onClick: () => confirmVoid(r.id) });
+              }
+              return canReadDocuments || canWrite || canRegisterAsset ? (
                 <Space>
                   {canReadDocuments ? (
                     <IconActionButton
@@ -347,39 +382,22 @@ export default function BillsClient({
                     />
                   ) : null}
                   {canWrite && r.status === "draft" && (
-                    <Button size="small" type="link" onClick={() => post(r.id)}>
+                    <Button size="small" onClick={() => post(r.id)}>
                       Post
                     </Button>
                   )}
-                  {r.status !== "draft" ? (
-                    <Button size="small" type="link" onClick={() => openHistory(r)}>
-                      Payments
-                    </Button>
-                  ) : null}
-                  {canWrite && r.status !== "void" && r.status !== "paid" && (
-                    <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
-                      Void
-                    </Button>
-                  )}
-                  {canWrite && (r.status === "open" || r.status === "partial") && (
-                    <Button size="small" type="link" onClick={() => setWriteOffFor(r)}>
-                      Write off
-                    </Button>
-                  )}
-                  {canRegisterAsset &&
-                  r.status !== "draft" &&
-                  r.status !== "void" &&
-                  r.journal_entry_id ? (
-                    <Button
-                      size="small"
-                      type="link"
-                      onClick={() => router.push(`/fixed-assets?bill=${r.id}`)}
-                    >
-                      Register asset
-                    </Button>
+                  {menu.length ? (
+                    <Dropdown menu={{ items: menu, style: { minWidth: 148 } }} trigger={["click"]}>
+                      <Button
+                        size="small"
+                        icon={<MoreOutlined />}
+                        aria-label={`Actions for ${r.bill_number ?? "draft bill"}`}
+                      />
+                    </Dropdown>
                   ) : null}
                 </Space>
-              ) : null,
+              ) : null;
+            },
           },
         ]}
       />
