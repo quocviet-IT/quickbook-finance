@@ -15,6 +15,7 @@
   --ob-text-strong: #334155;
   --ob-text-secondary: #475569;
   --ob-text-faint: #64748b;
+  --ob-text-caption: #8c8c8c;
   --ob-text-onDark: #ffffff;
   --ob-surface-page: #f6f7f9;
   --ob-surface-card: #ffffff;
@@ -27,6 +28,10 @@
   --ob-border-muted: #cbd5e1;
   --ob-border-soft: #dbe4e8;
   --ob-border-softAlt: #dbe4ea;
+  --ob-border-neutral: #d9d9d9;
+  --ob-border-cool: #dbe3e8;
+  --ob-border-coolSoft: #edf1f4;
+  --ob-border-coolTint: #eef2f6;
   --ob-chrome-text: #f8fafc;
   --ob-chrome-textMuted: #94a3b8;
   --ob-chrome-border: #1e293b;
@@ -41,6 +46,18 @@
   --ob-accent-ring: #5eead4;
   --ob-accent-line: #b8d7d3;
   --ob-accent-deep: #123f3c;
+  --ob-accent-glow: #2dd4bf;
+  --ob-accent-lineSoft: #99d5cf;
+  --ob-accent-lineHover: #85c7c0;
+  --ob-accent-lineMuted: #9fbfbb;
+  --ob-accent-lineHoverAlt: #9fc5c0;
+  --ob-accent-iconBg: #e7f6f4;
+  --ob-accent-iconSoft: #e2f1ee;
+  --ob-accent-activeBg: #e8f4f2;
+  --ob-accent-onDeep: #b9f2e8;
+  --ob-accent-strong: #115e59;
+  --ob-accent-strongHover: #0d9488;
+  --ob-accent-strongActive: #0f625b;
   --ob-panel-ink: #102a2a;
   --ob-panel-borderStrong: #dbe5e3;
   --ob-panel-soft: #f4f8f7;
@@ -51,11 +68,34 @@
   --ob-panel-text: #607170;
   --ob-panel-textStrong: #526361;
   --ob-panel-textSoft: #7a8988;
+  --ob-panel-textDeep: #3f5654;
+  --ob-panel-textMid: #6b7b79;
+  --ob-panel-textFaint: #71817f;
+  --ob-panel-textLineage: #677876;
+  --ob-panel-icon: #8a9997;
+  --ob-panel-iconSoft: #8da09d;
+  --ob-panel-onDeep: #d4e4e1;
+  --ob-panel-lineFaint: #d7e3e1;
+  --ob-panel-lineSoft: #e8eeed;
+  --ob-panel-lineTint: #e9efee;
+  --ob-panel-edge: #b8c9c6;
   --ob-feedback-negative: #b42318;
   --ob-feedback-negativeBorder: #fecaca;
   --ob-feedback-negativeBg: #fef2f2;
   --ob-feedback-positiveOnDark: #a7f3d0;
   --ob-feedback-infoBorder: #d6e4ff;
+  --ob-feedback-infoBg: #f0f5ff;
+  --ob-feedback-warning: #b54708;
+  --ob-feedback-favorite: #b7791f;
+  --ob-feedback-cautionBorder: #ffe58f;
+  --ob-feedback-cautionBg: #fffbe6;
+  --ob-feedback-positiveBg: #ecfdf5;
+  --ob-feedback-positiveBgAlt: #ecfdf3;
+  --ob-feedback-purpleBg: #f5f3ff;
+  --ob-feedback-infoBgAlt: #eff6ff;
+  --ob-feedback-warningText: #a16207;
+  --ob-feedback-warningBg: #fefce8;
+  --ob-feedback-warningBgAlt: #fff7ed;
   --ob-series-sales: #0f766e;
   --ob-series-purchases: #7c3aed;
   --ob-series-inventory: #0369a1;
@@ -86,6 +126,7 @@
   --ob-text-strong: #e2e8f0;
   --ob-text-secondary: #94a3b8;
   --ob-text-faint: #94a3b8;
+  --ob-text-caption: #94a3b8;
   --ob-text-onDark: #ffffff;
   --ob-surface-page: #0b1220;
   --ob-surface-card: #131c2e;
@@ -98,6 +139,10 @@
   --ob-border-muted: #2a3854;
   --ob-border-soft: #2a3854;
   --ob-border-softAlt: #2a3854;
+  --ob-border-neutral: #2a3854;
+  --ob-border-cool: #2a3854;
+  --ob-border-coolSoft: #1b2740;
+  --ob-border-coolTint: #1b2740;
   --ob-chrome-text: #f8fafc;
   --ob-chrome-textMuted: #94a3b8;
   --ob-chrome-border: #1e293b;
@@ -112,6 +157,18 @@
   --ob-accent-ring: #5eead4;
   --ob-accent-line: #1e4b46;
   --ob-accent-deep: #123f3c;
+  --ob-accent-glow: #2dd4bf;
+  --ob-accent-lineSoft: #1e4b46;
+  --ob-accent-lineHover: #1e4b46;
+  --ob-accent-lineMuted: #1e4b46;
+  --ob-accent-lineHoverAlt: #1e4b46;
+  --ob-accent-iconBg: #0b2b28;
+  --ob-accent-iconSoft: #0b2b28;
+  --ob-accent-activeBg: #0f2e2b;
+  --ob-accent-onDeep: #b9f2e8;
+  --ob-accent-strong: #5eead4;
+  --ob-accent-strongHover: #2dd4bf;
+  --ob-accent-strongActive: #5eead4;
   --ob-panel-ink: #f1f5f9;
   --ob-panel-borderStrong: #2a3854;
   --ob-panel-soft: #1b2740;
@@ -122,11 +179,34 @@
   --ob-panel-text: #94a3b8;
   --ob-panel-textStrong: #e2e8f0;
   --ob-panel-textSoft: #94a3b8;
+  --ob-panel-textDeep: #e2e8f0;
+  --ob-panel-textMid: #94a3b8;
+  --ob-panel-textFaint: #94a3b8;
+  --ob-panel-textLineage: #94a3b8;
+  --ob-panel-icon: #94a3b8;
+  --ob-panel-iconSoft: #94a3b8;
+  --ob-panel-onDeep: #d4e4e1;
+  --ob-panel-lineFaint: #2a3854;
+  --ob-panel-lineSoft: #1b2740;
+  --ob-panel-lineTint: #1b2740;
+  --ob-panel-edge: #2a3854;
   --ob-feedback-negative: #f87171;
   --ob-feedback-negativeBorder: #7f1d1d;
   --ob-feedback-negativeBg: #2a1416;
   --ob-feedback-positiveOnDark: #a7f3d0;
   --ob-feedback-infoBorder: #1e3a5f;
+  --ob-feedback-infoBg: #152a45;
+  --ob-feedback-warning: #fbbf24;
+  --ob-feedback-favorite: #fbbf24;
+  --ob-feedback-cautionBorder: #4a3d14;
+  --ob-feedback-cautionBg: #3a2f10;
+  --ob-feedback-positiveBg: #1b2740;
+  --ob-feedback-positiveBgAlt: #1b2740;
+  --ob-feedback-purpleBg: #1b2740;
+  --ob-feedback-infoBgAlt: #152a45;
+  --ob-feedback-warningText: #fbbf24;
+  --ob-feedback-warningBg: #3a2f10;
+  --ob-feedback-warningBgAlt: #3a2f10;
   --ob-series-sales: #2dd4bf;
   --ob-series-purchases: #c4b5fd;
   --ob-series-inventory: #38bdf8;
@@ -318,7 +398,7 @@ body {
 .app-shell__navigation-menu.ant-menu-dark .ant-menu-item-selected {
   color: var(--ob-accent-wash);
   background: rgba(15, 118, 110, 0.32);
-  box-shadow: inset 3px 0 0 #2dd4bf;
+  box-shadow: inset 3px 0 0 var(--ob-accent-glow);
 }
 
 .app-shell__navigation-menu.ant-menu-dark
@@ -1274,14 +1354,14 @@ body {
   padding: 8px 14px;
   color: var(--ob-intent-primary);
   font-weight: 600;
-  border: 1px solid #99d5cf;
+  border: 1px solid var(--ob-accent-lineSoft);
   border-radius: 8px;
   background: var(--ob-surface-card);
 }
 
 .report-center-back-link:hover,
 .report-route-chrome__back:hover {
-  color: #115e59;
+  color: var(--ob-accent-strong);
   border-color: var(--ob-intent-primary);
   background: var(--ob-accent-wash);
 }
@@ -1391,7 +1471,7 @@ body {
 }
 
 .report-hub-card.ant-card:hover {
-  border-color: #85c7c0;
+  border-color: var(--ob-accent-lineHover);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
   transform: translateY(-2px);
 }
@@ -1420,7 +1500,7 @@ body {
   color: var(--ob-intent-primary);
   font-size: 19px;
   border-radius: 10px;
-  background: #e7f6f4;
+  background: var(--ob-accent-iconBg);
 }
 
 .report-hub-card__favorite.ant-btn {
@@ -1430,7 +1510,7 @@ body {
 }
 
 .report-hub-card__favorite[aria-pressed="true"] {
-  color: #b7791f;
+  color: var(--ob-feedback-favorite);
 }
 
 .report-hub-card__title.ant-typography {
@@ -1838,7 +1918,7 @@ body {
 }
 
 .global-search.ant-select:not(.ant-select-disabled):hover {
-  border-color: #9fbfbb;
+  border-color: var(--ob-accent-lineMuted);
   background: var(--ob-surface-card);
 }
 
@@ -1939,7 +2019,7 @@ body {
 .app-shell__approvals--navigation.app-shell__approvals--active {
   color: var(--ob-accent-wash);
   background: rgba(15, 118, 110, 0.32);
-  box-shadow: inset 3px 0 0 #2dd4bf;
+  box-shadow: inset 3px 0 0 var(--ob-accent-glow);
 }
 
 .app-shell__approvals-icon {
@@ -2020,7 +2100,7 @@ body {
   color: var(--ob-text-strong);
   font-size: 14px;
   line-height: 1.55;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--ob-border-neutral);
   border-radius: 6px;
   background: var(--ob-surface-card);
   transition:
@@ -2139,7 +2219,7 @@ body {
 
 .dashboard-context .ant-tag {
   margin-inline-end: 0;
-  color: #3f5654;
+  color: var(--ob-panel-textDeep);
   border-color: var(--ob-panel-borderStrong);
   background: var(--ob-panel-bg);
 }
@@ -2193,7 +2273,7 @@ body {
   place-items: center;
   color: var(--ob-intent-primary);
   border-radius: 8px;
-  background: #e2f1ee;
+  background: var(--ob-accent-iconSoft);
 }
 
 .dashboard-filter-bar__control {
@@ -2268,7 +2348,7 @@ body {
 
 .dashboard-summary:hover {
   color: var(--dashboard-ink);
-  border-color: #9fc5c0;
+  border-color: var(--ob-accent-lineHoverAlt);
   box-shadow: 0 8px 24px rgba(15, 42, 40, 0.08);
   transform: translateY(-1px);
 }
@@ -2291,7 +2371,7 @@ body {
 
 .dashboard-summary--featured:hover {
   color: var(--ob-text-onDark);
-  border-color: #0d9488;
+  border-color: var(--ob-accent-strongHover);
   box-shadow: 0 10px 24px rgba(18, 63, 60, 0.18);
 }
 
@@ -2320,7 +2400,7 @@ body {
 }
 
 .dashboard-summary--featured .dashboard-summary__icon {
-  color: #b9f2e8;
+  color: var(--ob-accent-onDeep);
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -2376,7 +2456,7 @@ body {
 }
 
 .dashboard-summary--featured .dashboard-trend--neutral {
-  color: #d4e4e1;
+  color: var(--ob-panel-onDeep);
 }
 
 .dashboard-trend__dash {
@@ -2392,7 +2472,7 @@ body {
 }
 
 .amount-warning {
-  color: #b54708 !important;
+  color: var(--ob-feedback-warning) !important;
 }
 
 .dashboard-summary--featured .amount-positive {
@@ -2611,7 +2691,7 @@ body {
 }
 
 .dashboard-work-queue__filters button.is-active {
-  color: #0f625b;
+  color: var(--ob-accent-strongActive);
   border-color: var(--ob-accent-line);
   background: var(--ob-accent-hover);
 }
@@ -2716,7 +2796,7 @@ body {
 .dashboard-work-item__amount small {
   display: block;
   margin-top: 2px;
-  color: #71817f;
+  color: var(--ob-panel-textFaint);
   font-size: 10px;
   font-weight: 500;
 }
@@ -2734,7 +2814,7 @@ body {
 .dashboard-work-item > .anticon:last-child {
   grid-column: 4;
   grid-row: 1 / span 2;
-  color: #8a9997;
+  color: var(--ob-panel-icon);
   font-size: 11px;
 }
 
@@ -2865,7 +2945,7 @@ body {
 
 .dashboard-inventory-summary span {
   margin-bottom: 3px;
-  color: #6b7b79;
+  color: var(--ob-panel-textMid);
   font-size: 11px;
 }
 
@@ -2965,7 +3045,7 @@ body {
 }
 
 .dashboard-panel-empty > .anticon {
-  color: #8da09d;
+  color: var(--ob-panel-iconSoft);
   font-size: 26px;
 }
 
@@ -3005,7 +3085,7 @@ body {
 
 .dashboard-timeline-filters button.is-active {
   color: var(--ob-intent-primary);
-  background: #e8f4f2;
+  background: var(--ob-accent-activeBg);
   font-weight: 600;
 }
 
@@ -3036,7 +3116,7 @@ body {
   align-items: flex-start;
   gap: 9px;
   padding: 10px 12px;
-  color: #677876;
+  color: var(--ob-panel-textLineage);
   border: 1px solid var(--ob-panel-line);
   border-radius: 8px;
   background: var(--ob-panel-bg);
@@ -3402,7 +3482,7 @@ body {
    the workflow somebody opened the drawer to find. */
 .release-notes {
   border: 1px solid var(--ob-feedback-infoBorder);
-  background: #f0f5ff;
+  background: var(--ob-feedback-infoBg);
   border-radius: 8px;
   padding: 12px 14px;
 }
@@ -3442,8 +3522,8 @@ body {
 /* What to settle before step one. Loud enough to stop a reader who is skimming,
    because the steps below post to a ledger. */
 .system-guide__cautions {
-  border: 1px solid #ffe58f;
-  background: #fffbe6;
+  border: 1px solid var(--ob-feedback-cautionBorder);
+  background: var(--ob-feedback-cautionBg);
   border-radius: 8px;
   padding: 12px 14px;
 }
@@ -3474,7 +3554,7 @@ body {
 .system-guide__shot figcaption {
   margin-top: 4px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--ob-text-caption);
 }
 
 /* The entity a statement belongs to, above its title. One Book holds one

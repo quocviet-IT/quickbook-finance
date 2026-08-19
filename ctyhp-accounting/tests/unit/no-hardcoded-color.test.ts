@@ -22,20 +22,19 @@ import { describe, expect, it } from "vitest";
  * lib/client/report-export.ts. Colours inside a generated PDF or an XLSX cell
  * are not CSS and never derive from the theme.
  */
-const ALLOWLIST = new Map<string, string>([
-  [
-    "app/globals.css",
-    "225 hex predating the token wave, including #0f766e thirty times over — " +
-      "the same hand-copied duplication the wave removed from TSX. Converting " +
-      "3,300 lines of stylesheet is its own piece of work with real visual " +
-      "regression risk, so it was left whole rather than done by halves.",
-  ],
-  [
-    "components/work-areas/WorkAreaOverview.module.css",
-    "84 hex, a dozen of which are in neither the palette nor the tokens. Goes " +
-      "with the globals.css conversion.",
-  ],
-]);
+/**
+ * Empty, and that is the point.
+ *
+ * It held two entries for months: app/globals.css with "225 hex predating the
+ * token wave", and WorkAreaOverview.module.css with 84 more, both explained
+ * rather than skipped because "debt nobody can see is debt nobody pays". The
+ * light/dark conversion is what paid them. Every colour in both files now
+ * reads a token.
+ *
+ * Left as an empty map rather than deleted: the next stylesheet to arrive with
+ * colour in it should have to write down why, in the place the last two did.
+ */
+const ALLOWLIST = new Map<string, string>([]);
 
 /**
  * Built fresh on each use, never shared.
@@ -58,6 +57,19 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
+/**
+ * The generated `:root` blocks removed.
+ *
+ * Colour has to be written down somewhere, and after the light/dark
+ * conversion that somewhere is lib/design/tokens.ts, emitted into these two
+ * blocks. Exempting the blocks rather than the file is what keeps this guard
+ * sharp: a hex anywhere else in globals.css still fails, which is the whole
+ * point of having converted it.
+ */
+function withoutTokenBlocks(source: string): string {
+  return source.replace(/:root(\[data-theme="dark"\])? \{[^}]*--ob-[^}]*\}/g, "");
+}
+
 const files = [...sourceFiles(join(ROOT, "app")), ...sourceFiles(join(ROOT, "components"))];
 
 function relativePath(file: string): string {
@@ -75,13 +87,22 @@ describe("hard-coded colour", () => {
     expect(files.some((file) => file.endsWith(".css"))).toBe(true);
   });
 
-  it("appears in no file outside the two stylesheets still to be converted", () => {
+  it("appears in no file at all", () => {
     const offenders = files
-      .map((file) => ({ path: relativePath(file), source: readFileSync(file, "utf8") }))
+      .map((file) => ({ path: relativePath(file), source: withoutTokenBlocks(readFileSync(file, "utf8")) }))
       .filter(({ path }) => !ALLOWLIST.has(path))
       .filter(({ source }) => hexPattern().test(source))
       .map(({ path }) => path);
     expect(offenders).toEqual([]);
+  });
+
+  it("still catches a colour written outside the token blocks", () => {
+    // The exemption above is narrow on purpose, and a guard nobody has seen
+    // fail is a guard nobody should trust. This proves the hole is exactly
+    // the size of the generated blocks and no larger.
+    const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+    expect(hexPattern().test(withoutTokenBlocks(css))).toBe(false);
+    expect(hexPattern().test(withoutTokenBlocks(`${css}\n.rogue { color: #ff0000; }\n`))).toBe(true);
   });
 
   it("lists no file that has already been converted", () => {
