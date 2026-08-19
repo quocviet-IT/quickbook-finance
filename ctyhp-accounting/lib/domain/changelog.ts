@@ -41,6 +41,38 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.34",
+    date: "2026-08-19",
+    headline: "One Book now has a dark theme, and follows your computer unless you tell it otherwise.",
+    changes: [
+      {
+        kind: "added",
+        title: "A dark theme for the whole app",
+        detail:
+          "Three buttons at the top right: light, dark, or match your " +
+          "computer. Matching your computer is the default and it keeps " +
+          "matching — if your machine turns dark in the evening, so does " +
+          "One Book. Choose light or dark yourself and that choice wins " +
+          "until you change it, on this computer. The page never flashes " +
+          "white on its way to dark, whichever you pick.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Every colour in the app now comes from one place",
+        detail:
+          "Nothing you should notice, and the reason the dark theme is " +
+          "possible at all: the app's colours were spread across 309 " +
+          "hand-written values in two stylesheets and are now defined once " +
+          "each. The light theme was held to exactly what it looked like " +
+          "before, screen by screen, with one deliberate exception — 19 " +
+          "shades that differed by a byte or two and not to the eye were " +
+          "collapsed onto the colour they were imitating.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "1.33",
     date: "2026-08-18",
     headline: "Bank Transactions: the search box suggests as you type, and the filter bar is laid out in two clear rows.",
