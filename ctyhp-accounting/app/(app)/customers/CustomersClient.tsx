@@ -23,7 +23,8 @@ import IconActionButton from "@/components/ui/IconActionButton";
 import type { CustomerRow } from "@/lib/db/types";
 import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatPostalAddress } from "@/lib/domain/invoice-document";
-import { creditStateColor } from "@/lib/domain/credit";
+import { creditStateColor, creditStateLabel, type CreditState } from "@/lib/domain/credit";
+import { filterContacts, type ActiveFilter } from "@/lib/domain/contact-filter";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { createCustomerAction, updateCustomerAction } from "./actions";
 
@@ -60,6 +61,29 @@ export default function CustomersClient({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // The register had no way to search at all — every professional
+  // bookkeeping product leads its contact list with one (QuickBooks' "Find a
+  // customer or company", Xero's contact search), and a jeweller with a
+  // hundred customers should not have to scroll for one. The keyword and the
+  // active narrowing are shared with Vendors (lib/domain/contact-filter.ts);
+  // the credit narrowing is this screen's own, because only customers carry a
+  // credit state, and it filters on the same computed status the Credit
+  // status column shows — never a second opinion of it.
+  const [keyword, setKeyword] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
+  const [creditFilter, setCreditFilter] = useState<CreditState | "all">("all");
+
+  const visibleCustomers = filterContacts(customers, keyword, activeFilter).filter((row) => {
+    if (creditFilter === "all") return true;
+    return creditByCustomer.get(row.id)?.status.state === creditFilter;
+  });
+
+  // Only states the list actually contains: offering "On hold" to a register
+  // with nobody on hold is a filter that can only ever return nothing.
+  const presentCreditStates = [
+    ...new Set(credit.map((row) => row.status.state)),
+  ] as CreditState[];
 
   function openCreate() {
     setEditing(null);
@@ -223,7 +247,7 @@ export default function CustomersClient({
   return (
     <div>
       <FilterBar
-        resultCount={customers.length}
+        resultCount={visibleCustomers.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -231,14 +255,55 @@ export default function CustomersClient({
             </Button>
           ) : null
         }
-      />
+      >
+        <Input.Search
+          allowClear
+          aria-label="Search customers by name, contact, email, phone, or city"
+          placeholder="Search name, contact, email, or city"
+          style={{ width: 300 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter customers by credit status"
+          value={creditFilter}
+          onChange={setCreditFilter}
+          style={{ minWidth: 170 }}
+          options={[
+            { value: "all", label: "All credit statuses" },
+            ...presentCreditStates.map((state) => ({
+              value: state,
+              label: creditStateLabel(state),
+            })),
+          ]}
+        />
+        <Select
+          aria-label="Filter customers by active status"
+          value={activeFilter}
+          onChange={setActiveFilter}
+          style={{ minWidth: 130 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+        />
+      </FilterBar>
       <DataTable
         rowKey="id"
         columns={columns}
-        dataSource={customers}
+        dataSource={visibleCustomers}
         sticky
-        emptyTitle="No customers yet"
-        emptyDescription="Add a customer to create invoices and receive payments."
+        emptyTitle={
+          keyword || creditFilter !== "all" || activeFilter !== "all"
+            ? "No customers match these filters"
+            : "No customers yet"
+        }
+        emptyDescription={
+          keyword || creditFilter !== "all" || activeFilter !== "all"
+            ? "Clear a filter, or widen the search."
+            : "Add a customer to create invoices and receive payments."
+        }
       />
 
       <Modal

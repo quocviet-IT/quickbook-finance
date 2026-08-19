@@ -6,6 +6,7 @@ import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AccountRow, Box1099Row, VendorRow } from "@/lib/db/types";
 import { parsePaymentTerms } from "@/lib/domain/payment-terms";
+import { filterContacts, type ActiveFilter } from "@/lib/domain/contact-filter";
 import { createVendorAction } from "./actions";
 import VendorTaxDrawer from "./VendorTaxDrawer";
 
@@ -27,6 +28,12 @@ export default function VendorsClient({
 }) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
+
+  // The same search Customers has, from the same shared definition of
+  // "matches" — the two registers are mirrors and must not find differently.
+  const [keyword, setKeyword] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
+  const visibleVendors = filterContacts(vendors, keyword, activeFilter);
   const [taxFor, setTaxFor] = useState<VendorRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
@@ -64,7 +71,7 @@ export default function VendorsClient({
   return (
     <>
       <FilterBar
-        resultCount={vendors.length}
+        resultCount={visibleVendors.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
@@ -72,12 +79,36 @@ export default function VendorsClient({
             </Button>
           ) : null
         }
-      />
+      >
+        <Input.Search
+          allowClear
+          aria-label="Search vendors by name, email, or phone"
+          placeholder="Search name, email, or phone"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter vendors by active status"
+          value={activeFilter}
+          onChange={setActiveFilter}
+          style={{ minWidth: 130 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+        />
+      </FilterBar>
       <DataTable<VendorRow>
         rowKey="id"
-        dataSource={vendors}
-        emptyTitle="No vendors yet"
-        emptyDescription="Add a vendor to record bills, expenses, and payments."
+        dataSource={visibleVendors}
+        emptyTitle={keyword || activeFilter !== "all" ? "No vendors match these filters" : "No vendors yet"}
+        emptyDescription={
+          keyword || activeFilter !== "all"
+            ? "Clear a filter, or widen the search."
+            : "Add a vendor to record bills, expenses, and payments."
+        }
         columns={[
           { title: "Name", dataIndex: "name" },
           { title: "Email", dataIndex: "email", render: (v) => v ?? "—" },

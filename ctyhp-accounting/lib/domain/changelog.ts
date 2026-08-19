@@ -41,6 +41,56 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.38",
+    date: "2026-08-19",
+    headline: "Search comes to Customers and Vendors, the feedback queue reads properly, and the tab gets the One Book mark.",
+    changes: [
+      {
+        kind: "added",
+        title: "Search and filters on Customers",
+        detail:
+          "One search box that looks everywhere you might remember a " +
+          "customer by — name, contact person, email, phone, city — beside " +
+          "a credit-status filter and an active filter. The credit filter " +
+          "only offers statuses the register actually contains, and it " +
+          "reads the same computed status the Credit status column shows.",
+        route: "/customers",
+      },
+      {
+        kind: "added",
+        title: "The same search on Vendors",
+        detail:
+          "Name, email or phone, with the active filter beside it. Both " +
+          "registers share one definition of what a search matches, so " +
+          "they cannot drift apart.",
+        route: "/vendors",
+      },
+      {
+        kind: "changed",
+        title: "The feedback queue is readable at a glance",
+        detail:
+          "What happened is held to a fixed width and wraps, cut after a " +
+          "few lines with a \"more\" control for the full report — one " +
+          "long report no longer decides how wide the whole table is. " +
+          "Filed shows the date with the exact time on hover, and the " +
+          "other columns gave back the room they were not using. The " +
+          "Move to buttons are coloured by where they send a report: " +
+          "green to resolve, red to decline, gold back to review — the " +
+          "same gold the My Reports screen already uses for a report " +
+          "under review.",
+        route: "/settings/feedback",
+      },
+      {
+        kind: "changed",
+        title: "The browser tab shows the One Book mark",
+        detail:
+          "The tab icon is now the same teal 1B block as the sidebar, " +
+          "replacing the framework's default icon.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "1.37",
     date: "2026-08-19",
     headline: "Company Settings reads properly again, and the three sample companies are gone.",

@@ -8,10 +8,19 @@ import {
   Segmented,
   Space,
   Tag,
+  Tooltip,
   Typography,
   type TableColumnsType,
 } from "antd";
-import { FileOutlined, PictureOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  EyeOutlined,
+  FileOutlined,
+  PictureOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import type { ButtonProps } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import {
   describeFeedbackStatusChange,
@@ -42,6 +51,23 @@ import {
 } from "./actions";
 
 const KIND_COLOR: Record<string, string> = { broken: "red", suggestion: "blue" };
+
+/**
+ * What each Move-to button looks like, so the three destinations can be told
+ * apart before reading them: resolving is green, declining is red, and
+ * sending back to review is the same gold the reporter's own screen uses for
+ * a report in review (STATUS_COLOR in MyReportsClient) — the two screens
+ * describe one workflow and must not colour it two ways.
+ *
+ * Outlined, not solid. This column repeats on every row; a grid of solid
+ * green and red buttons would shout over the reports it is there to file.
+ */
+const MOVE_BUTTON: Record<FeedbackStatus, Pick<ButtonProps, "color" | "variant" | "icon">> = {
+  new: { color: "default", variant: "outlined" },
+  reviewing: { color: "gold", variant: "outlined", icon: <EyeOutlined /> },
+  resolved: { color: "green", variant: "outlined", icon: <CheckOutlined /> },
+  declined: { color: "danger", variant: "outlined", icon: <CloseOutlined /> },
+};
 
 /**
  * The colour follows the reporter's own answer, not the score: "I cannot finish
@@ -135,20 +161,27 @@ export default function FeedbackTriageClient({
     {
       title: "Filed",
       dataIndex: "createdAt",
-      width: 170,
-      render: (value: string) => new Date(value).toLocaleString("en-US"),
+      // The date answers "how stale is this queue"; the exact minute almost
+      // never matters and was costing sixty pixels on every row. It stays a
+      // hover away rather than gone.
+      width: 110,
+      render: (value: string) => (
+        <Tooltip title={new Date(value).toLocaleString("en-US")}>
+          <span>{new Date(value).toLocaleDateString("en-US")}</span>
+        </Tooltip>
+      ),
     },
     {
       title: "Kind",
       dataIndex: "kind",
-      width: 210,
+      width: 130,
       render: (kind: string) => (
         <Tag color={KIND_COLOR[kind]}>{feedbackKindLabel(kind as "broken")}</Tag>
       ),
     },
     {
       title: "Urgency",
-      width: 210,
+      width: 160,
       // Sorted by the score the database computed, never one recomputed here.
       sorter: (a: FeedbackReportView, b: FeedbackReportView) =>
         (improvementById.get(a.id)?.priority ?? 0) - (improvementById.get(b.id)?.priority ?? 0),
@@ -174,35 +207,58 @@ export default function FeedbackTriageClient({
     {
       title: "What happened",
       dataIndex: "description",
+      // Bounded, at last. This column had no width in a table sized to its
+      // contents, so one long report decided how wide the whole table was —
+      // the same unbounded free-text defect the 1.20 sweep fixed everywhere
+      // else; this screen was missed. Text wraps inside the column now, cut
+      // after a few lines with antd's own "more" control, so a long report
+      // costs its own row some height instead of costing every column its
+      // room.
+      width: 380,
       render: (text: string | null, row: FeedbackReportView) => {
         const entry = improvementById.get(row.id);
         // A suggestion reads as an argument: the difficulty first, then what
         // was asked for. The free-text note is background and comes last.
         if (entry?.currentDifficulty || entry?.desiredOutcome) {
           return (
-            <Space direction="vertical" size={2}>
+            <Space direction="vertical" size={2} style={{ width: "100%" }}>
               {entry.currentDifficulty ? (
-                <Typography.Text>
+                <Typography.Paragraph
+                  style={{ marginBottom: 0 }}
+                  ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
+                >
                   <Typography.Text type="secondary">Today: </Typography.Text>
                   {entry.currentDifficulty}
-                </Typography.Text>
+                </Typography.Paragraph>
               ) : null}
               {entry.desiredOutcome ? (
-                <Typography.Text>
+                <Typography.Paragraph
+                  style={{ marginBottom: 0 }}
+                  ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
+                >
                   <Typography.Text type="secondary">Wants: </Typography.Text>
                   {entry.desiredOutcome}
-                </Typography.Text>
+                </Typography.Paragraph>
               ) : null}
               {text ? (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ fontSize: 12, marginBottom: 0 }}
+                  ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
+                >
                   {text}
-                </Typography.Text>
+                </Typography.Paragraph>
               ) : null}
             </Space>
           );
         }
         return text ? (
-          <Typography.Text>{text}</Typography.Text>
+          <Typography.Paragraph
+            style={{ marginBottom: 0 }}
+            ellipsis={{ rows: 3, expandable: true, symbol: "more" }}
+          >
+            {text}
+          </Typography.Paragraph>
         ) : (
           <Typography.Text type="secondary">No description</Typography.Text>
         );
@@ -210,7 +266,7 @@ export default function FeedbackTriageClient({
     },
     {
       title: "Where",
-      width: 280,
+      width: 220,
       render: (_, row) => (
         <Space direction="vertical" size={0}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -283,6 +339,7 @@ export default function FeedbackTriageClient({
                   <Button
                     key={status}
                     size="small"
+                    {...MOVE_BUTTON[status]}
                     loading={busyId === row.id}
                     title={describeFeedbackStatusChange(row.status, status)}
                     onClick={() => move(row, status)}
