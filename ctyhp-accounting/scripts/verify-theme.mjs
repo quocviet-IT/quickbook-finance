@@ -214,7 +214,6 @@ if (mode === "dark") {
 }
 const host = new URL(base).hostname;
 await context.addCookies(sessionCookies(session.session, session.user, session.supabaseUrl, host));
-const page = await context.newPage();
 
 mkdirSync(outDir, { recursive: true });
 
@@ -230,11 +229,20 @@ let problems = 0;
 const moved = [];
 
 for (const route of ROUTES) {
+  // A fresh tab per route, which is how a reader arrives at one.
+  //
+  // Reusing a single page let Ant Design's injected style tags accumulate
+  // across navigations — 27 after the first page, 66 after the third — and
+  // the audit stopped being repeatable: 50 findings on one run, 71 on the
+  // next, from an unchanged build. A tab that has already mounted forty
+  // screens is not the tab anybody browses in.
+  const page = await context.newPage();
   try {
     await page.goto(`${base}${route}`, { waitUntil: "networkidle", timeout: 45_000 });
     await page.waitForTimeout(700);
   } catch {
     console.log(`  SKIP  ${route} — did not load`);
+    await page.close();
     continue;
   }
   checked += 1;
@@ -253,6 +261,7 @@ for (const route of ROUTES) {
       }
       if (found.length > 6) console.log(`    … and ${found.length - 6} more`);
     }
+    await page.close();
     continue;
   }
 
@@ -275,6 +284,7 @@ for (const route of ROUTES) {
       for (const c of added) console.log(`    appeared ${c}`);
     }
   }
+  await page.close();
 }
 
 // Never in dark mode. That branch `continue`s before a snapshot is taken, so

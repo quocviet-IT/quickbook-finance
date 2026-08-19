@@ -29,6 +29,27 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       locale={enUS}
       theme={{
         algorithm: theme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+        /*
+         * One variable scope per theme, and this is not a nicety.
+         *
+         * Ant Design v6 renders its component tokens as CSS variables and
+         * names the block after a key it derives itself — the same key for
+         * both themes. So the light block the server emits and the dark block
+         * the client emits land on the *identical* selector
+         * (`.css-var-…​.ant-table-css-var`), at identical specificity, and the
+         * one inserted last wins.
+         *
+         * Which one that is varies by page. Measured: on /banking the dark
+         * block came second and the table header was the dark surface; on
+         * /settings/audit the light block came second and the same header was
+         * the light one — with `data-theme` dark and every one of our own
+         * variables resolving correctly. Six routes were wrong and fifty were
+         * right, for no reason visible in any stylesheet.
+         *
+         * Distinct keys give the two themes distinct selectors, so they stop
+         * overwriting each other and insertion order stops mattering.
+         */
+        cssVar: { key: theme === "dark" ? "ob-dark" : "ob-light" },
         token: { ...token, borderRadius: 8, fontFamily: SANS, fontSize: 14, wireframe: false },
         components: {
           ...components,
