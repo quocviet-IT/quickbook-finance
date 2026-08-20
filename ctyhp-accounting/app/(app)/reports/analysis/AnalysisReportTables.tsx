@@ -1,5 +1,6 @@
 "use client";
-import { Alert, Card, Space, Table, Tag, Typography } from "antd";
+import { Alert, Card, Space, Tag, Typography } from "antd";
+import ReportTable from "@/components/ui/ReportTable";
 import type { WhatIfAnalysis } from "@/lib/domain/financial-analysis";
 import type { BalanceSheet, ProfitAndLoss, ReportSection } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/format";
@@ -161,10 +162,8 @@ export default function AnalysisReportTables({
         description="These figures include hypothetical adjustments and never post to the ledger."
       />
       <Card size="small" title="Profit & Loss">
-        <Table<AnalysisRow>
+        <ReportTable<AnalysisRow>
           rowKey="key"
-          size="small"
-          pagination={false}
           dataSource={pnlRows(analysis.pnl.actual, analysis.pnl.adjusted)}
           columns={columns}
         />
@@ -179,10 +178,8 @@ export default function AnalysisReportTables({
           </Space>
         }
       >
-        <Table<AnalysisRow>
+        <ReportTable<AnalysisRow>
           rowKey="key"
-          size="small"
-          pagination={false}
           dataSource={balanceSheetRows(analysis.balanceSheet.actual, analysis.balanceSheet.adjusted)}
           columns={columns}
         />

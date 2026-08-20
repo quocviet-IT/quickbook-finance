@@ -187,6 +187,14 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "what-if-analysis",
+    title: "What-If Analysis",
+    description:
+      "Lay hypothetical adjustments over real numbers and freeze the result as a report. Analysis never posts to the books.",
+    href: "/reports/analysis",
+    group: "accounting",
+  },
+  {
     id: "journal-report",
     title: "Journal Report",
     description: "Review journal entries and their debit and credit lines.",

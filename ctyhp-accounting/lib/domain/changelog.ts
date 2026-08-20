@@ -41,6 +41,29 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.44",
+    date: "2026-08-20",
+    headline: "Try an adjustment without touching the books, and freeze what you saw.",
+    changes: [
+      {
+        kind: "added",
+        title: "What-If Analysis with frozen reports",
+        detail:
+          "A new workspace in the Report Center lays hypothetical, balanced " +
+          "adjustments over the real Profit & Loss and Balance Sheet — " +
+          "Actual, Adjustment, and Adjusted side by side, with the sheet " +
+          "provably still balanced. Nothing ever posts to the ledger: the " +
+          "one thing that can be kept is a frozen report, a write-once " +
+          "photograph of the assumptions and the figures they produced, " +
+          "recomputed on the server at the moment of freezing. Frozen " +
+          "reports are listed on the same screen, can be reopened exactly " +
+          "as captured, can lend their assumptions back to the workspace, " +
+          "and can be archived by staff.",
+        route: "/reports/analysis",
+      },
+    ],
+  },
+  {
     version: "1.43",
     date: "2026-08-20",
     headline: "User actions live behind one tidy menu.",
