@@ -24,6 +24,7 @@
     "verify:import-transactions": "node --env-file=.env.local scripts/verify-import-transactions.mjs",
     "verify:saved-reports": "node --env-file=.env.local scripts/verify-saved-reports.mjs",
     "verify:saved-report-bucket": "node --env-file=.env.local scripts/verify-saved-report-bucket.mjs",
+    "verify:financial-analysis": "node --env-file=.env.local scripts/verify-financial-analysis.mjs",
     "verify:ledger-import": "node --env-file=.env.local scripts/verify-ledger-import.mjs",
     "verify:column-resize": "node --env-file=.env.local scripts/verify-column-resize.mjs",
     "verify:theme": "node --env-file=.env.local scripts/verify-theme.mjs",
