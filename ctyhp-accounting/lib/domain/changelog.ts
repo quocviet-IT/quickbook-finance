@@ -43,7 +43,7 @@ export const RELEASES: Release[] = [
   {
     version: "1.50",
     date: "2026-08-20",
-    headline: "The invoice import says what it will do, and what it did not do.",
+    headline: "The import says what it will do, and what it did not do.",
     changes: [
       {
         kind: "fixed",
@@ -69,6 +69,20 @@ export const RELEASES: Release[] = [
           "leaving the reader a bare \"2 skipped\". Those reasons now " +
           "reach the screen, named by invoice reference, so the file can be " +
           "corrected instead of guessed at.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "A contact named twice in one file counted as two new contacts",
+        detail:
+          "An export sorted by transaction repeats a customer on every line " +
+          "it appears in, and the preview compared each row only against " +
+          "what was already on file — so five mentions of one customer " +
+          "read as five new customers. The import has always created a " +
+          "contact once and updated it thereafter; the preview now counts " +
+          "it the same way, matching on the name ignoring case and spacing " +
+          "as the import does. Customers, vendors, products and the chart " +
+          "of accounts all count this way now.",
         route: "/settings/import",
       },
     ],

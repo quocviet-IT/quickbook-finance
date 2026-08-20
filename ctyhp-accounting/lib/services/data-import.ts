@@ -241,15 +241,23 @@ export async function previewImport(
   const typeOverrides = options.typeOverrides ?? {};
   const typeColumn = mapping.account_type ?? null;
 
+  // A file may name the same record twice — "Acme Corp" and "ACME Corp" are one
+  // customer, and an export sorted by transaction often repeats a contact. The
+  // importer creates it once and updates it thereafter; counting the second row
+  // as another create promised more new records than the import would deliver.
+  const seenInFile = new Set<string>();
+
   const preview: ImportPreviewRow[] = parsed.records.map((record, position) => {
     const key = keyOf(target, record);
     const line = parsed.sourceLines[position] ?? position + 2;
     const source = typeColumn === null ? "" : (rows[line - 2]?.[typeColumn] ?? "").trim();
     const chosen = typeOverrides[source];
+    const alreadyHere = existing.has(key) || seenInFile.has(key);
+    seenInFile.add(key);
     return {
       key,
       name: String(record.name ?? ""),
-      action: existing.has(key) ? "update" : "create",
+      action: alreadyHere ? "update" : "create",
       openingBalanceMinor: Number(record.opening_balance_minor ?? 0),
       values: chosen ? { ...record, account_type: chosen } : record,
     };
