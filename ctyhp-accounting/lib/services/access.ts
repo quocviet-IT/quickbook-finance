@@ -58,9 +58,17 @@ export async function listActors(sb: SupabaseClient): Promise<ActorRow[]> {
  * Create a confirmed account with the password supplied by the administrator,
  * then record its application role. Supabase Admin createUser does not send an
  * email, and the password is never written to application tables or audit data.
+ *
+ * Two grants, because they answer different questions (the same pair company
+ * provisioning writes): membership in the register decides whether this
+ * company is even visible to the new user, and the `acc_app_user` row decides
+ * what they may do once inside. This function used to write only the second —
+ * so every user created here was born unable to open the very company they
+ * were created in, and nobody noticed until one signed in.
  */
 export async function createUser(
   sb: SupabaseClient,
+  companyId: string,
   input: UserCreateInput,
 ): Promise<string> {
   const admin = createSupabaseAdminClient();
@@ -87,6 +95,21 @@ export async function createUser(
   if (eRow) {
     await admin.auth.admin.deleteUser(userId);
     throw new AccessError(eRow.message);
+  }
+
+  // Only the service role may write the register, by design — an application
+  // session must not be able to hand out access to other companies. This
+  // grant is scoped to the one company the administrator is creating the
+  // user in, which is exactly what that administrator was already allowed
+  // to do by the action's own guard.
+  const register = createSupabaseAdminClient("onebook");
+  const { error: eMember } = await register
+    .from("company_member")
+    .upsert({ company_id: companyId, user_id: userId }, { ignoreDuplicates: true });
+  if (eMember) {
+    await sb.from("acc_app_user").delete().eq("id", userId);
+    await admin.auth.admin.deleteUser(userId);
+    throw new AccessError(`Could not grant company membership: ${eMember.message}`);
   }
 
   return userId;

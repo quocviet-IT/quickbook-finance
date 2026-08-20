@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { resolveActiveCompany } from "@/lib/db/company";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { userCreateSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
@@ -25,8 +26,12 @@ export async function createUserAction(raw: unknown): Promise<ActionResult<{ id:
   const parsed = userCreateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
+    const company = await resolveActiveCompany();
+    if (!company.active) return { ok: false, error: "No company is selected" };
     const sb = await createSupabaseServerClient();
-    const id = await createUser(sb, parsed.data);
+    // The company id names where the new user's register membership goes —
+    // the same company this admin is signed into and creating them in.
+    const id = await createUser(sb, company.active.id, parsed.data);
     revalidatePath("/settings/users");
     return { ok: true, data: { id } };
   } catch (e) {

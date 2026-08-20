@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.46",
+    date: "2026-08-20",
+    headline: "A user you create can now actually open the company you created them in.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "New users were born without company access",
+        detail:
+          "Creating a user in Settings recorded their role inside the " +
+          "company but never granted the register membership that makes " +
+          "the company visible to them at all — so a freshly created " +
+          "colleague signed in to an app that said they belonged to no " +
+          "company. Creation now writes both grants together, scoped to " +
+          "the one company the administrator is signed into, and rolls the " +
+          "whole account back if either half fails.",
+        route: "/settings/users",
+      },
+    ],
+  },
+  {
     version: "1.45",
     date: "2026-08-20",
     headline: "What-If Analysis has its own tab in the Report Center.",

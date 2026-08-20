@@ -18,7 +18,7 @@ export function isAdminClientConfigured(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && key.length > 20 && !/^REPLACE/i.test(key);
 }
 
-export function createSupabaseAdminClient(): SupabaseClient {
+export function createSupabaseAdminClient(schema: string = "public"): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!isAdminClientConfigured()) {
@@ -28,6 +28,12 @@ export function createSupabaseAdminClient(): SupabaseClient {
     );
   }
   return createClient(url as string, serviceKey as string, {
+    // The register lives in the onebook schema and only the service role may
+    // write it — granting a new user their membership row is the one job that
+    // needs this parameter (see createUser in lib/services/access.ts).
+    db: { schema },
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+    // Widened the same way lib/db/server.ts widens: the schema is a runtime
+    // parameter here, so the client type cannot carry it.
+  }) as unknown as SupabaseClient;
 }
