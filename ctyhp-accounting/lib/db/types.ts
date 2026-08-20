@@ -1012,3 +1012,21 @@ export interface Vendor1099SummaryRow {
   paid_minor: number;
   eligibility_override: boolean;
 }
+
+export type FinancialAnalysisStatus = "active" | "archived";
+
+export interface FinancialAnalysisRow {
+  id: string;
+  title: string;
+  notes: string | null;
+  period_start: string;
+  period_end: string;
+  adjustments: unknown; // AnalysisAdjustment[] as stored jsonb — parse, never trust
+  snapshot: unknown; // WhatIfAnalysis as stored jsonb
+  status: FinancialAnalysisStatus;
+  created_by: string | null;
+  created_at: string;
+  archived_by: string | null;
+  archived_at: string | null;
+  archive_reason: string | null;
+}
