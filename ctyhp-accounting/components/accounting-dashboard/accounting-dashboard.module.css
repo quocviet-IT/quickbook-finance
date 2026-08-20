@@ -1,0 +1,324 @@
+/*
+ * The cockpit's layout.
+ *
+ * Twelve columns at desktop: the work an accountant has takes eight, the
+ * controls that say whether the books are safe take four, and both sit above
+ * the trends. That order is the whole redesign — see
+ * docs/superpowers/specs/2026-08-19-accounting-dashboard-redesign-design.md
+ * §6.3 — so it lives in one grid rather than in the order components happen
+ * to be written.
+ */
+
+.root {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 1440px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- Status strip ------------------------------------------------------- */
+/* One strip, not a row of cards: this is metadata about the page, and giving
+   it card weight is what pushed the actual work below the fold before. */
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 10px 16px;
+  border: 1px solid var(--ob-panel-lineFaint);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.stripPeriod {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.stripFacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ob-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.stripFact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- The two-column body ------------------------------------------------ */
+.body {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.queueColumn {
+  grid-column: span 8;
+  min-width: 0;
+}
+
+.controlColumn {
+  grid-column: span 4;
+  min-width: 0;
+}
+
+/* Tablet: eight columns, the control rail drops under the queue rather than
+   being squeezed into a strip too narrow to read a difference in. */
+@media (max-width: 1100px) {
+  .queueColumn,
+  .controlColumn {
+    grid-column: span 12;
+  }
+}
+
+/* --- Priority queue ----------------------------------------------------- */
+/* Rows, not a grid: see PriorityWorkQueue.tsx for why. The row is a four-part
+   line — severity, what and why, what it is worth, and the way to do it —
+   and the middle part is the only one allowed to grow. */
+.queueList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queueRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--ob-panel-lineFaint);
+}
+
+.queueRow:first-child {
+  border-top: none;
+}
+
+.queueSeverity {
+  flex: 0 0 auto;
+  margin: 0;
+  width: 66px;
+  text-align: center;
+}
+
+.queueTitleCell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.queueTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.queueTitle {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueReason {
+  font-size: 12px;
+  color: var(--ob-text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueAmount {
+  flex: 0 0 auto;
+  min-width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-body);
+}
+
+.queueAction {
+  flex: 0 0 auto;
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Control health ----------------------------------------------------- */
+.controlList {
+  display: flex;
+  flex-direction: column;
+}
+
+.controlRow {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ob-panel-lineFaint);
+}
+
+.controlRow:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.controlIcon {
+  flex: 0 0 auto;
+  line-height: 20px;
+  font-size: 16px;
+}
+
+.controlBody {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.controlHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.controlName {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.controlDifference {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.controlDetail {
+  font-size: 12px;
+  color: var(--ob-text-body);
+}
+
+.controlPass {
+  font-size: 12px;
+  color: var(--ob-text-faint);
+}
+
+/* Status colour is a reinforcement here, never the message: every row also
+   carries an icon and the word for its state. */
+.blocked .controlIcon,
+.blocked .controlDifference {
+  color: var(--ob-feedback-negative);
+}
+
+.attention .controlIcon,
+.attention .controlDifference {
+  color: var(--ob-feedback-warningText);
+}
+
+.healthy .controlIcon {
+  color: var(--ob-intent-success);
+}
+
+.unavailable .controlIcon {
+  color: var(--ob-text-faint);
+}
+
+/* --- Section notes ------------------------------------------------------ */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ob-text-caption);
+}
+
+.emptyState {
+  padding: 20px 8px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.emptyDetail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ob-text-caption);
+}
+
+/* --- Loading shell ------------------------------------------------------ */
+/* The page's own shape in grey, so the reader can see where their work will
+   land. Animated only for readers who have not asked for less motion. */
+.skeletonBase {
+  border-radius: 6px;
+  background: var(--ob-surface-muted);
+}
+
+.skeletonStrip {
+  composes: skeletonBase;
+  height: 44px;
+  border: 1px solid var(--ob-panel-lineFaint);
+}
+
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--ob-panel-lineFaint);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.skeletonHeading {
+  composes: skeletonBase;
+  height: 18px;
+  width: 32%;
+}
+
+.skeletonRow {
+  composes: skeletonBase;
+  height: 34px;
+}
+
+.skeletonControl {
+  composes: skeletonBase;
+  height: 48px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeletonBase {
+    animation: obSkeletonPulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes obSkeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

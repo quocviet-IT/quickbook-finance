@@ -41,6 +41,40 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.49",
+    date: "2026-08-20",
+    headline: "The accounting screen leads with your work, not with a chart.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Accounting operations: work and controls come first",
+        detail:
+          "The accounting overview opened on four metric cards and a " +
+          "twelve-month chart, and left the queue in a narrow rail below " +
+          "the fold. It now opens on a one-line status strip — which " +
+          "period, which day, which basis — then the priority work " +
+          "queue and the control health rail side by side. Every queue row " +
+          "says what it is, why it is there, what it is worth and the one " +
+          "action that clears it; every control says what it checks, what " +
+          "it found and when. Trends, journal mix and recent activity move " +
+          "into a collapsed section at the end.",
+        route: "/accounting",
+      },
+      {
+        kind: "added",
+        title: "A control that could not be checked says so",
+        detail:
+          "Each section of the page is now loaded on its own, so a slow " +
+          "trend query can no longer leave an accountant with no queue and " +
+          "no controls — it costs the trend and nothing else. And a " +
+          "check that could not run is reported as not evaluated rather " +
+          "than as passing: \"no exceptions\" and \"we could not look\" " +
+          "are opposite answers, and the old page rendered them the same.",
+        route: "/accounting",
+      },
+    ],
+  },
+  {
     version: "1.48",
     date: "2026-08-20",
     headline: "New-user passwords follow the Microsoft complexity standard.",

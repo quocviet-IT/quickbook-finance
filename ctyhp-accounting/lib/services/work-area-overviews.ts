@@ -14,19 +14,14 @@ import {
   type WorkAreaOverviewData,
   type WorkAreaTrendPoint,
 } from "@/lib/domain/work-area-overview";
-import { fiscalYearForDate } from "@/lib/domain/fiscal";
-import { buildTrialBalance } from "@/lib/domain/reports";
-import { listAccounts } from "./accounts";
 import { getArAging, getApAging } from "./aging";
 import { listBankAccounts, listBankConnections } from "./banking";
-import { getDashboardAnalytics } from "./dashboard";
 import { todayInTimeZone } from "./dashboard";
 import { getCurrentCompanySettings } from "./company";
 import { listFixedAssets } from "./fixed-assets";
 import { listCustomers, listInvoices, listPayments } from "./invoicing";
 import { getInventoryValuation } from "./inventory";
 import { listItems } from "./items";
-import { listJournalEntries } from "./journal";
 import {
   listBillPayments,
   listBills,
@@ -34,7 +29,6 @@ import {
   listVendors,
 } from "./payables";
 import { getReceivedNotBilled, listPurchaseOrders } from "./purchasing";
-import { listRecurringRuns, listRecurringTemplates } from "./recurring";
 import { getLedgerBalances } from "./reports";
 
 export interface WorkAreaOverviewContext {
@@ -107,46 +101,6 @@ function agingBreakdownPoints(
     href,
     tone: bucket.tone,
   }));
-}
-
-function topCountBreakdown(
-  values: string[],
-  href: string,
-  limit = 5,
-): WorkAreaBreakdownPoint[] {
-  const counts = values.reduce<Record<string, number>>((result, value) => {
-    const label = statusLabel(value || "other");
-    result[label] = (result[label] ?? 0) + 1;
-    return result;
-  }, {});
-  const sorted = Object.entries(counts).sort(
-    ([labelA, countA], [labelB, countB]) =>
-      countB - countA || labelA.localeCompare(labelB),
-  );
-  const visible = sorted.slice(0, limit);
-  const remainder = sorted
-    .slice(limit)
-    .reduce((sum, [, count]) => sum + count, 0);
-  return [
-    ...visible.map(([label, value]) => ({
-      key: label.toLowerCase().replace(/\s+/g, "-"),
-      label,
-      value,
-      href,
-      tone: "neutral" as const,
-    })),
-    ...(remainder > 0
-      ? [
-          {
-            key: "other",
-            label: "Other",
-            value: remainder,
-            href,
-            tone: "neutral" as const,
-          },
-        ]
-      : []),
-  ];
 }
 
 function moneyLabel(
@@ -1316,273 +1270,6 @@ export async function getInventoryOverview(
           )} difference.`,
       href: "/reports/inventory-valuation",
       status: valuation.tiesOut ? "healthy" : "attention",
-    },
-  };
-}
-
-export async function getAccountingOverview(
-  sb: SupabaseClient,
-  context: WorkAreaOverviewContext,
-): Promise<WorkAreaOverviewData> {
-  const { asOf, currencyCode, currencyDecimals, fiscalYearStartMonth } = context;
-  const fiscalYear = fiscalYearForDate(asOf, fiscalYearStartMonth);
-  const [accounts, journals, analytics, recurringTemplates, recurringRuns, periodResult] =
-    await Promise.all([
-      listAccounts(sb),
-      listJournalEntries(sb, {
-        from: trailingMonthWindows(asOf, 12)[0].from,
-        to: asOf,
-      }),
-      getDashboardAnalytics(sb, asOf),
-      listRecurringTemplates(sb),
-      listRecurringRuns(sb, 50),
-      sb
-        .from("acc_accounting_period")
-        .select(
-          "id,fiscal_year,period_month,period_start,period_end,label,status,close_reason,reopen_reason",
-        )
-        .eq("fiscal_year", fiscalYear)
-        .order("period_month"),
-    ]);
-  if (periodResult.error) throw new WorkAreaOverviewError(periodResult.error.message);
-  const periods = periodResult.data ?? [];
-  const ledgerRows = await getLedgerBalances(sb, null, asOf);
-  const trialBalance = buildTrialBalance(ledgerRows);
-  const mtdFrom = monthStart(asOf);
-  const mtdJournals = journals.filter((journal) =>
-    within(journal.entryDate, mtdFrom, asOf),
-  );
-  const mtdDebit = mtdJournals.reduce(
-    (sum, journal) =>
-      sum + journal.lines.reduce((lineSum, line) => lineSum + Number(line.debitMinor), 0),
-    0,
-  );
-  const openPeriods = periods.filter((period) => period.status === "open");
-  const dueRecurring = recurringTemplates.filter(
-    (template) => template.status === "active" && template.next_run_date <= asOf,
-  );
-  const failedRuns = recurringRuns.filter((run) => run.status === "failed");
-  const activePostingAccounts = accounts.filter(
-    (account) => account.status === "active" && account.is_posting_account,
-  );
-
-  return {
-    area: "accounting",
-    title: "Accounting overview",
-    description:
-      "Monitor ledger integrity, period close, journals, recurring work, and approval exceptions.",
-    asOf,
-    currencyCode,
-    currencyDecimals,
-    primaryAction: { label: "New journal entry", href: "/journal?new=1" },
-    metrics: [
-      {
-        key: "accounts",
-        label: "Posting accounts",
-        value: activePostingAccounts.length,
-        valueType: "number",
-        caption: `${accounts.filter((account) => account.status !== "active").length} inactive accounts`,
-        href: "/accounts",
-        tone: "neutral",
-        icon: "ledger",
-      },
-      {
-        key: "journal-volume",
-        label: "Journal volume this month",
-        value: mtdDebit,
-        valueType: "money",
-        caption: `${mtdJournals.length} posted entries`,
-        href: "/journal",
-        tone: "neutral",
-        icon: "ledger",
-      },
-      {
-        key: "periods",
-        label: "Open periods",
-        value: openPeriods.length,
-        valueType: "number",
-        caption:
-          analytics.metrics.openPastPeriods > 0
-            ? `${analytics.metrics.openPastPeriods} past their close date`
-            : "No overdue open periods",
-        href: "/settings/periods",
-        tone: analytics.metrics.openPastPeriods > 0 ? "warning" : "positive",
-        icon: "period",
-      },
-      {
-        key: "approvals",
-        label: "Pending approvals",
-        value: analytics.metrics.pendingApprovals,
-        valueType: "number",
-        caption: "Controlled actions awaiting a decision",
-        href: "/approvals",
-        tone: analytics.metrics.pendingApprovals > 0 ? "warning" : "positive",
-        icon: "approval",
-      },
-    ],
-    trend: {
-      title: "Ledger performance",
-      description: "Income and expense activity for the selected trend window.",
-      primaryLabel: "Income",
-      secondaryLabel: "Expenses",
-      valueType: "money",
-      points: analytics.monthlyPerformance.map((point) => ({
-        key: point.key,
-        label: point.label,
-        primary: point.incomeMinor,
-        secondary: point.expenseMinor,
-      })),
-    },
-    breakdowns: [
-      {
-        key: "journal-source",
-        title: "Journal source mix",
-        description: "Posted entries grouped by originating workflow.",
-        valueType: "number",
-        points: topCountBreakdown(
-          journals.map((journal) => journal.sourceType),
-          "/journal",
-        ),
-      },
-      {
-        key: "period-close",
-        title: "Period close progress",
-        description: "Fiscal-year periods grouped by current close status.",
-        valueType: "number",
-        points: [
-          {
-            key: "open",
-            label: "Open",
-            value: openPeriods.length,
-            href: "/settings/periods",
-            tone: analytics.metrics.openPastPeriods > 0 ? "warning" : "neutral",
-          },
-          {
-            key: "closed",
-            label: "Closed",
-            value: periods.filter((period) => period.status === "closed").length,
-            href: "/settings/periods",
-            tone: "positive",
-          },
-        ],
-      },
-    ],
-    stages: [
-      {
-        key: "open-periods",
-        label: "Open periods",
-        count: openPeriods.length,
-        href: "/settings/periods",
-        tone: analytics.metrics.openPastPeriods > 0 ? "warning" : "neutral",
-      },
-      {
-        key: "closed-periods",
-        label: "Closed periods",
-        count: periods.filter((period) => period.status === "closed").length,
-        href: "/settings/periods",
-        tone: "positive",
-      },
-      {
-        key: "recurring",
-        label: "Active recurring schedules",
-        count: recurringTemplates.filter((template) => template.status === "active").length,
-        valueMinor: recurringTemplates
-          .filter((template) => template.status === "active")
-          .reduce((sum, template) => sum + Number(template.total_minor), 0),
-        href: "/recurring",
-        tone: dueRecurring.length > 0 ? "warning" : "neutral",
-      },
-    ],
-    exceptions: [
-      {
-        key: "trial-balance",
-        title: "Trial Balance integrity",
-        detail: trialBalance.balanced
-          ? "Posted ledger debits and credits are balanced."
-          : "Trial Balance is out of balance and requires immediate review.",
-        count: trialBalance.balanced ? 0 : 1,
-        valueMinor: Math.abs(trialBalance.totalDebit - trialBalance.totalCredit),
-        href: "/reports?report=trial",
-        severity: trialBalance.balanced ? "low" : "high",
-      },
-      {
-        key: "past-periods",
-        title: "Periods past close date",
-        detail: "Complete reconciliations and close controls for overdue periods.",
-        count: analytics.metrics.openPastPeriods,
-        href: "/settings/periods",
-        severity: "high",
-      },
-      {
-        key: "approvals",
-        title: "Controlled actions awaiting approval",
-        detail: "Review maker-checker tasks without self-approval.",
-        count: analytics.metrics.pendingApprovals,
-        href: "/approvals",
-        severity: "medium",
-      },
-      {
-        key: "recurring",
-        title: "Recurring transaction exceptions",
-        detail: `${dueRecurring.length} schedules are due; ${failedRuns.length} recent runs failed.`,
-        count: dueRecurring.length + failedRuns.length,
-        href: "/recurring",
-        severity: failedRuns.length > 0 ? "high" : "medium",
-      },
-    ],
-    activities: journals.slice(0, 8).map((journal) => ({
-      key: `journal:${journal.id}`,
-      title: `Journal ${journal.entryNumber}`,
-      detail: `${statusLabel(journal.sourceType)} · ${journal.description || "No description"}`,
-      occurredOn: journal.entryDate,
-      valueMinor: journal.lines.reduce(
-        (sum, line) => sum + Number(line.debitMinor),
-        0,
-      ),
-      href: `/journal?entry=${journal.id}`,
-      status: journal.isReversal
-        ? "Reversal"
-        : journal.isReversed
-          ? "Reversed"
-          : statusLabel(journal.status),
-    })),
-    links: [
-      {
-        key: "chart",
-        label: "Chart of Accounts",
-        description: "Maintain posting accounts, hierarchy, types, and status.",
-        href: "/accounts",
-      },
-      {
-        key: "trial",
-        label: "Trial Balance",
-        description: "Validate debit and credit balances across the ledger.",
-        href: "/reports?report=trial",
-      },
-      {
-        key: "general-ledger",
-        label: "General Ledger",
-        description: "Drill into posted account activity and source records.",
-        href: "/reports/general-ledger",
-      },
-      {
-        key: "recurring",
-        label: "Recurring transactions",
-        description: "Review scheduled invoices, bills, expenses, and journals.",
-        href: "/recurring",
-      },
-    ],
-    control: {
-      title: "Ledger integrity",
-      detail: trialBalance.balanced
-        ? "Trial Balance is balanced from the authoritative posted ledger."
-        : `Debits and credits differ by ${moneyLabel(
-            Math.abs(trialBalance.totalDebit - trialBalance.totalCredit),
-            currencyCode,
-            currencyDecimals,
-          )}.`,
-      href: "/reports?report=trial",
-      status: trialBalance.balanced ? "healthy" : "attention",
     },
   };
 }

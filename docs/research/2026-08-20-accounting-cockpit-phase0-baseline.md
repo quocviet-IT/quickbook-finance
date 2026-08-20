@@ -102,10 +102,29 @@ Consequences for Phase 1, taken deliberately:
 
 ## 4. Acceptance criteria for Phase 1, restated as measurements
 
-| Criterion (spec Phase 1) | How it will be proved |
-|---|---|
-| At 1280×800: period status, three priority items, and critical controls without scrolling | Playwright reads bounding boxes; each must have `bottom ≤ 800` |
-| Every queue item opens its workflow in one click | Each row's action `href` resolves to the named screen |
-| A secondary service failure does not blank the page | A deliberately throwing section; queue and controls still render |
-| Keyboard order: status → queue → controls → secondary | Tab-order capture in reading order |
-| Route gzip within budget | `npm run quality:bundle` ≤ 680,783 for `/accounting` |
+| Criterion (spec Phase 1) | How it was proved | Result |
+|---|---|---|
+| At 1280×800: period status, three priority items, and critical controls without scrolling | Playwright bounding boxes | Strip `bottom 192`, **8 of 8** first-view queue rows above 800, control rail `top 208`. **Pass** |
+| Every queue item opens its workflow in one click | Followed the first three action links | `/bills` → Bills, `/invoices` → Invoices, deep-linked with the existing `queue`/`focus` parameters. **Pass** |
+| A secondary service failure does not blank the page | Threw from `getSecondaryAnalysis`, rebuilt, loaded the page | HTTP 200, no error boundary, 20 queue rows and 7 controls still rendered, the failed section showed "The trend and journal analysis could not be loaded. The work above is unaffected." and the strip read "Analysis unavailable". **Pass** |
+| Keyboard order: status → queue → controls → secondary | Tab-order capture | First stop is the queue filter, then each row's action, in reading order. **Pass** |
+| Route gzip within budget | `npm run quality:bundle` | **657,940 vs a 680,783 ceiling — 2,363 bytes *below* the 660,303 baseline.** Pass |
+
+### How the budget was met
+
+The first build came in at **733,522** — 73KB over — and the diff said why: the
+old page rendered no table at all, and the new one pulled the grid engine in
+twice (the queue, and three tables in secondary analysis). Two changes fixed it
+without giving anything up:
+
+1. The priority queue renders as rows rather than through `DataTable`. A work
+   queue is a list of things to do, not a data grid — nothing in it sorts,
+   pages, or selects — and `/dashboard`'s own work queue has always rendered
+   this way. That alone was ~48KB.
+2. Secondary analysis is loaded on demand. It is collapsed by default and most
+   readers never open it, so its tables and their engine no longer land in the
+   first view. The design document asks for exactly this in Phase 5; it was
+   needed in Phase 1 to stay honest about the budget.
+
+The `Tooltip` component went the same way: both uses repeated something already
+on screen, and a native `title` says it for nothing.
