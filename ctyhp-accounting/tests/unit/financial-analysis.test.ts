@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyAdjustments,
   buildWhatIfAnalysis,
+  freezeAnalysisSchema,
   validateAdjustment,
 } from "@/lib/domain/financial-analysis";
 import type { LedgerBalance } from "@/lib/domain/reports";
@@ -136,5 +137,56 @@ describe("buildWhatIfAnalysis", () => {
     expect(out.balanceSheet.adjusted.totalEquity).toBe(600_000);
     expect(out.balanceSheet.actual.balanced).toBe(true);
     expect(out.balanceSheet.adjusted.balanced).toBe(true);
+  });
+});
+
+describe("freezeAnalysisSchema", () => {
+  const UUID_A = "7d3f2b1a-0000-4000-8000-000000000001";
+  const UUID_B = "7d3f2b1a-0000-4000-8000-000000000002";
+  const REVENUE_UP_UUID = {
+    key: "a1",
+    label: "Recognize December revenue",
+    lines: [
+      { accountId: UUID_A, deltaMinor: 100_000 },
+      { accountId: UUID_B, deltaMinor: -100_000 },
+    ],
+  };
+  const good = {
+    title: "FY2026 margin scenario",
+    notes: null,
+    periodStart: "2026-01-01",
+    periodEnd: "2026-12-31",
+    adjustments: [REVENUE_UP_UUID],
+  };
+
+  it("accepts a complete freeze request", () => {
+    expect(freezeAnalysisSchema.safeParse(good).success).toBe(true);
+  });
+
+  it("refuses an empty adjustment list — a frozen actual is just a report", () => {
+    expect(freezeAnalysisSchema.safeParse({ ...good, adjustments: [] }).success).toBe(false);
+  });
+
+  it("refuses a period that ends before it starts", () => {
+    expect(
+      freezeAnalysisSchema.safeParse({ ...good, periodStart: "2026-12-31", periodEnd: "2026-01-01" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("refuses an adjustment that does not balance", () => {
+    const bad = {
+      ...REVENUE_UP_UUID,
+      lines: [
+        { accountId: UUID_A, deltaMinor: 5 },
+        { accountId: UUID_B, deltaMinor: -4 },
+      ],
+    };
+    expect(freezeAnalysisSchema.safeParse({ ...good, adjustments: [bad] }).success).toBe(false);
+  });
+
+  it("caps the adjustment count at 50", () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({ ...REVENUE_UP_UUID, key: `k${i}` }));
+    expect(freezeAnalysisSchema.safeParse({ ...good, adjustments: many }).success).toBe(false);
   });
 });

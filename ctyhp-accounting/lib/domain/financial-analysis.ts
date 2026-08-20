@@ -7,6 +7,7 @@
  *
  * Design record: docs/superpowers/specs/2026-08-20-what-if-analysis-design.md
  */
+import { z } from "zod";
 import type { AccountType } from "@/lib/db/types";
 import type { BalanceSheet, LedgerBalance, ProfitAndLoss } from "@/lib/domain/reports";
 import { buildBalanceSheet, buildProfitAndLoss } from "@/lib/domain/reports";
@@ -125,3 +126,34 @@ export function buildWhatIfAnalysis(
     },
   };
 }
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const adjustmentLineSchema = z.object({
+  accountId: z.string().uuid(),
+  deltaMinor: z.number().int().refine((n) => n !== 0, "A line of zero changes nothing."),
+});
+
+const adjustmentSchema = z
+  .object({
+    key: z.string().min(1).max(64),
+    label: z.string().trim().min(1, "Give the adjustment a label.").max(200),
+    lines: z.array(adjustmentLineSchema).min(2).max(30),
+  })
+  .refine((adj) => validateAdjustment(adj) === null, {
+    message: "Adjustment does not balance.",
+  });
+
+export const freezeAnalysisSchema = z
+  .object({
+    title: z.string().trim().min(1, "Give the analysis a title.").max(120),
+    notes: z.string().trim().max(2000).nullable(),
+    periodStart: z.string().regex(ISO_DATE),
+    periodEnd: z.string().regex(ISO_DATE),
+    adjustments: z.array(adjustmentSchema).min(1, "Freeze at least one adjustment.").max(50),
+  })
+  .refine((v) => v.periodEnd >= v.periodStart, {
+    message: "The period cannot end before it starts.",
+  });
+
+export type FreezeAnalysisInput = z.infer<typeof freezeAnalysisSchema>;
