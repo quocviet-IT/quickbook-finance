@@ -160,6 +160,26 @@ describe("access schemas", () => {
     expect(userCreateSchema.safeParse({ email: "a@b.vn", role: "viewer", password: "password" }).success).toBe(false);
   });
 
+  it("rejects a password containing the new user's own name — the Microsoft rule", () => {
+    const r = userCreateSchema.safeParse({
+      email: "a@b.vn",
+      full_name: "Kim Thanh",
+      role: "viewer",
+      password: "Thanh#2026x",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("accepts three of the four character kinds, as the Microsoft standard asks", () => {
+    const r = userCreateSchema.safeParse({
+      email: "a@b.vn",
+      full_name: "",
+      role: "viewer",
+      password: "Harbor2026x",
+    });
+    expect(r.success).toBe(true);
+  });
+
   it("requires a reason for a status change", () => {
     expect(userStatusSchema.safeParse({ status: "suspended", reason: "" }).success).toBe(false);
     expect(userStatusSchema.safeParse({ status: "suspended", reason: "Left the company" }).success).toBe(true);

@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { CASH_FLOW_ROLES, defaultCashFlowRole } from "./cashflow";
+import { passwordPolicyProblems } from "./password-policy";
 import { USD_CURRENCY_CODE } from "./currency";
 import {
   FEEDBACK_FREQUENCIES,
@@ -661,18 +662,21 @@ export const inventoryValuationSchema = z.object({
 export const APP_ROLES = ["admin", "accountant", "sales", "viewer"] as const;
 export const USER_STATUSES = ["invited", "active", "suspended", "offboarded"] as const;
 
-export const userCreateSchema = z.object({
-  email: z.email("Enter a valid email"),
-  full_name: z.string().trim().max(160).optional().or(z.literal("")).nullable(),
-  role: z.enum(APP_ROLES),
-  password: z
-    .string()
-    .min(12, "Use at least 12 characters")
-    .regex(/[a-z]/, "Include a lowercase letter")
-    .regex(/[A-Z]/, "Include an uppercase letter")
-    .regex(/\d/, "Include a number")
-    .regex(/[^A-Za-z0-9]/, "Include a special character"),
-});
+export const userCreateSchema = z
+  .object({
+    email: z.email("Enter a valid email"),
+    full_name: z.string().trim().max(160).optional().or(z.literal("")).nullable(),
+    role: z.enum(APP_ROLES),
+    password: z.string(),
+  })
+  // The Microsoft complexity standard, which needs the whole object: one of
+  // its rules is that the password must not contain the account name or the
+  // person's own name — a per-field regex cannot know either.
+  .superRefine((value, ctx) => {
+    for (const problem of passwordPolicyProblems(value.password, value.email, value.full_name)) {
+      ctx.addIssue({ code: "custom", path: ["password"], message: problem });
+    }
+  });
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 
 export const userRoleSchema = z.object({

@@ -7,6 +7,7 @@ import { MoreOutlined, PlusOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
+import { passwordPolicyProblems } from "@/lib/domain/password-policy";
 import { createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
 
@@ -288,13 +289,26 @@ function CreateUserModal({ onClose, onDone }: { onClose: () => void; onDone: () 
         <Form.Item
           name="password"
           label="Initial password"
+          // The Microsoft complexity standard — the same function the server
+          // schema runs, so this form cannot promise what the action refuses.
+          // Two of its rules read other fields, hence the dependencies.
+          dependencies={["email", "full_name"]}
+          extra="Microsoft standard: 8–256 characters, three of the four kinds (uppercase, lowercase, number, symbol), and no part of the person's name or account name."
           rules={[
             { required: true, message: "Enter a password" },
-            { min: 12, message: "Use at least 12 characters" },
-            { pattern: /[a-z]/, message: "Include a lowercase letter" },
-            { pattern: /[A-Z]/, message: "Include an uppercase letter" },
-            { pattern: /\d/, message: "Include a number" },
-            { pattern: /[^A-Za-z0-9]/, message: "Include a special character" },
+            ({ getFieldValue }) => ({
+              validator(_, value: string) {
+                if (!value) return Promise.resolve();
+                const problems = passwordPolicyProblems(
+                  value,
+                  getFieldValue("email"),
+                  getFieldValue("full_name"),
+                );
+                return problems.length
+                  ? Promise.reject(new Error(problems[0]))
+                  : Promise.resolve();
+              },
+            }),
           ]}
         >
           <Input.Password autoComplete="new-password" />

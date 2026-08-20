@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.48",
+    date: "2026-08-20",
+    headline: "New-user passwords follow the Microsoft complexity standard.",
+    changes: [
+      {
+        kind: "changed",
+        title: "The initial password is held to the Microsoft standard",
+        detail:
+          "Creating a user now enforces the same complexity rules Active " +
+          "Directory and Entra ID use: 8 to 256 characters, at least three " +
+          "of the four kinds of character (uppercase, lowercase, number, " +
+          "symbol), and — the rule the old policy lacked entirely " +
+          "— the password must not contain the person's account name " +
+          "or any part of their own name. The form and the server run the " +
+          "one same check, and the form now states the requirements up " +
+          "front instead of revealing them one rejection at a time.",
+        route: "/settings/users",
+      },
+    ],
+  },
+  {
     version: "1.47",
     date: "2026-08-20",
     headline: "One company or many, the company menu works the same way.",
