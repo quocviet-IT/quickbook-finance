@@ -41,6 +41,24 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.43",
+    date: "2026-08-20",
+    headline: "User actions live behind one tidy menu.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Suspend, Reactivate, and Offboard moved into one ⋯ menu",
+        detail:
+          "Each user row used to spread its actions as coloured text links " +
+          "— a different pair per status, so no two rows lined up and " +
+          "Offboard sat mid-sentence in red. Every row now shows one small " +
+          "⋯ button opening a menu, with Offboard set apart at the " +
+          "bottom in red. The same arrangement Bills and Payments use.",
+        route: "/settings/users",
+      },
+    ],
+  },
+  {
     version: "1.42",
     date: "2026-08-20",
     headline: "Search and status filters reach the purchasing and credit screens.",

@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { Alert, App, Button, Dropdown, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import type { MenuProps } from "antd";
+import { MoreOutlined, PlusOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
@@ -201,26 +202,34 @@ export default function UsersClient({
           {
             title: "Actions",
             key: "actions",
-            render: (_, r) =>
-              canManage ? (
-                <Space>
-                  {r.status !== "suspended" && r.status !== "offboarded" && (
-                    <Button size="small" type="link" onClick={() => changeStatus(r, "suspended")}>
-                      Suspend
-                    </Button>
-                  )}
-                  {(r.status === "suspended" || r.status === "offboarded") && (
-                    <Button size="small" type="link" onClick={() => changeStatus(r, "active")}>
-                      Reactivate
-                    </Button>
-                  )}
-                  {r.status !== "offboarded" && (
-                    <Button size="small" type="link" danger onClick={() => changeStatus(r, "offboarded")}>
-                      Offboard
-                    </Button>
-                  )}
-                </Space>
-              ) : null,
+            width: 90,
+            render: (_, r) => {
+              if (!canManage) return null;
+              const menu: MenuProps["items"] = [];
+              if (r.status !== "suspended" && r.status !== "offboarded") {
+                menu.push({ key: "suspend", label: "Suspend", onClick: () => changeStatus(r, "suspended") });
+              }
+              if (r.status === "suspended" || r.status === "offboarded") {
+                menu.push({ key: "reactivate", label: "Reactivate", onClick: () => changeStatus(r, "active") });
+              }
+              // Last, and separated — but only separated when there is
+              // something to separate from: an offboarded user's menu holds
+              // Reactivate alone, and a suspended user's opens with it.
+              if (r.status !== "offboarded") {
+                if (menu.length) menu.push({ type: "divider" as const, key: "before-offboard" });
+                menu.push({
+                  key: "offboard",
+                  label: "Offboard",
+                  danger: true,
+                  onClick: () => changeStatus(r, "offboarded"),
+                });
+              }
+              return menu.length ? (
+                <Dropdown menu={{ items: menu, style: { minWidth: 148 } }} trigger={["click"]}>
+                  <Button size="small" icon={<MoreOutlined />} aria-label={`Actions for ${r.email}`} />
+                </Dropdown>
+              ) : null;
+            },
           },
         ]}
       />
