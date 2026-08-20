@@ -41,6 +41,24 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.45",
+    date: "2026-08-20",
+    headline: "What-If Analysis has its own tab in the Report Center.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Analysis is its own group, not a card lost in Accounting",
+        detail:
+          "The What-If Analysis card sat among ten accounting reports, " +
+          "which made it hard to find — reported the day it shipped. " +
+          "The Report Center now has an Analysis tab of its own, holding " +
+          "the what-if workspace and any analysis reports that join it " +
+          "later.",
+        route: "/reports",
+      },
+    ],
+  },
+  {
     version: "1.44",
     date: "2026-08-20",
     headline: "Try an adjustment without touching the books, and freeze what you saw.",

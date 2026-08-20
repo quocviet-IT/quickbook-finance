@@ -1,5 +1,6 @@
 export type ReportGroupId =
   | "business-overview"
+  | "analysis"
   | "receivables"
   | "payables"
   | "accounting"
@@ -35,6 +36,11 @@ export const REPORT_GROUPS: ReportGroupDefinition[] = [
     id: "business-overview",
     label: "Business Overview",
     description: "Core financial statements and performance comparisons.",
+  },
+  {
+    id: "analysis",
+    label: "Analysis",
+    description: "What-if scenarios and frozen analysis reports. Nothing here posts to the books.",
   },
   {
     id: "receivables",
@@ -192,7 +198,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     description:
       "Lay hypothetical adjustments over real numbers and freeze the result as a report. Analysis never posts to the books.",
     href: "/reports/analysis",
-    group: "accounting",
+    group: "analysis",
   },
   {
     id: "journal-report",
