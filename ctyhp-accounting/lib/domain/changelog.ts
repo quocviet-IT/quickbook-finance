@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.47",
+    date: "2026-08-20",
+    headline: "One company or many, the company menu works the same way.",
+    changes: [
+      {
+        kind: "changed",
+        title: "New company lives in the dropdown for everyone",
+        detail:
+          "An administrator with one company used to see a plain label with " +
+          "a bare + icon beside it, while an administrator with several got " +
+          "a dropdown with a proper New company entry inside — two " +
+          "different interfaces for the same job, and the icon was easy to " +
+          "miss. Anyone allowed to create a company now gets the dropdown, " +
+          "however many companies they hold; the plain label remains for " +
+          "single-company users who cannot create one, where a menu of one " +
+          "choice would just be noise.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "1.46",
     date: "2026-08-20",
     headline: "A user you create can now actually open the company you created them in.",

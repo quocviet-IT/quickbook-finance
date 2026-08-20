@@ -47,7 +47,12 @@ export default function CompanySwitcher({
     );
   }
 
-  if (options.length <= 1) {
+  // A dropdown offering a choice of one is noise — for a reader. A platform
+  // administrator is different: their dropdown is also where "New company"
+  // lives, and hanging that offer off a bare icon beside a label (as this
+  // once did) gave the one-company administrator a different, easily missed
+  // UI from the many-company one. Same control, same place, either way.
+  if (options.length <= 1 && !canCreateCompany) {
     return (
       <Space size={6} className="app-shell__company">
         <BankOutlined />
@@ -55,14 +60,6 @@ export default function CompanySwitcher({
           {active.legalName}
         </Typography.Text>
         {active.isSample ? <Tag color="orange">sample</Tag> : null}
-        {/* With one company there is no dropdown to hang the offer off, so it
-            sits beside the name — otherwise the second company can never be
-            created from here at all. */}
-        {canCreateCompany ? (
-          <Link href="/settings/companies?new=1" aria-label="New company">
-            <PlusOutlined />
-          </Link>
-        ) : null}
       </Space>
     );
   }
