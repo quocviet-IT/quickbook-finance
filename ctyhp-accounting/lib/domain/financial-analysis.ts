@@ -8,7 +8,7 @@
  * Design record: docs/superpowers/specs/2026-08-20-what-if-analysis-design.md
  */
 import { z } from "zod";
-import type { AccountType } from "@/lib/db/types";
+import type { AccountType } from "@/lib/domain/accounts";
 import type { BalanceSheet, LedgerBalance, ProfitAndLoss } from "@/lib/domain/reports";
 import { buildBalanceSheet, buildProfitAndLoss } from "@/lib/domain/reports";
 
