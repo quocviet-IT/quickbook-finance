@@ -8,8 +8,9 @@ import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
-import type { AccountRow, CurrencyRow, VendorRow } from "@/lib/db/types";
+import type { AccountRow, CurrencyRow, ExpenseStatus, VendorRow } from "@/lib/db/types";
 import type { ExpenseWithVendor } from "@/lib/services/payables";
+import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { withVendor } from "@/lib/domain/vendors";
 import NewVendorButton from "@/components/NewVendorButton";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
@@ -52,6 +53,17 @@ export default function ExpensesClient({
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | ExpenseStatus>("all");
+
+  // An expense is money already out the door, so unlike bills there is no
+  // overdue to ask about — posted or void is the whole story.
+  const filteredExpenses = expenses.filter((expense) => {
+    if (!matchesDocumentKeyword([expense.expense_number, expense.vendor_name, expense.memo], keyword)) {
+      return false;
+    }
+    return statusFilter === "all" || expense.status === statusFilter;
+  });
 
   // A vendor created from inside this dialog has to appear in the picker now;
   // the page's own list will not refresh until the expense is saved.
@@ -113,7 +125,7 @@ export default function ExpensesClient({
   return (
     <>
       <FilterBar
-        resultCount={expenses.length}
+        resultCount={filteredExpenses.length}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
@@ -121,11 +133,31 @@ export default function ExpensesClient({
             </Button>
           ) : null
         }
-      />
+      >
+        <Input.Search
+          allowClear
+          aria-label="Search expenses by number, vendor, or memo"
+          placeholder="Search number, vendor, or memo"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter expenses by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          style={{ minWidth: 150 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "posted", label: "Posted" },
+            { value: "void", label: "Void" },
+          ]}
+        />
+      </FilterBar>
       <DataTable<ExpenseWithVendor>
         rowKey="id"
-        dataSource={expenses}
-        emptyTitle="No expenses yet"
+        dataSource={filteredExpenses}
+        emptyTitle={keyword || statusFilter !== "all" ? "No expenses match these filters" : "No expenses yet"}
         emptyDescription="Record money already paid from a bank or credit card account."
         columns={[
           { title: "Expense Number", dataIndex: "expense_number", render: (v) => v ?? "—" },

@@ -2,7 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
+import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import {
   createCreditMemoAction,
@@ -11,7 +14,7 @@ import {
   applyCreditMemoAction,
   listOpenInvoicesAction,
 } from "./actions";
-import type { CreditMemoRow, CustomerRow, AccountRow, TaxCodeRow } from "@/lib/db/types";
+import type { CreditMemoRow, CreditStatus, CustomerRow, AccountRow, TaxCodeRow } from "@/lib/db/types";
 
 interface Props {
   canWrite: boolean;
@@ -29,11 +32,15 @@ interface LineForm {
   tax_code_id?: string | null;
 }
 
-const STATUS_COLOR: Record<string, string> = {
+// Typed against the union on purpose: this map used to carry a key `voided`
+// for a status the type spells `void`, so a voided memo's tag silently fell
+// back to grey. A misspelt key is now a compile error instead.
+const STATUS_COLOR: Record<CreditStatus, string> = {
+  draft: "default",
   issued: "blue",
   partial: "gold",
   applied: "green",
-  voided: "red",
+  void: "red",
 };
 
 export default function CreditMemosClient({
@@ -57,6 +64,24 @@ export default function CreditMemosClient({
     [],
   );
   const [allocs, setAllocs] = useState<Record<string, number>>({});
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | CreditStatus>("all");
+
+  // The row carries only the customer's id; the picker's list is the same
+  // customers, so the name comes from there for the column and the search.
+  const customerNameById = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers]);
+
+  const filteredMemos = memos.filter((m) => {
+    if (
+      !matchesDocumentKeyword(
+        [m.credit_memo_number, customerNameById.get(m.customer_id), m.reason, m.memo],
+        keyword,
+      )
+    ) {
+      return false;
+    }
+    return statusFilter === "all" || m.status === statusFilter;
+  });
 
   const load = async () => {
     setLoading(true);
@@ -157,24 +182,54 @@ export default function CreditMemosClient({
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      {canWrite && (
-        <Button type="primary" onClick={() => setOpen(true)}>
-          New Credit Memo
-        </Button>
-      )}
-      <Table<CreditMemoRow>
+      <FilterBar
+        resultCount={filteredMemos.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New credit memo
+            </Button>
+          ) : null
+        }
+      >
+        <Input.Search
+          allowClear
+          aria-label="Search credit memos by number, customer, or reason"
+          placeholder="Search number, customer, or reason"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter credit memos by status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          style={{ minWidth: 160 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "issued", label: "Issued" },
+            { value: "partial", label: "Partially applied" },
+            { value: "applied", label: "Applied" },
+            { value: "void", label: "Void" },
+          ]}
+        />
+      </FilterBar>
+      <DataTable<CreditMemoRow>
         rowKey="id"
         loading={loading}
-        dataSource={memos}
+        dataSource={filteredMemos}
+        emptyTitle={keyword || statusFilter !== "all" ? "No credit memos match these filters" : "No credit memos yet"}
+        emptyDescription="Issue a credit memo to reduce what a customer owes."
         columns={[
           { title: "Number", dataIndex: "credit_memo_number", render: (n) => n ?? <Tag>draft</Tag> },
+          { title: "Customer", key: "customer", render: (_, m) => customerNameById.get(m.customer_id) ?? "—" },
           { title: "Date", dataIndex: "memo_date" },
           { title: "Total", align: "right", render: (_, m) => fmt(m.total_minor) },
           { title: "Remaining", align: "right", render: (_, m) => fmt(m.balance_remaining_minor) },
           {
             title: "Status",
             dataIndex: "status",
-            render: (s: string) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+            render: (s: CreditStatus) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
           },
           {
             title: "",

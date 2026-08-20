@@ -29,6 +29,7 @@ import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, InventoryValuationRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
+import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { createItemAction, updateItemAction, setItemActiveAction } from "./actions";
 import AdjustInventoryModal from "./AdjustInventoryModal";
 import ItemMovementsModal from "./ItemMovementsModal";
@@ -77,6 +78,20 @@ export default function ItemsClient({
   const isInventory = Form.useWatch("is_inventory", form);
 
   const onHandById = new Map(onHand.map((r) => [r.item_id, r]));
+
+  const [keyword, setKeyword] = useState("");
+  const [usedFor, setUsedFor] = useState<"all" | "sold" | "purchased" | "inventory">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
+
+  const filteredItems = items.filter((item) => {
+    if (!matchesDocumentKeyword([item.item_code, item.name, item.description], keyword)) return false;
+    if (usedFor === "sold" && !item.is_sold) return false;
+    if (usedFor === "purchased" && !item.is_purchased) return false;
+    if (usedFor === "inventory" && !item.is_inventory) return false;
+    if (activeFilter === "active" && !item.is_active) return false;
+    if (activeFilter === "inactive" && item.is_active) return false;
+    return true;
+  });
 
   function openCreate() {
     setEditing(null);
@@ -148,7 +163,7 @@ export default function ItemsClient({
   return (
     <>
       <FilterBar
-        resultCount={items.length}
+        resultCount={filteredItems.length}
         actions={
           <Space size={8} wrap>
             <Link href="/reports/inventory-valuation" className="accounting-context-link">
@@ -162,11 +177,47 @@ export default function ItemsClient({
             ) : null}
           </Space>
         }
-      />
+      >
+        <Input.Search
+          allowClear
+          aria-label="Search items by code, name, or description"
+          placeholder="Search code, name, or description"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <Select
+          aria-label="Filter items by what they are used for"
+          value={usedFor}
+          onChange={setUsedFor}
+          style={{ minWidth: 150 }}
+          options={[
+            { value: "all", label: "Used for anything" },
+            { value: "sold", label: "Sales" },
+            { value: "purchased", label: "Purchase" },
+            { value: "inventory", label: "Inventory" },
+          ]}
+        />
+        <Select
+          aria-label="Filter items by active status"
+          value={activeFilter}
+          onChange={setActiveFilter}
+          style={{ minWidth: 130 }}
+          options={[
+            { value: "all", label: "All statuses" },
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+        />
+      </FilterBar>
       <DataTable<ItemRow>
         rowKey="id"
-        dataSource={items}
-        emptyTitle="No products or services yet"
+        dataSource={filteredItems}
+        emptyTitle={
+          keyword || usedFor !== "all" || activeFilter !== "all"
+            ? "No items match these filters"
+            : "No products or services yet"
+        }
         emptyDescription="Add jewelry, services, or purchasing items to reuse them on transactions."
         columns={[
           { title: "Code", dataIndex: "item_code", render: (v) => v ?? "—" },

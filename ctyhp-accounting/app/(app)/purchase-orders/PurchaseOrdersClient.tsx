@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Select, Space, Tag } from "antd";
+import { Button, Input, Select, Space, Tag } from "antd";
 import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
@@ -12,6 +12,7 @@ import AttachmentDrawer, {
 } from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderWithVendor } from "@/lib/services/purchasing";
+import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import PurchaseOrderFormModal from "./PurchaseOrderFormModal";
 
 const STATUS_COLOR: Record<PoStatus, string> = {
@@ -61,12 +62,18 @@ export default function PurchaseOrdersClient({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<PoStatus | "all">("all");
+  const [keyword, setKeyword] = useState("");
   const [formOpen, setFormOpen] = useState(initialCreateOpen);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const rows = useMemo(
-    () => (status === "all" ? orders : orders.filter((o) => o.status === status)),
-    [orders, status],
+    () =>
+      orders.filter(
+        (o) =>
+          matchesDocumentKeyword([o.po_number, o.vendor_name], keyword) &&
+          (status === "all" || o.status === status),
+      ),
+    [orders, status, keyword],
   );
 
   function fmt(minor: number, code: string): string {
@@ -86,6 +93,14 @@ export default function PurchaseOrdersClient({
           ) : null
         }
       >
+        <Input.Search
+          allowClear
+          aria-label="Search purchase orders by number or vendor"
+          placeholder="Search PO number or vendor"
+          style={{ width: 280 }}
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+        />
         <Select
           value={status}
           onChange={setStatus}
@@ -98,7 +113,7 @@ export default function PurchaseOrdersClient({
       <DataTable<PurchaseOrderWithVendor>
         rowKey="id"
         dataSource={rows}
-        emptyTitle="No purchase orders yet"
+        emptyTitle={keyword || status !== "all" ? "No purchase orders match these filters" : "No purchase orders yet"}
         emptyDescription="Raise a purchase order to commit to a vendor before the goods and the bill arrive."
         columns={[
           {

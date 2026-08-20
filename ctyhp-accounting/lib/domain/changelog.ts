@@ -41,6 +41,48 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.42",
+    date: "2026-08-20",
+    headline: "Search and status filters reach the purchasing and credit screens.",
+    changes: [
+      {
+        kind: "added",
+        title: "Expenses, Purchase Orders, and Items are searchable",
+        detail:
+          "Expenses gained a search box (number, vendor, memo) and a " +
+          "Posted/Void filter; Purchase Orders gained a search box beside " +
+          "the status filter it already had; Items can be searched by code, " +
+          "name, or description and narrowed by what an item is used for " +
+          "(Sales, Purchase, Inventory) and by Active status. The count " +
+          "beside the controls always states how many rows survived.",
+        route: "/expenses",
+      },
+      {
+        kind: "added",
+        title: "Credit memos and vendor credits show who they belong to",
+        detail:
+          "Both screens gained the same search box and status filter as the " +
+          "rest of the app — and a column they had been missing: the " +
+          "customer on a credit memo, the vendor on a vendor credit. Until " +
+          "now a list of three credits gave no way to tell whose they were " +
+          "without opening each one. Both lists also page like every other " +
+          "register instead of running to any length.",
+        route: "/credit-memos",
+      },
+      {
+        kind: "fixed",
+        title: "A voided credit shows a red tag again",
+        detail:
+          "The colour map for credit statuses spelt the status \"voided\" " +
+          "while the database spells it \"void\", so a voided credit memo " +
+          "or vendor credit wore a grey tag as if the status were unknown. " +
+          "The map is now typed against the status list itself, so a " +
+          "misspelt entry cannot compile.",
+        route: "/vendor-credits",
+      },
+    ],
+  },
+  {
     version: "1.41",
     date: "2026-08-19",
     headline: "The Bills actions column is one tidy menu instead of a row of coloured links.",
