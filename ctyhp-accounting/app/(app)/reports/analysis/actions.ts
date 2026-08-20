@@ -35,7 +35,7 @@ async function loadAccounts(
   const { data, error } = await sb
     .from("acc_account")
     .select("id,account_code,name,account_type")
-    .eq("is_active", true)
+    .eq("status", "active")
     .order("account_code");
   if (error) throw new FinancialAnalysisError(error.message);
   return (data ?? []).map((a) => ({
