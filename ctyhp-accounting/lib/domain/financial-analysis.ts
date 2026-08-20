@@ -7,6 +7,9 @@
  *
  * Design record: docs/superpowers/specs/2026-08-20-what-if-analysis-design.md
  */
+import type { AccountType } from "@/lib/db/types";
+import type { BalanceSheet, LedgerBalance, ProfitAndLoss } from "@/lib/domain/reports";
+import { buildBalanceSheet, buildProfitAndLoss } from "@/lib/domain/reports";
 
 export interface AdjustmentLine {
   accountId: string;
@@ -47,4 +50,78 @@ export function validateAdjustment(adj: AnalysisAdjustment): string | null {
     return `Adjustment does not balance: debits ${money(debits)} vs credits ${money(credits)}.`;
   }
   return null;
+}
+
+export interface AdjustableAccount {
+  accountId: string;
+  accountCode: string;
+  name: string;
+  accountType: AccountType;
+}
+
+/**
+ * Lay the adjustments over the balances, returning new rows.
+ *
+ * An account can carry an adjustment while having no activity in the period —
+ * assuming rent for a company that has never paid rent is a normal what-if —
+ * so missing rows are synthesized from the chart at zero. An account the
+ * chart itself does not know is a caller bug, not a scenario, and throws.
+ */
+export function applyAdjustments(
+  rows: LedgerBalance[],
+  adjustments: AnalysisAdjustment[],
+  accounts: AdjustableAccount[],
+): LedgerBalance[] {
+  const byId = new Map(rows.map((r) => [r.accountId, { ...r }]));
+  const chart = new Map(accounts.map((a) => [a.accountId, a]));
+  for (const adj of adjustments) {
+    for (const line of adj.lines) {
+      let row = byId.get(line.accountId);
+      if (!row) {
+        const account = chart.get(line.accountId);
+        if (!account) throw new Error(`Unknown account in adjustment: ${line.accountId}`);
+        row = {
+          accountId: account.accountId,
+          accountCode: account.accountCode,
+          name: account.name,
+          accountType: account.accountType,
+          debitBase: 0,
+          creditBase: 0,
+        };
+        byId.set(line.accountId, row);
+      }
+      if (line.deltaMinor > 0) row.debitBase += line.deltaMinor;
+      else row.creditBase += -line.deltaMinor;
+    }
+  }
+  return [...byId.values()];
+}
+
+export interface WhatIfAnalysis {
+  pnl: { actual: ProfitAndLoss; adjusted: ProfitAndLoss };
+  balanceSheet: { actual: BalanceSheet; adjusted: BalanceSheet };
+}
+
+/**
+ * The same adjustments hit both row sets: a what-if entry is dated inside the
+ * period, so it moves the period's P&L and the as-of sheet together. Because
+ * buildBalanceSheet derives Current earnings from its own rows, a balanced
+ * adjustment keeps the adjusted sheet balanced with no extra bookkeeping here.
+ */
+export function buildWhatIfAnalysis(
+  pnlRows: LedgerBalance[],
+  bsRows: LedgerBalance[],
+  adjustments: AnalysisAdjustment[],
+  accounts: AdjustableAccount[],
+): WhatIfAnalysis {
+  return {
+    pnl: {
+      actual: buildProfitAndLoss(pnlRows),
+      adjusted: buildProfitAndLoss(applyAdjustments(pnlRows, adjustments, accounts)),
+    },
+    balanceSheet: {
+      actual: buildBalanceSheet(bsRows),
+      adjusted: buildBalanceSheet(applyAdjustments(bsRows, adjustments, accounts)),
+    },
+  };
 }
