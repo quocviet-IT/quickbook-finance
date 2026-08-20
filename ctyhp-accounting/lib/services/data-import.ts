@@ -9,6 +9,8 @@ import {
 import {
   groupInvoiceRows,
   type InvoiceImportRecord,
+  resolveInvoiceImports,
+  type InvoiceResolutionSources,
 } from "@/lib/domain/invoice-import";
 import { transactionFileChecksum } from "@/lib/domain/transaction-import";
 import {
@@ -30,6 +32,37 @@ export interface ImportPreviewRow {
   action: "create" | "update";
   openingBalanceMinor: number;
   values: Record<string, string | number | boolean | null>;
+}
+
+/**
+ * The names `acc_import_invoices` will search, read the same way it reads them.
+ *
+ * The account filter is deliberately identical to the one in the function —
+ * active, posting, and of type `income` — because a preview searching a wider
+ * set would approve invoices the import then refuses, which is the fault this
+ * whole path exists to close.
+ */
+async function invoiceResolutionSources(
+  sb: SupabaseClient,
+): Promise<InvoiceResolutionSources> {
+  const [customers, accounts] = await Promise.all([
+    sb.from("acc_customer").select("name"),
+    sb
+      .from("acc_account")
+      .select("account_code,name")
+      .eq("account_type", "income")
+      .eq("is_posting_account", true)
+      .eq("status", "active"),
+  ]);
+  if (customers.error) throw new DataImportError(customers.error.message);
+  if (accounts.error) throw new DataImportError(accounts.error.message);
+  return {
+    customers: (customers.data ?? []).map((row) => String(row.name)),
+    incomeAccounts: (accounts.data ?? []).map((row) => ({
+      code: String(row.account_code),
+      name: String(row.name),
+    })),
+  };
 }
 
 export interface ImportPreview {
@@ -169,9 +202,18 @@ export async function previewImport(
   // can assert.
   if (target === "invoices") {
     const grouped = groupInvoiceRows(parsed.records as unknown as InvoiceImportRecord[]);
+    // The same two lookups the import itself does, done here so the count on
+    // screen is a count of what will exist afterwards. Without this the preview
+    // promised every well-formed group and the import then skipped the ones
+    // naming a customer or an income account that is not on file — a screen
+    // saying "3 to create" that created one, with no way to see which two.
+    const { importable, blocked } = resolveInvoiceImports(
+      grouped.invoices,
+      await invoiceResolutionSources(sb),
+    );
     return {
       target,
-      rows: grouped.invoices.map((invoice) => ({
+      rows: importable.map((invoice) => ({
         key: invoice.customer,
         name: `${invoice.externalReference} · ${invoice.customer} · ${invoice.lines.length} line${invoice.lines.length === 1 ? "" : "s"}`,
         action: "create" as const,
@@ -180,15 +222,15 @@ export async function previewImport(
       })),
       problems: [
         ...parsed.problems,
-        ...grouped.problems.map((problem) => ({
+        ...[...grouped.problems, ...blocked].map((problem) => ({
           row: 0,
           message: `${problem.reference || "(no invoice number)"}: ${problem.message}`,
         })),
       ],
       blankRows: parsed.blankRows,
-      creates: grouped.invoices.length,
+      creates: importable.length,
       updates: 0,
-      openingTotalMinor: grouped.invoices.reduce((sum, i) => sum + i.subtotalMinor, 0),
+      openingTotalMinor: importable.reduce((sum, i) => sum + i.subtotalMinor, 0),
     };
   }
 
@@ -232,6 +274,14 @@ export interface ImportOutcome {
   created: number;
   updated: number;
   skipped: number;
+  /**
+   * Why each skipped record was skipped, named.
+   *
+   * A count alone tells a reader that something went wrong and nothing about
+   * what to do next; every one of these carries the document reference and the
+   * reason, so the file can be corrected rather than guessed at.
+   */
+  problems?: { reference: string; message: string }[];
   /** Opening documents raised, when the file carried balances. */
   openingCreated?: number;
   /**
@@ -354,12 +404,25 @@ export async function runImport(
     });
     if (error) throw new DataImportError(error.message);
     const row = (Array.isArray(data) ? data[0] : data) as
-      | { created?: number; skipped?: number }
+      | { created?: number; skipped?: number; problems?: unknown }
       | null;
+    // acc_import_invoices returns why each invoice was skipped, and this used
+    // to discard it — leaving the reader a bare "2 skipped" for work the
+    // database had already diagnosed by name.
+    const rpcProblems = Array.isArray(row?.problems)
+      ? (row.problems as { reference?: string; message?: string }[]).map((p) => ({
+          reference: String(p.reference ?? ""),
+          message: String(p.message ?? "Skipped"),
+        }))
+      : [];
     return {
       created: Number(row?.created ?? 0),
       updated: 0,
       skipped: Number(row?.skipped ?? 0) + grouped.problems.length,
+      problems: [
+        ...grouped.problems.map((p) => ({ reference: p.reference, message: p.message })),
+        ...rpcProblems,
+      ],
     };
   }
 

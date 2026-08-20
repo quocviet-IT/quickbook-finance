@@ -41,6 +41,39 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.50",
+    date: "2026-08-20",
+    headline: "The invoice import says what it will do, and what it did not do.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The invoice preview counted invoices it could not raise",
+        detail:
+          "\"See what will happen\" grouped the file into invoices and " +
+          "called every one of them a create — without checking that " +
+          "the customer is on file or that the income account exists, both " +
+          "of which the import itself checks. A file naming one unknown " +
+          "customer promised three invoices and raised one. The preview now " +
+          "runs the same two lookups the import runs, so the count on " +
+          "screen is the count that will exist, and each invoice it cannot " +
+          "raise is listed with the reason before anything is imported.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "Skipped records now say why they were skipped",
+        detail:
+          "The importer worked out exactly why each invoice was left out " +
+          "— no customer of that name, no active income account " +
+          "matching that column — and then threw the reasons away, " +
+          "leaving the reader a bare \"2 skipped\". Those reasons now " +
+          "reach the screen, named by invoice reference, so the file can be " +
+          "corrected instead of guessed at.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.49",
     date: "2026-08-20",
     headline: "The accounting screen leads with your work, not with a chart.",

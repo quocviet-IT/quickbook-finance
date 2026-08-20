@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { groupInvoiceRows, type InvoiceImportRecord } from "@/lib/domain/invoice-import";
+import {
+  groupInvoiceRows,
+  resolveInvoiceImports,
+  type InvoiceImportDocument,
+  type InvoiceImportRecord,
+} from "@/lib/domain/invoice-import";
 
 const line = (over: Partial<InvoiceImportRecord> = {}): InvoiceImportRecord => ({
   invoice_number: "INV-1001",
@@ -132,5 +137,89 @@ describe("groupInvoiceRows", () => {
 
   it("is empty for an empty file rather than throwing", () => {
     expect(groupInvoiceRows([])).toEqual({ invoices: [], problems: [] });
+  });
+});
+
+describe("resolveInvoiceImports", () => {
+  const doc = (overrides: Partial<InvoiceImportDocument> = {}): InvoiceImportDocument => ({
+    invoiceNumber: "INV-1",
+    externalReference: "INV-1",
+    customer: "Elena Brooks",
+    issueDate: "2026-08-01",
+    dueDate: null,
+    memo: null,
+    lines: [
+      { description: "Work", quantity: 1, unitPriceMinor: 10_000, incomeAccount: "4000", taxCode: null },
+    ],
+    subtotalMinor: 10_000,
+    ...overrides,
+  });
+
+  const sources = {
+    customers: ["Elena Brooks", "Daniel Carter"],
+    incomeAccounts: [
+      { code: "4000", name: "Sales Revenue" },
+      { code: "4100", name: "Service Revenue" },
+    ],
+  };
+
+  it("lets through an invoice whose customer and account both resolve", () => {
+    const out = resolveInvoiceImports([doc()], sources);
+    expect(out.importable).toHaveLength(1);
+    expect(out.blocked).toEqual([]);
+  });
+
+  it("matches a customer ignoring case and surrounding space, as the importer does", () => {
+    const out = resolveInvoiceImports([doc({ customer: "  elena BROOKS " })], sources);
+    expect(out.importable).toHaveLength(1);
+  });
+
+  it("blocks an unknown customer, naming it — this is the commonest reason an import does nothing", () => {
+    const out = resolveInvoiceImports([doc({ customer: "Acme Corporation" })], sources);
+    expect(out.importable).toEqual([]);
+    expect(out.blocked).toEqual([
+      { reference: "INV-1", message: "No customer named Acme Corporation" },
+    ]);
+  });
+
+  it("matches an income account by code or by name", () => {
+    const byName = doc({
+      lines: [
+        { description: "", quantity: 1, unitPriceMinor: 1, incomeAccount: "Service Revenue", taxCode: null },
+      ],
+    });
+    expect(resolveInvoiceImports([byName], sources).importable).toHaveLength(1);
+  });
+
+  it("blocks a line whose income account is not an active income account", () => {
+    const out = resolveInvoiceImports(
+      [
+        doc({
+          lines: [
+            { description: "", quantity: 1, unitPriceMinor: 1, incomeAccount: "Repairs Income", taxCode: null },
+          ],
+        }),
+      ],
+      sources,
+    );
+    expect(out.importable).toEqual([]);
+    expect(out.blocked[0].message).toBe("No active income account matches Repairs Income");
+  });
+
+  it("reports only the first fault of an invoice, the way the importer stops at it", () => {
+    const out = resolveInvoiceImports([doc({ customer: "Nobody", lines: [
+      { description: "", quantity: 1, unitPriceMinor: 1, incomeAccount: "Nothing", taxCode: null },
+    ] })], sources);
+    expect(out.blocked).toHaveLength(1);
+    expect(out.blocked[0].message).toMatch(/No customer named Nobody/);
+  });
+
+  it("one blocked invoice never costs the others", () => {
+    const out = resolveInvoiceImports(
+      [doc({ invoiceNumber: "A", externalReference: "A", customer: "Ghost" }), doc({ invoiceNumber: "B", externalReference: "B" })],
+      sources,
+    );
+    expect(out.importable.map((i) => i.externalReference)).toEqual(["B"]);
+    expect(out.blocked.map((b) => b.reference)).toEqual(["A"]);
   });
 });

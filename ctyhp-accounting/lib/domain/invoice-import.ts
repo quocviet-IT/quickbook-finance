@@ -197,3 +197,74 @@ export function groupInvoiceRows(
 
   return { invoices, problems };
 }
+
+/**
+ * What the importer will actually find when it looks these names up.
+ *
+ * The account list is expected to hold only accounts an invoice line may
+ * credit — active, posting, and of type `income` — because that is the set
+ * `acc_import_invoices` searches. Handing it a wider list here would put the
+ * preview back out of step with the import, which is the whole fault this
+ * exists to fix.
+ */
+export interface InvoiceResolutionSources {
+  customers: readonly string[];
+  incomeAccounts: readonly { code: string; name: string }[];
+}
+
+export interface ResolvedInvoiceImport {
+  importable: InvoiceImportDocument[];
+  blocked: InvoiceImportProblem[];
+}
+
+const norm = (value: string | null | undefined): string => (value ?? "").trim().toLowerCase();
+
+/**
+ * Split grouped invoices into the ones that can be raised and the ones that
+ * cannot, with the reason.
+ *
+ * These are the same two lookups `acc_import_invoices` does, in the same
+ * order and with the same matching rules, and that is the point: the preview
+ * used to count every well-formed group as a create, while the import then
+ * silently skipped the ones naming a customer or an account that does not
+ * exist. A screen promising "3 to create" and delivering one is worse than a
+ * screen that refuses — the reader has no way to tell which two are missing.
+ *
+ * Reporting stops at an invoice's first fault, as the importer does: a
+ * document that cannot be raised is not made more actionable by listing every
+ * further way it also could not be raised.
+ */
+export function resolveInvoiceImports(
+  invoices: readonly InvoiceImportDocument[],
+  sources: InvoiceResolutionSources,
+): ResolvedInvoiceImport {
+  const customers = new Set(sources.customers.map(norm));
+  const byCode = new Set(sources.incomeAccounts.map((a) => a.code.trim()));
+  const byName = new Set(sources.incomeAccounts.map((a) => norm(a.name)));
+
+  const importable: InvoiceImportDocument[] = [];
+  const blocked: InvoiceImportProblem[] = [];
+
+  for (const invoice of invoices) {
+    if (!customers.has(norm(invoice.customer))) {
+      blocked.push({
+        reference: invoice.externalReference,
+        message: `No customer named ${invoice.customer}`,
+      });
+      continue;
+    }
+    const badLine = invoice.lines.find(
+      (line) => !byCode.has(line.incomeAccount.trim()) && !byName.has(norm(line.incomeAccount)),
+    );
+    if (badLine) {
+      blocked.push({
+        reference: invoice.externalReference,
+        message: `No active income account matches ${badLine.incomeAccount}`,
+      });
+      continue;
+    }
+    importable.push(invoice);
+  }
+
+  return { importable, blocked };
+}

@@ -4,6 +4,7 @@ import {
   Alert,
   App,
   Button,
+  List,
   Space,
   Steps,
   Tag,
@@ -171,7 +172,39 @@ export default function ImportClient({
           message.error(res.error ?? "Import failed");
           throw new Error(res.error);
         }
-        const { created, updated, skipped, openingCreated, classification } = res.data;
+        const { created, updated, skipped, openingCreated, classification, problems } = res.data;
+        // A count of skipped records is not a reason. When the server worked
+        // out why — and for invoices it always does — say so, by name, in
+        // something that stays on screen long enough to be acted on.
+        if (problems && problems.length > 0) {
+          modal.info({
+            title: `${problems.length} record(s) were not imported`,
+            width: 560,
+            content: (
+              <List
+                size="small"
+                dataSource={problems.slice(0, 25)}
+                renderItem={(problem) => (
+                  <List.Item>
+                    <Typography.Text>
+                      <Typography.Text strong>
+                        {problem.reference || "(no reference)"}
+                      </Typography.Text>{" "}
+                      — {problem.message}
+                    </Typography.Text>
+                  </List.Item>
+                )}
+                footer={
+                  problems.length > 25 ? (
+                    <Typography.Text type="secondary">
+                      and {problems.length - 25} more.
+                    </Typography.Text>
+                  ) : null
+                }
+              />
+            ),
+          });
+        }
         message.success(
           `${created} created, ${updated} updated, ${skipped} skipped` +
             (openingCreated
