@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.52",
+    date: "2026-08-21",
+    headline: "The invoice preview now checks the sales tax code too.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "An unknown tax code was not reported until after importing",
+        detail:
+          "Yesterday's fix taught the preview to check the customer and the " +
+          "income account, but not the sales tax code — the third thing " +
+          "the import checks. A file of six invoices carrying a code the " +
+          "company does not have previewed as six creates and raised none. " +
+          "All three lookups now run before anything is imported, and when " +
+          "no row survives them the panel says so outright: \"Nothing in " +
+          "this file can be imported\", with the reason beside each document " +
+          "and the Import button disabled.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.51",
     date: "2026-08-20",
     headline: "The template you download is a file that imports.",

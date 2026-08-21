@@ -138,12 +138,22 @@ export default function ImportPreviewPanel({
         <Alert
           type="error"
           showIcon
-          message={`${preview.problems.length} row(s) will be left out`}
+          message={
+            // Saying "6 will be left out" beside a file of exactly six is
+            // technically true and useless. When nothing can be imported, say
+            // that first — it is the only sentence that changes what to do next.
+            preview.rows.length === 0
+              ? `Nothing in this file can be imported — all ${preview.problems.length} were refused`
+              : `${preview.problems.length} row(s) will be left out`
+          }
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {preview.problems.slice(0, 8).map((problem, index) => (
                 <li key={index}>
-                  Row {problem.row}: {problem.message}
+                  {/* An invoice problem names its own document, and there is no
+                      single row to point at — several lines make one invoice. */}
+                  {problem.row > 0 ? `Row ${problem.row}: ` : ""}
+                  {problem.message}
                 </li>
               ))}
               {preview.problems.length > 8 ? <li>…and {preview.problems.length - 8} more</li> : null}

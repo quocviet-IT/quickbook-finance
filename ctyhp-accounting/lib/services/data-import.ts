@@ -40,12 +40,15 @@ export interface ImportPreviewRow {
  * The account filter is deliberately identical to the one in the function —
  * active, posting, and of type `income` — because a preview searching a wider
  * set would approve invoices the import then refuses, which is the fault this
- * whole path exists to close.
+ * whole path exists to close. All three lookups are here for the same reason:
+ * checking two of the three still lets the third break the promise, which is
+ * exactly what happened to a real import of six invoices carrying a tax code
+ * the company does not have.
  */
 async function invoiceResolutionSources(
   sb: SupabaseClient,
 ): Promise<InvoiceResolutionSources> {
-  const [customers, accounts] = await Promise.all([
+  const [customers, accounts, taxCodes] = await Promise.all([
     sb.from("acc_customer").select("name"),
     sb
       .from("acc_account")
@@ -53,13 +56,19 @@ async function invoiceResolutionSources(
       .eq("account_type", "income")
       .eq("is_posting_account", true)
       .eq("status", "active"),
+    sb.from("acc_tax_code").select("code,name"),
   ]);
   if (customers.error) throw new DataImportError(customers.error.message);
   if (accounts.error) throw new DataImportError(accounts.error.message);
+  if (taxCodes.error) throw new DataImportError(taxCodes.error.message);
   return {
     customers: (customers.data ?? []).map((row) => String(row.name)),
     incomeAccounts: (accounts.data ?? []).map((row) => ({
       code: String(row.account_code),
+      name: String(row.name),
+    })),
+    taxCodes: (taxCodes.data ?? []).map((row) => ({
+      code: String(row.code),
       name: String(row.name),
     })),
   };

@@ -210,6 +210,8 @@ export function groupInvoiceRows(
 export interface InvoiceResolutionSources {
   customers: readonly string[];
   incomeAccounts: readonly { code: string; name: string }[];
+  /** Every tax code an invoice line may name. A line may name none. */
+  taxCodes: readonly { code: string; name: string }[];
 }
 
 export interface ResolvedInvoiceImport {
@@ -241,6 +243,8 @@ export function resolveInvoiceImports(
   const customers = new Set(sources.customers.map(norm));
   const byCode = new Set(sources.incomeAccounts.map((a) => a.code.trim()));
   const byName = new Set(sources.incomeAccounts.map((a) => norm(a.name)));
+  const taxByCode = new Set(sources.taxCodes.map((t) => norm(t.code)));
+  const taxByName = new Set(sources.taxCodes.map((t) => norm(t.name)));
 
   const importable: InvoiceImportDocument[] = [];
   const blocked: InvoiceImportProblem[] = [];
@@ -253,13 +257,30 @@ export function resolveInvoiceImports(
       });
       continue;
     }
-    const badLine = invoice.lines.find(
+    const badAccount = invoice.lines.find(
       (line) => !byCode.has(line.incomeAccount.trim()) && !byName.has(norm(line.incomeAccount)),
     );
-    if (badLine) {
+    if (badAccount) {
       blocked.push({
         reference: invoice.externalReference,
-        message: `No active income account matches ${badLine.incomeAccount}`,
+        message: `No active income account matches ${badAccount.incomeAccount}`,
+      });
+      continue;
+    }
+    // Sales tax is optional on a line, so only a code that was actually
+    // written has to resolve. This is the refusal the preview missed on the
+    // day it shipped: six invoices previewed as six creates and raised none,
+    // every one carrying a tax code the company does not have.
+    const badTax = invoice.lines.find(
+      (line) =>
+        norm(line.taxCode) !== "" &&
+        !taxByCode.has(norm(line.taxCode)) &&
+        !taxByName.has(norm(line.taxCode)),
+    );
+    if (badTax) {
+      blocked.push({
+        reference: invoice.externalReference,
+        message: `No sales tax code matches ${badTax.taxCode}`,
       });
       continue;
     }

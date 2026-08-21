@@ -161,6 +161,7 @@ describe("resolveInvoiceImports", () => {
       { code: "4000", name: "Sales Revenue" },
       { code: "4100", name: "Service Revenue" },
     ],
+    taxCodes: [],
   };
 
   it("lets through an invoice whose customer and account both resolve", () => {
@@ -221,5 +222,57 @@ describe("resolveInvoiceImports", () => {
     );
     expect(out.importable.map((i) => i.externalReference)).toEqual(["B"]);
     expect(out.blocked.map((b) => b.reference)).toEqual(["A"]);
+  });
+});
+
+describe("resolveInvoiceImports, sales tax code", () => {
+  /**
+   * The third lookup acc_import_invoices does, and the one this preview
+   * missed on the day it shipped: a real import of six invoices previewed as
+   * six creates and raised none, every one refused for a tax code the company
+   * does not have. A preview that checks two of the three refusals is still a
+   * promise the import will break.
+   */
+  const withTax = (taxCode: string | null): InvoiceImportDocument => ({
+    invoiceNumber: "INV-1",
+    externalReference: "INV-1",
+    customer: "Elena Brooks",
+    issueDate: "2026-08-01",
+    dueDate: null,
+    memo: null,
+    lines: [
+      { description: "Work", quantity: 1, unitPriceMinor: 10_000, incomeAccount: "4000", taxCode },
+    ],
+    subtotalMinor: 10_000,
+  });
+
+  const sources = {
+    customers: ["Elena Brooks"],
+    incomeAccounts: [{ code: "4000", name: "Sales Revenue" }],
+    taxCodes: [{ code: "TAX", name: "Sales Tax" }, { code: "TAX0", name: "Non-Taxable" }],
+  };
+
+  it("blocks a tax code the company does not have, naming it", () => {
+    const out = resolveInvoiceImports([withTax("CA-SJ")], sources);
+    expect(out.importable).toEqual([]);
+    expect(out.blocked).toEqual([
+      { reference: "INV-1", message: "No sales tax code matches CA-SJ" },
+    ]);
+  });
+
+  it("accepts a tax code by code or by name, ignoring case", () => {
+    expect(resolveInvoiceImports([withTax("TAX")], sources).importable).toHaveLength(1);
+    expect(resolveInvoiceImports([withTax("sales tax")], sources).importable).toHaveLength(1);
+    expect(resolveInvoiceImports([withTax("tax0")], sources).importable).toHaveLength(1);
+  });
+
+  it("accepts a line with no tax code at all — sales tax is optional", () => {
+    expect(resolveInvoiceImports([withTax(null)], sources).importable).toHaveLength(1);
+    expect(resolveInvoiceImports([withTax("  ")], sources).importable).toHaveLength(1);
+  });
+
+  it("reports the customer first when both the customer and the tax code are wrong", () => {
+    const doc = { ...withTax("CA-SJ"), customer: "Nobody" };
+    expect(resolveInvoiceImports([doc], sources).blocked[0].message).toMatch(/No customer named/);
   });
 });
