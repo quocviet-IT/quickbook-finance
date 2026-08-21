@@ -23,6 +23,11 @@ set search_path = public;
 
 create table if not exists acc_work_policy (
   id                      uuid primary key default gen_random_uuid(),
+  -- Which version this is. `created_at` cannot answer that: now() is the
+  -- transaction's start time, so two saves in one transaction share it and
+  -- "the newest" becomes whichever the planner happened to return. A strictly
+  -- increasing counter is exact, forever.
+  version                 bigint generated always as identity,
   -- Minor units. Null until somebody sets one; zero is a legitimate answer
   -- meaning "every difference matters", which is not the same thing.
   materiality_minor       bigint check (materiality_minor is null or materiality_minor >= 0),
@@ -34,7 +39,7 @@ create table if not exists acc_work_policy (
 );
 
 create index if not exists acc_work_policy_current_idx
-  on acc_work_policy (created_at desc);
+  on acc_work_policy (version desc);
 
 alter table acc_work_policy enable row level security;
 
@@ -69,7 +74,7 @@ language sql stable security definer set search_path = public as $$
   select p.materiality_minor, p.approval_sla_days, p.unmatched_bank_age_days,
          p.note, p.created_at, p.created_by
     from acc_work_policy p
-   order by p.created_at desc
+   order by p.version desc
    limit 1;
 $$;
 

@@ -23,8 +23,8 @@ const QUIET: InsightFacts = {
   approvals: { pendingCount: 0, oldestAgeDays: null },
   unmatchedBank: { count: 0, oldestAgeDays: null },
   failedRecurringRuns: [],
-  overdueAr: { nowMinor: 0, priorMinor: 0, rows: [] },
-  overdueAp: { nowMinor: 0, priorMinor: 0, rows: [] },
+  receivables: { nowMinor: 0, priorMinor: 0, rows: [] },
+  payables: { nowMinor: 0, priorMinor: 0, rows: [] },
   comparisonLabel: "July 2026",
 };
 
@@ -138,19 +138,19 @@ describe("approval-beyond-sla.v1", () => {
   });
 });
 
-describe("overdue-ar-increased.v1", () => {
+describe("ar-balance-grew.v1", () => {
   const rows = [
     { entityId: "c1", entityName: "Aurora Retail", balanceMinor: 700_00 },
     { entityId: "c2", entityName: "Harbor Metals", balanceMinor: 200_00 },
     { entityId: "c3", entityName: "Elena Brooks", balanceMinor: 100_00 },
   ];
 
-  it("fires when overdue receivables grew, and names where it is concentrated", () => {
+  it("fires when receivables grew, and names where the balance is concentrated", () => {
     const facts: InsightFacts = {
       ...QUIET,
-      overdueAr: { nowMinor: 1_000_00, priorMinor: 400_00, rows },
+      receivables: { nowMinor: 1_000_00, priorMinor: 400_00, rows },
     };
-    const [insight] = buildInsights(facts).filter((i) => i.ruleKey === "overdue-ar-increased.v1");
+    const [insight] = buildInsights(facts).filter((i) => i.ruleKey === "ar-balance-grew.v1");
     expect(insight.changePercent).toBe(150);
     // The headline figure of "it grew" is the growth, not the total. The total
     // is in the summary, where a reader can see both at once.
@@ -162,21 +162,21 @@ describe("overdue-ar-increased.v1", () => {
     expect(insight.evidence.some((e) => String(e.value).includes("Aurora Retail"))).toBe(true);
   });
 
-  it("does not fire when overdue receivables fell", () => {
+  it("does not fire when receivables fell", () => {
     const facts: InsightFacts = {
       ...QUIET,
-      overdueAr: { nowMinor: 100_00, priorMinor: 400_00, rows },
+      receivables: { nowMinor: 100_00, priorMinor: 400_00, rows },
     };
-    expect(keys(facts)).not.toContain("overdue-ar-increased.v1");
+    expect(keys(facts)).not.toContain("ar-balance-grew.v1");
   });
 
   it("does not fire on an increase below the materiality a company set", () => {
     const facts: InsightFacts = {
       ...QUIET,
       policy: { ...EMPTY_WORK_POLICY, materialityMinor: 50_000 },
-      overdueAr: { nowMinor: 41_000, priorMinor: 40_000, rows },
+      receivables: { nowMinor: 41_000, priorMinor: 40_000, rows },
     };
-    expect(keys(facts)).not.toContain("overdue-ar-increased.v1");
+    expect(keys(facts)).not.toContain("ar-balance-grew.v1");
   });
 
   it("fires on any increase when no materiality has been set", () => {
@@ -184,13 +184,13 @@ describe("overdue-ar-increased.v1", () => {
     // threshold the honest behaviour is to report and let a person judge.
     const facts: InsightFacts = {
       ...QUIET,
-      overdueAr: { nowMinor: 41_000, priorMinor: 40_000, rows },
+      receivables: { nowMinor: 41_000, priorMinor: 40_000, rows },
     };
-    expect(keys(facts)).toContain("overdue-ar-increased.v1");
+    expect(keys(facts)).toContain("ar-balance-grew.v1");
   });
 
   it("says nothing when there was nothing before and nothing now", () => {
-    expect(keys(QUIET)).not.toContain("overdue-ar-increased.v1");
+    expect(keys(QUIET)).not.toContain("ar-balance-grew.v1");
   });
 });
 
@@ -220,7 +220,7 @@ describe("every insight", () => {
       approvals: { pendingCount: 2, oldestAgeDays: 9 },
       unmatchedBank: { count: 4, oldestAgeDays: 30 },
       failedRecurringRuns: [{ id: "r1", templateName: "Rent", runDate: "2026-08-01" }],
-      overdueAr: { nowMinor: 900_00, priorMinor: 100_00, rows: [] },
+      receivables: { nowMinor: 900_00, priorMinor: 100_00, rows: [] },
     };
     const insights = buildInsights(facts);
     expect(insights.length).toBeGreaterThanOrEqual(6);

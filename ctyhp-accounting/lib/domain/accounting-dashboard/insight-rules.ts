@@ -63,8 +63,22 @@ export interface InsightFacts {
   approvals: { pendingCount: number; oldestAgeDays: number | null };
   unmatchedBank: { count: number; oldestAgeDays: number | null };
   failedRecurringRuns: readonly { id: string; templateName: string; runDate: string }[];
-  overdueAr: { nowMinor: number; priorMinor: number; rows: readonly OverdueParty[] };
-  overdueAp: { nowMinor: number; priorMinor: number; rows: readonly OverdueParty[] };
+  /**
+   * The control account balance at two dates, and who owes what today.
+   *
+   * The two totals come from the ledger rather than from the ageing report,
+   * and that is a correction worth the next reader's time. `acc_ar_ageing`
+   * filters documents by issue date but reports each one's balance **as it
+   * stands today** — so asking it for a past date returns today's money on
+   * yesterday's documents, and comparing two of those would show growth
+   * whether or not anything grew. The ledger, cumulative to a date, is the
+   * only figure that is actually of that date.
+   *
+   * `rows` is today's ageing, used for concentration only: who owes the most
+   * right now is a question about now.
+   */
+  receivables: { nowMinor: number; priorMinor: number; rows: readonly OverdueParty[] };
+  payables: { nowMinor: number; priorMinor: number; rows: readonly OverdueParty[] };
   /** What the prior figures are the prior figures *of*. */
   comparisonLabel: string;
 }
@@ -250,8 +264,8 @@ export function buildInsights(facts: InsightFacts): AccountingInsight[] {
 
   // --- Overdue receivables and payables grew -----------------------------
   insights.push(
-    ...overdueGrowth(facts, "ar", "Overdue receivables grew", "/reports/ar-aging"),
-    ...overdueGrowth(facts, "ap", "Overdue payables grew", "/reports/ap-aging"),
+    ...balanceGrowth(facts, "ar", "Receivables grew", "/reports/ar-aging"),
+    ...balanceGrowth(facts, "ap", "Payables grew", "/reports/ap-aging"),
   );
 
   // --- A scheduled run posted nothing ------------------------------------
@@ -284,18 +298,28 @@ export function buildInsights(facts: InsightFacts): AccountingInsight[] {
 /**
  * The one rule that compares two moments rather than reading one.
  *
+ * It reports the control account balance, not the overdue balance, and the
+ * difference matters. The design document asks for "overdue AR increased
+ * against the comparison period", and the ageing report cannot answer that:
+ * it reports today's balance on documents issued by a past date, so the past
+ * figure moves every time somebody pays an old invoice. Comparing two of those
+ * would produce growth out of a payment — an insight that is not merely
+ * imprecise but backwards. The ledger balance at a date is true of that date,
+ * so that is what this compares, and the sentence says receivables rather than
+ * overdue receivables because that is what it measured.
+ *
  * Materiality decides whether a rise is worth saying out loud. Where nobody
  * has set one, every rise is reported: "unconfigured" must not quietly become
  * "ignore anything small", because that is a threshold too — just an invisible
  * one nobody chose.
  */
-function overdueGrowth(
+function balanceGrowth(
   facts: InsightFacts,
   side: "ar" | "ap",
   title: string,
   href: string,
 ): AccountingInsight[] {
-  const source = side === "ar" ? facts.overdueAr : facts.overdueAp;
+  const source = side === "ar" ? facts.receivables : facts.payables;
   const increase = source.nowMinor - source.priorMinor;
   if (increase <= 0) return [];
   if (isConfigured(facts.policy, "materialityMinor") && increase < (facts.policy.materialityMinor ?? 0)) {
@@ -311,12 +335,12 @@ function overdueGrowth(
 
   return [
     {
-      id: `overdue-${side}-increased`,
-      ruleKey: `overdue-${side}-increased.v1`,
+      id: `${side}-balance-grew`,
+      ruleKey: `${side}-balance-grew.v1`,
       severity: "medium",
       title,
       summary:
-        `Overdue ${side === "ar" ? "receivables" : "payables"} are ${money(source.nowMinor)}, ` +
+        `${side === "ar" ? "Receivables" : "Payables"} stand at ${money(source.nowMinor)}, ` +
         `up ${money(increase)} on ${facts.comparisonLabel}.${concentrationSentence}`,
       amountMinor: increase,
       changePercent:

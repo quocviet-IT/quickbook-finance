@@ -9,6 +9,8 @@ import { getAccountingControls } from "./controls";
 import { getAccountingWorkQueue } from "./work-queue";
 import { getSecondaryAnalysis } from "./secondary-analysis";
 import { listWorkItemState, retireWorkItems } from "./work-item-state";
+import { getWorkPolicy } from "./policy";
+import { getAccountingInsights } from "./insights";
 
 export type {
   AccountingDashboardData,
@@ -16,6 +18,7 @@ export type {
 } from "./compose";
 export type { AccountingDashboardContext, AccountingPeriodRow } from "./context";
 export type { SecondaryAnalysis } from "./secondary-analysis";
+export type { InsightSection } from "./insights";
 
 /** Which service fills each slot. The rule for surviving a failure is in compose.ts. */
 export const DEFAULT_SECTIONS: AccountingDashboardSections = {
@@ -25,6 +28,8 @@ export const DEFAULT_SECTIONS: AccountingDashboardSections = {
   secondary: getSecondaryAnalysis,
   workState: listWorkItemState,
   retire: retireWorkItems,
+  policy: getWorkPolicy,
+  insights: getAccountingInsights,
 };
 
 export function getAccountingDashboard(

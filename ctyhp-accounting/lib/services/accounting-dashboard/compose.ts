@@ -8,6 +8,8 @@ import type {
   SectionEnvelope,
 } from "@/lib/domain/accounting-dashboard/types";
 import type { WorkItemState } from "@/lib/domain/accounting-dashboard/lifecycle";
+import { EMPTY_WORK_POLICY, type WorkPolicy } from "@/lib/domain/accounting-dashboard/policy";
+import type { InsightSection } from "./insights";
 import type { AccountingDashboardContext } from "./context";
 import type { SecondaryAnalysis } from "./secondary-analysis";
 
@@ -25,7 +27,10 @@ export interface AccountingDashboardData {
   context: AccountingDashboardContext;
   controls: SectionEnvelope<AccountingControl[]>;
   queue: SectionEnvelope<PriorityQueueItem[]>;
+  insights: SectionEnvelope<InsightSection>;
   secondary: SectionEnvelope<SecondaryAnalysis>;
+  /** What the company has configured, so the screen can say what it has not. */
+  policy: WorkPolicy;
 }
 
 /** How each section is fetched. Injectable, which is what makes the above testable. */
@@ -43,6 +48,18 @@ export interface AccountingDashboardSections {
   workState: (sb: SupabaseClient) => Promise<Map<string, WorkItemState>>;
   /** Marks as resolved the state of work no longer in the live set. */
   retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
+  policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
+  /**
+   * Runs after the controls, because most of what an insight has to say is
+   * about what a control found. A control section that failed simply gives the
+   * rules less to work with, which is the honest outcome.
+   */
+  insights: (
+    sb: SupabaseClient,
+    context: AccountingDashboardContext,
+    policy: WorkPolicy,
+    controls: readonly AccountingControl[],
+  ) => Promise<InsightSection>;
   secondary: (
     sb: SupabaseClient,
     context: AccountingDashboardContext,
@@ -69,12 +86,20 @@ export async function composeAccountingDashboard(
 ): Promise<AccountingDashboardData> {
   const context = await sections.context(sb);
 
-  const [controlsResult, queueResult, secondaryResult, stateResult] = await Promise.allSettled([
-    sections.controls(sb, context),
-    sections.queue(sb, context),
-    sections.secondary(sb, context),
-    sections.workState(sb),
-  ]);
+  const [controlsResult, queueResult, secondaryResult, stateResult, policyResult] =
+    await Promise.allSettled([
+      sections.controls(sb, context),
+      sections.queue(sb, context),
+      sections.secondary(sb, context),
+      sections.workState(sb),
+      sections.policy(sb),
+    ]);
+
+  // An unreadable policy is the same on screen as an unset one: the rules that
+  // need it stay asleep and say so. Losing the dashboard over a settings read
+  // would be out of all proportion.
+  const policy =
+    policyResult.status === "fulfilled" ? policyResult.value : EMPTY_WORK_POLICY;
 
   // A failed state read costs the lifecycle columns, never the work. An
   // accountant who cannot see who owns an invoice can still see the invoice.
@@ -111,6 +136,23 @@ export async function composeAccountingDashboard(
           queueResult.reason,
         );
 
+  // The rules run after the controls because most of what they have to say is
+  // about what a control found. They get their own envelope, so a rule engine
+  // that throws costs the explanation and never the work.
+  const insights = await sections
+    .insights(sb, context, policy, controls.data ?? [])
+    .then<SectionEnvelope<InsightSection>>((data) => ({
+      data,
+      generatedAt: new Date().toISOString(),
+      dataState: "fresh",
+    }))
+    .catch((reason) =>
+      failed<InsightSection>(
+        "The explanations could not be worked out. The work and the controls above are unaffected.",
+        reason,
+      ),
+    );
+
   // Retire the state of work that has gone, now that the live set is known.
   // This is the one moment it can be known, and it is what stops a dismissal
   // outliving its exception: the key of a trial-balance failure is the same
@@ -119,7 +161,7 @@ export async function composeAccountingDashboard(
     await sections.retire(sb, queue.data.map((item) => item.key));
   }
 
-  return { context, controls, queue, secondary };
+  return { context, controls, queue, insights, secondary, policy };
 }
 
 /**

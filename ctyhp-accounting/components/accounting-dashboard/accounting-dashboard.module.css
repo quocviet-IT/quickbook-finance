@@ -349,3 +349,83 @@
 .queueFilters :global(.ant-segmented) {
   width: max-content;
 }
+
+/* --- What changed and why (Phase 3) ------------------------------------- */
+.insightList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insightRow {
+  padding: 12px 2px;
+  border-top: 1px solid var(--ob-panel-lineFaint);
+}
+
+.insightRow:first-child {
+  border-top: none;
+  padding-top: 2px;
+}
+
+.insightHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.insightTitle {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+/* The rule that said it. Quiet, but present: a disagreement needs something
+   to point at other than the screen. */
+.insightRule {
+  margin-left: auto;
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 11px;
+  color: var(--ob-text-faint);
+}
+
+.insightSummary {
+  margin: 6px 0 8px !important;
+  color: var(--ob-text-body);
+  max-width: 78ch;
+}
+
+.insightEvidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.insightChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--ob-panel-lineFaint);
+  border-radius: 999px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-body);
+}
+
+.insightChipLabel {
+  color: var(--ob-text-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.insightAction {
+  margin-left: auto;
+}
+
+.insightSleeping {
+  margin-top: 12px;
+}

@@ -8,6 +8,7 @@ import { trialBalanceControl } from "@/lib/domain/accounting-dashboard/control-s
 import type { AccountingDashboardContext } from "@/lib/services/accounting-dashboard/context";
 import type { DerivedQueueItem } from "@/lib/domain/accounting-dashboard/types";
 import type { WorkItemState } from "@/lib/domain/accounting-dashboard/lifecycle";
+import { EMPTY_WORK_POLICY } from "@/lib/domain/accounting-dashboard/policy";
 
 const CONTEXT: AccountingDashboardContext = {
   asOf: "2026-08-20",
@@ -45,6 +46,8 @@ function sections(overrides: Partial<AccountingDashboardSections> = {}): Account
     secondary: async () => ({ trend: [], sourceMix: [], recentEntries: [] }),
     workState: async () => new Map<string, WorkItemState>(),
     retire: async () => 0,
+    policy: async () => EMPTY_WORK_POLICY,
+    insights: async () => ({ insights: [], sleeping: [] }),
     ...overrides,
   };
 }
@@ -210,5 +213,22 @@ describe("composeAccountingDashboard section isolation", () => {
       dueDate: "2026-09-01",
       stateVersion: 3,
     });
+  });
+  it("keeps the work when the rules cannot be worked out", async () => {
+    // An explanation is worth having. It is not worth the queue.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await composeAccountingDashboard(
+      sb,
+      sections({
+        insights: async () => {
+          throw new Error("rule engine unavailable");
+        },
+      }),
+    );
+    spy.mockRestore();
+
+    expect(out.insights.dataState).toBe("unavailable");
+    expect(out.queue.dataState).toBe("fresh");
+    expect(out.controls.dataState).toBe("fresh");
   });
 });

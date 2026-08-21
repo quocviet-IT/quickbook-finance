@@ -6,6 +6,7 @@ import type { AccountingDashboardData } from "@/lib/services/accounting-dashboar
 import type { Assignee } from "./WorkItemActions";
 import styles from "./accounting-dashboard.module.css";
 import AccountingStatusStrip from "./AccountingStatusStrip";
+import AccountingInsightList from "./AccountingInsightList";
 import ControlHealthPanel from "./ControlHealthPanel";
 import PriorityWorkQueue from "./PriorityWorkQueue";
 import { freshnessOf } from "./DataStateNote";
@@ -40,7 +41,7 @@ export default function AccountingDashboard({
   canManage: boolean;
   assignees: Assignee[];
 }) {
-  const { context, controls, queue, secondary } = data;
+  const { context, controls, queue, insights, secondary } = data;
 
   // Freshness is judged in the browser, against the reader's own clock: a
   // server-rendered page left open for an hour is stale even though nothing
@@ -49,6 +50,7 @@ export default function AccountingDashboard({
     const sections = [
       { name: "Controls", envelope: controls },
       { name: "Work queue", envelope: queue },
+      { name: "Explanations", envelope: insights },
       { name: "Analysis", envelope: secondary },
     ];
     return {
@@ -67,7 +69,7 @@ export default function AccountingDashboard({
         .sort()
         .at(-1) as string,
     };
-  }, [controls, queue, secondary]);
+  }, [controls, queue, insights, secondary]);
 
   return (
     <div className={styles.root}>
@@ -99,6 +101,8 @@ export default function AccountingDashboard({
           />
         </div>
       </div>
+
+      <AccountingInsightList insights={insights} />
 
       <SecondaryAnalysis
         secondary={secondary}

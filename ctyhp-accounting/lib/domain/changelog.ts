@@ -41,6 +41,39 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.56",
+    date: "2026-08-21",
+    headline: "The accounting screen explains itself, and shows its working.",
+    changes: [
+      {
+        kind: "added",
+        title: "What changed and why",
+        detail:
+          "A new section on the accounting screen says what is worth " +
+          "knowing \u2014 the trial balance out, a subledger no longer " +
+          "agreeing, periods still open, a scheduled run that posted " +
+          "nothing, receivables up on last month \u2014 with the figures " +
+          "it reached that from printed beside it and one place to go. " +
+          "Every line comes from a named rule, so a disagreement has " +
+          "something to point at.",
+        route: "/accounting",
+      },
+      {
+        kind: "added",
+        title: "Say what your company means by urgent, and by late",
+        detail:
+          "A new Work policy page sets the materiality threshold, how long " +
+          "an approval may wait, and how long a bank line may stay " +
+          "unmatched. Leaving one empty is a real answer: the rule that " +
+          "needs it says nothing and the screen names it, rather than " +
+          "judging by a number nobody chose. Changes are audited and every " +
+          "version is kept, so the question \"what was the threshold when " +
+          "this was judged\" has an answer.",
+        route: "/settings/work-policy",
+      },
+    ],
+  },
+  {
     version: "1.55",
     date: "2026-08-21",
     headline: "The accounting queue is work people own, not a list of alerts.",

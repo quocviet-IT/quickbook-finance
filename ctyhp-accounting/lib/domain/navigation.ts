@@ -213,6 +213,15 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         roles: ["admin"],
       },
       {
+        href: "/settings/work-policy",
+        title: "Work policy",
+        description:
+          "Say what this company means by urgent and by late. The accounting dashboard reads it; where a number is unset, the rule that needs it stays quiet.",
+        // Admin only, because acc_save_work_policy is admin only. A gate must
+        // name what the server actually enforces.
+        roles: ["admin"],
+      },
+      {
         href: "/settings/periods",
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",
