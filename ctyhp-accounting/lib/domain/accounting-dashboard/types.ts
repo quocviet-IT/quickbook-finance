@@ -17,6 +17,7 @@
  * can render an icon and a sentence beside the colour rather than relying on
  * green and red to carry the meaning alone (spec §7.3, §8.3).
  */
+import type { WorkLifecycle } from "./lifecycle";
 
 export type SectionDataState = "fresh" | "stale" | "unavailable";
 
@@ -82,4 +83,16 @@ export interface PriorityQueueItem {
   /** When the source data behind this item was read. */
   confirmedAt: string;
   blocksClose: boolean;
+
+  // --- The layer of human judgement over the top (Phase 2) ----------------
+  // Joined on by key at compose time, never stored beside the figures above:
+  // an item is still derived from the books on every read, and this says only
+  // what a person decided about it.
+  lifecycle: WorkLifecycle;
+  ownerId: string | null;
+  ownerName: string | null;
+  dueDate: string | null;
+  dismissReason: string | null;
+  /** The concurrency token to send back with a change. Null when untouched. */
+  stateUpdatedAt: string | null;
 }
