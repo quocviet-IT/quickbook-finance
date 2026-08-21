@@ -51,3 +51,4 @@ public/guide/last-failure.html
 
 # Generated accessibility, performance, viewport, and bundle reports.
 /.quality-results/
+server.log
