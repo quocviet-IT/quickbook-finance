@@ -28,6 +28,7 @@ export async function getWorkPolicy(sb: SupabaseClient): Promise<WorkPolicy> {
     materialityMinor: num(row.materiality_minor),
     approvalSlaDays: num(row.approval_sla_days),
     unmatchedBankAgeDays: num(row.unmatched_bank_age_days),
+    closeWindowDays: num(row.close_window_days),
   };
 }
 
@@ -43,6 +44,7 @@ export async function saveWorkPolicy(
     p_materiality_minor: input.materialityMinor,
     p_approval_sla_days: input.approvalSlaDays,
     p_unmatched_bank_age_days: input.unmatchedBankAgeDays,
+    p_close_window_days: input.closeWindowDays,
     p_note: input.note,
   });
   if (error) throw new WorkPolicyError(error.message);

@@ -37,6 +37,7 @@ export async function saveWorkPolicyAction(
       materialityMinor: clean(input.materialityMinor),
       approvalSlaDays: clean(input.approvalSlaDays),
       unmatchedBankAgeDays: clean(input.unmatchedBankAgeDays),
+      closeWindowDays: clean(input.closeWindowDays),
       note: input.note?.trim() ? input.note.trim() : null,
     });
     revalidatePath("/accounting");

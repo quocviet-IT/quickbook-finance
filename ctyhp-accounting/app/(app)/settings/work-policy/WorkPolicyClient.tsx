@@ -41,6 +41,7 @@ export default function WorkPolicyClient({
           : toMinor(values.materiality, baseDecimals),
       approvalSlaDays: values.approvalSlaDays ?? null,
       unmatchedBankAgeDays: values.unmatchedBankAgeDays ?? null,
+      closeWindowDays: values.closeWindowDays ?? null,
       note: values.note ?? null,
     });
     setSaving(false);
@@ -56,6 +57,7 @@ export default function WorkPolicyClient({
     policy.materialityMinor === null ? "a materiality threshold" : null,
     policy.approvalSlaDays === null ? "an approval SLA" : null,
     policy.unmatchedBankAgeDays === null ? "an unmatched-bank age" : null,
+    policy.closeWindowDays === null ? "a close window" : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -87,6 +89,7 @@ export default function WorkPolicyClient({
                 : fromMinor(policy.materialityMinor, baseDecimals),
             approvalSlaDays: policy.approvalSlaDays,
             unmatchedBankAgeDays: policy.unmatchedBankAgeDays,
+            closeWindowDays: policy.closeWindowDays,
           }}
         >
           <Form.Item
@@ -109,6 +112,14 @@ export default function WorkPolicyClient({
             name="unmatchedBankAgeDays"
             label="Days a bank line may stay unmatched"
             extra="After this many days an unmatched bank line is reported as late."
+          >
+            <InputNumber min={0} precision={0} style={{ width: 260 }} placeholder="Not set" />
+          </Form.Item>
+
+          <Form.Item
+            name="closeWindowDays"
+            label="Days before a period ends to start closing it"
+            extra="Inside this many days of a period end, the accounting screen suggests switching to close mode. A period already open past its end date is suggested regardless — that needs no policy."
           >
             <InputNumber min={0} precision={0} style={{ width: 260 }} placeholder="Not set" />
           </Form.Item>

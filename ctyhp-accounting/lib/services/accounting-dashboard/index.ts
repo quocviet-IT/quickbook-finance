@@ -3,6 +3,7 @@ import {
   composeAccountingDashboard,
   type AccountingDashboardData,
   type AccountingDashboardSections,
+  type DashboardMode,
 } from "./compose";
 import { getAccountingContext } from "./context";
 import { getAccountingControls } from "./controls";
@@ -11,14 +12,17 @@ import { getSecondaryAnalysis } from "./secondary-analysis";
 import { listWorkItemState, retireWorkItems } from "./work-item-state";
 import { getWorkPolicy } from "./policy";
 import { getAccountingInsights } from "./insights";
+import { getCloseReadiness } from "./close-readiness";
 
 export type {
   AccountingDashboardData,
   AccountingDashboardSections,
+  DashboardMode,
 } from "./compose";
 export type { AccountingDashboardContext, AccountingPeriodRow } from "./context";
 export type { SecondaryAnalysis } from "./secondary-analysis";
 export type { InsightSection } from "./insights";
+export type { CloseReadiness } from "./close-readiness";
 
 /** Which service fills each slot. The rule for surviving a failure is in compose.ts. */
 export const DEFAULT_SECTIONS: AccountingDashboardSections = {
@@ -30,11 +34,13 @@ export const DEFAULT_SECTIONS: AccountingDashboardSections = {
   retire: retireWorkItems,
   policy: getWorkPolicy,
   insights: getAccountingInsights,
+  close: getCloseReadiness,
 };
 
 export function getAccountingDashboard(
   sb: SupabaseClient,
+  mode: DashboardMode = "daily",
   sections: AccountingDashboardSections = DEFAULT_SECTIONS,
 ): Promise<AccountingDashboardData> {
-  return composeAccountingDashboard(sb, sections);
+  return composeAccountingDashboard(sb, sections, mode);
 }

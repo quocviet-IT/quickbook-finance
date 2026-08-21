@@ -21,18 +21,25 @@ export interface WorkPolicy {
   approvalSlaDays: number | null;
   /** Days a bank line may stay unmatched before it is late. */
   unmatchedBankAgeDays: number | null;
+  /**
+   * How many days before a period ends that closing it becomes worth starting.
+   * Null until a company decides; an overdue period needs no policy at all.
+   */
+  closeWindowDays: number | null;
 }
 
 export const EMPTY_WORK_POLICY: WorkPolicy = {
   materialityMinor: null,
   approvalSlaDays: null,
   unmatchedBankAgeDays: null,
+  closeWindowDays: null,
 };
 
 export const POLICY_FIELD_LABEL: Record<keyof WorkPolicy, string> = {
   materialityMinor: "Materiality threshold",
   approvalSlaDays: "Days an approval may wait",
   unmatchedBankAgeDays: "Days a bank line may stay unmatched",
+  closeWindowDays: "Days before a period ends to start closing it",
 };
 
 /**

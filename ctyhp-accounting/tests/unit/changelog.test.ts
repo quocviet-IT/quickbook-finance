@@ -133,9 +133,12 @@ describe("RELEASES", () => {
   it("only points at screens the app actually serves", () => {
     // A changelog that links to a renamed page is worse than one with no links.
     const served = new Set(appRoutes());
+    // A query string is part of a real destination — `/accounting?mode=close`
+    // is a page somebody can link to — so what has to exist is the path.
+    const pathOf = (route: string) => route.split("?")[0];
     const missing = RELEASES.flatMap((release) =>
       release.changes.map((change) => change.route).filter((route): route is string => !!route),
-    ).filter((route) => !served.has(route));
+    ).filter((route) => !served.has(pathOf(route)));
     expect(missing, `changelog links to pages that do not exist: ${missing.join(", ")}`).toEqual([]);
   });
 });

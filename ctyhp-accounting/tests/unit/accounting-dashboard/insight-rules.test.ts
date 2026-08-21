@@ -214,7 +214,12 @@ describe("every insight", () => {
   it("carries evidence, a timestamp, and somewhere to go", () => {
     const facts: InsightFacts = {
       ...QUIET,
-      policy: { materialityMinor: 0, approvalSlaDays: 1, unmatchedBankAgeDays: 7 },
+      policy: {
+        materialityMinor: 0,
+        approvalSlaDays: 1,
+        unmatchedBankAgeDays: 7,
+        closeWindowDays: null,
+      },
       controls: [trialBalanceControl({ balanced: false, differenceMinor: 5, evaluatedAt: AT })],
       overduePeriods: [{ id: "p1", label: "June 2026", periodEnd: "2026-06-30" }],
       approvals: { pendingCount: 2, oldestAgeDays: 9 },

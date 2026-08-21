@@ -9,13 +9,23 @@ import { getAccountingDashboard } from "@/lib/services/accounting-dashboard";
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountingOverviewPage() {
+/**
+ * The mode lives in the URL so it can be linked, bookmarked and shared — "the
+ * close is stuck on this" is a link somebody can send. Anything other than
+ * `close` is daily, which is the right default for an unrecognised value.
+ */
+export default async function AccountingOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const mode = (await searchParams).mode === "close" ? "close" : "daily";
   const sb = await createSupabaseServerClient();
   // The queue and the people who can hold it are read together: "Mine" and
   // "Assign to" are useless without both, and neither is worth a round trip
   // of its own.
   const [data, role, viewer, actors] = await Promise.all([
-    getAccountingDashboard(sb),
+    getAccountingDashboard(sb, mode),
     getUserRole(),
     getSessionUser(),
     listActors(sb).catch(() => []),
@@ -30,6 +40,7 @@ export default async function AccountingOverviewPage() {
         data={data}
         viewerId={viewer?.id ?? null}
         canManage={canWrite(role)}
+        canClose={role === "admin"}
         assignees={actors.map((actor: ActorRow) => ({
           id: actor.id,
           name: actor.full_name?.trim() || actor.email,

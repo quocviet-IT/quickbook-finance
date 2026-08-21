@@ -48,6 +48,7 @@ function sections(overrides: Partial<AccountingDashboardSections> = {}): Account
     retire: async () => 0,
     policy: async () => EMPTY_WORK_POLICY,
     insights: async () => ({ insights: [], sleeping: [] }),
+    close: async () => null,
     ...overrides,
   };
 }
@@ -230,5 +231,95 @@ describe("composeAccountingDashboard section isolation", () => {
     expect(out.insights.dataState).toBe("unavailable");
     expect(out.queue.dataState).toBe("fresh");
     expect(out.controls.dataState).toBe("fresh");
+  });
+});
+
+describe("close mode", () => {
+  const READINESS = {
+    period: { id: "p1", label: "July 2026", periodStart: "2026-07-01", periodEnd: "2026-07-31", status: "open" },
+    steps: [],
+    progress: { complete: 0, outstanding: 0, notApplicable: 0, unavailable: 0, applicable: 0, percent: null },
+    gateBlockers: null,
+    history: [],
+    medianDaysToClose: null,
+  };
+
+  it("daily mode never asks for the close checklist", async () => {
+    const close = vi.fn(async () => READINESS);
+    const out = await composeAccountingDashboard(sb, sections({ close }), "daily");
+    expect(close).not.toHaveBeenCalled();
+    // Null means "not asked for", which is not the same as a section that
+    // failed — a daily page must not carry a close section reading unavailable.
+    expect(out.close).toBeNull();
+    expect(out.mode).toBe("daily");
+  });
+
+  it("close mode fetches it and reports it fresh", async () => {
+    const out = await composeAccountingDashboard(sb, sections({ close: async () => READINESS }), "close");
+    expect(out.close?.dataState).toBe("fresh");
+    expect(out.close?.data?.period.label).toBe("July 2026");
+  });
+
+  it("a close checklist that throws costs only itself", async () => {
+    const out = await composeAccountingDashboard(
+      sb,
+      sections({
+        close: async () => {
+          throw new Error("period gone");
+        },
+      }),
+      "close",
+    );
+    expect(out.close?.dataState).toBe("unavailable");
+    expect(out.close?.data).toBeNull();
+    // The work is still there. That is the whole promise of the envelope.
+    expect(out.queue.dataState).toBe("fresh");
+    expect(out.controls.dataState).toBe("fresh");
+  });
+
+  it("a company with no period to close says so rather than failing", async () => {
+    const out = await composeAccountingDashboard(sb, sections({ close: async () => null }), "close");
+    expect(out.close?.dataState).toBe("fresh");
+    expect(out.close?.data).toBeNull();
+  });
+});
+
+describe("close recommendation", () => {
+  const overdue = {
+    id: "p0",
+    label: "June 2026",
+    periodStart: "2026-06-01",
+    periodEnd: "2026-06-30",
+    status: "open",
+  };
+
+  it("an overdue period recommends closing, with no policy set at all", async () => {
+    const out = await composeAccountingDashboard(
+      sb,
+      sections({
+        context: async () => ({ ...CONTEXT, overduePeriods: [overdue] }),
+      }),
+    );
+    expect(out.recommendation.recommended).toBe(true);
+    expect(out.recommendation.reason).toContain("June 2026");
+  });
+
+  it("with nothing overdue and no window chosen, the trigger sleeps", async () => {
+    const out = await composeAccountingDashboard(sb, sections());
+    expect(out.recommendation.recommended).toBe(false);
+    expect(out.recommendation.sleepingOn).toBe("closeWindowDays");
+  });
+
+  it("an unreadable policy leaves the recommendation asleep, not firing on a guess", async () => {
+    const out = await composeAccountingDashboard(
+      sb,
+      sections({
+        policy: async () => {
+          throw new Error("policy table gone");
+        },
+      }),
+    );
+    expect(out.recommendation.recommended).toBe(false);
+    expect(out.recommendation.sleepingOn).toBe("closeWindowDays");
   });
 });

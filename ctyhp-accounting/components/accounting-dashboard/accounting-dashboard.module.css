@@ -429,3 +429,119 @@
 .insightSleeping {
   margin-top: 12px;
 }
+
+/* --- Mode: daily or period close ---------------------------------------- */
+/* The toggle sits under the strip and above everything else, because it
+   changes what the rest of the page is answering. */
+.modeBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.modeHint {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* --- The close checklist ------------------------------------------------- */
+.closeExtra {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.closeProgress {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ob-panel-lineFaint);
+}
+
+/* The counts sit beside the ring rather than under it: a bar alone asks to be
+   trusted, and the numbers are what let the reader check it instead. */
+.closeProgressFacts {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.closeGate {
+  margin-top: 12px;
+}
+
+.closeSteps {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.closeStep {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ob-panel-lineFaint);
+}
+
+.closeStep:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* A step that does not apply is dimmed, never hidden. Hiding it would leave
+   the reader unable to tell "this company has no inventory" from "somebody
+   forgot to check the inventory". */
+.closeStep[data-status="not-applicable"] {
+  opacity: 0.6;
+}
+
+.closeStepIcon {
+  padding-top: 2px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.closeStepBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.closeStepHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.closeStepStatus {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ob-text-faint);
+}
+
+.closeHistory {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.closeActions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

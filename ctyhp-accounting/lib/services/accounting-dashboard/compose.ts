@@ -9,6 +9,11 @@ import type {
 } from "@/lib/domain/accounting-dashboard/types";
 import type { WorkItemState } from "@/lib/domain/accounting-dashboard/lifecycle";
 import { EMPTY_WORK_POLICY, type WorkPolicy } from "@/lib/domain/accounting-dashboard/policy";
+import {
+  closeRecommendation,
+  type CloseRecommendation,
+} from "@/lib/domain/accounting-dashboard/close-checklist";
+import type { CloseReadiness } from "./close-readiness";
 import type { InsightSection } from "./insights";
 import type { AccountingDashboardContext } from "./context";
 import type { SecondaryAnalysis } from "./secondary-analysis";
@@ -23,12 +28,35 @@ import type { SecondaryAnalysis } from "./secondary-analysis";
  * query it exists to defend against.
  */
 
+/**
+ * Which question the screen is answering.
+ *
+ * Daily is "what needs doing today". Close is "can this period be signed off".
+ * They want different things first, and pretending one layout serves both is
+ * how the page this replaced ended up serving neither.
+ */
+export type DashboardMode = "daily" | "close";
+
 export interface AccountingDashboardData {
+  mode: DashboardMode;
   context: AccountingDashboardContext;
   controls: SectionEnvelope<AccountingControl[]>;
   queue: SectionEnvelope<PriorityQueueItem[]>;
   insights: SectionEnvelope<InsightSection>;
   secondary: SectionEnvelope<SecondaryAnalysis>;
+  /**
+   * Whether an accountant should be closing rather than doing daily work.
+   * Costs nothing: the periods are already in the context and the policy is
+   * already fetched, so daily mode pays no query for this.
+   */
+  recommendation: CloseRecommendation;
+  /**
+   * The close checklist. Null in daily mode, where it was never asked for —
+   * which is different from a close section that was asked for and failed, and
+   * different again from `data: null` inside it, which means this company has
+   * no period to close.
+   */
+  close: SectionEnvelope<CloseReadiness | null> | null;
   /** What the company has configured, so the screen can say what it has not. */
   policy: WorkPolicy;
 }
@@ -64,6 +92,11 @@ export interface AccountingDashboardSections {
     sb: SupabaseClient,
     context: AccountingDashboardContext,
   ) => Promise<SecondaryAnalysis>;
+  /** Only called in close mode. Returns null when there is no period to close. */
+  close: (
+    sb: SupabaseClient,
+    context: AccountingDashboardContext,
+  ) => Promise<CloseReadiness | null>;
 }
 
 /**
@@ -83,6 +116,7 @@ export interface AccountingDashboardSections {
 export async function composeAccountingDashboard(
   sb: SupabaseClient,
   sections: AccountingDashboardSections,
+  mode: DashboardMode = "daily",
 ): Promise<AccountingDashboardData> {
   const context = await sections.context(sb);
 
@@ -153,6 +187,25 @@ export async function composeAccountingDashboard(
       ),
     );
 
+  // The close checklist is fetched only when somebody asked for it. Daily mode
+  // is the common case and it must not pay for a section it does not draw.
+  const close =
+    mode === "close"
+      ? await sections
+          .close(sb, context)
+          .then<SectionEnvelope<CloseReadiness | null>>((data) => ({
+            data,
+            generatedAt: new Date().toISOString(),
+            dataState: "fresh",
+          }))
+          .catch((reason) =>
+            failed<CloseReadiness | null>(
+              "The close checklist could not be worked out, so nothing here says this period is ready.",
+              reason,
+            ),
+          )
+      : null;
+
   // Retire the state of work that has gone, now that the live set is known.
   // This is the one moment it can be known, and it is what stops a dismissal
   // outliving its exception: the key of a trial-balance failure is the same
@@ -161,7 +214,27 @@ export async function composeAccountingDashboard(
     await sections.retire(sb, queue.data.map((item) => item.key));
   }
 
-  return { context, controls, queue, insights, secondary, policy };
+  const oldestOverdue = [...context.overduePeriods].sort((a, b) =>
+    a.periodEnd.localeCompare(b.periodEnd),
+  )[0];
+
+  return {
+    mode,
+    context,
+    controls,
+    queue,
+    insights,
+    secondary,
+    close,
+    policy,
+    recommendation: closeRecommendation({
+      today: context.asOf,
+      overdueCount: context.overduePeriods.length,
+      oldestOverdueLabel: oldestOverdue?.label ?? null,
+      currentPeriodEnd: context.currentPeriod?.periodEnd ?? null,
+      closeWindowDays: policy.closeWindowDays,
+    }),
+  };
 }
 
 /**

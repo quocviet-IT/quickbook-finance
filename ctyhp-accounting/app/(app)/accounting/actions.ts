@@ -4,6 +4,7 @@ import { getUserRole } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { transitionProblem, type WorkLifecycle } from "@/lib/domain/accounting-dashboard/lifecycle";
 import { canWrite } from "@/lib/domain/roles";
+import { closePeriod, PeriodsError, reopenPeriod } from "@/lib/services/periods";
 import {
   setWorkItemState,
   WorkItemStateError,
@@ -28,7 +29,8 @@ export interface WorkItemChange {
 }
 
 function msg(error: unknown): string {
-  if (error instanceof WorkItemStateError || error instanceof Error) return error.message;
+  if (error instanceof WorkItemStateError || error instanceof PeriodsError) return error.message;
+  if (error instanceof Error) return error.message;
   return "An unexpected error occurred";
 }
 
@@ -68,6 +70,66 @@ export async function changeWorkItemAction(
     });
     revalidatePath("/accounting");
     return { ok: true, version };
+  } catch (error) {
+    return { ok: false, error: msg(error) };
+  }
+}
+
+export interface PeriodActionResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Close a period from the cockpit.
+ *
+ * Every rule about whether it may be closed stays in `acc_close_period`: admin
+ * only, a reason required, and a refusal when a control account does not tie
+ * out at the period end unless the difference is explained in writing. None of
+ * that is repeated here, and the role check below is a courtesy that produces a
+ * readable message — not the guard. The guard is the database, because this
+ * screen will not be its only caller forever.
+ */
+export async function closePeriodAction(input: {
+  periodId: string;
+  reason: string;
+  varianceNote: string | null;
+}): Promise<PeriodActionResult> {
+  const role = await getUserRole();
+  if (role !== "admin") {
+    return { ok: false, error: "Only an admin can close a period" };
+  }
+  if (input.reason.trim().length === 0) {
+    return { ok: false, error: "A close reason is required" };
+  }
+  try {
+    const sb = await createSupabaseServerClient();
+    await closePeriod(sb, input.periodId, input.reason.trim(), input.varianceNote);
+    revalidatePath("/accounting");
+    revalidatePath("/settings/periods");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: msg(error) };
+  }
+}
+
+export async function reopenPeriodAction(input: {
+  periodId: string;
+  reason: string;
+}): Promise<PeriodActionResult> {
+  const role = await getUserRole();
+  if (role !== "admin") {
+    return { ok: false, error: "Only an admin can reopen a period" };
+  }
+  if (input.reason.trim().length === 0) {
+    return { ok: false, error: "A reason is required" };
+  }
+  try {
+    const sb = await createSupabaseServerClient();
+    await reopenPeriod(sb, input.periodId, input.reason.trim());
+    revalidatePath("/accounting");
+    revalidatePath("/settings/periods");
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: msg(error) };
   }

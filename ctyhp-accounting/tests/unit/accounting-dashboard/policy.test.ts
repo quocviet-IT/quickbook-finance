@@ -12,6 +12,7 @@ const CONFIGURED: WorkPolicy = {
   materialityMinor: 100_000,
   approvalSlaDays: 3,
   unmatchedBankAgeDays: 14,
+  closeWindowDays: 5,
 };
 
 describe("isConfigured", () => {

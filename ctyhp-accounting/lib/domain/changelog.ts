@@ -41,6 +41,59 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.57",
+    date: "2026-08-21",
+    headline: "Closing a month, with the checking done for you.",
+    changes: [
+      {
+        kind: "added",
+        title: "Period close mode",
+        detail:
+          "The accounting screen now has a second mode that answers a different "
+          + "question: can this month be signed off. It lists what has to be true "
+          + "before it can be — the trial balance, each control account, the "
+          + "bank, the approvals, anything still in draft — with what is "
+          + "stopping the close at the top and the figures behind every line. "
+          + "Nothing on it can be ticked: a step is done because the books say so, "
+          + "so the list cannot be talked into agreeing.",
+        route: "/accounting?mode=close",
+      },
+      {
+        kind: "changed",
+        title: "Every check is made at the period end, not today",
+        detail:
+          "The daily panel says whether the books are safe right now. The close "
+          + "checklist asks whether they were safe on the last day of the month, "
+          + "which is a different question the moment anybody posts a correction "
+          + "into the next month. Every figure on the checklist is read at the "
+          + "period end and says which date it came from.",
+        route: "/accounting?mode=close",
+      },
+      {
+        kind: "added",
+        title: "How long the last closes took",
+        detail:
+          "The close panel shows how many days after month end each of the last "
+          + "closes actually happened, and the typical figure across them. It is "
+          + "measured from the period's own close record — nothing new is "
+          + "tracked, and a month that was reopened and closed again counts from "
+          + "the second close.",
+        route: "/accounting?mode=close",
+      },
+      {
+        kind: "added",
+        title: "When to start closing",
+        detail:
+          "A period left open after the last day it covers is flagged with no "
+          + "setting at all. Being reminded before that — three days out, or "
+          + "five — is a judgement, so it waits on a number you set under Work "
+          + "policy, and until then it says nothing rather than nagging on a "
+          + "schedule nobody agreed to.",
+        route: "/settings/work-policy",
+      },
+    ],
+  },
+  {
     version: "1.56",
     date: "2026-08-21",
     headline: "The accounting screen explains itself, and shows its working.",
