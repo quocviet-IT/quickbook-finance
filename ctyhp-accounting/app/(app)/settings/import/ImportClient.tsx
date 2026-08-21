@@ -376,7 +376,7 @@ export default function ImportClient({
         />
       ) : null}
 
-      {target === "transactions" || target === "invoices" ? (
+      {target !== "general_ledger" ? (
         <ImportBatchRegister reloadKey={imported} onChanged={reset} source={target} />
       ) : null}
     </Space>

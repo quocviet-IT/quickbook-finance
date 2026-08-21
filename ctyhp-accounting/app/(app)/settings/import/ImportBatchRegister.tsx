@@ -9,12 +9,24 @@ export interface ImportBatchRegisterProps {
   reloadKey: number;
   onChanged: () => void;
   /** Which tab's imports to show. One register, narrowed per tab. */
-  source: "transactions" | "invoices";
+  source: RegisterSource;
 }
 
-const EMPTY_TEXT: Record<ImportBatchRegisterProps["source"], string> = {
+export type RegisterSource =
+  | "transactions"
+  | "invoices"
+  | "chart_of_accounts"
+  | "customers"
+  | "vendors"
+  | "items";
+
+const EMPTY_TEXT: Record<RegisterSource, string> = {
   transactions: "No transactions have been imported into this company yet.",
   invoices: "No invoices have been imported into this company yet.",
+  chart_of_accounts: "No chart of accounts has been imported into this company yet.",
+  customers: "No customers have been imported into this company yet.",
+  vendors: "No vendors have been imported into this company yet.",
+  items: "No products or services have been imported into this company yet.",
 };
 
 /**

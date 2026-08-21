@@ -132,11 +132,15 @@ export async function voidImportBatch(
   if (lookupError) throw new LedgerImportError(lookupError.message);
   if (!batch) throw new LedgerImportError("Import not found, or already undone");
 
-  if (String(batch.source) === "invoices") {
-    const { data, error } = await sb.rpc("acc_undo_invoice_import", {
-      p_batch_id: batchId,
-      p_reason: reason,
-    });
+  const source = String(batch.source);
+
+  // Three shapes of undo, one per shape of import. The batch decides, not the
+  // screen: a caller that picked wrong would void a ledger it meant to delete
+  // records from.
+  const listSources = ["chart_of_accounts", "customers", "vendors", "items"];
+  if (source === "invoices" || listSources.includes(source)) {
+    const rpc = source === "invoices" ? "acc_undo_invoice_import" : "acc_undo_list_import";
+    const { data, error } = await sb.rpc(rpc, { p_batch_id: batchId, p_reason: reason });
     if (error) throw new LedgerImportError(error.message);
     const row = (Array.isArray(data) ? data[0] : data) as
       | { removed?: number; kept?: number }

@@ -287,6 +287,34 @@ export async function previewImport(
   };
 }
 
+/**
+ * Put a list import on the register, with what it created.
+ *
+ * Deliberately never throws. The records are already in by the time this runs,
+ * and losing the register entry costs the undo — a real loss, worth a line in
+ * the log — while turning it into an error would tell the reader an import
+ * failed that in fact succeeded.
+ */
+async function recordListImport(
+  sb: SupabaseClient,
+  source: ImportTarget,
+  kind: "account" | "customer" | "vendor" | "item",
+  created: string[],
+  rows: readonly (readonly string[])[],
+  fileName: string | null | undefined,
+): Promise<void> {
+  if (created.length === 0) return;
+  const { error } = await sb.rpc("acc_record_list_import", {
+    p_source: source,
+    p_kind: kind,
+    p_file_name: fileName?.trim() || `${source}.csv`,
+    p_sha256: transactionFileChecksum(rows),
+    p_created: created,
+    p_row_count: rows.length,
+  });
+  if (error) console.error(`recording the ${source} import failed:`, error.message);
+}
+
 export interface ImportOutcome {
   created: number;
   updated: number;
@@ -475,6 +503,7 @@ export async function runImport(
     });
     if (error) throw new DataImportError(error.message);
     outcome = first(data);
+    await recordListImport(sb, target, "account", createdIds(data), rows, options.fileName);
     // The same classification an account created by hand gets. Left to the
     // column default, an imported chart holds the Cash Flow Statement in review
     // over accounts the application already has a settled answer for.
@@ -483,13 +512,16 @@ export async function runImport(
     const { data, error } = await sb.rpc("acc_import_items", { p_rows: payload });
     if (error) throw new DataImportError(error.message);
     outcome = first(data);
+    await recordListImport(sb, target, "item", createdIds(data), rows, options.fileName);
   } else {
+    const kind = target === "customers" ? "customer" : "vendor";
     const { data, error } = await sb.rpc("acc_import_contacts", {
       p_rows: payload,
-      p_kind: target === "customers" ? "customer" : "vendor",
+      p_kind: kind,
     });
     if (error) throw new DataImportError(error.message);
     outcome = first(data);
+    await recordListImport(sb, target, kind, createdIds(data), rows, options.fileName);
   }
 
   const asOf = options.openingBalancesAsOf;
@@ -527,6 +559,12 @@ export async function runImport(
   }
 
   return outcome;
+}
+
+/** The ids the importer says it created, for the register to link. */
+function createdIds(data: unknown): string[] {
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+  return Array.isArray(row?.created_ids) ? (row.created_ids as unknown[]).map(String) : [];
 }
 
 function first(data: unknown): ImportOutcome {

@@ -41,6 +41,35 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.54",
+    date: "2026-08-21",
+    headline: "Every import is on the record, and every one can be undone.",
+    changes: [
+      {
+        kind: "added",
+        title: "The chart of accounts, contacts and products tabs join the register",
+        detail:
+          "Every import tab now records what it brought in \u2014 the file, " +
+          "who ran it, when, and how many records \u2014 and offers Undo, " +
+          "the way transactions and invoices already did.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "Undo removes what an import created, and says what it could not",
+        detail:
+          "Only records the import brought into existence are removed. " +
+          "Anything it merely filled in is left alone: the values it " +
+          "replaced were never kept, so there is nothing to put back and an " +
+          "undo claiming otherwise would be inventing the past. A record " +
+          "something else now uses \u2014 an account with a posted entry, a " +
+          "customer named on an invoice \u2014 stays where it is and is " +
+          "counted back, so the reader knows exactly what remains.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.53",
     date: "2026-08-21",
     headline: "Invoice imports are on the record, and can be taken back out.",

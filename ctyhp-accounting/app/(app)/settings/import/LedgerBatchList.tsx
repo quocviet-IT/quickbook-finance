@@ -19,6 +19,9 @@ export interface LedgerBatchListProps {
  * plain journal entry, so without it a three-year ledger imported against the
  * wrong chart would have to be unpicked by hand.
  */
+/** Imports of a list of records, as opposed to a ledger or a set of documents. */
+const LIST_SOURCES = ["chart_of_accounts", "customers", "vendors", "items"];
+
 export default function LedgerBatchList({
   batches,
   canManage,
@@ -44,7 +47,10 @@ export default function LedgerBatchList({
       undoing.source === "invoices"
         ? `${removed} draft invoice(s) removed` +
             (kept > 0 ? `; ${kept} left in place because they have been issued` : "")
-        : `${removed} entries voided`,
+        : LIST_SOURCES.includes(undoing.source)
+          ? `${removed} record(s) removed` +
+            (kept > 0 ? `; ${kept} left in place because something else uses them` : "")
+          : `${removed} entries voided`,
     );
     setUndoing(null);
     setReason("");
@@ -62,16 +68,21 @@ export default function LedgerBatchList({
         columns={[
           { title: "File", dataIndex: "file_name" },
           {
-            title: "Mode",
-            dataIndex: "mode",
-            width: 130,
-            render: (mode: string) => (
+            // What the import produced, in the words of the thing it produced.
+            // "Drafts raised" is true of an invoice import and nonsense on a
+            // list of customers, and they share this column.
+            title: "Brought in",
+            key: "mode",
+            width: 140,
+            render: (_, row) => (
               <Tag>
-                {mode === "history"
+                {row.mode === "history"
                   ? "Whole history"
-                  : mode === "documents"
-                    ? "Drafts raised"
-                    : "Balances"}
+                  : row.mode === "balances"
+                    ? "Balances"
+                    : row.source === "invoices"
+                      ? "Drafts raised"
+                      : "Records added"}
               </Tag>
             ),
           },
@@ -127,7 +138,14 @@ export default function LedgerBatchList({
         }}
       >
         <p>
-          {undoing?.source === "invoices" ? (
+          {undoing && LIST_SOURCES.includes(undoing.source) ? (
+            <>
+              This removes the {undoing?.entry_count ?? 0} record(s) this import created. Anything
+              it only updated is left as it is — the values it replaced were never kept, so there
+              is nothing to put back. A record something else now uses — an account with a posted
+              entry, a customer named on an invoice — is left where it is and reported back.
+            </>
+          ) : undoing?.source === "invoices" ? (
             <>
               This deletes the {undoing?.entry_count ?? 0} draft invoice(s) this import raised.
               A draft has no number and has posted nothing, so removing it leaves no trace and no
