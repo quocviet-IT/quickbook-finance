@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { orderQueue } from "@/lib/domain/accounting-dashboard/priority";
-import type { PriorityQueueItem } from "@/lib/domain/accounting-dashboard/types";
+import type { DerivedQueueItem } from "@/lib/domain/accounting-dashboard/types";
 
 const base = {
   sourceId: null,
@@ -10,7 +10,7 @@ const base = {
   actionLabel: "Open",
   confirmedAt: "2026-08-20T00:00:00Z",
   blocksClose: false,
-} satisfies Omit<PriorityQueueItem, "key" | "sourceKind" | "severity" | "ageDays">;
+} satisfies Omit<DerivedQueueItem, "key" | "sourceKind" | "severity" | "ageDays">;
 
 describe("orderQueue", () => {
   it("puts a close-blocking control failure first, whatever its age", () => {
@@ -70,7 +70,7 @@ describe("orderQueue", () => {
   });
 
   it("is stable for identical rank — the same input twice gives the same output", () => {
-    const items: PriorityQueueItem[] = [
+    const items: DerivedQueueItem[] = [
       { ...base, key: "x", sourceKind: "bill-due", severity: "high", ageDays: 2 },
       { ...base, key: "y", sourceKind: "bill-due", severity: "high", ageDays: 2 },
     ];
@@ -78,7 +78,7 @@ describe("orderQueue", () => {
   });
 
   it("never mutates its input", () => {
-    const items: PriorityQueueItem[] = [
+    const items: DerivedQueueItem[] = [
       { ...base, key: "x", sourceKind: "bill-due", severity: "low", ageDays: 1 },
       { ...base, key: "y", sourceKind: "bill-due", severity: "critical", ageDays: 1 },
     ];

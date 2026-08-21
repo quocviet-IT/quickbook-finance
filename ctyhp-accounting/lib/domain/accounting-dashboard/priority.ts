@@ -1,4 +1,4 @@
-import type { PriorityQueueItem, QueueSeverity } from "./types";
+import type { DerivedQueueItem, QueueSeverity } from "./types";
 
 export const SEVERITY_RANK: Record<QueueSeverity, number> = {
   critical: 0,
@@ -22,7 +22,7 @@ export const SEVERITY_RANK: Record<QueueSeverity, number> = {
  * exception costs, not what makes it urgent. A missing amount therefore sorts
  * below a present one rather than above it.
  */
-export function orderQueue(items: PriorityQueueItem[]): PriorityQueueItem[] {
+export function orderQueue<T extends DerivedQueueItem>(items: T[]): T[] {
   return [...items].sort(
     (a, b) =>
       blockingRank(a) - blockingRank(b) ||
@@ -39,6 +39,6 @@ export function orderQueue(items: PriorityQueueItem[]): PriorityQueueItem[] {
  * turn on severity like any other item, or every soft check would claim the
  * top of the page and the tier would stop meaning anything.
  */
-function blockingRank(item: PriorityQueueItem): number {
+function blockingRank(item: DerivedQueueItem): number {
   return item.sourceKind === "control-failure" && item.blocksClose ? 0 : 1;
 }

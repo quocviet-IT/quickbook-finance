@@ -1,5 +1,5 @@
 import { calendarDayDifference, type WorkQueueItem } from "@/lib/domain/work-queue";
-import type { AccountingControl, PriorityQueueItem, QueueSeverity } from "./types";
+import type { AccountingControl, DerivedQueueItem, QueueSeverity } from "./types";
 
 /**
  * Turning each kind of source into one queue item.
@@ -18,7 +18,7 @@ import type { AccountingControl, PriorityQueueItem, QueueSeverity } from "./type
 export function controlFailureItems(
   controls: readonly AccountingControl[],
   confirmedAt: string,
-): PriorityQueueItem[] {
+): DerivedQueueItem[] {
   return controls
     .filter((control) => control.status !== "healthy")
     .map((control) => ({
@@ -75,7 +75,7 @@ export function workQueueItemToPriority(
   item: WorkQueueItem,
   asOf: string,
   confirmedAt: string,
-): PriorityQueueItem {
+): DerivedQueueItem {
   const mapped = KIND_MAP[item.kind];
   return {
     key: item.id,
@@ -102,7 +102,7 @@ export function overduePeriodItem(
   period: { id: string; label: string; periodEnd: string },
   asOf: string,
   confirmedAt: string,
-): PriorityQueueItem {
+): DerivedQueueItem {
   const ageDays = Math.max(0, calendarDayDifference(asOf, period.periodEnd));
   return {
     key: `period:${period.id}`,
@@ -126,7 +126,7 @@ export function recurringFailureItem(
   run: { id: string; templateName: string; runDate: string },
   asOf: string,
   confirmedAt: string,
-): PriorityQueueItem {
+): DerivedQueueItem {
   return {
     key: `recurring:${run.id}`,
     sourceKind: "recurring-failure",

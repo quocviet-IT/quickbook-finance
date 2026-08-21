@@ -6,7 +6,8 @@ import {
 } from "@/lib/services/accounting-dashboard/compose";
 import { trialBalanceControl } from "@/lib/domain/accounting-dashboard/control-status";
 import type { AccountingDashboardContext } from "@/lib/services/accounting-dashboard/context";
-import type { PriorityQueueItem } from "@/lib/domain/accounting-dashboard/types";
+import type { DerivedQueueItem } from "@/lib/domain/accounting-dashboard/types";
+import type { WorkItemState } from "@/lib/domain/accounting-dashboard/lifecycle";
 
 const CONTEXT: AccountingDashboardContext = {
   asOf: "2026-08-20",
@@ -20,7 +21,7 @@ const CONTEXT: AccountingDashboardContext = {
   overduePeriods: [],
 };
 
-const QUEUE_ITEM: PriorityQueueItem = {
+const QUEUE_ITEM: DerivedQueueItem = {
   key: "bill:1",
   sourceKind: "bill-due",
   sourceId: "1",
@@ -42,6 +43,8 @@ function sections(overrides: Partial<AccountingDashboardSections> = {}): Account
     ],
     queue: async () => [QUEUE_ITEM],
     secondary: async () => ({ trend: [], sourceMix: [], recentEntries: [] }),
+    workState: async () => new Map<string, WorkItemState>(),
+    retire: async () => 0,
     ...overrides,
   };
 }
@@ -143,5 +146,69 @@ describe("composeAccountingDashboard section isolation", () => {
     expect(out.queue.dataState).toBe("unavailable");
     expect(out.queue.data).toBeNull();
     expect(out.queue.unavailableReason).toMatch(/not a statement that there is no work/i);
+  });
+  it("keeps the work when the lifecycle state cannot be read", async () => {
+    // Who owns an invoice is worth knowing. It is not worth the invoice.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await composeAccountingDashboard(
+      sb,
+      sections({
+        workState: async () => {
+          throw new Error("state table unavailable");
+        },
+      }),
+    );
+    spy.mockRestore();
+
+    expect(out.queue.dataState).toBe("fresh");
+    expect(out.queue.data).toHaveLength(1);
+    expect(out.queue.data?.[0].lifecycle).toBe("new");
+    expect(out.queue.data?.[0].ownerId).toBeNull();
+  });
+
+  it("retires the state of work that is no longer in the live set", async () => {
+    // The keys handed to retire are exactly the ones the queue just produced,
+    // which is what stops a dismissal outliving the exception it dismissed.
+    let retiredWith: readonly string[] | null = null;
+    await composeAccountingDashboard(
+      sb,
+      sections({
+        retire: async (_sb, keys) => {
+          retiredWith = keys;
+          return 0;
+        },
+      }),
+    );
+    expect(retiredWith).toEqual(["bill:1"]);
+  });
+
+  it("carries a person's decision onto the item the books produced", async () => {
+    const out = await composeAccountingDashboard(
+      sb,
+      sections({
+        workState: async () =>
+          new Map<string, WorkItemState>([
+            [
+              "bill:1",
+              {
+                key: "bill:1",
+                lifecycle: "in_progress",
+                ownerId: "u1",
+                ownerName: "Kim Thanh",
+                dueDate: "2026-09-01",
+                dismissReason: null,
+                updatedAt: "2026-08-21T10:00:00Z",
+                updatedBy: "u1",
+              },
+            ],
+          ]),
+      }),
+    );
+    expect(out.queue.data?.[0]).toMatchObject({
+      lifecycle: "in_progress",
+      ownerName: "Kim Thanh",
+      dueDate: "2026-09-01",
+      stateUpdatedAt: "2026-08-21T10:00:00Z",
+    });
   });
 });

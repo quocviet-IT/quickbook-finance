@@ -8,6 +8,7 @@ import { getAccountingContext } from "./context";
 import { getAccountingControls } from "./controls";
 import { getAccountingWorkQueue } from "./work-queue";
 import { getSecondaryAnalysis } from "./secondary-analysis";
+import { listWorkItemState, retireWorkItems } from "./work-item-state";
 
 export type {
   AccountingDashboardData,
@@ -22,6 +23,8 @@ export const DEFAULT_SECTIONS: AccountingDashboardSections = {
   controls: getAccountingControls,
   queue: getAccountingWorkQueue,
   secondary: getSecondaryAnalysis,
+  workState: listWorkItemState,
+  retire: retireWorkItems,
 };
 
 export function getAccountingDashboard(

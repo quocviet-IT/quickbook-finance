@@ -66,7 +66,14 @@ export type QueueSourceKind =
   | "overdue-period"
   | "recurring-failure";
 
-export interface PriorityQueueItem {
+/**
+ * What the books say about one piece of work.
+ *
+ * Everything here is derived on every read. The builders in `queue-items.ts`
+ * produce exactly this and nothing more: they have no business knowing who
+ * picked something up.
+ */
+export interface DerivedQueueItem {
   key: string;
   sourceKind: QueueSourceKind;
   /** The record this item stands for, when it stands for one. */
@@ -83,11 +90,17 @@ export interface PriorityQueueItem {
   /** When the source data behind this item was read. */
   confirmedAt: string;
   blocksClose: boolean;
+}
 
-  // --- The layer of human judgement over the top (Phase 2) ----------------
-  // Joined on by key at compose time, never stored beside the figures above:
-  // an item is still derived from the books on every read, and this says only
-  // what a person decided about it.
+/**
+ * A work item as the screen sees it: what the books say, and what a person
+ * decided about it.
+ *
+ * The two halves are joined by key at compose time and never stored together.
+ * An item is still derived from the books on every read; the state below says
+ * only who picked it up, and it cannot make an exception go away.
+ */
+export interface PriorityQueueItem extends DerivedQueueItem {
   lifecycle: WorkLifecycle;
   ownerId: string | null;
   ownerName: string | null;

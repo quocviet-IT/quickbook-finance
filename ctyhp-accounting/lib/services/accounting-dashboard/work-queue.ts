@@ -4,7 +4,7 @@ import {
   recurringFailureItem,
   workQueueItemToPriority,
 } from "@/lib/domain/accounting-dashboard/queue-items";
-import type { PriorityQueueItem } from "@/lib/domain/accounting-dashboard/types";
+import type { DerivedQueueItem } from "@/lib/domain/accounting-dashboard/types";
 import { listRecurringRuns } from "@/lib/services/recurring";
 import { getDashboardWorkQueue } from "@/lib/services/work-queue";
 import type { AccountingDashboardContext } from "./context";
@@ -25,7 +25,7 @@ import type { AccountingDashboardContext } from "./context";
 export async function getAccountingWorkQueue(
   sb: SupabaseClient,
   context: AccountingDashboardContext,
-): Promise<PriorityQueueItem[]> {
+): Promise<DerivedQueueItem[]> {
   const confirmedAt = new Date().toISOString();
   const { asOf } = context;
 
@@ -34,7 +34,7 @@ export async function getAccountingWorkQueue(
     listRecurringRuns(sb, 50),
   ]);
 
-  const items: PriorityQueueItem[] = [];
+  const items: DerivedQueueItem[] = [];
 
   if (queue.status === "fulfilled") {
     items.push(

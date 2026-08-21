@@ -3,9 +3,11 @@ import { controlFailureItems } from "@/lib/domain/accounting-dashboard/queue-ite
 import { orderQueue } from "@/lib/domain/accounting-dashboard/priority";
 import type {
   AccountingControl,
+  DerivedQueueItem,
   PriorityQueueItem,
   SectionEnvelope,
 } from "@/lib/domain/accounting-dashboard/types";
+import type { WorkItemState } from "@/lib/domain/accounting-dashboard/lifecycle";
 import type { AccountingDashboardContext } from "./context";
 import type { SecondaryAnalysis } from "./secondary-analysis";
 
@@ -36,7 +38,11 @@ export interface AccountingDashboardSections {
   queue: (
     sb: SupabaseClient,
     context: AccountingDashboardContext,
-  ) => Promise<PriorityQueueItem[]>;
+  ) => Promise<DerivedQueueItem[]>;
+  /** What people have decided about the work, keyed by the item's own key. */
+  workState: (sb: SupabaseClient) => Promise<Map<string, WorkItemState>>;
+  /** Marks as resolved the state of work no longer in the live set. */
+  retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
   secondary: (
     sb: SupabaseClient,
     context: AccountingDashboardContext,
@@ -63,11 +69,20 @@ export async function composeAccountingDashboard(
 ): Promise<AccountingDashboardData> {
   const context = await sections.context(sb);
 
-  const [controlsResult, queueResult, secondaryResult] = await Promise.allSettled([
+  const [controlsResult, queueResult, secondaryResult, stateResult] = await Promise.allSettled([
     sections.controls(sb, context),
     sections.queue(sb, context),
     sections.secondary(sb, context),
+    sections.workState(sb),
   ]);
+
+  // A failed state read costs the lifecycle columns, never the work. An
+  // accountant who cannot see who owns an invoice can still see the invoice.
+  const state =
+    stateResult.status === "fulfilled"
+      ? stateResult.value
+      : (console.error("reading work item state failed:", stateResult.reason),
+        new Map<string, WorkItemState>());
 
   const controls = envelope(
     controlsResult,
@@ -81,10 +96,13 @@ export async function composeAccountingDashboard(
   const queue: SectionEnvelope<PriorityQueueItem[]> =
     queueResult.status === "fulfilled"
       ? {
-          data: orderQueue([
-            ...(controls.data ? controlFailureItems(controls.data, controls.generatedAt) : []),
-            ...queueResult.value,
-          ]),
+          data: withState(
+            orderQueue([
+              ...(controls.data ? controlFailureItems(controls.data, controls.generatedAt) : []),
+              ...queueResult.value,
+            ]),
+            state,
+          ),
           generatedAt: new Date().toISOString(),
           dataState: "fresh",
         }
@@ -93,7 +111,40 @@ export async function composeAccountingDashboard(
           queueResult.reason,
         );
 
+  // Retire the state of work that has gone, now that the live set is known.
+  // This is the one moment it can be known, and it is what stops a dismissal
+  // outliving its exception: the key of a trial-balance failure is the same
+  // every time it fails, so March's dismissal would otherwise hide April's.
+  if (queue.data) {
+    await sections.retire(sb, queue.data.map((item) => item.key));
+  }
+
   return { context, controls, queue, secondary };
+}
+
+/**
+ * The books' half of each item, joined to what a person decided about it.
+ *
+ * An item nobody has touched carries the default: new, unowned, undated. That
+ * is not a stored row — it is the absence of one, and saying so here keeps the
+ * state table holding only decisions somebody actually made.
+ */
+function withState(
+  items: DerivedQueueItem[],
+  state: Map<string, WorkItemState>,
+): PriorityQueueItem[] {
+  return items.map((item) => {
+    const decided = state.get(item.key);
+    return {
+      ...item,
+      lifecycle: decided?.lifecycle ?? "new",
+      ownerId: decided?.ownerId ?? null,
+      ownerName: decided?.ownerName ?? null,
+      dueDate: decided?.dueDate ?? null,
+      dismissReason: decided?.dismissReason ?? null,
+      stateUpdatedAt: decided?.updatedAt ?? null,
+    };
+  });
 }
 
 function envelope<T>(result: PromiseSettledResult<T>, reason: string): SectionEnvelope<T> {
