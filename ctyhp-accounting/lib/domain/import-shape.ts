@@ -91,15 +91,50 @@ const EXAMPLE_BY_KEY: Record<string, string> = {
   memo: "Thank you for your business",
 };
 
+/**
+ * Example values that belong to one target only.
+ *
+ * `description` is a field of both the chart of accounts and an invoice line,
+ * and the shared example made every invoice template describe its line as
+ * "Operating checking account" — a template that reads as nonsense on the one
+ * screen where a reader most needs an example to copy.
+ */
+const EXAMPLE_BY_TARGET: Partial<Record<ImportTarget, Record<string, string>>> = {
+  invoices: { description: "Repair and polish on a 14k gold band" },
+};
+
+/**
+ * Real values from the company, for the fields whose example must exist.
+ *
+ * The importer refuses an invoice naming a customer that is not on file, and
+ * refuses a tax code it cannot find — so a template carrying invented ones
+ * imports nothing, which is exactly what a reader downloading a template is
+ * least able to diagnose. A null tax code writes an empty cell: sales tax is
+ * optional on a line, and empty imports where wrong does not.
+ */
+export interface TemplateExamples {
+  customer?: string;
+  income_account?: string;
+  tax_code?: string | null;
+}
+
 /** A CSV with exactly the columns this tab reads, and one row showing the shape. */
-export function templateCsvFor(target: ImportTarget): string {
+export function templateCsvFor(target: ImportTarget, examples: TemplateExamples = {}): string {
   const fields = fieldsFor(target);
   const cell = (value: string) => (value.includes(",") ? `"${value}"` : value);
   const header = fields.map((field) => cell(field.label)).join(",");
+  const perTarget = EXAMPLE_BY_TARGET[target] ?? {};
   const example = fields
-    .map((field) => cell(EXAMPLE_BY_KEY[field.key] ?? EXAMPLE_BY_KIND[field.kind]))
+    .map((field) => {
+      if (Object.hasOwn(examples, field.key)) {
+        return cell(examples[field.key as keyof TemplateExamples] ?? "");
+      }
+      return cell(perTarget[field.key] ?? EXAMPLE_BY_KEY[field.key] ?? EXAMPLE_BY_KIND[field.kind]);
+    })
     .join(",");
-  return `${header}\n${example}\n`;
+  return `${header}
+${example}
+`;
 }
 
 export interface FileShapeDetection {

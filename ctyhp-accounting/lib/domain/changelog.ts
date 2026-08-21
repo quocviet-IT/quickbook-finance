@@ -41,6 +41,29 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.51",
+    date: "2026-08-20",
+    headline: "The template you download is a file that imports.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The invoice template named a customer nobody has",
+        detail:
+          "Download template produced a row naming \"Aurora Fine Jewelry\" as " +
+          "its customer and \"CA-SJ\" as its sales tax code — neither of " +
+          "which exists in any company — and described the invoice line " +
+          "as \"Operating checking account\", an example that had leaked in " +
+          "from the chart of accounts. Imported exactly as downloaded it " +
+          "raised nothing at all. The template is now built from the " +
+          "company's own records: a customer on file, an income account an " +
+          "invoice line may credit, and a tax code that exists. Where a " +
+          "company has no customers yet, the placeholder stays and the " +
+          "guidance above it already says to bring customers across first.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.50",
     date: "2026-08-20",
     headline: "The import says what it will do, and what it did not do.",

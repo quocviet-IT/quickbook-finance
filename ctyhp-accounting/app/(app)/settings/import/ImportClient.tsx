@@ -30,7 +30,7 @@ import ImportBatchRegister from "./ImportBatchRegister";
 import ImportPreflightSection from "./ImportPreflightSection";
 import ImportConfirmContent from "./ImportConfirmContent";
 import LedgerImportPanel from "./LedgerImportPanel";
-import { detectFileShape } from "@/lib/domain/import-shape";
+import { detectFileShape, type TemplateExamples } from "@/lib/domain/import-shape";
 import type { ImportPreview } from "@/lib/services/data-import";
 import {
   previewImportAction,
@@ -62,6 +62,7 @@ export default function ImportClient({
   baseDecimals,
   bankAccounts,
   accounts,
+  templateExamples,
 }: {
   companyName: string;
   isSampleCompany: boolean;
@@ -70,6 +71,8 @@ export default function ImportClient({
   bankAccounts: AccountRow[];
   /** The whole chart, for pointing a name in the file at an account. */
   accounts: AccountRow[];
+  /** Names this company has, so a downloaded template is a file that imports. */
+  templateExamples: TemplateExamples;
 }) {
   const { message, modal } = App.useApp();
   const [target, setTarget] = useState<ImportTarget>("chart_of_accounts");
@@ -286,6 +289,7 @@ export default function ImportClient({
 
       {ledgerTab ? null : (
         <ImportGuidance
+          templateExamples={templateExamples}
           target={target}
           detection={detection}
           onSwitchTarget={(next) => {

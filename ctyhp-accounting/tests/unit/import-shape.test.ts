@@ -157,3 +157,48 @@ describe("a categorized transactions export", () => {
     expect(describeShapeMismatch("general_ledger", detectFileShape(ledgerish))).toBeNull();
   });
 });
+
+describe("templateCsvFor, invoices", () => {
+  /** Read one cell out of the example row, by its column label. */
+  function cellOf(csv: string, label: string): string {
+    const [header, example] = csv.trim().split("\n");
+    const columns = header.split(",");
+    const index = columns.indexOf(label);
+    expect(index, `column ${label}`).toBeGreaterThanOrEqual(0);
+    // The example row has no quoted commas in any case this test builds.
+    return example.split(",")[index];
+  }
+
+  it("does not describe an invoice line as a bank account", () => {
+    // Both the chart of accounts and an invoice line carry a field keyed
+    // `description`, and the shared example made the invoice template read
+    // "Operating checking account" as its line description.
+    expect(cellOf(templateCsvFor("invoices"), "Line description")).not.toMatch(/checking account/i);
+  });
+
+  it("names a customer, an income account and a tax code the company actually has", () => {
+    // A template is an example the reader can import. Its own values must
+    // therefore exist: the importer refuses an unknown customer, and refuses a
+    // tax code it cannot find.
+    const csv = templateCsvFor("invoices", {
+      customer: "Le My Hanh Thi",
+      income_account: "4100",
+      tax_code: "TAX0",
+    });
+    expect(cellOf(csv, "Customer")).toBe("Le My Hanh Thi");
+    expect(cellOf(csv, "Income account")).toBe("4100");
+    expect(cellOf(csv, "Sales tax code")).toBe("TAX0");
+  });
+
+  it("leaves the tax code empty rather than naming one that does not exist", () => {
+    // Sales tax is optional on an invoice line, and an invented code blocks the
+    // whole invoice. Empty imports; wrong does not.
+    const csv = templateCsvFor("invoices", { customer: "Le My Hanh Thi", tax_code: null });
+    expect(cellOf(csv, "Sales tax code")).toBe("");
+  });
+
+  it("keeps its placeholder when the company has nothing to offer", () => {
+    const csv = templateCsvFor("invoices", {});
+    expect(cellOf(csv, "Customer").length).toBeGreaterThan(0);
+  });
+});

@@ -6,6 +6,7 @@ import {
   describeShapeMismatch,
   templateCsvFor,
   type FileShapeDetection,
+  type TemplateExamples,
 } from "@/lib/domain/import-shape";
 import { downloadTextFile } from "@/lib/client/download";
 
@@ -57,6 +58,8 @@ export interface ImportGuidanceProps {
   /** Null until a file has been read. */
   detection: FileShapeDetection | null;
   onSwitchTarget: (target: ImportTarget) => void;
+  /** Names this company actually has, so the invoice template can be imported. */
+  templateExamples: TemplateExamples;
 }
 
 /**
@@ -67,7 +70,12 @@ export interface ImportGuidanceProps {
  * carries every account, one row each. The first was fair — the screen showed a
  * mapping table and never said what the file was supposed to look like.
  */
-export default function ImportGuidance({ target, detection, onSwitchTarget }: ImportGuidanceProps) {
+export default function ImportGuidance({
+  target,
+  detection,
+  onSwitchTarget,
+  templateExamples,
+}: ImportGuidanceProps) {
   const fields = fieldsFor(target);
   const required = fields.filter((field) => field.required);
   const optional = fields.filter((field) => !field.required);
@@ -77,7 +85,9 @@ export default function ImportGuidance({ target, detection, onSwitchTarget }: Im
   function downloadTemplate() {
     downloadTextFile(
       `one-book-${target.replaceAll("_", "-")}-template.csv`,
-      templateCsvFor(target),
+      // Real names from this company, so the template is a file that imports
+      // rather than one that only shows the shape. See TemplateExamples.
+      templateCsvFor(target, templateExamples),
     );
   }
 
