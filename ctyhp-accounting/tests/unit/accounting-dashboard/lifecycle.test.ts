@@ -71,7 +71,7 @@ const base: PriorityQueueItem = {
   ownerName: null,
   dueDate: null,
   dismissReason: null,
-  stateUpdatedAt: null,
+  stateVersion: null,
 };
 
 const TODAY = "2026-08-21";

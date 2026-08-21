@@ -3,7 +3,7 @@ import type { WorkItemState, WorkLifecycle } from "@/lib/domain/accounting-dashb
 
 export class WorkItemStateError extends Error {}
 
-const COLUMNS = "work_key,lifecycle,owner_id,due_date,dismiss_reason,updated_at,updated_by";
+const COLUMNS = "work_key,lifecycle,owner_id,due_date,dismiss_reason,version,updated_by";
 
 /**
  * What people have decided about the work, keyed by the item's own key.
@@ -39,7 +39,7 @@ export async function listWorkItemState(
       ownerName: ownerId ? (names.get(ownerId) ?? null) : null,
       dueDate: row.due_date ? String(row.due_date) : null,
       dismissReason: row.dismiss_reason ? String(row.dismiss_reason) : null,
-      updatedAt: String(row.updated_at),
+      version: Number(row.version),
       updatedBy: row.updated_by ? String(row.updated_by) : null,
     });
   }
@@ -53,7 +53,7 @@ export interface SetWorkItemStateInput {
   dueDate: string | null;
   reason: string | null;
   /** What the caller last saw. Null means "I believe there is no row yet". */
-  expectedUpdatedAt: string | null;
+  expectedVersion: number | null;
   blocksClose: boolean;
 }
 
@@ -61,18 +61,18 @@ export interface SetWorkItemStateInput {
 export async function setWorkItemState(
   sb: SupabaseClient,
   input: SetWorkItemStateInput,
-): Promise<string> {
+): Promise<number> {
   const { data, error } = await sb.rpc("acc_set_work_item_state", {
     p_key: input.key,
     p_lifecycle: input.lifecycle,
     p_owner_id: input.ownerId,
     p_due_date: input.dueDate,
     p_reason: input.reason,
-    p_expected_updated_at: input.expectedUpdatedAt,
+    p_expected_version: input.expectedVersion,
     p_blocks_close: input.blocksClose,
   });
   if (error) throw new WorkItemStateError(error.message);
-  return String(data);
+  return Number(data);
 }
 
 /**

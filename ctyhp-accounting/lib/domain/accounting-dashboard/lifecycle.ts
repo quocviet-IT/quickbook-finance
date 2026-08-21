@@ -23,8 +23,14 @@ export interface WorkItemState {
   /** Entered by a person. Phase 3 adds a policy that can propose one. */
   dueDate: string | null;
   dismissReason: string | null;
-  /** The concurrency token: an update carrying a stale one is refused. */
-  updatedAt: string;
+  /**
+   * The concurrency token: an update carrying a stale one is refused.
+   *
+   * A counter rather than a timestamp — a timestamp loses precision on its way
+   * through a driver and a JSON serialiser, and would refuse writes that were
+   * never actually stale.
+   */
+  version: number;
   updatedBy: string | null;
 }
 

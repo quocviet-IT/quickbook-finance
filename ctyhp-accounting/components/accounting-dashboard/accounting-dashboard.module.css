@@ -322,3 +322,30 @@
     opacity: 0.55;
   }
 }
+
+/* --- Who owns the work (Phase 2) ---------------------------------------- */
+.queueOwner {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 118px;
+  font-size: 12px;
+  color: var(--ob-text-body);
+}
+
+.queueDueLate {
+  font-size: 12px;
+  color: var(--ob-feedback-negative);
+  font-weight: 500;
+}
+
+/* Nine filters need their own line: beside the card title they truncated it. */
+.queueFilters {
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+
+.queueFilters :global(.ant-segmented) {
+  width: max-content;
+}

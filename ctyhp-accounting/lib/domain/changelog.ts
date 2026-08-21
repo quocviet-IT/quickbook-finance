@@ -41,6 +41,37 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.55",
+    date: "2026-08-21",
+    headline: "The accounting queue is work people own, not a list of alerts.",
+    changes: [
+      {
+        kind: "added",
+        title: "Pick work up, put it down, or say why it can wait",
+        detail:
+          "Every row on the accounting queue can now be acknowledged, " +
+          "started, assigned to somebody, given a due date, or dismissed " +
+          "with a reason. Nine filters read the queue the way people " +
+          "actually ask for it \u2014 Mine, Unassigned, Overdue, Critical, " +
+          "Reconciliation, Approvals, Period close, and Dismissed.",
+        route: "/accounting",
+      },
+      {
+        kind: "added",
+        title: "Nobody can mark work done that the books still say is wrong",
+        detail:
+          "An item goes when its exception goes, not when somebody says so " +
+          "\u2014 and when it goes, the note about who was working on it is " +
+          "retired with it, so a dismissal in March cannot hide the same " +
+          "failure in April. Anything blocking a period close cannot be " +
+          "dismissed at all, no dismissal is accepted without a reason, and " +
+          "two people working one queue can no longer overwrite each " +
+          "other's decisions in silence.",
+        route: "/accounting",
+      },
+    ],
+  },
+  {
     version: "1.54",
     date: "2026-08-21",
     headline: "Every import is on the record, and every one can be undone.",

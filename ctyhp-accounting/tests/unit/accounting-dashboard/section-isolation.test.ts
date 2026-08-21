@@ -197,7 +197,7 @@ describe("composeAccountingDashboard section isolation", () => {
                 ownerName: "Kim Thanh",
                 dueDate: "2026-09-01",
                 dismissReason: null,
-                updatedAt: "2026-08-21T10:00:00Z",
+                version: 3,
                 updatedBy: "u1",
               },
             ],
@@ -208,7 +208,7 @@ describe("composeAccountingDashboard section isolation", () => {
       lifecycle: "in_progress",
       ownerName: "Kim Thanh",
       dueDate: "2026-09-01",
-      stateUpdatedAt: "2026-08-21T10:00:00Z",
+      stateVersion: 3,
     });
   });
 });

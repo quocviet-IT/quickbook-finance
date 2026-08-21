@@ -107,5 +107,5 @@ export interface PriorityQueueItem extends DerivedQueueItem {
   dueDate: string | null;
   dismissReason: string | null;
   /** The concurrency token to send back with a change. Null when untouched. */
-  stateUpdatedAt: string | null;
+  stateVersion: number | null;
 }

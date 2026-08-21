@@ -1,14 +1,30 @@
 "use client";
 import Link from "next/link";
 import { Button, Card, Segmented, Tag } from "antd";
-import { ArrowRightOutlined } from "@ant-design/icons";
+import { ArrowRightOutlined, MoreOutlined } from "@ant-design/icons";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import type {
   PriorityQueueItem,
   QueueSeverity,
   SectionEnvelope,
 } from "@/lib/domain/accounting-dashboard/types";
+import { matchesFilter, type QueueFilter } from "@/lib/domain/accounting-dashboard/lifecycle";
 import { formatMoney } from "@/lib/format";
+import type { Assignee } from "./WorkItemActions";
+
+/**
+ * Loaded when a row is on screen, not when the page is.
+ *
+ * The menu carries a date picker, a person picker and three dialogs — the
+ * heaviest thing on this route by some way, and used on a fraction of page
+ * loads. The same reasoning that put the secondary analysis behind a dynamic
+ * import in Phase 1: the queue must not pay for what most readers never open.
+ */
+const WorkItemActions = dynamic(() => import("./WorkItemActions"), {
+  loading: () => <Button size="small" icon={<MoreOutlined />} disabled aria-hidden="true" />,
+});
 import styles from "./accounting-dashboard.module.css";
 import { FreshnessNote, HealthyEmpty, UnavailableNote } from "./DataStateNote";
 
@@ -38,52 +54,51 @@ const SEVERITY_TAG: Record<QueueSeverity, { color: string; label: string }> = {
   low: { color: "default", label: "Low" },
 };
 
-type QueueFilter = "all" | "critical" | "controls" | "reconciliation" | "approvals";
-
 const FILTERS: { value: QueueFilter; label: string }[] = [
   { value: "all", label: "All" },
+  { value: "mine", label: "Mine" },
+  { value: "unassigned", label: "Unassigned" },
+  { value: "overdue", label: "Overdue" },
   { value: "critical", label: "Critical" },
-  { value: "controls", label: "Controls" },
   { value: "reconciliation", label: "Reconciliation" },
   { value: "approvals", label: "Approvals" },
+  { value: "period_close", label: "Period close" },
+  { value: "dismissed", label: "Dismissed" },
 ];
 
 /** The design document's answer to a queue that grows: limit the first view. */
 const FIRST_VIEW = 8;
-
-function matches(item: PriorityQueueItem, filter: QueueFilter): boolean {
-  switch (filter) {
-    case "critical":
-      return item.severity === "critical";
-    case "controls":
-      return item.sourceKind === "control-failure" || item.sourceKind === "overdue-period";
-    case "reconciliation":
-      return item.sourceKind === "unmatched-bank";
-    case "approvals":
-      return item.sourceKind === "pending-approval";
-    default:
-      return true;
-  }
-}
 
 export default function PriorityWorkQueue({
   queue,
   currencyCode,
   currencyDecimals,
   controlsEvaluated,
+  viewerId,
+  canManage,
+  assignees,
+  today,
 }: {
   queue: SectionEnvelope<PriorityQueueItem[]>;
   currencyCode: string;
   currencyDecimals: number;
   /** True when the controls actually ran, so an empty queue can be believed. */
   controlsEvaluated: boolean;
+  /** Who is looking, so "Mine" can mean somebody. */
+  viewerId: string | null;
+  /** A viewer reads the queue and changes nothing. */
+  canManage: boolean;
+  assignees: Assignee[];
+  /** The company's own today, not the browser's. */
+  today: string;
 }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [showAll, setShowAll] = useState(false);
 
   const matching = useMemo(
-    () => (queue.data ?? []).filter((item) => matches(item, filter)),
-    [queue.data, filter],
+    () => (queue.data ?? []).filter((item) => matchesFilter(item, filter, viewerId, today)),
+    [queue.data, filter, viewerId, today],
   );
   const visible = showAll ? matching : matching.slice(0, FIRST_VIEW);
   const hidden = matching.length - visible.length;
@@ -93,8 +108,9 @@ export default function PriorityWorkQueue({
       size="small"
       title="Priority work"
       className="accounting-priority-queue"
-      extra={
-        queue.data ? (
+    >
+      {queue.data ? (
+        <div className={styles.queueFilters}>
           <Segmented
             size="small"
             value={filter}
@@ -105,9 +121,8 @@ export default function PriorityWorkQueue({
             options={FILTERS}
             aria-label="Filter the work queue"
           />
-        ) : null
-      }
-    >
+        </div>
+      ) : null}
       {queue.dataState === "unavailable" || !queue.data ? (
         <UnavailableNote
           reason={queue.unavailableReason ?? "The work queue could not be loaded."}
@@ -117,7 +132,9 @@ export default function PriorityWorkQueue({
           title={filter === "all" ? "Nothing needs attention" : "Nothing matches this filter"}
           evidence={
             filter !== "all"
-              ? "Clear the filter to see the rest of the queue."
+              ? filter === "mine"
+                ? "Nothing is assigned to you. Pick something up from All."
+                : "Clear the filter to see the rest of the queue."
               : controlsEvaluated
                 ? "Every accounting control passed and no document, bank line, or approval is waiting."
                 : "No document, bank line, or approval is waiting — but the accounting controls could not be evaluated, so this is not a clean bill of health."
@@ -139,9 +156,31 @@ export default function PriorityWorkQueue({
                         blocks close
                       </Tag>
                     ) : null}
+                    {/* `new` renders as nothing: it is the absence of a
+                        decision, and a tag saying so would be noise on most
+                        of the queue most of the time. */}
+                    {item.lifecycle === "acknowledged" ? <Tag color="blue">acknowledged</Tag> : null}
+                    {item.lifecycle === "in_progress" ? <Tag color="cyan">in progress</Tag> : null}
+                    {item.lifecycle === "dismissed" ? (
+                      <Tag title={item.dismissReason ?? undefined}>dismissed</Tag>
+                    ) : null}
                   </span>
                   <span className={styles.queueReason}>{item.reason}</span>
                 </div>
+                <span className={styles.queueOwner}>
+                  {item.ownerName ?? (
+                    <span className={styles.queueReason}>Unassigned</span>
+                  )}
+                  {item.dueDate ? (
+                    <span
+                      className={
+                        item.dueDate < today ? styles.queueDueLate : styles.queueReason
+                      }
+                    >
+                      due {item.dueDate}
+                    </span>
+                  ) : null}
+                </span>
                 <span className={styles.queueAmount}>
                   {item.amountMinor === undefined
                     ? "—"
@@ -152,6 +191,15 @@ export default function PriorityWorkQueue({
                     {item.actionLabel} <ArrowRightOutlined aria-hidden="true" />
                   </Button>
                 </Link>
+                {canManage ? (
+                  <span className={styles.queueAction}>
+                    <WorkItemActions
+                      item={item}
+                      assignees={assignees}
+                      onChanged={() => router.refresh()}
+                    />
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>

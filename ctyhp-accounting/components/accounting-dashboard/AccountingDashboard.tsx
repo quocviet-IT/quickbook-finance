@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Card } from "antd";
 import type { AccountingDashboardData } from "@/lib/services/accounting-dashboard";
+import type { Assignee } from "./WorkItemActions";
 import styles from "./accounting-dashboard.module.css";
 import AccountingStatusStrip from "./AccountingStatusStrip";
 import ControlHealthPanel from "./ControlHealthPanel";
@@ -26,7 +27,19 @@ const SecondaryAnalysis = dynamic(() => import("./SecondaryAnalysis"), {
  * The page it replaced put four metric cards and a twelve-month chart first
  * and left an accountant scrolling for the queue.
  */
-export default function AccountingDashboard({ data }: { data: AccountingDashboardData }) {
+export default function AccountingDashboard({
+  data,
+  viewerId,
+  canManage,
+  assignees,
+}: {
+  data: AccountingDashboardData;
+  /** Who is looking, so "Mine" can mean somebody. */
+  viewerId: string | null;
+  /** A viewer reads the queue and changes nothing. */
+  canManage: boolean;
+  assignees: Assignee[];
+}) {
   const { context, controls, queue, secondary } = data;
 
   // Freshness is judged in the browser, against the reader's own clock: a
@@ -72,6 +85,10 @@ export default function AccountingDashboard({ data }: { data: AccountingDashboar
             currencyCode={context.currencyCode}
             currencyDecimals={context.currencyDecimals}
             controlsEvaluated={controls.dataState !== "unavailable"}
+            viewerId={viewerId}
+            canManage={canManage}
+            assignees={assignees}
+            today={context.asOf}
           />
         </div>
         <div className={styles.controlColumn}>

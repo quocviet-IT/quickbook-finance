@@ -142,7 +142,7 @@ function withState(
       ownerName: decided?.ownerName ?? null,
       dueDate: decided?.dueDate ?? null,
       dismissReason: decided?.dismissReason ?? null,
-      stateUpdatedAt: decided?.updatedAt ?? null,
+      stateVersion: decided?.version ?? null,
     };
   });
 }
