@@ -41,6 +41,37 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.53",
+    date: "2026-08-21",
+    headline: "Invoice imports are on the record, and can be taken back out.",
+    changes: [
+      {
+        kind: "added",
+        title: "The import register covers invoices, and undoes them",
+        detail:
+          "Importing invoices left no record: nobody could say afterwards " +
+          "which file the drafts came from or take them back out. The " +
+          "register the transactions tab already had now covers invoices " +
+          "too, and Undo deletes the drafts that import raised — a " +
+          "draft holds no number and has posted nothing, so removing it " +
+          "leaves no trace and no gap. An invoice issued since the import " +
+          "is left where it is and reported back, because it holds a number " +
+          "and a journal entry and taking it out is a void, on the invoice " +
+          "itself.",
+        route: "/settings/import",
+      },
+      {
+        kind: "added",
+        title: "The register says who ran each import",
+        detail:
+          "It has recorded the person since the day it was built and never " +
+          "showed them, so \"who imported this file\" was a question only a " +
+          "database connection could answer. There is now a column for it.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "1.52",
     date: "2026-08-21",
     headline: "The invoice preview now checks the sales tax code too.",

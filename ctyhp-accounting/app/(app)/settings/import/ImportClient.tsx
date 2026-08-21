@@ -376,8 +376,8 @@ export default function ImportClient({
         />
       ) : null}
 
-      {target === "transactions" ? (
-        <ImportBatchRegister reloadKey={imported} onChanged={reset} />
+      {target === "transactions" || target === "invoices" ? (
+        <ImportBatchRegister reloadKey={imported} onChanged={reset} source={target} />
       ) : null}
     </Space>
   );

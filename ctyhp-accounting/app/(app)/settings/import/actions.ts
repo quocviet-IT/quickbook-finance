@@ -24,6 +24,7 @@ import {
   listImportBatches,
   unresolvedAccountRefs,
   voidImportBatch,
+  type UndoOutcome,
   type ImportBatchRow,
 } from "@/lib/services/ledger-import";
 import { suggestMapping } from "@/lib/ai/suggest-mapping";
@@ -229,15 +230,19 @@ export async function listImportBatchesAction(): Promise<ActionResult<ImportBatc
 export async function voidImportBatchAction(
   batchId: string,
   reason: string,
-): Promise<ActionResult<{ voided: number }>> {
+): Promise<ActionResult<UndoOutcome>> {
+  // Guarded as a general-ledger action whatever the batch turns out to be:
+  // undoing an import is the most destructive thing this screen offers, and
+  // the narrower guard is the honest one to hold it to.
   const denied = await guard("general_ledger");
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    const voided = await voidImportBatch(sb, batchId, reason);
+    const outcome = await voidImportBatch(sb, batchId, reason);
     revalidatePath("/reports");
     revalidatePath("/journal");
-    return { ok: true, data: { voided } };
+    revalidatePath("/invoices");
+    return { ok: true, data: outcome };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Input, Modal, Table, Tag } from "antd";
+import { App, Button, Input, Modal, Table, Tag, Typography } from "antd";
 import type { ImportBatchRow } from "@/lib/services/ledger-import";
 import { voidImportBatchAction } from "./actions";
 
@@ -39,7 +39,13 @@ export default function LedgerBatchList({
       message.error(result.error ?? "Could not undo that import");
       return;
     }
-    message.success(`${result.data.voided} entries voided`);
+    const { removed, kept } = result.data;
+    message.success(
+      undoing.source === "invoices"
+        ? `${removed} draft invoice(s) removed` +
+            (kept > 0 ? `; ${kept} left in place because they have been issued` : "")
+        : `${removed} entries voided`,
+    );
     setUndoing(null);
     setReason("");
     onChanged();
@@ -58,9 +64,15 @@ export default function LedgerBatchList({
           {
             title: "Mode",
             dataIndex: "mode",
-            width: 120,
+            width: 130,
             render: (mode: string) => (
-              <Tag>{mode === "history" ? "Whole history" : "Balances"}</Tag>
+              <Tag>
+                {mode === "history"
+                  ? "Whole history"
+                  : mode === "documents"
+                    ? "Drafts raised"
+                    : "Balances"}
+              </Tag>
             ),
           },
           {
@@ -71,6 +83,16 @@ export default function LedgerBatchList({
           },
           { title: "Entries", dataIndex: "entry_count", width: 90, align: "right" },
           { title: "Lines", dataIndex: "line_count", width: 90, align: "right" },
+          {
+            // Who ran it. The register recorded this from the first day and
+            // never showed it, so "who imported this file" was a question only
+            // a database connection could answer.
+            title: "Imported by",
+            dataIndex: "imported_by_name",
+            width: 170,
+            render: (name: string | null) =>
+              name ?? <Typography.Text type="secondary">—</Typography.Text>,
+          },
           {
             title: "Imported",
             dataIndex: "imported_at",
@@ -105,9 +127,21 @@ export default function LedgerBatchList({
         }}
       >
         <p>
-          This voids the {undoing?.entry_count ?? 0} entries this import created. Voided entries
-          stay in the ledger and drop out of every report, exactly as a voided invoice does. An
-          entry dated in a closed period cannot be voided — reverse it instead.
+          {undoing?.source === "invoices" ? (
+            <>
+              This deletes the {undoing?.entry_count ?? 0} draft invoice(s) this import raised.
+              A draft has no number and has posted nothing, so removing it leaves no trace and no
+              gap. Any of them already issued is left exactly where it is and reported back —
+              those hold a number and a journal entry, and taking one out is a void, on the
+              invoice itself.
+            </>
+          ) : (
+            <>
+              This voids the {undoing?.entry_count ?? 0} entries this import created. Voided
+              entries stay in the ledger and drop out of every report, exactly as a voided invoice
+              does. An entry dated in a closed period cannot be voided — reverse it instead.
+            </>
+          )}
         </p>
         <Input
           placeholder="Imported against the wrong chart of accounts"

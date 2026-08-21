@@ -78,14 +78,48 @@ describe("importLedgerBatch", () => {
   });
 });
 
+/**
+ * Undoing an import reads the batch's own source first, because the two kinds
+ * of import are taken back in opposite ways: a ledger import is voided, an
+ * invoice import's drafts are deleted. A screen that chose between them could
+ * choose wrong; the batch cannot.
+ */
+function stubUndoClient(
+  source: string,
+  response: { data?: unknown; error?: { message: string } },
+) {
+  const rpc = vi.fn<(name: string, args: RpcArgs) => Promise<{ data: unknown; error: unknown }>>(
+    async () => ({ data: response.data ?? null, error: response.error ?? null }),
+  );
+  const from = vi.fn(() => ({
+    select: () => ({
+      eq: () => ({ maybeSingle: async () => ({ data: { source }, error: null }) }),
+    }),
+  }));
+  return { client: { rpc, from } as never, rpc };
+}
+
 describe("voidImportBatch", () => {
-  it("returns how many entries were voided", async () => {
-    const { client } = stubClient({ data: 554 });
-    await expect(voidImportBatch(client, "b1", "Wrong chart")).resolves.toBe(554);
+  it("voids the entries of a ledger import", async () => {
+    const { client, rpc } = stubUndoClient("wave_ledger", { data: 554 });
+    await expect(voidImportBatch(client, "b1", "Wrong chart")).resolves.toEqual({
+      removed: 554,
+      kept: 0,
+    });
+    expect(rpc.mock.calls[0][0]).toBe("acc_void_import_batch");
+  });
+
+  it("deletes the drafts of an invoice import, and reports the ones it could not", async () => {
+    const { client, rpc } = stubUndoClient("invoices", { data: [{ removed: 4, kept: 2 }] });
+    await expect(voidImportBatch(client, "b1", "Wrong file")).resolves.toEqual({
+      removed: 4,
+      kept: 2,
+    });
+    expect(rpc.mock.calls[0][0]).toBe("acc_undo_invoice_import");
   });
 
   it("does not swallow a refusal", async () => {
-    const { client } = stubClient({
+    const { client } = stubUndoClient("wave_ledger", {
       error: { message: "Cannot void an entry in a closed period" },
     });
     await expect(voidImportBatch(client, "b1", "Wrong chart")).rejects.toThrow(

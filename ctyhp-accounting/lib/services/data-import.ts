@@ -421,7 +421,7 @@ export async function runImport(
     });
     if (error) throw new DataImportError(error.message);
     const row = (Array.isArray(data) ? data[0] : data) as
-      | { created?: number; skipped?: number; problems?: unknown }
+      | { created?: number; skipped?: number; problems?: unknown; invoice_ids?: unknown }
       | null;
     // acc_import_invoices returns why each invoice was skipped, and this used
     // to discard it — leaving the reader a bare "2 skipped" for work the
@@ -432,6 +432,23 @@ export async function runImport(
           message: String(p.message ?? "Skipped"),
         }))
       : [];
+    // Record what came in, so the register can say afterwards which file it
+    // was, who ran it, and take it back out. A failure here must not lose the
+    // invoices that were already raised — it costs the undo, not the import,
+    // and saying so is better than pretending the import failed.
+    const invoiceIds = Array.isArray(row?.invoice_ids)
+      ? (row.invoice_ids as unknown[]).map(String)
+      : [];
+    if (invoiceIds.length > 0) {
+      const { error: batchError } = await sb.rpc("acc_record_invoice_import", {
+        p_file_name: options.fileName?.trim() || "invoices.csv",
+        p_sha256: transactionFileChecksum(rows),
+        p_invoices: invoiceIds,
+        p_line_count: grouped.invoices.reduce((sum, i) => sum + i.lines.length, 0),
+        p_total_minor: grouped.invoices.reduce((sum, i) => sum + i.subtotalMinor, 0),
+      });
+      if (batchError) console.error("recording the invoice import failed:", batchError.message);
+    }
     return {
       created: Number(row?.created ?? 0),
       updated: 0,

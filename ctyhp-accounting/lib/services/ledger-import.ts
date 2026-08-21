@@ -18,6 +18,8 @@ export interface ImportBatchRow {
   saved_report_id: string | null;
   status: "active" | "voided";
   imported_by: string | null;
+  /** Resolved for the screen: a uuid tells a reader nothing about who ran it. */
+  imported_by_name: string | null;
   imported_at: string;
   voided_at: string | null;
   void_reason: string | null;
@@ -78,26 +80,76 @@ export async function unresolvedAccountRefs(
 }
 
 export async function listImportBatches(sb: SupabaseClient): Promise<ImportBatchRow[]> {
-  const { data, error } = await sb
-    .from("acc_import_batch")
-    .select(COLUMNS)
-    .order("imported_at", { ascending: false })
-    .limit(20);
-  if (error) throw new LedgerImportError(error.message);
-  return (data ?? []) as unknown as ImportBatchRow[];
+  // The directory is read alongside rather than joined: acc_import_batch
+  // references auth.users, which an application session cannot select from, and
+  // acc_actor_directory is the one place allowed to answer "who is this id".
+  const [batches, actors] = await Promise.all([
+    sb.from("acc_import_batch").select(COLUMNS).order("imported_at", { ascending: false }).limit(20),
+    sb.rpc("acc_actor_directory"),
+  ]);
+  if (batches.error) throw new LedgerImportError(batches.error.message);
+
+  const names = new Map<string, string>();
+  if (!actors.error) {
+    for (const row of (actors.data ?? []) as Record<string, unknown>[]) {
+      const name = String(row.full_name ?? "").trim() || String(row.email ?? "").trim();
+      if (name) names.set(String(row.id), name);
+    }
+  }
+
+  return ((batches.data ?? []) as unknown as ImportBatchRow[]).map((batch) => ({
+    ...batch,
+    imported_by_name: batch.imported_by ? (names.get(batch.imported_by) ?? null) : null,
+  }));
 }
 
+export interface UndoOutcome {
+  /** Journal entries voided, or draft documents deleted. */
+  removed: number;
+  /** Documents left where they are because they had moved on. */
+  kept: number;
+}
+
+/**
+ * Take an import back out, the way its own kind of import can be taken back.
+ *
+ * A ledger or transaction import posted entries, so undoing it voids them and
+ * the trail stays. An invoice import raised drafts, so undoing it deletes them
+ * — that is the only thing that clears the data a reader is looking at. The
+ * source is read here rather than passed in: a screen that picked the wrong
+ * undo would void a ledger it meant to delete drafts from.
+ */
 export async function voidImportBatch(
   sb: SupabaseClient,
   batchId: string,
   reason: string,
-): Promise<number> {
+): Promise<UndoOutcome> {
+  const { data: batch, error: lookupError } = await sb
+    .from("acc_import_batch")
+    .select("source")
+    .eq("id", batchId)
+    .maybeSingle();
+  if (lookupError) throw new LedgerImportError(lookupError.message);
+  if (!batch) throw new LedgerImportError("Import not found, or already undone");
+
+  if (String(batch.source) === "invoices") {
+    const { data, error } = await sb.rpc("acc_undo_invoice_import", {
+      p_batch_id: batchId,
+      p_reason: reason,
+    });
+    if (error) throw new LedgerImportError(error.message);
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { removed?: number; kept?: number }
+      | null;
+    return { removed: Number(row?.removed ?? 0), kept: Number(row?.kept ?? 0) };
+  }
+
   const { data, error } = await sb.rpc("acc_void_import_batch", {
     p_batch_id: batchId,
     p_reason: reason,
   });
   if (error) throw new LedgerImportError(error.message);
-  return Number(data ?? 0);
+  return { removed: Number(data ?? 0), kept: 0 };
 }
 
 export async function linkImportBatchReport(
