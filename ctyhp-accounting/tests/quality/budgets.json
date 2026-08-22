@@ -7,8 +7,8 @@
       "ownedGzipBytes": 15000,
       "measured": {
         "date": "2026-08-22",
-        "gzipBytes": 666029,
-        "ownedGzipBytes": 13950,
+        "gzipBytes": 665157,
+        "ownedGzipBytes": 13996,
         "phase0": {
           "gzipBytes": 660303,
           "ownedGzipBytes": 13950
@@ -20,9 +20,39 @@
       "ownedGzipBytes": 13851,
       "measured": {
         "date": "2026-08-22",
-        "gzipBytes": 663882,
-        "ownedGzipBytes": 11803,
+        "gzipBytes": 663111,
+        "ownedGzipBytes": 11950,
         "note": "first measurement; no earlier figure to hold it to"
+      }
+    },
+    "/sales": {
+      "gzipBytes": 683588,
+      "ownedGzipBytes": 13995,
+      "measured": {
+        "date": "2026-08-22",
+        "gzipBytes": 663108,
+        "ownedGzipBytes": 11947,
+        "note": "first measurement after the phase 6 rebuild"
+      }
+    },
+    "/purchases": {
+      "gzipBytes": 683593,
+      "ownedGzipBytes": 14000,
+      "measured": {
+        "date": "2026-08-22",
+        "gzipBytes": 663113,
+        "ownedGzipBytes": 11952,
+        "note": "first measurement after the phase 6 rebuild"
+      }
+    },
+    "/inventory": {
+      "gzipBytes": 683648,
+      "ownedGzipBytes": 14055,
+      "measured": {
+        "date": "2026-08-22",
+        "gzipBytes": 663168,
+        "ownedGzipBytes": 12007,
+        "note": "first measurement after the phase 6 rebuild"
       }
     }
   },
@@ -30,7 +60,7 @@
     "gzipBytes": 2100000,
     "measured": {
       "date": "2026-08-22",
-      "gzipBytes": 1994065
+      "gzipBytes": 2022225
     }
   }
 }

@@ -257,3 +257,77 @@
   align-items: center;
   gap: 6px;
 }
+
+/* --- The two-section surface -------------------------------------------- */
+/* Used by the screens whose job is "here is the work, here is what is true
+   about it". The work takes eight columns and the checks take four; there is no
+   third region, and a surface that needs one composes its own page. */
+.surfaceRoot {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 1440px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.surfaceBody {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.surfaceQueue {
+  grid-column: span 8;
+  min-width: 0;
+}
+
+.surfaceControls {
+  grid-column: span 4;
+  min-width: 0;
+}
+
+/* Tablet: the check rail drops under the queue rather than being squeezed into
+   a strip too narrow to read a sentence in. */
+@media (max-width: 1100px) {
+  .surfaceQueue,
+  .surfaceControls {
+    grid-column: span 12;
+  }
+}
+
+/* --- Loading shell ------------------------------------------------------- */
+/* The page's own shape in grey, so a reader can see where their work will land.
+   Animated only for readers who have not asked for less motion. */
+.skeletonStrip,
+.skeletonPanel,
+.skeletonRail {
+  border-radius: 8px;
+  background: var(--ob-surface-muted);
+}
+
+.skeletonStrip {
+  height: 44px;
+}
+
+.skeletonPanel {
+  height: 420px;
+}
+
+.skeletonRail {
+  height: 320px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeletonStrip,
+  .skeletonPanel,
+  .skeletonRail {
+    animation: workSurfacePulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes workSurfacePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}

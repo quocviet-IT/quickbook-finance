@@ -1,1 +1,1 @@
-export { default } from "@/components/work-areas/WorkAreaOverviewSkeleton";
+﻿export { default } from "@/components/work-surface/SurfaceSkeleton";
