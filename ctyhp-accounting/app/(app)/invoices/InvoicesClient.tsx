@@ -11,20 +11,20 @@ import {
   Form,
   Input,
   InputNumber,
+  Dropdown,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Table,
   Tag,
   Tooltip,
   Typography,
+  type MenuProps,
   type TableColumnsType,
 } from "antd";
 import {
   DeleteOutlined,
-  EyeOutlined,
-  FilePdfOutlined,
+  MoreOutlined,
   PaperClipOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
@@ -151,7 +151,7 @@ export default function InvoicesClient({
   sequenceWarning: string | null;
   scannerConfigured: boolean;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm();
   const [open, setOpen] = useState(initialCreateOpen);
@@ -421,6 +421,24 @@ export default function InvoicesClient({
     else message.error(res.error ?? "Failed to void invoice");
   }
 
+  /**
+   * Void asks in a dialog rather than a popover, now that it lives in a menu.
+   *
+   * A Popconfirm anchored to a menu item lands over the menu it came from, and
+   * says the least at the moment the reader most needs telling — that this
+   * reverses a posted journal entry and cannot be undone by re-issuing.
+   */
+  function confirmVoid(invoice: InvoiceWithCustomer) {
+    modal.confirm({
+      title: `Void ${invoice.invoice_number ?? "this draft invoice"}?`,
+      content:
+        "This reverses its journal entry. The invoice number is not reused, and an invoice with payments applied cannot be voided.",
+      okText: "Void",
+      okButtonProps: { danger: true },
+      onOk: () => voidInv(invoice.id),
+    });
+  }
+
   async function viewInvoiceLines(inv: InvoiceWithCustomer) {
     setViewInvoice(inv);
     setViewLines([]);
@@ -573,57 +591,69 @@ export default function InvoicesClient({
     {
       title: "Actions",
       key: "actions",
-      width: 230,
-      render: (_: unknown, r) => (
-        <Space>
-          <IconActionButton
-            label="View invoice lines"
-            icon={<EyeOutlined />}
-            onClick={() => viewInvoiceLines(r)}
-          />
-          <IconActionButton
-            label="Download PDF"
-            icon={<FilePdfOutlined />}
-            loading={pdfId === r.id}
-            onClick={() => downloadPdf(r)}
-          />
-          {canReadDocuments ? (
-            <IconActionButton
-              label="Manage invoice attachments"
-              icon={<PaperClipOutlined />}
-              onClick={() =>
-                setAttachmentTarget({
-                  entityType: "invoice",
-                  entityId: r.id,
-                  label: `${r.invoice_number ?? "Draft invoice"} · ${r.customer_name}`,
-                })
-              }
-            />
-          ) : null}
-          {canWrite && r.status === "draft" && (
-            <Button
-              size="small"
-              type="primary"
-              loading={busyId === r.id}
-              onClick={() => startIssue(r)}
-            >
-              Issue
-            </Button>
-          )}
-          {canWrite && r.status !== "void" && r.status !== "paid" && (
-            <Popconfirm title="Void this invoice?" onConfirm={() => voidInv(r.id)} okText="Void" cancelText="Cancel">
-              <Button size="small" danger loading={busyId === r.id}>
-                Void
+      width: 140,
+      // The shape Payments settled on and Bills followed: the paperclip, the one
+      // state-advancing action a draft has, and everything else behind one ⋯.
+      //
+      // This column used to put three icon buttons and up to three text buttons
+      // in a row, a different set per status — so a paid invoice showed three
+      // controls, a draft showed five, and nothing lined up down the column. The
+      // eye and the PDF are still one click away; they are simply no longer
+      // competing with Void for the reader's attention.
+      render: (_: unknown, r) => {
+        const menu: MenuProps["items"] = [
+          { key: "lines", label: "View lines", onClick: () => viewInvoiceLines(r) },
+          {
+            key: "pdf",
+            label: pdfId === r.id ? "Preparing PDF…" : "Download PDF",
+            disabled: pdfId === r.id,
+            onClick: () => downloadPdf(r),
+          },
+        ];
+        if (canWrite && (r.status === "issued" || r.status === "partial")) {
+          menu.push({ key: "writeoff", label: "Write off", onClick: () => setWriteOffFor(r) });
+        }
+        // Last, and separated. The divider is conditional because a menu whose
+        // only item is Void would otherwise open with an orphaned line above it.
+        if (canWrite && r.status !== "void" && r.status !== "paid") {
+          if (menu.length) menu.push({ type: "divider" as const, key: "before-void" });
+          menu.push({
+            key: "void",
+            label: "Void invoice",
+            danger: true,
+            onClick: () => confirmVoid(r),
+          });
+        }
+        return (
+          <Space size={4}>
+            {canReadDocuments ? (
+              <IconActionButton
+                label="Manage invoice attachments"
+                icon={<PaperClipOutlined />}
+                onClick={() =>
+                  setAttachmentTarget({
+                    entityType: "invoice",
+                    entityId: r.id,
+                    label: `${r.invoice_number ?? "Draft invoice"} · ${r.customer_name}`,
+                  })
+                }
+              />
+            ) : null}
+            {canWrite && r.status === "draft" && (
+              <Button size="small" loading={busyId === r.id} onClick={() => startIssue(r)}>
+                Issue
               </Button>
-            </Popconfirm>
-          )}
-          {canWrite && (r.status === "issued" || r.status === "partial") && (
-            <Button size="small" onClick={() => setWriteOffFor(r)}>
-              Write off
-            </Button>
-          )}
-        </Space>
-      ),
+            )}
+            <Dropdown menu={{ items: menu, style: { minWidth: 148 } }} trigger={["click"]}>
+              <Button
+                size="small"
+                icon={<MoreOutlined />}
+                aria-label={`Actions for ${r.invoice_number ?? "draft invoice"}`}
+              />
+            </Dropdown>
+          </Space>
+        );
+      },
     },
   ];
 

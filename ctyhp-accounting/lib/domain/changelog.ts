@@ -47,6 +47,18 @@ export const RELEASES: Release[] = [
     changes: [
       {
         kind: "changed",
+        title: "The Actions column on Invoices lines up",
+        detail:
+          "It held three icon buttons and up to three coloured text buttons, a "
+          + "different set per status — so a paid invoice showed three controls "
+          + "and a draft showed five, and nothing lined up down the column. Now "
+          + "it matches Bills and Payments: attachments, Issue on a draft, and "
+          + "everything else behind one menu. View lines, Download PDF, Write "
+          + "off and Void are all still there, one click away.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
         title: "Sales opens with who to chase",
         detail:
           "Instead of four metric cards and a revenue chart, the first thing on "
