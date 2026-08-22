@@ -125,3 +125,85 @@ screen.
 - Unit tests over its rules, since the screens being replaced have none.
 - `/accounting`'s bundle ceiling is per-route; each new route gets its own entry
   in `budgets.json` so this phase cannot quietly add weight everywhere.
+
+---
+
+# What was built
+
+| Criterion | Result | |
+|---|---|:--:|
+| A pattern expands only after `/accounting` improves its behavioural metrics | **no pilot group, no measurement — waived knowingly** | ❌ |
+| Every work area has its own primary job and success measures | four questions, four sets of checks | ✅ |
+| Shared primitives contain no query or business rule specific to one area | enforced by `work-surface-boundary.test.ts` | ✅ |
+| The redesign does not recreate a service module over 1,000 lines | largest new file is 300 lines; the 1,275-line one is deleted | ✅ |
+
+**Net: 2,602 lines added, 2,993 removed.** What went: `WorkAreaOverview.tsx`
+(567), its stylesheet (962), the skeleton (35), `work-area-overviews.ts` (1,275).
+
+## The four questions, and what each screen does about them
+
+| Area | Question | Checks | The row that matters |
+|---|---|---|---|
+| Banking | What is unmatched, and how far is each account reconciled? | unmatched activity · feed health · statements reconciled | oldest unmatched line, with the account and the wait |
+| Sales | Who owes money, and what is being done about it? | overdue receivables · unapplied receipts · unissued invoices | a named customer, an invoice number, days late |
+| Purchases | What must be paid, what arrived, what does not add up? | bills due · received-not-billed · unapplied payments | a receipt nobody has been invoiced for |
+| Inventory | Can we sell it, and does it tie to the ledger? | valuation tie-out · negative stock · depreciation due | **the variance — the one row nobody may dismiss** |
+
+## The design decision that separates this from the last attempt
+
+Three of the four surfaces build **no control-failure queue rows**. Their checks
+summarise work the queue already itemises — unmatched activity *is* the unmatched
+lines — so a control row would put the same work on screen twice. The consequence
+follows honestly: nothing on those three blocks, so everything can be dismissed
+with a reason, and dismissing a row hides it while the check goes on counting.
+
+Inventory is the exception and proves the rule. A valuation variance has no
+smaller representation than itself, so it becomes a row, and it blocks. Which is
+the accounting surface's pattern, arrived at from the same argument rather than
+copied.
+
+`SurfaceScreen` exists because Banking, Sales and Purchases genuinely converged
+on two sections — **opted into, not fitted into**, which is the exact failure of
+the component this deletes. Accounting does not use it and should not: it has an
+explanation panel, a close mode and a trend section.
+
+## One defect closed on the way through
+
+Generalising the row menu exposed that `acc_set_work_item_state` took its
+"is this blocking" flag **from the browser**. The refusal to dismiss a blocking
+item was therefore answered by the person being refused.
+
+Nothing could be posted through it — dismissing changes no figure, and
+`acc_close_period` re-derives its own gate and never read the flag — but the
+guard existed to stop a blocking exception being swept out of sight, and one the
+sweeper supplies does not stop that. Each surface now hands in a resolver, it is
+called only on dismissal so ordinary actions cost nothing, and a resolver that
+throws leaves the item treated as blocking: **a failed read must not become
+permission.**
+
+## Measured
+
+| Route | total gzip | owned gzip |
+|---|---:|---:|
+| `/accounting` | 665,157 | 13,996 |
+| `/banking/overview` | 663,111 | 11,950 |
+| `/sales` | 663,108 | 11,947 |
+| `/purchases` | 663,113 | 11,952 |
+| `/inventory` | 663,168 | 12,007 |
+
+The four surfaces sit within 60 bytes of each other on owned JavaScript, which is
+what genuinely sharing parts looks like. All routes total 2,022,225 against a
+2,100,000 ceiling; every route has its own budget entry.
+
+2,183 tests, smoke 59 of 59, lint at its 11-warning baseline. Verified live on
+Aurora: Sales lists six overdue invoices from 34 to 122 days; Purchases reports
+three bills overdue at 15,820.00 and a PO line received-not-billed at 800.00
+ordered 67 days ago; Inventory ties out and shows eight assets with depreciation
+due since 2024; Banking shows 11 unmatched lines, oldest 230 days.
+
+## Still owed
+
+The behavioural measurement. Everything above says the screens are *better
+built*; none of it says an accountant finishes faster. Whoever picks this up
+should run it — the structure to compare against is now in place, which it was
+not before.

@@ -41,6 +41,54 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.59",
+    date: "2026-08-22",
+    headline: "Four overview screens now show work instead of metrics.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Sales opens with who to chase",
+        detail:
+          "Instead of four metric cards and a revenue chart, the first thing on "
+          + "the screen is a list of overdue invoices — named customer, invoice "
+          + "number, how many days late, how much — longest overdue first. Each "
+          + "row can be assigned to somebody, given a date, or set aside with a "
+          + "reason.",
+        route: "/sales",
+      },
+      {
+        kind: "changed",
+        title: "Purchases opens with what to settle",
+        detail:
+          "Bills that are late or due this week, goods that arrived and were "
+          + "never billed, and payments sitting against no bill — one list, "
+          + "because they compete for the same hour. The received-not-billed "
+          + "check is new: it finds liabilities the supplier has not invoiced "
+          + "yet, which nothing else in One Book was looking for.",
+        route: "/purchases",
+      },
+      {
+        kind: "changed",
+        title: "Banking opens with what needs matching",
+        detail:
+          "Unmatched lines oldest first, with the account and how long each has "
+          + "waited. Pending card authorisations are excluded and the screen "
+          + "says so, rather than counting money the bank has not committed to.",
+        route: "/banking/overview",
+      },
+      {
+        kind: "changed",
+        title: "Inventory says when stock and the ledger disagree",
+        detail:
+          "Negative stock and unposted depreciation are listed as work. If the "
+          + "value of what is on hand does not equal the inventory control "
+          + "account, that goes to the top and cannot be set aside — until it is "
+          + "explained, neither figure can be relied on.",
+        route: "/inventory",
+      },
+    ],
+  },
+  {
     version: "1.58",
     date: "2026-08-22",
     headline: "The accounting screen asks the database less than half as much.",
