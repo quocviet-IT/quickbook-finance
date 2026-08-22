@@ -69,16 +69,37 @@ export async function resolveActiveCompany(): Promise<ActiveCompany> {
 }
 
 /**
+ * Raised when a request needs books to read and this account is entitled to
+ * none. Caught by the app layout, which says so rather than showing an empty
+ * shell over somebody else's ledger.
+ */
+export class NoActiveCompanyError extends Error {
+  constructor() {
+    super("This account does not belong to any company.");
+    this.name = "NoActiveCompanyError";
+  }
+}
+
+/**
  * The schema holding the books this request should read.
  *
- * Falls back to `public` only when the register cannot be consulted at all —
- * during sign-in, for instance, before there is a user to have memberships.
- * It is never used to paper over a slug the user is not entitled to; that case
- * has already resolved to one of their own companies above.
+ * **Fails closed.** This used to end `?? "public"`, described as a fallback for
+ * sign-in — but it fired for any account the register returned nothing for, and
+ * `public` is not an empty schema, it is the first company's real ledger. An
+ * account holding a role in `public` and no entitlement therefore read that
+ * company's books while its own switcher showed no company at all. Reproduced
+ * on live data before the fix: `my_companies()` returned nothing,
+ * `acc_current_role()` returned `accountant`, and 14 invoices were readable.
+ *
+ * Nothing on the sign-in path needs this: `proxy.ts` builds its own client, the
+ * login screen uses the browser client, and the layout resolves the company
+ * itself before asking for one bound to it. So there is no case left where
+ * guessing a schema is better than refusing.
  */
 export async function activeSchema(): Promise<string> {
   const { active } = await resolveActiveCompany();
-  return active?.schemaName ?? "public";
+  if (!active) throw new NoActiveCompanyError();
+  return active.schemaName;
 }
 
 /**

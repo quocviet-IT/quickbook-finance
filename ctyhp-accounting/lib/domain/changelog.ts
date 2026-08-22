@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.60",
+    date: "2026-08-22",
+    headline: "Access to a company now follows the role, and only the role.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "An account with no company no longer lands in the first company's books",
+        detail:
+          "Access was recorded in two places that could disagree, and when the "
+          + "register had no answer the app fell back to the first company's "
+          + "ledger. An account could therefore read real books while its own "
+          + "company switcher showed nothing at all. Access is now decided by "
+          + "one thing — the role inside each company — and an account entitled "
+          + "to none is told so plainly instead of being shown somebody else's "
+          + "figures.",
+      },
+      {
+        kind: "changed",
+        title: "Suspending somebody takes effect everywhere at once",
+        detail:
+          "Suspending or offboarding a user now removes that company from their "
+          + "switcher immediately. There is no second record to remember to "
+          + "update, and no way for the two to drift apart.",
+        route: "/settings/users",
+      },
+    ],
+  },
+  {
     version: "1.59",
     date: "2026-08-22",
     headline: "Four overview screens now show work instead of metrics.",

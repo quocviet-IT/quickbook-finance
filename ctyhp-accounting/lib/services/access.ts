@@ -59,12 +59,22 @@ export async function listActors(sb: SupabaseClient): Promise<ActorRow[]> {
  * then record its application role. Supabase Admin createUser does not send an
  * email, and the password is never written to application tables or audit data.
  *
- * Two grants, because they answer different questions (the same pair company
- * provisioning writes): membership in the register decides whether this
- * company is even visible to the new user, and the `acc_app_user` row decides
- * what they may do once inside. This function used to write only the second —
- * so every user created here was born unable to open the very company they
- * were created in, and nobody noticed until one signed in.
+ * **One grant decides access, and it is the `acc_app_user` row.** Since 0123 the
+ * register derives entitlement from that row rather than keeping its own list,
+ * so a user is entitled to this company the moment the row exists and stops
+ * being entitled the moment it is suspended — one column, one effect.
+ *
+ * That is what makes the sequence below safe without a distributed transaction.
+ * The register write that follows is bookkeeping: who granted whom, and when.
+ * If it fails, the account is still correct and still usable; the two writes can
+ * no longer disagree about anything that matters, because only one of them is
+ * consulted.
+ *
+ * The history is worth keeping in view. This function once wrote only the
+ * `acc_app_user` row, and every user it created was born unable to open the
+ * company they were created in — the register was the gate then, and nobody
+ * noticed until one signed in. The fix at the time was to write both. The fix
+ * now is that only one of them answers the question.
  */
 export async function createUser(
   sb: SupabaseClient,
@@ -97,19 +107,25 @@ export async function createUser(
     throw new AccessError(eRow.message);
   }
 
-  // Only the service role may write the register, by design — an application
-  // session must not be able to hand out access to other companies. This
-  // grant is scoped to the one company the administrator is creating the
-  // user in, which is exactly what that administrator was already allowed
-  // to do by the action's own guard.
+  // The account is now usable: entitlement is the row above, and it exists.
+  //
+  // What follows records *who granted this and when*, which the role row does
+  // not carry. Only the service role may write the register, by design — an
+  // application session must not be able to hand out access to other companies.
+  //
+  // A failure here no longer rolls the account back, and that is the change:
+  // undoing a working account to keep an audit note tidy would trade something
+  // that matters for something that does not. It is reported and left for
+  // `onebook.entitlement_drift()` to surface.
   const register = createSupabaseAdminClient("onebook");
   const { error: eMember } = await register
     .from("company_member")
     .upsert({ company_id: companyId, user_id: userId }, { ignoreDuplicates: true });
   if (eMember) {
-    await sb.from("acc_app_user").delete().eq("id", userId);
-    await admin.auth.admin.deleteUser(userId);
-    throw new AccessError(`Could not grant company membership: ${eMember.message}`);
+    console.error(
+      `user ${userId} was created and is entitled to company ${companyId}, ` +
+        `but the register note failed: ${eMember.message}`,
+    );
   }
 
   return userId;
