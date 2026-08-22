@@ -40,7 +40,8 @@
     "verify:settings-guard": "node --env-file=.env.local scripts/verify-settings-guard.mjs",
     "smoke:payments-void": "node --env-file=.env.local scripts/smoke-payments-void.mjs",
     "test:e2e:document-ledger-report": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:document-files": "node --env-file=.env.local scripts/verify-document-files-every-company.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
