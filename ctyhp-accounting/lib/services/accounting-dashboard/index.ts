@@ -10,7 +10,7 @@ import { getAccountingControls } from "./controls";
 import { getAccountingWorkQueue } from "./work-queue";
 import { getSecondaryAnalysis } from "./secondary-analysis";
 import { listWorkItemState, retireWorkItems } from "./work-item-state";
-import { getWorkPolicy } from "./policy";
+import { getWorkPolicy } from "@/lib/services/work-policy";
 import { getAccountingInsights } from "./insights";
 import { getCloseReadiness } from "./close-readiness";
 

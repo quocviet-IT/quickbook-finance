@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Alert, Card } from "antd";
 import type { AccountingDashboardData } from "@/lib/services/accounting-dashboard";
-import type { Assignee } from "./WorkItemActions";
+import type { Assignee } from "@/components/work-surface/WorkItemActions";
 import styles from "./accounting-dashboard.module.css";
 import AccountingStatusStrip from "./AccountingStatusStrip";
 import AccountingInsightList from "./AccountingInsightList";

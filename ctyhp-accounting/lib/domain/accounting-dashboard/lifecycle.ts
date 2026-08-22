@@ -25,7 +25,7 @@ export type { WorkLifecycle, WorkItemState } from "@/lib/domain/work-surface/lif
  * What this surface calls things. Banking's blocking outcome is a
  * reconciliation, and what decides its work is the feed, not the books.
  */
-const NOUNS = { blocking: "the period close", records: "the books" };
+export const ACCOUNTING_NOUNS = { blocking: "the period close", records: "the books" };
 
 /**
  * The filters this surface adds to the universal ones.
@@ -51,7 +51,7 @@ export function transitionProblem(
   item: { blocksClose: boolean },
   reason: string | null,
 ): string | null {
-  return surfaceTransitionProblem(from, to, { blocking: item.blocksClose }, reason, NOUNS);
+  return surfaceTransitionProblem(from, to, { blocking: item.blocksClose }, reason, ACCOUNTING_NOUNS);
 }
 
 /** Whether one item belongs under one filter. */

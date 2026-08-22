@@ -34,3 +34,226 @@
   font-size: 12px;
   color: var(--ob-text-caption);
 }
+
+/* --- Control health ----------------------------------------------------- */
+/* One row per check: a mark, the word for its state, the condition it passes
+   on, and the figure it found. Colour agrees with all of that and never has to
+   carry it alone. */
+.controlList {
+  display: flex;
+  flex-direction: column;
+}
+
+.controlRow {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ob-panel-lineFaint);
+}
+
+.controlRow:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.controlIcon {
+  flex: 0 0 auto;
+  line-height: 20px;
+  font-size: 16px;
+}
+
+.controlBody {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.controlHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.controlName {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.controlDifference {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.controlDetail {
+  font-size: 12px;
+  color: var(--ob-text-body);
+}
+
+.controlPass {
+  font-size: 12px;
+  color: var(--ob-text-faint);
+}
+
+/* Status colour is a reinforcement here, never the message: every row also
+   carries an icon and the word for its state. */
+.blocked .controlIcon,
+.blocked .controlDifference {
+  color: var(--ob-feedback-negative);
+}
+
+.attention .controlIcon,
+.attention .controlDifference {
+  color: var(--ob-feedback-warningText);
+}
+
+.healthy .controlIcon {
+  color: var(--ob-intent-success);
+}
+
+.unavailable .controlIcon {
+  color: var(--ob-text-faint);
+}
+
+/* --- The work queue ----------------------------------------------------- */
+/* Rows, not a data grid. A queue is a list of things to do: nothing here sorts,
+   pages or selects, and keeping the table engine off these routes is worth
+   48KB gzip on each of them. */
+.queueList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queueRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--ob-panel-lineFaint);
+}
+
+.queueRow:first-child {
+  border-top: none;
+}
+
+.queueSeverity {
+  flex: 0 0 auto;
+  margin: 0;
+  width: 66px;
+  text-align: center;
+}
+
+.queueTitleCell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.queueTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.queueTitle {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueReason {
+  font-size: 12px;
+  color: var(--ob-text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueOwner {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 118px;
+  font-size: 12px;
+  color: var(--ob-text-body);
+}
+
+.queueDueLate {
+  font-size: 12px;
+  color: var(--ob-feedback-negative);
+  font-weight: 500;
+}
+
+.queueAmount {
+  flex: 0 0 auto;
+  min-width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-body);
+}
+
+.queueAction {
+  flex: 0 0 auto;
+}
+
+/* Nine filters need their own line: beside the card title they truncated it. */
+.queueFilters {
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+
+.queueFilters :global(.ant-segmented) {
+  width: max-content;
+}
+
+/* --- Status strip ------------------------------------------------------- */
+/* One strip, not a row of cards: this is metadata about the page, and giving it
+   card weight is what pushed the actual work below the fold before. */
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 10px 16px;
+  border: 1px solid var(--ob-panel-lineFaint);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.stripLead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.stripFacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ob-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.stripFact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

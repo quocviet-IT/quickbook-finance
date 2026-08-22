@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import type { WorkPolicy } from "@/lib/domain/accounting-dashboard/policy";
-import { saveWorkPolicy, WorkPolicyError } from "@/lib/services/accounting-dashboard/policy";
+import { saveWorkPolicy, WorkPolicyError } from "@/lib/services/work-policy";
 
 export interface WorkPolicyActionResult {
   ok: boolean;

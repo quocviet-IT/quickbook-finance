@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   EMPTY_WORK_POLICY,
   type WorkPolicy,
-} from "@/lib/domain/accounting-dashboard/policy";
+} from "@/lib/domain/work-policy";
 
 export class WorkPolicyError extends Error {}
 

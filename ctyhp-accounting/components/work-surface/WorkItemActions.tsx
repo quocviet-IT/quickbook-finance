@@ -4,32 +4,50 @@ import { App, Button, DatePicker, Dropdown, Input, Modal, Select } from "antd";
 import type { MenuProps } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { transitionProblem, type WorkLifecycle } from "@/lib/domain/accounting-dashboard/lifecycle";
-import type { PriorityQueueItem } from "@/lib/domain/accounting-dashboard/types";
-import { changeWorkItemAction } from "@/app/(app)/accounting/actions";
+import {
+  transitionProblem,
+  type SurfaceNouns,
+  type WorkLifecycle,
+} from "@/lib/domain/work-surface/lifecycle";
+import type { SurfaceWorkItem } from "@/lib/domain/work-surface/types";
+import type {
+  WorkItemActionResult,
+  WorkItemChange,
+} from "@/lib/services/work-surface/change-work-item";
 
 export interface Assignee {
   id: string;
   name: string;
 }
 
+/** The server action that writes the change. Passed in, so one menu serves every surface. */
+export type ChangeAction = (change: WorkItemChange) => Promise<WorkItemActionResult>;
+
 /**
  * What a person can do with one piece of work.
  *
- * Every option writes the same row through the same action, so the guard and
- * the concurrency token cannot drift between them. An option a rule forbids is
- * not shown greyed out — it is not shown: a menu that offers Dismiss on a
- * control blocking the close teaches the wrong thing about the books, even
- * when clicking it would fail.
+ * Every option writes the same row through the same action, so the guard and the
+ * concurrency token cannot drift between them. An option a rule forbids is not
+ * shown greyed out — it is not shown: a menu that offers Dismiss on a blocking
+ * item teaches the wrong thing, even when clicking it would fail.
+ *
+ * The `blocking` flag on the item is used **only to decide what to draw**. The
+ * decision that matters is taken on the server, which re-derives it from the
+ * records — see `change-work-item.ts`. A screen that lied about the flag would
+ * get a menu it could not use, not a dismissal it should not have.
  */
 export default function WorkItemActions({
   item,
   assignees,
   onChanged,
+  changeAction,
+  nouns = {},
 }: {
-  item: PriorityQueueItem;
+  item: SurfaceWorkItem;
   assignees: Assignee[];
   onChanged: () => void;
+  changeAction: ChangeAction;
+  nouns?: SurfaceNouns;
 }) {
   const { message } = App.useApp();
   const [assignOpen, setAssignOpen] = useState(false);
@@ -45,7 +63,7 @@ export default function WorkItemActions({
     over: { ownerId?: string | null; dueDate?: string | null; reason?: string | null } = {},
   ) {
     setBusy(true);
-    const result = await changeWorkItemAction({
+    const result = await changeAction({
       key: item.key,
       from: item.lifecycle,
       to,
@@ -53,7 +71,6 @@ export default function WorkItemActions({
       dueDate: over.dueDate !== undefined ? over.dueDate : item.dueDate,
       reason: over.reason ?? null,
       expectedVersion: item.stateVersion,
-      blocksClose: item.blocksClose,
     });
     setBusy(false);
     if (!result.ok) {
@@ -93,14 +110,10 @@ export default function WorkItemActions({
 
   if (item.lifecycle === "dismissed") {
     menu.push({ type: "divider" as const, key: "before-restore" });
-    menu.push({
-      key: "restore",
-      label: "Put it back",
-      onClick: () => void change("new"),
-    });
-  } else if (transitionProblem(item.lifecycle, "dismissed", item, "x") === null) {
-    // Offered only when the rules actually allow it. A control that blocks the
-    // close never sees this option at all.
+    menu.push({ key: "restore", label: "Put it back", onClick: () => void change("new") });
+  } else if (transitionProblem(item.lifecycle, "dismissed", item, "x", nouns) === null) {
+    // Offered only when the rules actually allow it. A blocking item never sees
+    // this option at all.
     menu.push({ type: "divider" as const, key: "before-dismiss" });
     menu.push({
       key: "dismiss",
@@ -126,7 +139,11 @@ export default function WorkItemActions({
         okText="Assign"
         onCancel={() => setAssignOpen(false)}
         onOk={async () => {
-          if (await change(item.lifecycle === "new" ? "acknowledged" : item.lifecycle, { ownerId: owner })) {
+          if (
+            await change(item.lifecycle === "new" ? "acknowledged" : item.lifecycle, {
+              ownerId: owner,
+            })
+          ) {
             setAssignOpen(false);
           }
         }}

@@ -2,7 +2,7 @@ import PageHeader from "@/components/PageHeader";
 import { getUserRole, isAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { requireSettingsAccess } from "@/lib/db/settings-access";
-import { getWorkPolicy } from "@/lib/services/accounting-dashboard/policy";
+import { getWorkPolicy } from "@/lib/services/work-policy";
 import { listCurrencies } from "@/lib/services/reference";
 import WorkPolicyClient from "./WorkPolicyClient";
 

@@ -7,12 +7,22 @@
       "ownedGzipBytes": 15000,
       "measured": {
         "date": "2026-08-22",
-        "gzipBytes": 665200,
-        "ownedGzipBytes": 13096,
+        "gzipBytes": 666029,
+        "ownedGzipBytes": 13950,
         "phase0": {
           "gzipBytes": 660303,
           "ownedGzipBytes": 13950
         }
+      }
+    },
+    "/banking/overview": {
+      "gzipBytes": 684362,
+      "ownedGzipBytes": 13851,
+      "measured": {
+        "date": "2026-08-22",
+        "gzipBytes": 663882,
+        "ownedGzipBytes": 11803,
+        "note": "first measurement; no earlier figure to hold it to"
       }
     }
   },
@@ -20,7 +30,7 @@
     "gzipBytes": 2100000,
     "measured": {
       "date": "2026-08-22",
-      "gzipBytes": 1981410
+      "gzipBytes": 1994065
     }
   }
 }
