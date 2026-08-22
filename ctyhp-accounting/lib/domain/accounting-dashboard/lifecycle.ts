@@ -1,118 +1,69 @@
-import type { PriorityQueueItem } from "./types";
+import {
+  matchesFilter as matchesSurfaceFilter,
+  surfaceFilters,
+  transitionProblem as surfaceTransitionProblem,
+  type KindFilter,
+  type WorkLifecycle,
+} from "@/lib/domain/work-surface/lifecycle";
+import { asWorkItem, type PriorityQueueItem } from "./types";
 
 /**
- * What a piece of work may become, and who is looking at it.
+ * What a piece of accounting work may become, and who is looking at it.
  *
- * The queue is derived from the books on every read — Phase 1's decision, and
- * still true. What this file governs is the layer of human judgement over the
- * top: who picked something up, who put it down, and who decided it does not
- * need doing. None of that touches an accounting figure, and none of it can
- * declare an exception fixed. Only the books do that.
+ * The rules themselves moved to `lib/domain/work-surface/lifecycle.ts` in
+ * Phase 6 — they are about work, not about ledgers, and Banking needs the same
+ * ones. What stays here is the part that is accounting's: that the outcome being
+ * blocked is a **period close**, and that this surface's own filters are
+ * reconciliation, approvals and period close.
  *
  * Design record: docs/superpowers/specs/2026-08-19-accounting-dashboard-redesign-design.md §7.2
  */
 
-export type WorkLifecycle = "new" | "acknowledged" | "in_progress" | "dismissed" | "resolved";
-
-/** The user-created state of one work item. Nothing accounting-shaped lives here. */
-export interface WorkItemState {
-  key: string;
-  lifecycle: WorkLifecycle;
-  ownerId: string | null;
-  ownerName: string | null;
-  /** Entered by a person. Phase 3 adds a policy that can propose one. */
-  dueDate: string | null;
-  dismissReason: string | null;
-  /**
-   * The concurrency token: an update carrying a stale one is refused.
-   *
-   * A counter rather than a timestamp — a timestamp loses precision on its way
-   * through a driver and a JSON serialiser, and would refuse writes that were
-   * never actually stale.
-   */
-  version: number;
-  updatedBy: string | null;
-}
+export type { WorkLifecycle, WorkItemState } from "@/lib/domain/work-surface/lifecycle";
 
 /**
- * Null when the move is legal; the reason it is not, otherwise.
- *
- * Deliberately permissive in both directions between `new`, `acknowledged` and
- * `in_progress`: a queue that only moves forwards is one people avoid touching,
- * and picking something up then putting it down is ordinary. The three refusals
- * are the ones that mean something.
+ * What this surface calls things. Banking's blocking outcome is a
+ * reconciliation, and what decides its work is the feed, not the books.
  */
+const NOUNS = { blocking: "the period close", records: "the books" };
+
+/**
+ * The filters this surface adds to the universal ones.
+ *
+ * Each names the `sourceKind` values it covers, and the shared layer only checks
+ * membership — it never learns that "unmatched-bank" has anything to do with a
+ * bank.
+ */
+export const ACCOUNTING_KIND_FILTERS: readonly KindFilter[] = [
+  { id: "reconciliation", label: "Reconciliation", kinds: ["unmatched-bank"] },
+  { id: "approvals", label: "Approvals", kinds: ["pending-approval"] },
+  { id: "period_close", label: "Period close", kinds: ["overdue-period"] },
+];
+
+export const QUEUE_FILTERS = surfaceFilters(ACCOUNTING_KIND_FILTERS);
+
+export type QueueFilter = string;
+
+/** Null when the move is legal; the reason it is not, otherwise. */
 export function transitionProblem(
   from: WorkLifecycle,
   to: WorkLifecycle,
   item: { blocksClose: boolean },
   reason: string | null,
 ): string | null {
-  if (to === "resolved") {
-    return "Work is resolved by the books, not by hand — an item goes when its exception does.";
-  }
-  if (from === "resolved") {
-    return "This item is already resolved; its exception has cleared.";
-  }
-  if (to === "dismissed") {
-    if (item.blocksClose) {
-      return "This blocks the period close and cannot be dismissed. Fix it or reopen the period.";
-    }
-    if ((reason ?? "").trim().length === 0) {
-      return "Say why this is being dismissed.";
-    }
-  }
-  return null;
+  return surfaceTransitionProblem(from, to, { blocking: item.blocksClose }, reason, NOUNS);
 }
 
-export type QueueFilter =
-  | "all"
-  | "mine"
-  | "unassigned"
-  | "overdue"
-  | "critical"
-  | "reconciliation"
-  | "approvals"
-  | "period_close"
-  | "dismissed";
-
-/**
- * Whether one item belongs under one filter.
- *
- * A dismissed item is hidden from every filter but its own. Hidden from the
- * work, never hidden from the reader: somebody decided it did not need doing,
- * and that decision has to remain inspectable.
- */
+/** Whether one item belongs under one filter. */
 export function matchesFilter(
   item: PriorityQueueItem,
   filter: QueueFilter,
   viewerId: string | null,
   today: string,
 ): boolean {
-  const dismissed = item.lifecycle === "dismissed";
-  if (filter === "dismissed") return dismissed;
-  if (dismissed) return false;
-
-  switch (filter) {
-    case "mine":
-      // No viewer means no "mine". Matching everything would quietly show one
-      // person another person's work.
-      return viewerId !== null && item.ownerId === viewerId;
-    case "unassigned":
-      return item.ownerId === null;
-    case "overdue":
-      // Due today is due, not late — the same rule the invoice screens settle
-      // on. And no due date is not overdue: nobody promised a day.
-      return item.dueDate !== null && item.dueDate < today;
-    case "critical":
-      return item.severity === "critical";
-    case "reconciliation":
-      return item.sourceKind === "unmatched-bank";
-    case "approvals":
-      return item.sourceKind === "pending-approval";
-    case "period_close":
-      return item.sourceKind === "overdue-period";
-    default:
-      return true;
-  }
+  return matchesSurfaceFilter(asWorkItem(item), filter, {
+    viewerId,
+    today,
+    kindFilters: ACCOUNTING_KIND_FILTERS,
+  });
 }

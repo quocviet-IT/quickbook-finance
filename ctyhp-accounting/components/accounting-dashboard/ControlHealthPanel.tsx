@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Card } from "antd";
-import StatusGlyph, { type GlyphName } from "./StatusGlyph";
+import StatusGlyph, { type GlyphName } from "@/components/work-surface/StatusGlyph";
 import type {
   AccountingControl,
   ControlStatus,

@@ -13,8 +13,8 @@ import {
   closeRecommendation,
   type CloseRecommendation,
 } from "@/lib/domain/accounting-dashboard/close-checklist";
-import { formatMoney } from "@/lib/format";
 import { createRequestMemo, type RequestMemo } from "@/lib/services/request-memo";
+import { envelope, failed, withDecisions } from "@/lib/services/work-surface/envelope";
 import type { CloseReadiness } from "./close-readiness";
 import type { InsightSection } from "./insights";
 import type { AccountingDashboardContext } from "./context";
@@ -270,49 +270,16 @@ export async function composeAccountingDashboard(
 /**
  * The books' half of each item, joined to what a person decided about it.
  *
- * An item nobody has touched carries the default: new, unowned, undated. That
- * is not a stored row — it is the absence of one, and saying so here keeps the
- * state table holding only decisions somebody actually made.
+ * The join is `withDecisions` in `lib/services/work-surface/envelope.ts` — every
+ * surface does it identically, and two copies would be two answers to "what does
+ * an item nobody has touched look like". This wrapper supplies the currency and
+ * narrows the result to this area's type.
  */
 function withState(
   items: DerivedQueueItem[],
   state: Map<string, WorkItemState>,
   context: AccountingDashboardContext,
 ): PriorityQueueItem[] {
-  return items.map((item) => {
-    const decided = state.get(item.key);
-    return {
-      ...item,
-      amountText:
-        item.amountMinor === undefined
-          ? null
-          : formatMoney(item.amountMinor, context.currencyCode, context.currencyDecimals),
-      lifecycle: decided?.lifecycle ?? "new",
-      ownerId: decided?.ownerId ?? null,
-      ownerName: decided?.ownerName ?? null,
-      dueDate: decided?.dueDate ?? null,
-      dismissReason: decided?.dismissReason ?? null,
-      stateVersion: decided?.version ?? null,
-    };
-  });
+  return withDecisions(items, state, context);
 }
 
-function envelope<T>(result: PromiseSettledResult<T>, reason: string): SectionEnvelope<T> {
-  if (result.status === "fulfilled") {
-    return { data: result.value, generatedAt: new Date().toISOString(), dataState: "fresh" };
-  }
-  return failed(reason, result.reason);
-}
-
-function failed<T>(reason: string, cause: unknown): SectionEnvelope<T> {
-  // The caller's message reaches the screen, never the database's: a section
-  // note is read by an accountant, and a raw Postgres error tells them nothing
-  // they can act on — while possibly naming tables they should not see.
-  console.error("accounting dashboard section failed:", cause);
-  return {
-    data: null,
-    generatedAt: new Date().toISOString(),
-    dataState: "unavailable",
-    unavailableReason: reason,
-  };
-}

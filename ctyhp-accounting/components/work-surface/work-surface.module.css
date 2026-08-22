@@ -1,0 +1,36 @@
+/*
+ * The pieces every work surface draws the same way.
+ *
+ * Deliberately small. This is not a layout — each area composes its own, around
+ * its own primary question — it is the handful of marks that must look and mean
+ * the same everywhere: when a figure was computed, that a section could not be
+ * computed at all, and that there is genuinely nothing to do.
+ *
+ * Plan: docs/superpowers/plans/2026-08-22-accounting-cockpit-phase6.md
+ */
+
+/* --- When a figure was computed, and whether to believe it -------------- */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ob-text-caption);
+}
+
+/* --- Nothing to do, and the evidence that this is good news ------------- */
+.emptyState {
+  padding: 20px 8px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.emptyDetail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ob-text-caption);
+}
