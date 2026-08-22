@@ -55,6 +55,7 @@ describe("transitionProblem", () => {
 });
 
 const base: PriorityQueueItem = {
+  amountText: null,
   key: "k",
   sourceKind: "overdue-invoice",
   sourceId: "a",

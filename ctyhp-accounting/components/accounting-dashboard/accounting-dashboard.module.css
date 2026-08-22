@@ -545,3 +545,40 @@
   align-items: center;
   gap: 8px;
 }
+
+/* The mode toggle: two links that look like one control. Styled here rather
+   than reached for from a component library, because what they are is links. */
+.modeToggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--ob-panel-lineFaint);
+  border-radius: 8px;
+  background: var(--ob-surface-sunken, var(--ob-surface-card));
+  gap: 2px;
+}
+
+.modeOption {
+  padding: 4px 14px;
+  border-radius: 6px;
+  color: var(--ob-text-body);
+  font-size: 13px;
+  line-height: 22px;
+  text-decoration: none;
+}
+
+.modeOption:hover {
+  color: var(--ob-text-heading);
+  background: var(--ob-surface-card);
+}
+
+.modeOption[aria-current="page"] {
+  background: var(--ob-surface-card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  color: var(--ob-text-heading);
+  font-weight: 600;
+}
+
+.modeStart {
+  white-space: nowrap;
+  font-weight: 600;
+}

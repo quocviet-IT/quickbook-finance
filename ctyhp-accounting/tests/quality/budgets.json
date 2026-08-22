@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "note": "Ceilings the build refuses to cross. Raise one only in a commit that says why, and put the new figure and its date in the same change. A budget nobody may edit becomes a budget everybody routes around; a budget edited silently is not a budget.",
+  "routes": {
+    "/accounting": {
+      "gzipBytes": 680783,
+      "ownedGzipBytes": 15000,
+      "measured": {
+        "date": "2026-08-22",
+        "gzipBytes": 665200,
+        "ownedGzipBytes": 13096,
+        "phase0": {
+          "gzipBytes": 660303,
+          "ownedGzipBytes": 13950
+        }
+      }
+    }
+  },
+  "total": {
+    "gzipBytes": 2100000,
+    "measured": {
+      "date": "2026-08-22",
+      "gzipBytes": 1981410
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,15 @@ describe("quality bundle analyzer", () => {
         chunks: ["static/chunks/route.js", "static/chunks/shared.js"],
         bytes: 45,
         gzipBytes: 85,
+        // One route in the fixture, so every chunk is used by exactly one
+        // route and all of them are owned. That is the definition working, not
+        // failing: "shared" means shared with another route, and here there is
+        // no other route. The two-route case below is where it bites.
+        owned: {
+          chunks: ["static/chunks/route.js", "static/chunks/shared.js"],
+          bytes: 45,
+          gzipBytes: 85,
+        },
       }],
       chunks: [
         {
@@ -107,5 +116,61 @@ describe("quality bundle analyzer", () => {
     }
 
     expect(() => resolvePhysicalChunkPath(nextDir, "static/chunks/escape.js")).toThrow(/escapes.*static.chunks/i);
+  });
+});
+
+
+describe("what a route owns", () => {
+  /**
+   * The route total is dominated by chunks every screen shares, so it barely
+   * moves whatever one page does to itself. What a page owns is the part its
+   * own design can actually move, and it is the figure worth budgeting.
+   */
+  it("separates a route's own chunks from the ones it shares", () => {
+    const root = mkdtempSync(join(tmpdir(), "bundle-owned-"));
+    const nextDir = join(root, ".next");
+    const chunks = join(nextDir, "static", "chunks");
+    mkdirSync(chunks, { recursive: true });
+    writeFileSync(join(chunks, "shared.js"), "// shared by both routes");
+    writeFileSync(join(chunks, "only-a.js"), "// only route a");
+    writeFileSync(join(chunks, "only-b.js"), "// only route b, and bigger than a's own");
+
+    const manifest = (route: string, own: string) =>
+      'globalThis.__RSC_MANIFEST = globalThis.__RSC_MANIFEST || {};\n'
+      + `globalThis.__RSC_MANIFEST[${JSON.stringify(route)}] = `
+      + JSON.stringify({
+        entryJSFiles: { "[project]/page": ["static/chunks/shared.js", `static/chunks/${own}`] },
+      })
+      + ";";
+
+    for (const [route, own] of [
+      ["/(app)/a/page", "only-a.js"],
+      ["/(app)/b/page", "only-b.js"],
+    ]) {
+      const dir = join(nextDir, "server", "app", "(app)", route.split("/")[2]);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "page_client-reference-manifest.js"), manifest(route, own));
+    }
+
+    const report = analyzeBundle(nextDir);
+    const routeNamed = (name: string) => {
+      const found = report.routes.find((entry: { route: string }) => entry.route === name);
+      if (!found) throw new Error(`the analyser did not report ${name}`);
+      return found;
+    };
+    const a = routeNamed("/a");
+    const b = routeNamed("/b");
+
+    expect(a.owned.chunks).toEqual(["static/chunks/only-a.js"]);
+    expect(b.owned.chunks).toEqual(["static/chunks/only-b.js"]);
+    // The shared chunk is in each route's total and in neither route's own.
+    expect(a.chunks).toContain("static/chunks/shared.js");
+    expect(a.owned.chunks).not.toContain("static/chunks/shared.js");
+    expect(a.owned.bytes).toBeLessThan(a.bytes);
+    // And owning more shows up as owning more, which is the whole reason to
+    // measure it apart from a total the page cannot move.
+    expect(b.owned.bytes).toBeGreaterThan(a.owned.bytes);
+
+    rmSync(root, { recursive: true, force: true });
   });
 });

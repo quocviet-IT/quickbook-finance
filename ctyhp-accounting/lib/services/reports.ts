@@ -53,3 +53,41 @@ export async function getTransactionList(
     accountIds: ((r.account_ids as string[] | null) ?? []).map(String),
   }));
 }
+
+/**
+ * Every month in the window, in one round trip.
+ *
+ * The caller gets exactly what `getLedgerBalances` gives, keyed by month, so
+ * the same `buildProfitAndLoss` runs over each month's rows. The RPC does no
+ * profit-and-loss arithmetic of its own — see 0121 for why that matters.
+ *
+ * A month with no postings has no key. That is not a gap to paper over here:
+ * the caller knows which months it asked for, and this function does not need
+ * to learn the calendar to agree with it.
+ */
+export async function getMonthlyLedgerBalances(
+  sb: SupabaseClient,
+  to: string,
+  months: number,
+): Promise<Map<string, LedgerBalance[]>> {
+  const { data, error } = await sb.rpc("acc_monthly_ledger_balances", {
+    p_to: to,
+    p_months: months,
+  });
+  if (error) throw new Error(error.message);
+  const byMonth = new Map<string, LedgerBalance[]>();
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const key = String(r.month_key);
+    const rows = byMonth.get(key) ?? [];
+    rows.push({
+      accountId: r.account_id as string,
+      accountCode: r.account_code as string,
+      name: r.name as string,
+      accountType: r.account_type as LedgerBalance["accountType"],
+      debitBase: Number(r.debit_base),
+      creditBase: Number(r.credit_base),
+    });
+    byMonth.set(key, rows);
+  }
+  return byMonth;
+}

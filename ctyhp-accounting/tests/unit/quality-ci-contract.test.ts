@@ -266,14 +266,24 @@ describe("quality CI contracts", () => {
     const steps = job!.steps ?? [];
     const buildIndex = indexByName(steps, "Build");
     const bundleIndex = indexByName(steps, "Bundle quality report");
+    const budgetIndex = indexByName(steps, "Bundle budget gate");
     const uploadIndex = indexByName(steps, "Upload quality report");
 
     expect(bundleIndex).toBe(buildIndex + 1);
-    expect(uploadIndex).toBe(bundleIndex + 1);
+    // The gate has to sit between the report and the upload: it needs the
+    // artifact the report writes, and the upload has to happen even when the
+    // gate fails — which is what `if: always()` on the upload is for.
+    expect(budgetIndex).toBe(bundleIndex + 1);
+    expect(uploadIndex).toBe(budgetIndex + 1);
     expect(steps[bundleIndex]).toEqual({
       name: "Bundle quality report",
       run: "npm run quality:bundle",
       env: { QUALITY_MODE: "report" },
+    });
+    // No `env` and no `continue-on-error`: this step exists to fail the build.
+    expect(steps[budgetIndex]).toEqual({
+      name: "Bundle budget gate",
+      run: "npm run quality:budget",
     });
     expect(steps[uploadIndex]).toEqual({
       name: "Upload quality report",

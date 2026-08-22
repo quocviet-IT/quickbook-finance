@@ -3,6 +3,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
+    alias: {
+      // See tests/stubs/server-only.ts: a build-time marker, not a module.
+      "server-only": new URL("./tests/stubs/server-only.ts", import.meta.url).pathname,
+    },
   },
   oxc: {
     // lib/design/status.tsx carries JSX. React 19's automatic runtime means no

@@ -12,6 +12,7 @@ import { buildTrialBalance } from "@/lib/domain/reports";
 import { getControlReconciliation } from "@/lib/services/gl-posting";
 import { getLedgerBalances } from "@/lib/services/reports";
 import type { AccountingDashboardContext } from "./context";
+import { NO_MEMO, type RequestMemo } from "@/lib/services/request-memo";
 
 /**
  * Every accounting control, evaluated as of the dashboard's date.
@@ -25,13 +26,16 @@ import type { AccountingDashboardContext } from "./context";
 export async function getAccountingControls(
   sb: SupabaseClient,
   context: AccountingDashboardContext,
+  memo: RequestMemo = NO_MEMO,
 ): Promise<AccountingControl[]> {
   const evaluatedAt = new Date().toISOString();
   const { asOf } = context;
 
   const [ledger, reconciliation, approvals, bank, unmatched] = await Promise.allSettled([
-    getLedgerBalances(sb, null, asOf),
-    getControlReconciliation(sb, asOf),
+    // The insights section wants this same read. Two sections asking one
+    // question is the price of their independence; paying for it twice is not.
+    memo(`ledger:null:${asOf}`, () => getLedgerBalances(sb, null, asOf)),
+    memo(`control-recon:${asOf}`, () => getControlReconciliation(sb, asOf)),
     sb
       .from("acc_approval_request")
       .select("requested_at", { count: "exact" })

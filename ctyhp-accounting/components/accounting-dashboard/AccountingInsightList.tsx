@@ -1,8 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Alert, Button, Card, Tag, Typography } from "antd";
-import { ArrowRightOutlined } from "@ant-design/icons";
-import { POLICY_FIELD_LABEL, ruleNeeds } from "@/lib/domain/accounting-dashboard/policy";
+import { Alert, Button, Card, Tag } from "antd";
 import type { QueueSeverity, SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
 import type { InsightSection } from "@/lib/services/accounting-dashboard";
 import styles from "./accounting-dashboard.module.css";
@@ -19,6 +17,12 @@ import { FreshnessNote, HealthyEmpty, UnavailableNote } from "./DataStateNote";
  * The sleeping-rules notice is not an apology. A rule that never fires because
  * nobody set its policy is invisible, and an invisible rule makes a page look
  * complete when it is not.
+ *
+ * Nothing here reacts to anything, so this looks like a Server Component and
+ * was briefly made one. It is not, for a measured reason: see the note in
+ * ControlHealthPanel. What did move to the server is the work — the label for
+ * each sleeping rule now arrives resolved, so the policy module no longer
+ * ships to the browser to print one word.
  */
 
 const SEVERITY_TAG: Record<QueueSeverity, { color: string; label: string }> = {
@@ -66,9 +70,7 @@ export default function AccountingInsightList({
                 <span className={styles.insightRule}>{insight.ruleKey}</span>
               </div>
 
-              <Typography.Paragraph className={styles.insightSummary}>
-                {insight.summary}
-              </Typography.Paragraph>
+              <p className={styles.insightSummary}>{insight.summary}</p>
 
               <div className={styles.insightEvidence}>
                 {insight.evidence.map((item, index) => (
@@ -83,8 +85,7 @@ export default function AccountingInsightList({
                 ))}
                 <Link href={insight.recommendedAction.href} className={styles.insightAction}>
                   <Button size="small" type="primary" ghost>
-                    {insight.recommendedAction.label}{" "}
-                    <ArrowRightOutlined aria-hidden="true" />
+                    {insight.recommendedAction.label} →
                   </Button>
                 </Link>
               </div>
@@ -101,15 +102,11 @@ export default function AccountingInsightList({
           message={`${sleeping.length} rule(s) cannot run yet`}
           description={
             <>
-              {sleeping.map((ruleKey) => {
-                const field = ruleNeeds(ruleKey);
-                return (
-                  <div key={ruleKey}>
-                    <code>{ruleKey}</code> is waiting on{" "}
-                    {field ? POLICY_FIELD_LABEL[field] : "a policy"}.
-                  </div>
-                );
-              })}
+              {sleeping.map((rule) => (
+                <div key={rule.ruleKey}>
+                  <code>{rule.ruleKey}</code> is waiting on {rule.waitingOn}.
+                </div>
+              ))}
               <div style={{ marginTop: 6 }}>
                 <Link href="/settings/work-policy">Set the work policy</Link> and they will start
                 reporting. Until then they say nothing, rather than judging by a number nobody

@@ -6,6 +6,7 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import type { SectionDataState } from "@/lib/domain/accounting-dashboard/types";
+import { freshnessOf } from "@/lib/domain/accounting-dashboard/freshness";
 import styles from "./accounting-dashboard.module.css";
 
 /**
@@ -16,12 +17,10 @@ import styles from "./accounting-dashboard.module.css";
  * exactly what a bare zero used to do.
  */
 
-/** A section older than this is worth flagging; the figures may have moved. */
-const STALE_AFTER_MS = 10 * 60 * 1000;
-
-export function freshnessOf(generatedAt: string, now: number = Date.now()): SectionDataState {
-  return now - Date.parse(generatedAt) > STALE_AFTER_MS ? "stale" : "fresh";
-}
+// The rule itself is in lib/domain/accounting-dashboard/freshness.ts, where it
+// can be read and tested without a browser. Re-exported so the components that
+// draw it keep importing from one place.
+export { freshnessOf };
 
 export function timeOnly(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });

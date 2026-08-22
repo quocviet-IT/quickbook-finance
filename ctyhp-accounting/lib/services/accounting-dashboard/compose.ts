@@ -13,6 +13,8 @@ import {
   closeRecommendation,
   type CloseRecommendation,
 } from "@/lib/domain/accounting-dashboard/close-checklist";
+import { formatMoney } from "@/lib/format";
+import { createRequestMemo, type RequestMemo } from "@/lib/services/request-memo";
 import type { CloseReadiness } from "./close-readiness";
 import type { InsightSection } from "./insights";
 import type { AccountingDashboardContext } from "./context";
@@ -67,6 +69,7 @@ export interface AccountingDashboardSections {
   controls: (
     sb: SupabaseClient,
     context: AccountingDashboardContext,
+    memo: RequestMemo,
   ) => Promise<AccountingControl[]>;
   queue: (
     sb: SupabaseClient,
@@ -86,7 +89,13 @@ export interface AccountingDashboardSections {
     sb: SupabaseClient,
     context: AccountingDashboardContext,
     policy: WorkPolicy,
-    controls: readonly AccountingControl[],
+    /**
+     * A promise, not a value. The rules need the controls; the reads behind
+     * them do not, and passing the settled array would serialise two sections
+     * that can overlap almost entirely.
+     */
+    controls: PromiseLike<readonly AccountingControl[]>,
+    memo: RequestMemo,
   ) => Promise<InsightSection>;
   secondary: (
     sb: SupabaseClient,
@@ -120,20 +129,51 @@ export async function composeAccountingDashboard(
 ): Promise<AccountingDashboardData> {
   const context = await sections.context(sb);
 
-  const [controlsResult, queueResult, secondaryResult, stateResult, policyResult] =
-    await Promise.allSettled([
-      sections.controls(sb, context),
-      sections.queue(sb, context),
-      sections.secondary(sb, context),
-      sections.workState(sb),
-      sections.policy(sb),
-    ]);
+  // Created here and dropped when this render ends, so two sections wanting the
+  // same read pay for one. Scoped to the request on purpose: see request-memo.ts.
+  const memo = createRequestMemo();
 
-  // An unreadable policy is the same on screen as an unset one: the rules that
-  // need it stay asleep and say so. Losing the dashboard over a settings read
-  // would be out of all proportion.
-  const policy =
-    policyResult.status === "fulfilled" ? policyResult.value : EMPTY_WORK_POLICY;
+  // Everything below starts now. The only ordering that survives is the one
+  // the data genuinely requires: the rules need the policy and the controls,
+  // and they await those themselves at the moment they need them. Awaiting the
+  // controls out here — which is what this did — put a whole round trip on the
+  // critical path to satisfy an argument list.
+  const policyPromise = sections.policy(sb).catch((reason) => {
+    // An unreadable policy is the same on screen as an unset one: the rules
+    // that need it stay asleep and say so. Losing the dashboard over a settings
+    // read would be out of all proportion.
+    console.error("reading the work policy failed:", reason);
+    return EMPTY_WORK_POLICY;
+  });
+  const controlsPromise = sections.controls(sb, context, memo);
+  // Settled immediately so a slow or failing section can never surface as an
+  // unhandled rejection while its siblings are still in flight.
+  const settled = <T,>(promise: Promise<T>): Promise<PromiseSettledResult<T>> =>
+    promise.then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (reason) => ({ status: "rejected" as const, reason }),
+    );
+
+  const controlsSettled = settled(controlsPromise);
+  // Started here rather than at the end. It needs only the context, so waiting
+  // until the other sections had finished bought nothing but a round trip. In
+  // daily mode it is never started at all: `null` means "not asked for", which
+  // is a different thing from a section that was asked for and failed.
+  const closeSettled =
+    mode === "close" ? settled(sections.close(sb, context)) : Promise.resolve(null);
+  const insightsSettled = settled(
+    policyPromise.then((policy) => sections.insights(sb, context, policy, controlsPromise, memo)),
+  );
+
+  const [queueResult, secondaryResult, stateResult, controlsResult, insightsResult, policy] =
+    await Promise.all([
+      settled(sections.queue(sb, context)),
+      settled(sections.secondary(sb, context)),
+      settled(sections.workState(sb)),
+      controlsSettled,
+      insightsSettled,
+      policyPromise,
+    ]);
 
   // A failed state read costs the lifecycle columns, never the work. An
   // accountant who cannot see who owns an invoice can still see the invoice.
@@ -151,6 +191,12 @@ export async function composeAccountingDashboard(
     secondaryResult,
     "The trend and journal analysis could not be loaded. The work above is unaffected.",
   );
+  // Its own envelope, so a rule engine that throws costs the explanation and
+  // never the work.
+  const insights = envelope(
+    insightsResult,
+    "The explanations could not be worked out. The work and the controls above are unaffected.",
+  );
 
   const queue: SectionEnvelope<PriorityQueueItem[]> =
     queueResult.status === "fulfilled"
@@ -161,6 +207,7 @@ export async function composeAccountingDashboard(
               ...queueResult.value,
             ]),
             state,
+            context,
           ),
           generatedAt: new Date().toISOString(),
           dataState: "fresh",
@@ -170,49 +217,32 @@ export async function composeAccountingDashboard(
           queueResult.reason,
         );
 
-  // The rules run after the controls because most of what they have to say is
-  // about what a control found. They get their own envelope, so a rule engine
-  // that throws costs the explanation and never the work.
-  const insights = await sections
-    .insights(sb, context, policy, controls.data ?? [])
-    .then<SectionEnvelope<InsightSection>>((data) => ({
-      data,
-      generatedAt: new Date().toISOString(),
-      dataState: "fresh",
-    }))
-    .catch((reason) =>
-      failed<InsightSection>(
-        "The explanations could not be worked out. The work and the controls above are unaffected.",
-        reason,
-      ),
-    );
-
-  // The close checklist is fetched only when somebody asked for it. Daily mode
-  // is the common case and it must not pay for a section it does not draw.
-  const close =
-    mode === "close"
-      ? await sections
-          .close(sb, context)
-          .then<SectionEnvelope<CloseReadiness | null>>((data) => ({
-            data,
-            generatedAt: new Date().toISOString(),
-            dataState: "fresh",
-          }))
-          .catch((reason) =>
-            failed<CloseReadiness | null>(
-              "The close checklist could not be worked out, so nothing here says this period is ready.",
-              reason,
-            ),
-          )
-      : null;
-
   // Retire the state of work that has gone, now that the live set is known.
   // This is the one moment it can be known, and it is what stops a dismissal
   // outliving its exception: the key of a trial-balance failure is the same
   // every time it fails, so March's dismissal would otherwise hide April's.
-  if (queue.data) {
-    await sections.retire(sb, queue.data.map((item) => item.key));
-  }
+  //
+  // Run alongside the close checklist rather than after it: one is a write that
+  // nothing else waits on, the other a read that started long ago, and neither
+  // has anything to say to the other.
+  const [closeResult] = await Promise.all([
+    closeSettled,
+    queue.data ? sections.retire(sb, queue.data.map((item) => item.key)) : Promise.resolve(0),
+  ]);
+
+  const close: SectionEnvelope<CloseReadiness | null> | null =
+    closeResult === null
+      ? null
+      : closeResult.status === "fulfilled"
+        ? {
+            data: closeResult.value,
+            generatedAt: new Date().toISOString(),
+            dataState: "fresh",
+          }
+        : failed<CloseReadiness | null>(
+            "The close checklist could not be worked out, so nothing here says this period is ready.",
+            closeResult.reason,
+          );
 
   const oldestOverdue = [...context.overduePeriods].sort((a, b) =>
     a.periodEnd.localeCompare(b.periodEnd),
@@ -247,11 +277,16 @@ export async function composeAccountingDashboard(
 function withState(
   items: DerivedQueueItem[],
   state: Map<string, WorkItemState>,
+  context: AccountingDashboardContext,
 ): PriorityQueueItem[] {
   return items.map((item) => {
     const decided = state.get(item.key);
     return {
       ...item,
+      amountText:
+        item.amountMinor === undefined
+          ? null
+          : formatMoney(item.amountMinor, context.currencyCode, context.currencyDecimals),
       lifecycle: decided?.lifecycle ?? "new",
       ownerId: decided?.ownerId ?? null,
       ownerName: decided?.ownerName ?? null,

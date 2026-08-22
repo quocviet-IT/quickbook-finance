@@ -1,12 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Card, Typography } from "antd";
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  QuestionCircleOutlined,
-  WarningOutlined,
-} from "@ant-design/icons";
+import { Card } from "antd";
+import StatusGlyph, { type GlyphName } from "./StatusGlyph";
 import type {
   AccountingControl,
   ControlStatus,
@@ -22,20 +17,22 @@ import { FreshnessNote, UnavailableNote } from "./DataStateNote";
  * Every row carries an icon, the word for its state, the condition it passes
  * on, and the figure it found. Colour agrees with all of that; it never has to
  * carry it alone, which is the rule the design document sets for status.
+ *
+ * A client component, and measurably right to be one. Making it a Server
+ * Component was tried and reverted: rendering antd from the server graph gives
+ * this route its own copy of the antd client references instead of sharing the
+ * app-wide chunk, and /accounting grew by 21KB gzip for a page that behaves
+ * identically. The measurement is in the Phase 5 plan.
  */
 
 const STATUS_PRESENTATION: Record<
   ControlStatus,
-  { icon: typeof CheckCircleOutlined; word: string; className: string }
+  { glyph: GlyphName; word: string; className: string }
 > = {
-  healthy: { icon: CheckCircleOutlined, word: "Passed", className: styles.healthy },
-  attention: { icon: WarningOutlined, word: "Needs attention", className: styles.attention },
-  blocked: { icon: CloseCircleOutlined, word: "Blocked", className: styles.blocked },
-  unavailable: {
-    icon: QuestionCircleOutlined,
-    word: "Not evaluated",
-    className: styles.unavailable,
-  },
+  healthy: { glyph: "check", word: "Passed", className: styles.healthy },
+  attention: { glyph: "warning", word: "Needs attention", className: styles.attention },
+  blocked: { glyph: "cross", word: "Blocked", className: styles.blocked },
+  unavailable: { glyph: "question", word: "Not evaluated", className: styles.unavailable },
 };
 
 /** Failures first: the rail is read top-down and the top is the alarm. */
@@ -71,13 +68,12 @@ export default function ControlHealthPanel({
         <div className={styles.controlList}>
           {rows.map((control) => {
             const presentation = STATUS_PRESENTATION[control.status];
-            const Icon = presentation.icon;
             return (
               <div
                 key={control.key}
                 className={`${styles.controlRow} ${presentation.className}`}
               >
-                <Icon className={styles.controlIcon} aria-hidden="true" />
+                <StatusGlyph name={presentation.glyph} className={styles.controlIcon} />
                 <div className={styles.controlBody}>
                   <div className={styles.controlHead}>
                     <Link href={control.href} className={styles.controlName}>
@@ -91,12 +87,10 @@ export default function ControlHealthPanel({
                         : ""}
                     </span>
                   </div>
-                  <Typography.Text className={styles.controlDetail}>
-                    {control.detail}
-                  </Typography.Text>
-                  <Typography.Text className={styles.controlPass}>
+                  <span className={styles.controlDetail}>{control.detail}</span>
+                  <span className={styles.controlPass}>
                     Passes when: {control.passCondition}
-                  </Typography.Text>
+                  </span>
                 </div>
               </div>
             );

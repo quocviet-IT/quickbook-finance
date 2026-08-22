@@ -108,4 +108,13 @@ export interface PriorityQueueItem extends DerivedQueueItem {
   dismissReason: string | null;
   /** The concurrency token to send back with a change. Null when untouched. */
   stateVersion: number | null;
+  /**
+   * The amount as the reader sees it, formatted where the currency is known.
+   *
+   * Presentation, deliberately on the item rather than in the browser: the
+   * string never changes while the page is open, and working it out client-side
+   * means shipping a currency formatter to print a fixed number. Null when the
+   * item has no amount — which is not the same as zero.
+   */
+  amountText: string | null;
 }

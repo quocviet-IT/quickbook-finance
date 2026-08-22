@@ -11,7 +11,6 @@ import type {
   SectionEnvelope,
 } from "@/lib/domain/accounting-dashboard/types";
 import { matchesFilter, type QueueFilter } from "@/lib/domain/accounting-dashboard/lifecycle";
-import { formatMoney } from "@/lib/format";
 import type { Assignee } from "./WorkItemActions";
 
 /**
@@ -71,8 +70,6 @@ const FIRST_VIEW = 8;
 
 export default function PriorityWorkQueue({
   queue,
-  currencyCode,
-  currencyDecimals,
   controlsEvaluated,
   viewerId,
   canManage,
@@ -80,8 +77,6 @@ export default function PriorityWorkQueue({
   today,
 }: {
   queue: SectionEnvelope<PriorityQueueItem[]>;
-  currencyCode: string;
-  currencyDecimals: number;
   /** True when the controls actually ran, so an empty queue can be believed. */
   controlsEvaluated: boolean;
   /** Who is looking, so "Mine" can mean somebody. */
@@ -182,9 +177,7 @@ export default function PriorityWorkQueue({
                   ) : null}
                 </span>
                 <span className={styles.queueAmount}>
-                  {item.amountMinor === undefined
-                    ? "—"
-                    : formatMoney(item.amountMinor, currencyCode, currencyDecimals)}
+                  {item.amountText ?? "—"}
                 </span>
                 <Link href={item.href} className={styles.queueAction}>
                   <Button size="small" type="primary" ghost>

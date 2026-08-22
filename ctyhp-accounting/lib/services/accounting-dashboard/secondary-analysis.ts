@@ -1,17 +1,29 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildProfitAndLoss } from "@/lib/domain/reports";
 import { listJournalEntries } from "@/lib/services/journal";
-import { getDashboardAnalytics } from "@/lib/services/dashboard";
-import { trailingMonthWindows } from "@/lib/domain/work-area-overview";
+import { trailingMonthRanges } from "@/lib/services/dashboard";
+import { getMonthlyLedgerBalances } from "@/lib/services/reports";
 import type { AccountingDashboardContext } from "./context";
 
 /**
  * The analysis an accountant reaches for *after* the work — trends, where the
  * journals came from, what happened lately.
  *
- * This section is the expensive one: twelve months of journal entries and the
- * whole dashboard analytics bundle. That is exactly why it is a section of its
- * own. It is fetched last, rendered collapsed, and when it fails the queue and
- * the controls above it do not even notice.
+ * This section is the expensive one, which is why it is a section of its own:
+ * fetched last, rendered below the fold, and when it fails the queue and the
+ * controls above it do not notice.
+ *
+ * It used to be far more expensive than it needed to be. It called
+ * `getDashboardAnalytics` — the entire payload the *main* dashboard is built
+ * from — and kept one field of it. Everything else was fetched and waited for
+ * and discarded: the metrics, the period comparison, cash flow, inventory, the
+ * operating pulse, the audit trail, and a second copy of the work queue this
+ * page had already loaded. Behind that field, `getMonthlyPerformance` issued
+ * one ledger query per month and awaited twelve round trips to draw one chart.
+ *
+ * Now: one aggregate call for the window (0121), and the same
+ * `buildProfitAndLoss` that every other report uses, run over each month's rows
+ * here rather than reimplemented in SQL.
  */
 
 export interface TrendPoint {
@@ -43,14 +55,17 @@ export interface SecondaryAnalysis {
   recentEntries: RecentEntry[];
 }
 
+const TREND_MONTHS = 12;
+
 export async function getSecondaryAnalysis(
   sb: SupabaseClient,
   context: AccountingDashboardContext,
 ): Promise<SecondaryAnalysis> {
   const { asOf } = context;
-  const [analytics, journals] = await Promise.all([
-    getDashboardAnalytics(sb, asOf),
-    listJournalEntries(sb, { from: trailingMonthWindows(asOf, 12)[0].from, to: asOf }),
+  const ranges = trailingMonthRanges(asOf, TREND_MONTHS);
+  const [byMonth, journals] = await Promise.all([
+    getMonthlyLedgerBalances(sb, asOf, TREND_MONTHS),
+    listJournalEntries(sb, { from: ranges[0].from, to: asOf }),
   ]);
 
   const counts = new Map<string, number>();
@@ -59,12 +74,7 @@ export async function getSecondaryAnalysis(
   }
 
   return {
-    trend: analytics.monthlyPerformance.map((point) => ({
-      key: point.key,
-      label: point.label,
-      incomeMinor: point.incomeMinor,
-      expenseMinor: point.expenseMinor,
-    })),
+    trend: monthlyTrend(ranges, byMonth),
     sourceMix: [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
@@ -83,6 +93,30 @@ export async function getSecondaryAnalysis(
           : humanise(journal.status),
     })),
   };
+}
+
+/**
+ * The twelve months, in order, whether or not each one had any postings.
+ *
+ * The caller asked for a window and gets the whole window back: a quiet month
+ * is a zero on the chart, not a gap that shifts every later bar one place to
+ * the left. The database returns only months that have rows, deliberately —
+ * teaching it which months were asked for would mean teaching it the calendar.
+ */
+export function monthlyTrend(
+  ranges: readonly { key: string; label: string }[],
+  byMonth: ReadonlyMap<string, Parameters<typeof buildProfitAndLoss>[0]>,
+): TrendPoint[] {
+  return ranges.map((range) => {
+    const pnl = buildProfitAndLoss(byMonth.get(range.key) ?? []);
+    return {
+      key: range.key,
+      label: range.label,
+      incomeMinor: pnl.income.total + pnl.otherIncome.total,
+      expenseMinor:
+        pnl.costOfGoodsSold.total + pnl.operatingExpenses.total + pnl.otherExpenses.total,
+    };
+  });
 }
 
 function humanise(value: string): string {

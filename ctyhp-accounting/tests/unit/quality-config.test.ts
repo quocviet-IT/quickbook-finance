@@ -34,7 +34,7 @@ import {
 } from "../../scripts/quality/run-runtime.mjs";
 
 describe("quality configuration", () => {
-  it("exposes five runnable quality operations through npm", () => {
+  it("exposes six runnable quality operations through npm", () => {
     const npmCli = process.env.npm_execpath;
     expect(npmCli).toBeTruthy();
     const listed = spawnSync(process.execPath, [npmCli!, "run", "--json"], {
@@ -49,6 +49,7 @@ describe("quality configuration", () => {
     expect(qualityScripts).toEqual({
       "quality:bundle": "node scripts/quality/run-bundle.mjs",
       "quality:runtime": "node --env-file-if-exists=.env.local scripts/quality/run-runtime.mjs",
+      "quality:budget": "node scripts/quality/run-budget.mjs",
       "quality:report": "node scripts/quality/report.mjs",
       "quality:all": "npm run quality:bundle && npm run quality:runtime",
       "quality:accept-baseline": "node scripts/quality/accept-baseline.mjs",
@@ -62,6 +63,7 @@ describe("quality configuration", () => {
     expect([...entryPoints].sort()).toEqual([
       "scripts/quality/accept-baseline.mjs",
       "scripts/quality/report.mjs",
+      "scripts/quality/run-budget.mjs",
       "scripts/quality/run-bundle.mjs",
       "scripts/quality/run-runtime.mjs",
     ]);

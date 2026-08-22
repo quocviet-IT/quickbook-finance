@@ -11,6 +11,11 @@ function measurementsFor(report) {
     ...report.routes.map((route) => ({
       key: `bundle.route.${route.route}.gzipBytes`, kind: "bundle", value: route.gzipBytes,
     })),
+    // Tracked separately from the route total on purpose: see the note in
+    // bundle.mjs. This is the part a page's own design can actually move.
+    ...report.routes.map((route) => ({
+      key: `bundle.owned.${route.route}.gzipBytes`, kind: "bundle", value: route.owned.gzipBytes,
+    })),
     ...report.chunks.map((chunk) => ({
       key: `bundle.chunk.${chunk.chunk}.gzipBytes`,
       kind: "bundle",

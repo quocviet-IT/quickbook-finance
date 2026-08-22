@@ -158,11 +158,24 @@ export function analyzeBundle(nextDir) {
   const routes = [...routeChunks.entries()].map(([route, routeChunkSet]) => {
     const routeChunkNames = [...routeChunkSet].sort();
     const details = routeChunkNames.map((chunk) => chunkDetails.get(chunk));
+    // What this route alone loads. The route total is dominated by chunks every
+    // screen shares, so it barely moves whatever one page does to itself — and
+    // a figure that cannot move is a figure nobody can be held to. This one can:
+    // it is the code that exists because this page exists.
+    const ownedChunkNames = routeChunkNames.filter(
+      (chunk) => chunkUsage.get(chunk)?.size === 1,
+    );
+    const ownedDetails = ownedChunkNames.map((chunk) => chunkDetails.get(chunk));
     return {
       route,
       chunks: routeChunkNames,
       bytes: details.reduce((total, detail) => total + detail.bytes, 0),
       gzipBytes: details.reduce((total, detail) => total + detail.gzipBytes, 0),
+      owned: {
+        chunks: ownedChunkNames,
+        bytes: ownedDetails.reduce((total, detail) => total + detail.bytes, 0),
+        gzipBytes: ownedDetails.reduce((total, detail) => total + detail.gzipBytes, 0),
+      },
     };
   }).sort((left, right) => left.route.localeCompare(right.route));
   const sharedChunks = chunks.filter((chunk) => chunk.routes.length > 1);

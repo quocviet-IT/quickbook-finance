@@ -2,8 +2,7 @@
 import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Alert, Button, Card, Segmented } from "antd";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Alert, Card } from "antd";
 import type { AccountingDashboardData } from "@/lib/services/accounting-dashboard";
 import type { Assignee } from "./WorkItemActions";
 import styles from "./accounting-dashboard.module.css";
@@ -55,9 +54,6 @@ export default function AccountingDashboard({
   assignees: Assignee[];
 }) {
   const { context, controls, queue, insights, secondary, close, recommendation, mode } = data;
-  const router = useRouter();
-  const params = useSearchParams();
-
   // Who holds each blocking control, so the close panel can put the person on
   // the same row as the problem. Taken from the work the queue already carries
   // rather than fetched again — the close step and the queue item are two
@@ -69,14 +65,6 @@ export default function AccountingDashboard({
     }
     return byKey;
   }, [queue]);
-
-  function switchMode(next: string | number) {
-    const search = new URLSearchParams(params?.toString() ?? "");
-    if (next === "close") search.set("mode", "close");
-    else search.delete("mode");
-    const query = search.toString();
-    router.push(query ? `/accounting?${query}` : "/accounting");
-  }
 
   // Freshness is judged in the browser, against the reader's own clock: a
   // server-rendered page left open for an hour is stale even though nothing
@@ -116,14 +104,26 @@ export default function AccountingDashboard({
       />
 
       <div className={styles.modeBar}>
-        <Segmented
-          value={mode}
-          onChange={switchMode}
-          options={[
-            { label: "Daily", value: "daily" },
-            { label: "Period close", value: "close" },
-          ]}
-        />
+        {/* Links, not a control. The mode lives in the URL, so it is already a
+            place rather than a state — and a link is bookmarkable, shareable,
+            openable in a new tab, and needs no JavaScript to work. A Segmented
+            here would have been a button pretending to be a link. */}
+        <nav className={styles.modeToggle} aria-label="Dashboard mode">
+          <Link
+            href="/accounting"
+            className={styles.modeOption}
+            aria-current={mode === "daily" ? "page" : undefined}
+          >
+            Daily
+          </Link>
+          <Link
+            href="/accounting?mode=close"
+            className={styles.modeOption}
+            aria-current={mode === "close" ? "page" : undefined}
+          >
+            Period close
+          </Link>
+        </nav>
         {/* Recommended, never forced. The screen does not know what somebody
             came here to do, and switching the layout under them because a date
             passed would be the page deciding that for them. */}
@@ -134,9 +134,9 @@ export default function AccountingDashboard({
             showIcon
             message={recommendation.reason}
             action={
-              <Button size="small" onClick={() => switchMode("close")}>
+              <Link href="/accounting?mode=close" className={styles.modeStart}>
                 Start the close
-              </Button>
+              </Link>
             }
           />
         ) : null}
@@ -162,10 +162,10 @@ export default function AccountingDashboard({
 
       <div className={styles.body}>
         <div className={styles.queueColumn}>
+          {/* No currency props: each item arrives with its amount already
+              written, formatted on the server where the currency is known. */}
           <PriorityWorkQueue
             queue={queue}
-            currencyCode={context.currencyCode}
-            currencyDecimals={context.currencyDecimals}
             controlsEvaluated={controls.dataState !== "unavailable"}
             viewerId={viewerId}
             canManage={canManage}

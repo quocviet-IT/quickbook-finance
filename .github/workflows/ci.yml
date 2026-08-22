@@ -62,6 +62,14 @@ jobs:
         env:
           QUALITY_MODE: report
 
+      # The report above measures and never fails, which is right for an audit
+      # and useless as a guard. This one refuses: it compares the same artifact
+      # against the ceilings in tests/quality/budgets.json and fails the build
+      # when one is crossed. Needs only the build — no server, no sign-in, no
+      # clock — so it runs on every push rather than weekly.
+      - name: Bundle budget gate
+        run: npm run quality:budget
+
       - name: Upload quality report
         if: always()
         uses: actions/upload-artifact@v4

@@ -41,6 +41,36 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.58",
+    date: "2026-08-22",
+    headline: "The accounting screen asks the database less than half as much.",
+    changes: [
+      {
+        kind: "changed",
+        title: "The twelve-month chart is one question, not twelve",
+        detail:
+          "Drawing the trend used to run one query per month and wait for all "
+          + "twelve. It is now a single call, and every figure it produces was "
+          + "compared against the old path month by month before the old one was "
+          + "removed. A page load asks the database 25 things where it used to "
+          + "ask 61.",
+        route: "/accounting",
+      },
+      {
+        kind: "fixed",
+        title: "Ageing reconciled against the wrong day",
+        detail:
+          "The receivables and payables ageing reports checked their total "
+          + "against the control account using the server's date rather than the "
+          + "company's. For a company on New York time that is tomorrow from 8pm "
+          + "local. The two figures matched unless somebody had post-dated an "
+          + "entry, which is why it went unnoticed. Every figure on the "
+          + "accounting screen now speaks for the same day.",
+        route: "/accounting",
+      },
+    ],
+  },
+  {
     version: "1.57",
     date: "2026-08-21",
     headline: "Closing a month, with the checking done for you.",
