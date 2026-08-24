@@ -142,7 +142,6 @@ export default function UsersClient({
         rowKey="id"
         dataSource={users}
         pagination={false}
-        scroll={{ x: "max-content" }}
         locale={{ emptyText: "No users yet" }}
         columns={[
           {

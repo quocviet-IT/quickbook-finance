@@ -158,7 +158,6 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
         dataSource={rows}
         loading={loading}
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(AUDIT_DEFAULT_PAGE_SIZE))}
-        scroll={{ x: "max-content" }}
         locale={{ emptyText: ran ? "No matching audit entries" : "Set a filter and search" }}
         expandable={{
           expandedRowRender: (r) => (

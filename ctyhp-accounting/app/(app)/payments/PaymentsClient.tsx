@@ -25,6 +25,8 @@ import AttachmentDrawer, {
   type AttachmentTarget,
 } from "@/components/documents/AttachmentDrawer";
 import IconActionButton from "@/components/ui/IconActionButton";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import type {
   AccountRow,
   ActorRow,
@@ -180,11 +182,26 @@ export default function PaymentsClient({
   }
 
   const columns: TableColumnsType<PaymentListRow> = [
-    { title: "Number", dataIndex: "payment_number", width: 120, render: (n) => n ?? "—" },
-    { title: "Customer", dataIndex: "customer_name" },
-    { title: "Date", dataIndex: "payment_date", width: 120 },
-    { title: "Method", dataIndex: "method", width: 130, render: (m) => m ?? "—" },
-    { title: "Reference", dataIndex: "reference", width: 140, render: (r) => r ?? "—" },
+    { title: "Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (n) => n ?? "—" },
+    {
+      // The elastic column. Method and Reference were 270px between them and
+      // are facts about this payment rather than columns anybody scans, so
+      // they read underneath it.
+      ...flexColumn<PaymentListRow>({
+        title: "Customer",
+        key: "customer_name",
+        render: (_: unknown, r: PaymentListRow) => (
+          <div style={{ minWidth: 0 }}>
+            <span title={r.customer_name}>{r.customer_name}</span>
+            {secondaryLine(
+              [r.method, r.reference ? `Ref ${r.reference}` : null].filter(Boolean).join(" · ") ||
+                "No method recorded",
+            )}
+          </div>
+        ),
+      }),
+    },
+    { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE },
     {
       title: "Amount",
       dataIndex: "amount_minor",
@@ -283,7 +300,6 @@ export default function PaymentsClient({
         dataSource={visiblePayments}
         size="small"
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAYMENTS_DEFAULT_PAGE_SIZE))}
-        scroll={{ x: "max-content" }}
         sticky
       />
 

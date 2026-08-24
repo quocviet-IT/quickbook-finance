@@ -189,8 +189,7 @@ export default function ApprovalsClient({
             request.id === initialFocusId ? "accounting-data-row--focused" : ""
           }
           pagination={false}
-          scroll={{ x: "max-content" }}
-          locale={{ emptyText: "Nothing waiting for a decision" }}
+            locale={{ emptyText: "Nothing waiting for a decision" }}
           columns={[
             ...commonColumns,
             {
@@ -241,8 +240,7 @@ export default function ApprovalsClient({
             setDecidedPageSize,
             pageSizeOptionsFor(DECIDED_DEFAULT_PAGE_SIZE),
           )}
-          scroll={{ x: "max-content" }}
-          locale={{ emptyText: "No decisions yet" }}
+            locale={{ emptyText: "No decisions yet" }}
           columns={[
             ...commonColumns,
             {
