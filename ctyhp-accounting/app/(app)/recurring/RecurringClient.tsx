@@ -36,6 +36,7 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import IconActionButton from "@/components/ui/IconActionButton";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -431,10 +432,14 @@ export default function RecurringClient({
     {
       title: "Actions",
       key: "actions",
-      width: 160,
+      // "Generate next" and "Pause" side by side measure about 214px, and
+      // under a fixed layout a cell whose content will not fit simply spills
+      // past its column — the table then reports 54px of overflow even though
+      // every declared width adds up. Icons, with the words in their tooltips.
+      width: 100,
       align: "right",
       render: (_, template) => (
-        <Space>
+        <Space size={4}>
           <Popconfirm
             title={`Generate the ${dayjs(template.next_run_date).format("MMM D, YYYY")} occurrence?`}
             description={
@@ -444,28 +449,24 @@ export default function RecurringClient({
             }
             onConfirm={() => void generate(template)}
           >
-            <Button
-              size="small"
+            <IconActionButton
+              label="Generate the next occurrence"
               type="primary"
               icon={<PlayCircleOutlined />}
               loading={busyKey === `run-${template.id}`}
               disabled={!canManage || template.status !== "active"}
-            >
-              Generate next
-            </Button>
+            />
           </Popconfirm>
           {template.status !== "ended" ? (
-            <Button
-              size="small"
+            <IconActionButton
+              label={template.status === "active" ? "Pause this schedule" : "Resume this schedule"}
               icon={
                 template.status === "active" ? <PauseCircleOutlined /> : <ReloadOutlined />
               }
               loading={busyKey === `status-${template.id}`}
               disabled={!canManage}
               onClick={() => void changeStatus(template)}
-            >
-              {template.status === "active" ? "Pause" : "Resume"}
-            </Button>
+            />
           ) : null}
         </Space>
       ),

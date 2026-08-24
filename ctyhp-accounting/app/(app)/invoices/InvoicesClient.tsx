@@ -526,7 +526,9 @@ export default function InvoicesClient({
         a.customer_name.localeCompare(b.customer_name),
     },
     {
-      title: "Issue date",
+      // "Issue date" wrapped onto two lines inside the date token and made
+      // every heading row taller; the one-word form says the same thing.
+      title: "Issued",
       dataIndex: "issue_date",
       width: COLUMN.DATE,
       sorter: (a, b) => a.issue_date.localeCompare(b.issue_date),

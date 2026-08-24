@@ -90,7 +90,7 @@ export default function BackupsClient({
       render: (value: number | null) => (value === null ? "—" : value.toLocaleString("en-US")),
     },
     actionsColumn<BackupRow>({
-      width: canRestore ? 190 : COLUMN.CODE,
+      width: canRestore ? 160 : COLUMN.CODE,
       actions: (row) => [
         <Button
           key="download"
@@ -102,9 +102,12 @@ export default function BackupsClient({
           Download
         </Button>,
         canRestore ? (
+          // "Restore as new company" spelled out measured wider than the whole
+          // column, and a cell that will not fit spills past it under a fixed
+          // layout. The sentence lives on the page it opens.
           <Link key="restore" href={`/settings/backups/${row.id}/restore`}>
             <Button size="small" disabled={row.status !== "stored"}>
-              Restore as new company
+              Restore
             </Button>
           </Link>
         ) : null,
