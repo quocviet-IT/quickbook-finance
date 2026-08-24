@@ -134,15 +134,16 @@ export default function BankTransactionsTable({
       width: widths.date ?? COLUMN.DATE,
     },
     {
-      // Elastic: no width until the reader drags one, so it takes whatever the
-      // measured columns leave. Its second line carries the account source and
-      // the reference, which used to be columns of their own.
+      // The elastic column, and the only one that never takes a width:
+      // something has to absorb the remainder or the row total stops being the
+      // box, and the column holding text somebody typed is the one that should
+      // grow. Its second line carries the account source and the reference,
+      // which used to be columns of their own.
       ...flexColumn<BankReviewTableRow>({
         title: "Description",
         key: "description",
         render: (_value: unknown, row: BankReviewTableRow) => <DescriptionCell row={row} />,
       }),
-      ...(widths.description === undefined ? null : { width: widths.description }),
     },
     {
       title: "Amount",
@@ -173,32 +174,33 @@ export default function BankTransactionsTable({
       ),
     },
     {
-      // The last elastic column, and the only one that never takes a width:
-      // something has to absorb the remainder or the row total stops being the
-      // box. It leads with the status tag that used to be its own column.
-      ...flexColumn<BankReviewTableRow>({
-        title: "Match",
-        key: "match",
-        floor: COLUMN.RICH_MIN,
-        render: (_value: unknown, row: BankReviewTableRow) => (
-          <MatchCell
-            row={row}
-            canWrite={canWrite}
-            busy={busy}
-            statusTag={
-              <Space size={4}>
-                <Tag color={TXN_STATUS[row.transaction.status].color}>
-                  {TXN_STATUS[row.transaction.status].text}
-                </Tag>
-                {row.transaction.pending ? <Tag>Pending</Tag> : null}
-              </Space>
-            }
-            onSettle={onSettle}
-            onApprove={onApprove}
-            onReject={onReject}
-          />
-        ),
-      }),
+      // Measured, at exactly the floor its controls need: a tag, a line of
+      // text and up to three buttons. Left elastic in the first cut of this,
+      // and the screenshot showed the mistake — 340px spent rendering the word
+      // "Matched" while the description beside it was cut mid-reference. It
+      // leads with the status tag that used to be a column of its own, out
+      // past the right-hand edge.
+      title: "Match",
+      key: "match",
+      width: widths.match ?? COLUMN.RICH_MIN,
+      render: (_value: unknown, row: BankReviewTableRow) => (
+        <MatchCell
+          row={row}
+          canWrite={canWrite}
+          busy={busy}
+          statusTag={
+            <Space size={4}>
+              <Tag color={TXN_STATUS[row.transaction.status].color}>
+                {TXN_STATUS[row.transaction.status].text}
+              </Tag>
+              {row.transaction.pending ? <Tag>Pending</Tag> : null}
+            </Space>
+          }
+          onSettle={onSettle}
+          onApprove={onApprove}
+          onReject={onReject}
+        />
+      ),
     },
   ];
 

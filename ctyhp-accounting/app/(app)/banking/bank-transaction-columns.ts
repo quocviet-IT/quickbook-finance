@@ -25,13 +25,17 @@ export type BankColumnKey = (typeof BANK_COLUMN_KEYS)[number];
  * The columns whose content has a known length. Anything not named here is
  * elastic: it carries no width and absorbs what these leave.
  *
- * `description` is absent on purpose even though it is resizable — it starts
- * elastic, and dragging it is what gives it a width for the first time.
+ * Match is measured, at exactly the floor its controls need. The first cut of
+ * this left Match elastic, and the screenshot showed why that was wrong: it
+ * took 340px to render the word "Matched" while the description beside it was
+ * cut mid-reference. The column that should grow is the one holding text
+ * somebody typed.
  */
 export const BANK_MEASURED_WIDTHS: Partial<Record<BankColumnKey, number>> = {
   date: COLUMN.DATE,
   amount: COLUMN.MONEY,
   category: COLUMN.PICKER,
+  match: COLUMN.RICH_MIN,
 };
 
 /**
@@ -41,24 +45,25 @@ export const BANK_MEASURED_WIDTHS: Partial<Record<BankColumnKey, number>> = {
  * number that happens to be close to it: there is always exactly one column
  * absorbing the remainder.
  */
-export const BANK_LAST_ELASTIC_KEY: BankColumnKey = "match";
+export const BANK_LAST_ELASTIC_KEY: BankColumnKey = "description";
 
 /**
- * Floors. Description may be dragged and so needs one; Category holds a select
- * that cannot shrink past its own arrow.
+ * Floors. Category holds a select that cannot shrink past its own arrow, and
+ * Match holds a tag, a line of text and up to three buttons — below 240 those
+ * stack into the broken pile a reader screenshotted in August.
  */
 export const BANK_MIN_WIDTHS: Partial<Record<BankColumnKey, number>> = {
-  description: COLUMN.TEXT_MIN,
   category: COLUMN.PICKER,
+  match: COLUMN.RICH_MIN,
 };
 
 /**
  * The delete button, the attachments button and the selection checkbox — plus
- * what Match needs at its narrowest, which is the floor a drag stops at.
+ * what the description needs at its narrowest, which is where a drag stops.
  */
 export const BANK_BUDGET = {
   chrome: COLUMN.ACTION * 2 + COLUMN.SELECTION,
-  elasticFloor: COLUMN.RICH_MIN,
+  elasticFloor: COLUMN.TEXT_MIN,
 };
 
 /** Where this reader's own widths are kept. */

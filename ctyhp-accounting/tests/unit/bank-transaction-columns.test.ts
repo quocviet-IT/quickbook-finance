@@ -37,12 +37,16 @@ describe("the bank transactions columns", () => {
     expect(BANK_BUDGET.chrome).toBe(COLUMN.ACTION * 2 + COLUMN.SELECTION);
   });
 
-  it("leaves Match without a width, so something absorbs the remainder", () => {
-    // The last elastic column never takes a width of its own. That is what
-    // keeps the row total pinned to the box whatever else the reader drags.
-    expect(BANK_LAST_ELASTIC_KEY).toBe("match");
-    expect(BANK_MEASURED_WIDTHS).not.toHaveProperty("match");
-    expect(BANK_BUDGET.elasticFloor).toBe(COLUMN.RICH_MIN);
+  it("leaves the description without a width, so something absorbs the remainder", () => {
+    // The elastic column never takes a width of its own, which is what keeps
+    // the row total pinned to the box whatever else the reader drags. It is
+    // the description and not Match: the first cut had that the other way
+    // round and spent 340px rendering the word "Matched" beside a description
+    // cut mid-reference.
+    expect(BANK_LAST_ELASTIC_KEY).toBe("description");
+    expect(BANK_MEASURED_WIDTHS).not.toHaveProperty("description");
+    expect(BANK_MEASURED_WIDTHS.match).toBe(COLUMN.RICH_MIN);
+    expect(BANK_BUDGET.elasticFloor).toBe(COLUMN.TEXT_MIN);
   });
 
   it("reads its widths from a new key, and names the one it replaces", () => {

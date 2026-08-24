@@ -57,9 +57,12 @@ export default function MatchCell({
     return (
       <Space direction="vertical" size={4}>
         {statusTag}
-        <Typography.Text type="secondary">
-          {row.transaction.status === "matched" ? "Matched" : "No suggestion"}
-        </Typography.Text>
+        {/* The tag above already says "Matched" — repeating the word underneath
+            it was the first thing visible in the screenshot of this rework. A
+            line with no suggestion still says so, because that is news. */}
+        {row.transaction.status === "matched" ? null : (
+          <Typography.Text type="secondary">No suggestion</Typography.Text>
+        )}
         {settleButton}
       </Space>
     );
