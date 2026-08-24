@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
@@ -160,11 +162,14 @@ export default function ExpensesClient({
         emptyTitle={keyword || statusFilter !== "all" ? "No expenses match these filters" : "No expenses yet"}
         emptyDescription="Record money already paid from a bank or credit card account."
         columns={[
-          { title: "Expense Number", dataIndex: "expense_number", render: (v) => v ?? "—" },
-          { title: "Vendor", dataIndex: "vendor_name" },
-          { title: "Date", dataIndex: "expense_date" },
-          { title: "Total", dataIndex: "total_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
-          { title: "Status", dataIndex: "status", render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag> },
+          { title: "Expense Number", dataIndex: "expense_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
+          // The elastic column: a vendor name is text somebody typed, so it
+          // takes whatever the measured columns leave rather than a number
+          // picked in advance.
+          flexColumn<ExpenseWithVendor>({ title: "Vendor", dataIndex: "vendor_name" }),
+          { title: "Date", dataIndex: "expense_date", width: COLUMN.DATE },
+          { title: "Total", dataIndex: "total_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag> },
           {
             title: "Actions",
             key: "actions",

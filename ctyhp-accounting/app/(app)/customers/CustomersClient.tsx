@@ -13,11 +13,12 @@ import {
   Switch,
   Tag,
   Tooltip,
-  Typography,
   type TableColumnsType,
 } from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { CustomerRow } from "@/lib/db/types";
@@ -139,41 +140,30 @@ export default function CustomersClient({
 
   const columns: TableColumnsType<CustomerRow> = [
     {
-      // Name and email in one cell: two columns of text pushed the credit
-      // figures off the right-hand edge, and nobody sorts on an address.
-      title: "Customer",
-      dataIndex: "name",
-      render: (name: string, row) => (
-        <div>
-          <div>{name}</div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {row.email ?? "No email"}
-          </Typography.Text>
-        </div>
-      ),
-    },
-    {
-      title: "Location",
-      width: 150,
-      render: (_, row) => {
-        const lines = formatPostalAddress(row);
-        if (lines.length === 0) {
-          // An invoice for a customer without an address prints without a
-          // "Bill to" block, so the gap is worth showing here.
-          return <Tag color="orange">No address</Tag>;
-        }
-        const city = [row.city, row.region].filter(Boolean).join(", ");
-        return (
-          <Tooltip title={lines.join(" · ")}>
-            <span>{city || lines[0]}</span>
-          </Tooltip>
-        );
-      },
+      // Name, email and where they are, in one elastic cell. Two columns of
+      // text used to push the credit figures off the right-hand edge, and
+      // nobody sorts on an address.
+      ...flexColumn<CustomerRow>({
+        title: "Customer",
+        key: "name",
+        render: (_: unknown, row: CustomerRow) => {
+          const lines = formatPostalAddress(row);
+          const city = [row.city, row.region].filter(Boolean).join(", ");
+          const where = lines.length === 0 ? "No address" : city || lines[0];
+          return (
+            <div style={{ minWidth: 0 }}>
+              <span title={row.name}>{row.name}</span>
+              {secondaryLine(`${row.email ?? "No email"} · ${where}`)}
+            </div>
+          );
+        },
+      }),
+      sorter: (a: CustomerRow, b: CustomerRow) => a.name.localeCompare(b.name),
     },
     {
       title: "Credit limit",
       key: "credit_limit",
-      width: 120,
+      width: COLUMN.MONEY,
       align: "right",
       render: (_, row) =>
         row.credit_limit_minor === null ? (
@@ -187,14 +177,14 @@ export default function CustomersClient({
     {
       title: "Owed now",
       key: "balance",
-      width: 120,
+      width: COLUMN.MONEY,
       align: "right",
       render: (_, row) => money(creditByCustomer.get(row.id)?.openBalanceMinor ?? 0),
     },
     {
       title: "Available",
       key: "available",
-      width: 120,
+      width: COLUMN.MONEY,
       align: "right",
       render: (_, row) => {
         const available = creditByCustomer.get(row.id)?.status.availableMinor ?? null;
@@ -209,7 +199,7 @@ export default function CustomersClient({
     {
       title: "Credit status",
       key: "credit_status",
-      width: 160,
+      width: 140,
       render: (_, row) => {
         const status = creditByCustomer.get(row.id)?.status;
         if (!status) return "\u2014";

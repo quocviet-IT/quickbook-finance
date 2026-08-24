@@ -19,6 +19,8 @@ import {
   StopOutlined,
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import ClassifyAccountsButton from "./ClassifyAccountsButton";
 import IconActionButton from "@/components/ui/IconActionButton";
@@ -159,44 +161,65 @@ export default function AccountsClient({
   }
 
   const columns: TableColumnsType<AccountRow> = [
-    { title: "Code", dataIndex: "account_code", width: 90, sorter: (a, b) => a.account_code.localeCompare(b.account_code) },
     {
-      title: "Account name",
-      dataIndex: "name",
-      render: (name: string, row) => (
-        <span>
-          {row.parent_account_id ? <span style={{ color: TOKENS.text.secondary }}>↳ </span> : null}
-          {name}
-        </span>
-      ),
+      title: "Code",
+      dataIndex: "account_code",
+      width: COLUMN.CODE,
+      sorter: (a, b) => a.account_code.localeCompare(b.account_code),
+    },
+    {
+      // The elastic column. Four columns used to follow it — Detail, Cash
+      // flow, Normal and Statement, 570px between them — each printing a fact
+      // derived from the account's own type. They read under the name now,
+      // where they qualify it, and the table fits the screen.
+      ...flexColumn<AccountRow>({
+        title: "Account name",
+        key: "name",
+        render: (_: unknown, row: AccountRow) => {
+          const detail =
+            row.account_type === "bank" ? bankDetailLabel(row.detail_type) : row.detail_type;
+          const under = [
+            detail,
+            CASH_FLOW_ROLE_LABELS[row.cash_flow_role],
+            normalBalanceOf(row.account_type) === "debit" ? "Debit normal" : "Credit normal",
+            statementSectionOf(row.account_type) === "balance_sheet"
+              ? "Balance Sheet"
+              : "Profit & Loss",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <div style={{ minWidth: 0 }}>
+              <span title={row.name}>
+                {row.parent_account_id ? (
+                  <span style={{ color: TOKENS.text.secondary }}>↳ </span>
+                ) : null}
+                {row.name}
+              </span>
+              {secondaryLine(under)}
+            </div>
+          );
+        },
+      }),
+      sorter: (a: AccountRow, b: AccountRow) => a.name.localeCompare(b.name),
     },
     {
       title: "Type",
       dataIndex: "account_type",
+      width: 150,
       render: (t: AccountType) => <Tag>{ACCOUNT_TYPE_LABEL[t]}</Tag>,
       filters: ACCOUNT_TYPES.map((t) => ({ text: ACCOUNT_TYPE_LABEL[t], value: t })),
       onFilter: (value, row) => row.account_type === value,
     },
     {
-      title: "Detail",
-      dataIndex: "detail_type",
-      width: 160,
-      render: (detail: string | null, row) =>
-        row.account_type === "bank" ? (
-          <Tag color={detail ? "blue" : "orange"}>{bankDetailLabel(detail)}</Tag>
-        ) : (
-          (detail ?? "—")
-        ),
-    },
-    {
+      // The filter stays on the row even though the value now reads on the
+      // second line: it is how a reader finds every unclassified account,
+      // which is the one question this column is asked.
       title: "Cash flow",
       dataIndex: "cash_flow_role",
-      width: 190,
-      render: (role: CashFlowRole) => (
-        <Tag color={role === "unclassified" ? "orange" : "blue"}>
-          {CASH_FLOW_ROLE_LABELS[role]}
-        </Tag>
-      ),
+      width: COLUMN.STATUS,
+      render: (role: CashFlowRole) =>
+        role === "unclassified" ? <Tag color="orange">Unclassified</Tag> : <Tag color="blue">Set</Tag>,
       filters: CASH_FLOW_ROLES.map((role) => ({
         text: CASH_FLOW_ROLE_LABELS[role],
         value: role,
@@ -204,24 +227,9 @@ export default function AccountsClient({
       onFilter: (value, row) => row.cash_flow_role === value,
     },
     {
-      title: "Normal",
-      dataIndex: "account_type",
-      key: "normal",
-      width: 80,
-      render: (t: AccountType) => (normalBalanceOf(t) === "debit" ? "Debit" : "Credit"),
-    },
-    {
-      title: "Statement",
-      dataIndex: "account_type",
-      key: "statement",
-      width: 140,
-      render: (t: AccountType) =>
-        statementSectionOf(t) === "balance_sheet" ? "Balance Sheet" : "Profit & Loss",
-    },
-    {
       title: "Status",
       dataIndex: "status",
-      width: 110,
+      width: COLUMN.STATUS,
       render: (s: AccountStatus) => <Tag color={STATUS_LABELS[s].color}>{STATUS_LABELS[s].text}</Tag>,
     },
     ...(canWrite
@@ -229,7 +237,8 @@ export default function AccountsClient({
           {
             title: "Actions",
             key: "actions",
-            width: 90,
+            width: COLUMN.ACTION * 2,
+            align: "right" as const,
             render: (_: unknown, row: AccountRow) => (
               <Space size={4}>
                 <IconActionButton

@@ -19,6 +19,8 @@ import {
 } from "antd";
 import { DeleteOutlined, MoreOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import IconActionButton from "@/components/ui/IconActionButton";
@@ -296,38 +298,53 @@ export default function BillsClient({
             : "Enter a vendor bill to track Accounts Payable and due dates."
         }
         columns={[
-          { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? <Tag>draft</Tag> },
-          { title: "Vendor", dataIndex: "vendor_name" },
-          { title: "Vendor Reference", dataIndex: "vendor_ref", render: (v) => v ?? "—" },
-          { title: "Date", dataIndex: "bill_date" },
-          { title: "Due", dataIndex: "due_date", render: (v) => v ?? "—" },
+          { title: "Bill Number", dataIndex: "bill_number", width: COLUMN.CODE, render: (v) => v ?? <Tag>draft</Tag> },
+          {
+            // The elastic column. Its second line carries the vendor's own
+            // reference and the journal entry, which were columns of their own
+            // and are read far less often than they cost.
+            ...flexColumn<BillWithVendor>({
+              title: "Vendor",
+              key: "vendor_name",
+              render: (_: unknown, r: BillWithVendor) => (
+                <div style={{ minWidth: 0 }}>
+                  <span title={r.vendor_name}>{r.vendor_name}</span>
+                  {secondaryLine(
+                    <>
+                      {r.vendor_ref ? `Ref ${r.vendor_ref}` : "No vendor reference"}
+                      {r.entry_number ? (
+                        <>
+                          {" · "}
+                          <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
+                        </>
+                      ) : null}
+                    </>,
+                  )}
+                </div>
+              ),
+            }),
+          },
+          { title: "Date", dataIndex: "bill_date", width: COLUMN.DATE },
+          { title: "Due", dataIndex: "due_date", width: COLUMN.DATE, render: (v) => v ?? "—" },
           {
             title: "Total",
             dataIndex: "total_minor",
+            width: COLUMN.MONEY,
             align: "right",
             render: (v: number, r) => fmt(v, r.currency_code),
           },
           {
             title: "Balance",
             dataIndex: "balance_due_minor",
+            width: COLUMN.MONEY,
             align: "right",
             render: (v: number, r) => fmt(v, r.currency_code),
           },
           {
             title: "Status",
             dataIndex: "status",
+            width: COLUMN.STATUS,
             render: (s: string) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
-          },
-          {
-            title: "Journal entry",
-            key: "entry",
-            width: 140,
-            render: (_, r) =>
-              r.entry_number ? (
-                <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
-              ) : (
-                "—"
-              ),
           },
           {
             title: "Actions",

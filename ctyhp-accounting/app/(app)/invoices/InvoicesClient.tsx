@@ -17,7 +17,6 @@ import {
   Space,
   Table,
   Tag,
-  Tooltip,
   Typography,
   type MenuProps,
   type TableColumnsType,
@@ -30,6 +29,8 @@ import {
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
@@ -52,7 +53,7 @@ import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
 import EmptyCatalogHint from "@/components/EmptyCatalogHint";
-import { documentAttribution, formatAuditTimestamp } from "@/lib/domain/audit";
+import { documentAttribution } from "@/lib/domain/audit";
 import {
   checkInvoiceAgainstCredit,
   creditStateColor,
@@ -481,7 +482,7 @@ export default function InvoicesClient({
     {
       title: "Number",
       dataIndex: "invoice_number",
-      width: 120,
+      width: COLUMN.CODE,
       // Drafts have no number yet and sort to the top; everything else runs in
       // sequence, which is how a break becomes visible while scrolling.
       defaultSortOrder: "descend",
@@ -489,102 +490,101 @@ export default function InvoicesClient({
       render: (n) => n ?? <Tag>draft</Tag>,
     },
     {
-      title: "Customer",
-      dataIndex: "customer_name",
-      sorter: (a, b) => a.customer_name.localeCompare(b.customer_name),
+      // The elastic column: no width, so it takes whatever the measured ones
+      // leave. Its second line carries the journal entry and who raised the
+      // document, both of which used to be columns of their own and pushed
+      // this table 116px past the screen.
+      ...flexColumn<InvoiceWithCustomer>({
+        title: "Customer",
+        key: "customer_name",
+        render: (_: unknown, r: InvoiceWithCustomer) => {
+          const attribution = documentAttribution(r, directory);
+          const under = [
+            r.entry_number ?? null,
+            `raised ${attribution.createdAt.slice(0, 10)} by ${attribution.createdBy}`,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <div style={{ minWidth: 0 }}>
+              <span title={r.customer_name}>{r.customer_name}</span>
+              {secondaryLine(
+                r.entry_number ? (
+                  <>
+                    <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
+                    {` · ${under.slice(r.entry_number.length + 3)}`}
+                  </>
+                ) : (
+                  under
+                ),
+              )}
+            </div>
+          );
+        },
+      }),
+      sorter: (a: InvoiceWithCustomer, b: InvoiceWithCustomer) =>
+        a.customer_name.localeCompare(b.customer_name),
     },
     {
       title: "Issue date",
       dataIndex: "issue_date",
-      width: 120,
+      width: COLUMN.DATE,
       sorter: (a, b) => a.issue_date.localeCompare(b.issue_date),
     },
     {
       title: "Total",
       dataIndex: "total_minor",
-      width: 130,
+      width: COLUMN.MONEY,
       align: "right",
       sorter: (a, b) => a.total_minor - b.total_minor,
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
+      // Paid used to be a column of its own beside this one. It is the same
+      // fact read the other way round — total less balance — so it reads under
+      // the balance instead of costing another 130px of the row.
       title: "Balance due",
       dataIndex: "balance_due_minor",
-      width: 130,
+      width: COLUMN.MONEY,
       align: "right",
       sorter: (a, b) => a.balance_due_minor - b.balance_due_minor,
-      render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
+      render: (v: number, r) => (
+        <div>
+          {formatMoney(v, r.currency_code, decimalsOf(r.currency_code))}
+          {r.total_minor - r.balance_due_minor > 0
+            ? secondaryLine(
+                `${formatMoney(r.total_minor - r.balance_due_minor, r.currency_code, decimalsOf(r.currency_code))} paid`,
+              )
+            : null}
+        </div>
+      ),
     },
     {
-      title: "Paid",
-      key: "paid",
-      width: 130,
-      align: "right",
-      sorter: (a, b) =>
-        a.total_minor - a.balance_due_minor - (b.total_minor - b.balance_due_minor),
-      render: (_: unknown, r) =>
-        formatMoney(r.total_minor - r.balance_due_minor, r.currency_code, decimalsOf(r.currency_code)),
-    },
-    {
+      // Age used to be a column of its own, 130px to print "31 d overdue" on
+      // the rows that had one. It qualifies the status, so it reads under it.
       title: "Status",
       dataIndex: "status",
-      width: 130,
-      render: (s: InvoiceStatus) => <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>,
-    },
-    {
-      // How long the money has been outstanding, which is the question the
-      // status alone never answers.
-      title: "Age",
-      key: "age",
-      width: 130,
-      render: (_: unknown, r) => {
-        if (r.status === "paid" || r.status === "void" || r.status === "draft") return "—";
-        const age = outstandingAge({
-          issueDate: r.issue_date,
-          dueDate: r.due_date,
-          asOf: today,
-        });
-        return age.isOverdue ? (
-          <Typography.Text type="danger">{age.overdueDays} d overdue</Typography.Text>
-        ) : (
-          <Typography.Text type="secondary">{age.ageDays} d old</Typography.Text>
-        );
-      },
-    },
-    {
-      // Who made this invoice and when, on the row itself: the first question an
-      // auditor asks of a document, and one it should not take a click to answer.
-      title: "Journal entry",
-      key: "entry",
-      width: 140,
-      render: (_: unknown, r: InvoiceWithCustomer) =>
-        r.entry_number ? (
-          <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
-        ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
-        ),
-    },
-    {
-      title: "Created",
-      dataIndex: "created_at",
-      width: 120,
-      render: (_: string, r) => {
-        const attribution = documentAttribution(r, directory);
-        // The author reads in the tooltip and in the invoice dialog; the column
-        // keeps to a date so the table fits on one screen.
+      width: COLUMN.STATUS,
+      render: (s: InvoiceStatus, r: InvoiceWithCustomer) => {
+        const age =
+          s === "paid" || s === "void" || s === "draft"
+            ? null
+            : outstandingAge({ issueDate: r.issue_date, dueDate: r.due_date, asOf: today });
         return (
-          <Tooltip
-            title={`Created by ${attribution.createdBy} at ${formatAuditTimestamp(attribution.createdAt)}${
-              attribution.modifiedAt
-                ? ` · last edited by ${attribution.modifiedBy} at ${formatAuditTimestamp(attribution.modifiedAt)}`
-                : ""
-            }`}
-          >
-            <span>
-              {attribution.createdAt.slice(0, 10)}
-              {attribution.modifiedAt ? " ·" : ""}
-            </span>
-          </Tooltip>
+          <div>
+            <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>
+            {age
+              ? secondaryLine(
+                  age.isOverdue ? (
+                    <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                      {age.overdueDays} d overdue
+                    </Typography.Text>
+                  ) : (
+                    `${age.ageDays} d old`
+                  ),
+                )
+              : null}
+          </div>
         );
       },
     },
@@ -592,6 +592,7 @@ export default function InvoicesClient({
       title: "Actions",
       key: "actions",
       width: 140,
+      align: "right",
       // The shape Payments settled on and Bills followed: the paperclip, the one
       // state-advancing action a draft has, and everything else behind one ⋯.
       //

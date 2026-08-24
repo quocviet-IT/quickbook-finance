@@ -125,7 +125,6 @@ export function useColumnResize<K extends string>(
       box: measuredBox.current ?? TABLE_BOX_AT_1280,
       ...budget,
     });
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWidths(mergeColumnWidths(defaults, recovered));
     setHydrated(true);
     if (legacyStorageKey) {
@@ -200,10 +199,10 @@ export function useColumnResize<K extends string>(
         window.addEventListener("pointercancel", end);
       },
     }),
-    // `mins` is a module constant at both call sites, so listing it is free;
-    // a caller building it inline would re-create these props per render,
-    // which costs nothing worse than the render itself.
-    [widths, mins],
+    // `mins` and `budget` are module constants at every call site, so listing
+    // them is free; a caller building one inline would re-create these props
+    // per render, which costs nothing worse than the render itself.
+    [widths, mins, budget],
   );
 
   const guardHeaderDrag = useCallback(
