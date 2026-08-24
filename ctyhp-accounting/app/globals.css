@@ -817,6 +817,26 @@ body {
 }
 
 /*
+ * A table held to its box.
+ *
+ * `fit` means the row total is the container width, so no horizontal scrollbar
+ * is offered at all — the columns that declare a width take it and the ones
+ * that declare none share what is left. Below the narrowest viewport this
+ * design supports (1280, a 984px box) those columns would have to go under
+ * their floors, so the table keeps a minimum and scrolls inside its own frame
+ * rather than squeezing an amount into two characters. That is a phone and
+ * tablet-portrait case only.
+ */
+.accounting-table--fit .ant-table table {
+  min-width: 960px;
+}
+
+.accounting-table--fit .ant-table-content,
+.accounting-table--fit .ant-table-body {
+  overflow-x: auto;
+}
+
+/*
  * Tables whose column widths the reader drags for themselves.
  *
  * rc-table writes `min-width: 100%` inline on the table element whenever
@@ -833,10 +853,15 @@ body {
  * Opt-in, never global. A table sized by its contents should still fill the
  * page; only one whose widths somebody chose on purpose should be held to
  * exactly those numbers.
+ *
+ * Never under `fit`. There the stretch is the whole mechanism — the row total
+ * is meant to be the box — so releasing the table from it would leave a gap
+ * on the right of every wide screen, which is the "gaps in the columns" this
+ * work exists to remove.
  */
-.accounting-table--exact-widths .ant-table-header table,
-.accounting-table--exact-widths .ant-table-body table,
-.accounting-table--exact-widths .ant-table-content table {
+.accounting-data-table:not(.accounting-table--fit).accounting-table--exact-widths .ant-table-header table,
+.accounting-data-table:not(.accounting-table--fit).accounting-table--exact-widths .ant-table-body table,
+.accounting-data-table:not(.accounting-table--fit).accounting-table--exact-widths .ant-table-content table {
   min-width: 0 !important;
 }
 

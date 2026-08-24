@@ -16,6 +16,14 @@ export type DataTableProps<RecordType extends object> = TableProps<RecordType> &
   rows?: RecordType[];
   /** Server mode: one page, and how many there are altogether. */
   page?: ServerPage<RecordType>;
+  /**
+   * Whether this table is held to the width of its box. Default: it is.
+   *
+   * `false` restores Ant Design's `x: "max-content"` and is only for a table
+   * that genuinely is a matrix — a grid whose column count is data rather than
+   * design. Every use is named in tests/unit/table-fit-contract.test.ts.
+   */
+  fit?: boolean;
 };
 
 export default function DataTable<RecordType extends object>({
@@ -28,6 +36,7 @@ export default function DataTable<RecordType extends object>({
   dataSource,
   locale,
   scroll,
+  fit = true,
   // Accounting work means comparing many rows at once, so lists default to the
   // dense row height; a page can still opt into a roomier table.
   size = "small",
@@ -48,13 +57,29 @@ export default function DataTable<RecordType extends object>({
   });
 
   return (
-    <div className="accounting-data-table">
+    <div className={`accounting-data-table${fit ? " accounting-table--fit" : ""}`}>
       <Table<RecordType>
         {...props}
         size={size}
         dataSource={resolved.data as RecordType[]}
         pagination={resolved.pagination}
-        scroll={{ x: "max-content", ...scroll }}
+        // A fixed layout is what makes a declared width binding and lets the
+        // columns that declare none share what is left. Under `auto` — which
+        // is what rc-table falls back to — a width is a hint the browser may
+        // overrule, and the elastic columns would not be elastic at all.
+        tableLayout={props.tableLayout ?? (fit ? "fixed" : undefined)}
+        // Under `fit` the row total IS the box, so there is nothing to scroll
+        // sideways and `scroll.x` must not be set. This one line, defaulted to
+        // `max-content` for every table, is why the same complaint arrived
+        // from four different screens. A caller may still ask for a vertical
+        // viewport.
+        scroll={
+          fit
+            ? scroll?.y === undefined
+              ? undefined
+              : { y: scroll.y }
+            : { x: "max-content", ...scroll }
+        }
         locale={{
           ...locale,
           emptyText: locale?.emptyText ?? (
