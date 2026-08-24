@@ -5,6 +5,7 @@ import {
   clampColumnWidth,
   mergeColumnWidths,
   parseStoredWidths,
+  resizeWithinBox,
   resizedWidth,
   serializeColumnWidths,
   totalColumnWidth,
@@ -164,6 +165,63 @@ describe("per-column minimums", () => {
     expect(parseStoredWidths('{"date":10,"match":60}', ["date", "match"], { match: 240 })).toEqual({
       date: MIN_COLUMN_WIDTH,
       match: 240,
+    });
+  });
+});
+
+describe("resizeWithinBox", () => {
+  // Banking: date, amount and category are measured, description has been
+  // dragged so it carries a width too, and match is the last elastic column
+  // and never does.
+  // 88 + 116 + 150 + 260 = 614, and 614 + 116 + 240 = 970: this layout fits
+  // the 984px box with 14px to spare, which is what makes the ceiling below
+  // 274 rather than something the starting state has already broken.
+  const WIDTHS = { date: 88, amount: 116, category: 150, description: 260 };
+  const BUDGET = { box: 984, chrome: 116, elasticFloor: 240 };
+
+  it("lets a column widen while the elastic column can still pay for it", () => {
+    expect(resizeWithinBox(WIDTHS, "description", 270, BUDGET).description).toBe(270);
+  });
+
+  it("stops the drag where the elastic column would go under its floor", () => {
+    // 984 - 116 chrome - 240 floor = 628 for the measured columns.
+    // date + amount + category = 354, so description may reach 274, no further.
+    expect(resizeWithinBox(WIDTHS, "description", 900, BUDGET).description).toBe(274);
+  });
+
+  it("keeps the row inside its box after every widening", () => {
+    for (const attempt of [200, 274, 275, 600, 5000]) {
+      const next = resizeWithinBox(WIDTHS, "description", attempt, BUDGET);
+      const measured = Object.values(next).reduce((sum, px) => sum + (px ?? 0), 0);
+      expect(measured + BUDGET.chrome + BUDGET.elasticFloor).toBeLessThanOrEqual(BUDGET.box);
+    }
+  });
+
+  it("always allows narrowing, down to the column's own floor", () => {
+    expect(resizeWithinBox(WIDTHS, "category", 90, BUDGET, { category: 150 }).category).toBe(150);
+    expect(resizeWithinBox(WIDTHS, "description", 10, BUDGET).description).toBe(MIN_COLUMN_WIDTH);
+  });
+
+  it("never widens a column in a box too small for what is already declared", () => {
+    // The drag holds still rather than making it worse, and nothing shrinks
+    // behind the reader's back.
+    const tight = { box: 700, chrome: 116, elasticFloor: 240 };
+    const next = resizeWithinBox(WIDTHS, "description", 400, tight);
+    expect(next.description).toBe(WIDTHS.description);
+    expect(next.date).toBe(WIDTHS.date);
+  });
+
+  it("gives an elastic column a width the first time it is dragged", () => {
+    // Description arrives with no width at all: it was absorbing the
+    // remainder. Dragging it is what turns it into a measured column.
+    const elastic = { date: 88, amount: 116, category: 150 };
+    expect(resizeWithinBox(elastic, "description", 260, BUDGET).description).toBe(260);
+  });
+
+  it("leaves every other column exactly as it was", () => {
+    expect(resizeWithinBox(WIDTHS, "description", 250, BUDGET)).toEqual({
+      ...WIDTHS,
+      description: 250,
     });
   });
 });

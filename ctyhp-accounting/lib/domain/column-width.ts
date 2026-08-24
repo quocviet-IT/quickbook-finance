@@ -149,3 +149,63 @@ export function mergeColumnWidths<K extends string>(
 export function totalColumnWidth(widths: Record<string, number>, pinnedWidth: number): number {
   return Object.values(widths).reduce((sum, width) => sum + width, 0) + pinnedWidth;
 }
+
+/**
+ * What a table has to fit inside, for the arithmetic below.
+ */
+export interface BoxBudget {
+  /** The table's own width, measured from the DOM once at pointer-down. */
+  box: number;
+  /**
+   * Everything in the row that is not a resizable column: the pinned action
+   * columns and Ant Design's selection checkbox. A drag can never reclaim it.
+   */
+  chrome: number;
+  /** The floors of the elastic columns that still carry no width of their own. */
+  elasticFloor: number;
+}
+
+/**
+ * A column's new width, refused where it would push the row out of its box.
+ *
+ * This replaces the arithmetic that turned the August resize gesture into the
+ * thing reported next. `totalColumnWidth` above adds the widths up and hands
+ * the sum to `scroll.x`, so widening a column manufactured horizontal
+ * scrolling — the exact fault being complained about. Here the box is fixed
+ * and the widths live inside it: widening takes room from the elastic column,
+ * and stops when that column reaches its floor.
+ *
+ * Narrowing is never refused. Room given up goes straight back to the elastic
+ * column, which is what makes the gesture zero-sum rather than a scrollbar
+ * generator.
+ *
+ * A column absent from `widths` is elastic — it has been absorbing the
+ * remainder — and dragging it is what gives it a width for the first time.
+ *
+ * Nothing here reads the DOM, so every rule is asserted directly in
+ * tests/unit/column-width.test.ts.
+ */
+export function resizeWithinBox<K extends string>(
+  widths: Partial<Record<K, number>>,
+  key: K,
+  nextWidth: number,
+  budget: BoxBudget,
+  mins: Partial<Record<K, number>> = {},
+): Partial<Record<K, number>> {
+  const min = mins[key] ?? MIN_COLUMN_WIDTH;
+  const wanted = clampColumnWidth(nextWidth, min);
+  const current = widths[key] ?? min;
+
+  // What is left for the measured columns once the untouchable parts are out.
+  const forMeasured = budget.box - budget.chrome - budget.elasticFloor;
+  const others = (Object.keys(widths) as K[])
+    .filter((other) => other !== key)
+    .reduce((sum, other) => sum + (widths[other] ?? 0), 0);
+  const ceiling = forMeasured - others;
+
+  // Narrowing always goes through. Widening only as far as the ceiling — and
+  // never below where the column already sits, because a box too small for
+  // what is already declared must not shrink a column nobody dragged.
+  const allowed = wanted <= current ? wanted : Math.max(current, Math.min(wanted, ceiling));
+  return { ...widths, [key]: Math.max(min, allowed) };
+}
