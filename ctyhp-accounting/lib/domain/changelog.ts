@@ -41,6 +41,56 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.61",
+    date: "2026-08-24",
+    headline: "Lists fit the screen. No more scrolling sideways to read a row.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A bank line reads across one screen instead of two",
+        detail:
+          "Bank Transactions spent 200px on the account name — the same bank on "
+          + "every row, and the one already chosen in the filter above — and "
+          + "135px on a reference column that was empty on most lines, while "
+          + "Match and Status sat off the right-hand edge. Both now read on the "
+          + "second line under the description, the status joins the Match "
+          + "column, and the description takes the room that frees up.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Every list is held to the width of its box",
+        detail:
+          "Columns whose content has a known length — a date, an amount, a "
+          + "status, a button — take a fixed width from one shared set. The "
+          + "column holding text somebody typed takes whatever is left. Facts "
+          + "that used to cost a column of their own read on a second line "
+          + "under the row's own name, so nothing was removed. Fifteen screens "
+          + "changed, and a check now runs over every list at two screen sizes "
+          + "so the next new table cannot bring the sideways scrolling back.",
+      },
+      {
+        kind: "fixed",
+        title: "Dragging a column no longer creates a scrollbar",
+        detail:
+          "Widening a column takes its room from the elastic column beside it "
+          + "and stops when that column reaches its floor, instead of making "
+          + "the whole table wider than the screen. Column widths saved before "
+          + "this release are reset once, because those widths are the layout "
+          + "being fixed.",
+      },
+      {
+        kind: "fixed",
+        title: "The feedback queue itself fitted the screen last",
+        detail:
+          "Feedback triage ran 823px past its box — the widest offender in the "
+          + "app, on the screen where this very report was read. Where a report "
+          + "came from and who filed it now read under the description.",
+        route: "/settings/feedback",
+      },
+    ],
+  },
+  {
     version: "1.60",
     date: "2026-08-22",
     headline: "Access to a company now follows the role, and only the role.",

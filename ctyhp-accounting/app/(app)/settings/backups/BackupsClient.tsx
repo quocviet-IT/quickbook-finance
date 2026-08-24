@@ -90,7 +90,7 @@ export default function BackupsClient({
       render: (value: number | null) => (value === null ? "—" : value.toLocaleString("en-US")),
     },
     actionsColumn<BackupRow>({
-      width: canRestore ? 220 : COLUMN.CODE,
+      width: canRestore ? 190 : COLUMN.CODE,
       actions: (row) => [
         <Button
           key="download"

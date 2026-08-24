@@ -17,6 +17,8 @@ import {
 } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import type { FixedAssetStatus } from "@/lib/db/types";
@@ -227,23 +229,25 @@ export default function FixedAssetReportClient({
 
   const assetColumns: TableColumnsType<FixedAssetView> = [
     {
-      title: "Asset",
-      key: "asset",
-      width: 280,
-      render: (_value, asset) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>
-            {asset.asset_number} · {asset.name}
-          </Typography.Text>
-          <Typography.Text type="secondary">{asset.category}</Typography.Text>
-        </Space>
-      ),
+      // The elastic column, with the category under the name.
+      ...flexColumn<FixedAssetView>({
+        title: "Asset",
+        key: "asset",
+        render: (_value: unknown, asset: FixedAssetView) => (
+          <div style={{ minWidth: 0 }}>
+            <Typography.Text strong title={`${asset.asset_number} · ${asset.name}`}>
+              {asset.asset_number} · {asset.name}
+            </Typography.Text>
+            {secondaryLine(asset.category)}
+          </div>
+        ),
+      }),
     },
-    { title: "In service", dataIndex: "in_service_date", width: 115 },
+    { title: "In service", dataIndex: "in_service_date", width: COLUMN.DATE },
     {
       title: "Status",
       dataIndex: "status",
-      width: 135,
+      width: COLUMN.STATUS,
       render: (value: FixedAssetStatus) => (
         <Tag color={ASSET_STATUS[value].color}>{ASSET_STATUS[value].label}</Tag>
       ),
@@ -251,28 +255,28 @@ export default function FixedAssetReportClient({
     {
       title: "Cost",
       dataIndex: "cost_minor",
-      width: 140,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => money(value),
     },
     {
-      title: "Accumulated depreciation",
+      title: "Accum. dep.",
       dataIndex: "accumulated_depreciation_minor",
-      width: 190,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => money(value),
     },
     {
       title: "Net book value",
       dataIndex: "net_book_value_minor",
-      width: 150,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => <Typography.Text strong>{money(value)}</Typography.Text>,
     },
     {
       title: "Disposal result",
       dataIndex: "disposal_gain_loss_minor",
-      width: 160,
+      width: 140,
       align: "right",
       render: (value: number | null, asset) =>
         value === null ? (
@@ -293,37 +297,39 @@ export default function FixedAssetReportClient({
 
   const depreciationColumns: TableColumnsType<AssetDepreciationDetail> = [
     {
-      title: "Asset",
-      key: "asset",
-      width: 280,
-      render: (_value, row) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>
-            {row.asset_number} · {row.asset_name}
-          </Typography.Text>
-          <Typography.Text type="secondary">{row.category}</Typography.Text>
-        </Space>
-      ),
+      // The elastic column, with the category under the name.
+      ...flexColumn<AssetDepreciationDetail>({
+        title: "Asset",
+        key: "asset",
+        render: (_value: unknown, row: AssetDepreciationDetail) => (
+          <div style={{ minWidth: 0 }}>
+            <Typography.Text strong title={`${row.asset_number} · ${row.asset_name}`}>
+              {row.asset_number} · {row.asset_name}
+            </Typography.Text>
+            {secondaryLine(row.category)}
+          </div>
+        ),
+      }),
     },
-    { title: "Period end", dataIndex: "period_end", width: 115 },
+    { title: "Period end", dataIndex: "period_end", width: COLUMN.DATE },
     {
       title: "Planned",
       dataIndex: "planned_amount_minor",
-      width: 145,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => money(value),
     },
     {
       title: "Recognized",
       dataIndex: "posted_amount_minor",
-      width: 145,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => money(value),
     },
     {
       title: "Status",
       dataIndex: "status",
-      width: 145,
+      width: COLUMN.STATUS,
       render: (value: string) => {
         const config = SCHEDULE_STATUS[value] ?? { label: value, color: "default" };
         return <Tag color={config.color}>{config.label}</Tag>;
@@ -332,7 +338,7 @@ export default function FixedAssetReportClient({
     {
       title: "Journal entry",
       dataIndex: "journal_entry_id",
-      width: 145,
+      width: 130,
       render: (value: string | null, row) =>
         value ? <Link href={`/journal?entry=${value}`}>{row.journal_entry_number ?? "View"}</Link> : "—",
     },

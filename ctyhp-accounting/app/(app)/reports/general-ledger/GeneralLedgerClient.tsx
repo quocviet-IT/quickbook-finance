@@ -16,7 +16,6 @@ import type { GeneralLedger, GeneralLedgerRow } from "@/lib/services/journal";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { ColumnHeaderCell } from "@/components/ui/ColumnHeaderCell";
 import { useColumnResize } from "@/components/ui/useColumnResize";
-import { totalColumnWidth } from "@/lib/domain/column-width";
 import {
   GENERAL_LEDGER_BUDGET,
   GENERAL_LEDGER_DEFAULT_WIDTHS,
@@ -258,19 +257,10 @@ export default function GeneralLedgerClient({
             // rc-table reads as a signal; remove that one property and every
             // width below silently stops binding.
             tableLayout="fixed"
-            // The previous fix for this screen was `scroll={{ x: undefined }}`:
-            // a wire memo several hundred characters long decided how wide the
-            // table was and pushed Debit, Credit and Running off the side, and
-            // giving up the horizontal scroll is what made the widths bind.
-            //
-            // That cannot stay once the reader controls the widths. REQ-01
-            // requires horizontal scrolling to keep working when the total
-            // exceeds the viewport, and a table pinned to the page cannot let
-            // anyone widen Memo without crushing Debit and Credit to do it.
-            // The memo can no longer run away on its own — it has a width like
-            // everything else — so the scroll is now the reader's choice
-            // rather than the longest description's.
-            scroll={{ x: totalColumnWidth(widths, 0) }}
+            // No `scroll.x`. The memo carries no width and absorbs the
+            // remainder, so the row total IS the box — handing rc-table a
+            // total was what let a widened column produce the sideways
+            // scrolling this report was reported for twice.
             // Holds the table to exactly the widths above. Without it, a table
             // narrower than the page is stretched to fill it and the spare
             // room is shared out across every column — so narrowing Memo would

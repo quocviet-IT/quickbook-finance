@@ -15,24 +15,20 @@ import { describe, expect, it } from "vitest";
  * reason, and says so at its own call site.
  */
 const MATRIX = new Map<string, string>([
-  [
-    "app/(app)/settings/permissions/PermissionMatrixClient.tsx",
-    "permissions by role: a grid, and both axes are data",
-  ],
-  [
-    "components/reports/BudgetVsActualView.tsx",
-    "twelve months plus variance columns, chosen by the report not the screen",
-  ],
   ["components/reports/PnlTrendView.tsx", "one column per period, count chosen by the reader"],
   [
     "components/reports/BalanceSheetTrendView.tsx",
     "one column per period, count chosen by the reader",
   ],
-  [
-    "app/(app)/reports/saved/SavedReportViewer.tsx",
-    "columns come from a stored report definition, unknown at build time",
-  ],
 ]);
+
+/**
+ * Three more were candidates and none of them qualified, which is the point of
+ * checking rather than listing: the permission grid and the saved-report
+ * viewer reach for Ant Design's Table directly, so this boundary never covered
+ * them (see tests/unit/table-adoption.test.ts), and the budget view turned out
+ * to pass no `scroll.x` at all.
+ */
 
 /** The implementation itself declares the default; it is exempt by path. */
 const OWN_IMPLEMENTATION = new Set(["components/ui/DataTable.tsx"]);

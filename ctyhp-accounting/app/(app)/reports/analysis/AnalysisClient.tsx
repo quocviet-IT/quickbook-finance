@@ -317,7 +317,7 @@ export default function AnalysisClient({
             {
               title: "Period",
               key: "period",
-              width: 190,
+              width: 170,
               render: (_, r) => `${r.period_start} → ${r.period_end}`,
             },
             {
@@ -335,7 +335,8 @@ export default function AnalysisClient({
             {
               title: "Actions",
               key: "actions",
-              width: 200,
+              width: 170,
+              align: "right",
               render: (_, r) => (
                 <Space>
                   <Button size="small" onClick={() => setViewing(r)}>

@@ -89,6 +89,13 @@ export default function PnlTrendView({
             rowKey="key"
             dataSource={rows}
             pagination={false}
+            // A matrix, not a list: one column per period, and how many
+            // periods is the reader's own choice. There is no width to fit it
+            // to, so this table keeps Ant Design's horizontal scrolling — the
+            // only kind of table that may. Named in
+            // tests/unit/table-fit-contract.test.ts, which is what stops the
+            // exemption spreading.
+            fit={false}
             scroll={{ x: "max-content" }}
             columns={[
               {

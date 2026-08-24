@@ -48,8 +48,16 @@ const columnsBlock = source.slice(source.indexOf("columns={["));
  * that changes a number and not the screen.
  */
 describe("the General Ledger column widths", () => {
-  it("gives every column a width the reader controls", () => {
+  it("gives every measured column a width the reader controls", () => {
+    // Every column except the memo. The memo is the elastic one now — it
+    // carries no width at all and absorbs whatever the others leave, which is
+    // what the reviewer was dragging it towards by hand. See
+    // docs/superpowers/specs/2026-08-24-lists-that-fit-the-screen-design.md.
     for (const key of GENERAL_LEDGER_COLUMN_KEYS) {
+      if (key === "memo") {
+        expect(source).not.toContain(`width: widths.${key}`);
+        continue;
+      }
       expect(source, key).toContain(`width: widths.${key}`);
     }
   });
@@ -63,12 +71,17 @@ describe("the General Ledger column widths", () => {
     expect(columnsBlock).not.toMatch(/width:\s*\d+/);
   });
 
-  it("gives every column a handle, not only the one the video pointed at", () => {
+  it("gives every measured column a handle, not only the one the video pointed at", () => {
     // Memo is the column they dragged, but TC-04 asks for DATE, DEBIT, CREDIT
     // and BALANCE too. Counting is what catches a column added later with a
     // width but no handle — it would look resizable and refuse to move.
+    //
+    // One fewer than the key count: the elastic column has no handle, because
+    // it is the column paying for every other column's width. A width of its
+    // own would leave nothing absorbing the remainder, and the row total would
+    // stop being the width of the box.
     const handles = columnsBlock.match(/onHeaderCell:/g) ?? [];
-    expect(handles.length).toBe(GENERAL_LEDGER_COLUMN_KEYS.length);
+    expect(handles.length).toBe(GENERAL_LEDGER_COLUMN_KEYS.length - 1);
   });
 
   it("names its table layout instead of inheriting one by accident", () => {
@@ -79,21 +92,16 @@ describe("the General Ledger column widths", () => {
     expect(source).toContain('tableLayout="fixed"');
   });
 
-  it("scrolls sideways on a real total rather than giving up the scroll", () => {
-    // `scroll={{ x: undefined }}` was the previous fix for this screen: a
-    // several-hundred-character memo decided the table's width and pushed
-    // Debit, Credit and Running off the edge, and dropping the horizontal
-    // scroll is what made the widths bind. It cannot stay — REQ-01 requires
-    // horizontal scrolling to keep working once the reader widens a column
-    // past the viewport, and a table that cannot exceed the page cannot let
-    // them widen anything without crushing its neighbours.
+  it("asks for no horizontal scroll at all", () => {
+    // This assertion has now been written three ways, which is the history of
+    // the complaint. `x: undefined` was the first fix, a real total was the
+    // second, and both were answers to "how wide should the scroll be" when
+    // the reader had been saying all along that there should not be one.
     //
-    // Matched against the JSX prop, not against any mention of the string:
-    // the comment above `scroll` in that file explains what the old value was
-    // and why it went, and that history is worth more than a tidier assertion.
-    expect(source).not.toMatch(/scroll=\{\{\s*x:\s*undefined/);
-    expect(source).not.toMatch(/scroll=\{\{\s*x:\s*"max-content"/);
-    expect(source).toMatch(/scroll=\{\{\s*x:\s*totalColumnWidth\(widths/);
+    // Under a fitted table the memo takes the remainder, so the row total IS
+    // the box: there is nothing to scroll to. A total handed to rc-table is
+    // what let a widened column manufacture the scrollbar again.
+    expect(source).not.toMatch(/scroll=\{\{\s*x:/);
   });
 
   it("renders through the shared header cell, which is what draws the handle", () => {
@@ -101,14 +109,15 @@ describe("the General Ledger column widths", () => {
     expect(source).toContain("resizeHandleProps");
   });
 
-  it("holds the table to its declared widths instead of stretching to the page", () => {
-    // rc-table writes `min-width: 100%` inline whenever horizontal scrolling
-    // is on, so a table narrower than its container is stretched and the
-    // spare room is shared across every column. Narrowing Memo then widens
-    // Debit, Credit and Running — measured, before this class existed: Debit
-    // went 140px to 159px on a single drag, and Memo could not reach its own
-    // 60px floor. REQ-01 says only the dragged column may change.
-    expect(source).toContain("accounting-table--exact-widths");
+  it("lets the elastic column take the stretch, rather than fighting it", () => {
+    // `accounting-table--exact-widths` used to be here, releasing the table
+    // from the inline `min-width: 100%` rc-table writes when horizontal
+    // scrolling is on. With no horizontal scrolling there is no such rule to
+    // fight, and the stretch is now the mechanism: the memo is meant to grow
+    // into whatever the measured columns leave. Keeping the class would leave
+    // a gap down the right of every wide screen — the "gaps in the columns"
+    // this work exists to remove.
+    expect(source).not.toContain("accounting-table--exact-widths");
   });
 
   it("keeps the memo's tooltip, so narrowing a column never hides what it said", () => {

@@ -174,7 +174,6 @@ export default function CashFlowForecastClient({
           size="small"
           pagination={false}
           dataSource={forecast.buckets}
-          scroll={{ x: "max-content" }}
           columns={[
             {
               title: "Week beginning",

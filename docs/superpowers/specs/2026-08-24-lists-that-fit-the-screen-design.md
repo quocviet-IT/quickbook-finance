@@ -297,3 +297,29 @@ the outcome is evidence rather than a claim.
    scrollbar at either viewport.
 5. `npm test`, `npm run typecheck`, `npm run lint` green.
 6. Feedback `a9c5b84b` moves out of `new` only after 1 through 5 hold.
+
+## 12. What changed during implementation
+
+Four things the design got wrong, recorded here rather than quietly corrected,
+because each was found by measuring rather than by reasoning.
+
+**Match is measured, not elastic (7.1).** The first cut made Match the column
+that absorbs the remainder. A screenshot of it showed Match holding 340px to
+render one tag while the description beside it was cut mid-reference — the same
+complaint, one column to the left. The elastic column is the description; Match
+takes the 240px its buttons need.
+
+**The resize invariant is stated against the box, not as a sum (6.2).** An
+elastic column has no width, so "the widths total the same before and after" is
+not expressible over the returned map. `resizeWithinBox` refuses any width that
+would push the row past the measured box instead.
+
+**The matrix allow-list is two files, not five (8.2).** Of the five candidates,
+the permission grid and the saved-report viewer reach for Ant Design's `Table`
+directly and were never inside this boundary, and the budget view turned out to
+pass no `scroll.x` at all. Only the two trend views needed the exemption.
+
+**Three tables the survey missed.** The contract test found `scroll.x` on the
+purchase order detail, the fixed asset report and the ageing table, and the
+runtime gate found overflow on Backups and What-If Analysis. All five were
+reworked with the rest.

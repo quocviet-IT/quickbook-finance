@@ -431,7 +431,7 @@ export default function RecurringClient({
     {
       title: "Actions",
       key: "actions",
-      width: 190,
+      width: 160,
       align: "right",
       render: (_, template) => (
         <Space>
