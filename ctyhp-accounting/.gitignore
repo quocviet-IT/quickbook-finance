@@ -42,6 +42,9 @@ yarn-error.log*
 next-env.d.ts
 supabase/.temp/
 next-server.log
+# Output of scripts/verify-table-fit.mjs and the server it runs against.
+table-fit-*.log
+server-fit.log
 
 # Server log from a local npm start; never part of the build.
 next-start.log
