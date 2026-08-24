@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { ColumnType } from "antd/es/table";
 import { moneyDisplay } from "@/lib/domain/money-display";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { TOKENS } from "@/lib/design/tokens";
 import { ToneBadge, type Tone } from "@/lib/design/tone";
 
@@ -200,4 +201,75 @@ export function actionsColumn<T>(spec: ActionsColumnSpec<T>): ColumnType<T> {
       </span>
     ),
   };
+}
+
+export interface FlexColumnSpec<T> {
+  title: string;
+  dataIndex?: Key<T>;
+  key?: string;
+  render?: ColumnType<T>["render"];
+  /**
+   * How narrow this column may get before the table stops giving room away.
+   * Text columns take the default; a cell holding controls passes RICH_MIN.
+   */
+  floor?: number;
+}
+
+/**
+ * A column with no width, which is the whole point of it.
+ *
+ * Under `table-layout: fixed` the columns that declare a width take it and the
+ * rest share what is left. That is how a table ends up exactly as wide as its
+ * box: every screen has one or two of these, and they absorb the remainder
+ * instead of a scrollbar absorbing it.
+ *
+ * `minWidth` is not an Ant Design column property. It is carried here so a
+ * screen's own unit test can add up its floors through `fitsBox`, and Ant
+ * Design passes keys it does not know straight through.
+ */
+export function flexColumn<T>(spec: FlexColumnSpec<T>): ColumnType<T> & { minWidth: number } {
+  return {
+    title: spec.title,
+    ...(spec.dataIndex ? { dataIndex: spec.dataIndex } : null),
+    ...(spec.key ? { key: spec.key } : null),
+    minWidth: spec.floor ?? COLUMN.TEXT_MIN,
+    // No width. See the note above.
+    ellipsis: { showTitle: false },
+    render:
+      spec.render ??
+      ((value: unknown) => {
+        const text = typeof value === "string" ? value.trim() : "";
+        if (text === "") return ABSENT;
+        // `title` rather than Ant Design's Tooltip: this renders inside a cell
+        // that is already truncating, and a Tooltip needs a wrapper element
+        // that breaks the ellipsis — see components/ui/long-text-column.tsx,
+        // which pays for the wrapper because it also sets the width.
+        return <span title={text}>{text}</span>;
+      }),
+  };
+}
+
+/**
+ * The muted line under an elastic cell's primary text.
+ *
+ * This is where a narrowed table puts what used to be its own column — the
+ * account a line came from, the reference the bank sent, the entry it posted
+ * to. One line, cut with an ellipsis, so a row never grows a third line and
+ * the table keeps scrolling only downwards.
+ */
+export function secondaryLine(text: ReactNode): ReactElement {
+  return (
+    <span
+      style={{
+        display: "block",
+        fontSize: 12,
+        color: TOKENS.text.secondary,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {text}
+    </span>
+  );
 }

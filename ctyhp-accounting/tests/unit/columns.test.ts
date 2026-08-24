@@ -1,6 +1,15 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import { actionsColumn, dateColumn, moneyColumn, statusColumn, textColumn } from "@/components/ui/columns";
+import {
+  actionsColumn,
+  dateColumn,
+  flexColumn,
+  moneyColumn,
+  secondaryLine,
+  statusColumn,
+  textColumn,
+} from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { TOKENS } from "@/lib/design/tokens";
 import { ToneBadge, toneToken, type Tone } from "@/lib/design/tone";
 
@@ -10,7 +19,13 @@ import { ToneBadge, toneToken, type Tone } from "@/lib/design/tone";
  * guard needs a type the compiler can carry through it.
  */
 interface CellProps {
-  style?: { color?: string; fontVariantNumeric?: string };
+  style?: {
+    color?: string;
+    fontVariantNumeric?: string;
+    fontSize?: number;
+    whiteSpace?: string;
+    textOverflow?: string;
+  };
   children?: ReactNode;
   "aria-label"?: string;
   dateTime?: string;
@@ -222,5 +237,50 @@ describe("actionsColumn", () => {
     const column = actionsColumn<Row>({ actions: (record) => [String(record.status)] });
     const cell = asElement(column.render!(undefined, row, 0), "actionsColumn");
     expect(cell.props.children).toEqual(["void"]);
+  });
+});
+
+describe("flexColumn", () => {
+  it("carries no width at all, which is what makes it elastic", () => {
+    const column = flexColumn<Row>({ title: "Memo", dataIndex: "memo" });
+    expect(column.width).toBeUndefined();
+    // A fixed layout needs the cut declared on the column, or a long memo
+    // widens the table instead of being truncated.
+    expect(column.ellipsis).toEqual({ showTitle: false });
+  });
+
+  it("keeps its floor where the screen can read it", () => {
+    expect(flexColumn<Row>({ title: "Memo", dataIndex: "memo" }).minWidth).toBe(COLUMN.TEXT_MIN);
+    expect(flexColumn<Row>({ title: "Match", key: "match", floor: COLUMN.RICH_MIN }).minWidth).toBe(
+      COLUMN.RICH_MIN,
+    );
+  });
+
+  it("shows the whole value on hover, and an em dash when there is none", () => {
+    const column = flexColumn<Row>({ title: "Memo", dataIndex: "memo" });
+    const cell = asElement(column.render!("a wire description", row, 0), "flex cell");
+    expect(cell.props.title).toBe("a wire description");
+    expect(column.render!(null, row, 0)).toBe("—");
+    expect(column.render!("   ", row, 0)).toBe("—");
+  });
+
+  it("hands a screen its own renderer untouched", () => {
+    const column = flexColumn<Row>({
+      title: "Description",
+      key: "description",
+      render: () => "whatever the screen builds",
+    });
+    expect(column.render!(null, row, 0)).toBe("whatever the screen builds");
+  });
+});
+
+describe("secondaryLine", () => {
+  it("is one muted line that cuts rather than wraps", () => {
+    const line = asElement(secondaryLine("Bank of America · 121"), "secondary line");
+    expect(line.props.style?.fontSize).toBe(12);
+    expect(line.props.style?.whiteSpace).toBe("nowrap");
+    expect(line.props.style?.textOverflow).toBe("ellipsis");
+    // The muted token, never a hex value written here.
+    expect(line.props.style?.color).toBe(TOKENS.text.secondary);
   });
 });
