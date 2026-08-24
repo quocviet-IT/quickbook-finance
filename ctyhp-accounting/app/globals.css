@@ -822,15 +822,15 @@ body {
  * `fit` means the row total is the container width, so no horizontal scrollbar
  * is offered at all — the columns that declare a width take it and the ones
  * that declare none share what is left. Below the narrowest viewport this
- * design supports (1280, a 984px box) those columns would have to go under
- * their floors, so the table keeps a minimum and scrolls inside its own frame
- * rather than squeezing an amount into two characters. That is a phone and
- * tablet-portrait case only.
+ * design supports (1280, a 984px box) the declared widths stop fitting, the
+ * table grows past its frame on their own account, and this makes the frame
+ * scroll rather than the page. That is a phone and tablet-portrait case only.
+ *
+ * No `min-width` here. A first cut set 960px and it was wrong twice over: a
+ * table nested inside a Card has a narrower frame than the page does — 941px
+ * at a 1280 viewport — so the rule produced exactly the 19px of horizontal
+ * scrolling it was meant to prevent, on a screen whose columns fitted.
  */
-.accounting-table--fit .ant-table table {
-  min-width: 960px;
-}
-
 .accounting-table--fit .ant-table-content,
 .accounting-table--fit .ant-table-body {
   overflow-x: auto;

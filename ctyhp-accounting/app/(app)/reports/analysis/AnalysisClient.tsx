@@ -315,16 +315,20 @@ export default function AnalysisClient({
             // The elastic column: a title is whatever somebody called it.
             flexColumn<FinancialAnalysisRow>({ title: "Title", dataIndex: "title" }),
             {
+              // Two dates and an arrow measure about 177px, and a cell that
+              // will not fit spills past its column rather than shrinking.
               title: "Period",
               key: "period",
-              width: 170,
+              width: 190,
               render: (_, r) => `${r.period_start} → ${r.period_end}`,
             },
             {
+              // The date alone. The minute a scenario was frozen has never
+              // been the question this column is asked.
               title: "Created",
               dataIndex: "created_at",
-              width: 140,
-              render: (v: string) => v.slice(0, 16).replace("T", " "),
+              width: COLUMN.DATE,
+              render: (v: string) => v.slice(0, 10),
             },
             {
               title: "Status",

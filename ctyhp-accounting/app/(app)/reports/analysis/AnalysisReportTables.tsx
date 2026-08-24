@@ -1,6 +1,8 @@
 "use client";
 import { Alert, Card, Space, Tag, Typography } from "antd";
 import ReportTable from "@/components/ui/ReportTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import type { WhatIfAnalysis } from "@/lib/domain/financial-analysis";
 import type { BalanceSheet, ProfitAndLoss, ReportSection } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/format";
@@ -107,29 +109,31 @@ export default function AnalysisReportTables({
 
   const columns = [
     {
-      title: "Account",
-      dataIndex: "label",
-      render: (label: string, row: AnalysisRow) =>
-        row.kind === "section" ? (
-          <Typography.Text strong>{label}</Typography.Text>
-        ) : row.kind === "total" ? (
-          <Typography.Text strong>{label}</Typography.Text>
+      // Elastic, and cut to its column: an account name is text somebody
+      // typed, and without the cut a long one spills past the table rather
+      // than being truncated — 19px of horizontal scroll at 1280.
+      ...flexColumn<AnalysisRow>({ title: "Account", key: "label" }),
+      render: (_: unknown, row: AnalysisRow) =>
+        row.kind === "section" || row.kind === "total" ? (
+          <Typography.Text strong title={row.label}>
+            {row.label}
+          </Typography.Text>
         ) : (
-          label
+          <span title={row.label}>{row.label}</span>
         ),
     },
     {
       title: "Actual",
       dataIndex: "actual",
       align: "right" as const,
-      width: 150,
+      width: COLUMN.MONEY,
       render: (v: number | null, row: AnalysisRow) => cell(v, row),
     },
     {
       title: "Adjustment",
       key: "delta",
       align: "right" as const,
-      width: 150,
+      width: COLUMN.MONEY,
       render: (_: unknown, row: AnalysisRow) => {
         if (row.kind === "section") return "";
         const d = delta(row);
@@ -142,7 +146,7 @@ export default function AnalysisReportTables({
       title: "Adjusted",
       dataIndex: "adjusted",
       align: "right" as const,
-      width: 150,
+      width: COLUMN.MONEY,
       render: (v: number | null, row: AnalysisRow) => cell(v, row),
     },
   ];
