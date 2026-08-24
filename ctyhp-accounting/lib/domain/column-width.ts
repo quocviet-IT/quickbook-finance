@@ -113,8 +113,14 @@ export function parseStoredWidths<K extends string>(
   return widths;
 }
 
-/** What goes into storage. The inverse of `parseStoredWidths`. */
-export function serializeColumnWidths(widths: Record<string, number>): string {
+/**
+ * What goes into storage. The inverse of `parseStoredWidths`.
+ *
+ * `Partial`, because an elastic column has no width to write down and
+ * `JSON.stringify` drops an undefined value rather than storing a null the
+ * parser would then have to reject.
+ */
+export function serializeColumnWidths(widths: Partial<Record<string, number>>): string {
   return JSON.stringify(widths);
 }
 
@@ -126,9 +132,9 @@ export function serializeColumnWidths(widths: Record<string, number>): string {
  * whatever a stale storage entry happens to hold.
  */
 export function mergeColumnWidths<K extends string>(
-  defaults: Record<K, number>,
+  defaults: Partial<Record<K, number>>,
   stored: Partial<Record<K, number>>,
-): Record<K, number> {
+): Partial<Record<K, number>> {
   return { ...defaults, ...stored };
 }
 
@@ -163,6 +169,27 @@ export interface BoxBudget {
   chrome: number;
   /** The floors of the elastic columns that still carry no width of their own. */
   elasticFloor: number;
+}
+
+/**
+ * Stored widths, thrown away wholesale when they cannot fit.
+ *
+ * Not clamped one by one: the widths a reader dragged are a layout, and a
+ * layout half-honoured is neither theirs nor the shipped one. If the set as a
+ * whole no longer fits the narrowest box supported, the shipped defaults are
+ * the better answer — they are guaranteed to fit — and the reader can drag
+ * again from there.
+ *
+ * Without this, the person who reported the sideways scrolling would have
+ * opened the fixed screen and found their own August widths, totalling 1530px,
+ * merged straight back over it.
+ */
+export function discardOversizeWidths<K extends string>(
+  stored: Partial<Record<K, number>>,
+  budget: BoxBudget,
+): Partial<Record<K, number>> {
+  const total = Object.values(stored).reduce((sum: number, px) => sum + ((px as number) ?? 0), 0);
+  return total + budget.chrome + budget.elasticFloor <= budget.box ? stored : {};
 }
 
 /**

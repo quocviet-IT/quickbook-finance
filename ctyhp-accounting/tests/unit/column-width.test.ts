@@ -173,10 +173,20 @@ describe("resizeWithinBox", () => {
   // Banking: date, amount and category are measured, description has been
   // dragged so it carries a width too, and match is the last elastic column
   // and never does.
+  // Named because `key` is where the generic is inferred from: without the
+  // annotation a call that widens "description" would narrow the type to that
+  // one column and the assertions about its neighbours would not compile.
+  type BankKey = "date" | "amount" | "category" | "description";
+
   // 88 + 116 + 150 + 260 = 614, and 614 + 116 + 240 = 970: this layout fits
   // the 984px box with 14px to spare, which is what makes the ceiling below
   // 274 rather than something the starting state has already broken.
-  const WIDTHS = { date: 88, amount: 116, category: 150, description: 260 };
+  const WIDTHS: Partial<Record<BankKey, number>> = {
+    date: 88,
+    amount: 116,
+    category: 150,
+    description: 260,
+  };
   const BUDGET = { box: 984, chrome: 116, elasticFloor: 240 };
 
   it("lets a column widen while the elastic column can still pay for it", () => {
@@ -206,7 +216,7 @@ describe("resizeWithinBox", () => {
     // The drag holds still rather than making it worse, and nothing shrinks
     // behind the reader's back.
     const tight = { box: 700, chrome: 116, elasticFloor: 240 };
-    const next = resizeWithinBox(WIDTHS, "description", 400, tight);
+    const next = resizeWithinBox<BankKey>(WIDTHS, "description", 400, tight);
     expect(next.description).toBe(WIDTHS.description);
     expect(next.date).toBe(WIDTHS.date);
   });
@@ -214,8 +224,8 @@ describe("resizeWithinBox", () => {
   it("gives an elastic column a width the first time it is dragged", () => {
     // Description arrives with no width at all: it was absorbing the
     // remainder. Dragging it is what turns it into a measured column.
-    const elastic = { date: 88, amount: 116, category: 150 };
-    expect(resizeWithinBox(elastic, "description", 260, BUDGET).description).toBe(260);
+    const elastic: Partial<Record<BankKey, number>> = { date: 88, amount: 116, category: 150 };
+    expect(resizeWithinBox<BankKey>(elastic, "description", 260, BUDGET).description).toBe(260);
   });
 
   it("leaves every other column exactly as it was", () => {

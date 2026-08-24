@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
+  MIN_COLUMN_WIDTH,
+  discardOversizeWidths,
   mergeColumnWidths,
   parseStoredWidths,
-  resizedWidth,
+  resizeWithinBox,
   serializeColumnWidths,
 } from "@/lib/domain/column-width";
+import { TABLE_BOX_AT_1280 } from "@/lib/design/table-metrics";
 import type { ColumnHeaderCellProps } from "./ColumnHeaderCell";
 
 /**
@@ -36,8 +39,13 @@ import type { ColumnHeaderCellProps } from "./ColumnHeaderCell";
  * reorder would fire on top of the resize.
  */
 export interface UseColumnResizeResult<K extends string> {
-  /** Current width of every column, in pixels. Never outside the bounds. */
-  widths: Record<K, number>;
+  /**
+   * The width of every column that has one, in pixels, never outside the
+   * bounds. A key that is absent has no width at all: that is an elastic
+   * column, absorbing whatever the measured ones leave. Dragging one is what
+   * gives it a width for the first time.
+   */
+  widths: Partial<Record<K, number>>;
   /**
    * Props for a resizable column's `onHeaderCell`. A column that never calls
    * this grows no handle, which is how the pinned action columns and the
@@ -70,19 +78,32 @@ interface ActiveResize<K> {
 }
 
 export function useColumnResize<K extends string>(
-  defaults: Record<K, number>,
+  defaults: Partial<Record<K, number>>,
   storageKey: string,
   /** Floors above the global 60px, for columns whose content cannot shrink
    *  that far — a cell of buttons stacks into a broken pile at 60. Applied to
    *  the drag and to widths read back from storage alike. */
   mins: Partial<Record<K, number>> = {},
+  /**
+   * What this table spends on things a drag cannot reclaim, and what its
+   * elastic columns need at their narrowest. Without it a drag has no ceiling
+   * and can put the horizontal scrollbar back, which is the whole complaint.
+   */
+  budget: { chrome: number; elasticFloor: number } = { chrome: 0, elasticFloor: 0 },
+  /**
+   * A previous release's storage key, removed on first read. A layout saved
+   * before the box was binding is exactly the layout being fixed.
+   */
+  legacyStorageKey?: string,
 ): UseColumnResizeResult<K> {
-  const [widths, setWidths] = useState<Record<K, number>>(defaults);
+  const [widths, setWidths] = useState<Partial<Record<K, number>>>(defaults);
   // Storage is read after mount, never during render: the server has no
   // localStorage, so a width read during render would make the server and
   // client markup disagree and React would throw a hydration error.
   const [hydrated, setHydrated] = useState(false);
   const dragRef = useRef<ActiveResize<K> | null>(null);
+  /** The table's width as the last drag measured it. See the mount effect. */
+  const measuredBox = useRef<number | null>(null);
 
   useEffect(() => {
     let stored: string | null = null;
@@ -95,9 +116,26 @@ export function useColumnResize<K extends string>(
       console.warn("reading stored column widths failed:", err);
     }
     const keys = Object.keys(defaults) as K[];
+    // A layout saved before the box was binding is thrown away whole rather
+    // than clamped column by column — see discardOversizeWidths. The box is
+    // whatever a drag last measured, and TABLE_BOX_AT_1280 until one has:
+    // judging a stored layout against the narrowest supported box is the
+    // safe direction to be wrong in.
+    const recovered = discardOversizeWidths(parseStoredWidths(stored, keys, mins), {
+      box: measuredBox.current ?? TABLE_BOX_AT_1280,
+      ...budget,
+    });
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWidths(mergeColumnWidths(defaults, parseStoredWidths(stored, keys, mins)));
+    setWidths(mergeColumnWidths(defaults, recovered));
     setHydrated(true);
+    if (legacyStorageKey) {
+      try {
+        window.localStorage.removeItem(legacyStorageKey);
+      } catch {
+        // A profile that refuses storage also refuses removal, and on such a
+        // profile there was no saved layout to migrate in the first place.
+      }
+    }
     // `defaults` is a module constant at every call site; listing it would
     // re-read storage on every render for a value that never changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,21 +161,28 @@ export function useColumnResize<K extends string>(
         // of that, for the browsers where this alone is not enough.
         event.preventDefault();
         event.stopPropagation();
-        // The width as it is right now, read once. Every frame below measures
-        // against this number and the pointer's total travel — see
-        // `resizedWidth` for why accumulating per-frame deltas drifts.
-        dragRef.current = { key, startX: event.clientX, startWidth: widths[key] };
+        // Both numbers are read once, here. An elastic column has no width in
+        // state — it was absorbing the remainder — so its starting width is
+        // whatever the browser gave the cell; and the box is measured rather
+        // than watched, because a resize is a gesture, not a subscription.
+        const cell = (event.target as HTMLElement).closest("th");
+        const table = cell?.closest(".ant-table");
+        const startWidth = Math.round(
+          widths[key] ?? cell?.getBoundingClientRect().width ?? MIN_COLUMN_WIDTH,
+        );
+        const box = table?.clientWidth ?? TABLE_BOX_AT_1280;
+        measuredBox.current = box;
+        dragRef.current = { key, startX: event.clientX, startWidth };
 
         const move = (moveEvent: PointerEvent) => {
           const active = dragRef.current;
           if (!active) return;
-          const next = resizedWidth(
-            active.startWidth,
-            moveEvent.clientX - active.startX,
-            mins[active.key],
-          );
+          // Every frame measures against the width at pointer-down and the
+          // pointer's total travel — see `resizedWidth` for why accumulating
+          // per-frame deltas drifts away from the pointer.
+          const wanted = active.startWidth + (moveEvent.clientX - active.startX);
           setWidths((current) =>
-            current[active.key] === next ? current : { ...current, [active.key]: next },
+            resizeWithinBox(current, active.key, wanted, { box, ...budget }, mins),
           );
         };
         const end = () => {
