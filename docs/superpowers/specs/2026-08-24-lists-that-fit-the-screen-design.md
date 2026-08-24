@@ -128,21 +128,42 @@ The August gesture stays. Its arithmetic changes. Today `useColumnResize` sums
 the widths and hands the total to `scroll.x`, so widening a column manufactures
 horizontal scroll — precisely what the reader is complaining about.
 
+Only measured columns have a width at all, so "the total stays the same" is not
+expressible as a sum over the returned map — the elastic columns are the
+remainder, and CSS computes them. The invariant is therefore stated against the
+box:
+
 New pure function in `lib/domain/column-width.ts`:
 
-    redistribute(widths, key, delta, { mins, elasticKeys, box }) -> widths
+    resizeWithinBox(widths, key, delta, { box, chrome, elasticFloor }, mins) -> widths
+
+`box` is the table's own width, measured once from the DOM at pointer-down (the
+nearest `.ant-table` of the handle being dragged) — no `ResizeObserver`.
+`chrome` is everything in the row that is not a resizable column: the pinned
+action columns and the selection checkbox. `elasticFloor` is the sum of the
+elastic columns' floors.
 
 Invariants, each one a test:
 
-1. The sum of the returned widths equals the sum of the given widths.
+1. After the call, `sum(returned widths) + chrome + elasticFloor <= box`
+   whenever it held before it.
 2. No returned width is below its own minimum (`mins`, already per-column on
    `main`), and never below `MIN_COLUMN_WIDTH`.
-3. Width taken by a widened column comes out of the elastic columns first, in
-   left-to-right order; a measured neighbour is never silently narrowed.
-4. When every elastic column already sits at its floor, the drag stops moving
-   rather than overflowing the box.
+3. Narrowing is always allowed down to that minimum; the room goes back to the
+   elastic columns, which is what makes the gesture zero-sum.
+4. Widening stops at the point where the elastic columns would drop under their
+   floors. The drag holds still instead of overflowing the box — a measured
+   neighbour is never silently narrowed to pay for it.
+5. A box too small to hold what is already declared never causes a widening,
+   and never shrinks a column on its own.
 
-Only measured columns are stored; an elastic column has no width to store.
+An elastic column starts with no width, and therefore no width to store — but
+it keeps its resize handle, because Description is the column the reader
+reaches for. Dragging it gives it a pixel width like any measured column, and
+the room comes out of the table's **last elastic column**, which is declared
+per table and never takes a width of its own (`match` on `/banking`). That is
+what keeps the row total pinned to the box no matter what the reader drags:
+there is always exactly one column absorbing the remainder.
 
 **The stored-widths trap.** Readers who already dragged their columns have
 1530px of widths sitting in `localStorage` under
@@ -217,7 +238,7 @@ Three gates, because this complaint has now survived three fixes.
 
 ### 8.1 Unit — the arithmetic
 
-`lib/domain/column-width.test.ts` gains the four `redistribute` invariants from
+`lib/domain/column-width.test.ts` gains the four `resizeWithinBox` invariants from
 6.2. A new `lib/design/table-metrics.test.ts` asserts every token is a positive
 integer, and that the measured tokens `/banking` uses plus `TEXT_MIN` plus
 `RICH_MIN` stay under 984 — so widening a token later fails here rather than on
