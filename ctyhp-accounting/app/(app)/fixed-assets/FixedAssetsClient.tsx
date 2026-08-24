@@ -15,7 +15,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Progress,
   Row,
   Select,
   Space,
@@ -39,6 +38,8 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import AttachmentDrawer, {
@@ -708,59 +709,56 @@ export default function FixedAssetsClient({
 
   const columns: TableColumnsType<FixedAssetView> = [
     {
-      title: "Asset",
-      key: "asset",
-      width: 280,
-      render: (_value, asset) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>
-            {asset.asset_number} · {asset.name}
-          </Typography.Text>
-          <Typography.Text type="secondary">{asset.category}</Typography.Text>
-        </Space>
-      ),
+      // The elastic column. Depreciation progress used to be 190px of progress
+      // bar; it is one fraction, so it reads here under the asset with its
+      // category.
+      ...flexColumn<FixedAssetView>({
+        title: "Asset",
+        key: "asset",
+        render: (_value: unknown, asset: FixedAssetView) => (
+          <div style={{ minWidth: 0 }}>
+            <Typography.Text strong title={`${asset.asset_number} · ${asset.name}`}>
+              {asset.asset_number} · {asset.name}
+            </Typography.Text>
+            {secondaryLine(
+              `${asset.category} · ${
+                asset.total_periods
+                  ? `${asset.posted_periods}/${asset.total_periods} periods posted`
+                  : "Not depreciated"
+              }`,
+            )}
+          </div>
+        ),
+      }),
     },
-    { title: "In service", dataIndex: "in_service_date", width: 115 },
+    { title: "In service", dataIndex: "in_service_date", width: COLUMN.DATE },
     {
       title: "Cost",
       dataIndex: "cost_minor",
-      width: 130,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => money(value),
     },
     {
-      title: "Accumulated depreciation",
+      // "Accumulated depreciation" is 180px of heading for a column of
+      // amounts. The short form is what an accountant writes anyway.
+      title: "Accum. dep.",
       dataIndex: "accumulated_depreciation_minor",
-      width: 180,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => money(value),
     },
     {
       title: "Net book value",
       dataIndex: "net_book_value_minor",
-      width: 140,
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => <Typography.Text strong>{money(value)}</Typography.Text>,
     },
     {
-      title: "Depreciation progress",
-      key: "progress",
-      width: 190,
-      render: (_value, asset) =>
-        asset.total_periods ? (
-          <Progress
-            percent={Math.round((asset.posted_periods / asset.total_periods) * 100)}
-            size="small"
-            format={() => `${asset.posted_periods}/${asset.total_periods}`}
-          />
-        ) : (
-          <Typography.Text type="secondary">Not depreciated</Typography.Text>
-        ),
-    },
-    {
       title: "Status",
       dataIndex: "status",
-      width: 135,
+      width: COLUMN.STATUS,
       render: (value: FixedAssetStatus, asset) => (
         <Space direction="vertical" size={2}>
           <Tag color={STATUS_LABELS[value].color}>{STATUS_LABELS[value].label}</Tag>
@@ -771,8 +769,11 @@ export default function FixedAssetsClient({
     {
       title: "Actions",
       key: "action",
-      width: 315,
-      fixed: "right",
+      // Two of the three buttons were text 315px wide. Schedule and Dispose
+      // are familiar enough to read as icons; Post keeps its word, because it
+      // writes to the ledger and should say so.
+      width: 190,
+      align: "right",
       render: (_value, asset) => (
         <Space size={4}>
           {canReadDocuments ? (
@@ -788,9 +789,11 @@ export default function FixedAssetsClient({
               }
             />
           ) : null}
-          <Button size="small" icon={<ScheduleOutlined />} onClick={() => void openSchedule(asset)}>
-            Schedule
-          </Button>
+          <IconActionButton
+            label="Depreciation schedule"
+            icon={<ScheduleOutlined />}
+            onClick={() => void openSchedule(asset)}
+          />
           {canPost && asset.due_depreciation_minor > 0 && asset.status !== "disposed" ? (
             <Button
               size="small"
@@ -804,13 +807,11 @@ export default function FixedAssetsClient({
             </Button>
           ) : null}
           {canDispose && asset.status !== "disposed" ? (
-            <Button
-              size="small"
+            <IconActionButton
+              label="Dispose of this asset"
               icon={<StopOutlined />}
               onClick={() => void openDisposal(asset)}
-            >
-              Dispose
-            </Button>
+            />
           ) : null}
         </Space>
       ),
@@ -819,8 +820,8 @@ export default function FixedAssetsClient({
 
   const scheduleColumns: TableColumnsType<AssetDepreciationScheduleRow> = [
     { title: "Period", dataIndex: "sequence_number", width: 75 },
-    { title: "From", dataIndex: "period_start", width: 110 },
-    { title: "Through", dataIndex: "period_end", width: 110 },
+    { title: "From", dataIndex: "period_start", width: COLUMN.DATE },
+    { title: "Through", dataIndex: "period_end", width: COLUMN.DATE },
     {
       title: "Planned",
       dataIndex: "planned_amount_minor",
@@ -958,7 +959,6 @@ export default function FixedAssetsClient({
           setRegisterPageSize,
           pageSizeOptionsFor(ASSET_REGISTER_DEFAULT_PAGE_SIZE),
         )}
-        scroll={{ x: 1450 }}
         sticky
         emptyTitle="No fixed assets"
         emptyDescription="Register equipment, fixtures, security systems, and other long-lived assets."
@@ -1228,7 +1228,6 @@ export default function FixedAssetsClient({
             setSchedulePageSize,
             pageSizeOptionsFor(DEPRECIATION_SCHEDULE_DEFAULT_PAGE_SIZE),
           )}
-          scroll={{ x: 780 }}
           emptyTitle="No depreciation schedule"
           emptyDescription="This asset is configured as non-depreciable."
         />

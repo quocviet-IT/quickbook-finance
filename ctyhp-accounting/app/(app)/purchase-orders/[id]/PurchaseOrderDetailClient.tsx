@@ -221,7 +221,6 @@ export default function PurchaseOrderDetailClient({
           size="small"
           pagination={false}
           dataSource={lines}
-          scroll={{ x: "max-content" }}
           columns={[
             { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
             { title: "Description", dataIndex: "description", ...longTextColumn() },
@@ -326,8 +325,7 @@ export default function PurchaseOrderDetailClient({
             size="small"
             pagination={false}
             dataSource={exceptions}
-            scroll={{ x: "max-content" }}
-            columns={[
+              columns={[
               { title: "Kind", dataIndex: "kind", render: (v: string) => <Tag color="orange">{v}</Tag> },
               { title: "Expected", dataIndex: "expected_value", align: "right", render: (v: number) => Number(v) },
               { title: "Actual", dataIndex: "actual_value", align: "right", render: (v: number) => Number(v) },

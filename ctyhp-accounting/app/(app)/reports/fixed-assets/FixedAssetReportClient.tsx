@@ -436,7 +436,6 @@ export default function FixedAssetReportClient({
               setAssetsPageSize,
               pageSizeOptionsFor(ASSET_REGISTER_DEFAULT_PAGE_SIZE),
             )}
-            scroll={{ x: 1280 }}
             emptyTitle="No assets match the report filters"
           />
         </>
@@ -472,7 +471,6 @@ export default function FixedAssetReportClient({
               setDepreciationPageSize,
               pageSizeOptionsFor(DEPRECIATION_DEFAULT_PAGE_SIZE),
             )}
-            scroll={{ x: 980 }}
             emptyTitle="No depreciation rows match the report filters"
           />
         </>

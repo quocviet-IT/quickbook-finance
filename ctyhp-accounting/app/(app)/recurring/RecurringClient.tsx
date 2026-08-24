@@ -36,6 +36,8 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import type {
   AccountRow,
@@ -368,26 +370,28 @@ export default function RecurringClient({
 
   const templateColumns: TableColumnsType<RecurringTemplateRow> = [
     {
-      title: "Schedule",
-      key: "schedule",
-      width: 250,
-      render: (_, template) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>{template.name}</Typography.Text>
-          <Typography.Text type="secondary">
-            {DOCUMENT_TYPE_LABELS[template.document_type]}
-          </Typography.Text>
-        </Space>
-      ),
-    },
-    {
-      title: "Frequency",
-      key: "frequency",
-      render: (_, template) => scheduleLabel(template),
+      // The elastic column. What kind of document this makes, and how often,
+      // both read under its name: the frequency was a column of its own
+      // printing a phrase like "Every month on the 1st".
+      ...flexColumn<RecurringTemplateRow>({
+        title: "Schedule",
+        key: "schedule",
+        render: (_: unknown, template: RecurringTemplateRow) => (
+          <div style={{ minWidth: 0 }}>
+            <Typography.Text strong title={template.name}>
+              {template.name}
+            </Typography.Text>
+            {secondaryLine(
+              `${DOCUMENT_TYPE_LABELS[template.document_type]} · ${scheduleLabel(template)}`,
+            )}
+          </div>
+        ),
+      }),
     },
     {
       title: "Next occurrence",
       dataIndex: "next_run_date",
+      width: 110,
       render: (value: string, template) => (
         <Space direction="vertical" size={0}>
           <Typography.Text>{dayjs(value).format("MMM D, YYYY")}</Typography.Text>
@@ -398,39 +402,37 @@ export default function RecurringClient({
     {
       title: "Amount",
       dataIndex: "total_minor",
+      width: COLUMN.MONEY,
       align: "right",
       render: (value: number) => formatMoney(value, "USD", 2),
     },
     {
+      // The last run reads under the status: both answer "is this schedule
+      // working", and one of them is blank on most rows.
       title: "Status",
       dataIndex: "status",
-      render: (value: RecurringTemplateStatus) => (
-        <Tag color={TEMPLATE_STATUS[value].color}>{TEMPLATE_STATUS[value].label}</Tag>
-      ),
-    },
-    {
-      title: "Last result",
-      key: "last",
-      render: (_, template) =>
-        template.last_run_status ? (
-          <Space direction="vertical" size={0}>
+      width: 130,
+      render: (value: RecurringTemplateStatus, template) => (
+        <Space direction="vertical" size={2}>
+          <Tag color={TEMPLATE_STATUS[value].color}>{TEMPLATE_STATUS[value].label}</Tag>
+          {template.last_run_status ? (
             <Tag color={RUN_STATUS[template.last_run_status].color}>
               {RUN_STATUS[template.last_run_status].label}
             </Tag>
-            {template.last_error ? (
-              <Typography.Text type="danger" ellipsis={{ tooltip: template.last_error }}>
-                {template.last_error}
-              </Typography.Text>
-            ) : null}
-          </Space>
-        ) : (
-          <Typography.Text type="secondary">Not run</Typography.Text>
-        ),
+          ) : null}
+          {template.last_error ? (
+            <Typography.Text type="danger" style={{ fontSize: 12 }} ellipsis={{ tooltip: template.last_error }}>
+              {template.last_error}
+            </Typography.Text>
+          ) : null}
+        </Space>
+      ),
     },
     {
       title: "Actions",
       key: "actions",
-      fixed: "right",
+      width: 190,
+      align: "right",
       render: (_, template) => (
         <Space>
           <Popconfirm
@@ -638,7 +640,6 @@ export default function RecurringClient({
             setTemplatesPageSize,
             pageSizeOptionsFor(TEMPLATES_DEFAULT_PAGE_SIZE),
           )}
-          scroll={{ x: 1120 }}
         />
       </section>
 
@@ -655,7 +656,6 @@ export default function RecurringClient({
             setRunsPageSize,
             pageSizeOptionsFor(RUNS_DEFAULT_PAGE_SIZE),
           )}
-          scroll={{ x: 860 }}
         />
       </section>
 

@@ -17,6 +17,8 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { allocateAcrossBills } from "@/lib/domain/payables";
 import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
@@ -184,7 +186,6 @@ export default function PayBillsClient({
       <Table<BillPaymentRow & { vendor_name: string }>
         rowKey="id"
         dataSource={payments}
-        scroll={{ x: "max-content" }}
         pagination={{
           // Explicit, unlike the rest of this sweep's default DataTable/Table
           // behaviour: this screen wants the size changer shown regardless of
@@ -194,12 +195,13 @@ export default function PayBillsClient({
           showSizeChanger: true,
         }}
         columns={[
-          { title: "Payment Number", dataIndex: "payment_number", render: (v) => v ?? "—" },
-          { title: "Vendor", dataIndex: "vendor_name" },
-          { title: "Date", dataIndex: "payment_date" },
-          { title: "Amount", dataIndex: "amount_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
-          { title: "Unapplied", dataIndex: "unapplied_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
-          { title: "Status", dataIndex: "status", render: (s: string) => <Tag color={s === "void" ? "red" : "blue"}>{s}</Tag> },
+          { title: "Payment Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
+          // The elastic column: a vendor name is text somebody typed.
+          flexColumn<BillPaymentRow & { vendor_name: string }>({ title: "Vendor", dataIndex: "vendor_name" }),
+          { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE },
+          { title: "Amount", dataIndex: "amount_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+          { title: "Unapplied", dataIndex: "unapplied_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "blue"}>{s}</Tag> },
           {
             title: "Actions",
             key: "actions",
@@ -290,8 +292,7 @@ export default function PayBillsClient({
             locale={{ emptyText: describeNoOpenBills(selectedVendorId ? (selectedVendorName ?? "This vendor") : null) }}
             size="small"
             pagination={false}
-            scroll={{ x: "max-content" }}
-            style={{ marginTop: 8 }}
+                style={{ marginTop: 8 }}
             columns={[
               { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? "—" },
               { title: "Date", dataIndex: "bill_date" },

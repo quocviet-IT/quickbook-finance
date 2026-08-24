@@ -112,7 +112,6 @@ export default function AgingByPartyTable({
             loading={loading}
             pagination={false}
             dataSource={grid.rows}
-            scroll={{ x: "max-content" }}
             locale={{ emptyText: emptyDescription }}
             columns={[
               {
