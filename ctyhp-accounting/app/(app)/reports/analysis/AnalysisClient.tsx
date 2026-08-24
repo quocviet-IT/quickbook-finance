@@ -21,6 +21,8 @@ import {
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { FinancialAnalysisRow } from "@/lib/db/types";
@@ -310,20 +312,24 @@ export default function AnalysisClient({
           emptyTitle="No frozen reports yet"
           emptyDescription="Freeze a scenario above to keep it exactly as it was computed."
           columns={[
-            { title: "Title", dataIndex: "title" },
+            // The elastic column: a title is whatever somebody called it.
+            flexColumn<FinancialAnalysisRow>({ title: "Title", dataIndex: "title" }),
             {
               title: "Period",
               key: "period",
+              width: 190,
               render: (_, r) => `${r.period_start} → ${r.period_end}`,
             },
             {
               title: "Created",
               dataIndex: "created_at",
+              width: 140,
               render: (v: string) => v.slice(0, 16).replace("T", " "),
             },
             {
               title: "Status",
               dataIndex: "status",
+              width: COLUMN.STATUS,
               render: (s: string) => <Tag color={s === "active" ? "green" : "default"}>{s}</Tag>,
             },
             {

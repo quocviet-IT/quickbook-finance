@@ -18,10 +18,13 @@ import { ColumnHeaderCell } from "@/components/ui/ColumnHeaderCell";
 import { useColumnResize } from "@/components/ui/useColumnResize";
 import { totalColumnWidth } from "@/lib/domain/column-width";
 import {
+  GENERAL_LEDGER_BUDGET,
   GENERAL_LEDGER_DEFAULT_WIDTHS,
   GENERAL_LEDGER_WIDTH_STORAGE_KEY,
+  GENERAL_LEDGER_WIDTH_STORAGE_KEY_V1,
   type GeneralLedgerColumnKey,
 } from "./general-ledger-columns";
+import { secondaryLine } from "@/components/ui/columns";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -101,6 +104,9 @@ export default function GeneralLedgerClient({
   const { widths, resizeHandleProps } = useColumnResize<GeneralLedgerColumnKey>(
     GENERAL_LEDGER_DEFAULT_WIDTHS,
     GENERAL_LEDGER_WIDTH_STORAGE_KEY,
+    {},
+    GENERAL_LEDGER_BUDGET,
+    GENERAL_LEDGER_WIDTH_STORAGE_KEY_V1,
   );
 
   const run = useCallback(async () => {
@@ -270,7 +276,7 @@ export default function GeneralLedgerClient({
             // room is shared out across every column — so narrowing Memo would
             // widen Debit, Credit and Running, which REQ-01 forbids and no
             // spreadsheet does. See app/globals.css.
-            className="accounting-table--exact-widths"
+
             columns={[
               {
                 title: "Date",
@@ -288,36 +294,31 @@ export default function GeneralLedgerClient({
                 ),
               },
               {
-                title: "Source",
-                dataIndex: "sourceType",
-                width: widths.source,
-                onHeaderCell: () => resizeHandleProps("source"),
-                render: (source, row) => {
-                  const href = sourceHref(row.sourceType, row.sourceId);
-                  return href ? <Link href={href}>{source}</Link> : source;
-                },
-              },
-              {
                 // DESCRIPTION in the video, and the column they were dragging.
+                // Elastic now: it takes whatever the measured columns leave,
+                // so it is widest exactly where there is room for it to be.
+                // Source used to be a column of its own and reads underneath.
                 title: "Memo",
                 dataIndex: "memo",
-                width: widths.memo,
-                onHeaderCell: () => resizeHandleProps("memo"),
-                // `showTitle: false` turns off the browser's own tooltip, which
-                // is slow to appear and renders a wire description as one
-                // unbroken line. The Ant Design one replaces it: it opens at
-                // once and wraps, which is the only way several hundred
-                // characters are readable — and it is what keeps narrowing
-                // this column safe, because nothing is ever put out of reach.
                 ellipsis: { showTitle: false },
-                render: (memo: string | null) =>
-                  memo ? (
-                    <Tooltip title={memo} placement="topLeft" styles={{ root: { maxWidth: 640 } }}>
-                      <span>{memo}</span>
-                    </Tooltip>
-                  ) : (
-                    ""
-                  ),
+                render: (memo: string | null, row) => {
+                  const href = sourceHref(row.sourceType, row.sourceId);
+                  return (
+                    <div style={{ minWidth: 0 }}>
+                      {/* `showTitle: false` above turns off the browser's own
+                          tooltip, which is slow and renders a wire description
+                          as one unbroken line. The Ant Design one opens at once
+                          and wraps, which is what keeps a narrowed column safe:
+                          nothing is ever put out of reach. */}
+                      <Tooltip title={memo} placement="topLeft" styles={{ root: { maxWidth: 640 } }}>
+                        <span>{memo ?? ""}</span>
+                      </Tooltip>
+                      {secondaryLine(
+                        href ? <Link href={href}>{row.sourceType}</Link> : row.sourceType,
+                      )}
+                    </div>
+                  );
+                },
               },
               {
                 title: "Debit",

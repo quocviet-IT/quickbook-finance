@@ -5,8 +5,8 @@ import { Alert, Button, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Link from "next/link";
 import DataTable from "@/components/ui/DataTable";
-import { dateColumn, statusColumn, actionsColumn } from "@/components/ui/columns";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import { dateColumn, statusColumn, actionsColumn, flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
 import { downloadBackupAction, type BackupRow } from "./actions";
@@ -57,26 +57,25 @@ export default function BackupsClient({
   }, []);
 
   const columns: ColumnsType<BackupRow> = [
-    dateColumn<BackupRow>({ title: "Date", dataIndex: "takenAt", width: 130 }),
+    dateColumn<BackupRow>({ title: "Date", dataIndex: "takenAt", width: COLUMN.DATE }),
     statusColumn<BackupRow>({
       title: "Status",
       dataIndex: "status",
-      width: 120,
+      width: COLUMN.STATUS,
       tones: {
         stored: { tone: "positive", label: "Stored" },
         skipped: { tone: "neutral", label: "Skipped" },
         failed: { tone: "danger", label: "Failed" },
       },
     }),
-    {
-      title: "Why no file",
-      dataIndex: "skipReason",
-      ...longTextColumn(320),
-    },
+    // The elastic column. It is blank on every stored backup and holds a
+    // sentence on the few that were skipped, so a fixed 320px was the worst of
+    // both: too wide for the common row, too narrow for the rare one.
+    flexColumn<BackupRow>({ title: "Why no file", dataIndex: "skipReason" }),
     {
       title: "Size",
       dataIndex: "sizeBytes",
-      width: 110,
+      width: COLUMN.QTY,
       align: "right",
       // Bytes are display arithmetic, not money: formatBytes divides to build
       // "2.4 MB" and must stay away from fromMinor/formatMoney, which throw on
@@ -86,12 +85,12 @@ export default function BackupsClient({
     {
       title: "Journal lines",
       dataIndex: "journalLineCount",
-      width: 130,
+      width: COLUMN.CODE,
       align: "right",
       render: (value: number | null) => (value === null ? "—" : value.toLocaleString("en-US")),
     },
     actionsColumn<BackupRow>({
-      width: canRestore ? 220 : 120,
+      width: canRestore ? 220 : COLUMN.CODE,
       actions: (row) => [
         <Button
           key="download"

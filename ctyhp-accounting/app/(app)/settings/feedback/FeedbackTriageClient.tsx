@@ -22,6 +22,9 @@ import {
 } from "@ant-design/icons";
 import type { ButtonProps } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import IconActionButton from "@/components/ui/IconActionButton";
+import { secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import {
   describeFeedbackStatusChange,
   FEEDBACK_STATUSES,
@@ -157,6 +160,19 @@ export default function FeedbackTriageClient({
     else message.error(res.error ?? "Attachment unavailable");
   }
 
+  /**
+   * Where a report came from and who filed it, in one line.
+   *
+   * Two columns until this rework — 410px of the row — and both are context
+   * for the description rather than things a reader scans down the column.
+   */
+  function provenance(row: FeedbackReportView): string {
+    const purpose = improvementById.get(row.id)?.pagePurpose;
+    return [summarizePageContext(row.page), purpose, row.reporter?.email ?? "no email"]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
   const columns: TableColumnsType<FeedbackReportView> = [
     {
       title: "Filed",
@@ -164,7 +180,7 @@ export default function FeedbackTriageClient({
       // The date answers "how stale is this queue"; the exact minute almost
       // never matters and was costing sixty pixels on every row. It stays a
       // hover away rather than gone.
-      width: 110,
+      width: COLUMN.DATE,
       render: (value: string) => (
         <Tooltip title={new Date(value).toLocaleString("en-US")}>
           <span>{new Date(value).toLocaleDateString("en-US")}</span>
@@ -174,14 +190,14 @@ export default function FeedbackTriageClient({
     {
       title: "Kind",
       dataIndex: "kind",
-      width: 130,
+      width: COLUMN.STATUS,
       render: (kind: string) => (
         <Tag color={KIND_COLOR[kind]}>{feedbackKindLabel(kind as "broken")}</Tag>
       ),
     },
     {
       title: "Urgency",
-      width: 160,
+      width: 130,
       // Sorted by the score the database computed, never one recomputed here.
       sorter: (a: FeedbackReportView, b: FeedbackReportView) =>
         (improvementById.get(a.id)?.priority ?? 0) - (improvementById.get(b.id)?.priority ?? 0),
@@ -207,14 +223,11 @@ export default function FeedbackTriageClient({
     {
       title: "What happened",
       dataIndex: "description",
-      // Bounded, at last. This column had no width in a table sized to its
-      // contents, so one long report decided how wide the whole table was —
-      // the same unbounded free-text defect the 1.20 sweep fixed everywhere
-      // else; this screen was missed. Text wraps inside the column now, cut
-      // after a few lines with antd's own "more" control, so a long report
-      // costs its own row some height instead of costing every column its
-      // room.
-      width: 380,
+      // The elastic column, and the one this screen exists to read. Where the
+      // report came from and who filed it were columns of their own, 410px
+      // between them, and this table overflowed its box by 823px — which is
+      // precisely the complaint being triaged in it.
+      minWidth: COLUMN.TEXT_MIN,
       render: (text: string | null, row: FeedbackReportView) => {
         const entry = improvementById.get(row.id);
         // A suggestion reads as an argument: the difficulty first, then what
@@ -249,64 +262,45 @@ export default function FeedbackTriageClient({
                   {text}
                 </Typography.Paragraph>
               ) : null}
+              {secondaryLine(provenance(row))}
             </Space>
           );
         }
-        return text ? (
-          <Typography.Paragraph
-            style={{ marginBottom: 0 }}
-            ellipsis={{ rows: 3, expandable: true, symbol: "more" }}
-          >
-            {text}
-          </Typography.Paragraph>
-        ) : (
-          <Typography.Text type="secondary">No description</Typography.Text>
+        return (
+          <div style={{ minWidth: 0 }}>
+            {text ? (
+              <Typography.Paragraph
+                style={{ marginBottom: 0 }}
+                ellipsis={{ rows: 3, expandable: true, symbol: "more" }}
+              >
+                {text}
+              </Typography.Paragraph>
+            ) : (
+              <Typography.Text type="secondary">No description</Typography.Text>
+            )}
+            {secondaryLine(provenance(row))}
+          </div>
         );
       },
     },
     {
-      title: "Where",
-      width: 220,
-      render: (_, row) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {summarizePageContext(row.page)}
-          </Typography.Text>
-          {/* What that screen is for, as the guide describes it — so a reader
-              knows which part of the system an idea belongs to without opening
-              the route. */}
-          {improvementById.get(row.id)?.pagePurpose ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12, fontStyle: "italic" }}>
-              {improvementById.get(row.id)?.pagePurpose}
-            </Typography.Text>
-          ) : null}
-        </Space>
-      ),
-    },
-    {
-      title: "Reporter",
-      width: 190,
-      render: (_, row) => row.reporter?.email ?? "—",
-    },
-    {
-      title: "Screenshot",
-      width: 120,
+      title: "Shot",
+      width: COLUMN.ACTION + 16,
+      align: "center",
       render: (_, row) =>
         row.screenshot ? (
-          <Button
-            size="small"
+          <IconActionButton
+            label="View the screenshot filed with this report"
             icon={<PictureOutlined />}
             onClick={() => openScreenshot(row.screenshot as string)}
-          >
-            View
-          </Button>
+          />
         ) : (
           <Typography.Text type="secondary">—</Typography.Text>
         ),
     },
     {
       title: "Attachments",
-      width: 240,
+      width: 130,
       render: (_, row) => {
         const files = attachmentsByReport.get(row.id) ?? [];
         if (files.length === 0) return <Typography.Text type="secondary">—</Typography.Text>;
@@ -332,7 +326,8 @@ export default function FeedbackTriageClient({
       ? [
           {
             title: "Move to",
-            width: 240,
+            width: 190,
+            align: "right" as const,
             render: (_: unknown, row: FeedbackReportView) => (
               <Space size="small" wrap>
                 {nextStatuses(row.status).map((status) => (

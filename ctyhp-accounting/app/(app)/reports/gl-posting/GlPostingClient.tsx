@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Alert, App, Button, DatePicker, Segmented, Space, Statistic, Table, Tag } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { fromMinor } from "@/lib/domain/money";
 import {
@@ -201,34 +203,43 @@ export default function GlPostingClient({
               {
                 title: "Document",
                 dataIndex: "documentNumber",
-                width: 150,
+                width: COLUMN.CODE,
                 render: (value: string | null) => value ?? <i>unnumbered</i>,
               },
-              { title: "Date", dataIndex: "documentDate", width: 110 },
-              { title: "Name", dataIndex: "partyName" },
-              { title: "Status", dataIndex: "documentStatus", width: 100 },
+              { title: "Date", dataIndex: "documentDate", width: COLUMN.DATE },
+              // The elastic column: the journal entry used to be a column of
+              // its own, 160px printing a reference that belongs to the row it
+              // is on.
+              flexColumn<PostingCheck>({
+                title: "Name",
+                key: "partyName",
+                render: (_: unknown, row: PostingCheck) => (
+                  <div style={{ minWidth: 0 }}>
+                    <span title={row.partyName ?? ""}>{row.partyName ?? "—"}</span>
+                    {secondaryLine(
+                      row.entryNumber ? (
+                        <Link href={`/reports/journal?entry=${row.journalEntryId}`}>
+                          {row.entryNumber}
+                        </Link>
+                      ) : (
+                        "Not posted"
+                      ),
+                    )}
+                  </div>
+                ),
+              }),
+              { title: "Status", dataIndex: "documentStatus", width: COLUMN.STATUS },
               {
                 title: "Amount",
                 dataIndex: "amountMinor",
-                width: 130,
+                width: COLUMN.MONEY,
                 align: "right",
                 render: (value: number) => money(value),
               },
               {
-                title: "Journal entry",
-                key: "entry",
-                width: 160,
-                render: (_: unknown, row) =>
-                  row.entryNumber ? (
-                    <Link href={`/journal?entry=${row.journalEntryId}`}>{row.entryNumber}</Link>
-                  ) : (
-                    "—"
-                  ),
-              },
-              {
                 title: "Posting",
                 key: "verdict",
-                width: 170,
+                width: 150,
                 render: (_: unknown, row) => (
                   <Tag color={VERDICT_COLOR[row.verdict]}>{POSTING_VERDICT_LABEL[row.verdict]}</Tag>
                 ),

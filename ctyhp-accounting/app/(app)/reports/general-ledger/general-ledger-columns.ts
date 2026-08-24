@@ -1,3 +1,5 @@
+import { COLUMN } from "@/lib/design/table-metrics";
+
 /**
  * The General Ledger report's columns, and the width each one starts at.
  *
@@ -17,36 +19,41 @@
  * A `.ts` module rather than numbers inside the screen so a test can hold the
  * set of keys without importing a component that pulls in Ant Design.
  */
-export const GENERAL_LEDGER_COLUMN_KEYS = [
-  "date",
-  "entry",
-  "source",
-  "memo",
-  "debit",
-  "credit",
-  "running",
-] as const;
+export const GENERAL_LEDGER_COLUMN_KEYS = ["date", "entry", "memo", "debit", "credit", "running"] as const;
 
 export type GeneralLedgerColumnKey = (typeof GENERAL_LEDGER_COLUMN_KEYS)[number];
 
 /**
- * Six of these are the literals this report has always used. `memo` is the
- * new one: it never had a width, and under the layout this screen used to run
- * it took whatever room was left over — about 180px on a laptop, which is why
- * a wire description was unreadable and why the reviewer wanted to widen it.
+ * The measured columns, from the shared tokens. `memo` is absent on purpose:
+ * it is the elastic column and takes whatever these leave, which is what makes
+ * the row total the width of the box.
  *
- * The total is 1,010px. That fits without a scrollbar on the screens this is
- * read on, and the reader can drag it either way from there.
+ * Source was a column of its own — 120px printing "Invoice" or "Payment" — and
+ * now reads under the memo, where it qualifies the line rather than competing
+ * with it for the screen.
  */
-export const GENERAL_LEDGER_DEFAULT_WIDTHS: Record<GeneralLedgerColumnKey, number> = {
-  date: 110,
-  entry: 130,
-  source: 120,
-  memo: 220,
-  debit: 140,
-  credit: 140,
-  running: 150,
+export const GENERAL_LEDGER_DEFAULT_WIDTHS: Partial<Record<GeneralLedgerColumnKey, number>> = {
+  date: COLUMN.DATE,
+  entry: COLUMN.CODE,
+  debit: COLUMN.MONEY,
+  credit: COLUMN.MONEY,
+  running: COLUMN.MONEY_WIDE,
 };
 
-/** Where this reader's own widths are kept, namespaced by screen. */
-export const GENERAL_LEDGER_WIDTH_STORAGE_KEY = "onebook.general-ledger.column-widths";
+/** The elastic column: it never takes a width. */
+export const GENERAL_LEDGER_ELASTIC_KEY: GeneralLedgerColumnKey = "memo";
+
+/** What a drag cannot reclaim here, and what the memo needs at its narrowest. */
+export const GENERAL_LEDGER_BUDGET = { chrome: 0, elasticFloor: COLUMN.TEXT_MIN };
+
+/**
+ * Where this reader's own widths are kept, namespaced by screen.
+ *
+ * v2: the widths saved under the old key total 1,010px against a 984px box at
+ * the narrowest viewport supported, so a reader who dragged these columns in
+ * August would otherwise get the sideways scrolling back.
+ */
+export const GENERAL_LEDGER_WIDTH_STORAGE_KEY = "onebook.general-ledger.column-widths.v2";
+
+/** The key it replaces, removed on first read. */
+export const GENERAL_LEDGER_WIDTH_STORAGE_KEY_V1 = "onebook.general-ledger.column-widths";

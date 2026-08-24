@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { Button, Card, DatePicker, Input, Select, Space, Statistic, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import {
@@ -214,44 +216,43 @@ export default function TransactionListClient({
             : "Widen the dates, or post a document to see it here."
         }
         columns={[
-          { title: "Date", dataIndex: "entryDate", width: 115 },
+          { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE },
           {
-            title: "Vendor/Customer Name",
-            dataIndex: "partyName",
-            width: 210,
-            render: (name: string | null) =>
-              name ?? <Typography.Text type="secondary">—</Typography.Text>,
+            // Two elastic columns: a party name and a description are both
+            // text somebody typed, and neither has a length worth guessing.
+            ...flexColumn<TransactionListRow>({
+              title: "Vendor/Customer Name",
+              dataIndex: "partyName",
+            }),
           },
           {
-            title: "Description",
-            dataIndex: "description",
-            render: (description: string, row) => (
-              <Space direction="vertical" size={0}>
-                <span>{description}</span>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {row.entryNumber} · {row.sourceType.replaceAll("_", " ")}
-                </Typography.Text>
-              </Space>
-            ),
-          },
-          {
-            title: "Account Type",
-            dataIndex: "categoryLabel",
-            width: 210,
-            render: (label: string | null) =>
-              label ?? <Typography.Text type="secondary">—</Typography.Text>,
-          },
-          {
-            title: "Bank or Credit Card",
-            dataIndex: "moneyLabel",
-            width: 200,
-            render: (label: string | null) =>
-              label ?? <Typography.Text type="secondary">—</Typography.Text>,
+            // Account Type and Bank or Credit Card were 410px of the row
+            // between them, printing one label each. They qualify the line, so
+            // they read under it with the entry number.
+            ...flexColumn<TransactionListRow>({
+              title: "Description",
+              key: "description",
+              render: (_: unknown, row: TransactionListRow) => (
+                <div style={{ minWidth: 0 }}>
+                  <span title={row.description}>{row.description}</span>
+                  {secondaryLine(
+                    [
+                      row.entryNumber,
+                      row.sourceType.replaceAll("_", " "),
+                      row.categoryLabel,
+                      row.moneyLabel,
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                  )}
+                </div>
+              ),
+            }),
           },
           {
             title: "Amount",
             dataIndex: "amountMinor",
-            width: 150,
+            width: COLUMN.MONEY,
             align: "right",
             render: (amount: number) => (
               <span style={{ color: amount < 0 ? TOKENS.money.negative : TOKENS.money.positive }}>{money(amount)}</span>
@@ -260,7 +261,7 @@ export default function TransactionListClient({
           {
             title: "Reconciled",
             dataIndex: "reconciled",
-            width: 120,
+            width: COLUMN.STATUS,
             render: (reconciled: boolean) =>
               reconciled ? <Tag color="green">Yes</Tag> : <Tag>No</Tag>,
           },
