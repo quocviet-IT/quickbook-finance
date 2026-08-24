@@ -41,12 +41,22 @@ export default function DescriptionCell({ row }: { row: Row }) {
       ? "Direct bank feed"
       : "File upload";
 
+  // Account source and Reference used to be columns of their own, 335px
+  // between them. Account source held the same bank on every row — the one
+  // already chosen in the filter bar — and Reference was an em dash on every
+  // row, while Match and Status sat off the side of the screen. They are facts
+  // about this line, so they read here, under it (feedback a9c5b84b).
+  const reference = row.transaction.reference?.trim();
+  const under = [row.accountName, reference ? `Ref ${reference}` : null, origin]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Tooltip title={row.transaction.description} placement="topLeft" styles={{ root: { maxWidth: 640 } }}>
       <div style={{ minWidth: 0 }}>
         <span style={ONE_LINE}>{row.transaction.description}</span>
         <Typography.Text type="secondary" style={{ fontSize: 12, ...ONE_LINE }}>
-          {origin}
+          {under}
         </Typography.Text>
       </div>
     </Tooltip>

@@ -4,11 +4,21 @@ import { Button, Space, Tag, Typography, type TableColumnsType } from "antd";
 import { PaperClipOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import IconActionButton from "@/components/ui/IconActionButton";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import { flexColumn } from "@/components/ui/columns";
 import { ColumnHeaderCell, type ColumnHeaderCellProps } from "@/components/ui/ColumnHeaderCell";
 import { useColumnDrag } from "@/components/ui/useColumnDrag";
 import { useColumnResize } from "@/components/ui/useColumnResize";
-import { totalColumnWidth } from "@/lib/domain/column-width";
+import { COLUMN } from "@/lib/design/table-metrics";
+import {
+  BANK_BUDGET,
+  BANK_COLUMN_KEYS,
+  BANK_LAST_ELASTIC_KEY,
+  BANK_MEASURED_WIDTHS,
+  BANK_MIN_WIDTHS,
+  BANK_WIDTH_STORAGE_KEY,
+  BANK_WIDTH_STORAGE_KEY_V1,
+  type BankColumnKey,
+} from "./bank-transaction-columns";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
 import type { BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
@@ -23,76 +33,6 @@ import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from 
 import type { BankTransactionDeleteEligibility } from "@/lib/domain/bank-transaction-delete";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
-
-/**
- * RQ-01: the reorderable data columns, in the order they ship today.
- *
- * Deliberately just these eight — never "delete" or "attachments". Those two
- * are built separately below, always `fixed: "right"`, and are never given
- * to `useColumnDrag`, so there is no key here a reader could drag them to:
- * the drag mechanism only ever sees the columns in this list, and only ever
- * reorders among them.
- */
-const DATA_COLUMN_KEYS = [
-  "date",
-  "description",
-  "account",
-  "reference",
-  "amount",
-  "category",
-  "match",
-  "status",
-] as const;
-
-type BankColumnKey = (typeof DATA_COLUMN_KEYS)[number];
-
-/**
- * RQ-01-REV: the width each column starts at, and the only place those
- * numbers live now.
- *
- * Seven of them are the literals this table has always used. `description` is
- * the new one: it never had a width, which is precisely why the reviewer had
- * to scroll. A column with no width in a table asked to be as wide as its
- * contents grows to fit the longest wire description in the account and
- * pushes Amount, Category and Status off the side of the screen — the
- * complaint in the follow-up video, word for word: "you have to scroll again,
- * wherever in left or right."
- */
-const DEFAULT_COLUMN_WIDTHS: Record<BankColumnKey, number> = {
-  date: 115,
-  description: 320,
-  account: 200,
-  reference: 135,
-  amount: 140,
-  category: 190,
-  match: 300,
-  status: 130,
-};
-
-/**
- * Where this reader's own widths are kept. Namespaced by screen so a second
- * resizable table cannot silently inherit this one's columns.
- */
-const COLUMN_WIDTH_STORAGE_KEY = "onebook.bank-transactions.column-widths";
-
-/**
- * Each pinned action column, in pixels. They are declared `width: 56` below
- * and are not resizable — but they still occupy the row, so the table's own
- * scroll width has to count them or the last data column ends up underneath
- * the Delete button.
- */
-const PINNED_COLUMN_WIDTH = 56;
-
-/**
- * Floors above the global 60px. Match holds a tag, a description and up to
- * three buttons; at the global floor those stacked into the broken pile a
- * reader screenshotted. A stored width already under the floor is re-clamped
- * on load, so the fix reaches layouts broken before it existed.
- */
-const MIN_COLUMN_WIDTHS: Partial<Record<BankColumnKey, number>> = {
-  match: 240,
-  category: 150,
-};
 
 const TXN_STATUS: Record<BankTxnStatus, { text: string; color: string }> = {
   unmatched: { text: "For review", color: "orange" },
@@ -169,49 +109,45 @@ export default function BankTransactionsTable({
   // exactly the shipped order, and lives only in this component's state —
   // section 8 of the change request settled that a reorder does not survive
   // a reload or a fresh login.
-  const { order: columnOrder, headerCellProps } = useColumnDrag<BankColumnKey>(DATA_COLUMN_KEYS);
+  const { order: columnOrder, headerCellProps } = useColumnDrag<BankColumnKey>(BANK_COLUMN_KEYS);
 
   // RQ-01-REV: this reader's own column widths. Unlike the order above these
   // do survive a reload — a bookkeeper narrows Description because their
   // descriptions are always long, and making them do it again every morning
   // would be the same wasted effort the video was reporting.
   const { widths, resizeHandleProps, guardHeaderDrag } = useColumnResize<BankColumnKey>(
-    DEFAULT_COLUMN_WIDTHS,
-    COLUMN_WIDTH_STORAGE_KEY,
-    MIN_COLUMN_WIDTHS,
+    BANK_MEASURED_WIDTHS,
+    BANK_WIDTH_STORAGE_KEY,
+    BANK_MIN_WIDTHS,
+    // Without this the drag has no ceiling and would put the horizontal
+    // scrollbar back — which is what the reader reported after the August
+    // release shipped the gesture itself.
+    BANK_BUDGET,
+    BANK_WIDTH_STORAGE_KEY_V1,
   );
 
   const dataColumns: TableColumnsType<BankReviewTableRow> = [
-    { title: "Date", key: "date", dataIndex: ["transaction", "txn_date"], width: widths.date },
     {
-      title: "Description",
-      key: "description",
-      width: widths.description,
-      render: (_value: unknown, row: BankReviewTableRow) => <DescriptionCell row={row} />,
+      title: "Date",
+      key: "date",
+      dataIndex: ["transaction", "txn_date"],
+      width: widths.date ?? COLUMN.DATE,
     },
     {
-      title: "Account source",
-      key: "account",
-      width: widths.account,
-      render: (_value: unknown, row: BankReviewTableRow) => (
-        <Typography.Text type="secondary">{row.accountName}</Typography.Text>
-      ),
-    },
-    {
-      title: "Reference",
-      key: "reference",
-      dataIndex: ["transaction", "reference"],
-      // A reference is whatever the bank's file put there, and some of them
-      // are a 36-character payment id. Under a fixed layout that wrapped over
-      // three lines and made every row in the table taller; the shared helper
-      // cuts it to the column and keeps the whole value on hover, which is
-      // what every other free-text column here already does.
-      ...longTextColumn(widths.reference),
+      // Elastic: no width until the reader drags one, so it takes whatever the
+      // measured columns leave. Its second line carries the account source and
+      // the reference, which used to be columns of their own.
+      ...flexColumn<BankReviewTableRow>({
+        title: "Description",
+        key: "description",
+        render: (_value: unknown, row: BankReviewTableRow) => <DescriptionCell row={row} />,
+      }),
+      ...(widths.description === undefined ? null : { width: widths.description }),
     },
     {
       title: "Amount",
       key: "amount",
-      width: widths.amount,
+      width: widths.amount ?? COLUMN.MONEY,
       align: "right",
       render: (_value: unknown, row: BankReviewTableRow) => (
         <span style={{ color: row.transaction.amount_minor < 0 ? TOKENS.money.negative : TOKENS.money.positive }}>
@@ -224,7 +160,7 @@ export default function BankTransactionsTable({
       // which is a different question from which document it settles.
       title: "Category",
       key: "category",
-      width: widths.category,
+      width: widths.category ?? COLUMN.PICKER,
       render: (_value: unknown, row: BankReviewTableRow) => (
         <CategoriseCell
           transactionId={row.transaction.id}
@@ -237,51 +173,53 @@ export default function BankTransactionsTable({
       ),
     },
     {
-      // What the line looks like it is, and the decision, in the same place the
-      // line is read. This used to be a separate tab.
-      title: "Match",
-      key: "match",
-      width: widths.match,
-      render: (_value: unknown, row: BankReviewTableRow) => (
-        <MatchCell
-          row={row}
-          canWrite={canWrite}
-          busy={busy}
-          onSettle={onSettle}
-          onApprove={onApprove}
-          onReject={onReject}
-        />
-      ),
-    },
-    {
-      title: "Status",
-      key: "status",
-      width: widths.status,
-      render: (_value: unknown, row: BankReviewTableRow) => (
-        <Space size={4}>
-          <Tag color={TXN_STATUS[row.transaction.status].color}>
-            {TXN_STATUS[row.transaction.status].text}
-          </Tag>
-          {row.transaction.pending ? <Tag>Pending</Tag> : null}
-        </Space>
-      ),
+      // The last elastic column, and the only one that never takes a width:
+      // something has to absorb the remainder or the row total stops being the
+      // box. It leads with the status tag that used to be its own column.
+      ...flexColumn<BankReviewTableRow>({
+        title: "Match",
+        key: "match",
+        floor: COLUMN.RICH_MIN,
+        render: (_value: unknown, row: BankReviewTableRow) => (
+          <MatchCell
+            row={row}
+            canWrite={canWrite}
+            busy={busy}
+            statusTag={
+              <Space size={4}>
+                <Tag color={TXN_STATUS[row.transaction.status].color}>
+                  {TXN_STATUS[row.transaction.status].text}
+                </Tag>
+                {row.transaction.pending ? <Tag>Pending</Tag> : null}
+              </Space>
+            }
+            onSettle={onSettle}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+        ),
+      }),
     },
   ];
 
   // RQ-01: never draggable, never a drop target. These two are built apart
   // from dataColumns and appended after the reorder is applied, so there is
-  // no key of theirs in DATA_COLUMN_KEYS for a reader to drag a data column
+  // no key of theirs in BANK_COLUMN_KEYS for a reader to drag a data column
   // onto, and no onHeaderCell on either that would make them draggable
   // themselves — see ColumnHeaderCell's module comment for what that
   // omission actually enforces.
+  //
+  // No longer `fixed: "right"`. rc-table only pins a column while horizontal
+  // scrolling is on (Table.js, horizonScroll), and under `fit` there is none:
+  // a pinned column would have nothing to stick to and would still carry the
+  // sticky background of one.
   const pinnedColumns: TableColumnsType<BankReviewTableRow> = [
     ...(canWrite
       ? [
           {
             title: "",
             key: "delete",
-            width: 56,
-            fixed: "right" as const,
+            width: COLUMN.ACTION,
             render: (_value: unknown, row: BankReviewTableRow) => (
               <DeleteRowAction
                 row={row}
@@ -297,8 +235,7 @@ export default function BankTransactionsTable({
           {
             title: "",
             key: "attachments",
-            width: 56,
-            fixed: "right" as const,
+            width: COLUMN.ACTION,
             render: (_value: unknown, row: BankReviewTableRow) => (
               <IconActionButton
                 label="View bank transaction attachments"
@@ -325,9 +262,13 @@ export default function BankTransactionsTable({
       // the heading itself moves the column, its right edge resizes it.
       // `guardHeaderDrag` is the line between them — it swallows the reorder
       // that a press on the resize handle would otherwise start.
+      //
+      // Except on the last elastic column, which gets no handle at all: it is
+      // the column paying for every other column's width, and a width of its
+      // own would leave nothing absorbing the remainder.
       const header: ColumnHeaderCellProps = {
         ...guardHeaderDrag(headerCellProps(key)),
-        ...resizeHandleProps(key),
+        ...(key === BANK_LAST_ELASTIC_KEY ? null : resizeHandleProps(key)),
       };
       return [{ ...column, onHeaderCell: () => header }];
     }),
@@ -357,25 +298,13 @@ export default function BankTransactionsTable({
         // Every header cell renders through this — including the row-selection
         // checkbox and the pinned action columns above — but only a column
         // whose own onHeaderCell supplies drag or resize props (set above,
-        // only for the eight data columns) ever looks or behaves differently.
+        // only for the five data columns) ever looks or behaves differently.
         components={{ header: { cell: ColumnHeaderCell } }}
-        // RQ-01-REV, and the reason resizing works at all here. rc-table falls
-        // back to `table-layout: auto` when a table has a pinned column and
-        // asks for `scroll.x: "max-content"` — which this one did, through
-        // DataTable's default (see @rc-component/table/es/Table.js, the
-        // mergedTableLayout memo). Under `auto` a declared column width is a
-        // hint the browser may overrule, so narrowing Description would have
-        // changed a number and left the screen exactly as it was. Naming the
-        // layout and handing over a real total width makes the widths binding,
-        // which is what makes the horizontal scrollbar actually get shorter.
-        tableLayout="fixed"
-        scroll={{ x: totalColumnWidth(widths, pinnedColumns.length * PINNED_COLUMN_WIDTH) }}
-        // Holds the table to exactly the widths above rather than letting it
-        // stretch to fill a wide screen — on a stretched table the spare room
-        // is shared across every column, so narrowing one widens the rest.
-        // Invisible here at the default widths, which already overflow a
-        // laptop; it matters on a large monitor. See app/globals.css.
-        className="accounting-table--exact-widths"
+        // The widths above are binding because DataTable puts every fitted
+        // table in `table-layout: fixed` and passes no `scroll.x` at all —
+        // see components/ui/DataTable.tsx. This table used to hand rc-table a
+        // total width, which is precisely how dragging a column produced the
+        // sideways scrolling the reader reported.
         dataSource={rows}
         rowClassName={(row: BankReviewTableRow) =>
           row.transaction.id === initialFocusId ? "accounting-data-row--focused" : ""

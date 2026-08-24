@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { Button, Space, Tag, Typography } from "antd";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
 import type { BankTransactionRow } from "@/lib/db/types";
@@ -11,6 +12,13 @@ export interface MatchCellProps {
   canWrite: boolean;
   /** The suggestion currently being approved or rejected, if any. */
   busy: string | null;
+  /**
+   * This line's own status, which used to be a column of its own out past the
+   * right-hand edge of the screen. The filter bar above already narrows by
+   * status, so the column was repeating the filter in 130px that Match needed
+   * for its buttons (feedback a9c5b84b).
+   */
+  statusTag: ReactNode;
   onSettle: (row: Row) => void;
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
@@ -30,6 +38,7 @@ export default function MatchCell({
   row,
   canWrite,
   busy,
+  statusTag,
   onSettle,
   onApprove,
   onReject,
@@ -47,6 +56,7 @@ export default function MatchCell({
   if (!row.suggestion) {
     return (
       <Space direction="vertical" size={4}>
+        {statusTag}
         <Typography.Text type="secondary">
           {row.transaction.status === "matched" ? "Matched" : "No suggestion"}
         </Typography.Text>
@@ -58,6 +68,7 @@ export default function MatchCell({
   const match = row.suggestion;
   return (
     <Space direction="vertical" size={2}>
+      {statusTag}
       <Space size={6} wrap>
         <Tag color="blue">{match.target_number ?? "Ledger entry"}</Tag>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
