@@ -252,31 +252,24 @@ export default function FeedbackTriageClient({
         const files = attachmentsByReport.get(row.id) ?? [];
         if (files.length === 0) return <Typography.Text type="secondary">—</Typography.Text>;
         return (
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={2} style={{ width: "100%" }}>
             {files.map((file) => (
-              <Tooltip key={file.id} title={`${file.fileName} (${formatBytes(file.sizeBytes)})`}>
-                <Button
-                  size="small"
-                  type="link"
-                  icon={<FileOutlined />}
-                  // Cut to the column. A file called "Screenshot 2026-08-13
-                  // 111857.png" is wider than any column worth giving it, and
-                  // an uncut link ran over the buttons beside it.
-                  style={{
-                    padding: 0,
-                    height: "auto",
-                    textAlign: "left",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                  }}
-                  onClick={() => openAttachment(file.storagePath)}
-                >
-                  {file.fileName}
-                </Button>
-              </Tooltip>
+              // A link, not a Button: Ant Design wraps a button's children in
+              // a span of its own, so an ellipsis set on the button cuts at
+              // the wrong level — the text ended mid-character against the
+              // column border with no ellipsis at all, which is what a reader
+              // screenshotted. Typography.Link does the truncation itself and
+              // carries the whole name in the tooltip.
+              <Typography.Link
+                key={file.id}
+                ellipsis
+                title={`${file.fileName} (${formatBytes(file.sizeBytes)})`}
+                style={{ display: "block", maxWidth: "100%", fontSize: 13 }}
+                onClick={() => openAttachment(file.storagePath)}
+              >
+                <FileOutlined style={{ marginInlineEnd: 4 }} />
+                {file.fileName}
+              </Typography.Link>
             ))}
           </Space>
         );
