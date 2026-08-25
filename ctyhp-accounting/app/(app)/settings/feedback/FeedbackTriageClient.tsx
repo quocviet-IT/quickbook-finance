@@ -23,19 +23,20 @@ import {
 import type { ButtonProps } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import IconActionButton from "@/components/ui/IconActionButton";
-import { secondaryLine } from "@/components/ui/columns";
+import ReportCell from "./ReportCell";
 import { COLUMN } from "@/lib/design/table-metrics";
 import {
   describeFeedbackStatusChange,
   FEEDBACK_STATUSES,
   feedbackFrequencyLabel,
   feedbackImpactLabel,
+  feedbackImpactShortLabel,
   feedbackKindLabel,
+  feedbackKindShortLabel,
   feedbackStatusLabel,
   nextStatuses,
   queueCounts,
   sortNewestFirst,
-  summarizePageContext,
   type FeedbackStatus,
 } from "@/lib/domain/feedback";
 import type {
@@ -160,19 +161,6 @@ export default function FeedbackTriageClient({
     else message.error(res.error ?? "Attachment unavailable");
   }
 
-  /**
-   * Where a report came from and who filed it, in one line.
-   *
-   * Two columns until this rework — 410px of the row — and both are context
-   * for the description rather than things a reader scans down the column.
-   */
-  function provenance(row: FeedbackReportView): string {
-    const purpose = improvementById.get(row.id)?.pagePurpose;
-    return [summarizePageContext(row.page), purpose, row.reporter?.email ?? "no email"]
-      .filter(Boolean)
-      .join(" · ");
-  }
-
   const columns: TableColumnsType<FeedbackReportView> = [
     {
       title: "Filed",
@@ -188,11 +176,16 @@ export default function FeedbackTriageClient({
       ),
     },
     {
+      // One word, with the full wording on hover. The sentence this used to
+      // print — "Suggestion for improvement" — is 26 characters and spilled
+      // straight over the Urgency column beside it.
       title: "Kind",
       dataIndex: "kind",
-      width: COLUMN.STATUS,
+      width: 120,
       render: (kind: string) => (
-        <Tag color={KIND_COLOR[kind]}>{feedbackKindLabel(kind as "broken")}</Tag>
+        <Tooltip title={feedbackKindLabel(kind as "broken")}>
+          <Tag color={KIND_COLOR[kind]}>{feedbackKindShortLabel(kind as "broken")}</Tag>
+        </Tooltip>
       ),
     },
     {
@@ -209,7 +202,14 @@ export default function FeedbackTriageClient({
         return (
           <Space direction="vertical" size={2}>
             {entry.impact ? (
-              <Tag color={IMPACT_COLOR[entry.impact]}>{feedbackImpactLabel(entry.impact)}</Tag>
+              // Same reason as Kind above: the full sentence is written for
+              // the person choosing it, and "There is a way round, but it
+              // costs time" cannot be a column.
+              <Tooltip title={feedbackImpactLabel(entry.impact)}>
+                <Tag color={IMPACT_COLOR[entry.impact]}>
+                  {feedbackImpactShortLabel(entry.impact)}
+                </Tag>
+              </Tooltip>
             ) : null}
             {entry.frequency ? (
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -223,65 +223,12 @@ export default function FeedbackTriageClient({
     {
       title: "What happened",
       dataIndex: "description",
-      // The elastic column, and the one this screen exists to read. Where the
-      // report came from and who filed it were columns of their own, 410px
-      // between them, and this table overflowed its box by 823px — which is
-      // precisely the complaint being triaged in it.
+      // The elastic column, and the one this screen exists to read. See
+      // ReportCell for what moved onto its second line and why.
       minWidth: COLUMN.TEXT_MIN,
-      render: (text: string | null, row: FeedbackReportView) => {
-        const entry = improvementById.get(row.id);
-        // A suggestion reads as an argument: the difficulty first, then what
-        // was asked for. The free-text note is background and comes last.
-        if (entry?.currentDifficulty || entry?.desiredOutcome) {
-          return (
-            <Space direction="vertical" size={2} style={{ width: "100%" }}>
-              {entry.currentDifficulty ? (
-                <Typography.Paragraph
-                  style={{ marginBottom: 0 }}
-                  ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                >
-                  <Typography.Text type="secondary">Today: </Typography.Text>
-                  {entry.currentDifficulty}
-                </Typography.Paragraph>
-              ) : null}
-              {entry.desiredOutcome ? (
-                <Typography.Paragraph
-                  style={{ marginBottom: 0 }}
-                  ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                >
-                  <Typography.Text type="secondary">Wants: </Typography.Text>
-                  {entry.desiredOutcome}
-                </Typography.Paragraph>
-              ) : null}
-              {text ? (
-                <Typography.Paragraph
-                  type="secondary"
-                  style={{ fontSize: 12, marginBottom: 0 }}
-                  ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                >
-                  {text}
-                </Typography.Paragraph>
-              ) : null}
-              {secondaryLine(provenance(row))}
-            </Space>
-          );
-        }
-        return (
-          <div style={{ minWidth: 0 }}>
-            {text ? (
-              <Typography.Paragraph
-                style={{ marginBottom: 0 }}
-                ellipsis={{ rows: 3, expandable: true, symbol: "more" }}
-              >
-                {text}
-              </Typography.Paragraph>
-            ) : (
-              <Typography.Text type="secondary">No description</Typography.Text>
-            )}
-            {secondaryLine(provenance(row))}
-          </div>
-        );
-      },
+      render: (_: unknown, row: FeedbackReportView) => (
+        <ReportCell row={row} entry={improvementById.get(row.id)} />
+      ),
     },
     {
       title: "Shot",
@@ -307,16 +254,29 @@ export default function FeedbackTriageClient({
         return (
           <Space direction="vertical" size={2}>
             {files.map((file) => (
-              <Button
-                key={file.id}
-                size="small"
-                type="link"
-                icon={<FileOutlined />}
-                style={{ padding: 0, height: "auto", textAlign: "left" }}
-                onClick={() => openAttachment(file.storagePath)}
-              >
-                {file.fileName} ({formatBytes(file.sizeBytes)})
-              </Button>
+              <Tooltip key={file.id} title={`${file.fileName} (${formatBytes(file.sizeBytes)})`}>
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<FileOutlined />}
+                  // Cut to the column. A file called "Screenshot 2026-08-13
+                  // 111857.png" is wider than any column worth giving it, and
+                  // an uncut link ran over the buttons beside it.
+                  style={{
+                    padding: 0,
+                    height: "auto",
+                    textAlign: "left",
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                  }}
+                  onClick={() => openAttachment(file.storagePath)}
+                >
+                  {file.fileName}
+                </Button>
+              </Tooltip>
             ))}
           </Space>
         );

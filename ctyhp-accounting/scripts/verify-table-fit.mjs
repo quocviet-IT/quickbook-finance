@@ -81,11 +81,36 @@ const MEASURE = () => {
       const found = node.querySelector?.("h1, h2, h3, .ant-typography h4");
       if (found?.textContent) heading = found.textContent.trim();
     }
+    // A cell whose content is wider than its column does not widen the table
+    // — it spills over the column beside it, and the reader sees two values
+    // printed on top of each other. The table measurement above cannot see
+    // that at all: a reader had to send a screenshot of "Suggestion for
+    // improvement" lying across the Urgency column before it was found.
+    //
+    // A cell that hides its own overflow (Ant Design's ellipsis) is fine: it
+    // is wider than its column by design and cuts itself.
+    const headings = Array.from(wrapper.querySelectorAll("thead th")).map((th) =>
+      (th.textContent || "").trim().slice(0, 20),
+    );
+    const spills = [];
+    for (const row of Array.from(wrapper.querySelectorAll("tbody tr")).slice(0, 12)) {
+      Array.from(row.children).forEach((cell, index) => {
+        if (getComputedStyle(cell).overflowX !== "visible") return;
+        const inner = Array.from(cell.children).reduce(
+          (widest, child) => Math.max(widest, child.scrollWidth ?? 0),
+          cell.scrollWidth,
+        );
+        const over = inner - cell.clientWidth;
+        if (over > 1) spills.push((headings[index] || `col ${index}`) + " +" + over + "px");
+      });
+    }
+
     return {
       kind,
       overflow: scroller.scrollWidth - scroller.clientWidth,
       width: scroller.clientWidth,
       heading: heading.slice(0, 44),
+      spills: Array.from(new Set(spills)).slice(0, 4),
     };
   });
 };
@@ -129,9 +154,15 @@ for (const viewport of VIEWPORTS) {
       if (table.kind === "raw") {
         // Ant Design's Table used directly: outside this work's scope, but
         // counted so the size of what is left is a number and not a guess.
-        if (table.overflow > 1) {
+        if (table.overflow > 1 || table.spills.length > 0) {
           rawOverflow.set(route, (rawOverflow.get(route) ?? 0) + 1);
-          console.log(`  RAW   ${where} — overflows by ${table.overflow}px (not migrated)`);
+          console.log(
+            `  RAW   ${where} — ${
+              table.overflow > 1
+                ? `overflows by ${table.overflow}px`
+                : `cell spills: ${table.spills.join(", ")}`
+            } (not migrated)`,
+          );
         }
         return;
       }
@@ -140,6 +171,9 @@ for (const viewport of VIEWPORTS) {
       if (table.overflow > 1) {
         failed++;
         console.log(`  FAIL  ${where} — overflows by ${table.overflow}px`);
+      } else if (table.spills.length > 0) {
+        failed++;
+        console.log(`  FAIL  ${where} — cell spills over its column: ${table.spills.join(", ")}`);
       } else {
         console.log(`  PASS  ${where}`);
       }

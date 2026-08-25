@@ -63,6 +63,24 @@ export function feedbackKindLabel(kind: FeedbackKind): string {
   return KIND_LABELS[kind];
 }
 
+/**
+ * The same thing, in a word.
+ *
+ * A triage table scans down a column; the sentence above is written for
+ * somebody choosing between options in a form, and at 26 characters it does
+ * not fit a column at all. It spilled over the Urgency column beside it and a
+ * reader sent a screenshot of the two overlapping. The full wording is one
+ * hover away wherever this is used.
+ */
+const KIND_SHORT_LABELS: Record<FeedbackKind, string> = {
+  broken: "Broken",
+  suggestion: "Suggestion",
+};
+
+export function feedbackKindShortLabel(kind: FeedbackKind): string {
+  return KIND_SHORT_LABELS[kind];
+}
+
 const STATUS_LABELS: Record<FeedbackStatus, string> = {
   new: "New",
   reviewing: "Reviewing",
@@ -87,6 +105,21 @@ const IMPACT_LABELS: Record<FeedbackImpact, string> = {
 
 export function feedbackImpactLabel(impact: FeedbackImpact): string {
   return IMPACT_LABELS[impact];
+}
+
+/**
+ * The impact as a column can carry it. See feedbackKindShortLabel: the
+ * sentences above are for the person choosing, not for a table scanning
+ * thirty rows. "There is a way round, but it costs time" is 39 characters.
+ */
+const IMPACT_SHORT_LABELS: Record<FeedbackImpact, string> = {
+  blocking: "Blocking",
+  slows_work: "Costs time",
+  nice_to_have: "Nice to have",
+};
+
+export function feedbackImpactShortLabel(impact: FeedbackImpact): string {
+  return IMPACT_SHORT_LABELS[impact];
 }
 
 const FREQUENCY_LABELS: Record<FeedbackFrequency, string> = {

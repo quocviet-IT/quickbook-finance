@@ -73,8 +73,10 @@ export default function CategoriseCell({
   if (posting) {
     const label = `${posting.account_code} — ${posting.account_name}`;
     return (
-      <Space direction="vertical" size={0}>
-        <Typography.Text>{label}</Typography.Text>
+      <Space direction="vertical" size={0} style={{ maxWidth: "100%" }}>
+        {/* Cut to the column, with the whole account name on hover: an account
+            is named by whoever set up the chart, and some run long. */}
+        <Typography.Text ellipsis={{ tooltip: label }}>{label}</Typography.Text>
         <Space size={6}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
@@ -118,7 +120,14 @@ export default function CategoriseCell({
     <Tooltip title="Choosing an account posts this line to the ledger">
       <Select
         showSearch
-        style={{ minWidth: 240 }}
+        // Fills its column rather than declaring a minimum wider than one. A
+        // 240px minimum inside a 150px column does not widen the column — it
+        // spills over the Match column beside it, which is the fault a reader
+        // screenshotted on the triage screen in its other form.
+        style={{ width: "100%" }}
+        // The dropdown is free to be wider than the cell, and needs to be: an
+        // account reads "5000 — Cost of Goods Sold".
+        popupMatchSelectWidth={320}
         placeholder="Search accounts…"
         loading={busy}
         disabled={busy}

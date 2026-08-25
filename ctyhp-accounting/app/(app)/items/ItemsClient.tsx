@@ -26,6 +26,8 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, InventoryValuationRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
@@ -220,75 +222,106 @@ export default function ItemsClient({
         }
         emptyDescription="Add jewelry, services, or purchasing items to reuse them on transactions."
         columns={[
-          { title: "Code", dataIndex: "item_code", render: (v) => v ?? "—" },
-          { title: "Name", dataIndex: "name" },
+          { title: "Code", dataIndex: "item_code", width: COLUMN.CODE, render: (v) => v ?? "—" },
+          {
+            // The elastic column. "Used for" was three tags side by side in a
+            // column that declared no width — about 230px of content that
+            // spilled over the Status column beside it. What an item is used
+            // for reads under its name instead.
+            ...flexColumn<ItemRow>({
+              title: "Name",
+              key: "name",
+              render: (_: unknown, r: ItemRow) => {
+                const used = [
+                  r.is_sold ? "Sales" : null,
+                  r.is_purchased ? "Purchase" : null,
+                  r.is_inventory ? "Inventory" : null,
+                ].filter(Boolean);
+                return (
+                  <div style={{ minWidth: 0 }}>
+                    <span title={r.name}>{r.name}</span>
+                    {secondaryLine(used.length ? used.join(" · ") : "Not in use")}
+                  </div>
+                );
+              },
+            }),
+          },
           {
             title: "Sales price",
             dataIndex: "sales_price_minor",
+            width: COLUMN.MONEY,
             align: "right",
             render: (v: number, r) => (r.is_sold ? `$${(v / 100).toFixed(2)}` : "—"),
           },
           {
-            // Two different costs used to share one heading. This one is typed
-            // on the card; the accounts use the weighted average beside it, and
-            // they part company the first time an item is bought at a new price.
-            title: "Purchase cost (card)",
-            dataIndex: "purchase_cost_minor",
-            align: "right",
-            render: (v: number, r) => (r.is_purchased ? `$${(v / 100).toFixed(2)}` : "—"),
-          },
-          {
-            title: "Ledger cost (average)",
+            // Two costs, one column. The card cost is what somebody typed on
+            // the item; the ledger carries the weighted average of what was
+            // actually paid, and the two part company the first time the item
+            // is bought at a new price. A column each cost 116px and left the
+            // name — the thing people search by — squeezed to 101px.
+            title: "Ledger cost",
             key: "ledger_cost",
+            width: COLUMN.MONEY,
             align: "right",
             render: (_, r) => {
-              if (!r.is_inventory) return "—";
-              const unit = Number(onHandById.get(r.id)?.unit_cost_minor ?? 0);
               const card = Number(r.purchase_cost_minor ?? 0);
+              const cardLine = r.is_purchased ? secondaryLine(`card $${(card / 100).toFixed(2)}`) : null;
+              if (!r.is_inventory) {
+                return (
+                  <div>
+                    —{cardLine}
+                  </div>
+                );
+              }
+              const unit = Number(onHandById.get(r.id)?.unit_cost_minor ?? 0);
               const differs = card > 0 && unit > 0 && unit !== card;
               const text = `$${(unit / 100).toFixed(2)}`;
-              return differs ? (
-                <Tooltip title="The books carry this item at the weighted average of what was actually paid, which is no longer the figure on the card.">
-                  <Typography.Text type="warning">{text}</Typography.Text>
-                </Tooltip>
-              ) : (
-                text
+              return (
+                <div>
+                  {differs ? (
+                    <Tooltip title="The books carry this item at the weighted average of what was actually paid, which is no longer the figure on the card.">
+                      <Typography.Text type="warning">{text}</Typography.Text>
+                    </Tooltip>
+                  ) : (
+                    text
+                  )}
+                  {cardLine}
+                </div>
               );
             },
           },
           {
+            // Quantity and what it is worth are one fact asked two ways, so
+            // they share a cell. As separate columns they cost 204px and left
+            // the item name — the thing people search by — under its floor.
             title: "On hand",
             key: "on_hand",
+            width: COLUMN.MONEY,
             align: "right",
-            render: (_, r) => (r.is_inventory ? Number(onHandById.get(r.id)?.qty_on_hand ?? 0) : "—"),
-          },
-          {
-            title: "Inventory value",
-            key: "inventory_value",
-            align: "right",
-            render: (_, r) =>
-              r.is_inventory ? `$${((onHandById.get(r.id)?.value_minor ?? 0) / 100).toFixed(2)}` : "—",
-          },
-          {
-            title: "Used for",
-            key: "used",
-            render: (_, r) => (
-              <Space>
-                {r.is_sold && <Tag color="blue">Sales</Tag>}
-                {r.is_purchased && <Tag color="gold">Purchase</Tag>}
-                {r.is_inventory && <Tag color="purple">Inventory</Tag>}
-              </Space>
-            ),
+            render: (_, r) => {
+              if (!r.is_inventory) return "—";
+              const row = onHandById.get(r.id);
+              return (
+                <div>
+                  {Number(row?.qty_on_hand ?? 0)}
+                  {secondaryLine(`$${((row?.value_minor ?? 0) / 100).toFixed(2)}`)}
+                </div>
+              );
+            },
           },
           {
             title: "Status",
             dataIndex: "is_active",
+            width: COLUMN.STATUS,
             render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Active" : "Inactive"}</Tag>,
           },
           {
             title: "Actions",
             key: "actions",
-            width: 160,
+            // Four icon buttons on an inventory item: edit, activate, adjust
+            // and movements. At 100px they spilled 16px past the column.
+            width: COLUMN.ACTION * 4 + 12,
+            align: "right",
             render: (_, r) =>
               canManageItems ? (
                 <Space size={4}>

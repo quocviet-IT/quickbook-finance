@@ -9,7 +9,7 @@ import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
 import { passwordPolicyProblems } from "@/lib/domain/password-policy";
 import { createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
 
 const STATUS_COLOR: Record<UserStatus, string> = {
   invited: "blue",
@@ -145,24 +145,35 @@ export default function UsersClient({
         locale={{ emptyText: "No users yet" }}
         columns={[
           {
-            title: "Email",
-            dataIndex: "email",
-            render: (v: string, r) => (
-              <Space>
-                {v}
-                {r.id === currentUserId && <Tag>you</Tag>}
-              </Space>
-            ),
+            // The elastic column: an email address is as long as it is, and
+            // the name and the reason a status was set belong with it rather
+            // than in columns of their own.
+            ...flexColumn<AppUserRow>({
+              title: "Email",
+              key: "email",
+              render: (_: unknown, r: AppUserRow) => (
+                <div style={{ minWidth: 0 }}>
+                  <span title={r.email}>{r.email}</span>
+                  {r.id === currentUserId ? <Tag style={{ marginLeft: 6 }}>you</Tag> : null}
+                  {secondaryLine(
+                    [r.full_name || "No name recorded", r.status_reason].filter(Boolean).join(" · "),
+                  )}
+                </div>
+              ),
+            }),
           },
-          { title: "Name", dataIndex: "full_name", render: (v: string) => v || "—" },
           {
             title: "Role",
             dataIndex: "role",
+            width: 160,
             render: (v: AppRole, r) =>
               canManage ? (
                 <Select
                   value={v}
-                  style={{ width: 150 }}
+                  // Fills the column instead of declaring a width wider than
+                  // one; the dropdown stays readable on its own.
+                  style={{ width: "100%" }}
+                  popupMatchSelectWidth={200}
                   options={ROLE_OPTIONS}
                   aria-label={`Role for ${r.email}`}
                   onChange={(role) => changeRole(r, role)}
@@ -174,8 +185,9 @@ export default function UsersClient({
           {
             title: "Status",
             dataIndex: "status",
+            width: 150,
             render: (v: UserStatus, r) => (
-              <Space>
+              <Space size={4} wrap>
                 <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v]}</Tag>
                 {isLastActiveAdmin(users, r.id) && <Tag color="gold">last admin</Tag>}
               </Space>
@@ -184,6 +196,7 @@ export default function UsersClient({
           {
             title: "MFA",
             dataIndex: "mfa_enrolled",
+            width: 130,
             render: (v: boolean, r) =>
               v ? (
                 <Tag color="green">enrolled</Tag>
@@ -196,13 +209,14 @@ export default function UsersClient({
           {
             title: "Last sign-in",
             dataIndex: "last_sign_in",
+            width: 140,
             render: (v: string | null) => (v ? v.slice(0, 16).replace("T", " ") : "never"),
           },
-          { title: "Reason", dataIndex: "status_reason", ...longTextColumn() },
           {
             title: "Actions",
             key: "actions",
             width: 90,
+            align: "right" as const,
             render: (_, r) => {
               if (!canManage) return null;
               const menu: MenuProps["items"] = [];

@@ -9,7 +9,9 @@ import {
   feedbackExportFileName,
   feedbackFrequencyLabel,
   feedbackImpactLabel,
+  feedbackImpactShortLabel,
   feedbackKindLabel,
+  feedbackKindShortLabel,
   newFeedbackReport,
   nextStatuses,
   queueCounts,
@@ -190,5 +192,31 @@ describe("the improvement vocabulary", () => {
     for (const frequency of FEEDBACK_FREQUENCIES) {
       expect(feedbackFrequencyLabel(frequency)).toBeTruthy();
     }
+  });
+});
+
+describe("labels short enough for a column", () => {
+  it("gives every kind a short form that fits a narrow column", () => {
+    // The triage table gave Kind a 104px column and the tag inside it read
+    // "Suggestion for improvement" — 26 characters. A fixed layout does not
+    // shrink that; it spills, and it landed on top of the Urgency column
+    // beside it. The long wording stays where somebody is choosing it.
+    for (const kind of ["broken", "suggestion"] as const) {
+      const short = feedbackKindShortLabel(kind);
+      expect(short.length, short).toBeLessThanOrEqual(12);
+      expect(short.length).toBeGreaterThan(0);
+    }
+    expect(feedbackKindShortLabel("broken")).toBe("Broken");
+    expect(feedbackKindShortLabel("suggestion")).toBe("Suggestion");
+  });
+
+  it("gives every impact a short form, and keeps the full one for the form", () => {
+    for (const impact of ["blocking", "slows_work", "nice_to_have"] as const) {
+      expect(feedbackImpactShortLabel(impact).length, impact).toBeLessThanOrEqual(14);
+    }
+    expect(feedbackImpactShortLabel("slows_work")).toBe("Costs time");
+    // The sentence a reporter reads when choosing is untouched: it is what
+    // stops everyone picking the most severe option.
+    expect(feedbackImpactLabel("slows_work")).toBe("There is a way round, but it costs time");
   });
 });
