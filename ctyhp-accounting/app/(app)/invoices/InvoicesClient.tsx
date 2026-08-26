@@ -33,9 +33,8 @@ import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import IconActionButton from "@/components/ui/IconActionButton";
-import AttachmentDrawer, {
-  type AttachmentTarget,
-} from "@/components/documents/AttachmentDrawer";
+import dynamic from "next/dynamic";
+import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import type {
   AccountRow,
   ActorRow,
@@ -97,6 +96,12 @@ interface LineForm {
   tax_code_id?: string | null;
   item_id?: string | null;
 }
+
+
+/** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
+const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
+  ssr: false,
+});
 
 export default function InvoicesClient({
   initialCreateOpen,
@@ -741,13 +746,18 @@ export default function InvoicesClient({
         }
       />
 
-      <AttachmentDrawer
-        target={attachmentTarget}
-        canManage={canManageDocuments}
-        canGovern={canGovernDocuments}
-        scannerConfigured={scannerConfigured}
-        onClose={() => setAttachmentTarget(null)}
-      />
+      {/* Fetched when a paperclip is clicked. The drawer already did nothing
+          until it had a target — every effect inside returns early on a null
+          one — so this changes when it downloads, not what it does. */}
+      {attachmentTarget ? (
+        <AttachmentDrawer
+          target={attachmentTarget}
+          canManage={canManageDocuments}
+          canGovern={canGovernDocuments}
+          scannerConfigured={scannerConfigured}
+          onClose={() => setAttachmentTarget(null)}
+        />
+      ) : null}
 
       {/* Create invoice */}
       <Modal

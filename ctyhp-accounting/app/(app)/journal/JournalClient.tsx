@@ -5,9 +5,8 @@ import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/ico
 import type { Dayjs } from "dayjs";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import IconActionButton from "@/components/ui/IconActionButton";
-import AttachmentDrawer, {
-  type AttachmentTarget,
-} from "@/components/documents/AttachmentDrawer";
+import dynamic from "next/dynamic";
+import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
 
@@ -35,6 +34,12 @@ interface LineForm {
   debit?: number;
   credit?: number;
 }
+
+
+/** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
+const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
+  ssr: false,
+});
 
 export default function JournalClient({
   canWrite,
@@ -285,13 +290,18 @@ export default function JournalClient({
           },
         ]}
       />
-      <AttachmentDrawer
-        target={attachmentTarget}
-        canManage={canManageDocuments}
-        canGovern={canGovernDocuments}
-        scannerConfigured={scannerConfigured}
-        onClose={() => setAttachmentTarget(null)}
-      />
+      {/* Fetched when a paperclip is clicked. The drawer already did nothing
+          until it had a target — every effect inside returns early on a null
+          one — so this changes when it downloads, not what it does. */}
+      {attachmentTarget ? (
+        <AttachmentDrawer
+          target={attachmentTarget}
+          canManage={canManageDocuments}
+          canGovern={canGovernDocuments}
+          scannerConfigured={scannerConfigured}
+          onClose={() => setAttachmentTarget(null)}
+        />
+      ) : null}
       <Modal
         open={open}
         title="New Journal Entry"

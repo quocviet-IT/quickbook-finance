@@ -7,9 +7,8 @@ import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
-import AttachmentDrawer, {
-  type AttachmentTarget,
-} from "@/components/documents/AttachmentDrawer";
+import dynamic from "next/dynamic";
+import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderWithVendor } from "@/lib/services/purchasing";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
@@ -33,6 +32,12 @@ const STATUS_OPTIONS: { value: PoStatus | "all"; label: string }[] = [
   { value: "closed", label: "Closed" },
   { value: "cancelled", label: "Cancelled" },
 ];
+
+
+/** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
+const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
+  ssr: false,
+});
 
 export default function PurchaseOrdersClient({
   initialCreateOpen,
@@ -160,13 +165,18 @@ export default function PurchaseOrdersClient({
         ]}
       />
 
-      <AttachmentDrawer
-        target={attachmentTarget}
-        canManage={canManageDocuments}
-        canGovern={canGovernDocuments}
-        scannerConfigured={scannerConfigured}
-        onClose={() => setAttachmentTarget(null)}
-      />
+      {/* Fetched when a paperclip is clicked. The drawer already did nothing
+          until it had a target — every effect inside returns early on a null
+          one — so this changes when it downloads, not what it does. */}
+      {attachmentTarget ? (
+        <AttachmentDrawer
+          target={attachmentTarget}
+          canManage={canManageDocuments}
+          canGovern={canGovernDocuments}
+          scannerConfigured={scannerConfigured}
+          onClose={() => setAttachmentTarget(null)}
+        />
+      ) : null}
 
       <PurchaseOrderFormModal
         open={formOpen}

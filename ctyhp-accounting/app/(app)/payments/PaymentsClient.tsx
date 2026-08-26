@@ -21,9 +21,8 @@ import {
   PaperClipOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
-import AttachmentDrawer, {
-  type AttachmentTarget,
-} from "@/components/documents/AttachmentDrawer";
+import dynamic from "next/dynamic";
+import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -56,6 +55,12 @@ const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
   applied: { text: "Applied", color: "green" },
   void: { text: "Void", color: "red" },
 };
+
+
+/** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
+const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
+  ssr: false,
+});
 
 export default function PaymentsClient({
   initialCreateOpen,
@@ -303,13 +308,18 @@ export default function PaymentsClient({
         sticky
       />
 
-      <AttachmentDrawer
-        target={attachmentTarget}
-        canManage={canManageDocuments}
-        canGovern={canGovernDocuments}
-        scannerConfigured={scannerConfigured}
-        onClose={() => setAttachmentTarget(null)}
-      />
+      {/* Fetched when a paperclip is clicked. The drawer already did nothing
+          until it had a target — every effect inside returns early on a null
+          one — so this changes when it downloads, not what it does. */}
+      {attachmentTarget ? (
+        <AttachmentDrawer
+          target={attachmentTarget}
+          canManage={canManageDocuments}
+          canGovern={canGovernDocuments}
+          scannerConfigured={scannerConfigured}
+          onClose={() => setAttachmentTarget(null)}
+        />
+      ) : null}
 
       <PaymentDetailDrawer
         payment={detailFor}

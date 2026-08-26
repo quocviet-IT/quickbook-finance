@@ -14,7 +14,6 @@ import {
   Space,
   Tag,
   Typography,
-  Upload,
 } from "antd";
 import {
   BankOutlined,
@@ -28,14 +27,13 @@ import BankTransactionsFilters, { ALL_ACCOUNTS } from "./BankTransactionsFilters
 import { EmptyState } from "@/components/ui/PageStates";
 import BankTransactionsTable from "./BankTransactionsTable";
 import BankImportList from "./BankImportList";
+import dynamic from "next/dynamic";
 import DeleteBankLineModal, {
   type DeleteBankLineTarget,
 } from "./DeleteBankLineModal";
 import BatchAssignAccountModal, { type BatchAssignTarget } from "./BatchAssignAccountModal";
 import { pruneSelection } from "@/lib/domain/bank-transaction-batch";
-import AttachmentDrawer, {
-  type AttachmentTarget,
-} from "@/components/documents/AttachmentDrawer";
+import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import {
   BANK_SETUP_DETAIL_TYPES,
   bankDetailLabel,
@@ -58,6 +56,22 @@ import type {
   SuggestionView,
 } from "@/lib/services/banking";
 import { parseCsv } from "@/lib/csv";
+
+/**
+ * Loaded on demand. `ssr: false` because a dialog nobody has opened has
+ * nothing to render on the server, and the uploader inside it reaches for the
+ * File API either way.
+ */
+const ImportStatementModal = dynamic(() => import("./ImportStatementModal"), { ssr: false });
+
+/**
+ * The attachment drawer, fetched when a paperclip is clicked. It carries the
+ * uploader, the scan status and the document list — none of which a reader
+ * scanning the transaction list has asked for.
+ */
+const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
+  ssr: false,
+});
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
 import {
   filterBankTransactions,
@@ -596,11 +610,19 @@ export default function BankingClient({
 
   return (
     <div>
-      <Script
-        src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"
-        strategy="afterInteractive"
-        onReady={resumePlaidOAuth}
-      />
+      {/* Only when it can be used. Where Plaid is not configured the Connect
+          button is disabled and openPlaidLink refuses before it ever touches
+          window.Plaid, so fetching their script from a CDN on every visit buys
+          nothing on the heaviest screen in the app. An OAuth return can only
+          follow a connection that Plaid had to be configured to make, so the
+          resume path below is unaffected. */}
+      {plaidConfigured ? (
+        <Script
+          src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"
+          strategy="afterInteractive"
+          onReady={resumePlaidOAuth}
+        />
+      ) : null}
 
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space wrap size="middle">
@@ -809,13 +831,19 @@ export default function BankingClient({
         }}
       />
 
-      <AttachmentDrawer
-        target={attachmentTarget}
-        canManage={canManageDocuments}
-        canGovern={canGovernDocuments}
-        scannerConfigured={scannerConfigured}
-        onClose={() => setAttachmentTarget(null)}
-      />
+      {/* Rendered only once a row's paperclip is clicked, which is what keeps
+          the drawer and Ant Design's uploader out of the first load. Nothing
+          else on this screen uses the uploader now that the CSV dialog is
+          loaded on demand too. */}
+      {attachmentTarget ? (
+        <AttachmentDrawer
+          target={attachmentTarget}
+          canManage={canManageDocuments}
+          canGovern={canGovernDocuments}
+          scannerConfigured={scannerConfigured}
+          onClose={() => setAttachmentTarget(null)}
+        />
+      ) : null}
 
       {/* Keyed so each bank line gets a fresh dialog rather than one that has
           to remember to forget the previous line's allocations. */}
@@ -831,33 +859,22 @@ export default function BankingClient({
         />
       ) : null}
 
-      <Modal
-        title="Import bank statement"
-        open={importOpen}
-        onOk={confirmImport}
-        onCancel={() => {
-          setImportOpen(false);
-          setParsed([]);
-        }}
-        okText={parsed.length ? `Import ${parsed.length} rows` : "Import"}
-        okButtonProps={{ disabled: !parsed.length, loading: busy === "import" }}
-        cancelText="Cancel"
-        width={640}
-      >
-        <Typography.Paragraph type="secondary">
-          Upload a comma-separated values file with columns: <code>date, description, amount, reference, balance</code>.
-          Positive amounts are money in. Dates may use YYYY-MM-DD or MM/DD/YYYY.
-        </Typography.Paragraph>
-        <Upload.Dragger accept=".csv" beforeUpload={handleFile} maxCount={1} showUploadList={{ showRemoveIcon: false }}>
-          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">Click or drag a comma-separated values file here</p>
-        </Upload.Dragger>
-        {parsed.length > 0 ? (
-          <Typography.Paragraph style={{ marginTop: 12 }}>
-            Parsed <strong>{parsed.length}</strong> transactions from <strong>{fileName}</strong>.
-          </Typography.Paragraph>
-        ) : null}
-      </Modal>
+      {/* Fetched when it is opened, not when the page is. See
+          ImportStatementModal for why this one screen is worth it. */}
+      {importOpen ? (
+        <ImportStatementModal
+          open={importOpen}
+          parsedCount={parsed.length}
+          fileName={fileName}
+          importing={busy === "import"}
+          onFile={handleFile}
+          onConfirm={confirmImport}
+          onCancel={() => {
+            setImportOpen(false);
+            setParsed([]);
+          }}
+        />
+      ) : null}
 
       <Modal
         title={`Map ${pendingLink?.institutionName ?? "bank"} accounts`}
