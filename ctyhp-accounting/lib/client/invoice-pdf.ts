@@ -1,7 +1,6 @@
 "use client";
 
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF } from "jspdf";
 import type { InvoiceDocument } from "@/lib/domain/invoice-document";
 import { invoiceDocumentFileName } from "@/lib/domain/invoice-document";
 
@@ -11,11 +10,31 @@ const ACCENT: [number, number, number] = [15, 118, 110];
 const MARGIN = 48;
 
 /**
+ * The PDF library, fetched the first time somebody actually wants a PDF.
+ *
+ * Loading it at the top of this module put 123 KB into the /invoices bundle
+ * for every reader who opened the list — measured on production, 25 August
+ * 2026 — when only the few who click Download ever need it. The type import
+ * above is erased at build time and costs nothing.
+ *
+ * lib/client/report-export.ts has always loaded the same library this way; it
+ * is the pattern, and this module was the exception to it.
+ */
+async function pdfLibrary() {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  return { jsPDF, autoTable };
+}
+
+/**
  * Draws the document model produced by lib/domain/invoice-document. Every
  * string here already came from that module — this file decides placement,
  * never content.
  */
-export function renderInvoicePdf(doc: InvoiceDocument): jsPDF {
+export async function renderInvoicePdf(doc: InvoiceDocument): Promise<jsPDF> {
+  const { jsPDF, autoTable } = await pdfLibrary();
   const pdf = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const rightEdge = pageWidth - MARGIN;
@@ -132,15 +151,17 @@ export function renderInvoicePdf(doc: InvoiceDocument): jsPDF {
   return pdf;
 }
 
-export function downloadInvoicePdf(
+export async function downloadInvoicePdf(
   doc: InvoiceDocument,
   invoiceNumber: string | null,
   issueDate: string,
-): void {
-  renderInvoicePdf(doc).save(invoiceDocumentFileName(invoiceNumber, issueDate));
+): Promise<void> {
+  const pdf = await renderInvoicePdf(doc);
+  pdf.save(invoiceDocumentFileName(invoiceNumber, issueDate));
 }
 
 /** Opens the browser print dialog on the rendered document. */
-export function printInvoicePdf(doc: InvoiceDocument): void {
-  renderInvoicePdf(doc).autoPrint().output("dataurlnewwindow");
+export async function printInvoicePdf(doc: InvoiceDocument): Promise<void> {
+  const pdf = await renderInvoicePdf(doc);
+  pdf.autoPrint().output("dataurlnewwindow");
 }

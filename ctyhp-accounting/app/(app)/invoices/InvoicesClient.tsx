@@ -472,7 +472,7 @@ export default function InvoicesClient({
         message.error(res.error ?? "Failed to build the invoice PDF");
         return;
       }
-      downloadInvoicePdf(res.data, inv.invoice_number, inv.issue_date);
+      await downloadInvoicePdf(res.data, inv.invoice_number, inv.issue_date);
     } finally {
       setPdfId(null);
     }
