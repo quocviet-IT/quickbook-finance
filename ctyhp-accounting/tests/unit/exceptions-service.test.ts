@@ -57,6 +57,16 @@ function resultOf(source: Source): { data: Row[] | null; error: { message: strin
   return { data: source, error: null };
 }
 
+/**
+ * One page of a source, the way `.range(from, to)` returns it: inclusive at
+ * both ends. Returning the whole source regardless would make any paging loop
+ * see a full page forever, so a fixture of a thousand rows or more would hang
+ * the suite instead of failing it.
+ */
+function pageOf(source: Source, from: number, to: number) {
+  return source instanceof Error ? resultOf(source) : resultOf(source.slice(from, to + 1));
+}
+
 /** Every method this service calls on a query, chainable, resolving on `limit` or `range`. */
 interface Chain {
   select: (columns?: string) => Chain;
@@ -78,7 +88,7 @@ function chainFor(source: Source): Chain {
     lte: () => builder,
     order: () => builder,
     limit: async () => resultOf(source),
-    range: async () => resultOf(source),
+    range: async (from: number, to: number) => pageOf(source, from, to),
   };
   return builder;
 }
@@ -108,15 +118,22 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
       }
     },
     rpc(name: string, args: Record<string, unknown>) {
-      if (name === "acc_ledger_balances") return Promise.resolve(resultOf(c.ledgerBalances));
+      // `reports.ts` pages every set-returning RPC with `.range()`, which
+      // supabase-js's builder allows on an rpc call as on a select. This stub
+      // models only `.range()`, not a bare `await`: every RPC read in this
+      // service goes through the paging helper, which always calls it.
+      const paged = (source: Source) => ({
+        range: async (from: number, to: number) => pageOf(source, from, to),
+      });
+      if (name === "acc_ledger_balances") return paged(c.ledgerBalances);
       if (name === "acc_transaction_list") {
         // The same RPC serves two different reads here — entries in range and
         // entries after today — told apart the only way the caller can: the
         // `p_to` it sent. The future-dated read is the one that runs to
         // "9999-12-31".
-        return Promise.resolve(resultOf(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange));
+        return paged(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange);
       }
-      if (name === "acc_monthly_ledger_balances") return Promise.resolve(resultOf(c.monthlyBalances));
+      if (name === "acc_monthly_ledger_balances") return paged(c.monthlyBalances);
       throw new Error(`fakeClient: unhandled rpc "${name}"`);
     },
   };

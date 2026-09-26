@@ -59,6 +59,12 @@ export const RELEASES: Release[] = [
           "A check that found nothing says so, and a check that could not run says that instead. The report never changes a figure.",
         route: "/reports/exceptions",
       },
+      {
+        kind: "fixed",
+        title: "Reports on a large book no longer stop at the thousandth row",
+        detail:
+          "The database hands back at most 1,000 rows to a single request and says nothing when it does. The Transaction List report, the P&L and Balance Sheet, the dashboards, inventory, and the Exception Report all read past that limit now, so on a book with more than 1,000 entries in a range, or more than 1,000 month-account pairs, totals on those books can differ from what was shown before — they are now complete.",
+      },
     ],
   },
   {

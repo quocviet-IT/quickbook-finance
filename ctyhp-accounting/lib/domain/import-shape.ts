@@ -59,16 +59,20 @@ const EXAMPLE_BY_KIND: Record<FieldSpec["kind"], string> = {
 };
 
 /**
- * Values for the fields where a generic example would teach nothing. The chart
- * of accounts row is the PC49 account from the report, so the answer to "how do
- * I add this ledger" is a file the person can open.
+ * Values for the fields where a generic example would teach nothing.
+ *
+ * These are invented, not drawn from any real company's books. This screen is
+ * published to every person who opens the import tab, so a worked example
+ * here can never be a real account or a real balance — that would be the
+ * same leak as shipping a customer's ledger in a fixture file, just rendered
+ * instead of committed.
  */
 const EXAMPLE_BY_KEY: Record<string, string> = {
   account_code: "121",
-  name: "PC49 BoA CK 3388",
+  name: "Riverbend Bank CK 4471",
   account_type: "Bank",
   description: "Operating checking account",
-  opening_balance_minor: "968798.29",
+  opening_balance_minor: "412903.55",
   email: "billing@example.com",
   contact_name: "Alex Tran",
   phone: "408-555-0134",
