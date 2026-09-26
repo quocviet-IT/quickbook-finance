@@ -5,8 +5,11 @@ import {
   undepositedFunds,
   unreconciledBankAccounts,
   wrongWayBalances,
+  yearTotalsFromMonthly,
+  yearsWithIncomeAndNoCost,
   type ExceptionAccount,
   type ExceptionBankAccount,
+  type LedgerBalance,
   type UndepositedDetail,
 } from "@/lib/domain/exceptions";
 
@@ -189,6 +192,71 @@ describe("unreconciledBankAccounts", () => {
   it("says nothing about a closed account with no balance to prove", () => {
     const rows = unreconciledBankAccounts([bank()], new Map([["a1", 0]]), "2026-09-30");
     expect(rows).toEqual([]);
+  });
+});
+
+const bal = (over: Partial<LedgerBalance> = {}): LedgerBalance => ({
+  accountId: "x",
+  accountCode: "4000",
+  name: "Sales Revenue",
+  accountType: "income",
+  debitBase: 0,
+  creditBase: 0,
+  ...over,
+});
+
+describe("yearTotalsFromMonthly", () => {
+  it("sums income as credits less debits, and cost as debits less credits", () => {
+    const byMonth = new Map<string, LedgerBalance[]>([
+      ["2026-01", [bal({ creditBase: 100_00 }), bal({ accountCode: "6000", accountType: "expense", debitBase: 40_00 })]],
+      ["2026-02", [bal({ creditBase: 50_00, debitBase: 10_00 })]],
+    ]);
+    expect(yearTotalsFromMonthly(byMonth)).toEqual([
+      { year: "2026", incomeMinor: 140_00, costMinor: 40_00 },
+    ]);
+  });
+
+  it("counts other income and other expense on the right sides", () => {
+    const byMonth = new Map<string, LedgerBalance[]>([
+      ["2026-01", [
+        bal({ accountType: "other_income", creditBase: 30_00 }),
+        bal({ accountType: "other_expense", debitBase: 7_00 }),
+        bal({ accountType: "cost_of_goods_sold", debitBase: 3_00 }),
+      ]],
+    ]);
+    expect(yearTotalsFromMonthly(byMonth)).toEqual([
+      { year: "2026", incomeMinor: 30_00, costMinor: 10_00 },
+    ]);
+  });
+
+  it("ignores balance sheet accounts entirely", () => {
+    const byMonth = new Map<string, LedgerBalance[]>([
+      ["2026-01", [bal({ accountType: "bank", debitBase: 900_00 })]],
+    ]);
+    expect(yearTotalsFromMonthly(byMonth)).toEqual([{ year: "2026", incomeMinor: 0, costMinor: 0 }]);
+  });
+
+  it("separates the years and returns them oldest first", () => {
+    const byMonth = new Map<string, LedgerBalance[]>([
+      ["2025-12", [bal({ creditBase: 10_00 })]],
+      ["2024-06", [bal({ creditBase: 20_00 })]],
+    ]);
+    expect(yearTotalsFromMonthly(byMonth).map((y) => y.year)).toEqual(["2024", "2025"]);
+  });
+});
+
+describe("yearsWithIncomeAndNoCost", () => {
+  it("flags a year with revenue and nothing spent against it", () => {
+    const rows = yearsWithIncomeAndNoCost([{ year: "2024", incomeMinor: 500_000_00, costMinor: 0 }]);
+    expect(rows).toEqual([{ year: "2024", incomeMinor: 500_000_00, costMinor: 0 }]);
+  });
+
+  it("does not flag a year with even one cost in it", () => {
+    expect(yearsWithIncomeAndNoCost([{ year: "2024", incomeMinor: 500_000_00, costMinor: 1 }])).toEqual([]);
+  });
+
+  it("does not flag a year with no income either — that is a quiet year, not a broken one", () => {
+    expect(yearsWithIncomeAndNoCost([{ year: "2024", incomeMinor: 0, costMinor: 0 }])).toEqual([]);
   });
 });
 

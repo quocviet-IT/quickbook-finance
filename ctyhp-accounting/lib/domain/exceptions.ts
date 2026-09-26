@@ -245,3 +245,49 @@ export function unreconciledBankAccounts(
   }
   return rows.sort((x, y) => x.accountName.localeCompare(y.accountName));
 }
+
+const INCOME_TYPES: ReadonlySet<AccountType> = new Set<AccountType>(["income", "other_income"]);
+const COST_TYPES: ReadonlySet<AccountType> = new Set<AccountType>([
+  "cost_of_goods_sold",
+  "expense",
+  "other_expense",
+]);
+
+/**
+ * Fold the monthly balance map into one row per calendar year.
+ *
+ * The map's keys are `YYYY-MM`, so the year is the first four characters. Both
+ * sides are netted: a credit note against income and a refund against a cost
+ * both belong in the total they reduce.
+ */
+export function yearTotalsFromMonthly(
+  byMonth: ReadonlyMap<string, readonly LedgerBalance[]>,
+): YearTotals[] {
+  const years = new Map<string, YearTotals>();
+  for (const [monthKey, balances] of byMonth) {
+    const year = monthKey.slice(0, 4);
+    const totals = years.get(year) ?? { year, incomeMinor: 0, costMinor: 0 };
+    for (const b of balances) {
+      if (INCOME_TYPES.has(b.accountType)) totals.incomeMinor += b.creditBase - b.debitBase;
+      else if (COST_TYPES.has(b.accountType)) totals.costMinor += b.debitBase - b.creditBase;
+    }
+    years.set(year, totals);
+  }
+  return [...years.values()].sort((x, y) => x.year.localeCompare(y.year));
+}
+
+export interface IncomeNoCostRow {
+  year: string;
+  incomeMinor: number;
+  costMinor: number;
+}
+
+/**
+ * Revenue with nothing spent against it almost always means the period is only
+ * part-entered. The profit shown for that year is not a profit.
+ */
+export function yearsWithIncomeAndNoCost(years: readonly YearTotals[]): IncomeNoCostRow[] {
+  return years
+    .filter((y) => y.incomeMinor > 0 && y.costMinor === 0)
+    .map((y) => ({ year: y.year, incomeMinor: y.incomeMinor, costMinor: y.costMinor }));
+}
