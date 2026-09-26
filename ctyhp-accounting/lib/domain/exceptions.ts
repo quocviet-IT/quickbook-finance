@@ -333,3 +333,18 @@ export function duplicateEntries(
     .map(([key, entries]) => ({ key, entries }))
     .sort((x, y) => x.entries[0].entryDate.localeCompare(y.entries[0].entryDate));
 }
+
+/**
+ * Dated after today. Usually a typing slip in the year.
+ *
+ * Re-filtered here even though the read is already windowed, so the check
+ * stands on its own and cannot be widened by a change to its caller.
+ */
+export function futureDatedEntries(
+  rows: readonly TransactionListRow[],
+  today: string,
+): TransactionListRow[] {
+  return rows
+    .filter((r) => r.entryDate > today)
+    .sort((x, y) => x.entryDate.localeCompare(y.entryDate));
+}

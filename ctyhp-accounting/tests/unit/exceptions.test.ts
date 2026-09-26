@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   duplicateEntries,
+  futureDatedEntries,
   holdingAccounts,
   undepositedFunds,
   unreconciledBankAccounts,
@@ -343,6 +344,29 @@ describe("duplicateEntries", () => {
       refs,
     );
     expect(groups).toEqual([]);
+  });
+});
+
+describe("futureDatedEntries", () => {
+  it("flags an entry dated after today", () => {
+    const rows = futureDatedEntries([txn({ entryDate: "2027-01-04" })], "2026-09-26");
+    expect(rows).toHaveLength(1);
+  });
+
+  it("leaves today's own entries alone", () => {
+    expect(futureDatedEntries([txn({ entryDate: "2026-09-26" })], "2026-09-26")).toEqual([]);
+  });
+
+  it("leaves the past alone", () => {
+    expect(futureDatedEntries([txn({ entryDate: "2026-09-25" })], "2026-09-26")).toEqual([]);
+  });
+
+  it("returns the soonest first", () => {
+    const rows = futureDatedEntries(
+      [txn({ entryId: "b", entryDate: "2027-05-01" }), txn({ entryId: "a", entryDate: "2026-12-01" })],
+      "2026-09-26",
+    );
+    expect(rows.map((r) => r.entryId)).toEqual(["a", "b"]);
   });
 });
 
