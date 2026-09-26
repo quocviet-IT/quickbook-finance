@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { wrongWayBalances, type ExceptionAccount } from "@/lib/domain/exceptions";
+import {
+  holdingAccounts,
+  undepositedFunds,
+  wrongWayBalances,
+  type ExceptionAccount,
+  type UndepositedDetail,
+} from "@/lib/domain/exceptions";
 
 const account = (over: Partial<ExceptionAccount> = {}): ExceptionAccount => ({
   accountId: "a1",
@@ -66,6 +72,74 @@ describe("wrongWayBalances", () => {
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0].accountCode).toBe("6300");
+  });
+});
+
+describe("holdingAccounts", () => {
+  it("flags anything left in Uncategorized", () => {
+    const rows = holdingAccounts([
+      account({ accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 475_000_00 }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].balanceMinor).toBe(475_000_00);
+  });
+
+  it("matches Suspense and Ask My Accountant too", () => {
+    const rows = holdingAccounts([
+      account({ accountId: "s1", accountCode: "9100", name: "Suspense", accountType: "current_asset", debitBase: 10_00 }),
+      account({ accountId: "s2", accountCode: "9200", name: "Ask My Accountant", accountType: "current_asset", debitBase: 20_00 }),
+    ]);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("stays silent when the holding account has been cleared to zero", () => {
+    expect(holdingAccounts([account({ name: "Uncategorized Income", accountType: "income" })])).toEqual([]);
+  });
+
+  it("does not flag an ordinary account", () => {
+    expect(holdingAccounts([account({ name: "Sales Revenue", accountType: "income", creditBase: 900_00 })])).toEqual([]);
+  });
+});
+
+describe("undepositedFunds", () => {
+  const details = new Map<string, UndepositedDetail>([
+    ["u1", { entryCount: 12, oldestEntryDate: "2026-01-04" }],
+  ]);
+
+  it("flags a balance sitting in Undeposited Funds", () => {
+    const rows = undepositedFunds(
+      [account({ accountId: "u1", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset", debitBase: 33_400_00 })],
+      details,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].entryCount).toBe(12);
+    expect(rows[0].oldestEntryDate).toBe("2026-01-04");
+  });
+
+  it("recognises the account by code when it has been renamed", () => {
+    const rows = undepositedFunds(
+      [account({ accountId: "u1", accountCode: "1210", name: "Takings not yet banked", accountType: "current_asset", debitBase: 500_00 })],
+      details,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("recognises a second one by name when it does not carry the code", () => {
+    const rows = undepositedFunds(
+      [account({ accountId: "u2", accountCode: "1211", name: "Undeposited Funds - Branch", accountType: "current_asset", debitBase: 500_00 })],
+      new Map(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].entryCount).toBe(0);
+    expect(rows[0].oldestEntryDate).toBeNull();
+  });
+
+  it("says nothing when the account has emptied, which is what should happen", () => {
+    const rows = undepositedFunds(
+      [account({ accountId: "u1", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset" })],
+      details,
+    );
+    expect(rows).toEqual([]);
   });
 });
 

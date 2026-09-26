@@ -128,3 +128,70 @@ export function wrongWayBalances(accounts: readonly ExceptionAccount[]): WrongWa
   }
   return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
 }
+
+export interface HoldingRow {
+  accountId: string;
+  accountCode: string;
+  name: string;
+  balanceMinor: number;
+}
+
+/**
+ * Both spellings of "uncategorised" are matched. The interface writes the
+ * American one, but a chart imported from elsewhere may not.
+ */
+const HOLDING = /uncategori[sz]ed|suspense|ask my accountant/i;
+
+/**
+ * Anything left in a holding account has not been given a real account yet, so
+ * it is in the wrong place on both statements.
+ */
+export function holdingAccounts(accounts: readonly ExceptionAccount[]): HoldingRow[] {
+  const rows: HoldingRow[] = [];
+  for (const a of accounts) {
+    const balanceMinor = a.debitBase - a.creditBase;
+    if (balanceMinor === 0 || !HOLDING.test(a.name)) continue;
+    rows.push({ accountId: a.accountId, accountCode: a.accountCode, name: a.name, balanceMinor });
+  }
+  return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
+}
+
+export interface UndepositedRow {
+  accountId: string;
+  accountCode: string;
+  name: string;
+  balanceMinor: number;
+  entryCount: number;
+  oldestEntryDate: string | null;
+}
+
+const UNDEPOSITED_NAME = /undeposited/i;
+/** The seeded chart's code for it; accepted alongside the name, never instead. */
+const UNDEPOSITED_CODE = "1210";
+
+/**
+ * Undeposited funds should empty as takings reach the bank. A balance that
+ * keeps growing means the sales are recorded but the deposits are not —
+ * revenue is in the books, the cash is not.
+ */
+export function undepositedFunds(
+  accounts: readonly ExceptionAccount[],
+  details: ReadonlyMap<string, UndepositedDetail>,
+): UndepositedRow[] {
+  const rows: UndepositedRow[] = [];
+  for (const a of accounts) {
+    const balanceMinor = a.debitBase - a.creditBase;
+    if (balanceMinor === 0) continue;
+    if (!UNDEPOSITED_NAME.test(a.name) && a.accountCode !== UNDEPOSITED_CODE) continue;
+    const detail = details.get(a.accountId);
+    rows.push({
+      accountId: a.accountId,
+      accountCode: a.accountCode,
+      name: a.name,
+      balanceMinor,
+      entryCount: detail?.entryCount ?? 0,
+      oldestEntryDate: detail?.oldestEntryDate ?? null,
+    });
+  }
+  return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
+}
