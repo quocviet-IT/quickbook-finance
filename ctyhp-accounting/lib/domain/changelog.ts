@@ -41,6 +41,47 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.63",
+    date: "2026-09-26",
+    headline: "The whole ledger as a Beancount file.",
+    changes: [
+      {
+        kind: "added",
+        title: "Beancount Export",
+        detail:
+          "Download every posted entry as a Beancount v3 file, ready for bean-check and Fava. Invoices and the payments that settle them share a link, so they stay grouped, and each transaction keeps its OneBook entry number. Amounts are in each entry's own currency. Downloading needs the Export company data permission and is recorded in the audit log.",
+        route: "/reports/beancount",
+      },
+    ],
+  },
+  {
+    version: "1.62",
+    date: "2026-09-26",
+    headline: "The checks a reviewer runs by hand, in one report.",
+    changes: [
+      {
+        kind: "added",
+        title: "Exception Report",
+        detail:
+          "Eight checks over the books: entries recorded more than once, a check number used twice on one account, money received but not yet banked, a balance pointing the wrong way, a year with income and no costs, bank accounts not agreed to a statement, entries dated in the future, and anything still sitting in a holding account. Nothing here is proof of a mistake — each line is a question worth answering.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "Every check is shown, even when it finds nothing",
+        detail:
+          "A check that found nothing says so, and a check that could not run says that instead. The report never changes a figure.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "fixed",
+        title: "Reports on a large book no longer stop at the thousandth row",
+        detail:
+          "The database hands back at most 1,000 rows to a single request and says nothing when it does. The Transaction List report, the P&L and Balance Sheet, the dashboards, inventory, and the Exception Report all read past that limit now, so on a book with more than 1,000 entries in a range, or more than 1,000 month-account pairs, totals on those books can differ from what was shown before — they are now complete.",
+      },
+    ],
+  },
+  {
     version: "1.61",
     date: "2026-08-24",
     headline: "Lists fit the screen. No more scrolling sideways to read a row.",
