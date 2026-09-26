@@ -335,6 +335,15 @@ describe("duplicateEntries", () => {
     );
     expect(groups.map((g) => g.entries[0].entryDate)).toEqual(["2026-01-01", "2026-05-01"]);
   });
+
+  it("does not group two entries whose party and reference merely concatenate alike", () => {
+    const refs = new Map<string, string>([["t1", "x"], ["t2", "1018|x"]]);
+    const groups = duplicateEntries(
+      [txn({ partyName: "Smith|1018" }), txn({ entryId: "t2", partyName: "Smith" })],
+      refs,
+    );
+    expect(groups).toEqual([]);
+  });
 });
 
 describe("the exceptions module", () => {

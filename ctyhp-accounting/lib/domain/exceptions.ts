@@ -307,6 +307,9 @@ export interface DuplicateGroup {
  *
  * Repeated wages on one day are normal when several people are paid the same;
  * the same supplier paid twice usually is not.
+ *
+ * The key is JSON-encoded so a value containing the separator cannot make two
+ * different entries look alike.
  */
 export function duplicateEntries(
   rows: readonly TransactionListRow[],
@@ -314,13 +317,13 @@ export function duplicateEntries(
 ): DuplicateGroup[] {
   const groups = new Map<string, TransactionListRow[]>();
   for (const r of rows) {
-    const key = [
+    const key = JSON.stringify([
       r.entryDate,
       r.partyName ?? "",
       referenceByEntryId.get(r.entryId) ?? "",
-      [...r.accountIds].sort().join(","),
-      String(r.amountMinor),
-    ].join("|");
+      [...r.accountIds].sort(),
+      r.amountMinor,
+    ]);
     const bucket = groups.get(key);
     if (bucket) bucket.push(r);
     else groups.set(key, [r]);
