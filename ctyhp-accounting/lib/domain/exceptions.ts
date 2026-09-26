@@ -291,3 +291,42 @@ export function yearsWithIncomeAndNoCost(years: readonly YearTotals[]): IncomeNo
     .filter((y) => y.incomeMinor > 0 && y.costMinor === 0)
     .map((y) => ({ year: y.year, incomeMinor: y.incomeMinor, costMinor: y.costMinor }));
 }
+
+export interface DuplicateGroup {
+  /** Stable across renders, so the table can key rows by it. */
+  key: string;
+  entries: TransactionListRow[];
+}
+
+/**
+ * Same date, same name, same reference, same accounts, same amount.
+ *
+ * The reference is the document's own — a check number, a wire reference —
+ * never `entry_number`, which is unique by definition and would stop this check
+ * ever firing.
+ *
+ * Repeated wages on one day are normal when several people are paid the same;
+ * the same supplier paid twice usually is not.
+ */
+export function duplicateEntries(
+  rows: readonly TransactionListRow[],
+  referenceByEntryId: ReadonlyMap<string, string>,
+): DuplicateGroup[] {
+  const groups = new Map<string, TransactionListRow[]>();
+  for (const r of rows) {
+    const key = [
+      r.entryDate,
+      r.partyName ?? "",
+      referenceByEntryId.get(r.entryId) ?? "",
+      [...r.accountIds].sort().join(","),
+      String(r.amountMinor),
+    ].join("|");
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(r);
+    else groups.set(key, [r]);
+  }
+  return [...groups.entries()]
+    .filter(([, entries]) => entries.length > 1)
+    .map(([key, entries]) => ({ key, entries }))
+    .sort((x, y) => x.entries[0].entryDate.localeCompare(y.entries[0].entryDate));
+}

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  duplicateEntries,
   holdingAccounts,
   undepositedFunds,
   unreconciledBankAccounts,
@@ -10,6 +11,7 @@ import {
   type ExceptionAccount,
   type ExceptionBankAccount,
   type LedgerBalance,
+  type TransactionListRow,
   type UndepositedDetail,
 } from "@/lib/domain/exceptions";
 
@@ -257,6 +259,81 @@ describe("yearsWithIncomeAndNoCost", () => {
 
   it("does not flag a year with no income either — that is a quiet year, not a broken one", () => {
     expect(yearsWithIncomeAndNoCost([{ year: "2024", incomeMinor: 0, costMinor: 0 }])).toEqual([]);
+  });
+});
+
+const txn = (over: Partial<TransactionListRow> = {}): TransactionListRow => ({
+  entryId: "t1",
+  entryNumber: "JE-000001",
+  entryDate: "2026-03-04",
+  description: "Monthly rent",
+  sourceType: "manual",
+  partyName: "Harbour Property Ltd",
+  categoryLabel: "Rent",
+  moneyLabel: "Checking 3388",
+  amountMinor: -4_500_00,
+  currencyCode: "USD",
+  reconciled: false,
+  accountIds: ["rent", "checking"],
+  ...over,
+});
+
+describe("duplicateEntries", () => {
+  const noRefs = new Map<string, string>();
+
+  it("groups two entries alike in date, party, accounts and amount", () => {
+    const groups = duplicateEntries([txn(), txn({ entryId: "t2", entryNumber: "JE-000002" })], noRefs);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].entries.map((e) => e.entryId)).toEqual(["t1", "t2"]);
+  });
+
+  it("reports nothing when the amounts differ", () => {
+    expect(duplicateEntries([txn(), txn({ entryId: "t2", amountMinor: -4_500_01 })], noRefs)).toEqual([]);
+  });
+
+  it("reports nothing when the accounts differ", () => {
+    expect(
+      duplicateEntries([txn(), txn({ entryId: "t2", accountIds: ["rent", "savings"] })], noRefs),
+    ).toEqual([]);
+  });
+
+  it("does not care what order the accounts arrive in", () => {
+    const groups = duplicateEntries(
+      [txn(), txn({ entryId: "t2", accountIds: ["checking", "rent"] })],
+      noRefs,
+    );
+    expect(groups).toHaveLength(1);
+  });
+
+  it("separates two entries carrying different references", () => {
+    const refs = new Map<string, string>([["t1", "1018"], ["t2", "1019"]]);
+    expect(duplicateEntries([txn(), txn({ entryId: "t2" })], refs)).toEqual([]);
+  });
+
+  it("groups two entries carrying the same reference", () => {
+    const refs = new Map<string, string>([["t1", "1018"], ["t2", "1018"]]);
+    expect(duplicateEntries([txn(), txn({ entryId: "t2" })], refs)).toHaveLength(1);
+  });
+
+  it("treats a missing party the same as another missing party", () => {
+    const groups = duplicateEntries(
+      [txn({ partyName: null }), txn({ entryId: "t2", partyName: null })],
+      noRefs,
+    );
+    expect(groups).toHaveLength(1);
+  });
+
+  it("returns the groups oldest first", () => {
+    const groups = duplicateEntries(
+      [
+        txn({ entryId: "n1", entryDate: "2026-05-01" }),
+        txn({ entryId: "n2", entryDate: "2026-05-01" }),
+        txn({ entryId: "o1", entryDate: "2026-01-01" }),
+        txn({ entryId: "o2", entryDate: "2026-01-01" }),
+      ],
+      noRefs,
+    );
+    expect(groups.map((g) => g.entries[0].entryDate)).toEqual(["2026-01-01", "2026-05-01"]);
   });
 });
 
