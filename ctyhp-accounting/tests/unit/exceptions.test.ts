@@ -378,6 +378,7 @@ const pay = (over: Partial<ExceptionPaymentRef> = {}): ExceptionPaymentRef => ({
   paymentId: "p1",
   kind: "vendor",
   paymentNumber: "BP-000001",
+  journalEntryId: "e1",
   paymentDate: "2026-04-02",
   reference: "1018",
   accountId: "checking",
@@ -488,6 +489,22 @@ describe("buildExceptionReport", () => {
     );
     expect(report.unreconciled).toHaveLength(1);
     expect(report.unreconciled[0].balanceMinor).toBe(96_293_85);
+  });
+
+  it("tells two same-day payments apart by the reference their own entry carries", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        entriesInRange: [
+          txn({ entryId: "je-1", entryNumber: "JE-000101" }),
+          txn({ entryId: "je-2", entryNumber: "JE-000102" }),
+        ],
+        paymentReferences: [
+          pay({ paymentId: "p1", paymentNumber: "BP-000001", journalEntryId: "je-1", reference: "1018" }),
+          pay({ paymentId: "p2", paymentNumber: "BP-000002", journalEntryId: "je-2", reference: "1019" }),
+        ],
+      }),
+    );
+    expect(report.duplicates).toEqual([]);
   });
 });
 

@@ -72,6 +72,13 @@ export interface ExceptionPaymentRef {
   paymentId: string;
   kind: "customer" | "vendor";
   paymentNumber: string | null;
+  /**
+   * The journal entry this payment posted, which is the only key that can join
+   * a payment to a row of the transaction list. Document numbers cannot: a
+   * payment's number and its entry's number come from separate sequences
+   * (`PMT-`/`BP-` against `JE-`), so they are never equal.
+   */
+  journalEntryId: string | null;
   paymentDate: string;
   reference: string;
   /** The bank or credit-card account the money moved through. */
@@ -427,21 +434,22 @@ export interface ExceptionReport {
 /**
  * The reference a duplicate is judged by, keyed on the entry that produced it.
  *
- * A payment's journal entry is the one the transaction list shows, so the
- * reference travels with the entry id.
+ * Joined on the journal entry's own id, which a payment records directly.
+ *
+ * **Not** joined on document numbers. A payment's number and its entry's number
+ * come from separate sequences — `PMT-` and `BP-` against `JE-` — so matching
+ * those two strings finds nothing at all. The failure would be silent and
+ * expensive: every payment's reference would fall back to blank, and two
+ * unrelated payments alike in date, party, accounts and amount would be reported
+ * as a double posting.
  */
 function referencesByEntry(
   payments: readonly ExceptionPaymentRef[],
-  entries: readonly TransactionListRow[],
 ): Map<string, string> {
-  const byNumber = new Map<string, string>();
-  for (const p of payments) {
-    if (p.paymentNumber) byNumber.set(p.paymentNumber, p.reference);
-  }
   const out = new Map<string, string>();
-  for (const e of entries) {
-    const reference = byNumber.get(e.entryNumber);
-    if (reference) out.set(e.entryId, reference);
+  for (const p of payments) {
+    const reference = p.reference.trim();
+    if (p.journalEntryId !== null && reference !== "") out.set(p.journalEntryId, reference);
   }
   return out;
 }
@@ -449,12 +457,12 @@ function referencesByEntry(
 /** Run all eight. Nothing here reads a clock, a database or a file. */
 export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
   const balanceByAccountId = new Map<string, number>(
-    input.accounts.map((a) => [a.accountId, a.debitBase - a.creditBase]),
+    input.accounts.map((a) => [a.accountId, signedBalance(a)]),
   );
 
   const duplicates = duplicateEntries(
     input.entriesInRange,
-    referencesByEntry(input.paymentReferences, input.entriesInRange),
+    referencesByEntry(input.paymentReferences),
   );
   const checkNumberClashes = duplicateCheckNumbers(input.paymentReferences);
   const undeposited = undepositedFunds(input.accounts, input.undepositedDetails);
