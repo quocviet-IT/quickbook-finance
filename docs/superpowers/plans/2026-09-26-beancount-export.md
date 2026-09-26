@@ -692,7 +692,7 @@ describe("buildBeancountFile", () => {
     const text = buildBeancountFile(input({ entries: [entry()] }));
     // A label standing on its own, as the prototype's `;; TIN: ...` line was.
     // Case-sensitive and word-bounded: "Operating" contains "tin" and is fine.
-    expect(text).not.toMatch(/(TIN|EIN)/);
+    expect(text).not.toMatch(/\b(TIN|EIN)\b/);
   });
 
   it("balances every transaction it writes, per currency", () => {
