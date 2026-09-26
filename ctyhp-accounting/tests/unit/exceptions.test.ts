@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   holdingAccounts,
   undepositedFunds,
+  unreconciledBankAccounts,
   wrongWayBalances,
   type ExceptionAccount,
+  type ExceptionBankAccount,
   type UndepositedDetail,
 } from "@/lib/domain/exceptions";
 
@@ -148,6 +150,45 @@ describe("undepositedFunds", () => {
       new Map(),
     );
     expect(rows).toHaveLength(1);
+  });
+});
+
+const bank = (over: Partial<ExceptionBankAccount> = {}): ExceptionBankAccount => ({
+  bankAccountId: "b1",
+  accountId: "a1",
+  accountName: "Checking 3388",
+  lastReconciledDate: null,
+  ...over,
+});
+
+describe("unreconciledBankAccounts", () => {
+  const balances = new Map<string, number>([["a1", 96_293_85]]);
+
+  it("flags a bank account nobody has ever reconciled", () => {
+    const rows = unreconciledBankAccounts([bank()], balances, "2026-09-30");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].lastReconciledDate).toBeNull();
+    expect(rows[0].balanceMinor).toBe(96_293_85);
+  });
+
+  it("flags one whose last reconciliation stops short of the report date", () => {
+    const rows = unreconciledBankAccounts([bank({ lastReconciledDate: "2026-06-30" })], balances, "2026-09-30");
+    expect(rows).toHaveLength(1);
+  });
+
+  it("leaves one reconciled exactly to the report date alone", () => {
+    const rows = unreconciledBankAccounts([bank({ lastReconciledDate: "2026-09-30" })], balances, "2026-09-30");
+    expect(rows).toEqual([]);
+  });
+
+  it("leaves one reconciled beyond the report date alone", () => {
+    const rows = unreconciledBankAccounts([bank({ lastReconciledDate: "2026-10-31" })], balances, "2026-09-30");
+    expect(rows).toEqual([]);
+  });
+
+  it("says nothing about a closed account with no balance to prove", () => {
+    const rows = unreconciledBankAccounts([bank()], new Map([["a1", 0]]), "2026-09-30");
+    expect(rows).toEqual([]);
   });
 });
 

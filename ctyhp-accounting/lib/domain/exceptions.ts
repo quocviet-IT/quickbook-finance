@@ -210,3 +210,38 @@ export function undepositedFunds(
   }
   return byLargestFirst(rows);
 }
+
+export interface UnreconciledRow {
+  bankAccountId: string;
+  accountId: string;
+  accountName: string;
+  balanceMinor: number;
+  lastReconciledDate: string | null;
+}
+
+/**
+ * A balance nobody has proved against the bank.
+ *
+ * An account with nothing in it is not asked about: there is no balance to
+ * prove, and a closed account would otherwise stay on the list forever.
+ */
+export function unreconciledBankAccounts(
+  banks: readonly ExceptionBankAccount[],
+  balanceByAccountId: ReadonlyMap<string, number>,
+  to: string,
+): UnreconciledRow[] {
+  const rows: UnreconciledRow[] = [];
+  for (const b of banks) {
+    const balanceMinor = balanceByAccountId.get(b.accountId) ?? 0;
+    if (balanceMinor === 0) continue;
+    if (b.lastReconciledDate !== null && b.lastReconciledDate >= to) continue;
+    rows.push({
+      bankAccountId: b.bankAccountId,
+      accountId: b.accountId,
+      accountName: b.accountName,
+      balanceMinor,
+      lastReconciledDate: b.lastReconciledDate,
+    });
+  }
+  return rows.sort((x, y) => x.accountName.localeCompare(y.accountName));
+}
