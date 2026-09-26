@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   accountNames,
+  beancountFileName,
+  buildBeancountFile,
   documentsByEntry,
   formatAmount,
   quote,
@@ -9,6 +11,8 @@ import {
   tagSafe,
   type BeancountAccount,
   type BeancountDocumentRows,
+  type BeancountEntry,
+  type BeancountInput,
 } from "@/lib/domain/beancount";
 
 const acct = (over: Partial<BeancountAccount> = {}): BeancountAccount => ({
@@ -160,6 +164,243 @@ describe("documentsByEntry", () => {
     );
     expect(docs.get("e1")).toEqual({ links: [], reference: null, dueDate: null });
     expect(docs.get("e2")).toEqual({ links: [], reference: null, dueDate: null });
+  });
+});
+
+const USD = { code: "USD", decimalPlaces: 2, isBase: true };
+const EUR = { code: "EUR", decimalPlaces: 2, isBase: false };
+const VND = { code: "VND", decimalPlaces: 0, isBase: false };
+
+const BANK = acct({ id: "acc-bank", code: "1010", name: "Operating Checking", type: "bank" });
+const AR = acct({ id: "acc-ar", code: "1100", name: "Accounts Receivable", type: "accounts_receivable" });
+const SALES = acct({ id: "acc-sales", code: "4000", name: "Sales Revenue", type: "income" });
+
+const entry = (over: Partial<BeancountEntry> = {}): BeancountEntry => ({
+  id: "e1",
+  entryNumber: "JE-000001",
+  entryDate: "2025-01-15",
+  description: "Invoice INV-000001",
+  sourceType: "invoice",
+  currencyCode: "USD",
+  lines: [
+    { accountId: "acc-ar", debitMinor: 120000, creditMinor: 0 },
+    { accountId: "acc-sales", debitMinor: 0, creditMinor: 120000 },
+  ],
+  ...over,
+});
+
+const input = (over: Partial<BeancountInput> = {}): BeancountInput => ({
+  company: { legalName: "Riverbend Trading LLC", fiscalYearStartMonth: 1, accountingBasis: "accrual" },
+  generatedAt: "2026-09-26T08:00:00.000Z",
+  accounts: [BANK, AR, SALES],
+  entries: [],
+  partyByEntryId: new Map(),
+  documentByEntryId: new Map(),
+  currencies: [USD, EUR, VND],
+  prices: [],
+  ...over,
+});
+
+describe("buildBeancountFile", () => {
+  it("writes a small book exactly", () => {
+    const text = buildBeancountFile(
+      input({
+        entries: [
+          entry(),
+          entry({
+            id: "e2",
+            entryNumber: "JE-000002",
+            entryDate: "2025-02-03",
+            description: "Payment received",
+            sourceType: "payment",
+            lines: [
+              { accountId: "acc-bank", debitMinor: 120000, creditMinor: 0 },
+              { accountId: "acc-ar", debitMinor: 0, creditMinor: 120000 },
+            ],
+          }),
+        ],
+        partyByEntryId: new Map([["e1", "Harbor Cafe"], ["e2", "Harbor Cafe"]]),
+        documentByEntryId: new Map([
+          ["e1", { links: ["INV-000001"], reference: null, dueDate: "2025-02-14" }],
+          ["e2", { links: ["INV-000001"], reference: "1042", dueDate: null }],
+        ]),
+      }),
+    );
+
+    // The longest name is Assets:Receivable:1100-Accounts-Receivable (42), so
+    // accounts pad to 44 and amounts right-align in 16.
+    const a = (name: string) => name.padEnd(44);
+    const n = (amount: string) => amount.padStart(16);
+    expect(text).toBe(
+      [
+        ";; " + "=".repeat(58),
+        ";; Riverbend Trading LLC - Beancount ledger",
+        ";; Generated 2026-09-26 | Beancount v3 format",
+        ";; " + "=".repeat(58),
+        "",
+        'option "title" "Riverbend Trading LLC"',
+        'option "operating_currency" "USD"',
+        ";; Fiscal year starts: January",
+        ";; Basis: accrual",
+        "",
+        ";; --- Chart of accounts ---",
+        "",
+        ";; Assets",
+        "2025-01-15 open Assets:Bank:1010-Operating-Checking",
+        "2025-01-15 open Assets:Receivable:1100-Accounts-Receivable",
+        "",
+        ";; Income",
+        "2025-01-15 open Income:4000-Sales-Revenue",
+        "",
+        ";; --- Transactions ---",
+        "",
+        ";; January 2025",
+        "",
+        '2025-01-15 * "Harbor Cafe" "Invoice INV-000001" #invoice ^INV-000001',
+        '  entry: "JE-000001"',
+        "  due: 2025-02-14",
+        `  ${a("Assets:Receivable:1100-Accounts-Receivable")}${n("1200.00")} USD`,
+        `  ${a("Income:4000-Sales-Revenue")}${n("-1200.00")} USD`,
+        "",
+        ";; February 2025",
+        "",
+        '2025-02-03 * "Harbor Cafe" "Payment received" #payment ^INV-000001',
+        '  entry: "JE-000002"',
+        '  num: "1042"',
+        `  ${a("Assets:Bank:1010-Operating-Checking")}${n("1200.00")} USD`,
+        `  ${a("Assets:Receivable:1100-Accounts-Receivable")}${n("-1200.00")} USD`,
+        "",
+        ";; --- End of file ---",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("writes only the narration when an entry has no counterparty", () => {
+    const text = buildBeancountFile(input({ entries: [entry({ sourceType: "manual", description: "Month-end accrual" })] }));
+    expect(text).toContain('2025-01-15 * "Month-end accrual" #manual\n');
+  });
+
+  it("orders entries by date then number, whatever order they arrive in", () => {
+    const text = buildBeancountFile(
+      input({
+        entries: [
+          entry({ id: "late", entryNumber: "JE-000009", entryDate: "2025-03-01" }),
+          entry({ id: "b", entryNumber: "JE-000003", entryDate: "2025-01-15" }),
+          entry({ id: "a", entryNumber: "JE-000002", entryDate: "2025-01-15" }),
+        ],
+      }),
+    );
+    const order = [...text.matchAll(/entry: "(JE-\d+)"/g)].map((m) => m[1]);
+    expect(order).toEqual(["JE-000002", "JE-000003", "JE-000009"]);
+  });
+
+  it("writes a zero-decimal currency without a decimal point", () => {
+    const text = buildBeancountFile(
+      input({
+        entries: [
+          entry({
+            currencyCode: "VND",
+            lines: [
+              { accountId: "acc-bank", debitMinor: 150000, creditMinor: 0 },
+              { accountId: "acc-sales", debitMinor: 0, creditMinor: 150000 },
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(text).toMatch(/Assets:Bank:1010-Operating-Checking\s+150000 VND/);
+    expect(text).toMatch(/Income:4000-Sales-Revenue\s+-150000 VND/);
+  });
+
+  it("adds price directives only for foreign currencies the book uses", () => {
+    const text = buildBeancountFile(
+      input({
+        entries: [entry({ currencyCode: "EUR" })],
+        prices: [
+          { currencyCode: "EUR", rateDate: "2025-01-15", rateToBase: "1.0837000000" },
+          { currencyCode: "VND", rateDate: "2025-01-15", rateToBase: "0.0000400000" },
+          { currencyCode: "USD", rateDate: "2025-01-15", rateToBase: "1" },
+        ],
+      }),
+    );
+    expect(text).toContain(";; --- Prices ---\n\n2025-01-15 price EUR 1.0837 USD\n");
+    expect(text).not.toContain("price VND");
+    expect(text).not.toContain("price USD");
+  });
+
+  it("omits the prices section for a single-currency book", () => {
+    const text = buildBeancountFile(input({ entries: [entry()] }));
+    expect(text).not.toContain("--- Prices ---");
+  });
+
+  it("refuses an entry posting to an account missing from the chart", () => {
+    const bad = entry({ lines: [{ accountId: "nowhere", debitMinor: 1, creditMinor: 0 }] });
+    expect(() => buildBeancountFile(input({ entries: [bad] }))).toThrow(/JE-000001/);
+  });
+
+  it("refuses an entry in a currency it has no decimals for", () => {
+    expect(() => buildBeancountFile(input({ entries: [entry({ currencyCode: "GBP" })] }))).toThrow(/GBP/);
+  });
+
+  it("never writes a TIN, whatever the company settings hold", () => {
+    const text = buildBeancountFile(input({ entries: [entry()] }));
+    // A label standing on its own, as the prototype's `;; TIN: ...` line was.
+    // Case-sensitive and word-bounded: "Operating" contains "tin" and is fine.
+    expect(text).not.toMatch(/\b(TIN|EIN)\b/);
+  });
+
+  it("balances every transaction it writes, per currency", () => {
+    const text = buildBeancountFile(
+      input({
+        entries: [
+          entry(),
+          entry({
+            id: "e2",
+            entryNumber: "JE-000002",
+            currencyCode: "EUR",
+            lines: [
+              { accountId: "acc-bank", debitMinor: 33317, creditMinor: 0 },
+              { accountId: "acc-ar", debitMinor: 1, creditMinor: 0 },
+              { accountId: "acc-sales", debitMinor: 0, creditMinor: 33318 },
+            ],
+          }),
+          entry({
+            id: "e3",
+            entryNumber: "JE-000003",
+            currencyCode: "VND",
+            lines: [
+              { accountId: "acc-bank", debitMinor: 2500000, creditMinor: 0 },
+              { accountId: "acc-sales", debitMinor: 0, creditMinor: 2500000 },
+            ],
+          }),
+        ],
+      }),
+    );
+    // Read the file back the way bean-check starts: every transaction's postings
+    // summed per currency must be exactly zero.
+    const sums: Array<Map<string, number>> = [];
+    for (const line of text.split("\n")) {
+      if (/^\d{4}-\d{2}-\d{2} \*/.test(line)) sums.push(new Map());
+      const posting = line.match(/^ {2}\S+\s+(-?\d+)(?:\.(\d+))?\s([A-Z]{3})$/);
+      if (posting) {
+        const minor = Number(posting[1] + (posting[2] ?? ""));
+        const current = sums[sums.length - 1];
+        current.set(posting[3], (current.get(posting[3]) ?? 0) + minor);
+      }
+    }
+    expect(sums).toHaveLength(3);
+    for (const bucket of sums) for (const total of bucket.values()) expect(total).toBe(0);
+  });
+});
+
+describe("beancountFileName", () => {
+  it("names the file after the company", () => {
+    expect(beancountFileName("Riverbend Trading LLC")).toBe("riverbend-trading-llc.beancount");
+  });
+
+  it("falls back when the name yields nothing usable", () => {
+    expect(beancountFileName("!!")).toBe("ledger.beancount");
   });
 });
 
