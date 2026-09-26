@@ -106,6 +106,21 @@ export interface WrongWayRow {
 
 const CONTRA = /^\s*contra\b/i;
 
+/** Debit-positive, so a credit balance reads negative. */
+function signedBalance(account: ExceptionAccount): number {
+  return account.debitBase - account.creditBase;
+}
+
+/**
+ * Largest question first.
+ *
+ * Every balance check orders its findings this way, so it is written once: a
+ * reviewer works down from the figure most worth explaining.
+ */
+function byLargestFirst<T extends { balanceMinor: number }>(rows: T[]): T[] {
+  return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
+}
+
 /**
  * An asset in credit, or a liability in debit.
  *
@@ -123,10 +138,10 @@ export function wrongWayBalances(accounts: readonly ExceptionAccount[]): WrongWa
       accountCode: a.accountCode,
       name: a.name,
       accountType: a.accountType,
-      balanceMinor: a.debitBase - a.creditBase,
+      balanceMinor: signedBalance(a),
     });
   }
-  return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
+  return byLargestFirst(rows);
 }
 
 export interface HoldingRow {
@@ -149,11 +164,11 @@ const HOLDING = /uncategori[sz]ed|suspense|ask my accountant/i;
 export function holdingAccounts(accounts: readonly ExceptionAccount[]): HoldingRow[] {
   const rows: HoldingRow[] = [];
   for (const a of accounts) {
-    const balanceMinor = a.debitBase - a.creditBase;
+    const balanceMinor = signedBalance(a);
     if (balanceMinor === 0 || !HOLDING.test(a.name)) continue;
     rows.push({ accountId: a.accountId, accountCode: a.accountCode, name: a.name, balanceMinor });
   }
-  return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
+  return byLargestFirst(rows);
 }
 
 export interface UndepositedRow {
@@ -180,7 +195,7 @@ export function undepositedFunds(
 ): UndepositedRow[] {
   const rows: UndepositedRow[] = [];
   for (const a of accounts) {
-    const balanceMinor = a.debitBase - a.creditBase;
+    const balanceMinor = signedBalance(a);
     if (balanceMinor === 0) continue;
     if (!UNDEPOSITED_NAME.test(a.name) && a.accountCode !== UNDEPOSITED_CODE) continue;
     const detail = details.get(a.accountId);
@@ -193,5 +208,5 @@ export function undepositedFunds(
       oldestEntryDate: detail?.oldestEntryDate ?? null,
     });
   }
-  return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
+  return byLargestFirst(rows);
 }

@@ -141,6 +141,14 @@ describe("undepositedFunds", () => {
     );
     expect(rows).toEqual([]);
   });
+
+  it("reports an account matching both the name and the code only once", () => {
+    const rows = undepositedFunds(
+      [account({ accountId: "u1", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset", debitBase: 900_00 })],
+      new Map(),
+    );
+    expect(rows).toHaveLength(1);
+  });
 });
 
 describe("the exceptions module", () => {
