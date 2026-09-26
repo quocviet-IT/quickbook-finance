@@ -103,13 +103,13 @@ reference, same accounts, same amount. Repeated wages on one day are normal
 when several people are paid the same; the same supplier paid twice usually is
 not."*
 
-### 4.2 A cheque number used twice on one account
+### 4.2 A check number used twice on one account
 
 Group `acc_payment` and `acc_bill_payment` by (bank or credit-card account,
 `reference`). Report any pair where the same reference appears against the same
 account more than once. Skip null and empty references.
 
-Counted per account on purpose, so the same number in two different cheque
+Counted per account on purpose, so the same number in two different check
 books is not flagged.
 
 ### 4.3 Money received but not yet banked
@@ -174,10 +174,16 @@ Five, all of them existing and all of them already filtered to
 | 2 | `acc_transaction_list(from, to)` | 4.1 |
 | 3 | `acc_transaction_list(today + 1 day, '9999-12-31')` | 4.7 |
 | 4 | `getMonthlyLedgerBalances` over the book's full span, summed by year. The span is the earliest and latest `entry_date` among posted entries, read in the same round trip — not the report's date range, and not a guessed number of years | 4.5 |
-| 5 | `acc_payment` + `acc_bill_payment` where `reference` is not null; plus, only when 4.3 finds a non-zero balance, the entry count and earliest date against that account | 4.2, 4.3 |
+| 5 | `acc_payment` + `acc_bill_payment` where `reference` is not null; plus, only when 4.3 finds a non-zero balance, the entry count and earliest date against that account | **4.1**, 4.2, 4.3 |
 
 Read 5's second half runs only when there is something to describe, so the
 common case costs nothing.
+
+Read 5 feeds 4.1 as well as 4.2, and that is easy to miss: the reference in the
+duplicate key comes from this read, not from the transaction list. If it fails
+and only 4.2 is marked unavailable, 4.1 keeps running with every reference blank
+— which turns it into a generator of false duplicates while the screen reports it
+as clean. Both checks must be recorded against this read.
 
 ## 6. The screen
 
@@ -203,7 +209,7 @@ a row can be traced back to the check that raised it.
 
 Footer, kept from the prototype: *"Nothing here is proof of a mistake. Each
 line is a question a reviewer would ask, and most have an innocent answer — four
-wages of the same amount on one day, a cheque book that restarts at 1000. What
+wages of the same amount on one day, a check book that restarts at 1000. What
 matters is that somebody has looked and can say why."*
 
 Interface language is US English, as everywhere else in the application.
@@ -238,7 +244,7 @@ Each check gets at least three cases: it fires when it should, it stays silent
 when it should, and one boundary case. The boundary cases that matter:
 
 - 4.1 — two entries alike in everything but reference are **not** duplicates
-- 4.2 — the same cheque number against two different bank accounts is **not**
+- 4.2 — the same check number against two different bank accounts is **not**
   flagged
 - 4.4 — an account with `detail_type = 'Contra fixed asset'` carrying a credit
   balance is **not** flagged
@@ -259,7 +265,7 @@ application before.
 
 Fixtures are **constructed, never copied**. This repository is public. The
 Pacific Four Nine ledger contains real customer data — the names of people who
-sent money by Zelle, bank account identifiers, cheque numbers, wages — and none
+sent money by Zelle, bank account identifiers, check numbers, wages — and none
 of it may enter `tests/`.
 
 What the fixtures reproduce is the *shape* of each finding, with invented names

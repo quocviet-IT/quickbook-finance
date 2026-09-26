@@ -52,6 +52,7 @@ The first check, and the types every later task consumes. `naturalBalance` alrea
 Create `tests/unit/exceptions.test.ts`:
 
 ```ts
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { wrongWayBalances, type ExceptionAccount } from "@/lib/domain/exceptions";
 
@@ -69,11 +70,11 @@ const account = (over: Partial<ExceptionAccount> = {}): ExceptionAccount => ({
 describe("wrongWayBalances", () => {
   it("flags an expense account carrying a credit balance", () => {
     const rows = wrongWayBalances([
-      account({ accountId: "e1", accountCode: "6100", name: "Payroll Taxes", accountType: "expense", creditBase: 7_334_72 }),
+      account({ accountId: "e1", accountCode: "6100", name: "Payroll Taxes", accountType: "expense", creditBase: 8_250_00 }),
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0].accountCode).toBe("6100");
-    expect(rows[0].balanceMinor).toBe(-7_334_72);
+    expect(rows[0].balanceMinor).toBe(-8_250_00);
   });
 
   it("leaves an account carrying its normal balance alone", () => {
@@ -107,7 +108,20 @@ describe("wrongWayBalances", () => {
     expect(rows.map((r) => r.accountCode)).toEqual(["6200", "6100"]);
   });
 });
+
+describe("the exceptions module", () => {
+  it("imports nothing that could write to the books", () => {
+    const source = readFileSync("lib/domain/exceptions.ts", "utf8");
+    const imported = [...source.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
+    expect(imported.filter((p) => p.startsWith("@/lib/db/") || p.startsWith("@/lib/services/"))).toEqual([]);
+  });
+});
 ```
+
+This guard lands in Task 1, not later, because the module's own doc comment
+claims it exists. Tasks 2 to 8 keep appending to this file, and a claim with no
+test behind it is how the eighth append quietly breaks the rule the whole report
+rests on.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -150,7 +164,7 @@ export type { LedgerBalance, TransactionListRow };
  */
 export const CHECK_LABEL = {
   duplicates: "Entries recorded more than once",
-  cheque: "A cheque number used twice on one account",
+  checkNumber: "A check number used twice on one account",
   undeposited: "Money received but not yet banked",
   wrongWay: "A balance pointing the wrong way",
   incomeNoCost: "A year with income and no costs",
@@ -163,20 +177,20 @@ export type CheckKey = keyof typeof CHECK_LABEL;
 
 /* ---------------------------------------------------------------- inputs */
 
-/** An account with its cumulative balance and the classification the checks need. */
-export interface ExceptionAccount {
-  accountId: string;
-  accountCode: string;
-  name: string;
-  accountType: AccountType;
+/**
+ * An account with its cumulative balance and the classification the checks need.
+ *
+ * Extends `LedgerBalance` rather than restating it: the report reads its
+ * balances through `acc_ledger_balances`, and a second "account with a balance"
+ * shape would be free to drift from the first.
+ */
+export interface ExceptionAccount extends LedgerBalance {
   /**
    * OneBook records that an account is contra rather than guessing from its
    * name: migration 0046 creates "Accumulated Depreciation" with
    * `detail_type = 'Contra fixed asset'`.
    */
   detailType: string | null;
-  debitBase: number;
-  creditBase: number;
 }
 
 export interface ExceptionBankAccount {
@@ -193,6 +207,13 @@ export interface ExceptionPaymentRef {
   paymentId: string;
   kind: "customer" | "vendor";
   paymentNumber: string | null;
+  /**
+   * The journal entry this payment posted, which is the only key that can join
+   * a payment to a row of the transaction list. Document numbers cannot: a
+   * payment's number and its entry's number come from separate sequences
+   * (`PMT-`/`BP-` against `JE-`), so they are never equal.
+   */
+  journalEntryId: string | null;
   paymentDate: string;
   reference: string;
   /** The bank or credit-card account the money moved through. */
@@ -225,7 +246,7 @@ export interface WrongWayRow {
   balanceMinor: number;
 }
 
-const CONTRA = /^\s*contra/i;
+const CONTRA = /^\s*contra\b/i;
 
 /**
  * An asset in credit, or a liability in debit.
@@ -254,7 +275,7 @@ export function wrongWayBalances(accounts: readonly ExceptionAccount[]): WrongWa
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 5 tests
+Expected: PASS, 7 tests
 
 - [ ] **Step 5: Commit**
 
@@ -291,10 +312,10 @@ import {
 describe("holdingAccounts", () => {
   it("flags anything left in Uncategorized", () => {
     const rows = holdingAccounts([
-      account({ accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 475_000_00 }),
+      account({ accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 150_000_00 }),
     ]);
     expect(rows).toHaveLength(1);
-    expect(rows[0].balanceMinor).toBe(475_000_00);
+    expect(rows[0].balanceMinor).toBe(150_000_00);
   });
 
   it("matches Suspense and Ask My Accountant too", () => {
@@ -438,7 +459,7 @@ export function undepositedFunds(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 14 tests
+Expected: PASS, 16 tests
 
 - [ ] **Step 5: Commit**
 
@@ -469,19 +490,19 @@ import { unreconciledBankAccounts, type ExceptionBankAccount } from "@/lib/domai
 const bank = (over: Partial<ExceptionBankAccount> = {}): ExceptionBankAccount => ({
   bankAccountId: "b1",
   accountId: "a1",
-  accountName: "Checking 3388",
+  accountName: "Business Checking",
   lastReconciledDate: null,
   ...over,
 });
 
 describe("unreconciledBankAccounts", () => {
-  const balances = new Map<string, number>([["a1", 96_293_85]]);
+  const balances = new Map<string, number>([["a1", 41_780_00]]);
 
   it("flags a bank account nobody has ever reconciled", () => {
     const rows = unreconciledBankAccounts([bank()], balances, "2026-09-30");
     expect(rows).toHaveLength(1);
     expect(rows[0].lastReconciledDate).toBeNull();
-    expect(rows[0].balanceMinor).toBe(96_293_85);
+    expect(rows[0].balanceMinor).toBe(41_780_00);
   });
 
   it("flags one whose last reconciliation stops short of the report date", () => {
@@ -555,7 +576,7 @@ export function unreconciledBankAccounts(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 19 tests
+Expected: PASS, 21 tests
 
 - [ ] **Step 5: Commit**
 
@@ -715,7 +736,7 @@ export function yearsWithIncomeAndNoCost(years: readonly YearTotals[]): IncomeNo
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 26 tests
+Expected: PASS, 28 tests
 
 - [ ] **Step 5: Commit**
 
@@ -751,7 +772,7 @@ const txn = (over: Partial<TransactionListRow> = {}): TransactionListRow => ({
   sourceType: "manual",
   partyName: "Harbour Property Ltd",
   categoryLabel: "Rent",
-  moneyLabel: "Checking 3388",
+  moneyLabel: "Business Checking",
   amountMinor: -4_500_00,
   currencyCode: "USD",
   reconciled: false,
@@ -838,7 +859,7 @@ export interface DuplicateGroup {
 /**
  * Same date, same name, same reference, same accounts, same amount.
  *
- * The reference is the document's own — a cheque number, a wire reference —
+ * The reference is the document's own — a check number, a wire reference —
  * never `entry_number`, which is unique by definition and would stop this check
  * ever firing.
  *
@@ -851,13 +872,17 @@ export function duplicateEntries(
 ): DuplicateGroup[] {
   const groups = new Map<string, TransactionListRow[]>();
   for (const r of rows) {
-    const key = [
+    // JSON-encoded, not joined on a separator: `partyName` and the reference
+    // are free text, and `["a|b","c"].join("|")` equals `["a","b|c"].join("|")`.
+    // A separator a value can contain would make two different entries look
+    // alike, which is the one failure this check must not have.
+    const key = JSON.stringify([
       r.entryDate,
       r.partyName ?? "",
       referenceByEntryId.get(r.entryId) ?? "",
-      [...r.accountIds].sort().join(","),
-      String(r.amountMinor),
-    ].join("|");
+      [...r.accountIds].sort(),
+      r.amountMinor,
+    ]);
     const bucket = groups.get(key);
     if (bucket) bucket.push(r);
     else groups.set(key, [r]);
@@ -872,7 +897,7 @@ export function duplicateEntries(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 34 tests
+Expected: PASS, 37 tests
 
 - [ ] **Step 5: Commit**
 
@@ -955,7 +980,7 @@ export function futureDatedEntries(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 38 tests
+Expected: PASS, 41 tests
 
 - [ ] **Step 5: Commit**
 
@@ -966,7 +991,7 @@ git commit -m "feat(exceptions): entries dated after today"
 
 ---
 
-### Task 7: A cheque number used twice on one account
+### Task 7: A check number used twice on one account
 
 **Files:**
 - Modify: `lib/domain/exceptions.ts`
@@ -974,46 +999,47 @@ git commit -m "feat(exceptions): entries dated after today"
 
 **Interfaces:**
 - Consumes: `ExceptionPaymentRef` from Task 1
-- Produces: `chequeNumbersUsedTwice(payments): ChequeClash[]`
+- Produces: `duplicateCheckNumbers(payments): CheckNumberClash[]`
 
 - [ ] **Step 1: Write the failing tests**
 
 Append to `tests/unit/exceptions.test.ts`:
 
 ```ts
-import { chequeNumbersUsedTwice, type ExceptionPaymentRef } from "@/lib/domain/exceptions";
+import { duplicateCheckNumbers, type ExceptionPaymentRef } from "@/lib/domain/exceptions";
 
 const pay = (over: Partial<ExceptionPaymentRef> = {}): ExceptionPaymentRef => ({
   paymentId: "p1",
   kind: "vendor",
   paymentNumber: "BP-000001",
+  journalEntryId: "e1",
   paymentDate: "2026-04-02",
   reference: "1018",
   accountId: "checking",
-  accountName: "Checking 3388",
+  accountName: "Business Checking",
   partyName: "Northwood Metals",
   amountMinor: 30_000_00,
   ...over,
 });
 
-describe("chequeNumbersUsedTwice", () => {
+describe("duplicateCheckNumbers", () => {
   it("flags one number against one account twice", () => {
-    const rows = chequeNumbersUsedTwice([pay(), pay({ paymentId: "p2", partyName: "Someone else" })]);
+    const rows = duplicateCheckNumbers([pay(), pay({ paymentId: "p2", partyName: "Someone else" })]);
     expect(rows).toHaveLength(1);
     expect(rows[0].reference).toBe("1018");
     expect(rows[0].payments).toHaveLength(2);
   });
 
-  it("does not flag the same number in two different cheque books", () => {
-    const rows = chequeNumbersUsedTwice([
+  it("does not flag the same number in two different check books", () => {
+    const rows = duplicateCheckNumbers([
       pay(),
-      pay({ paymentId: "p2", accountId: "savings", accountName: "Savings 6764" }),
+      pay({ paymentId: "p2", accountId: "savings", accountName: "Business Savings" }),
     ]);
     expect(rows).toEqual([]);
   });
 
   it("ignores payments carrying no reference", () => {
-    const rows = chequeNumbersUsedTwice([
+    const rows = duplicateCheckNumbers([
       pay({ reference: "" }),
       pay({ paymentId: "p2", reference: "   " }),
     ]);
@@ -1021,12 +1047,12 @@ describe("chequeNumbersUsedTwice", () => {
   });
 
   it("treats surrounding spaces as the same number", () => {
-    const rows = chequeNumbersUsedTwice([pay(), pay({ paymentId: "p2", reference: " 1018 " })]);
+    const rows = duplicateCheckNumbers([pay(), pay({ paymentId: "p2", reference: " 1018 " })]);
     expect(rows).toHaveLength(1);
   });
 
   it("matches a customer payment against a vendor payment on one account", () => {
-    const rows = chequeNumbersUsedTwice([pay(), pay({ paymentId: "p2", kind: "customer" })]);
+    const rows = duplicateCheckNumbers([pay(), pay({ paymentId: "p2", kind: "customer" })]);
     expect(rows).toHaveLength(1);
   });
 });
@@ -1035,14 +1061,14 @@ describe("chequeNumbersUsedTwice", () => {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: FAIL — `chequeNumbersUsedTwice is not exported`
+Expected: FAIL — `duplicateCheckNumbers is not exported`
 
 - [ ] **Step 3: Write the implementation**
 
 Append to `lib/domain/exceptions.ts`:
 
 ```ts
-export interface ChequeClash {
+export interface CheckNumberClash {
   accountId: string;
   accountName: string;
   reference: string;
@@ -1051,12 +1077,12 @@ export interface ChequeClash {
 
 /**
  * Counted per bank account on purpose, so the same number in two different
- * cheque books is not flagged. Two entries against one number on one account
- * means one of them is miscoded, or the cheque was reissued.
+ * check books is not flagged. Two entries against one number on one account
+ * means one of them is miscoded, or the check was reissued.
  */
-export function chequeNumbersUsedTwice(
+export function duplicateCheckNumbers(
   payments: readonly ExceptionPaymentRef[],
-): ChequeClash[] {
+): CheckNumberClash[] {
   const groups = new Map<string, ExceptionPaymentRef[]>();
   for (const p of payments) {
     const reference = p.reference.trim();
@@ -1084,13 +1110,13 @@ export function chequeNumbersUsedTwice(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 43 tests
+Expected: PASS, 46 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add ctyhp-accounting/lib/domain/exceptions.ts ctyhp-accounting/tests/unit/exceptions.test.ts
-git commit -m "feat(exceptions): one cheque number, used twice on one account"
+git commit -m "feat(exceptions): one check number, used twice on one account"
 ```
 
 ---
@@ -1110,7 +1136,6 @@ git commit -m "feat(exceptions): one cheque number, used twice on one account"
 Append to `tests/unit/exceptions.test.ts`:
 
 ```ts
-import { readFileSync } from "node:fs";
 import { buildExceptionReport, type ExceptionReportInput } from "@/lib/domain/exceptions";
 
 const emptyInput = (over: Partial<ExceptionReportInput> = {}): ExceptionReportInput => ({
@@ -1159,7 +1184,7 @@ describe("buildExceptionReport", () => {
     const report = buildExceptionReport(
       emptyInput({
         accounts: [
-          account({ accountId: "h", accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 475_000_00 }),
+          account({ accountId: "h", accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 150_000_00 }),
         ],
         entriesAfterToday: [txn({ entryId: "f1", entryDate: "2027-01-01" })],
       }),
@@ -1173,23 +1198,51 @@ describe("buildExceptionReport", () => {
   it("derives the bank balance lookup from the accounts it was given", () => {
     const report = buildExceptionReport(
       emptyInput({
-        accounts: [account({ accountId: "a1", accountType: "bank", debitBase: 96_293_85 })],
-        bankAccounts: [{ bankAccountId: "b1", accountId: "a1", accountName: "Checking 3388", lastReconciledDate: null }],
+        accounts: [account({ accountId: "a1", accountType: "bank", debitBase: 41_780_00 })],
+        bankAccounts: [{ bankAccountId: "b1", accountId: "a1", accountName: "Business Checking", lastReconciledDate: null }],
       }),
     );
     expect(report.unreconciled).toHaveLength(1);
-    expect(report.unreconciled[0].balanceMinor).toBe(96_293_85);
-  });
-});
-
-describe("the exceptions module", () => {
-  it("imports nothing that could write to the books", () => {
-    const source = readFileSync("lib/domain/exceptions.ts", "utf8");
-    const imported = [...source.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
-    expect(imported.filter((p) => p.startsWith("@/lib/db/") || p.startsWith("@/lib/services/"))).toEqual([]);
+    expect(report.unreconciled[0].balanceMinor).toBe(41_780_00);
   });
 });
 ```
+
+The import guard lives in Task 1 and needs nothing here. It now covers every
+append made since, including this one.
+
+One hardening to make here, though: Task 1's guard regex matches only
+double-quoted `from "..."` imports. Widen it so no syntax can slip past — replace
+the body of that test in `tests/unit/exceptions.test.ts` with a substring check:
+
+```ts
+describe("the exceptions module", () => {
+  it("imports nothing that could write to the books", () => {
+    const source = readFileSync("lib/domain/exceptions.ts", "utf8");
+    expect(source).not.toMatch(/@\/lib\/(db|services)\//);
+  });
+});
+```
+
+This catches a single-quoted import, a dynamic `import()`, and a re-export
+alike. The whole report rests on this module being unable to write, so the test
+that proves it should not depend on a quoting style.
+
+And one more consistency fix while you are in this file. `duplicateCheckNumbers`
+still builds its grouping key by concatenating the account id and the reference
+with a separator, while `duplicateEntries` encodes its key with
+`JSON.stringify`. No collision is reachable in the first one, because an account
+id is a database-generated UUID and cannot contain the separator - but that is a
+fact living in the schema, not in this file, and two grouping keys built two
+different ways in one module is an invitation to copy the weaker one next time.
+Change it to match:
+
+```ts
+    const key = JSON.stringify([p.accountId, reference]);
+```
+
+Behaviour is unchanged, so every existing `duplicateCheckNumbers` test must pass
+untouched.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -1229,7 +1282,7 @@ export interface ExceptionReport {
   checksRun: 8;
   unavailable: CheckKey[];
   duplicates: DuplicateGroup[];
-  chequeClashes: ChequeClash[];
+  checkNumberClashes: CheckNumberClash[];
   undeposited: UndepositedRow[];
   wrongWay: WrongWayRow[];
   incomeNoCost: IncomeNoCostRow[];
@@ -1241,21 +1294,22 @@ export interface ExceptionReport {
 /**
  * The reference a duplicate is judged by, keyed on the entry that produced it.
  *
- * A payment's journal entry is the one the transaction list shows, so the
- * reference travels with the entry id.
+ * Joined on the journal entry's own id, which a payment records directly.
+ *
+ * **Not** joined on document numbers. A payment's number and its entry's number
+ * come from separate sequences — `PMT-` and `BP-` against `JE-` — so matching
+ * those two strings finds nothing at all. The failure would be silent and
+ * expensive: every payment's reference would fall back to blank, and two
+ * unrelated payments alike in date, party, accounts and amount would be reported
+ * as a double posting. The check would cry wolf on live books from day one.
  */
 function referencesByEntry(
   payments: readonly ExceptionPaymentRef[],
-  entries: readonly TransactionListRow[],
 ): Map<string, string> {
-  const byNumber = new Map<string, string>();
-  for (const p of payments) {
-    if (p.paymentNumber) byNumber.set(p.paymentNumber, p.reference);
-  }
   const out = new Map<string, string>();
-  for (const e of entries) {
-    const reference = byNumber.get(e.entryNumber);
-    if (reference) out.set(e.entryId, reference);
+  for (const p of payments) {
+    const reference = p.reference.trim();
+    if (p.journalEntryId !== null && reference !== "") out.set(p.journalEntryId, reference);
   }
   return out;
 }
@@ -1263,14 +1317,14 @@ function referencesByEntry(
 /** Run all eight. Nothing here reads a clock, a database or a file. */
 export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
   const balanceByAccountId = new Map<string, number>(
-    input.accounts.map((a) => [a.accountId, a.debitBase - a.creditBase]),
+    input.accounts.map((a) => [a.accountId, signedBalance(a)]),
   );
 
   const duplicates = duplicateEntries(
     input.entriesInRange,
-    referencesByEntry(input.paymentReferences, input.entriesInRange),
+    referencesByEntry(input.paymentReferences),
   );
-  const chequeClashes = chequeNumbersUsedTwice(input.paymentReferences);
+  const checkNumberClashes = duplicateCheckNumbers(input.paymentReferences);
   const undeposited = undepositedFunds(input.accounts, input.undepositedDetails);
   const wrongWay = wrongWayBalances(input.accounts);
   const incomeNoCost = yearsWithIncomeAndNoCost(input.yearTotals);
@@ -1282,7 +1336,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     entriesExamined: input.entriesInRange.length,
     questionsRaised:
       duplicates.length +
-      chequeClashes.length +
+      checkNumberClashes.length +
       undeposited.length +
       wrongWay.length +
       incomeNoCost.length +
@@ -1292,7 +1346,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     checksRun: 8,
     unavailable: [...input.unavailable],
     duplicates,
-    chequeClashes,
+    checkNumberClashes,
     undeposited,
     wrongWay,
     incomeNoCost,
@@ -1306,7 +1360,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run tests/unit/exceptions.test.ts`
-Expected: PASS, 49 tests
+Expected: PASS, 52 tests
 
 - [ ] **Step 5: Run the type checker**
 
@@ -1441,11 +1495,11 @@ async function paymentReferences(sb: SupabaseClient): Promise<ExceptionPaymentRe
   const [customer, vendor] = await Promise.all([
     sb
       .from("acc_payment")
-      .select("id,payment_number,payment_date,reference,amount_minor,deposit_account_id,acc_customer(name),acc_account(name)")
+      .select("id,payment_number,journal_entry_id,payment_date,reference,amount_minor,deposit_account_id,acc_customer(name),acc_account(name)")
       .not("reference", "is", null),
     sb
       .from("acc_bill_payment")
-      .select("id,payment_number,payment_date,reference,amount_minor,payment_account_id,acc_vendor(name),acc_account(name)")
+      .select("id,payment_number,journal_entry_id,payment_date,reference,amount_minor,payment_account_id,acc_vendor(name),acc_account(name)")
       .not("reference", "is", null),
   ]);
   if (customer.error) throw new ExceptionsError(customer.error.message);
@@ -1459,6 +1513,7 @@ async function paymentReferences(sb: SupabaseClient): Promise<ExceptionPaymentRe
       paymentId: r.id as string,
       kind: "customer",
       paymentNumber: (r.payment_number as string | null) ?? null,
+      journalEntryId: (r.journal_entry_id as string | null) ?? null,
       paymentDate: r.payment_date as string,
       reference: (r.reference as string | null) ?? "",
       accountId: r.deposit_account_id as string,
@@ -1472,6 +1527,7 @@ async function paymentReferences(sb: SupabaseClient): Promise<ExceptionPaymentRe
       paymentId: r.id as string,
       kind: "vendor",
       paymentNumber: (r.payment_number as string | null) ?? null,
+      journalEntryId: (r.journal_entry_id as string | null) ?? null,
       paymentDate: r.payment_date as string,
       reference: (r.reference as string | null) ?? "",
       accountId: r.payment_account_id as string,
@@ -1568,7 +1624,7 @@ export async function getExceptionReport(
     .map((a) => a.accountId);
 
   const [refs, details, byMonth] = await Promise.all([
-    readOr(unavailable, ["cheque"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
+    readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
     readOr(unavailable, [], new Map<string, UndepositedDetail>(), () =>
       undepositedDetails(sb, holdingIds, to),
     ),
@@ -1722,6 +1778,27 @@ export default async function ExceptionsPage() {
 }
 ```
 
+> **Superseded during execution, and the code below with it.** The sample client
+> under this step renders its eight tables with Ant Design's raw `Table`. Two
+> repo gates this plan did not know about say no:
+>
+> * `tests/unit/table-adoption.test.ts` holds an allowlist of files still using a
+>   raw `Table`, asserts `RAW_TABLE.size <= 49` and is already at exactly 49, with
+>   the stated rule "only ever shrinks, so a new raw table cannot be waved
+>   through". A new raw-`Table` file cannot be added.
+> * `tests/unit/no-hardcoded-color.test.ts` rejects the literal `#cf1322` that the
+>   sample uses for the red statistic.
+>
+> The shipped screen therefore uses this repo's current convention -
+> `components/ui/DataTable.tsx` with `flexColumn()` and the `COLUMN` tokens from
+> `components/ui/columns.tsx` and `lib/design/table-metrics.ts`, as
+> `TransactionListClient.tsx` does - and `TOKENS.intent.danger` for the colour.
+> The two files this plan cites as conventions are themselves grandfathered
+> raw-`Table` debt, not a pattern to extend. **Everything else below still
+> governs: the eight sections, their wording verbatim, the "Could not run" versus
+> "Nothing found" distinction, the "All dates" labels, the drill-through target
+> and the CSV shape.**
+
 - [ ] **Step 3: Write the client**
 
 Create `app/(app)/reports/exceptions/ExceptionsClient.tsx`:
@@ -1812,9 +1889,9 @@ export default function ExceptionsClient({
         push("Recorded more than once", e.entryDate, e.entryNumber, e.partyName ?? "", e.categoryLabel ?? "", money(e.amountMinor)),
       ),
     );
-    report.chequeClashes.forEach((c) =>
+    report.checkNumberClashes.forEach((c) =>
       c.payments.forEach((p) =>
-        push("Cheque number used twice", p.paymentDate, p.reference, p.partyName, c.accountName, money(p.amountMinor)),
+        push("Check number used twice", p.paymentDate, p.reference, p.partyName, c.accountName, money(p.amountMinor)),
       ),
     );
     report.undeposited.forEach((u) =>
@@ -1956,14 +2033,14 @@ export default function ExceptionsClient({
           )}
 
           {section(
-            "cheque",
-            report.chequeClashes.length,
-            "Counted per bank account, so the same number in two different cheque books is not flagged. Two entries against one number on one account means one of them is miscoded, or the cheque was reissued.",
+            "checkNumber",
+            report.checkNumberClashes.length,
+            "Counted per bank account, so the same number in two different check books is not flagged. Two entries against one number on one account means one of them is miscoded, or the check was reissued.",
             <Table
               size="small"
               pagination={false}
               rowKey={(r) => r.paymentId}
-              dataSource={report.chequeClashes.flatMap((c) => c.payments)}
+              dataSource={report.checkNumberClashes.flatMap((c) => c.payments)}
               columns={[
                 { title: "Account", dataIndex: "accountName", ellipsis: true },
                 { title: "Number", dataIndex: "reference", width: 120 },
@@ -2092,7 +2169,7 @@ export default function ExceptionsClient({
           <Typography.Paragraph type="secondary" style={{ marginTop: 28 }}>
             <strong>Nothing here is proof of a mistake.</strong> Each line is a question a reviewer
             would ask, and most have an innocent answer — four wages of the same amount on one day, a
-            cheque book that restarts at 1000. What matters is that somebody has looked and can say
+            check book that restarts at 1000. What matters is that somebody has looked and can say
             why.
           </Typography.Paragraph>
         </>
@@ -2111,7 +2188,7 @@ In `lib/domain/report-catalog.ts`, add this object to `REPORT_CATALOG` immediate
     id: "exception-report",
     title: "Exception Report",
     description:
-      "Eight checks a reviewer runs by hand: entries posted twice, a cheque number reused, a balance pointing the wrong way, anything still uncoded.",
+      "Eight checks a reviewer runs by hand: entries posted twice, a check number reused, a balance pointing the wrong way, anything still uncoded.",
     href: "/reports/exceptions",
     group: "accounting",
   },
@@ -2189,7 +2266,7 @@ In `lib/domain/changelog.ts`, add this release to the top of `RELEASES` — the 
         kind: "added",
         title: "Exception Report",
         detail:
-          "Eight checks over the books: entries recorded more than once, a cheque number used twice on one account, money received but not yet banked, a balance pointing the wrong way, a year with income and no costs, bank accounts not agreed to a statement, entries dated in the future, and anything still sitting in a holding account. Nothing here is proof of a mistake — each line is a question worth answering.",
+          "Eight checks over the books: entries recorded more than once, a check number used twice on one account, money received but not yet banked, a balance pointing the wrong way, a year with income and no costs, bank accounts not agreed to a statement, entries dated in the future, and anything still sitting in a holding account. Nothing here is proof of a mistake — each line is a question worth answering.",
         route: "/reports/exceptions",
       },
       {
