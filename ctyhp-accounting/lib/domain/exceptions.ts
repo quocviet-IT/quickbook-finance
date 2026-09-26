@@ -368,7 +368,7 @@ export function duplicateCheckNumbers(
   for (const p of payments) {
     const reference = p.reference.trim();
     if (reference === "") continue;
-    const key = `${p.accountId}|${reference}`;
+    const key = JSON.stringify([p.accountId, reference]);
     const bucket = groups.get(key);
     if (bucket) bucket.push(p);
     else groups.set(key, [p]);
@@ -385,4 +385,105 @@ export function duplicateCheckNumbers(
       (x, y) =>
         x.accountName.localeCompare(y.accountName) || x.reference.localeCompare(y.reference),
     );
+}
+
+/* ---------------------------------------------------------------- report */
+
+export interface ExceptionReportInput {
+  /** The as-of date every balance check reads at. */
+  to: string;
+  /** Supplied, never read from the clock, so the checks are deterministic. */
+  today: string;
+  accounts: readonly ExceptionAccount[];
+  undepositedDetails: ReadonlyMap<string, UndepositedDetail>;
+  bankAccounts: readonly ExceptionBankAccount[];
+  yearTotals: readonly YearTotals[];
+  entriesInRange: readonly TransactionListRow[];
+  entriesAfterToday: readonly TransactionListRow[];
+  paymentReferences: readonly ExceptionPaymentRef[];
+  /**
+   * Checks whose data could not be read. They are reported as unavailable
+   * rather than as "nothing found", because a check that could not run and a
+   * check that found nothing are opposite answers.
+   */
+  unavailable: readonly CheckKey[];
+}
+
+export interface ExceptionReport {
+  entriesExamined: number;
+  questionsRaised: number;
+  checksRun: 8;
+  unavailable: CheckKey[];
+  duplicates: DuplicateGroup[];
+  checkNumberClashes: CheckNumberClash[];
+  undeposited: UndepositedRow[];
+  wrongWay: WrongWayRow[];
+  incomeNoCost: IncomeNoCostRow[];
+  unreconciled: UnreconciledRow[];
+  futureDated: TransactionListRow[];
+  holding: HoldingRow[];
+}
+
+/**
+ * The reference a duplicate is judged by, keyed on the entry that produced it.
+ *
+ * A payment's journal entry is the one the transaction list shows, so the
+ * reference travels with the entry id.
+ */
+function referencesByEntry(
+  payments: readonly ExceptionPaymentRef[],
+  entries: readonly TransactionListRow[],
+): Map<string, string> {
+  const byNumber = new Map<string, string>();
+  for (const p of payments) {
+    if (p.paymentNumber) byNumber.set(p.paymentNumber, p.reference);
+  }
+  const out = new Map<string, string>();
+  for (const e of entries) {
+    const reference = byNumber.get(e.entryNumber);
+    if (reference) out.set(e.entryId, reference);
+  }
+  return out;
+}
+
+/** Run all eight. Nothing here reads a clock, a database or a file. */
+export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
+  const balanceByAccountId = new Map<string, number>(
+    input.accounts.map((a) => [a.accountId, a.debitBase - a.creditBase]),
+  );
+
+  const duplicates = duplicateEntries(
+    input.entriesInRange,
+    referencesByEntry(input.paymentReferences, input.entriesInRange),
+  );
+  const checkNumberClashes = duplicateCheckNumbers(input.paymentReferences);
+  const undeposited = undepositedFunds(input.accounts, input.undepositedDetails);
+  const wrongWay = wrongWayBalances(input.accounts);
+  const incomeNoCost = yearsWithIncomeAndNoCost(input.yearTotals);
+  const unreconciled = unreconciledBankAccounts(input.bankAccounts, balanceByAccountId, input.to);
+  const futureDated = futureDatedEntries(input.entriesAfterToday, input.today);
+  const holding = holdingAccounts(input.accounts);
+
+  return {
+    entriesExamined: input.entriesInRange.length,
+    questionsRaised:
+      duplicates.length +
+      checkNumberClashes.length +
+      undeposited.length +
+      wrongWay.length +
+      incomeNoCost.length +
+      unreconciled.length +
+      futureDated.length +
+      holding.length,
+    checksRun: 8,
+    unavailable: [...input.unavailable],
+    duplicates,
+    checkNumberClashes,
+    undeposited,
+    wrongWay,
+    incomeNoCost,
+    unreconciled,
+    futureDated,
+    holding,
+  };
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  buildExceptionReport,
   duplicateCheckNumbers,
   duplicateEntries,
   futureDatedEntries,
@@ -13,6 +14,7 @@ import {
   type ExceptionAccount,
   type ExceptionBankAccount,
   type ExceptionPaymentRef,
+  type ExceptionReportInput,
   type LedgerBalance,
   type TransactionListRow,
   type UndepositedDetail,
@@ -420,10 +422,78 @@ describe("duplicateCheckNumbers", () => {
   });
 });
 
+const emptyInput = (over: Partial<ExceptionReportInput> = {}): ExceptionReportInput => ({
+  to: "2026-09-30",
+  today: "2026-09-26",
+  accounts: [],
+  undepositedDetails: new Map(),
+  bankAccounts: [],
+  yearTotals: [],
+  entriesInRange: [],
+  entriesAfterToday: [],
+  paymentReferences: [],
+  unavailable: [],
+  ...over,
+});
+
+describe("buildExceptionReport", () => {
+  it("runs eight checks and raises nothing on an empty book", () => {
+    const report = buildExceptionReport(emptyInput());
+    expect(report.checksRun).toBe(8);
+    expect(report.questionsRaised).toBe(0);
+    expect(report.entriesExamined).toBe(0);
+    expect(report.unavailable).toEqual([]);
+  });
+
+  it("carries through the checks whose data could not be read", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        unavailable: ["incomeNoCost"],
+        accounts: [account({ accountCode: "9000", name: "Suspense", accountType: "current_asset", debitBase: 12_00 })],
+      }),
+    );
+    expect(report.unavailable).toEqual(["incomeNoCost"]);
+    // The other seven still ran.
+    expect(report.holding).toHaveLength(1);
+  });
+
+  it("counts the entries it examined from the range, not from every read", () => {
+    const report = buildExceptionReport(
+      emptyInput({ entriesInRange: [txn(), txn({ entryId: "t2" })], entriesAfterToday: [txn({ entryId: "t3", entryDate: "2027-01-01" })] }),
+    );
+    expect(report.entriesExamined).toBe(2);
+  });
+
+  it("adds every check's findings into one count of questions", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        accounts: [
+          account({ accountId: "h", accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 475_000_00 }),
+        ],
+        entriesAfterToday: [txn({ entryId: "f1", entryDate: "2027-01-01" })],
+      }),
+    );
+    // one holding account, one wrong-way balance it is not, one future entry
+    expect(report.holding).toHaveLength(1);
+    expect(report.futureDated).toHaveLength(1);
+    expect(report.questionsRaised).toBe(2);
+  });
+
+  it("derives the bank balance lookup from the accounts it was given", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        accounts: [account({ accountId: "a1", accountType: "bank", debitBase: 96_293_85 })],
+        bankAccounts: [{ bankAccountId: "b1", accountId: "a1", accountName: "Checking 3388", lastReconciledDate: null }],
+      }),
+    );
+    expect(report.unreconciled).toHaveLength(1);
+    expect(report.unreconciled[0].balanceMinor).toBe(96_293_85);
+  });
+});
+
 describe("the exceptions module", () => {
   it("imports nothing that could write to the books", () => {
     const source = readFileSync("lib/domain/exceptions.ts", "utf8");
-    const imported = [...source.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
-    expect(imported.filter((p) => p.startsWith("@/lib/db/") || p.startsWith("@/lib/services/"))).toEqual([]);
+    expect(source).not.toMatch(/@\/lib\/(db|services)\//);
   });
 });
