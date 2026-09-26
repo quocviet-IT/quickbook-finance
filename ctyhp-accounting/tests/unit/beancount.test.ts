@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   accountNames,
+  documentsByEntry,
   formatAmount,
   quote,
   sanitizeComponent,
   tagSafe,
   type BeancountAccount,
+  type BeancountDocumentRows,
 } from "@/lib/domain/beancount";
 
 const acct = (over: Partial<BeancountAccount> = {}): BeancountAccount => ({
@@ -99,6 +101,65 @@ describe("formatAmount", () => {
 
   it("refuses a value that is not a whole number of minor units", () => {
     expect(() => formatAmount(10.5, 2)).toThrow();
+  });
+});
+
+const noRows = (over: Partial<BeancountDocumentRows> = {}): BeancountDocumentRows => ({
+  invoices: [],
+  bills: [],
+  payments: [],
+  billPayments: [],
+  paymentAllocations: [],
+  billPaymentAllocations: [],
+  ...over,
+});
+
+describe("documentsByEntry", () => {
+  it("gives an invoice's entry its number as a link and its due date", () => {
+    const docs = documentsByEntry(
+      noRows({ invoices: [{ id: "i1", number: "INV-000001", dueDate: "2025-02-14", journalEntryId: "e1" }] }),
+    );
+    expect(docs.get("e1")).toEqual({ links: ["INV-000001"], reference: null, dueDate: "2025-02-14" });
+  });
+
+  it("links a payment's entry to every invoice it settled, and carries its reference", () => {
+    const docs = documentsByEntry(
+      noRows({
+        invoices: [
+          { id: "i1", number: "INV-000001", dueDate: null, journalEntryId: "e1" },
+          { id: "i2", number: "INV-000002", dueDate: null, journalEntryId: "e2" },
+        ],
+        payments: [{ id: "p1", reference: "1042", journalEntryId: "e3" }],
+        paymentAllocations: [
+          { paymentId: "p1", documentId: "i2" },
+          { paymentId: "p1", documentId: "i1" },
+        ],
+      }),
+    );
+    expect(docs.get("e3")).toEqual({ links: ["INV-000001", "INV-000002"], reference: "1042", dueDate: null });
+  });
+
+  it("does the same for bills and bill payments", () => {
+    const docs = documentsByEntry(
+      noRows({
+        bills: [{ id: "b1", number: "BILL-000007", dueDate: "2025-03-01", journalEntryId: "e1" }],
+        billPayments: [{ id: "bp1", reference: " 2210 ", journalEntryId: "e2" }],
+        billPaymentAllocations: [{ paymentId: "bp1", documentId: "b1" }],
+      }),
+    );
+    expect(docs.get("e1")).toEqual({ links: ["BILL-000007"], reference: null, dueDate: "2025-03-01" });
+    expect(docs.get("e2")).toEqual({ links: ["BILL-000007"], reference: "2210", dueDate: null });
+  });
+
+  it("ignores a blank reference and a document with no number", () => {
+    const docs = documentsByEntry(
+      noRows({
+        invoices: [{ id: "i1", number: null, dueDate: null, journalEntryId: "e1" }],
+        payments: [{ id: "p1", reference: "   ", journalEntryId: "e2" }],
+      }),
+    );
+    expect(docs.get("e1")).toEqual({ links: [], reference: null, dueDate: null });
+    expect(docs.get("e2")).toEqual({ links: [], reference: null, dueDate: null });
   });
 });
 

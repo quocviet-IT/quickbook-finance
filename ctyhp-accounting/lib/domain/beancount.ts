@@ -116,3 +116,84 @@ export function formatAmount(minor: number, decimals: number): string {
   const fraction = decimals === 0 ? "" : `.${digits.slice(-decimals)}`;
   return `${negative ? "-" : ""}${whole}${fraction}`;
 }
+
+/** What an entry carries from the document behind it. */
+export interface BeancountDocument {
+  /** Document numbers for `^link`, sorted, without duplicates. */
+  links: string[];
+  /** A payment's check number or wire reference, for `num:`. */
+  reference: string | null;
+  /** An invoice's or bill's due date, for `due:`. */
+  dueDate: string | null;
+}
+
+interface NumberedDocument {
+  id: string;
+  number: string | null;
+  dueDate: string | null;
+  journalEntryId: string;
+}
+
+interface PaymentDocument {
+  id: string;
+  reference: string | null;
+  journalEntryId: string;
+}
+
+interface Allocation {
+  paymentId: string;
+  documentId: string;
+}
+
+export interface BeancountDocumentRows {
+  invoices: readonly NumberedDocument[];
+  bills: readonly NumberedDocument[];
+  payments: readonly PaymentDocument[];
+  billPayments: readonly PaymentDocument[];
+  paymentAllocations: readonly Allocation[];
+  billPaymentAllocations: readonly Allocation[];
+}
+
+/**
+ * The document behind each journal entry, keyed by entry id.
+ *
+ * Joined on `journal_entry_id`, which each document records. Not on document
+ * numbers: a payment's number and its entry's number come from separate
+ * sequences and are never equal.
+ *
+ * A document gets `^` its own number; a payment gets the numbers of the
+ * documents it settled, so Fava groups an invoice with the payments against it.
+ */
+export function documentsByEntry(rows: BeancountDocumentRows): Map<string, BeancountDocument> {
+  const out = new Map<string, BeancountDocument>();
+
+  const addDocuments = (docs: readonly NumberedDocument[]) => {
+    for (const d of docs) {
+      out.set(d.journalEntryId, { links: d.number ? [d.number] : [], reference: null, dueDate: d.dueDate });
+    }
+  };
+
+  const addPayments = (
+    payments: readonly PaymentDocument[],
+    allocations: readonly Allocation[],
+    documents: readonly NumberedDocument[],
+  ) => {
+    const numberOf = new Map(documents.map((d) => [d.id, d.number]));
+    for (const p of payments) {
+      const links = new Set<string>();
+      for (const a of allocations) {
+        if (a.paymentId !== p.id) continue;
+        const n = numberOf.get(a.documentId);
+        if (n) links.add(n);
+      }
+      const reference = p.reference?.trim() ? p.reference.trim() : null;
+      out.set(p.journalEntryId, { links: [...links].sort(), reference, dueDate: null });
+    }
+  };
+
+  addDocuments(rows.invoices);
+  addDocuments(rows.bills);
+  addPayments(rows.payments, rows.paymentAllocations, rows.invoices);
+  addPayments(rows.billPayments, rows.billPaymentAllocations, rows.bills);
+  return out;
+}
