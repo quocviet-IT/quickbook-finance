@@ -29,7 +29,7 @@ export type { LedgerBalance, TransactionListRow };
  */
 export const CHECK_LABEL = {
   duplicates: "Entries recorded more than once",
-  cheque: "A cheque number used twice on one account",
+  checkNumber: "A check number used twice on one account",
   undeposited: "Money received but not yet banked",
   wrongWay: "A balance pointing the wrong way",
   incomeNoCost: "A year with income and no costs",
@@ -42,20 +42,20 @@ export type CheckKey = keyof typeof CHECK_LABEL;
 
 /* ---------------------------------------------------------------- inputs */
 
-/** An account with its cumulative balance and the classification the checks need. */
-export interface ExceptionAccount {
-  accountId: string;
-  accountCode: string;
-  name: string;
-  accountType: AccountType;
+/**
+ * An account with its cumulative balance and the classification the checks need.
+ *
+ * Extends `LedgerBalance` rather than restating it: the report reads its
+ * balances through `acc_ledger_balances`, and a second "account with a balance"
+ * shape would be free to drift from the first.
+ */
+export interface ExceptionAccount extends LedgerBalance {
   /**
    * OneBook records that an account is contra rather than guessing from its
    * name: migration 0046 creates "Accumulated Depreciation" with
    * `detail_type = 'Contra fixed asset'`.
    */
   detailType: string | null;
-  debitBase: number;
-  creditBase: number;
 }
 
 export interface ExceptionBankAccount {
@@ -104,7 +104,7 @@ export interface WrongWayRow {
   balanceMinor: number;
 }
 
-const CONTRA = /^\s*contra/i;
+const CONTRA = /^\s*contra\b/i;
 
 /**
  * An asset in credit, or a liability in debit.

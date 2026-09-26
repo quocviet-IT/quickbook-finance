@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { wrongWayBalances, type ExceptionAccount } from "@/lib/domain/exceptions";
 
@@ -51,5 +52,27 @@ describe("wrongWayBalances", () => {
       account({ accountId: "b", accountCode: "6200", accountType: "expense", creditBase: 900_00 }),
     ]);
     expect(rows.map((r) => r.accountCode)).toEqual(["6200", "6100"]);
+  });
+
+  it("still flags a detail_type like 'Contractor Fees' that contains 'Contractor' without a word boundary", () => {
+    const rows = wrongWayBalances([
+      account({
+        accountCode: "6300",
+        name: "Contractor Fees",
+        accountType: "expense",
+        detailType: "Contractor Fees",
+        creditBase: 1_000_00,
+      }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].accountCode).toBe("6300");
+  });
+});
+
+describe("the exceptions module", () => {
+  it("imports nothing that could write to the books", () => {
+    const source = readFileSync("lib/domain/exceptions.ts", "utf8");
+    const imported = [...source.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
+    expect(imported.filter((p) => p.startsWith("@/lib/db/") || p.startsWith("@/lib/services/"))).toEqual([]);
   });
 });
