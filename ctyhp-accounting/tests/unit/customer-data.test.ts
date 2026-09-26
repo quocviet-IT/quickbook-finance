@@ -26,6 +26,15 @@ import { describe, expect, it } from "vitest";
  * bank-account label). Nowhere in this file is a real figure written down —
  * that would recreate the exact problem this file exists to prevent.
  *
+ * This gate covers source, schema, tests and docs: `lib/`, `app/`,
+ * `supabase/`, `tests/`, and the repository root's `docs/`. Source is in
+ * scope because the worst instance of this leak so far was not in a test
+ * fixture or a planning doc — it was in production code, rendered on the
+ * import screen as the worked example shown to every user, and it was found
+ * by a person reading the code, not by this gate. An earlier version of
+ * this gate, scanning only `tests/` and root `docs/`, would not have caught
+ * it.
+ *
  * Some files predate this gate and still carry that shape; they are
  * grandfathered below by exact path. Whether and when to clean them up is a
  * decision for a person, not this test — this test only makes sure the
@@ -34,16 +43,20 @@ import { describe, expect, it } from "vitest";
  *
  * The first version of this list named 5 files, written from memory rather
  * than from a run of this test. Running it found 5 more — a sixth test file
- * plus four planning docs the first pass never looked at — so the list
- * below is the result of actually running the scan, not of guessing at it
- * again: 10 files, settled by measurement.
+ * plus four planning docs the first pass never looked at — so that list was
+ * the result of actually running the scan, not of guessing at it again: 10
+ * files, settled by measurement. Widening the scan roots to source and
+ * schema found one more: a migration comment describing how the importer
+ * resolves an account name. An applied migration is not rewritten after the
+ * fact, so it is grandfathered too rather than edited — 11 files, still
+ * settled by measurement rather than memory.
  *
  * `.claude/settings.json` also contains the `pc49` token once, but as part
  * of a recorded Bash permission pattern (a scratchpad script's filename from
  * an earlier session), not as ledger data. That file sits outside this
- * gate's scan roots (`tests/` and `docs/`) already, and stays there
- * deliberately rather than being added below — allowlisting it would imply
- * it is the same kind of debt as the other ten, which it is not.
+ * gate's scan roots already, and stays there deliberately rather than being
+ * added below — allowlisting it would imply it is the same kind of debt as
+ * the other eleven, which it is not.
  */
 
 /** This file's own path, exempt because it necessarily names the pattern. */
@@ -67,6 +80,7 @@ const GRANDFATHERED = new Set<string>([
   "../docs/superpowers/plans/2026-08-06-import-transactions.md",
   "../docs/superpowers/specs/2026-08-05-import-guidance-design.md",
   "../docs/superpowers/specs/2026-08-06-wave-ledger-import-design.md",
+  "supabase/migrations/0100_import_transactions.sql",
 ]);
 
 /**
@@ -84,8 +98,14 @@ function markerPattern(): RegExp {
 
 const PROJECT_ROOT = process.cwd();
 
-/** Directories that are never source material for a leak. */
-const SKIP_DIRS = new Set(["node_modules", ".git", ".next", "coverage"]);
+/**
+ * Directories that are never source material for a leak: dependency and
+ * build output (`node_modules`, `.next`, `coverage`), VCS internals
+ * (`.git`), and the Supabase CLI's local, gitignored scratch state
+ * (`.temp`, e.g. `supabase/.temp/pooler-url`) — machine-local, never
+ * committed, and not what this gate is watching for.
+ */
+const SKIP_DIRS = new Set(["node_modules", ".git", ".next", "coverage", ".temp"]);
 
 function filesUnder(dir: string): string[] {
   const out: string[] = [];
@@ -115,9 +135,13 @@ function scan(root: string): { path: string; source: string }[] {
 // `docs/` lives at the repository root, one level above this project.
 const DOCS_ROOT = resolve(PROJECT_ROOT, "..", "docs");
 
-const files = [...scan(join(PROJECT_ROOT, "tests")), ...scan(DOCS_ROOT)].filter(
-  (file) => file.path !== SELF,
-);
+// Source and schema, alongside tests and docs: the worst leak of all was in
+// `lib/`, not in either of those — see the header comment above.
+const SCAN_ROOTS = ["lib", "app", "supabase", "tests"].map((root) => join(PROJECT_ROOT, root));
+
+const files = SCAN_ROOTS.flatMap(scan)
+  .concat(scan(DOCS_ROOT))
+  .filter((file) => file.path !== SELF);
 
 describe("customer data leak gate", () => {
   it("finds files to check", () => {
@@ -140,12 +164,12 @@ describe("customer data leak gate", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("only ever shrinks, so an eleventh leaked file cannot be waved through", () => {
+  it("only ever shrinks, so a twelfth leaked file cannot be waved through", () => {
     // The allowlist is the outstanding cleanup, not a resting place. Adding
     // to it is how a guard quietly stops guarding, and it reads in a diff
     // exactly like an unrelated change. Lowering this number is the
     // cleanup; raising it has to be argued for, out loud, to a person.
-    expect(GRANDFATHERED.size).toBeLessThanOrEqual(10);
+    expect(GRANDFATHERED.size).toBeLessThanOrEqual(11);
   });
 
   it("lists no file that has already been cleaned", () => {
