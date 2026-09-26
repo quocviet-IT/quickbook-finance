@@ -14,3 +14,27 @@ node_modules/
 # they stay on the machine that needs them. Committing one is not a mistake you
 # can take back: the file leaves the working tree easily and the history never.
 data/
+
+# The same data, arriving loose at the repo root rather than in data/. It does,
+# repeatedly: a client's prototype lands here carrying two whole general ledgers
+# inside it, an invoice export lands here carrying customer names and amounts.
+# The rule above only helped the files that happened to be filed tidily, so these
+# patterns cover the untidy ones. Nothing matching them is tracked today.
+#
+# The prototype has already been renamed once while sitting here, so match the
+# stem rather than one filename.
+/Accounting-System*.html
+/*.beancount
+/*.bean
+
+# No CSV belongs at the repo root: the application, and every fixture it is
+# allowed to commit, lives under ctyhp-accounting/. One that appears here came
+# out of an accounting system and is somebody's real ledger.
+/*.csv
+
+# Output from test and gate runs. No log file is tracked anywhere in this repo,
+# and a server log quotes the rows it served.
+*.log
+
+# Windows shell leftovers.
+desktop.ini
