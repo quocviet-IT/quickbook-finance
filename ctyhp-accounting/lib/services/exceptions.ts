@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildExceptionReport,
   yearTotalsFromMonthly,
+  UNDEPOSITED_CODE,
+  UNDEPOSITED_NAME,
   type CheckKey,
   type ExceptionAccount,
   type ExceptionBankAccount,
@@ -28,9 +30,6 @@ import {
  * safe to run on live books at any time, including inside a closed period.
  */
 export class ExceptionsError extends Error {}
-
-const UNDEPOSITED_NAME = /undeposited/i;
-const UNDEPOSITED_CODE = "1210";
 
 /**
  * Run one read; if it fails, record which checks lose their data and carry on.
@@ -232,7 +231,7 @@ export async function getExceptionReport(
     .map((a) => a.accountId);
 
   const [refs, details, byMonth] = await Promise.all([
-    readOr(unavailable, ["checkNumber"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
+    readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
     readOr(unavailable, [], new Map<string, UndepositedDetail>(), () =>
       undepositedDetails(sb, holdingIds, to),
     ),

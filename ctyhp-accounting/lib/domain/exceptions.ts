@@ -187,9 +187,14 @@ export interface UndepositedRow {
   oldestEntryDate: string | null;
 }
 
-const UNDEPOSITED_NAME = /undeposited/i;
-/** The seeded chart's code for it; accepted alongside the name, never instead. */
-const UNDEPOSITED_CODE = "1210";
+/** Exported: the service reads this too, to decide which accounts to fetch detail for. */
+export const UNDEPOSITED_NAME = /undeposited/i;
+/**
+ * The seeded chart's code for it; accepted alongside the name, never instead.
+ * Exported: the service reads this too, so the two layers cannot disagree about
+ * which account is a holding account.
+ */
+export const UNDEPOSITED_CODE = "1210";
 
 /**
  * Undeposited funds should empty as takings reach the bank. A balance that

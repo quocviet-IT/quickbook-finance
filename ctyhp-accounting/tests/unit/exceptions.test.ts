@@ -513,4 +513,10 @@ describe("the exceptions module", () => {
     const source = readFileSync("lib/domain/exceptions.ts", "utf8");
     expect(source).not.toMatch(/@\/lib\/(db|services)\//);
   });
+
+  it("does not let the service keep its own copy of which account is a holding account", () => {
+    const service = readFileSync("lib/services/exceptions.ts", "utf8");
+    expect(service).not.toMatch(/const\s+UNDEPOSITED_(NAME|CODE)\s*=/);
+    expect(service).toMatch(/UNDEPOSITED_NAME/);
+  });
 });
