@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.63",
+    date: "2026-09-26",
+    headline: "The whole ledger as a Beancount file.",
+    changes: [
+      {
+        kind: "added",
+        title: "Beancount Export",
+        detail:
+          "Download every posted entry as a Beancount v3 file, ready for bean-check and Fava. Invoices and the payments that settle them share a link, so they stay grouped, and each transaction keeps its OneBook entry number. Amounts are in each entry's own currency. Downloading needs the Export company data permission and is recorded in the audit log.",
+        route: "/reports/beancount",
+      },
+    ],
+  },
+  {
     version: "1.62",
     date: "2026-09-26",
     headline: "The checks a reviewer runs by hand, in one report.",

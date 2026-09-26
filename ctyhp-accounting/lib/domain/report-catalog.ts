@@ -136,6 +136,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "beancount-export",
+    title: "Beancount Export",
+    description: "Download the whole ledger as a Beancount v3 file for bean-check and Fava.",
+    href: "/reports/beancount",
+    group: "accounting",
+  },
+  {
     id: "accounts-receivable-aging",
     title: "Accounts Receivable Aging",
     description: "Prioritize collections by customer and overdue age.",
