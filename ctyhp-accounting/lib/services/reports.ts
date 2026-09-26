@@ -2,6 +2,43 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
 
+const RPC_PAGE = 1000;
+
+/**
+ * Read a set-returning RPC past PostgREST's thousand-row cap.
+ *
+ * `db-max-rows` caps rows fetched from "a view, table, or stored procedure"
+ * alike, and PostgREST reports no error when it truncates — a call that never
+ * asks for a range just gets the first page back, silently short past 1,000
+ * rows. This pages with `.range()` until a page comes back shorter than the
+ * page size, the same loop `transaction-import-preview.ts` and
+ * `company-export.ts` use for a table select.
+ *
+ * This is only correct when the RPC orders its result totally, so a row can
+ * never straddle a page boundary and shift between two reads. The three
+ * callers below already do: `acc_transaction_list` by
+ * `(entry_date, entry_number)` — entry_number is unique; `acc_ledger_balances`
+ * by `account_code` — unique; `acc_monthly_ledger_balances` by
+ * `(month, account_code)` — month plus a unique code. Paging any other RPC
+ * first needs the same proof.
+ */
+async function pagedRpc<T>(
+  sb: SupabaseClient,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += RPC_PAGE) {
+    const { data, error } = await sb.rpc(fn, args).range(from, from + RPC_PAGE - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    // A short page is the last page. Asking again would cost a round trip to
+    // be told the same thing.
+    if (page.length < RPC_PAGE) return rows;
+  }
+}
+
 /**
  * Per-account debit/credit totals (base-currency minor units) from posted
  * entries within [p_from, p_to]. p_from null = cumulative (for as-of reports).
@@ -12,9 +49,11 @@ export async function getLedgerBalances(
   from: string | null,
   to: string,
 ): Promise<LedgerBalance[]> {
-  const { data, error } = await sb.rpc("acc_ledger_balances", { p_from: from, p_to: to });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r: Record<string, unknown>) => ({
+  const data = await pagedRpc<Record<string, unknown>>(sb, "acc_ledger_balances", {
+    p_from: from,
+    p_to: to,
+  });
+  return data.map((r: Record<string, unknown>) => ({
     accountId: r.account_id as string,
     accountCode: r.account_code as string,
     name: r.name as string,
@@ -34,9 +73,11 @@ export async function getTransactionList(
   from: string,
   to: string,
 ): Promise<TransactionListRow[]> {
-  const { data, error } = await sb.rpc("acc_transaction_list", { p_from: from, p_to: to });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r: Record<string, unknown>) => ({
+  const data = await pagedRpc<Record<string, unknown>>(sb, "acc_transaction_list", {
+    p_from: from,
+    p_to: to,
+  });
+  return data.map((r: Record<string, unknown>) => ({
     entryId: r.entry_id as string,
     entryNumber: r.entry_number as string,
     entryDate: String(r.entry_date).slice(0, 10),
@@ -70,13 +111,12 @@ export async function getMonthlyLedgerBalances(
   to: string,
   months: number,
 ): Promise<Map<string, LedgerBalance[]>> {
-  const { data, error } = await sb.rpc("acc_monthly_ledger_balances", {
+  const data = await pagedRpc<Record<string, unknown>>(sb, "acc_monthly_ledger_balances", {
     p_to: to,
     p_months: months,
   });
-  if (error) throw new Error(error.message);
   const byMonth = new Map<string, LedgerBalance[]>();
-  for (const r of (data ?? []) as Record<string, unknown>[]) {
+  for (const r of data) {
     const key = String(r.month_key);
     const rows = byMonth.get(key) ?? [];
     rows.push({

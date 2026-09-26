@@ -108,15 +108,19 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
       }
     },
     rpc(name: string, args: Record<string, unknown>) {
-      if (name === "acc_ledger_balances") return Promise.resolve(resultOf(c.ledgerBalances));
+      // `reports.ts` pages every set-returning RPC with `.range()`, exactly
+      // as supabase-js's real builder allows on an rpc call as on a select.
+      // One page answers every source here, so the loop there stops after it.
+      const paged = (source: Source) => ({ range: async () => resultOf(source) });
+      if (name === "acc_ledger_balances") return paged(c.ledgerBalances);
       if (name === "acc_transaction_list") {
         // The same RPC serves two different reads here — entries in range and
         // entries after today — told apart the only way the caller can: the
         // `p_to` it sent. The future-dated read is the one that runs to
         // "9999-12-31".
-        return Promise.resolve(resultOf(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange));
+        return paged(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange);
       }
-      if (name === "acc_monthly_ledger_balances") return Promise.resolve(resultOf(c.monthlyBalances));
+      if (name === "acc_monthly_ledger_balances") return paged(c.monthlyBalances);
       throw new Error(`fakeClient: unhandled rpc "${name}"`);
     },
   };
