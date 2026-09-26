@@ -142,8 +142,19 @@ describe("undepositedFunds", () => {
       new Map(),
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0].entryCount).toBe(0);
+    // Absent is not zero: no detail was supplied for this account, and that is
+    // a different answer from "the detail read ran and found no entries".
+    expect(rows[0].entryCount).toBeNull();
     expect(rows[0].oldestEntryDate).toBeNull();
+  });
+
+  it("reports entryCount as null, never zero, for a balance the detail read never covered", () => {
+    const rows = undepositedFunds(
+      [account({ accountId: "u3", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset", debitBase: 750_00 })],
+      new Map(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].entryCount).toBeNull();
   });
 
   it("says nothing when the account has emptied, which is what should happen", () => {

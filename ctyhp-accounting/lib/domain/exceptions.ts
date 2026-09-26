@@ -121,8 +121,10 @@ function signedBalance(account: ExceptionAccount): number {
 /**
  * Largest question first.
  *
- * Every balance check orders its findings this way, so it is written once: a
- * reviewer works down from the figure most worth explaining.
+ * `wrongWayBalances`, `holdingAccounts` and `undepositedFunds` all order their
+ * findings this way, so it is written once: a reviewer works down from the
+ * figure most worth explaining. `unreconciledBankAccounts` is the one balance
+ * check that does not — it sorts by account name instead.
  */
 function byLargestFirst<T extends { balanceMinor: number }>(rows: T[]): T[] {
   return rows.sort((x, y) => Math.abs(y.balanceMinor) - Math.abs(x.balanceMinor));
@@ -183,7 +185,12 @@ export interface UndepositedRow {
   accountCode: string;
   name: string;
   balanceMinor: number;
-  entryCount: number;
+  /**
+   * `null` when the detail read could not name a figure for this account —
+   * distinct from `0`, which says the read ran and found nothing. The balance
+   * above is still known and shown either way; only the count is absent.
+   */
+  entryCount: number | null;
   oldestEntryDate: string | null;
 }
 
@@ -216,7 +223,7 @@ export function undepositedFunds(
       accountCode: a.accountCode,
       name: a.name,
       balanceMinor,
-      entryCount: detail?.entryCount ?? 0,
+      entryCount: detail?.entryCount ?? null,
       oldestEntryDate: detail?.oldestEntryDate ?? null,
     });
   }

@@ -1,8 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, DatePicker, Space, Statistic, Tag, Typography } from "antd";
+import { Alert, Button, DatePicker, Space, Statistic, Tag, Typography, type TableColumnsType } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
+import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -35,13 +36,22 @@ export default function ExceptionsClient({
   companyName,
   baseCurrency,
   baseDecimals,
+  fiscalStartMonth,
 }: {
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  fiscalStartMonth: number;
 }) {
-  const [from, setFrom] = useState<Dayjs>(dayjs().startOf("year"));
-  const [to, setTo] = useState<Dayjs>(dayjs());
+  const today = dayjs();
+  // The current fiscal year, not the calendar year: for a company whose year
+  // starts in July, "this year" on 2026-09-26 began 2026-07-01, not 2026-01-01.
+  const fiscalYearStart = fiscalMonths(
+    fiscalYearForDate(today.format("YYYY-MM-DD"), fiscalStartMonth),
+    fiscalStartMonth,
+  )[0].start;
+  const [from, setFrom] = useState<Dayjs>(dayjs(fiscalYearStart));
+  const [to, setTo] = useState<Dayjs>(today);
   const [report, setReport] = useState<ExceptionReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,6 +93,26 @@ export default function ExceptionsClient({
     <Link href={`/reports/journal?entry=${row.entryId}`}>{row.entryNumber}</Link>
   );
 
+  /**
+   * Date / Entry / Name / Split / Amount.
+   *
+   * Shared by the duplicates and future-dated sections below, which listed a
+   * journal entry the same way — the same five columns, declared twice.
+   */
+  const transactionColumns: TableColumnsType<TransactionListRow> = [
+    { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE },
+    { title: "Entry", key: "entry", width: COLUMN.CODE, render: (_, r) => entryLink(r) },
+    flexColumn<TransactionListRow>({ title: "Name", dataIndex: "partyName" }),
+    flexColumn<TransactionListRow>({ title: "Split", dataIndex: "categoryLabel" }),
+    {
+      title: "Amount",
+      dataIndex: "amountMinor",
+      width: COLUMN.MONEY,
+      align: "right",
+      render: (_, r) => money(r.amountMinor),
+    },
+  ];
+
   const exportCsv = () => {
     if (!report) return;
     const lines: string[] = ["Check,Date,Reference,Name,Account,Amount"];
@@ -116,6 +146,14 @@ export default function ExceptionsClient({
     );
     report.holding.forEach((h) =>
       push("Still in a holding account", to.format("YYYY-MM-DD"), h.accountCode, "", h.name, money(h.balanceMinor)),
+    );
+    // A check named here contributed no rows above, and no rows is exactly
+    // what a check that found nothing also looks like. This file is the
+    // artifact of "somebody has looked", so it has to be able to say "could
+    // not look" too, or the one case where the books need a second try reads
+    // as the one case where they are clean.
+    report.unavailable.forEach((key) =>
+      push(CHECK_LABEL[key], "", "", "Could not be run", "", ""),
     );
 
     const csv = csvWithReportIdentity(lines.join("\n"), {
@@ -226,19 +264,7 @@ export default function ExceptionsClient({
               rowKey="entryId"
               pagination={false}
               dataSource={report.duplicates.flatMap((g) => g.entries)}
-              columns={[
-                { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE },
-                { title: "Entry", key: "entry", width: COLUMN.CODE, render: (_, r) => entryLink(r) },
-                flexColumn<TransactionListRow>({ title: "Name", dataIndex: "partyName" }),
-                flexColumn<TransactionListRow>({ title: "Split", dataIndex: "categoryLabel" }),
-                {
-                  title: "Amount",
-                  dataIndex: "amountMinor",
-                  width: COLUMN.MONEY,
-                  align: "right",
-                  render: (_, r) => money(r.amountMinor),
-                },
-              ]}
+              columns={transactionColumns}
             />,
           )}
 
@@ -283,8 +309,18 @@ export default function ExceptionsClient({
                   align: "right",
                   render: (_, r) => money(r.balanceMinor),
                 },
-                { title: "Entries", dataIndex: "entryCount", width: COLUMN.QTY },
-                { title: "Oldest", dataIndex: "oldestEntryDate", width: COLUMN.DATE },
+                {
+                  title: "Entries",
+                  dataIndex: "entryCount",
+                  width: COLUMN.QTY,
+                  render: (_, r) => (r.entryCount === null ? "—" : r.entryCount),
+                },
+                {
+                  title: "Oldest",
+                  dataIndex: "oldestEntryDate",
+                  width: COLUMN.DATE,
+                  render: (_, r) => r.oldestEntryDate ?? "—",
+                },
               ]}
             />,
           )}
@@ -380,19 +416,7 @@ export default function ExceptionsClient({
               rowKey="entryId"
               pagination={false}
               dataSource={report.futureDated}
-              columns={[
-                { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE },
-                { title: "Entry", key: "entry", width: COLUMN.CODE, render: (_, r) => entryLink(r) },
-                flexColumn<TransactionListRow>({ title: "Name", dataIndex: "partyName" }),
-                flexColumn<TransactionListRow>({ title: "Split", dataIndex: "categoryLabel" }),
-                {
-                  title: "Amount",
-                  dataIndex: "amountMinor",
-                  width: COLUMN.MONEY,
-                  align: "right",
-                  render: (_, r) => money(r.amountMinor),
-                },
-              ]}
+              columns={transactionColumns}
             />,
             true,
           )}

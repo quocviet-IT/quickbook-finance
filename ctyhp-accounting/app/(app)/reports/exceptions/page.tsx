@@ -32,6 +32,7 @@ export default async function ExceptionsPage() {
         companyName={company?.legal_name ?? "Company name not set"}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        fiscalStartMonth={company?.fiscal_year_start_month ?? 1}
       />
     </div>
   );
