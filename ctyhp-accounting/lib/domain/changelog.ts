@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.62",
+    date: "2026-09-26",
+    headline: "The checks a reviewer runs by hand, in one report.",
+    changes: [
+      {
+        kind: "added",
+        title: "Exception Report",
+        detail:
+          "Eight checks over the books: entries recorded more than once, a check number used twice on one account, money received but not yet banked, a balance pointing the wrong way, a year with income and no costs, bank accounts not agreed to a statement, entries dated in the future, and anything still sitting in a holding account. Nothing here is proof of a mistake — each line is a question worth answering.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "Every check is shown, even when it finds nothing",
+        detail:
+          "A check that found nothing says so, and a check that could not run says that instead. The report never changes a figure.",
+        route: "/reports/exceptions",
+      },
+    ],
+  },
+  {
     version: "1.61",
     date: "2026-08-24",
     headline: "Lists fit the screen. No more scrolling sideways to read a row.",
