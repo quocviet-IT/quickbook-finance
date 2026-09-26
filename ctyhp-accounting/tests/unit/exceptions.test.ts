@@ -34,11 +34,11 @@ const account = (over: Partial<ExceptionAccount> = {}): ExceptionAccount => ({
 describe("wrongWayBalances", () => {
   it("flags an expense account carrying a credit balance", () => {
     const rows = wrongWayBalances([
-      account({ accountId: "e1", accountCode: "6100", name: "Payroll Taxes", accountType: "expense", creditBase: 7_334_72 }),
+      account({ accountId: "e1", accountCode: "6100", name: "Payroll Taxes", accountType: "expense", creditBase: 8_250_00 }),
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0].accountCode).toBe("6100");
-    expect(rows[0].balanceMinor).toBe(-7_334_72);
+    expect(rows[0].balanceMinor).toBe(-8_250_00);
   });
 
   it("leaves an account carrying its normal balance alone", () => {
@@ -90,10 +90,10 @@ describe("wrongWayBalances", () => {
 describe("holdingAccounts", () => {
   it("flags anything left in Uncategorized", () => {
     const rows = holdingAccounts([
-      account({ accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 475_000_00 }),
+      account({ accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 150_000_00 }),
     ]);
     expect(rows).toHaveLength(1);
-    expect(rows[0].balanceMinor).toBe(475_000_00);
+    expect(rows[0].balanceMinor).toBe(150_000_00);
   });
 
   it("matches Suspense and Ask My Accountant too", () => {
@@ -166,19 +166,19 @@ describe("undepositedFunds", () => {
 const bank = (over: Partial<ExceptionBankAccount> = {}): ExceptionBankAccount => ({
   bankAccountId: "b1",
   accountId: "a1",
-  accountName: "Checking 3388",
+  accountName: "Business Checking",
   lastReconciledDate: null,
   ...over,
 });
 
 describe("unreconciledBankAccounts", () => {
-  const balances = new Map<string, number>([["a1", 96_293_85]]);
+  const balances = new Map<string, number>([["a1", 41_780_00]]);
 
   it("flags a bank account nobody has ever reconciled", () => {
     const rows = unreconciledBankAccounts([bank()], balances, "2026-09-30");
     expect(rows).toHaveLength(1);
     expect(rows[0].lastReconciledDate).toBeNull();
-    expect(rows[0].balanceMinor).toBe(96_293_85);
+    expect(rows[0].balanceMinor).toBe(41_780_00);
   });
 
   it("flags one whose last reconciliation stops short of the report date", () => {
@@ -275,7 +275,7 @@ const txn = (over: Partial<TransactionListRow> = {}): TransactionListRow => ({
   sourceType: "manual",
   partyName: "Harbour Property Ltd",
   categoryLabel: "Rent",
-  moneyLabel: "Checking 3388",
+  moneyLabel: "Business Checking",
   amountMinor: -4_500_00,
   currencyCode: "USD",
   reconciled: false,
@@ -382,7 +382,7 @@ const pay = (over: Partial<ExceptionPaymentRef> = {}): ExceptionPaymentRef => ({
   paymentDate: "2026-04-02",
   reference: "1018",
   accountId: "checking",
-  accountName: "Checking 3388",
+  accountName: "Business Checking",
   partyName: "Northwood Metals",
   amountMinor: 30_000_00,
   ...over,
@@ -399,7 +399,7 @@ describe("duplicateCheckNumbers", () => {
   it("does not flag the same number in two different check books", () => {
     const rows = duplicateCheckNumbers([
       pay(),
-      pay({ paymentId: "p2", accountId: "savings", accountName: "Savings 6764" }),
+      pay({ paymentId: "p2", accountId: "savings", accountName: "Business Savings" }),
     ]);
     expect(rows).toEqual([]);
   });
@@ -469,7 +469,7 @@ describe("buildExceptionReport", () => {
     const report = buildExceptionReport(
       emptyInput({
         accounts: [
-          account({ accountId: "h", accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 475_000_00 }),
+          account({ accountId: "h", accountCode: "9000", name: "Uncategorized Expense", accountType: "expense", debitBase: 150_000_00 }),
         ],
         entriesAfterToday: [txn({ entryId: "f1", entryDate: "2027-01-01" })],
       }),
@@ -483,12 +483,12 @@ describe("buildExceptionReport", () => {
   it("derives the bank balance lookup from the accounts it was given", () => {
     const report = buildExceptionReport(
       emptyInput({
-        accounts: [account({ accountId: "a1", accountType: "bank", debitBase: 96_293_85 })],
-        bankAccounts: [{ bankAccountId: "b1", accountId: "a1", accountName: "Checking 3388", lastReconciledDate: null }],
+        accounts: [account({ accountId: "a1", accountType: "bank", debitBase: 41_780_00 })],
+        bankAccounts: [{ bankAccountId: "b1", accountId: "a1", accountName: "Business Checking", lastReconciledDate: null }],
       }),
     );
     expect(report.unreconciled).toHaveLength(1);
-    expect(report.unreconciled[0].balanceMinor).toBe(96_293_85);
+    expect(report.unreconciled[0].balanceMinor).toBe(41_780_00);
   });
 
   it("tells two same-day payments apart by the reference their own entry carries", () => {
