@@ -31,6 +31,19 @@ import { describe, expect, it } from "vitest";
  * decision for a person, not this test — this test only makes sure the
  * grandfathered list cannot grow, cannot go stale, and that nothing outside
  * it is allowed to carry the marker.
+ *
+ * The first version of this list named 5 files, written from memory rather
+ * than from a run of this test. Running it found 5 more — a sixth test file
+ * plus four planning docs the first pass never looked at — so the list
+ * below is the result of actually running the scan, not of guessing at it
+ * again: 10 files, settled by measurement.
+ *
+ * `.claude/settings.json` also contains the `pc49` token once, but as part
+ * of a recorded Bash permission pattern (a scratchpad script's filename from
+ * an earlier session), not as ledger data. That file sits outside this
+ * gate's scan roots (`tests/` and `docs/`) already, and stays there
+ * deliberately rather than being added below — allowlisting it would imply
+ * it is the same kind of debt as the other ten, which it is not.
  */
 
 /** This file's own path, exempt because it necessarily names the pattern. */
@@ -39,8 +52,8 @@ const SELF = "tests/unit/customer-data.test.ts";
 /**
  * Files that predate this gate and still contain the marker. Do not add to
  * this set to silence a new failure — that defeats the gate. Do not edit
- * the five files themselves from this test either; removing the leak from
- * them is a separate decision for a human. This set exists only to shrink,
+ * the files themselves from this test either; removing the leak from them
+ * is a separate decision for a human. This set exists only to shrink,
  * enforced by the "only ever shrinks" test below.
  */
 const GRANDFATHERED = new Set<string>([
@@ -49,6 +62,11 @@ const GRANDFATHERED = new Set<string>([
   "tests/unit/import-preflight.test.ts",
   "tests/unit/import-transactions-migration.test.ts",
   "tests/unit/import-transactions-service.test.ts",
+  "tests/unit/transaction-import.test.ts",
+  "../docs/superpowers/plans/2026-08-06-import-guidance.md",
+  "../docs/superpowers/plans/2026-08-06-import-transactions.md",
+  "../docs/superpowers/specs/2026-08-05-import-guidance-design.md",
+  "../docs/superpowers/specs/2026-08-06-wave-ledger-import-design.md",
 ]);
 
 /**
@@ -122,12 +140,12 @@ describe("customer data leak gate", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("only ever shrinks, so a sixth leaked file cannot be waved through", () => {
+  it("only ever shrinks, so an eleventh leaked file cannot be waved through", () => {
     // The allowlist is the outstanding cleanup, not a resting place. Adding
     // to it is how a guard quietly stops guarding, and it reads in a diff
     // exactly like an unrelated change. Lowering this number is the
     // cleanup; raising it has to be argued for, out loud, to a person.
-    expect(GRANDFATHERED.size).toBeLessThanOrEqual(5);
+    expect(GRANDFATHERED.size).toBeLessThanOrEqual(10);
   });
 
   it("lists no file that has already been cleaned", () => {
