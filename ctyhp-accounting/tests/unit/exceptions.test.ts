@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  duplicateCheckNumbers,
   duplicateEntries,
   futureDatedEntries,
   holdingAccounts,
@@ -11,6 +12,7 @@ import {
   yearsWithIncomeAndNoCost,
   type ExceptionAccount,
   type ExceptionBankAccount,
+  type ExceptionPaymentRef,
   type LedgerBalance,
   type TransactionListRow,
   type UndepositedDetail,
@@ -367,6 +369,54 @@ describe("futureDatedEntries", () => {
       "2026-09-26",
     );
     expect(rows.map((r) => r.entryId)).toEqual(["a", "b"]);
+  });
+});
+
+const pay = (over: Partial<ExceptionPaymentRef> = {}): ExceptionPaymentRef => ({
+  paymentId: "p1",
+  kind: "vendor",
+  paymentNumber: "BP-000001",
+  paymentDate: "2026-04-02",
+  reference: "1018",
+  accountId: "checking",
+  accountName: "Checking 3388",
+  partyName: "Northwood Metals",
+  amountMinor: 30_000_00,
+  ...over,
+});
+
+describe("duplicateCheckNumbers", () => {
+  it("flags one number against one account twice", () => {
+    const rows = duplicateCheckNumbers([pay(), pay({ paymentId: "p2", partyName: "Someone else" })]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].reference).toBe("1018");
+    expect(rows[0].payments).toHaveLength(2);
+  });
+
+  it("does not flag the same number in two different check books", () => {
+    const rows = duplicateCheckNumbers([
+      pay(),
+      pay({ paymentId: "p2", accountId: "savings", accountName: "Savings 6764" }),
+    ]);
+    expect(rows).toEqual([]);
+  });
+
+  it("ignores payments carrying no reference", () => {
+    const rows = duplicateCheckNumbers([
+      pay({ reference: "" }),
+      pay({ paymentId: "p2", reference: "   " }),
+    ]);
+    expect(rows).toEqual([]);
+  });
+
+  it("treats surrounding spaces as the same number", () => {
+    const rows = duplicateCheckNumbers([pay(), pay({ paymentId: "p2", reference: " 1018 " })]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("matches a customer payment against a vendor payment on one account", () => {
+    const rows = duplicateCheckNumbers([pay(), pay({ paymentId: "p2", kind: "customer" })]);
+    expect(rows).toHaveLength(1);
   });
 });
 

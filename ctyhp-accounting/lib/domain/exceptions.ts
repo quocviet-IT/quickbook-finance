@@ -348,3 +348,41 @@ export function futureDatedEntries(
     .filter((r) => r.entryDate > today)
     .sort((x, y) => x.entryDate.localeCompare(y.entryDate));
 }
+
+export interface CheckNumberClash {
+  accountId: string;
+  accountName: string;
+  reference: string;
+  payments: ExceptionPaymentRef[];
+}
+
+/**
+ * Counted per bank account on purpose, so the same number in two different
+ * check books is not flagged. Two entries against one number on one account
+ * means one of them is miscoded, or the check was reissued.
+ */
+export function duplicateCheckNumbers(
+  payments: readonly ExceptionPaymentRef[],
+): CheckNumberClash[] {
+  const groups = new Map<string, ExceptionPaymentRef[]>();
+  for (const p of payments) {
+    const reference = p.reference.trim();
+    if (reference === "") continue;
+    const key = `${p.accountId}|${reference}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(p);
+    else groups.set(key, [p]);
+  }
+  return [...groups.values()]
+    .filter((ps) => ps.length > 1)
+    .map((ps) => ({
+      accountId: ps[0].accountId,
+      accountName: ps[0].accountName,
+      reference: ps[0].reference.trim(),
+      payments: [...ps].sort((x, y) => x.paymentDate.localeCompare(y.paymentDate)),
+    }))
+    .sort(
+      (x, y) =>
+        x.accountName.localeCompare(y.accountName) || x.reference.localeCompare(y.reference),
+    );
+}
