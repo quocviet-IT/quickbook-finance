@@ -2786,6 +2786,8 @@ export function printReport(): void {
 }
 ```
 
+> **Changed in review (commit 1122712):** forcing `data-theme` raced `ThemeProvider`, which owns that attribute. `print-report.ts` now never touches the theme: it exports `printReport()` (sets the `print-report` body class around `window.print()`) and `watchReportPrinting()` (the same class on `beforeprint`/`afterprint`, for Ctrl+P). The paper takes the light palette while printing because `cssVariableBlock()` in `lib/design/tokens.ts` gives the light rule the selector `:root, body.print-report .report-print-area`. The table also colours a negative change or % of income in the danger colour.
+
 - [ ] **Step 4: The table**
 
 `ctyhp-accounting/components/reports/StatementTable.tsx`:
@@ -3368,6 +3370,7 @@ import { ReportFoot, ReportPaper, StatRow, reportPaperStyles as styles, type Sta
 import ReportToolbar from "@/components/reports/ReportToolbar";
 import StatementTable from "@/components/reports/StatementTable";
 import ZoomSheet from "@/components/reports/ZoomSheet";
+import { watchReportPrinting } from "@/lib/client/print-report";
 import { formatMoney } from "@/lib/format";
 import { dayBefore, fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
@@ -3673,6 +3676,9 @@ export default function ReportsClient({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void run();
   }, [run]);
+
+  // Ctrl+P prints the report alone too, not only the Print button.
+  useEffect(() => watchReportPrinting(), []);
 
   const paperRange = point ? `As of ${longDate(ran.to)}` : rangeText(ran.from, ran.to);
   const sheet = useMemo(
