@@ -1,7 +1,8 @@
 /* Generated from lib/design/tokens.ts. Do not edit by hand — a unit test
    asserts this block still matches cssVariableBlock() exactly, so changing a
    colour means changing the token and copying the new block over. */
-:root {
+:root,
+body.print-report .report-print-area {
   --ob-money-positive: #15803d;
   --ob-money-negative: #b91c1c;
   --ob-money-zero: #475569;

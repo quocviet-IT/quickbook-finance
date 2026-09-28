@@ -65,9 +65,17 @@ function sourceFiles(dir: string): string[] {
  * blocks. Exempting the blocks rather than the file is what keeps this guard
  * sharp: a hex anywhere else in globals.css still fails, which is the whole
  * point of having converted it.
+ *
+ * The light block's selector also covers `body.print-report
+ * .report-print-area` (see cssVariableBlock in lib/design/tokens.ts, and
+ * lib/client/print-report.ts): a printed report takes the light palette on
+ * its own selector rather than by forcing `data-theme` on `<html>`.
  */
 function withoutTokenBlocks(source: string): string {
-  return source.replace(/:root(\[data-theme="dark"\])? \{[^}]*--ob-[^}]*\}/g, "");
+  return source.replace(
+    /:root(,\nbody\.print-report \.report-print-area)?(\[data-theme="dark"\])? \{[^}]*--ob-[^}]*\}/g,
+    "",
+  );
 }
 
 const files = [...sourceFiles(join(ROOT, "app")), ...sourceFiles(join(ROOT, "components"))];

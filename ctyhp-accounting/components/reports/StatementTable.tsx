@@ -24,6 +24,15 @@ const TONE_CLASS = { favorable: styles.favorable, unfavorable: styles.unfavorabl
 const percentText = (value: number | null | undefined): string => (value == null ? "" : formatPercent(value));
 
 /**
+ * The class for a cell holding a signed value: the row's tone when it has one
+ * (Budget vs Actual — already coloured favourable/unfavourable, so nothing is
+ * added on top of it), the danger colour when it has no tone but the value is
+ * itself below zero, nothing otherwise.
+ */
+const signClass = (value: number | null | undefined, toneClass?: string): string =>
+  toneClass ? ` ${toneClass}` : value != null && value < 0 ? ` ${styles.negative}` : "";
+
+/**
  * A statement as the client's prototype prints one (`table.rpt`): sections in
  * small capitals, accounts indented under their parent, a rule over each total
  * and a double rule under the last. Every figure with something behind it is a
@@ -117,20 +126,26 @@ export default function StatementTable({
               ) : (
                 row.label
               );
-            const tone = row.tone ? ` ${TONE_CLASS[row.tone]}` : "";
+            const toneClass = row.tone ? TONE_CLASS[row.tone] : undefined;
             return (
               <tr key={row.key} className={ROW_CLASS[row.kind]}>
                 <td className={INDENT[row.depth]}>{label}</td>
                 {columns.map((c, i) => (
                   <Fragment key={c.key}>
                     <td className={styles.r}>{amount(row, i)}</td>
-                    {percent ? <td className={styles.pct}>{percentText(row.percent?.[i])}</td> : null}
+                    {percent ? (
+                      <td className={`${styles.pct}${signClass(row.percent?.[i])}`}>{percentText(row.percent?.[i])}</td>
+                    ) : null}
                   </Fragment>
                 ))}
                 {changeLabels ? (
                   <>
-                    <td className={`${styles.r}${tone}`}>{row.change ? money(row.change.amount) : ""}</td>
-                    <td className={`${styles.pct}${tone}`}>{percentText(row.change?.percent)}</td>
+                    <td className={`${styles.r}${signClass(row.change?.amount, toneClass)}`}>
+                      {row.change ? money(row.change.amount) : ""}
+                    </td>
+                    <td className={`${styles.pct}${signClass(row.change?.percent, toneClass)}`}>
+                      {percentText(row.change?.percent)}
+                    </td>
                   </>
                 ) : null}
               </tr>
