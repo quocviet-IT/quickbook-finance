@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { App, Checkbox, Input, Space } from "antd";
 import { ADJUSTING_NOTE_MAX, type ClosedPeriodAsk } from "@/lib/domain/adjusting-entries";
 import type { JournalEntrySummary } from "@/lib/services/journal";
@@ -31,6 +31,20 @@ export default function AdjustingEntryControl({
   const [busy, setBusy] = useState(false);
   const marked = entry.adjusting !== null;
 
+  /**
+   * Every change this control makes, run one after another in the order the
+   * user made them. Clicking the checkbox while the note still has focus fires
+   * the note's save first and the checkbox second; run side by side, whichever
+   * answered last would decide what the screen shows, whatever the database
+   * ended up holding.
+   */
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const inTurn = (work: () => Promise<void>): Promise<void> => {
+    const next = queue.current.then(work, work);
+    queue.current = next.catch(() => undefined);
+    return next;
+  };
+
   if (!canEdit) {
     return marked ? (
       <div style={{ marginTop: 10 }}>
@@ -40,36 +54,38 @@ export default function AdjustingEntryControl({
     ) : null;
   }
 
-  const toggle = async (next: boolean, confirmClosed: boolean): Promise<void> => {
-    setBusy(true);
-    const r = next
-      ? await markAdjustingAction({ entryId: entry.id, note: null, confirmClosed })
-      : await unmarkAdjustingAction({ entryId: entry.id, confirmClosed });
-    setBusy(false);
-    if (!r.ok || !r.data) {
-      message.error(r.error ?? "The entry could not be changed.");
-      return;
-    }
-    if (r.data.kind === "closed_period") {
-      onClosedPeriod(r.data.ask, () => toggle(next, true));
-      return;
-    }
-    setNote("");
-    onChange(next ? { note: null } : null);
-  };
+  const toggle = (next: boolean, confirmClosed: boolean): Promise<void> =>
+    inTurn(async () => {
+      setBusy(true);
+      const r = next
+        ? await markAdjustingAction({ entryId: entry.id, note: null, confirmClosed })
+        : await unmarkAdjustingAction({ entryId: entry.id, confirmClosed });
+      setBusy(false);
+      if (!r.ok || !r.data) {
+        message.error(r.error ?? "The entry could not be changed.");
+        return;
+      }
+      if (r.data.kind === "closed_period") {
+        onClosedPeriod(r.data.ask, () => toggle(next, true));
+        return;
+      }
+      setNote("");
+      onChange(next ? { note: null } : null);
+    });
 
-  const saveNote = async () => {
-    const trimmed = note.trim();
-    if (trimmed === (entry.adjusting?.note ?? "")) return;
-    setBusy(true);
-    const r = await markAdjustingAction({ entryId: entry.id, note: trimmed || null, confirmClosed: unlocked });
-    setBusy(false);
-    if (!r.ok || !r.data || r.data.kind !== "done") {
-      message.error(r.error ?? "The note could not be saved.");
-      return;
-    }
-    onChange({ note: trimmed || null });
-  };
+  const saveNote = (): Promise<void> =>
+    inTurn(async () => {
+      const trimmed = note.trim();
+      if (trimmed === (entry.adjusting?.note ?? "")) return;
+      setBusy(true);
+      const r = await markAdjustingAction({ entryId: entry.id, note: trimmed || null, confirmClosed: unlocked });
+      setBusy(false);
+      if (!r.ok || !r.data || r.data.kind !== "done") {
+        message.error(r.error ?? "The note could not be saved.");
+        return;
+      }
+      onChange({ note: trimmed || null });
+    });
 
   return (
     <Space wrap size={10} style={{ marginTop: 10 }}>
