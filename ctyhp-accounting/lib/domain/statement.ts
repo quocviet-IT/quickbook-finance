@@ -11,8 +11,15 @@
  * are always the builders', never re-added.
  */
 
-import type { AccountType } from "@/lib/domain/accounts";
-import { percentOfIncome, type ProfitAndLoss, type ReportSection } from "@/lib/domain/reports";
+import { ACCOUNT_TYPES, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
+import { dayBefore } from "@/lib/domain/fiscal";
+import {
+  percentOfIncome,
+  type BalanceSheet,
+  type ProfitAndLoss,
+  type ReportSection,
+  type TrialBalance,
+} from "@/lib/domain/reports";
 import type { StatementColumnSpec } from "@/lib/domain/statement-columns";
 
 /* ------------------------------------------------------------------ model */
@@ -389,5 +396,219 @@ export function pnlStatement(input: PnlStatementInput): Statement {
     rows,
     empty: [income, cogs, opex, otherIncome, otherExpenses].every((l) => l.length === 0),
     outOfBalance: null,
+  };
+}
+
+/* ---------------------------------------------------------- Balance Sheet */
+
+export interface BalanceSheetStatementInput {
+  columns: readonly StatementColumn[];
+  sheets: readonly BalanceSheet[];
+  /** Per column: `netIncomeOf` everything up to the day before the fiscal year that contains the column's date. */
+  priorEarnings: readonly number[];
+  /** Per column: the first day of that fiscal year. */
+  fiscalYearStarts: readonly string[];
+  accounts: AccountIndex;
+  change: boolean;
+}
+
+const ASSET_GROUPS: ReadonlyArray<{ key: string; title: string; types: AccountType[]; always: boolean }> = [
+  { key: "cash", title: "Cash and Bank", types: ["bank"], always: true },
+  { key: "ar", title: "Accounts Receivable", types: ["accounts_receivable"], always: false },
+  { key: "other", title: "Other Current Assets", types: ["current_asset"], always: true },
+  { key: "long", title: "Long-term Assets", types: ["fixed_asset"], always: true },
+];
+
+const LIABILITY_TYPES: AccountType[] = ["accounts_payable", "credit_card", "current_liability"];
+
+/** `buildBalanceSheet`'s own line for the profit it carries in equity. */
+const isCurrentEarnings = (line: SectionLine) => line.accountId === null && line.name === "Current earnings";
+
+/** Following `reportBS`. */
+export function balanceSheetStatement(input: BalanceSheetStatementInput): Statement {
+  const { sheets } = input;
+  const width = sheets.length;
+  const ctx: Ctx = { columns: input.columns, accounts: input.accounts, percentBase: null, change: input.change };
+  const rows: StatementRow[] = [];
+  const typeOf = (leaf: Leaf) => (leaf.accountId ? input.accounts.get(leaf.accountId)?.type : undefined);
+  const plIds = [...input.accounts.values()]
+    .filter((a) => statementSectionOf(a.type) === "profit_and_loss")
+    .map((a) => a.id);
+
+  // Assets, in the prototype's groups; an account of an unexpected type counts as other current.
+  const assets = leavesOf(sheets.map((s) => s.assets));
+  const groupOf = (leaf: Leaf) => {
+    const type = typeOf(leaf);
+    return ASSET_GROUPS.find((g) => type !== undefined && g.types.includes(type))?.key ?? "other";
+  };
+  rows.push(sectionRow(ctx, "assets", "Assets"));
+  for (const group of ASSET_GROUPS) {
+    const leaves = assets.filter((leaf) => groupOf(leaf) === group.key);
+    if (leaves.length === 0 && !group.always) continue;
+    rows.push(classheadRow(ctx, `assets:${group.key}`, group.title));
+    renderTree(forest(leaves, ctx, ofTypes(...group.types)), 1, ctx, rows, `assets:${group.key}`);
+    rows.push(
+      makeRow(ctx, {
+        key: `assets:${group.key}:total`,
+        kind: "subtotal",
+        label: `Total ${group.title}`,
+        amounts: sumLeaves(leaves, width),
+        zoomIds: idsOf(leaves),
+      }),
+    );
+  }
+  rows.push(makeRow(ctx, { key: "assets:total", kind: "grand", label: "Total Assets", amounts: sheets.map((s) => s.totalAssets), zoomIds: idsOf(assets) }));
+
+  // Liabilities. OneBook has no long-term liability type, so there is one group.
+  const liabilities = leavesOf(sheets.map((s) => s.liabilities));
+  rows.push(spacerRow(ctx, "s-liabilities"));
+  rows.push(sectionRow(ctx, "liabilities", "Liabilities"));
+  rows.push(classheadRow(ctx, "liabilities:current", "Current Liabilities"));
+  renderTree(forest(liabilities, ctx, ofTypes(...LIABILITY_TYPES)), 1, ctx, rows, "liabilities");
+  rows.push(
+    makeRow(ctx, {
+      key: "liabilities:current:total",
+      kind: "subtotal",
+      label: "Total Current Liabilities",
+      amounts: sumLeaves(liabilities, width),
+      zoomIds: idsOf(liabilities),
+    }),
+  );
+  rows.push(
+    makeRow(ctx, { key: "liabilities:total", kind: "total", label: "Total Liabilities", amounts: sheets.map((s) => s.totalLiabilities), zoomIds: idsOf(liabilities) }),
+  );
+
+  // Equity: the accounts, then the builder's "Current earnings" split at the start of the fiscal year.
+  const equity = leavesOf(sheets.map((s) => ({ ...s.equity, lines: s.equity.lines.filter((l) => !isCurrentEarnings(l)) })));
+  const earnings = sheets.map((s) => s.equity.lines.find(isCurrentEarnings)?.amount ?? 0);
+  const prior = [...input.priorEarnings];
+  const thisYear = earnings.map((e, i) => e - prior[i]);
+  rows.push(spacerRow(ctx, "s-equity"));
+  rows.push(sectionRow(ctx, "equity", "Equity"));
+  renderTree(forest(equity, ctx, ofTypes("equity")), 1, ctx, rows, "equity");
+  if (prior.some((v) => v !== 0)) {
+    rows.push(
+      makeRow(ctx, {
+        key: "equity:retained",
+        kind: "account",
+        label: "Retained earnings — prior years",
+        depth: 1,
+        amounts: prior,
+        zoomIds: plIds,
+        zoomRange: (i) => ({ from: null, to: dayBefore(input.fiscalYearStarts[i]) }),
+      }),
+    );
+  }
+  if (thisYear.some((v) => v !== 0)) {
+    rows.push(
+      makeRow(ctx, {
+        key: "equity:net-income",
+        kind: "account",
+        label: "Net income — this year",
+        depth: 1,
+        amounts: thisYear,
+        zoomIds: plIds,
+        zoomRange: (i) => ({ from: input.fiscalYearStarts[i], to: input.columns[i].to }),
+      }),
+    );
+  }
+  const equityIds = [...idsOf(equity), ...plIds];
+  rows.push(makeRow(ctx, { key: "equity:total", kind: "total", label: "Total Equity", amounts: sheets.map((s) => s.totalEquity), zoomIds: equityIds }));
+  rows.push(spacerRow(ctx, "s-le"));
+  rows.push(
+    makeRow(ctx, {
+      key: "le:total",
+      kind: "grand",
+      label: "Total Liabilities and Equity",
+      amounts: sheets.map((s) => s.totalLiabilities + s.totalEquity),
+      zoomIds: [...idsOf(liabilities), ...equityIds],
+    }),
+  );
+
+  const unbalanced = sheets.find((s) => !s.balanced);
+  return {
+    title: "Balance Sheet",
+    columns: [...input.columns],
+    changeLabels: input.change ? ["Change", "%"] : null,
+    percent: false,
+    rows,
+    empty: assets.length === 0 && liabilities.length === 0 && equity.length === 0 && earnings.every((e) => e === 0),
+    outOfBalance: unbalanced ? unbalanced.totalAssets - (unbalanced.totalLiabilities + unbalanced.totalEquity) : null,
+  };
+}
+
+/* ---------------------------------------------------------- Trial Balance */
+
+export interface TrialBalanceStatementInput {
+  columns: readonly StatementColumn[];
+  tbs: readonly TrialBalance[];
+  accounts: AccountIndex;
+}
+
+/** Following `reportTB`: a Debit and a Credit for every date. */
+export function trialBalanceStatement(input: TrialBalanceStatementInput): Statement {
+  const several = input.columns.length > 1;
+  const columns: StatementColumn[] = input.columns.flatMap((c) => [
+    { ...c, key: `${c.key}:dr`, label: several ? `${c.label} Debit` : "Debit" },
+    { ...c, key: `${c.key}:cr`, label: several ? `${c.label} Credit` : "Credit" },
+  ]);
+  const ctx: Ctx = { columns, accounts: input.accounts, percentBase: null, change: false };
+
+  const lines = new Map<string, { code: string; name: string; debit: number[]; credit: number[] }>();
+  input.tbs.forEach((tb, i) => {
+    for (const line of tb.lines) {
+      let entry = lines.get(line.accountId);
+      if (!entry) {
+        entry = { code: line.accountCode, name: line.name, debit: input.tbs.map(() => 0), credit: input.tbs.map(() => 0) };
+        lines.set(line.accountId, entry);
+      }
+      entry.debit[i] = line.debit;
+      entry.credit[i] = line.credit;
+    }
+  });
+  const order = (id: string) => {
+    const type = input.accounts.get(id)?.type;
+    const index = type ? ACCOUNT_TYPES.indexOf(type) : -1;
+    return index === -1 ? ACCOUNT_TYPES.length : index;
+  };
+  const ids = [...lines.keys()].sort((a, b) => order(a) - order(b) || lines.get(a)!.code.localeCompare(lines.get(b)!.code));
+
+  const rows = ids.map((id) => {
+    const entry = lines.get(id)!;
+    const row = makeRow(ctx, {
+      key: `a:${id}`,
+      kind: "account",
+      label: labelOf(entry.code, entry.name),
+      accountId: id,
+      amounts: input.tbs.flatMap((_, i) => [entry.debit[i], entry.credit[i]]),
+      zoomIds: [id],
+    });
+    // A zero side is a blank, as on any trial balance.
+    row.cells = row.cells.map((cell) => (cell.amount === 0 ? { amount: null, zoom: null } : cell));
+    return row;
+  });
+
+  const total = makeRow(ctx, { key: "total", kind: "grand", label: "Total", amounts: input.tbs.flatMap((tb) => [tb.totalDebit, tb.totalCredit]) });
+  total.cells = total.cells.map((cell, j) => {
+    const tb = input.tbs[Math.floor(j / 2)];
+    const debitSide = j % 2 === 0;
+    const accountIds = tb.lines.filter((l) => (debitSide ? l.debit : l.credit) > 0).map((l) => l.accountId);
+    return {
+      amount: cell.amount,
+      zoom: accountIds.length
+        ? { title: debitSide ? "Total debits" : "Total credits", accountIds, from: columns[j].from, to: columns[j].to, figure: cell.amount ?? 0 }
+        : null,
+    };
+  });
+
+  const unbalanced = input.tbs.find((tb) => !tb.balanced);
+  return {
+    title: "Trial Balance",
+    columns,
+    changeLabels: null,
+    percent: false,
+    rows: [...rows, total],
+    empty: input.tbs.every((tb) => tb.lines.length === 0),
+    outOfBalance: unbalanced ? unbalanced.totalDebit - unbalanced.totalCredit : null,
   };
 }
