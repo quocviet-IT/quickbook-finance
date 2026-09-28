@@ -28,7 +28,7 @@ export default function ZoomSheet({
   money: (minor: number) => string;
 }) {
   const [loaded, setLoaded] = useState<{ spec: ZoomSpec; result: ZoomResult | null; error: string | null } | null>(null);
-  const [openEntry, setOpenEntry] = useState<string | null>(null);
+  const [openEntry, setOpenEntry] = useState<{ spec: ZoomSpec; entryId: string } | null>(null);
 
   useEffect(() => {
     if (!spec) return;
@@ -57,6 +57,9 @@ export default function ZoomSheet({
   const current = loaded && loaded.spec === spec ? loaded : null;
   const result = current?.result ?? null;
   const error = current?.error ?? null;
+
+  // An entry opened from an earlier figure is not this one's.
+  const entryId = openEntry && openEntry.spec === spec ? openEntry.entryId : null;
 
   const dates = spec ? (spec.from ? rangeText(spec.from, spec.to) : `All dates through ${longDate(spec.to)}`) : "";
   const columns = [
@@ -137,7 +140,7 @@ export default function ZoomSheet({
             rows={result.rows}
             columns={columns}
             rowClassName={() => styles.clickable}
-            onRow={(r) => ({ onClick: () => setOpenEntry(r.entryId), title: "Open this entry" })}
+            onRow={(r) => ({ onClick: () => spec && setOpenEntry({ spec, entryId: r.entryId }), title: "Open this entry" })}
             emptyTitle="No entries"
             emptyDescription="Nothing was posted to these accounts in these dates."
           />
@@ -147,7 +150,7 @@ export default function ZoomSheet({
           </div>
         </>
       )}
-      <EntryDetailDrawer entryId={openEntry} onClose={() => setOpenEntry(null)} />
+      <EntryDetailDrawer entryId={entryId} onClose={() => setOpenEntry(null)} />
     </Drawer>
   );
 }
