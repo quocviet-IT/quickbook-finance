@@ -13,13 +13,17 @@
 
 import { ACCOUNT_TYPES, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import { dayBefore } from "@/lib/domain/fiscal";
+import { fromMinor } from "@/lib/domain/money";
 import {
   percentOfIncome,
   type BalanceSheet,
+  type BudgetVsActual,
   type ProfitAndLoss,
   type ReportSection,
+  type StatementOfEquity,
   type TrialBalance,
 } from "@/lib/domain/reports";
+import { sanitizeExportFileName, type ReportExportColumn, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { StatementColumnSpec } from "@/lib/domain/statement-columns";
 
 /* ------------------------------------------------------------------ model */
@@ -611,5 +615,242 @@ export function trialBalanceStatement(input: TrialBalanceStatementInput): Statem
     rows: [...rows, total],
     empty: input.tbs.every((tb) => tb.lines.length === 0),
     outOfBalance: unbalanced ? unbalanced.totalDebit - unbalanced.totalCredit : null,
+  };
+}
+
+/* -------------------------------------------------------- Budget vs Actual */
+
+export interface BudgetStatementInput {
+  bva: BudgetVsActual;
+  from: string;
+  to: string;
+  accounts: AccountIndex;
+}
+
+const BUDGET_SECTIONS: ReadonlyArray<{
+  key: string;
+  title: string;
+  types: AccountType[];
+  incomeSide: boolean;
+  always: boolean;
+  pick: (p: ProfitAndLoss) => ReportSection;
+}> = [
+  { key: "income", title: "Income", types: ["income"], incomeSide: true, always: true, pick: (p) => p.income },
+  { key: "cogs", title: "Cost of Goods Sold", types: ["cost_of_goods_sold"], incomeSide: false, always: false, pick: (p) => p.costOfGoodsSold },
+  { key: "opex", title: "Operating Expenses", types: ["expense"], incomeSide: false, always: true, pick: (p) => p.operatingExpenses },
+  { key: "other-income", title: "Other Income", types: ["other_income"], incomeSide: true, always: false, pick: (p) => p.otherIncome },
+  { key: "other-expenses", title: "Other Expenses", types: ["other_expense"], incomeSide: false, always: false, pick: (p) => p.otherExpenses },
+];
+
+/** Good news is more income than budgeted, or less cost — the rule `buildBudgetVsActual` applies to a line. */
+function toneOf(variance: number, incomeSide: boolean): StatementTone {
+  if (variance === 0) return null;
+  return (incomeSide ? variance > 0 : variance < 0) ? "favorable" : "unfavorable";
+}
+
+/** Following `reportBudget`: Actual, Budget, Variance and %, by the P&L's sections. */
+export function budgetStatement(input: BudgetStatementInput): Statement {
+  const { bva } = input;
+  const columns: StatementColumn[] = [
+    { key: "actual", label: "Actual", sub: "", from: input.from, to: input.to, isTotal: false },
+    { key: "budget", label: "Budget", sub: "", from: input.from, to: input.to, isTotal: false },
+  ];
+  const ctx: Ctx = { columns, accounts: input.accounts, percentBase: null, change: true };
+  const rows: StatementRow[] = [];
+  const shown = bva.lines.filter((l) => l.current !== 0 || l.prior !== 0);
+  const budgetRow = (spec: RowSpec, incomeSide: boolean): StatementRow => {
+    const row = makeRow(ctx, spec);
+    row.cells[1] = { amount: row.cells[1].amount, zoom: null }; // a budget is not in the books
+    row.tone = row.change ? toneOf(row.change.amount, incomeSide) : null;
+    return row;
+  };
+  const sectionIds = new Map<string, string[]>();
+  for (const section of BUDGET_SECTIONS) {
+    const lines = shown.filter((l) => section.types.includes(l.accountType));
+    sectionIds.set(section.key, lines.flatMap((l) => (l.accountId ? [l.accountId] : [])));
+    if (lines.length === 0 && !section.always) continue;
+    rows.push(sectionRow(ctx, section.key, section.title));
+    if (lines.length === 0) {
+      rows.push(noteRow(ctx, `${section.key}:note`, section.incomeSide ? "No income budgeted or earned" : "No expenses budgeted or spent"));
+    }
+    for (const line of lines) {
+      rows.push(
+        budgetRow(
+          {
+            key: `${section.key}:a:${line.accountId}`,
+            kind: "account",
+            label: labelOf(line.accountCode, line.name),
+            depth: 1,
+            accountId: line.accountId,
+            amounts: [line.current, line.prior],
+            zoomIds: line.accountId ? [line.accountId] : null,
+          },
+          section.incomeSide,
+        ),
+      );
+    }
+    rows.push(
+      budgetRow(
+        {
+          key: `${section.key}:total`,
+          kind: "total",
+          label: `Total ${section.title}`,
+          amounts: [section.pick(bva.actual).total, section.pick(bva.budget).total],
+          zoomIds: sectionIds.get(section.key),
+        },
+        section.incomeSide,
+      ),
+    );
+    if (section.key === "cogs") {
+      rows.push(
+        budgetRow(
+          {
+            key: "gross",
+            kind: "total",
+            label: "Gross Profit",
+            amounts: [bva.actual.grossProfit, bva.budget.grossProfit],
+            zoomIds: [...(sectionIds.get("income") ?? []), ...(sectionIds.get("cogs") ?? [])],
+          },
+          true,
+        ),
+      );
+    }
+    rows.push(spacerRow(ctx, `s-${section.key}`));
+  }
+  rows.push(
+    budgetRow(
+      {
+        key: "net-income",
+        kind: "grand",
+        label: "Net Income",
+        amounts: [bva.actual.netIncome, bva.budget.netIncome],
+        zoomIds: [...sectionIds.values()].flat(),
+      },
+      true,
+    ),
+  );
+  return { title: "Budget vs Actual", columns, changeLabels: ["Variance", "%"], percent: false, rows, empty: shown.length === 0, outOfBalance: null };
+}
+
+/* ----------------------------------------------------- Statement of Equity */
+
+export interface EquityStatementInput {
+  soe: StatementOfEquity;
+  from: string;
+  to: string;
+  accounts: AccountIndex;
+}
+
+/** The prototype has no such report; it takes the same paper and table. */
+export function equityStatement(input: EquityStatementInput): Statement {
+  const columns: StatementColumn[] = [{ key: "amount", label: "Amount", sub: "", from: input.from, to: input.to, isTotal: false }];
+  const ctx: Ctx = { columns, accounts: input.accounts, percentBase: null, change: false };
+  const all = [...input.accounts.values()];
+  const equityIds = all.filter((a) => a.type === "equity").map((a) => a.id);
+  const plIds = all.filter((a) => statementSectionOf(a.type) === "profit_and_loss").map((a) => a.id);
+  const rows: StatementRow[] = [];
+  for (const line of input.soe.lines) {
+    switch (line.kind) {
+      case "opening":
+        rows.push(
+          makeRow(ctx, {
+            key: line.key,
+            kind: "account",
+            label: line.label,
+            amounts: [line.amount],
+            zoomIds: [...equityIds, ...plIds],
+            zoomRange: () => ({ from: null, to: dayBefore(input.from) }),
+          }),
+        );
+        break;
+      case "activity":
+        rows.push(
+          makeRow(ctx, {
+            key: line.key,
+            kind: "account",
+            label: line.label,
+            depth: 1,
+            accountId: line.accountId,
+            amounts: [line.amount],
+            zoomIds: line.accountId ? [line.accountId] : null,
+          }),
+        );
+        break;
+      case "income":
+        rows.push(makeRow(ctx, { key: line.key, kind: "account", label: line.label, amounts: [line.amount], zoomIds: plIds }));
+        break;
+      case "closing":
+        rows.push(spacerRow(ctx, "s-closing"));
+        rows.push(
+          makeRow(ctx, {
+            key: line.key,
+            kind: "grand",
+            label: line.label,
+            amounts: [line.amount],
+            zoomIds: [...equityIds, ...plIds],
+            zoomRange: () => ({ from: null, to: input.to }),
+          }),
+        );
+        break;
+    }
+  }
+  const soe = input.soe;
+  return {
+    title: "Statement of Equity",
+    columns,
+    changeLabels: null,
+    percent: false,
+    rows,
+    empty: soe.openingEquity === 0 && soe.equityActivity === 0 && soe.netIncome === 0,
+    outOfBalance: null,
+  };
+}
+
+/* ------------------------------------------------------------ the export */
+
+export interface StatementSheetMeta {
+  companyName: string;
+  currencyCode: string;
+  decimals: number;
+  /** The paper's range line. */
+  subtitle: string;
+  fileName: string;
+}
+
+/** The statement as one sheet for PDF, Excel, CSV and Copy — the rows on screen, spacers aside. */
+export function statementSheet(statement: Statement, meta: StatementSheetMeta): ReportExportSheet {
+  const columns: ReportExportColumn[] = [{ key: "account", header: "Account", width: 44 }];
+  statement.columns.forEach((column, i) => {
+    columns.push({ key: `c${i}`, header: column.label, kind: "money", width: 16 });
+    if (statement.percent) columns.push({ key: `p${i}`, header: "% of income", kind: "percent", width: 12 });
+  });
+  if (statement.changeLabels) {
+    columns.push(
+      { key: "change", header: statement.changeLabels[0], kind: "money", width: 16 },
+      { key: "changePct", header: statement.changeLabels[1], kind: "percent", width: 12 },
+    );
+  }
+  const rows = statement.rows
+    .filter((r) => r.kind !== "spacer")
+    .map((r) => {
+      const out: Record<string, string | number | null> = { account: `${"  ".repeat(r.depth)}${r.label}` };
+      r.cells.forEach((cell, i) => {
+        out[`c${i}`] = cell.amount === null ? null : fromMinor(cell.amount, meta.decimals);
+        if (statement.percent) out[`p${i}`] = r.percent?.[i] ?? null;
+      });
+      if (statement.changeLabels) {
+        out.change = r.change ? fromMinor(r.change.amount, meta.decimals) : null;
+        out.changePct = r.change?.percent ?? null;
+      }
+      return out;
+    });
+  return {
+    fileName: sanitizeExportFileName(meta.fileName),
+    companyName: meta.companyName,
+    title: statement.title,
+    subtitle: meta.subtitle,
+    currencyCode: meta.currencyCode,
+    columns,
+    rows,
   };
 }

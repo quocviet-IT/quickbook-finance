@@ -1,11 +1,22 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { AccountType } from "@/lib/domain/accounts";
-import { buildBalanceSheet, buildProfitAndLoss, buildTrialBalance, type BalanceSheet, type LedgerBalance } from "@/lib/domain/reports";
+import {
+  buildBalanceSheet,
+  buildBudgetVsActual,
+  buildProfitAndLoss,
+  buildStatementOfEquity,
+  buildTrialBalance,
+  type BalanceSheet,
+  type LedgerBalance,
+} from "@/lib/domain/reports";
 import {
   balanceSheetStatement,
+  budgetStatement,
+  equityStatement,
   indexAccounts,
   pnlStatement,
+  statementSheet,
   trialBalanceStatement,
   type AccountRef,
   type Statement,
@@ -324,5 +335,108 @@ describe("trialBalanceStatement", () => {
       "May 31, 2026 Debit",
       "May 31, 2026 Credit",
     ]);
+  });
+});
+
+describe("budgetStatement", () => {
+  const BUDGET_ACCOUNTS = indexAccounts([
+    acct("sales", "4000", "Sales", "income"),
+    acct("cogs", "5000", "Cost of Goods Sold", "cost_of_goods_sold"),
+    acct("rent", "6100", "Rent", "expense"),
+    acct("ads", "6300", "Advertising", "expense"),
+    acct("misc", "6400", "Miscellaneous", "expense"),
+  ]);
+  const b = (id: string, debitBase: number, creditBase: number): LedgerBalance => {
+    const a = BUDGET_ACCOUNTS.get(id)!;
+    return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, debitBase, creditBase };
+  };
+  const budgetOf = (id: string, amountMinor: number) => {
+    const a = BUDGET_ACCOUNTS.get(id)!;
+    return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, amountMinor };
+  };
+  const bva = buildBudgetVsActual(
+    [b("sales", 0, 1_000_000), b("cogs", 300_000, 0), b("rent", 150_000, 0), b("misc", 0, 0)],
+    [budgetOf("sales", 900_000), budgetOf("cogs", 250_000), budgetOf("rent", 200_000), budgetOf("ads", 50_000)],
+  );
+  const s = budgetStatement({ bva, from: "2026-01-01", to: "2026-06-30", accounts: BUDGET_ACCOUNTS });
+
+  it("sets actual beside budget, with the builder's variance", () => {
+    expect(s.columns.map((c) => c.label)).toEqual(["Actual", "Budget"]);
+    expect(s.changeLabels).toEqual(["Variance", "%"]);
+    for (const line of bva.lines.filter((l) => l.current !== 0 || l.prior !== 0)) {
+      const r = s.rows.find((x) => x.kind === "account" && x.accountId === line.accountId);
+      expect(r?.cells.map((c) => c.amount)).toEqual([line.current, line.prior]);
+      expect(r?.change).toEqual({ amount: line.variance, percent: line.variancePercent });
+    }
+    expect(amounts(s, "net-income")).toEqual([bva.actual.netIncome, bva.budget.netIncome]);
+  });
+
+  it("colours a variance by whether it is good news", () => {
+    expect(row(s, "income:a:sales")?.tone).toBe("favorable");
+    expect(row(s, "opex:a:rent")?.tone).toBe("favorable");
+    expect(row(s, "cogs:a:cogs")?.tone).toBe("unfavorable");
+    expect(row(s, "opex:a:ads")?.tone).toBe("favorable");
+    expect(row(s, "net-income")?.tone).toBe("favorable");
+  });
+
+  it("opens the actual figure and never the budget, which is not in the books", () => {
+    expect(row(s, "income:a:sales")?.cells[0].zoom?.accountIds).toEqual(["sales"]);
+    expect(row(s, "income:a:sales")?.cells[1].zoom).toBeNull();
+  });
+
+  it("leaves out an account with neither an actual nor a budget", () => {
+    expect(s.rows.some((r) => r.accountId === "misc")).toBe(false);
+  });
+});
+
+describe("equityStatement", () => {
+  const EQ_ACCOUNTS = indexAccounts([
+    acct("owner", "3000", "Owner's Equity", "equity"),
+    acct("sales", "4000", "Sales", "income"),
+    acct("rent", "6100", "Rent", "expense"),
+  ]);
+  const e = (id: string, debitBase: number, creditBase: number): LedgerBalance => {
+    const a = EQ_ACCOUNTS.get(id)!;
+    return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, debitBase, creditBase };
+  };
+  const soe = buildStatementOfEquity(
+    [e("owner", 0, 600_000), e("sales", 0, 300_000), e("rent", 100_000, 0)],
+    [e("owner", 0, 50_000), e("sales", 0, 400_000), e("rent", 150_000, 0)],
+  );
+  const s = equityStatement({ soe, from: "2026-01-01", to: "2026-06-30", accounts: EQ_ACCOUNTS });
+
+  it("carries the builder's lines and closes on its ending equity", () => {
+    expect(amounts(s, "opening")).toEqual([800_000]);
+    expect(amounts(s, "net-income")).toEqual([250_000]);
+    expect(amounts(s, "closing")).toEqual([soe.closingEquity]);
+    expect(row(s, "closing")?.kind).toBe("grand");
+  });
+
+  it("opens each line onto the entries behind it", () => {
+    expect(row(s, "opening")?.cells[0].zoom).toMatchObject({ from: null, to: "2025-12-31" });
+    expect(row(s, "closing")?.cells[0].zoom).toMatchObject({ from: null, to: "2026-06-30" });
+    expect(row(s, "net-income")?.cells[0].zoom?.accountIds).toEqual(["sales", "rent"]);
+  });
+});
+
+describe("statementSheet", () => {
+  const sheet = statementSheet(pair(), {
+    companyName: "Harbour Test Co",
+    currencyCode: "USD",
+    decimals: 2,
+    subtitle: "April 1, 2026 – June 30, 2026",
+    fileName: "Profit and Loss 2026-04-01 to 2026-06-30",
+  });
+
+  it("names its columns as the screen does, with the % and change columns", () => {
+    expect(sheet.columns.map((c) => c.header)).toEqual(["Account", "Q2 2026", "% of income", "Q1 2026", "% of income", "Change", "%"]);
+    expect(sheet.fileName).toBe("Profit-and-Loss-2026-04-01-to-2026-06-30");
+  });
+
+  it("writes the figures in the currency's units, indents accounts, and leaves out the spacers", () => {
+    const total = sheet.rows.find((r) => r.account === "Total Income");
+    expect(total).toMatchObject({ c0: 12_000, c1: 8_000, change: 4_000, changePct: 50 });
+    expect(sheet.rows.find((r) => String(r.account).trim() === "6210 Showroom Repairs")?.account).toBe("    6210 Showroom Repairs");
+    expect(sheet.rows.some((r) => r.account === "")).toBe(false);
   });
 });
