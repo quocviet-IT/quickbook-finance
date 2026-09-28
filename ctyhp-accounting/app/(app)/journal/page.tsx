@@ -25,6 +25,7 @@ export default async function JournalPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    canMarkAdjusting,
   ] = await Promise.all([
     listCurrencies(sb),
     listAccounts(sb),
@@ -32,6 +33,7 @@ export default async function JournalPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    hasPermission(sb, "journal.post"),
   ]);
   const base = currencies.find((c) => c.is_base);
   const postingAccounts = accounts.filter((a) => a.is_posting_account && a.status === "active");
@@ -48,6 +50,7 @@ export default async function JournalPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
+        canMarkAdjusting={canMarkAdjusting}
         scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>

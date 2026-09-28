@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.65",
+    date: "2026-09-28",
+    headline: "The Working Trial Balance: what the books said, what was adjusted and why, and what they say now.",
+    changes: [
+      {
+        kind: "added",
+        title: "Working Trial Balance",
+        detail:
+          "The trial balance in three column pairs — unadjusted, adjustments, adjusted — for any period, with every adjusting entry listed underneath with the reason for it. Earlier years' profit is carried on one retained-earnings line so all three pairs balance. Click an adjustment to see the whole entry. Save it as PDF, Excel or CSV.",
+        route: "/reports/working-trial-balance",
+      },
+      {
+        kind: "added",
+        title: "Mark an entry as an adjusting entry",
+        detail:
+          "Open an entry on the Journal screen and tick Adjusting entry, with a note saying why. Nothing is inferred from the date or the accounts: an entry is an adjustment because somebody said so. An entry in a closed period asks once before it changes, and every mark is recorded in the audit log. Marking changes no balance.",
+        route: "/journal",
+      },
+      {
+        kind: "changed",
+        title: "Depreciation counts as an adjusting entry",
+        detail:
+          "Every depreciation charge, including those already posted, is marked adjusting, so it appears in the middle column of the Working Trial Balance. The charge itself is unchanged.",
+        route: "/fixed-assets",
+      },
+    ],
+  },
+  {
     version: "1.64",
     date: "2026-09-28",
     headline: "The Exception Report and the Beancount Export, laid out as reports you can work from.",

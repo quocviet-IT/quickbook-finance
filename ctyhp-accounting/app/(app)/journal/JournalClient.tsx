@@ -9,6 +9,9 @@ import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
+import AdjustingEntryControl from "./AdjustingEntryControl";
+import type { ClosedPeriodAsk } from "@/lib/domain/adjusting-entries";
+import { shortDate } from "@/lib/domain/report-presets";
 
 interface Account {
   id: string;
@@ -27,6 +30,8 @@ interface Props {
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
+  /** May tick "Adjusting entry": the `journal.post` permission. */
+  canMarkAdjusting: boolean;
   scannerConfigured: boolean;
 }
 interface LineForm {
@@ -51,6 +56,7 @@ export default function JournalClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
+  canMarkAdjusting,
   scannerConfigured,
 }: Props) {
   const { message, modal } = App.useApp();
@@ -64,6 +70,12 @@ export default function JournalClient({
     initialEntryId ? [initialEntryId] : [],
   );
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
+  /** The prototype's closed-period question, waiting for an answer. */
+  const [closedAsk, setClosedAsk] = useState<{ ask: ClosedPeriodAsk; retry: () => Promise<void> } | null>(null);
+  /** Asked once, then remembered for the rest of the visit. */
+  const [unlocked, setUnlocked] = useState(false);
+  const setAdjusting = (id: string, mark: JournalEntrySummary["adjusting"]) =>
+    setEntries((list) => list.map((e) => (e.id === id ? { ...e, adjusting: mark } : e)));
 
   /**
    * How many entries match the dates on screen, and how many were read.
@@ -200,6 +212,45 @@ export default function JournalClient({
           }
         />
       )}
+      {closedAsk ? (
+        <Alert
+          type="warning"
+          showIcon
+          title={
+            <span>
+              <strong>{shortDate(closedAsk.ask.entryDate)} is in a closed period.</strong> The books are closed through{" "}
+              {shortDate(closedAsk.ask.closedThrough)}. Changing that entry will alter a period somebody has already
+              signed off.
+            </span>
+          }
+          action={
+            <Space wrap>
+              <Button
+                size="small"
+                danger
+                onClick={async () => {
+                  const pending = closedAsk;
+                  setUnlocked(true);
+                  setClosedAsk(null);
+                  await pending.retry();
+                }}
+              >
+                Unlock and change it
+              </Button>
+              <Button size="small" onClick={() => setClosedAsk(null)}>
+                Leave it alone
+              </Button>
+            </Space>
+          }
+        />
+      ) : unlocked ? (
+        <Alert
+          type="info"
+          showIcon
+          title="Closed periods are unlocked for this visit"
+          description="Adjusting marks on entries in a closed period can be changed until you leave this page. Each change is recorded in the audit log with the period marked closed."
+        />
+      ) : null}
       <Table<JournalEntrySummary>
         rowKey="id"
         loading={loading}
@@ -213,18 +264,28 @@ export default function JournalClient({
           expandedRowKeys,
           onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys].map(String)),
           expandedRowRender: (e) => (
-            <Table
-              size="small"
-              rowKey={(_, i) => String(i)}
-              pagination={false}
-              dataSource={e.lines}
-              columns={[
-                { title: "Account", render: (_, l) => `${l.accountCode} ${l.accountName}` },
-                { title: "Memo", dataIndex: "memo" },
-                { title: "Debit", align: "right", render: (_, l) => fmt(l.debitMinor) },
-                { title: "Credit", align: "right", render: (_, l) => fmt(l.creditMinor) },
-              ]}
-            />
+            <div>
+              <Table
+                size="small"
+                rowKey={(_, i) => String(i)}
+                pagination={false}
+                dataSource={e.lines}
+                columns={[
+                  { title: "Account", render: (_, l) => `${l.accountCode} ${l.accountName}` },
+                  { title: "Memo", dataIndex: "memo" },
+                  { title: "Debit", align: "right", render: (_, l) => fmt(l.debitMinor) },
+                  { title: "Credit", align: "right", render: (_, l) => fmt(l.creditMinor) },
+                ]}
+              />
+              <AdjustingEntryControl
+                key={`${e.id}:${e.adjusting ? "on" : "off"}`}
+                entry={e}
+                canEdit={canMarkAdjusting && e.status === "posted"}
+                unlocked={unlocked}
+                onChange={(mark) => setAdjusting(e.id, mark)}
+                onClosedPeriod={(ask, retry) => setClosedAsk({ ask, retry })}
+              />
+            </div>
           ),
         }}
         columns={[
@@ -254,8 +315,13 @@ export default function JournalClient({
           },
           {
             title: "Status",
-            width: 120,
-            render: (_, e) => (e.isReversed ? <Tag color="orange">reversed</Tag> : <Tag color="green">{e.status}</Tag>),
+            width: 170,
+            render: (_, e) => (
+              <Space size={4} wrap>
+                {e.isReversed ? <Tag color="orange">reversed</Tag> : <Tag color="green">{e.status}</Tag>}
+                {e.adjusting ? <Tag color="purple">adjusting</Tag> : null}
+              </Space>
+            ),
           },
           {
             title: "",
