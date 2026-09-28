@@ -87,6 +87,26 @@ function readCurrencies(sb: SupabaseClient): Promise<CurrencyRow[]> {
     sb.from("acc_currency").select("code,decimal_places,is_base").order("code").range(f, t));
 }
 
+function readAccountRows(sb: SupabaseClient): Promise<AccountRow[]> {
+  return readAll<AccountRow>("acc_account", (f, t) =>
+    sb.from("acc_account").select("id,account_code,name,account_type").order("account_code").range(f, t));
+}
+
+function toBeancountAccount(a: AccountRow): BeancountAccount {
+  return { id: a.id, code: a.account_code, name: a.name, type: a.account_type };
+}
+
+/**
+ * The whole chart, as the file names it.
+ *
+ * Exported for an entry's detail sheet, which shows the entry as Beancount and
+ * must name its accounts exactly as the file does — and a Beancount name can
+ * depend on the rest of the chart, when two codes clean up to the same text.
+ */
+export async function readBeancountAccounts(sb: SupabaseClient): Promise<BeancountAccount[]> {
+  return (await readAccountRows(sb)).map(toBeancountAccount);
+}
+
 /** Everything `buildBeancountFile` needs. Throws if any read fails. */
 export async function readBeancountInput(sb: SupabaseClient, generatedAt: string): Promise<BeancountInput> {
   const [
@@ -103,8 +123,7 @@ export async function readBeancountInput(sb: SupabaseClient, generatedAt: string
     currencies,
     company,
   ] = await Promise.all([
-    readAll<AccountRow>("acc_account", (f, t) =>
-      sb.from("acc_account").select("id,account_code,name,account_type").order("account_code").range(f, t)),
+    readAccountRows(sb),
     readAll<EntryRow>("acc_journal_entry", (f, t) =>
       sb
         .from("acc_journal_entry")
@@ -182,12 +201,7 @@ export async function readBeancountInput(sb: SupabaseClient, generatedAt: string
       accountingBasis: company.accounting_basis,
     },
     generatedAt,
-    accounts: accounts.map<BeancountAccount>((a) => ({
-      id: a.id,
-      code: a.account_code,
-      name: a.name,
-      type: a.account_type,
-    })),
+    accounts: accounts.map(toBeancountAccount),
     entries: entries.map<BeancountEntry>((e) => ({
       id: e.id,
       entryNumber: e.entry_number,

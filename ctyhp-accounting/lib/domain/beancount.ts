@@ -266,19 +266,108 @@ function trimRate(rate: string): string {
 }
 
 /**
- * The whole ledger as Beancount v3 text.
+ * One line of the file, with what a reader can open from it.
  *
- * Postings carry each entry's own currency: OneBook guarantees an entry balances
+ * The file is text, but a screen showing it wants more than text: an account
+ * name that opens its ledger, an entry that opens its detail. So the builder
+ * produces lines that say what they are and where their parts sit, and
+ * `buildBeancountFile` is simply those lines joined. There is one builder, so
+ * the file on screen and the file handed over cannot differ.
+ */
+export type BeancountTextLine =
+  | { kind: "comment" | "blank" | "option" | "price"; text: string }
+  | {
+      kind: "open";
+      text: string;
+      accountId: string;
+      /** Where the account name begins; it runs to the end of the line. */
+      accountStart: number;
+    }
+  | { kind: "txn" | "meta"; text: string; entryId: string }
+  | {
+      kind: "posting";
+      text: string;
+      entryId: string;
+      accountId: string;
+      /** The account name is `text.slice(2, accountEnd)`. */
+      accountEnd: number;
+      /** The amount, without its padding, is `text.slice(amountStart, amountEnd)`. */
+      amountStart: number;
+      amountEnd: number;
+      /** A credit posting — a negative amount in Beancount's signed form. */
+      credit: boolean;
+    };
+
+/** What writing one entry needs besides the entry itself. */
+export interface BeancountEntryContext {
+  names: ReadonlyMap<string, string>;
+  /** The width account names are padded to, so amounts line up down the file. */
+  nameWidth: number;
+  /** Decimal places of the entry's own currency. */
+  decimals: number;
+  party?: string;
+  document?: BeancountDocument;
+}
+
+/** Account names are padded to the longest, plus two spaces. */
+export function beancountNameWidth(names: ReadonlyMap<string, string>): number {
+  return Math.max(0, ...[...names.values()].map((n) => n.length)) + 2;
+}
+
+/**
+ * One entry: its header, its metadata, its postings.
+ *
+ * Postings carry the entry's own currency: OneBook guarantees an entry balances
  * in that currency, while its base-currency figures are rounded line by line and
  * can be out by a minor unit — which `bean-check` would reject.
  */
-export function buildBeancountFile(input: BeancountInput): string {
+export function beancountEntryLines(e: BeancountEntry, ctx: BeancountEntryContext): BeancountTextLine[] {
+  const out: BeancountTextLine[] = [];
+  let header = `${e.entryDate} *`;
+  if (ctx.party) header += ` ${quote(ctx.party)}`;
+  header += ` ${quote(e.description ?? "")} #${tagSafe(e.sourceType)}`;
+  for (const link of ctx.document?.links ?? []) header += ` ^${tagSafe(link)}`;
+  out.push({ kind: "txn", text: header, entryId: e.id });
+  out.push({ kind: "meta", text: `  entry: ${quote(e.entryNumber)}`, entryId: e.id });
+  if (ctx.document?.reference) out.push({ kind: "meta", text: `  num: ${quote(ctx.document.reference)}`, entryId: e.id });
+  if (ctx.document?.dueDate) out.push({ kind: "meta", text: `  due: ${ctx.document.dueDate}`, entryId: e.id });
+
+  for (const l of e.lines) {
+    const account = ctx.names.get(l.accountId);
+    if (!account) throw new BeancountError(`Entry ${e.entryNumber} posts to an account that is not in the chart`);
+    const signed = l.debitMinor - l.creditMinor;
+    const amount = formatAmount(signed, ctx.decimals);
+    const amountEnd = 2 + ctx.nameWidth + Math.max(16, amount.length);
+    out.push({
+      kind: "posting",
+      text: `  ${account.padEnd(ctx.nameWidth)}${amount.padStart(16)} ${e.currencyCode}`,
+      entryId: e.id,
+      accountId: l.accountId,
+      accountEnd: 2 + account.length,
+      amountStart: amountEnd - amount.length,
+      amountEnd,
+      credit: signed < 0,
+    });
+  }
+  return out;
+}
+
+/** One entry as Beancount text, exactly as it appears in the file. */
+export function beancountEntryText(e: BeancountEntry, ctx: BeancountEntryContext): string {
+  return beancountEntryLines(e, ctx)
+    .map((l) => l.text)
+    .join("\n");
+}
+
+/** The whole ledger as Beancount v3 lines. See `buildBeancountFile`. */
+export function buildBeancountLines(input: BeancountInput): BeancountTextLine[] {
   const base = input.currencies.find((c) => c.isBase);
   if (!base) throw new BeancountError("No base currency is set");
   const decimalsOf = new Map(input.currencies.map((c) => [c.code, c.decimalPlaces]));
 
   const names = accountNames(input.accounts);
-  const nameWidth = Math.max(0, ...[...names.values()].map((n) => n.length)) + 2;
+  const idByName = new Map([...names].map(([id, name]) => [name, id]));
+  const nameWidth = beancountNameWidth(names);
 
   const entries = [...input.entries].sort(
     (x, y) => x.entryDate.localeCompare(y.entryDate) || x.entryNumber.localeCompare(y.entryNumber),
@@ -287,29 +376,35 @@ export function buildBeancountFile(input: BeancountInput): string {
   // posting to it by construction.
   const openDate = entries[0]?.entryDate ?? input.generatedAt.slice(0, 10);
 
-  const out: string[] = [];
+  const out: BeancountTextLine[] = [];
+  const comment = (text: string) => out.push({ kind: "comment", text });
+  const blank = () => out.push({ kind: "blank", text: "" });
   const rule = `;; ${"=".repeat(58)}`;
-  out.push(
-    rule,
-    `;; ${oneLine(input.company.legalName)} - Beancount ledger`,
-    `;; Generated ${input.generatedAt.slice(0, 10)} | Beancount v3 format`,
-    rule,
-    "",
-    `option "title" ${quote(input.company.legalName)}`,
-    `option "operating_currency" ${quote(base.code)}`,
+
+  comment(rule);
+  comment(`;; ${oneLine(input.company.legalName)} - Beancount ledger`);
+  comment(`;; Generated ${input.generatedAt.slice(0, 10)} | Beancount v3 format`);
+  comment(rule);
+  blank();
+  out.push({ kind: "option", text: `option "title" ${quote(input.company.legalName)}` });
+  out.push({ kind: "option", text: `option "operating_currency" ${quote(base.code)}` });
+  comment(
     `;; Fiscal year starts: ${MONTHS[input.company.fiscalYearStartMonth - 1] ?? String(input.company.fiscalYearStartMonth)}`,
-    `;; Basis: ${input.company.accountingBasis}`,
-    "",
-    ";; --- Chart of accounts ---",
-    "",
   );
+  comment(`;; Basis: ${input.company.accountingBasis}`);
+  blank();
+  comment(";; --- Chart of accounts ---");
+  blank();
 
   for (const root of ROOTS) {
     const inRoot = [...names.values()].filter((n) => n.startsWith(`${root}:`)).sort();
     if (inRoot.length === 0) continue;
-    out.push(`;; ${root}`);
-    for (const n of inRoot) out.push(`${openDate} open ${n}`);
-    out.push("");
+    comment(`;; ${root}`);
+    for (const n of inRoot) {
+      const prefix = `${openDate} open `;
+      out.push({ kind: "open", text: `${prefix}${n}`, accountId: idByName.get(n) as string, accountStart: prefix.length });
+    }
+    blank();
   }
 
   const used = new Set(entries.map((e) => e.currencyCode));
@@ -317,48 +412,55 @@ export function buildBeancountFile(input: BeancountInput): string {
     .filter((p) => p.currencyCode !== base.code && used.has(p.currencyCode))
     .sort((x, y) => x.rateDate.localeCompare(y.rateDate) || x.currencyCode.localeCompare(y.currencyCode));
   if (prices.length > 0) {
-    out.push(";; --- Prices ---", "");
-    for (const p of prices) out.push(`${p.rateDate} price ${p.currencyCode} ${trimRate(p.rateToBase)} ${base.code}`);
-    out.push("");
+    comment(";; --- Prices ---");
+    blank();
+    for (const p of prices) {
+      out.push({ kind: "price", text: `${p.rateDate} price ${p.currencyCode} ${trimRate(p.rateToBase)} ${base.code}` });
+    }
+    blank();
   }
 
-  out.push(";; --- Transactions ---", "");
-  if (entries.length === 0) out.push("; No posted entries.", "");
+  comment(";; --- Transactions ---");
+  blank();
+  if (entries.length === 0) {
+    comment("; No posted entries.");
+    blank();
+  }
 
   let month = "";
   for (const e of entries) {
     const m = e.entryDate.slice(0, 7);
     if (m !== month) {
       month = m;
-      out.push(`;; ${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`, "");
+      comment(`;; ${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`);
+      blank();
     }
 
     const decimals = decimalsOf.get(e.currencyCode);
     if (decimals === undefined) {
       throw new BeancountError(`Entry ${e.entryNumber} is in ${e.currencyCode}, which has no currency record`);
     }
-
-    const party = input.partyByEntryId.get(e.id);
-    const doc = input.documentByEntryId.get(e.id);
-    let header = `${e.entryDate} *`;
-    if (party) header += ` ${quote(party)}`;
-    header += ` ${quote(e.description ?? "")} #${tagSafe(e.sourceType)}`;
-    for (const link of doc?.links ?? []) header += ` ^${tagSafe(link)}`;
-    out.push(header, `  entry: ${quote(e.entryNumber)}`);
-    if (doc?.reference) out.push(`  num: ${quote(doc.reference)}`);
-    if (doc?.dueDate) out.push(`  due: ${doc.dueDate}`);
-
-    for (const l of e.lines) {
-      const account = names.get(l.accountId);
-      if (!account) throw new BeancountError(`Entry ${e.entryNumber} posts to an account that is not in the chart`);
-      const amount = formatAmount(l.debitMinor - l.creditMinor, decimals);
-      out.push(`  ${account.padEnd(nameWidth)}${amount.padStart(16)} ${e.currencyCode}`);
-    }
-    out.push("");
+    out.push(
+      ...beancountEntryLines(e, {
+        names,
+        nameWidth,
+        decimals,
+        party: input.partyByEntryId.get(e.id),
+        document: input.documentByEntryId.get(e.id),
+      }),
+    );
+    blank();
   }
 
-  out.push(";; --- End of file ---");
-  return `${out.join("\n")}\n`;
+  comment(";; --- End of file ---");
+  return out;
+}
+
+/** The whole ledger as Beancount v3 text: `buildBeancountLines`, joined. */
+export function buildBeancountFile(input: BeancountInput): string {
+  return `${buildBeancountLines(input)
+    .map((l) => l.text)
+    .join("\n")}\n`;
 }
 
 /** `<company-slug>.beancount`, or `ledger.beancount` when the name yields no slug. */

@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   accountNames,
+  beancountEntryText,
   beancountFileName,
+  beancountNameWidth,
   buildBeancountFile,
+  buildBeancountLines,
   documentsByEntry,
   formatAmount,
   quote,
@@ -391,6 +394,83 @@ describe("buildBeancountFile", () => {
     }
     expect(sums).toHaveLength(3);
     for (const bucket of sums) for (const total of bucket.values()) expect(total).toBe(0);
+  });
+});
+
+describe("buildBeancountLines", () => {
+  const book = () =>
+    input({
+      entries: [
+        entry(),
+        entry({
+          id: "e2",
+          entryNumber: "JE-000002",
+          entryDate: "2025-02-03",
+          description: "Payment received",
+          sourceType: "payment",
+          lines: [
+            { accountId: "acc-bank", debitMinor: 120000, creditMinor: 0 },
+            { accountId: "acc-ar", debitMinor: 0, creditMinor: 120000 },
+          ],
+        }),
+      ],
+      partyByEntryId: new Map([["e1", "Harbor Cafe"]]),
+      documentByEntryId: new Map([["e1", { links: ["INV-000001"], reference: null, dueDate: "2025-02-14" }]]),
+    });
+
+  it("joins to exactly the file that is handed over", () => {
+    const lines = buildBeancountLines(book());
+    expect(`${lines.map((l) => l.text).join("\n")}\n`).toBe(buildBeancountFile(book()));
+  });
+
+  it("says which account each open line and posting belongs to, and where its name sits", () => {
+    const lines = buildBeancountLines(book());
+    const open = lines.find((l) => l.kind === "open" && l.accountId === "acc-sales");
+    expect(open && open.kind === "open" ? open.text.slice(open.accountStart) : null).toBe("Income:4000-Sales-Revenue");
+
+    const posting = lines.find((l) => l.kind === "posting" && l.entryId === "e1" && l.accountId === "acc-sales");
+    if (!posting || posting.kind !== "posting") throw new Error("no posting");
+    expect(posting.text.slice(2, posting.accountEnd)).toBe("Income:4000-Sales-Revenue");
+    expect(posting.text.slice(posting.amountStart, posting.amountEnd)).toBe("-1200.00");
+    expect(posting.credit).toBe(true);
+    expect(posting.text.slice(posting.amountEnd)).toBe(" USD");
+  });
+
+  it("marks a debit posting as not a credit", () => {
+    const lines = buildBeancountLines(book());
+    const debit = lines.find((l) => l.kind === "posting" && l.entryId === "e2" && l.accountId === "acc-bank");
+    if (!debit || debit.kind !== "posting") throw new Error("no posting");
+    expect(debit.text.slice(debit.amountStart, debit.amountEnd)).toBe("1200.00");
+    expect(debit.credit).toBe(false);
+  });
+
+  it("ties every header and metadata line to its entry", () => {
+    const lines = buildBeancountLines(book());
+    const header = lines.find((l) => l.kind === "txn" && l.entryId === "e1");
+    expect(header?.text).toBe('2025-01-15 * "Harbor Cafe" "Invoice INV-000001" #invoice ^INV-000001');
+    const meta = lines.filter((l) => l.kind === "meta" && l.entryId === "e1").map((l) => l.text);
+    expect(meta).toEqual(['  entry: "JE-000001"', "  due: 2025-02-14"]);
+  });
+});
+
+describe("beancountEntryText", () => {
+  it("writes one entry exactly as the file does", () => {
+    const b = input({
+      entries: [entry()],
+      partyByEntryId: new Map([["e1", "Harbor Cafe"]]),
+      documentByEntryId: new Map([["e1", { links: ["INV-000001"], reference: null, dueDate: "2025-02-14" }]]),
+    });
+    const names = accountNames(b.accounts);
+    const text = beancountEntryText(entry(), {
+      names,
+      nameWidth: beancountNameWidth(names),
+      decimals: 2,
+      party: "Harbor Cafe",
+      document: { links: ["INV-000001"], reference: null, dueDate: "2025-02-14" },
+    });
+    expect(buildBeancountFile(b)).toContain(`${text}\n`);
+    // Header, entry number, due date, two postings.
+    expect(text.split("\n")).toHaveLength(5);
   });
 });
 

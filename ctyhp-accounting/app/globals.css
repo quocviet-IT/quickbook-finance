@@ -115,6 +115,15 @@
   --ob-series-payable: #7c3aed;
   --ob-series-axis: #94a3b8;
   --ob-series-grid: #e2e8f0;
+  --ob-code-bg: #0f172a;
+  --ob-code-text: #e2e8f0;
+  --ob-code-comment: #94a3b8;
+  --ob-code-keyword: #60a5fa;
+  --ob-code-open: #5eead4;
+  --ob-code-entry: #fbbf24;
+  --ob-code-account: #c4b5fd;
+  --ob-code-debit: #a7f3d0;
+  --ob-code-credit: #f87171;
 }
 
 :root[data-theme="dark"] {
@@ -231,6 +240,15 @@
   --ob-series-payable: #c4b5fd;
   --ob-series-axis: #94a3b8;
   --ob-series-grid: #2a3854;
+  --ob-code-bg: #0a101c;
+  --ob-code-text: #e2e8f0;
+  --ob-code-comment: #94a3b8;
+  --ob-code-keyword: #60a5fa;
+  --ob-code-open: #5eead4;
+  --ob-code-entry: #fbbf24;
+  --ob-code-account: #c4b5fd;
+  --ob-code-debit: #a7f3d0;
+  --ob-code-credit: #f87171;
 }
 
 html,

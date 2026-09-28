@@ -117,3 +117,26 @@ export function csvWithReportIdentity(
   ];
   return `${preamble.join("\n")}\n${csv}`;
 }
+
+/**
+ * A sheet as CSV, with the report's identity above it: what "Save as CSV"
+ * hands over, from the same sheet the PDF and Excel buttons use.
+ *
+ * Money is written as a plain number in the currency's own decimals, without a
+ * symbol or thousands separators, so a spreadsheet reads it as a number.
+ */
+export function csvFromExportSheet(sheet: ReportExportSheet): string {
+  const cell = (value: string): string => (/[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+  const digits = new Intl.NumberFormat("en-US", { style: "currency", currency: sheet.currencyCode }).resolvedOptions()
+    .maximumFractionDigits ?? 2;
+  const value = (v: string | number | null | undefined, kind: ExportCellKind): string => {
+    if (v === null || v === undefined || v === "") return "";
+    if (typeof v === "number" && kind === "money") return v.toFixed(digits);
+    return typeof v === "number" ? String(v) : v;
+  };
+  const lines = [
+    sheet.columns.map((c) => cell(c.header)).join(","),
+    ...sheet.rows.map((r) => sheet.columns.map((c) => cell(value(r[c.key], c.kind ?? "text"))).join(",")),
+  ];
+  return csvWithReportIdentity(lines.join("\n"), sheet);
+}
