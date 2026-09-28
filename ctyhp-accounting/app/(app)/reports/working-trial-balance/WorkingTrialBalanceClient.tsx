@@ -202,7 +202,11 @@ export default function WorkingTrialBalanceClient({
         <StatRow
           items={[
             { label: "Accounts", value: r.accountCount.toLocaleString("en-US") },
-            { label: "Adjusting entries", value: r.adjustingEntryCount, danger: r.adjustingEntryCount > 0 },
+            {
+              label: "Adjusting entries",
+              value: r.adjustingEntryCount.toLocaleString("en-US"),
+              danger: r.adjustingEntryCount > 0,
+            },
             { label: "Adjusted total", value: money(r.totals.adjustedDebit) },
           ]}
         />

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountType } from "@/lib/domain/accounts";
 import { entryDisplayName } from "@/lib/domain/entry-detail";
+import { dayBefore } from "@/lib/domain/fiscal";
 import {
   buildWorkingTrialBalance,
   type AdjustingEntry,
@@ -40,12 +41,6 @@ type MarkRow = {
       | null;
   };
 };
-
-function dayBefore(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
 
 /** Posted entries dated in the range and marked adjusting, with their lines. Paged. */
 async function readAdjusting(sb: SupabaseClient, from: string, to: string): Promise<MarkRow[]> {

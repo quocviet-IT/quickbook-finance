@@ -57,20 +57,25 @@ export default function AdjustingEntryControl({
   const toggle = (next: boolean, confirmClosed: boolean): Promise<void> =>
     inTurn(async () => {
       setBusy(true);
-      const r = next
-        ? await markAdjustingAction({ entryId: entry.id, note: null, confirmClosed })
-        : await unmarkAdjustingAction({ entryId: entry.id, confirmClosed });
-      setBusy(false);
-      if (!r.ok || !r.data) {
-        message.error(r.error ?? "The entry could not be changed.");
-        return;
+      try {
+        const r = next
+          ? await markAdjustingAction({ entryId: entry.id, note: null, confirmClosed })
+          : await unmarkAdjustingAction({ entryId: entry.id, confirmClosed });
+        if (!r.ok || !r.data) {
+          message.error(r.error ?? "The entry could not be changed.");
+          return;
+        }
+        if (r.data.kind === "closed_period") {
+          onClosedPeriod(r.data.ask, () => toggle(next, true));
+          return;
+        }
+        setNote("");
+        onChange(next ? { note: null } : null);
+      } catch {
+        message.error("The change could not be saved. Check the connection and try again.");
+      } finally {
+        setBusy(false);
       }
-      if (r.data.kind === "closed_period") {
-        onClosedPeriod(r.data.ask, () => toggle(next, true));
-        return;
-      }
-      setNote("");
-      onChange(next ? { note: null } : null);
     });
 
   const saveNote = (): Promise<void> =>
@@ -78,13 +83,18 @@ export default function AdjustingEntryControl({
       const trimmed = note.trim();
       if (trimmed === (entry.adjusting?.note ?? "")) return;
       setBusy(true);
-      const r = await markAdjustingAction({ entryId: entry.id, note: trimmed || null, confirmClosed: unlocked });
-      setBusy(false);
-      if (!r.ok || !r.data || r.data.kind !== "done") {
-        message.error(r.error ?? "The note could not be saved.");
-        return;
+      try {
+        const r = await markAdjustingAction({ entryId: entry.id, note: trimmed || null, confirmClosed: unlocked });
+        if (!r.ok || !r.data || r.data.kind !== "done") {
+          message.error(r.error ?? "The note could not be saved.");
+          return;
+        }
+        onChange({ note: trimmed || null });
+      } catch {
+        message.error("The change could not be saved. Check the connection and try again.");
+      } finally {
+        setBusy(false);
       }
-      onChange({ note: trimmed || null });
     });
 
   return (
