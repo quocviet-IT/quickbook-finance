@@ -58,8 +58,9 @@ From top to bottom, following `renderReports`:
    - **Compare** (P&L, Balance Sheet, Trial Balance), the prototype's `COMPARE`
      list: No comparison · Previous period · Previous year · Column per year ·
      Column per quarter · Column per month.
-   - **% of income** (P&L only, shown when there is no comparison or one
-     comparison column), as today.
+   - **% of income** (P&L only), as today: on by default with no comparison or
+     one comparison column, off by default for a column per period, and once
+     the reader flips it their choice stands (`nextShowPercentOfIncome`).
    - **Run**.
    - Actions on the right: **Copy this report**, **CSV**, **PDF**, **Excel**,
      **Print**.
@@ -208,9 +209,9 @@ as the prototype does. "Operating Expenses" keeps OneBook's name.
   the prototype's statements do.
 
 The balance-sheet line types need each line's account type, which
-`ReportSection` lines do not carry. The builder therefore takes the column's
-`LedgerBalance[]` alongside the `BalanceSheet`, groups lines by type, and is
-tested to reproduce the builder's section totals exactly.
+`ReportSection` lines do not carry. The builder therefore looks each line's
+type up in the chart the page already passes for the tree, groups lines by
+type, and is tested to reproduce the builder's section totals exactly.
 
 **Trial Balance** — `trialBalanceStatement(tbs, columns)`, following
 `reportTB`: accounts ordered by account type then code; for each column a Debit
@@ -218,7 +219,9 @@ and a Credit cell; **Total** (grand); if debits and credits differ, a note
 "Debits and credits differ by <amount>".
 
 **Budget vs Actual** — `budgetStatement(bva)`, following `reportBudget`:
-columns Budget · Actual · Variance · %; the P&L's sections and totals; a
+columns Actual · Budget · Variance · % (OneBook's order, so the variance reads
+as the first column less the second, as every change column does); the P&L's
+sections and totals; a
 favourable variance in the success colour and an unfavourable one in the danger
 colour, favourable meaning above budget for income and below budget for costs.
 The budget editor drawer stays where it is.
