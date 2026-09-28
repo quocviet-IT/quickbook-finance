@@ -9,6 +9,13 @@ import {
   toControlledActionResponse,
   type ControlledActionResponse,
 } from "@/lib/services/approval-flow";
+import { hasPermission } from "@/lib/services/access";
+import {
+  markAdjustingSchema,
+  unmarkAdjustingSchema,
+  type AdjustingResult,
+} from "@/lib/domain/adjusting-entries";
+import { markAdjusting, unmarkAdjusting } from "@/lib/services/adjusting-entries";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
@@ -90,5 +97,49 @@ export async function listReversedAction(): Promise<ActionResult<ReversedEntryRo
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: await listReversedEntries(sb) };
+  } catch (err) { return { ok: false, error: msg(err) }; }
+}
+
+type Session = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/** The database checks this too; asking first gives a plain sentence instead of an error code. */
+async function adjustingGuard(sb: Session): Promise<string | null> {
+  return (await hasPermission(sb, "journal.post"))
+    ? null
+    : "Marking an adjusting entry needs the Post manual journals permission.";
+}
+
+function afterAdjusting(result: AdjustingResult) {
+  if (result.kind === "done") {
+    revalidatePath("/journal");
+    revalidatePath("/reports/working-trial-balance");
+  }
+}
+
+/** Mark an entry adjusting, or change its note. Moves the entry between two report columns; changes no figure. */
+export async function markAdjustingAction(raw: unknown): Promise<ActionResult<AdjustingResult>> {
+  const parsed = markAdjustingSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const denied = await adjustingGuard(sb);
+    if (denied) return { ok: false, error: denied };
+    const result = await markAdjusting(sb, parsed.data.entryId, parsed.data.note || null, parsed.data.confirmClosed);
+    afterAdjusting(result);
+    return { ok: true, data: result };
+  } catch (err) { return { ok: false, error: msg(err) }; }
+}
+
+/** Take the adjusting mark off an entry, and its note with it. */
+export async function unmarkAdjustingAction(raw: unknown): Promise<ActionResult<AdjustingResult>> {
+  const parsed = unmarkAdjustingSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const denied = await adjustingGuard(sb);
+    if (denied) return { ok: false, error: denied };
+    const result = await unmarkAdjusting(sb, parsed.data.entryId, parsed.data.confirmClosed);
+    afterAdjusting(result);
+    return { ok: true, data: result };
   } catch (err) { return { ok: false, error: msg(err) }; }
 }

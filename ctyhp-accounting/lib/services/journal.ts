@@ -33,6 +33,8 @@ export interface JournalEntrySummary {
   isReversed: boolean;
   reversalEntryId: string | null;
   isReversal: boolean;
+  /** Marked adjusting, with its reason; null when it is not. */
+  adjusting: { note: string | null } | null;
   lines: JournalEntryLineSummary[];
 }
 
@@ -115,6 +117,7 @@ type EntryRow = {
   source_type: string; source_id: string | null; status: string;
   acc_journal_line: { account_id: string; debit_minor: number; credit_minor: number; memo: string | null; line_order: number;
     acc_account: { account_code: string; name: string } | null }[];
+  acc_adjusting_entry: { note: string | null } | { note: string | null }[] | null;
 };
 
 /**
@@ -145,12 +148,22 @@ export async function countJournalEntries(
   return count ?? 0;
 }
 
+/**
+ * An entry's adjusting mark. The mark's key is the entry's id, so PostgREST
+ * embeds it as one object — or, in some versions, a one-element list.
+ */
+function markOf(v: EntryRow["acc_adjusting_entry"]): { note: string | null } | null {
+  const m = Array.isArray(v) ? v[0] : v;
+  return m ? { note: m.note ?? null } : null;
+}
+
 export async function listJournalEntries(sb: SupabaseClient, filters: JournalFilters): Promise<JournalEntrySummary[]> {
   let q = sb
     .from("acc_journal_entry")
     .select(
       "id,entry_number,entry_date,description,source_type,source_id,status," +
-        "acc_journal_line(account_id,debit_minor,credit_minor,memo,line_order,acc_account(account_code,name))",
+        "acc_journal_line(account_id,debit_minor,credit_minor,memo,line_order,acc_account(account_code,name))," +
+        "acc_adjusting_entry(note)",
     )
     .order("entry_date", { ascending: false })
     .order("entry_number", { ascending: false })
@@ -189,6 +202,7 @@ export async function listJournalEntries(sb: SupabaseClient, filters: JournalFil
       isReversed: reversedOf.has(e.id),
       reversalEntryId: reversedOf.get(e.id) ?? null,
       isReversal: reversalIds.has(e.id),
+      adjusting: markOf(e.acc_adjusting_entry),
       lines: [...e.acc_journal_line]
         .sort((a, b) => a.line_order - b.line_order)
         .map((l) => ({
