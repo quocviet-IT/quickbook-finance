@@ -185,7 +185,12 @@ export default function WorkingTrialBalanceClient({
     }),
     { title: "Debit", key: "debit", width: COLUMN.MONEY, align: "right", render: (_, r) => (r.debit ? money(r.debit) : "") },
     { title: "Credit", key: "credit", width: COLUMN.MONEY, align: "right", render: (_, r) => (r.credit ? money(r.credit) : "") },
-    flexColumn<AjeRow>({ title: "Why", key: "why", floor: 160, render: (_, r) => r.why ?? "" }),
+    {
+      ...flexColumn<AjeRow>({ title: "Why", key: "why", floor: 160, render: (_, r) => r.why ?? "" }),
+      // The reason is what a reviewer reads this list for, so it wraps rather
+      // than being cut to one line the way a name or an account is.
+      ellipsis: false,
+    },
   ];
 
   /* ---------------------------------------------------------- page */
