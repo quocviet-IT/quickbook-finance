@@ -3683,3 +3683,24 @@ body {
   margin-right: 12px;
   min-width: 0;
 }
+
+/* Printing a report prints the report (lib/client/print-report.ts): everything
+ * else on the page — navigation, toolbar, floating buttons — is hidden, and the
+ * report starts at the top of the sheet. */
+@media print {
+  body.print-report * {
+    visibility: hidden;
+  }
+
+  body.print-report .report-print-area,
+  body.print-report .report-print-area * {
+    visibility: visible;
+  }
+
+  body.print-report .report-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
