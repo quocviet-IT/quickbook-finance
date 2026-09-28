@@ -477,3 +477,23 @@
   padding: 1px 5px;
   border-radius: 3px;
 }
+
+/* ---------- a trial balance on paper ----------
+ * The total is a row of the table, as the prototype's `det-total` is, rather
+ * than a Table.Summary a screen would have to reach into Ant Design for. */
+.det :global(.ant-table-wrapper .ant-table-tbody) > tr.totalRow > td {
+  border-top: 1px solid var(--ob-border-muted);
+  border-bottom: 3px double var(--ob-border-muted);
+  font-weight: 700;
+}
+
+.det :global(.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell[colspan]) {
+  text-align: center;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--ob-text-secondary);
+  line-height: 1.7;
+}

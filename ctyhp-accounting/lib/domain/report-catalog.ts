@@ -128,6 +128,14 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "working-trial-balance",
+    title: "Working Trial Balance",
+    description:
+      "The trial balance in three column pairs — unadjusted, adjustments, adjusted — with every adjusting entry and the reason for it.",
+    href: "/reports/working-trial-balance",
+    group: "accounting",
+  },
+  {
     id: "exception-report",
     title: "Exception Report",
     description:
