@@ -145,6 +145,27 @@ describe("pointColumns (Balance Sheet, Trial Balance)", () => {
       ["2026", "2026-09-28"],
     ]);
   });
+
+  it("refuses Columns from after As of for month, quarter and years", () => {
+    expect(pointColumns("month", "2026-03-15", "2026-04-01", 1)).toEqual({
+      ok: false,
+      message: "Columns from is after As of.",
+    });
+    expect(pointColumns("quarter", "2026-03-15", "2026-04-01", 1)).toEqual({
+      ok: false,
+      message: "Columns from is after As of.",
+    });
+    expect(pointColumns("years", "2026-03-15", "2026-04-01", 1)).toEqual({
+      ok: false,
+      message: "Columns from is after As of.",
+    });
+  });
+
+  it("ignores Columns from for none, prev and year", () => {
+    expect(pointColumns("prev", "2026-03-15", "2026-04-01", 1).ok).toBe(true);
+    expect(pointColumns("year", "2026-03-15", "2026-04-01", 1).ok).toBe(true);
+    expect(pointColumns("none", "2026-03-15", "2026-04-01", 1).ok).toBe(true);
+  });
 });
 
 describe("helpers", () => {

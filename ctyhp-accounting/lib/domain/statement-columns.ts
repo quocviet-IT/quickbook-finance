@@ -95,6 +95,13 @@ export function rangeLabel(from: string, to: string): string {
 const monthName = (date: string) => `${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
 const quarterName = (date: string) => `Q${Math.floor((Number(date.slice(5, 7)) - 1) / 3) + 1} ${date.slice(0, 4)}`;
 
+function fiscalYearLimitMessage(split: readonly RangeColumn[]): string | null {
+  if (split.length > MAX_TREND_COLUMNS) {
+    return `That range is ${split.length} fiscal years. Narrow the range.`;
+  }
+  return null;
+}
+
 /** A range column, with its dates in small text under a heading that names a period instead. */
 function rangeColumn(key: string, from: string, to: string, label = rangeLabel(from, to)): StatementColumnSpec {
   const dates = `${shortDate(from)} – ${shortDate(to)}`;
@@ -133,9 +140,8 @@ export function rangeColumns(mode: CompareMode, from: string, to: string, fiscal
     }
     case "years": {
       const split = fiscalYearColumns(from, to, fiscalStartMonth);
-      if (split.length > MAX_TREND_COLUMNS) {
-        return { ok: false, message: `That range is ${split.length} fiscal years. Narrow the range.` };
-      }
+      const message = fiscalYearLimitMessage(split);
+      if (message) return { ok: false, message };
       return perPeriod(split, from, to, (c) => c.label);
     }
   }
@@ -159,6 +165,9 @@ export function pointColumns(
   columnsFrom: string,
   fiscalStartMonth: number,
 ): ColumnPlan {
+  if (["month", "quarter", "years"].includes(mode) && columnsFrom > asOf) {
+    return { ok: false, message: "Columns from is after As of." };
+  }
   const current = pointColumn("current", asOf);
   switch (mode) {
     case "none":
@@ -169,7 +178,6 @@ export function pointColumns(
       return { ok: true, columns: [current, pointColumn("prior", sameDayLastYear(asOf))], change: true };
     case "month":
     case "quarter": {
-      if (columnsFrom > asOf) return { ok: false, message: "Columns from is after As of." };
       const message = trendColumnLimitMessage(mode, columnsFrom, asOf);
       if (message) return { ok: false, message };
       const split = mode === "month" ? monthlyColumns(columnsFrom, asOf) : quarterlyColumns(columnsFrom, asOf);
@@ -177,11 +185,9 @@ export function pointColumns(
       return { ok: true, columns: split.map((c, i) => pointColumn(`p${i}`, c.to, name(c.to))), change: false };
     }
     case "years": {
-      if (columnsFrom > asOf) return { ok: false, message: "Columns from is after As of." };
       const split = fiscalYearColumns(columnsFrom, asOf, fiscalStartMonth);
-      if (split.length > MAX_TREND_COLUMNS) {
-        return { ok: false, message: `That range is ${split.length} fiscal years. Narrow the range.` };
-      }
+      const message = fiscalYearLimitMessage(split);
+      if (message) return { ok: false, message };
       return {
         ok: true,
         columns: split.map((c, i) => pointColumn(`p${i}`, c.to, fiscalYearLabel(c.to, fiscalStartMonth))),
