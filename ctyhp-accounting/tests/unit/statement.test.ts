@@ -137,6 +137,55 @@ describe("pnlStatement", () => {
     expect(single([]).empty).toBe(true);
     expect(single(CURRENT).empty).toBe(false);
   });
+
+  it("keeps the row of an expense account that names itself as its own parent", () => {
+    const SELF_ACCOUNTS = indexAccounts([acct("loop", "6300", "Self-Parented Expense", "expense", "loop")]);
+    const balSelf = (id: string, debitBase: number, creditBase: number): LedgerBalance => {
+      const a = SELF_ACCOUNTS.get(id)!;
+      return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, debitBase, creditBase };
+    };
+    const pnl = buildProfitAndLoss([balSelf("loop", 7_000, 0)]);
+    const s = pnlStatement({ columns: [Q2], pnls: [pnl], accounts: SELF_ACCOUNTS, showPercent: false, change: false });
+    expect(row(s, "opex:a:loop")?.depth).toBe(1);
+    expect(amounts(s, "opex:a:loop")).toEqual([7_000]);
+    expect(amounts(s, "opex:total")).toEqual([7_000]);
+  });
+
+  it("keeps both rows of two expense accounts that name each other as parent, nested under one Total", () => {
+    const LOOP2_ACCOUNTS = indexAccounts([
+      acct("expA", "6300", "Expense A", "expense", "expB"),
+      acct("expB", "6400", "Expense B", "expense", "expA"),
+    ]);
+    const balLoop2 = (id: string, debitBase: number, creditBase: number): LedgerBalance => {
+      const a = LOOP2_ACCOUNTS.get(id)!;
+      return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, debitBase, creditBase };
+    };
+    const pnl = buildProfitAndLoss([balLoop2("expA", 4_000, 0), balLoop2("expB", 6_000, 0)]);
+    const s = pnlStatement({ columns: [Q2], pnls: [pnl], accounts: LOOP2_ACCOUNTS, showPercent: false, change: false });
+    expect(row(s, "opex:a:expB")?.depth).toBe(1);
+    expect(row(s, "opex:a:expA")?.depth).toBe(2);
+    expect(amounts(s, "opex:a:expB")).toEqual([6_000]);
+    expect(amounts(s, "opex:a:expA")).toEqual([4_000]);
+    expect(row(s, "opex:t:expB")?.kind).toBe("subtotal");
+    expect(amounts(s, "opex:t:expB")).toEqual([10_000]);
+    expect(amounts(s, "opex:total")).toEqual([pnl.operatingExpenses.total]);
+  });
+
+  it("puts an expense account at the top when its parent is outside Operating Expenses, with no subtotal", () => {
+    const CROSS_ACCOUNTS = indexAccounts([
+      acct("inc", "4000", "Income", "income"),
+      acct("exp", "6100", "Expense Under Income", "expense", "inc"),
+    ]);
+    const balCross = (id: string, debitBase: number, creditBase: number): LedgerBalance => {
+      const a = CROSS_ACCOUNTS.get(id)!;
+      return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, debitBase, creditBase };
+    };
+    const pnl = buildProfitAndLoss([balCross("exp", 5_000, 0)]);
+    const s = pnlStatement({ columns: [Q2], pnls: [pnl], accounts: CROSS_ACCOUNTS, showPercent: false, change: false });
+    expect(row(s, "opex:a:exp")?.depth).toBe(1);
+    expect(amounts(s, "opex:a:exp")).toEqual([5_000]);
+    expect(s.rows.some((r) => r.key.startsWith("opex:t:"))).toBe(false);
+  });
 });
 
 describe("statement module", () => {

@@ -225,8 +225,9 @@ function forest(leaves: readonly Leaf[], ctx: Ctx, inSection: (a: AccountRef) =>
     const node: TreeNode = { key: id, accountId: id, code: account.code, label: labelOf(account.code, account.name), own: null, children: [] };
     nodes.set(id, node);
     const parent = account.parentId ? ctx.accounts.get(account.parentId) : undefined;
-    if (parent && inSection(parent) && !trail.has(parent.id)) {
-      nodeFor(parent.id, new Set([...trail, id])).children.push(node);
+    const here = new Set([...trail, id]);
+    if (parent && inSection(parent) && !here.has(parent.id)) {
+      nodeFor(parent.id, here).children.push(node);
     } else {
       roots.push(node);
     }
