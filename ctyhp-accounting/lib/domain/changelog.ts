@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.64",
+    date: "2026-09-28",
+    headline: "The Exception Report and the Beancount Export, laid out as reports you can work from.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Entries recorded more than once no longer groups different payers together",
+        detail:
+          "A bank line has no customer or vendor, so the check used to treat every bank line as having the same name — two transfers of the same amount on the same day, from two different people, were listed as one payment recorded twice. The check now compares the name the report shows: the customer or vendor, or else the bank's own description. Fewer lines are flagged, and the ones that are really do look alike.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "changed",
+        title: "The Exception Report reads like a report",
+        detail:
+          "Pick a period — This month, This quarter, This year, the last three or five years, All dates or your own dates — and the report is headed with the company, the dates and the basis. Each check says what it found and why it matters. Look-alike entries are grouped with a count, every entry shows its type and number, and a bank line shows the bank's description instead of a dash. Save it as PDF, Excel or CSV.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "Click a line to see the whole transaction",
+        detail:
+          "A side sheet opens with the document and its lines, the double entry, the payments that settled it or the invoices it paid, and the entry as it appears in the Beancount file — without leaving the report. Account names open that account's General Ledger in a new tab.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "changed",
+        title: "The Beancount Export shows the file it hands over",
+        detail:
+          "The whole ledger file is on the page, with account names that open their ledger and amounts that open their entry. Copy puts the file on the clipboard and Save file downloads it; both need the Export company data permission and both are recorded in the audit log.",
+        route: "/reports/beancount",
+      },
+    ],
+  },
+  {
     version: "1.63",
     date: "2026-09-26",
     headline: "The whole ledger as a Beancount file.",

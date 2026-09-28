@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { csvFromExportSheet } from "@/lib/domain/report-export";
 import {
   buildExceptionReport,
+  exceptionReportSheet,
   duplicateCheckNumbers,
   duplicateEntries,
   futureDatedEntries,
@@ -266,7 +268,15 @@ describe("yearTotalsFromMonthly", () => {
 describe("yearsWithIncomeAndNoCost", () => {
   it("flags a year with revenue and nothing spent against it", () => {
     const rows = yearsWithIncomeAndNoCost([{ year: "2024", incomeMinor: 500_000_00, costMinor: 0 }]);
-    expect(rows).toEqual([{ year: "2024", incomeMinor: 500_000_00, costMinor: 0 }]);
+    expect(rows).toEqual([{ year: "2024", incomeMinor: 500_000_00, costMinor: 0, entryCount: null }]);
+  });
+
+  it("says how many entries the flagged year has, when that was counted", () => {
+    const rows = yearsWithIncomeAndNoCost(
+      [{ year: "2024", incomeMinor: 500_000_00, costMinor: 0 }],
+      new Map([["2024", 37]]),
+    );
+    expect(rows[0].entryCount).toBe(37);
   });
 
   it("does not flag a year with even one cost in it", () => {
@@ -336,6 +346,27 @@ describe("duplicateEntries", () => {
       [txn({ partyName: null }), txn({ entryId: "t2", partyName: null })],
       noRefs,
     );
+    expect(groups).toHaveLength(1);
+  });
+
+  it("names a bank line by its description, so two payers on one day are not one payment", () => {
+    // A bank line has no customer or vendor; the bank's text is who paid. The
+    // prototype keys on that payee, and so must this — otherwise every
+    // same-amount transfer on a day is called a duplicate of the others.
+    const bank = { sourceType: "bank", partyName: null, amountMinor: 1_00 };
+    const groups = duplicateEntries(
+      [
+        txn({ ...bank, description: "Zelle payment from ALICE EXAMPLE 1001" }),
+        txn({ ...bank, entryId: "t2", description: "Zelle payment from BOB SAMPLE 2002" }),
+      ],
+      noRefs,
+    );
+    expect(groups).toEqual([]);
+  });
+
+  it("still groups a bank line that arrived twice with the same description", () => {
+    const bank = { sourceType: "bank", partyName: null, description: "Zelle payment from ALICE EXAMPLE 1001" };
+    const groups = duplicateEntries([txn(bank), txn({ ...bank, entryId: "t2" })], noRefs);
     expect(groups).toHaveLength(1);
   });
 
@@ -516,6 +547,68 @@ describe("buildExceptionReport", () => {
       }),
     );
     expect(report.duplicates).toEqual([]);
+  });
+});
+
+describe("exceptionReportSheet", () => {
+  const meta = { companyName: "Riverbend Trading LLC", currencyCode: "USD", decimals: 2, from: "2026-01-01", to: "2026-09-26" };
+
+  it("keeps every check, saying which found nothing and which could not run", () => {
+    const report = buildExceptionReport(emptyInput({ unavailable: ["incomeNoCost"] }));
+    const sheet = exceptionReportSheet(report, meta);
+    expect(sheet.rows).toHaveLength(8);
+    const byCheck = new Map(sheet.rows.map((r) => [r.check, r.name]));
+    expect(byCheck.get("A year with income and no costs")).toBe("Could not run");
+    expect(byCheck.get("Entries dated in the future")).toBe("Nothing found");
+  });
+
+  it("names a bank line by its description when it has no customer or vendor", () => {
+    const a = txn({ entryId: "a", partyName: null, description: "ZELLE FROM HARBOR CAFE", sourceType: "bank" });
+    const b = txn({ entryId: "b", entryNumber: "JE-000002", partyName: null, description: "ZELLE FROM HARBOR CAFE", sourceType: "bank" });
+    const report = buildExceptionReport(emptyInput({ entriesInRange: [a, b] }));
+    const rows = exceptionReportSheet(report, meta).rows.filter((r) => r.check === "Entries recorded more than once");
+    expect(rows.map((r) => [r.type, r.name, r.amount])).toEqual([
+      ["Bank JE-000001", "ZELLE FROM HARBOR CAFE", -4500],
+      ["Bank JE-000002", "ZELLE FROM HARBOR CAFE", -4500],
+    ]);
+  });
+
+  it("titles the sheet with the report's range and basis", () => {
+    const sheet = exceptionReportSheet(buildExceptionReport(emptyInput()), meta);
+    expect(sheet.title).toBe("Exception Report");
+    expect(sheet.subtitle).toBe("January 1, 2026 – September 26, 2026 · Accrual basis");
+    expect(sheet.fileName).toBe("exception-report-2026-01-01-to-2026-09-26");
+  });
+});
+
+describe("csvFromExportSheet", () => {
+  it("writes money as a plain number and quotes a value holding a comma", () => {
+    const csv = csvFromExportSheet({
+      fileName: "x",
+      companyName: "Cascade Precious Metals, Inc.",
+      title: "Exception Report",
+      subtitle: "January 1, 2026 – September 26, 2026",
+      currencyCode: "USD",
+      columns: [
+        { key: "name", header: "Name" },
+        { key: "amount", header: "Amount", kind: "money" },
+      ],
+      rows: [
+        { name: "Harbor Cafe, Inc.", amount: -1234.5 },
+        { name: "Nothing found", amount: null },
+      ],
+    });
+    expect(csv.split("\n")).toEqual([
+      '"Cascade Precious Metals, Inc."',
+      "Exception Report",
+      // The range has commas in it, so it is quoted like any other value.
+      '"January 1, 2026 – September 26, 2026"',
+      "Currency: USD",
+      "",
+      "Name,Amount",
+      '"Harbor Cafe, Inc.",-1234.50',
+      "Nothing found,",
+    ]);
   });
 });
 

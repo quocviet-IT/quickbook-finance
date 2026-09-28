@@ -225,6 +225,27 @@ export const TOKENS = {
     axis: PALETTE.slate400,
     grid: PALETTE.slate200,
   },
+  /**
+   * A ledger file shown as text: the Beancount view and the "As Beancount"
+   * block in an entry's detail.
+   *
+   * The block is dark in both themes, like the client's prototype it follows,
+   * so everything written on it is its own token rather than a borrowed one.
+   * Borrowing is how this app has gone wrong before: a colour chosen to be
+   * read on a light card, reused on a dark block, and unreadable there. Every
+   * text colour below is checked against `code.bg` in TEXT_ON_SURFACE_PAIRS.
+   */
+  code: {
+    bg: PALETTE.slate900,
+    text: PALETTE.mist200,
+    comment: PALETTE.mist400,
+    keyword: PALETTE.blue400,
+    open: PALETTE.teal300,
+    entry: PALETTE.amber400,
+    account: PALETTE.violet400,
+    debit: PALETTE.green200,
+    credit: PALETTE.red400,
+  },
 } as const;
 
 /**
@@ -389,6 +410,18 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     axis: PALETTE.mist400,
     grid: PALETTE.ink600,
   },
+  // Dark in both themes; only the ground moves, to sit below a dark card.
+  code: {
+    bg: PALETTE.ink950,
+    text: PALETTE.mist200,
+    comment: PALETTE.mist400,
+    keyword: PALETTE.blue400,
+    open: PALETTE.teal300,
+    entry: PALETTE.amber400,
+    account: PALETTE.violet400,
+    debit: PALETTE.green200,
+    credit: PALETTE.red400,
+  },
 };
 
 export type Tokens = typeof TOKENS;
@@ -481,6 +514,15 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["chrome.menuItem", "surface.sider"],
   ["chrome.textAccent", "surface.sider"],
   ["chrome.text", "surface.sider"],
+  /** A ledger file as text. Every colour it is written in, on its own ground. */
+  ["code.text", "code.bg"],
+  ["code.comment", "code.bg"],
+  ["code.keyword", "code.bg"],
+  ["code.open", "code.bg"],
+  ["code.entry", "code.bg"],
+  ["code.account", "code.bg"],
+  ["code.debit", "code.bg"],
+  ["code.credit", "code.bg"],
 ];
 
 /**

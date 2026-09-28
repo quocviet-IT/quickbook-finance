@@ -1,7 +1,7 @@
 "use server";
 import { createHash } from "node:crypto";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { beancountFileName, buildBeancountFile } from "@/lib/domain/beancount";
+import { beancountFileName, buildBeancountFile, buildBeancountLines, type BeancountTextLine } from "@/lib/domain/beancount";
 import { BEANCOUNT_SOURCES, readBeancountInput } from "@/lib/services/beancount";
 import { readSchemaVersion } from "@/lib/services/company-export";
 
@@ -17,6 +17,44 @@ export interface BeancountExportResult {
   entryCount: number;
 }
 
+export interface BeancountPreviewResult {
+  fileName: string;
+  lines: BeancountTextLine[];
+}
+
+type Session = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/** Signed in and allowed to export company data, or the reason not. */
+async function exportAllowed(sb: Session): Promise<string | null> {
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return "Your session has expired. Sign in again.";
+  const { data: allowed, error } = await sb.rpc("acc_has_permission", { p_key: "company.export" });
+  if (error || allowed !== true) return "Seeing or saving the ledger file needs the Export company data permission.";
+  return null;
+}
+
+/**
+ * The file, line by line, for the page to show.
+ *
+ * Showing the ledger is not handing it over, so this writes no audit row — the
+ * same entries are on the Journal screen. Copy and Save file are the hand-over,
+ * and they go through `beancountExportAction`, which records each one. The
+ * permission is the export's own all the same: this is the file.
+ */
+export async function beancountPreviewAction(): Promise<ActionResult<BeancountPreviewResult>> {
+  const sb = await createSupabaseServerClient();
+  const refused = await exportAllowed(sb);
+  if (refused) return { ok: false, error: refused };
+  try {
+    const input = await readBeancountInput(sb, new Date().toISOString());
+    return { ok: true, data: { fileName: beancountFileName(input.company.legalName), lines: buildBeancountLines(input) } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "An unexpected error occurred" };
+  }
+}
+
 /**
  * The whole ledger as a Beancount file.
  *
@@ -27,17 +65,8 @@ export interface BeancountExportResult {
  */
 export async function beancountExportAction(): Promise<ActionResult<BeancountExportResult>> {
   const sb = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  if (!user) return { ok: false, error: "Your session has expired. Sign in again." };
-
-  const { data: allowed, error: permissionError } = await sb.rpc("acc_has_permission", {
-    p_key: "company.export",
-  });
-  if (permissionError || allowed !== true) {
-    return { ok: false, error: "You do not have permission to export company data" };
-  }
+  const refused = await exportAllowed(sb);
+  if (refused) return { ok: false, error: refused };
 
   try {
     const generatedAt = new Date().toISOString();

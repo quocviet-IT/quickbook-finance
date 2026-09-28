@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildExceptionReport,
   yearTotalsFromMonthly,
+  yearsWithIncomeAndNoCost,
   UNDEPOSITED_CODE,
   UNDEPOSITED_NAME,
   type CheckKey,
@@ -98,17 +99,61 @@ async function lastReconciledByBankAccount(
   }
 }
 
-/** The earliest posted entry, which is where the per-year check has to start. */
-async function earliestEntryDate(sb: SupabaseClient): Promise<string | null> {
+/** The earliest or latest posted entry's date. */
+async function edgeEntryDate(sb: SupabaseClient, ascending: boolean): Promise<string | null> {
   const { data, error } = await sb
     .from("acc_journal_entry")
     .select("entry_date")
     .eq("status", "posted")
-    .order("entry_date", { ascending: true })
+    .order("entry_date", { ascending })
     .limit(1);
   if (error) throw new ExceptionsError(error.message);
   const rows = (data ?? []) as { entry_date: string }[];
-  return rows.length > 0 ? rows[0].entry_date : null;
+  return rows.length > 0 ? String(rows[0].entry_date).slice(0, 10) : null;
+}
+
+/** The earliest posted entry, which is where the per-year check has to start. */
+function earliestEntryDate(sb: SupabaseClient): Promise<string | null> {
+  return edgeEntryDate(sb, true);
+}
+
+/**
+ * The first and last posted entry, which the period picker needs: "All dates"
+ * runs between them, and "Last 3 years" counts back from the last.
+ */
+export async function postedEntryDateSpan(
+  sb: SupabaseClient,
+): Promise<{ first: string | null; last: string | null }> {
+  const [first, last] = await Promise.all([edgeEntryDate(sb, true), edgeEntryDate(sb, false)]);
+  return { first, last };
+}
+
+/**
+ * Posted entries in each of the given calendar years, up to `to`.
+ *
+ * Only the years the income check flags are counted — usually none, rarely
+ * more than two — so this costs a head count per flagged year and nothing when
+ * the books are in order.
+ */
+async function entriesPerYear(
+  sb: SupabaseClient,
+  years: readonly string[],
+  to: string,
+): Promise<Map<string, number>> {
+  const counts = await Promise.all(
+    years.map(async (year) => {
+      const end = `${year}-12-31` < to ? `${year}-12-31` : to;
+      const { count, error } = await sb
+        .from("acc_journal_entry")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "posted")
+        .gte("entry_date", `${year}-01-01`)
+        .lte("entry_date", end);
+      if (error) throw new ExceptionsError(error.message);
+      return [year, count ?? 0] as const;
+    }),
+  );
+  return new Map(counts);
 }
 
 const named = (v: unknown): string => (v as { name?: string } | null)?.name ?? "";
@@ -319,6 +364,17 @@ export async function getExceptionReport(
     ),
   ]);
 
+  const yearTotals = yearTotalsFromMonthly(byMonth);
+  // A detail of the income check, like the undeposited detail above: if the
+  // count cannot be read the check still stands, with its count left unknown.
+  const entryCountByYear = await readOr(unavailable, [], new Map<string, number>(), () =>
+    entriesPerYear(
+      sb,
+      yearsWithIncomeAndNoCost(yearTotals).map((y) => y.year),
+      to,
+    ),
+  );
+
   const bankAccounts: ExceptionBankAccount[] = banks.map((b) => ({
     bankAccountId: b.id,
     accountId: b.account_id,
@@ -332,7 +388,8 @@ export async function getExceptionReport(
     accounts,
     undepositedDetails: details,
     bankAccounts,
-    yearTotals: yearTotalsFromMonthly(byMonth),
+    yearTotals,
+    entryCountByYear,
     entriesInRange,
     entriesAfterToday,
     paymentReferences: refs,

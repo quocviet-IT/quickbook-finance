@@ -13,7 +13,11 @@
  * Money is integer minor units, base currency, throughout.
  */
 
-import { naturalBalance, type AccountType } from "@/lib/domain/accounts";
+import { ACCOUNT_TYPE_LABEL, naturalBalance, type AccountType } from "@/lib/domain/accounts";
+import { entryDisplayName, sourceLabel } from "@/lib/domain/entry-detail";
+import { fromMinor } from "@/lib/domain/money";
+import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
+import { rangeText } from "@/lib/domain/report-presets";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
 
@@ -299,16 +303,30 @@ export interface IncomeNoCostRow {
   year: string;
   incomeMinor: number;
   costMinor: number;
+  /**
+   * Posted entries dated in the year, as the prototype shows beside it — a year
+   * of income with three entries and a year with three hundred are different
+   * questions. Null when the count could not be read; the check still stands.
+   */
+  entryCount: number | null;
 }
 
 /**
  * Revenue with nothing spent against it almost always means the period is only
  * part-entered. The profit shown for that year is not a profit.
  */
-export function yearsWithIncomeAndNoCost(years: readonly YearTotals[]): IncomeNoCostRow[] {
+export function yearsWithIncomeAndNoCost(
+  years: readonly YearTotals[],
+  entryCountByYear: ReadonlyMap<string, number> = new Map(),
+): IncomeNoCostRow[] {
   return years
     .filter((y) => y.incomeMinor > 0 && y.costMinor === 0)
-    .map((y) => ({ year: y.year, incomeMinor: y.incomeMinor, costMinor: y.costMinor }));
+    .map((y) => ({
+      year: y.year,
+      incomeMinor: y.incomeMinor,
+      costMinor: y.costMinor,
+      entryCount: entryCountByYear.get(y.year) ?? null,
+    }));
 }
 
 export interface DuplicateGroup {
@@ -324,6 +342,12 @@ export interface DuplicateGroup {
  * never `entry_number`, which is unique by definition and would stop this check
  * ever firing.
  *
+ * The name is the one the report shows: the customer or vendor, or else the
+ * entry's description. A bank line has no customer or vendor, and its
+ * description is the bank's own text of who paid — the prototype's payee. Keyed
+ * on the party alone, every same-amount transfer on one day, from different
+ * people, came out as one payment recorded several times.
+ *
  * Repeated wages on one day are normal when several people are paid the same;
  * the same supplier paid twice usually is not.
  *
@@ -338,7 +362,7 @@ export function duplicateEntries(
   for (const r of rows) {
     const key = JSON.stringify([
       r.entryDate,
-      r.partyName ?? "",
+      entryDisplayName(r),
       referenceByEntryId.get(r.entryId) ?? "",
       [...r.accountIds].sort(),
       r.amountMinor,
@@ -417,6 +441,8 @@ export interface ExceptionReportInput {
   undepositedDetails: ReadonlyMap<string, UndepositedDetail>;
   bankAccounts: readonly ExceptionBankAccount[];
   yearTotals: readonly YearTotals[];
+  /** Posted entries per calendar year, for the years the income check flags. */
+  entryCountByYear?: ReadonlyMap<string, number>;
   entriesInRange: readonly TransactionListRow[];
   entriesAfterToday: readonly TransactionListRow[];
   paymentReferences: readonly ExceptionPaymentRef[];
@@ -479,7 +505,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const checkNumberClashes = duplicateCheckNumbers(input.paymentReferences);
   const undeposited = undepositedFunds(input.accounts, input.undepositedDetails);
   const wrongWay = wrongWayBalances(input.accounts);
-  const incomeNoCost = yearsWithIncomeAndNoCost(input.yearTotals);
+  const incomeNoCost = yearsWithIncomeAndNoCost(input.yearTotals, input.entryCountByYear);
   const unreconciled = unreconciledBankAccounts(input.bankAccounts, balanceByAccountId, input.to);
   const futureDated = futureDatedEntries(input.entriesAfterToday, input.today);
   const holding = holdingAccounts(input.accounts);
@@ -505,5 +531,136 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     unreconciled,
     futureDated,
     holding,
+  };
+}
+
+/* ---------------------------------------------------------------- export */
+
+export interface ExceptionSheetMeta {
+  companyName: string;
+  currencyCode: string;
+  decimals: number;
+  from: string;
+  to: string;
+}
+
+type SheetRow = ReportExportSheet["rows"][number];
+
+/**
+ * The report as one table, for PDF, Excel and CSV.
+ *
+ * Every check appears, including the ones with nothing to say. A printed
+ * Exception Report is the record that somebody looked, so "Nothing found" and
+ * "Could not run" are rows of it — and they must stay two different rows,
+ * because the second one means the books still need a look.
+ */
+export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionSheetMeta): ReportExportSheet {
+  const money = (minor: number) => fromMinor(minor, meta.decimals);
+  const rows: SheetRow[] = [];
+  const entryRow = (check: CheckKey, e: TransactionListRow): SheetRow => ({
+    check: CHECK_LABEL[check],
+    date: e.entryDate,
+    type: `${sourceLabel(e.sourceType)} ${e.entryNumber}`,
+    name: entryDisplayName(e),
+    account: e.categoryLabel ?? "",
+    amount: money(e.amountMinor),
+  });
+
+  const add = (check: CheckKey, found: SheetRow[]) => {
+    if (report.unavailable.includes(check)) {
+      rows.push({ check: CHECK_LABEL[check], date: "", type: "", name: "Could not run", account: "", amount: null });
+    } else if (found.length === 0) {
+      rows.push({ check: CHECK_LABEL[check], date: "", type: "", name: "Nothing found", account: "", amount: null });
+    } else {
+      rows.push(...found);
+    }
+  };
+
+  add("duplicates", report.duplicates.flatMap((g) => g.entries.map((e) => entryRow("duplicates", e))));
+  add(
+    "checkNumber",
+    report.checkNumberClashes.flatMap((c) =>
+      c.payments.map((p) => ({
+        check: CHECK_LABEL.checkNumber,
+        date: p.paymentDate,
+        type: `${p.kind === "customer" ? "Payment" : "Bill payment"} ${p.paymentNumber ?? ""}`.trim(),
+        name: p.partyName,
+        account: `${c.accountName}, number ${c.reference}`,
+        amount: money(p.amountMinor),
+      })),
+    ),
+  );
+  add(
+    "undeposited",
+    report.undeposited.map((u) => ({
+      check: CHECK_LABEL.undeposited,
+      date: u.oldestEntryDate ?? "",
+      type: "Oldest entry",
+      name: u.entryCount === null ? "" : `${u.entryCount} entries`,
+      account: `${u.accountCode} ${u.name}`,
+      amount: money(u.balanceMinor),
+    })),
+  );
+  add(
+    "wrongWay",
+    report.wrongWay.map((w) => ({
+      check: CHECK_LABEL.wrongWay,
+      date: meta.to,
+      type: ACCOUNT_TYPE_LABEL[w.accountType],
+      name: "",
+      account: `${w.accountCode} ${w.name}`,
+      amount: money(w.balanceMinor),
+    })),
+  );
+  add(
+    "incomeNoCost",
+    report.incomeNoCost.map((y) => ({
+      check: CHECK_LABEL.incomeNoCost,
+      date: y.year,
+      type: "Income",
+      name: y.entryCount === null ? "" : `${y.entryCount} entries`,
+      account: "",
+      amount: money(y.incomeMinor),
+    })),
+  );
+  add(
+    "unreconciled",
+    report.unreconciled.map((u) => ({
+      check: CHECK_LABEL.unreconciled,
+      date: u.lastReconciledDate ?? "never",
+      type: "Last reconciled",
+      name: "",
+      account: u.accountName,
+      amount: money(u.balanceMinor),
+    })),
+  );
+  add("futureDated", report.futureDated.map((e) => entryRow("futureDated", e)));
+  add(
+    "holding",
+    report.holding.map((h) => ({
+      check: CHECK_LABEL.holding,
+      date: meta.to,
+      type: "Balance",
+      name: "",
+      account: `${h.accountCode} ${h.name}`,
+      amount: money(h.balanceMinor),
+    })),
+  );
+
+  return {
+    fileName: sanitizeExportFileName(`exception-report-${meta.from}-to-${meta.to}`),
+    companyName: meta.companyName,
+    title: "Exception Report",
+    subtitle: `${rangeText(meta.from, meta.to)} · Accrual basis`,
+    currencyCode: meta.currencyCode,
+    columns: [
+      { key: "check", header: "Check", width: 34 },
+      { key: "date", header: "Date", width: 12 },
+      { key: "type", header: "Type", width: 20 },
+      { key: "name", header: "Name", width: 30 },
+      { key: "account", header: "Account", width: 30 },
+      { key: "amount", header: "Amount", kind: "money", width: 14 },
+    ],
+    rows,
   };
 }
