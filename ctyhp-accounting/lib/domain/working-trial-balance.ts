@@ -14,6 +14,9 @@
 
 import { statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import type { LedgerBalance } from "@/lib/domain/reports";
+import { fromMinor } from "@/lib/domain/money";
+import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
+import { rangeText } from "@/lib/domain/report-presets";
 
 export const RETAINED_EARNINGS_KEY = "retained-earnings-before-period";
 export const RETAINED_EARNINGS_LABEL = "Retained earnings — before this period";
@@ -233,5 +236,83 @@ export function buildWorkingTrialBalance(input: WorkingTrialBalanceInput): Worki
     accountCount: balanceSheet.length + profitAndLoss.length,
     adjustingEntryCount: adjusting.length,
     adjustments: adjustmentRows(adjusting),
+  };
+}
+
+/* ---------------------------------------------------------------- export */
+
+export interface WtbSheetMeta {
+  companyName: string;
+  currencyCode: string;
+  decimals: number;
+}
+
+type SheetRow = ReportExportSheet["rows"][number];
+
+/**
+ * The report as one table, for PDF, Excel and CSV: the six columns and their
+ * total, then "The adjustments" with each posting's amount in the Adjustments
+ * pair and its reason under Why.
+ */
+export function workingTrialBalanceSheet(report: WorkingTrialBalance, meta: WtbSheetMeta): ReportExportSheet {
+  const amount = (minor: number) => (minor === 0 ? null : fromMinor(minor, meta.decimals));
+  const debit = (v: number) => (v > 0 ? amount(v) : null);
+  const credit = (v: number) => (v < 0 ? amount(-v) : null);
+  const t = report.totals;
+
+  const rows: SheetRow[] = report.rows.map((r) => ({
+    account: r.accountId ? `${r.accountCode} ${r.name}` : r.name,
+    ud: debit(r.unadjusted),
+    uc: credit(r.unadjusted),
+    ad: debit(r.adjustment),
+    ac: credit(r.adjustment),
+    nd: debit(r.adjusted),
+    nc: credit(r.adjusted),
+    why: null,
+  }));
+  rows.push({
+    account: "Total",
+    ud: fromMinor(t.unadjustedDebit, meta.decimals),
+    uc: fromMinor(t.unadjustedCredit, meta.decimals),
+    ad: fromMinor(t.adjustmentDebit, meta.decimals),
+    ac: fromMinor(t.adjustmentCredit, meta.decimals),
+    nd: fromMinor(t.adjustedDebit, meta.decimals),
+    nc: fromMinor(t.adjustedCredit, meta.decimals),
+    why: null,
+  });
+
+  if (report.adjustments.length > 0) {
+    rows.push({ account: "The adjustments", ud: null, uc: null, ad: null, ac: null, nd: null, nc: null, why: null });
+    for (const a of report.adjustments) {
+      rows.push({
+        account: a.first ? `${a.number} · ${a.date} · ${a.name} — ${a.account}` : `— ${a.account}`,
+        ud: null,
+        uc: null,
+        ad: amount(a.debit),
+        ac: amount(a.credit),
+        nd: null,
+        nc: null,
+        why: a.why,
+      });
+    }
+  }
+
+  return {
+    fileName: sanitizeExportFileName(`working-trial-balance-${report.from}-to-${report.to}`),
+    companyName: meta.companyName,
+    title: "Working Trial Balance",
+    subtitle: `${rangeText(report.from, report.to)} · Accrual basis`,
+    currencyCode: meta.currencyCode,
+    columns: [
+      { key: "account", header: "Account", width: 44 },
+      { key: "ud", header: "Unadjusted debit", kind: "money", width: 16 },
+      { key: "uc", header: "Unadjusted credit", kind: "money", width: 16 },
+      { key: "ad", header: "Adjustments debit", kind: "money", width: 16 },
+      { key: "ac", header: "Adjustments credit", kind: "money", width: 16 },
+      { key: "nd", header: "Adjusted debit", kind: "money", width: 16 },
+      { key: "nc", header: "Adjusted credit", kind: "money", width: 16 },
+      { key: "why", header: "Why", width: 36 },
+    ],
+    rows,
   };
 }

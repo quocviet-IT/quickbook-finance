@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import {
   RETAINED_EARNINGS_KEY,
   RETAINED_EARNINGS_LABEL,
   buildWorkingTrialBalance,
+  workingTrialBalanceSheet,
   type AdjustingEntry,
   type WorkingTrialBalance,
   type WorkingTrialBalanceInput,
@@ -190,5 +192,55 @@ describe("the adjustments list", () => {
   it("gives the entry's description as the reason when there is no note", () => {
     const r = build({ adjusting: [EARLIER] });
     expect(r.adjustments[0].why).toBe("Prepaid insurance used in February");
+  });
+});
+
+describe("workingTrialBalanceSheet", () => {
+  const sheet = workingTrialBalanceSheet(build(), { companyName: "Harbour Test Co", currencyCode: "USD", decimals: 2 });
+
+  it("names the report, its dates and its basis", () => {
+    expect(sheet.fileName).toBe("working-trial-balance-2026-01-01-to-2026-03-31");
+    expect(sheet.title).toBe("Working Trial Balance");
+    expect(sheet.subtitle).toBe("January 1, 2026 – March 31, 2026 · Accrual basis");
+    expect(sheet.columns.map((c) => c.header)).toEqual([
+      "Account",
+      "Unadjusted debit",
+      "Unadjusted credit",
+      "Adjustments debit",
+      "Adjustments credit",
+      "Adjusted debit",
+      "Adjusted credit",
+      "Why",
+    ]);
+  });
+
+  it("writes each figure on its own side, in the currency's units, and leaves the other side empty", () => {
+    expect(sheet.rows[0]).toEqual({ account: "1000 Cash", ud: 16000, uc: null, ad: null, ac: null, nd: 16000, nc: null, why: null });
+    expect(sheet.rows.find((r) => r.account === RETAINED_EARNINGS_LABEL)).toMatchObject({ ud: null, uc: 3000, nc: 3000 });
+  });
+
+  it("closes the table with its total, then lists the adjustments", () => {
+    const total = sheet.rows.findIndex((r) => r.account === "Total");
+    expect(sheet.rows[total]).toEqual({ account: "Total", ud: 17000, uc: 17000, ad: 500, ac: 500, nd: 17500, nc: 17500, why: null });
+    expect(sheet.rows[total + 1]).toMatchObject({ account: "The adjustments" });
+    expect(sheet.rows[total + 2]).toMatchObject({
+      account: "AJE 1 · 2026-03-31 · Harbour Property Ltd — 6100 Rent",
+      ad: 500,
+      ac: null,
+      why: "March rent billed in April",
+    });
+    expect(sheet.rows[total + 3]).toMatchObject({ account: "— 2100 Accrued Liabilities", ad: null, ac: 500, why: null });
+  });
+
+  it("has no adjustments heading when there were none", () => {
+    const plain = workingTrialBalanceSheet(build({ adjusting: [] }), { companyName: "X", currencyCode: "USD", decimals: 2 });
+    expect(plain.rows.some((r) => r.account === "The adjustments")).toBe(false);
+  });
+});
+
+describe("working-trial-balance module", () => {
+  it("imports nothing that could write to the books", () => {
+    const source = readFileSync("lib/domain/working-trial-balance.ts", "utf8");
+    expect(source).not.toMatch(/@\/lib\/(db|services)\//);
   });
 });
