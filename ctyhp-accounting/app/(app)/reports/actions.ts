@@ -17,6 +17,9 @@ import {
   cashFlowRangeSchema,
   type BudgetMonthSaveInput,
 } from "@/lib/domain/schemas";
+import type { ZoomSpec } from "@/lib/domain/statement";
+import { zoomSpecProblem, type ZoomResult } from "@/lib/domain/zoom";
+import { getZoom } from "@/lib/services/zoom";
 
 export interface ActionResult<T> {
   ok: boolean;
@@ -117,5 +120,19 @@ export async function getStatementOfEquityAction(
     return { ok: true, data: buildStatementOfEquity(opening, activity) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to load Statement of Equity" };
+  }
+}
+
+/** The posted lines behind one figure of a statement. Reads only. */
+export async function zoomAction(spec: ZoomSpec): Promise<ActionResult<ZoomResult>> {
+  const role = await getUserRole();
+  if (!role) return { ok: false, error: "Not authorized" };
+  const problem = zoomSpecProblem(spec);
+  if (problem) return { ok: false, error: problem };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getZoom(sb, spec) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "The entries could not be read." };
   }
 }
