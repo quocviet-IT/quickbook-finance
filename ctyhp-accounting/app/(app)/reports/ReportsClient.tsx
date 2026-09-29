@@ -351,7 +351,16 @@ export default function ReportsClient({
   // plain read result for every other statement.
   const shownStatement = type === "pnl" ? pnlShown : statement;
 
-  const paperRange = point ? `As of ${longDate(ran.to)}` : rangeText(ran.from, ran.to);
+  // While a notice is showing, the paper's own read never ran for the dates
+  // currently asked for, so the header must not keep quoting the last
+  // successful run's range — it heads with what is asked for instead.
+  const paperRange = notice
+    ? point
+      ? `As of ${longDate(to)}`
+      : rangeText(from, to)
+    : point
+      ? `As of ${longDate(ran.to)}`
+      : rangeText(ran.from, ran.to);
   const sheet = useMemo(
     () =>
       shownStatement && !shownStatement.empty
