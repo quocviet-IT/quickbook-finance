@@ -14,6 +14,7 @@ import {
   type LedgerMatchCandidate,
 } from "@/lib/domain/reconciliation";
 import { decryptBankToken, encryptBankToken } from "./bank-token-crypto";
+import { readAllPages } from "./paging";
 import {
   exchangePlaidPublicToken as exchangePublicToken,
   getPlaidAccounts,
@@ -241,11 +242,19 @@ export async function listBankTransactionPostings(
   sb: SupabaseClient,
   bankAccountId: string | null,
 ): Promise<BankPostingRow[]> {
-  const { data, error } = await sb.rpc("acc_bank_transaction_postings", {
-    p_bank_account_id: bankAccountId,
-  });
-  if (error) throw new BankingError(error.message);
-  return (data ?? []) as unknown as BankPostingRow[];
+  // One row per other line of each entry, so a deposit of 64 items is 64 rows
+  // and a few hundred bank lines pass PostgREST's cap. Ordered on these three,
+  // two rows can tie only when every column they return is the same.
+  return readAllPages<BankPostingRow>(
+    (from, to) =>
+      sb
+        .rpc("acc_bank_transaction_postings", { p_bank_account_id: bankAccountId })
+        .order("bank_transaction_id")
+        .order("account_id")
+        .order("journal_entry_id")
+        .range(from, to),
+    (message) => new BankingError(message),
+  );
 }
 
 /**
@@ -291,15 +300,21 @@ export async function listBankTransactions(
   sb: SupabaseClient,
   bankAccountId: string | null,
 ): Promise<BankTransactionRow[]> {
-  let query = sb
-    .from("acc_bank_transaction")
-    // The label's name comes along, so the list does not ask once per row.
-    .select("*,acc_bank_category(name)")
-    .is("provider_removed_at", null);
-  if (bankAccountId) query = query.eq("bank_account_id", bankAccountId);
-  const { data, error } = await query.order("txn_date", { ascending: false });
-  if (error) throw new BankingError(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+  const data = await readAllPages<Record<string, unknown>>(
+    (from, to) => {
+      let query = sb
+        .from("acc_bank_transaction")
+        // The label's name comes along, so the list does not ask once per row.
+        .select("*,acc_bank_category(name)")
+        .is("provider_removed_at", null);
+      if (bankAccountId) query = query.eq("bank_account_id", bankAccountId);
+      // Newest first; the id settles lines of the same day, so no line can
+      // move between two pages of the read.
+      return query.order("txn_date", { ascending: false }).order("id").range(from, to);
+    },
+    (message) => new BankingError(message),
+  );
+  return data.map((row) => ({
     ...(row as unknown as BankTransactionRow),
     bank_category_name: (row.acc_bank_category as { name?: string } | null)?.name ?? null,
   }));
@@ -607,38 +622,61 @@ export async function generateSuggestions(sb: SupabaseClient, bankAccountId: str
     .single();
   if (bankError) throw new BankingError(bankError.message);
 
-  const [{ data: txnData, error: txnError }, { data: approved, error: approvedError }, { data: lineData, error: lineError }] =
-    await Promise.all([
-      sb
-        .from("acc_bank_transaction")
-        .select("id,txn_date,amount_minor,description,reference")
-        .eq("bank_account_id", bankAccountId)
-        .eq("status", "unmatched")
-        .eq("pending", false)
-        .is("provider_removed_at", null),
-      sb.from("acc_reconciliation").select("journal_line_id").eq("status", "approved").not("journal_line_id", "is", null),
-      sb
-        .from("acc_journal_line")
-        .select(
-          "id,journal_entry_id,debit_minor,credit_minor,memo," +
-            "acc_journal_entry!inner(id,entry_number,entry_date,description,source_type,source_id,source_ref,status)",
-        )
-        .eq("account_id", (bankAccount as { account_id: string }).account_id)
-        .eq("acc_journal_entry.status", "posted"),
-    ]);
-  if (txnError) throw new BankingError(txnError.message);
-  if (approvedError) throw new BankingError(approvedError.message);
-  if (lineError) throw new BankingError(lineError.message);
+  // Each read is paged and ordered on a unique column. The approved matches
+  // above all: read short, a ledger line some bank line already holds looks
+  // free, and is offered again.
+  const fail = (message: string) => new BankingError(message);
+  const [txnData, approved, lineData] = await Promise.all([
+    readAllPages<Record<string, unknown>>(
+      (from, to) =>
+        sb
+          .from("acc_bank_transaction")
+          .select("id,txn_date,amount_minor,description,reference")
+          .eq("bank_account_id", bankAccountId)
+          .eq("status", "unmatched")
+          .eq("pending", false)
+          .is("provider_removed_at", null)
+          .order("id")
+          .range(from, to),
+      fail,
+    ),
+    readAllPages<Record<string, unknown>>(
+      (from, to) =>
+        sb
+          .from("acc_reconciliation")
+          .select("journal_line_id")
+          .eq("status", "approved")
+          .not("journal_line_id", "is", null)
+          // Unique among approved matches (acc_reconciliation_approved_journal_line_uq).
+          .order("journal_line_id")
+          .range(from, to),
+      fail,
+    ),
+    readAllPages<Record<string, unknown>>(
+      (from, to) =>
+        sb
+          .from("acc_journal_line")
+          .select(
+            "id,journal_entry_id,debit_minor,credit_minor,memo," +
+              "acc_journal_entry!inner(id,entry_number,entry_date,description,source_type,source_id,source_ref,status)",
+          )
+          .eq("account_id", (bankAccount as { account_id: string }).account_id)
+          .eq("acc_journal_entry.status", "posted")
+          .order("id")
+          .range(from, to),
+      fail,
+    ),
+  ]);
 
-  const takenLines = new Set((approved ?? []).map((row) => row.journal_line_id as string).filter(Boolean));
-  const txns: BankTxnLite[] = (txnData ?? []).map((txn) => ({
+  const takenLines = new Set(approved.map((row) => row.journal_line_id as string).filter(Boolean));
+  const txns: BankTxnLite[] = txnData.map((txn) => ({
     id: txn.id as string,
     txnDate: txn.txn_date as string,
     amountMinor: Number(txn.amount_minor),
     description: (txn.description as string) ?? "",
     reference: (txn.reference as string) ?? null,
   }));
-  const candidates: LedgerMatchCandidate[] = ((lineData ?? []) as unknown as Record<string, unknown>[])
+  const candidates: LedgerMatchCandidate[] = lineData
     .filter((line) => !takenLines.has(line.id as string))
     .map((line) => {
       const entry = line.acc_journal_entry as {
@@ -698,19 +736,24 @@ export async function listSuggestions(
   sb: SupabaseClient,
   bankAccountId: string | null,
 ): Promise<SuggestionView[]> {
-  let query = sb
-    .from("acc_reconciliation")
-    .select(
-      "id,confidence,rule_applied,status,bank_transaction_id,payment_id,journal_line_id," +
-        "acc_bank_transaction!inner(txn_date,description,amount_minor,bank_account_id)," +
-        "acc_payment(payment_number)," +
-        "acc_journal_line(id,journal_entry_id,acc_journal_entry(entry_number,description,source_type))",
-    )
-    .eq("status", "suggested");
-  if (bankAccountId) query = query.eq("acc_bank_transaction.bank_account_id", bankAccountId);
-  const { data, error } = await query.order("confidence", { ascending: false });
-  if (error) throw new BankingError(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => {
+  const data = await readAllPages<Record<string, unknown>>(
+    (from, to) => {
+      let query = sb
+        .from("acc_reconciliation")
+        .select(
+          "id,confidence,rule_applied,status,bank_transaction_id,payment_id,journal_line_id," +
+            "acc_bank_transaction!inner(txn_date,description,amount_minor,bank_account_id)," +
+            "acc_payment(payment_number)," +
+            "acc_journal_line(id,journal_entry_id,acc_journal_entry(entry_number,description,source_type))",
+        )
+        .eq("status", "suggested");
+      if (bankAccountId) query = query.eq("acc_bank_transaction.bank_account_id", bankAccountId);
+      // Most confident first; the id settles ties so paging cannot skip one.
+      return query.order("confidence", { ascending: false }).order("id").range(from, to);
+    },
+    (message) => new BankingError(message),
+  );
+  return data.map((row) => {
     const txn = row.acc_bank_transaction as { txn_date: string; description: string; amount_minor: number };
     const payment = row.acc_payment as { payment_number?: string } | null;
     const line = row.acc_journal_line as {

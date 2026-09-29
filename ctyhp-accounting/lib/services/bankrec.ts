@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StatementReconciliationRow } from "@/lib/db/types";
+import { readAllPages } from "@/lib/services/paging";
 import type { ReconciliationCreateInput, ReconciliationAdjustmentInput, ReconciliationReopenInput } from "@/lib/domain/schemas";
 
 export class BankRecError extends Error {}
@@ -61,9 +62,21 @@ export async function listReconciliations(sb: SupabaseClient, bankAccountId: str
 }
 
 export async function getReconciliationLines(sb: SupabaseClient, id: string): Promise<ReconLineView[]> {
-  const { data, error } = await sb.rpc("acc_reconciliation_lines", { p_reconciliation_id: id });
-  if (error) throw new BankRecError(error.message);
-  return (data ?? []).map((r: Record<string, unknown>) => ({
+  // Paged past PostgREST's cap: an account with a thousand lines to the
+  // statement date would otherwise show the first thousand and let the session
+  // be ticked against a list that is not all there. The line id settles two
+  // lines of one entry on the same account.
+  const data = await readAllPages<Record<string, unknown>>(
+    (from, to) =>
+      sb
+        .rpc("acc_reconciliation_lines", { p_reconciliation_id: id })
+        .order("entry_date")
+        .order("entry_number")
+        .order("journal_line_id")
+        .range(from, to),
+    (message) => new BankRecError(message),
+  );
+  return data.map((r: Record<string, unknown>) => ({
     journalLineId: r.journal_line_id as string, entryId: r.entry_id as string,
     entryNumber: (r.entry_number as string) ?? null, entryDate: r.entry_date as string,
     sourceType: r.source_type as string, memo: (r.memo as string) ?? null,

@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.69",
+    date: "2026-09-29",
+    headline: "Banking shows every line, however many there are.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Bank Transactions, the Banking overview and Reconcile stopped at 1,000 lines",
+        detail:
+          "A company with more than a thousand bank lines saw only the first thousand in the all-accounts view, some lines showed \"Matched elsewhere\" instead of the account they were posted to, the Banking overview left out the newest lines, and Find ledger matches could offer a ledger line another bank line already held. Every list on these screens now reads all of its lines.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.68",
     date: "2026-09-29",
     headline: "A New form opened from a link no longer redraws the page.",
