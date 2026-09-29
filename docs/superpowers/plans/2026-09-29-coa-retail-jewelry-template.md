@@ -738,6 +738,7 @@ In `tests/unit/exceptions.test.ts`:
     expect(rows).toHaveLength(1);
     expect(rows[0].accountCode).toBe("6300");
   });
+```
 
 - [ ] **Step 2: Run them to see them fail**
 
