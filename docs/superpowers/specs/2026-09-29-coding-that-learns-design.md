@@ -1,8 +1,8 @@
 # Coding that learns: bank rules and suggestions from history
 
 **Status:** approved in conversation, 2026-09-29.
-**Branch:** `feat/coding-that-learns` (from `main` at 1.68).
-**Release:** 1.69.
+**Branch:** `feat/coding-that-learns` (on `fix/banking-paged-reads`, 1.69, whose paged Banking reads it builds on).
+**Release:** 1.70.
 **Source:** the client's prototype, `Accounting-System-v3.html`: "What's new" 2.7 and 2.4, the `coding that learns` block, and `ruleMatch` / `cleanPayee` in the bank statement import.
 
 ## 1. What is asked
@@ -200,7 +200,7 @@ In `app/(app)/banking/actions.ts`, or `rules/actions.ts` for the rule actions:
 
 ### 4.6 Release
 
-Changelog 1.69:
+Changelog 1.70:
 
 - bank rules;
 - suggestions from history on waiting bank lines;
