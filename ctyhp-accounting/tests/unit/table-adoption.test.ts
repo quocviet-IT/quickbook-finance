@@ -29,13 +29,13 @@ function tablePattern(): RegExp {
 }
 
 /**
- * Screens still rendering Ant Design's Table directly. 49 as of 2026-08-14.
+ * Screens still rendering Ant Design's Table directly. 49 as of 2026-08-14;
+ * 47 as of 2026-09-28.
  *
- * Two of these — ReportsClient.tsx and BudgetVsActualView.tsx — carry no bare
- * `<Table `, only a hand-rolled `summary` built from `<Table.Summary.Row>` and
- * `<Table.Summary.Cell>` bolted onto `DataTable`. That is still Ant Design's
- * Table reached into directly, and it is exactly what ReportTable exists to
- * own instead, so it belongs on this list like any other.
+ * ReportsClient.tsx and BudgetVsActualView.tsx were on this list for a
+ * hand-rolled Table.Summary; the financial statements now render through
+ * components/reports/StatementTable.tsx, a plain table, and both entries are
+ * gone (2026-09-28).
  */
 const RAW_TABLE = new Set<string>([
   "app/(app)/approvals/ApprovalsClient.tsx",
@@ -55,7 +55,6 @@ const RAW_TABLE = new Set<string>([
   "app/(app)/purchase-orders/[id]/PurchaseOrderDetailClient.tsx",
   "app/(app)/purchase-orders/[id]/ReceiveModal.tsx",
   "app/(app)/reports/1099/Report1099Client.tsx",
-  "app/(app)/reports/ReportsClient.tsx",
   "app/(app)/reports/cash-flow-forecast/CashFlowForecastClient.tsx",
   "app/(app)/reports/gl-posting/GlPostingClient.tsx",
   "app/(app)/reports/inventory-review/InventoryReviewClient.tsx",
@@ -85,7 +84,6 @@ const RAW_TABLE = new Set<string>([
   "components/payables/PayRunPanel.tsx",
   "components/reports/AgingByPartyTable.tsx",
   "components/reports/AllowanceForDoubtfulAccounts.tsx",
-  "components/reports/BudgetVsActualView.tsx",
   "components/settlements/SettlementHistory.tsx",
 ]);
 
@@ -133,7 +131,7 @@ describe("table adoption", () => {
     // The allowlist is the outstanding work. Adding to it is how a guard
     // quietly stops guarding, and it reads in a diff exactly like a migration.
     // Lowering this number is the migration; raising it has to be argued for.
-    expect(RAW_TABLE.size).toBeLessThanOrEqual(49);
+    expect(RAW_TABLE.size).toBeLessThanOrEqual(47);
   });
 
   it("lists no file that has already been migrated", () => {
