@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.66",
+    date: "2026-09-28",
+    headline: "The five financial statements, set out on paper, with every figure opening onto the entries behind it.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Profit and Loss, Balance Sheet, Trial Balance, Budget vs Actual and Statement of Equity read like statements",
+        detail:
+          "Each is headed with the company, the dates and the basis, and set out the way an accountant sets one out: sections, accounts nested under their parent with a subtotal, a rule above each total and a double rule under the last. The Balance Sheet groups assets into cash and bank, receivables, other current and long-term, and shows earlier years' profit and this year's on separate lines. No figure changes.",
+        route: "/reports",
+      },
+      {
+        kind: "added",
+        title: "Click any figure to see the entries behind it",
+        detail:
+          "Every amount on the five statements, totals included, opens a list of the posted lines that make it up — which always adds up to the figure you clicked. Click a line to see the whole transaction.",
+        route: "/reports",
+      },
+      {
+        kind: "changed",
+        title: "One period picker and one Compare list",
+        detail:
+          "Pick This month through All dates, or your own dates, and compare with the previous period, the previous year, or a column per month, quarter or year. Copy the report, save it as CSV, PDF or Excel, or print it.",
+        route: "/reports",
+      },
+    ],
+  },
+  {
     version: "1.65",
     date: "2026-09-28",
     headline: "The Working Trial Balance: what the books said, what was adjusted and why, and what they say now.",
