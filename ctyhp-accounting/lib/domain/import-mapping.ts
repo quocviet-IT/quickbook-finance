@@ -11,7 +11,7 @@
  *      mapping somebody picks, not a change to this file.
  *
  *   2. **What an account actually is.** QuickBooks has dozens of account detail
- *      types; One Book has thirteen account types. There is no 1:1, and getting
+ *      types; One Book has fourteen account types. There is no 1:1, and getting
  *      it wrong does not fail — it silently files a liability as an asset. Every
  *      translation is written down below, and anything unrecognised is reported
  *      for a person to decide rather than guessed at.
@@ -478,7 +478,7 @@ export function proposeMapping(
 /**
  * What another product's account type means here.
  *
- * QuickBooks and Wave both carry far more detail types than One Book's thirteen
+ * QuickBooks and Wave both carry far more detail types than One Book's fourteen
  * account types, and the mapping is a judgement in a few places — a credit card
  * is a liability, "Other Current Asset" is a current asset, "Cost of Goods
  * Sold" is its own type here. Every rule is written down so it can be argued
@@ -491,7 +491,7 @@ const ACCOUNT_TYPE_RULES: readonly { pattern: RegExp; type: AccountType }[] = [
   { pattern: /^bank|checking|savings|cash and cash equivalents|money market/i, type: "bank" },
   { pattern: /fixed asset|property, plant|non-?current asset|plant and equipment/i, type: "fixed_asset" },
   { pattern: /other current asset|current asset|prepaid|inventory|stock/i, type: "current_asset" },
-  { pattern: /long ?term liabilit|non-?current liabilit|loan payable|notes payable/i, type: "current_liability" },
+  { pattern: /long ?term liabilit|non-?current liabilit|loan payable|notes payable/i, type: "long_term_liability" },
   { pattern: /other current liabilit|current liabilit|liabilit/i, type: "current_liability" },
   { pattern: /equity|retained earnings|owner|capital/i, type: "equity" },
   { pattern: /cost of goods sold|^cogs$|cost of sales/i, type: "cost_of_goods_sold" },

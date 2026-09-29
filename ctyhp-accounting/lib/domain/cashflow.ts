@@ -42,6 +42,7 @@ export function defaultCashFlowRole(type: AccountType): CashFlowRole {
       return "investing";
     case "equity":
     case "credit_card":
+    case "long_term_liability":
       return "financing";
     case "income":
     case "cost_of_goods_sold":
@@ -57,7 +58,7 @@ export function defaultCashFlowRole(type: AccountType): CashFlowRole {
 
 export function cashFlowCategoryOf(t: AccountType): CashFlowCategory {
   if (t === "fixed_asset") return "investing";
-  if (t === "equity" || t === "credit_card") return "financing";
+  if (t === "equity" || t === "credit_card" || t === "long_term_liability") return "financing";
   return "operating";
 }
 

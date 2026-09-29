@@ -34,6 +34,7 @@ const ACCOUNT_PREFIX: Record<AccountType, string> = {
   accounts_payable: "Liabilities:Payable",
   credit_card: "Liabilities:CreditCard",
   current_liability: "Liabilities:Current",
+  long_term_liability: "Liabilities:LongTerm",
   equity: "Equity",
   income: "Income",
   other_income: "Income:Other",
