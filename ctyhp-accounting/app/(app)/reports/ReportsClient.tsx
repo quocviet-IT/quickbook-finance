@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Spin } from "antd";
@@ -170,22 +170,37 @@ export default function ReportsClient({
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
 
   const [statement, setStatement] = useState<Statement | null>(null);
+  // What a Profit and Loss read produced, kept apart from the Statement built from
+  // it: flipping "% of income" only rebuilds this into a Statement (see the
+  // pnlShown memo below); it never triggers another read of the books.
+  const [pnlData, setPnlData] = useState<{
+    columns: readonly StatementColumn[];
+    pnls: readonly ProfitAndLoss[];
+    change: boolean;
+  } | null>(null);
   const [chart, setChart] = useState<ChartSpec | null>(null);
   const [stats, setStats] = useState<StatItem[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [ran, setRan] = useState(initialRange);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState<ZoomSpec | null>(null);
+  // A run-generation guard: a slower, older read that finishes after a newer one
+  // has already started must not call show/refuse/message.error and replace the
+  // statement, or the reader's later request, with the earlier one's result.
+  const latestRun = useRef(0);
 
   const money = useCallback((minor: number) => formatMoney(minor, baseCurrency, baseDecimals), [baseCurrency, baseDecimals]);
 
   const run = useCallback(async () => {
+    const id = ++latestRun.current;
+    const current = () => id === latestRun.current;
     const read = async (f: string | null, t: string): Promise<LedgerBalance[]> => {
       const result = await getLedgerBalancesAction(f, t);
       if (!result.ok || !result.data) throw new Error(result.error ?? "The ledger could not be read.");
       return result.data;
     };
     const show = (next: Statement, nextChart: ChartSpec | null, nextStats: StatItem[] | null, range: { from: string; to: string }) => {
+      if (!current()) return;
       setStatement(next);
       setChart(nextChart);
       setStats(nextStats);
@@ -193,8 +208,10 @@ export default function ReportsClient({
       setNotice(null);
     };
     const refuse = (text: string) => {
+      if (!current()) return;
       setNotice(text);
       setStatement(null);
+      setPnlData(null);
       setChart(null);
       setStats(null);
     };
@@ -255,12 +272,14 @@ export default function ReportsClient({
         const detail = plan.columns.filter((c) => !c.isTotal);
         const detailPnls = (await Promise.all(detail.map((c) => read(c.from, c.to)))).map(buildProfitAndLoss);
         const pnls = plan.columns.map((c) => (c.isTotal ? sumProfitAndLoss(detailPnls) : detailPnls[detail.indexOf(c)]));
-        show(
-          pnlStatement({ columns: plan.columns, pnls, accounts: index, showPercent, change: plan.change }),
-          pnlChart(plan.columns, pnls),
-          null,
-          { from, to },
-        );
+        if (!current()) return;
+        // The Statement itself is built by the pnlShown memo below, from this plus
+        // showPercent: toggling "% of income" must not read the books again.
+        setPnlData({ columns: plan.columns, pnls, change: plan.change });
+        setChart(pnlChart(plan.columns, pnls));
+        setStats(null);
+        setRan({ from, to });
+        setNotice(null);
         return;
       }
 
@@ -293,16 +312,15 @@ export default function ReportsClient({
         { from, to },
       );
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "The report could not be produced.");
+      if (current()) message.error(error instanceof Error ? error.message : "The report could not be produced.");
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [
     type,
     from,
     to,
     compare,
-    showPercent,
     fiscalYear,
     budgetFromPeriod,
     budgetToPeriod,
@@ -322,11 +340,22 @@ export default function ReportsClient({
   // Ctrl+P prints the report alone too, not only the Print button.
   useEffect(() => watchReportPrinting(), []);
 
+  // The P&L Statement, rebuilt from the last read whenever showPercent changes —
+  // a display-only redraw, never another trip to the books (see pnlData above).
+  const pnlShown = useMemo(
+    () =>
+      pnlData ? pnlStatement({ columns: pnlData.columns, pnls: pnlData.pnls, accounts: index, showPercent, change: pnlData.change }) : null,
+    [pnlData, index, showPercent],
+  );
+  // The statement actually on screen: the P&L's own memo for that report, the
+  // plain read result for every other statement.
+  const shownStatement = type === "pnl" ? pnlShown : statement;
+
   const paperRange = point ? `As of ${longDate(ran.to)}` : rangeText(ran.from, ran.to);
   const sheet = useMemo(
     () =>
-      statement && !statement.empty
-        ? statementSheet(statement, {
+      shownStatement && !shownStatement.empty
+        ? statementSheet(shownStatement, {
             companyName,
             currencyCode: baseCurrency,
             decimals: baseDecimals,
@@ -334,7 +363,7 @@ export default function ReportsClient({
             fileName: `${TITLES[type]} ${ran.from} to ${ran.to}`,
           })
         : null,
-    [statement, companyName, baseCurrency, baseDecimals, paperRange, type, ran],
+    [shownStatement, companyName, baseCurrency, baseDecimals, paperRange, type, ran],
   );
 
   // A month-by-month request that is too wide may still fit by quarter.
@@ -353,9 +382,9 @@ export default function ReportsClient({
         </div>
       ) : null}
     </div>
-  ) : !statement ? (
+  ) : !shownStatement ? (
     <div className={styles.empty}>{loading ? "Reading the books…" : "The report has not been run."}</div>
-  ) : statement.empty ? (
+  ) : shownStatement.empty ? (
     <div className={styles.empty}>
       No entries fall in this period.
       <br />
@@ -364,13 +393,13 @@ export default function ReportsClient({
   ) : (
     <>
       {stats ? <StatRow items={stats} /> : null}
-      <StatementTable statement={statement} money={money} onZoom={setZoom} />
-      {statement.outOfBalance !== null ? (
+      <StatementTable statement={shownStatement} money={money} onZoom={setZoom} />
+      {shownStatement.outOfBalance !== null ? (
         <Alert
           type="error"
           showIcon
           className={styles.outOfBalance}
-          title={`${type === "trial" ? "Debits and credits" : "Assets, and liabilities plus equity,"} differ by ${money(Math.abs(statement.outOfBalance))}.`}
+          title={`${type === "trial" ? "Debits and credits" : "Assets, and liabilities plus equity,"} differ by ${money(Math.abs(shownStatement.outOfBalance))}.`}
           description="This should not happen while every entry balances. The General Ledger Posting report shows which document did not reach the ledger."
         />
       ) : null}
@@ -453,7 +482,7 @@ export default function ReportsClient({
         sheet={sheet}
       />
 
-      <Spin spinning={loading && statement !== null} description="Reading the books again…">
+      <Spin spinning={loading && shownStatement !== null} description="Reading the books again…">
         <div aria-live="polite" aria-busy={loading}>
           {chart ? (
             <ReportBody
