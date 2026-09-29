@@ -573,6 +573,15 @@
   color: var(--ob-money-negative);
 }
 
+/* A QuickZoom button in the last column (.zoom's negative margin lets it sit
+ * flush with the figures around it) sticks 3px past .rptScroll without this,
+ * forcing a horizontal scroll on every statement whose last column is a
+ * figure. */
+.rpt th:last-child,
+.rpt td:last-child {
+  padding-right: 3px;
+}
+
 .rpt td.ind0 {
   padding-left: 0;
 }
