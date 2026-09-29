@@ -20,6 +20,17 @@ const INDENT = [styles.ind0, styles.ind1, styles.ind2, styles.ind3];
 
 const TONE_CLASS = { favorable: styles.favorable, unfavorable: styles.unfavorable } as const;
 
+/**
+ * The page this replaced spelled each variance out as Favorable / Unfavorable
+ * text, not colour alone. A title gives a reader that hovers the same word a
+ * sighted reader gets from the colour; the screen-reader-only text right below
+ * gives it to a reader that cannot hover either.
+ */
+const TONE_TITLE = {
+  favorable: "Favorable: above budget for income, below budget for costs",
+  unfavorable: "Unfavorable: below budget for income, above budget for costs",
+} as const;
+
 /** A percentage cell: blank when there is no percentage to give (nothing to divide by). */
 const percentText = (value: number | null | undefined): string => (value == null ? "" : formatPercent(value));
 
@@ -140,8 +151,12 @@ export default function StatementTable({
                 ))}
                 {changeLabels ? (
                   <>
-                    <td className={`${styles.r}${signClass(row.change?.amount, toneClass)}`}>
+                    <td
+                      className={`${styles.r}${signClass(row.change?.amount, toneClass)}`}
+                      title={row.tone ? TONE_TITLE[row.tone] : undefined}
+                    >
                       {row.change ? money(row.change.amount) : ""}
+                      {row.tone ? <span className="accounting-sr-only">{` ${row.tone}`}</span> : null}
                     </td>
                     <td className={`${styles.pct}${signClass(row.change?.percent, toneClass)}`}>
                       {percentText(row.change?.percent)}
