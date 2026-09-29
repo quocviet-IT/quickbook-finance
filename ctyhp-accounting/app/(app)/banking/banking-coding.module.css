@@ -1,0 +1,22 @@
+/* The strip above Bank Transactions that offers the suggested lines. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-subtle);
+  color: var(--ob-text-body);
+}
+
+.barText {
+  flex: 1 1 320px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ob-text-secondary);
+}

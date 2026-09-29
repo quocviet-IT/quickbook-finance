@@ -4,6 +4,7 @@ import { App, Button, Select, Space, Tooltip, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
 import { ACCOUNT_TYPE_LABEL, normalBalanceOf, type AccountType } from "@/lib/domain/accounts";
 import { searchAccounts } from "@/lib/domain/account-search";
+import type { CodingSuggestionView } from "@/lib/domain/coding";
 import type { BankPostingRow } from "@/lib/services/banking";
 import { categoriseBankTransactionAction, uncategoriseBankTransactionAction } from "./actions";
 
@@ -16,6 +17,10 @@ export interface CategoriseCellProps {
   posting: BankPostingRow | null;
   canWrite: boolean;
   onChanged: () => void;
+  /** What a rule or history suggests for this line, when it is waiting. */
+  suggestion?: CodingSuggestionView | null;
+  /** Opens the rule form, filled from this line. */
+  onCreateRule?: () => void;
 }
 
 /**
@@ -40,6 +45,8 @@ export default function CategoriseCell({
   posting,
   canWrite,
   onChanged,
+  suggestion = null,
+  onCreateRule,
 }: CategoriseCellProps) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
@@ -69,6 +76,34 @@ export default function CategoriseCell({
       })),
     [accounts, query],
   );
+
+  async function post(accountId: string) {
+    setBusy(true);
+    const res = await categoriseBankTransactionAction(transactionId, accountId);
+    setBusy(false);
+    if (!res.ok || !res.data) {
+      message.error(res.error ?? "Could not categorise this line");
+      return;
+    }
+    message.success(
+      `Posted to ${res.data.account_code} — ${res.data.account_name}` +
+        (res.data.entry_number ? ` as ${res.data.entry_number}` : ""),
+    );
+    onChanged();
+  }
+
+  // What a rule or the company's own history says this line is, with the whole
+  // reason one hover away. Suggested only: nothing posts until Use is clicked.
+  const hint = suggestion ? (
+    <Tooltip title={suggestion.why}>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }} ellipsis>
+        {suggestion.source === "rule"
+          ? `${suggestion.short} → ${suggestion.accountLabel}`
+          : `Usually ${suggestion.accountLabel} · ${suggestion.short}`}
+      </Typography.Text>
+    </Tooltip>
+  ) : null;
+  const linkStyle = { padding: 0, height: "auto", fontSize: 12 } as const;
 
   if (posting) {
     const label = `${posting.account_code} — ${posting.account_name}`;
@@ -102,6 +137,11 @@ export default function CategoriseCell({
               Change
             </Button>
           ) : null}
+          {canWrite && onCreateRule ? (
+            <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
+              Create rule
+            </Button>
+          ) : null}
         </Space>
       </Space>
     );
@@ -114,56 +154,58 @@ export default function CategoriseCell({
     return <Typography.Text type="secondary">Matched elsewhere</Typography.Text>;
   }
 
-  if (!canWrite) return <Typography.Text type="secondary">—</Typography.Text>;
+  if (!canWrite) return hint ?? <Typography.Text type="secondary">—</Typography.Text>;
 
   return (
-    <Tooltip title="Choosing an account posts this line to the ledger">
-      <Select
-        showSearch
-        // Fills its column rather than declaring a minimum wider than one. A
-        // 240px minimum inside a 150px column does not widen the column — it
-        // spills over the Match column beside it, which is the fault a reader
-        // screenshotted on the triage screen in its other form.
-        style={{ width: "100%" }}
-        // The dropdown is free to be wider than the cell, and needs to be: an
-        // account reads "5000 — Cost of Goods Sold".
-        popupMatchSelectWidth={320}
-        placeholder="Search accounts…"
-        loading={busy}
-        disabled={busy}
-        // The list is already filtered and ranked; antd must not filter again.
-        filterOption={false}
-        searchValue={query}
-        onSearch={setQuery}
-        options={options}
-        // Which report the money will land in, and which side of the books it
-        // sits on — the reader asked for exactly this: "if it is debit, if it
-        // is credit, anything".
-        optionRender={(option) => (
-          <Space direction="vertical" size={0}>
-            <span>{option.data.label}</span>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {ACCOUNT_TYPE_LABEL[option.data.type as AccountType]} ·{" "}
-              {normalBalanceOf(option.data.type as AccountType) === "debit" ? "Debit" : "Credit"}
-              {option.data.via ? ` · matched on “${option.data.via}”` : ""}
-            </Typography.Text>
-          </Space>
-        )}
-        onChange={async (accountId: string) => {
-          setBusy(true);
-          const res = await categoriseBankTransactionAction(transactionId, accountId);
-          setBusy(false);
-          if (!res.ok || !res.data) {
-            message.error(res.error ?? "Could not categorise this line");
-            return;
-          }
-          message.success(
-            `Posted to ${res.data.account_code} — ${res.data.account_name}` +
-              (res.data.entry_number ? ` as ${res.data.entry_number}` : ""),
-          );
-          onChanged();
-        }}
-      />
-    </Tooltip>
+    <Space direction="vertical" size={0} style={{ width: "100%" }}>
+      <Tooltip title="Choosing an account posts this line to the ledger">
+        <Select
+          showSearch
+          // Fills its column rather than declaring a minimum wider than one. A
+          // 240px minimum inside a 150px column does not widen the column — it
+          // spills over the Match column beside it, which is the fault a reader
+          // screenshotted on the triage screen in its other form.
+          style={{ width: "100%" }}
+          // The dropdown is free to be wider than the cell, and needs to be: an
+          // account reads "5000 — Cost of Goods Sold".
+          popupMatchSelectWidth={320}
+          placeholder="Search accounts…"
+          loading={busy}
+          disabled={busy}
+          // The list is already filtered and ranked; antd must not filter again.
+          filterOption={false}
+          searchValue={query}
+          onSearch={setQuery}
+          options={options}
+          // Which report the money will land in, and which side of the books it
+          // sits on — the reader asked for exactly this: "if it is debit, if it
+          // is credit, anything".
+          optionRender={(option) => (
+            <Space direction="vertical" size={0}>
+              <span>{option.data.label}</span>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {ACCOUNT_TYPE_LABEL[option.data.type as AccountType]} ·{" "}
+                {normalBalanceOf(option.data.type as AccountType) === "debit" ? "Debit" : "Credit"}
+                {option.data.via ? ` · matched on “${option.data.via}”` : ""}
+              </Typography.Text>
+            </Space>
+          )}
+          onChange={(accountId: string) => void post(accountId)}
+        />
+      </Tooltip>
+      <Space size={6} wrap>
+        {hint}
+        {suggestion ? (
+          <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => void post(suggestion.accountId)}>
+            Use
+          </Button>
+        ) : null}
+        {onCreateRule ? (
+          <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
+            Create rule
+          </Button>
+        ) : null}
+      </Space>
+    </Space>
   );
 }

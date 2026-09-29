@@ -28,6 +28,7 @@ import MatchCell from "./MatchCell";
 import DeleteRowAction from "./DeleteRowAction";
 import type { AccountRow } from "@/lib/db/types";
 import type { BankPostingRow } from "@/lib/services/banking";
+import type { CodingSuggestionView } from "@/lib/domain/coding";
 import { TOKENS } from "@/lib/design/tokens";
 import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
 import type { BankTransactionDeleteEligibility } from "@/lib/domain/bank-transaction-delete";
@@ -54,6 +55,10 @@ export interface BankTransactionsTableProps {
   /** What each matched line was posted to, keyed by transaction. */
   postings: Map<string, BankPostingRow>;
   onCategorised: () => void;
+  /** The coding suggestion for each waiting line, keyed by transaction. */
+  codingSuggestions: Map<string, CodingSuggestionView>;
+  /** Open the rule form for a line; the account is the one it is posted to or suggested for. */
+  onCreateRule: (row: BankReviewTableRow, accountId: string | null) => void;
   onSettle: (row: BankReviewTableRow) => void;
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
@@ -91,6 +96,8 @@ export default function BankTransactionsTable({
   postableAccounts,
   postings,
   onCategorised,
+  codingSuggestions,
+  onCreateRule,
   onSettle,
   onApprove,
   onReject,
@@ -162,16 +169,22 @@ export default function BankTransactionsTable({
       title: "Category",
       key: "category",
       width: widths.category ?? COLUMN.PICKER,
-      render: (_value: unknown, row: BankReviewTableRow) => (
-        <CategoriseCell
-          transactionId={row.transaction.id}
-          status={row.transaction.status}
-          accounts={postableAccounts}
-          posting={postings.get(row.transaction.id) ?? null}
-          canWrite={canWrite}
-          onChanged={onCategorised}
-        />
-      ),
+      render: (_value: unknown, row: BankReviewTableRow) => {
+        const posting = postings.get(row.transaction.id) ?? null;
+        const suggestion = codingSuggestions.get(row.transaction.id) ?? null;
+        return (
+          <CategoriseCell
+            transactionId={row.transaction.id}
+            status={row.transaction.status}
+            accounts={postableAccounts}
+            posting={posting}
+            canWrite={canWrite}
+            onChanged={onCategorised}
+            suggestion={suggestion}
+            onCreateRule={() => onCreateRule(row, posting?.account_id ?? suggestion?.accountId ?? null)}
+          />
+        );
+      },
     },
     {
       // Measured, at exactly the floor its controls need: a tag, a line of
