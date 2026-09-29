@@ -2787,6 +2787,8 @@ export function printReport(): void {
 ```
 
 > **Changed in review (commit 1122712):** forcing `data-theme` raced `ThemeProvider`, which owns that attribute. `print-report.ts` now never touches the theme: it exports `printReport()` (sets the `print-report` body class around `window.print()`) and `watchReportPrinting()` (the same class on `beforeprint`/`afterprint`, for Ctrl+P). The paper takes the light palette while printing because `cssVariableBlock()` in `lib/design/tokens.ts` gives the light rule the selector `:root, body.print-report .report-print-area`. The table also colours a negative change or % of income in the danger colour.
+>
+> **Changed in the final fix wave:** the `@media print` block in `app/globals.css` hid the rest of the page with `visibility: hidden` and pulled `.report-print-area` out with `position: absolute; top: 0; left: 0`, which resolved against Ant Design's `.ant-spin-container` (`position: relative`) around the paper, not the page — so a print landed offset, with the hidden app still taking up space. It now hides every element that neither holds `.report-print-area` nor sits inside it, with `*:not(:has(.report-print-area)):not(.report-print-area):not(.report-print-area *) { display: none !important; }`, rather than positioning the report over a hidden page.
 
 - [ ] **Step 4: The table**
 

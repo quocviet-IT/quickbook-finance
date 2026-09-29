@@ -3685,23 +3685,12 @@ body {
   min-width: 0;
 }
 
-/* Printing a report prints the report (lib/client/print-report.ts): everything
- * else on the page — navigation, toolbar, floating buttons — is hidden, and the
- * report starts at the top of the sheet. */
+/* Printing a report prints the report (lib/client/print-report.ts). */
 @media print {
-  body.print-report * {
-    visibility: hidden;
-  }
-
-  body.print-report .report-print-area,
-  body.print-report .report-print-area * {
-    visibility: visible;
-  }
-
-  body.print-report .report-print-area {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+  /* Printing a report prints the report: every element that neither holds the
+     report nor sits inside it is taken out of the page, so nothing else prints
+     and no blank pages follow. */
+  body.print-report *:not(:has(.report-print-area)):not(.report-print-area):not(.report-print-area *) {
+    display: none !important;
   }
 }
