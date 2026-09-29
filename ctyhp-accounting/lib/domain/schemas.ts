@@ -21,7 +21,13 @@ export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
   error: "Only USD is supported",
 });
 
-const accountInputSchema = z.object({
+/**
+ * An account's fields, with no defaults. Zod 4 applies a `.default()` even
+ * inside `.partial()`, so an update schema built from defaulted fields writes
+ * `status: "active"` into every edit that does not mention status — renaming
+ * an inactive account used to reactivate it.
+ */
+const accountFieldsSchema = z.object({
   account_code: z
     .string()
     .trim()
@@ -32,9 +38,17 @@ const accountInputSchema = z.object({
   account_type: z.enum(ACCOUNT_TYPES),
   cash_flow_role: z.enum(CASH_FLOW_ROLES).optional(),
   detail_type: z.string().trim().max(80).optional().nullable(),
+  is_contra: z.boolean(),
   parent_account_id: z.uuid().optional().nullable(),
   description: z.string().trim().max(500).optional().nullable(),
   default_tax_code_id: z.uuid().optional().nullable(),
+  currency_code: usdCurrencySchema,
+  is_posting_account: z.boolean(),
+  status: z.enum(ACCOUNT_STATUSES),
+});
+
+const accountInputSchema = accountFieldsSchema.extend({
+  is_contra: z.boolean().default(false),
   currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   is_posting_account: z.boolean().default(true),
   status: z.enum(ACCOUNT_STATUSES).default("active"),
@@ -47,8 +61,8 @@ export const accountCreateSchema = accountInputSchema.transform((value) => ({
 
 export type AccountCreateInput = z.infer<typeof accountCreateSchema>;
 
-/** Update allows partial fields but never changes the code via this path. */
-export const accountUpdateSchema = accountInputSchema.partial().omit({ account_code: true });
+/** Update allows partial fields, changes only those given, and never changes the code via this path. */
+export const accountUpdateSchema = accountFieldsSchema.partial().omit({ account_code: true });
 export type AccountUpdateInput = z.infer<typeof accountUpdateSchema>;
 
 export const accountStatusSchema = z.enum(ACCOUNT_STATUSES);

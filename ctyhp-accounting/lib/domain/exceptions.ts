@@ -55,11 +55,11 @@ export type CheckKey = keyof typeof CHECK_LABEL;
  */
 export interface ExceptionAccount extends LedgerBalance {
   /**
-   * OneBook records that an account is contra rather than guessing from its
-   * name: migration 0046 creates "Accumulated Depreciation" with
-   * `detail_type = 'Contra fixed asset'`.
+   * Said on the account (migration 0125) rather than guessed from its detail
+   * type's wording: Accumulated Depreciation, Allowance for Doubtful Accounts,
+   * Sales Returns, Owner's Draw.
    */
-  detailType: string | null;
+  isContra: boolean;
 }
 
 export interface ExceptionBankAccount {
@@ -115,8 +115,6 @@ export interface WrongWayRow {
   balanceMinor: number;
 }
 
-const CONTRA = /^\s*contra\b/i;
-
 /** Debit-positive, so a credit balance reads negative. */
 function signedBalance(account: ExceptionAccount): number {
   return account.debitBase - account.creditBase;
@@ -144,7 +142,7 @@ function byLargestFirst<T extends { balanceMinor: number }>(rows: T[]): T[] {
 export function wrongWayBalances(accounts: readonly ExceptionAccount[]): WrongWayRow[] {
   const rows: WrongWayRow[] = [];
   for (const a of accounts) {
-    if (CONTRA.test(a.detailType ?? "")) continue;
+    if (a.isContra) continue;
     if (naturalBalance(a.accountType, a.debitBase, a.creditBase) >= 0) continue;
     rows.push({
       accountId: a.accountId,

@@ -85,3 +85,10 @@ describe("accountCreateSchema", () => {
     expect("account_code" in accountUpdateSchema.shape).toBe(false);
   });
 });
+
+describe("accountUpdateSchema", () => {
+  it("changes only what it is given — renaming an inactive account must not reactivate it", () => {
+    expect(accountUpdateSchema.parse({ name: "Rent" })).toEqual({ name: "Rent" });
+    expect(accountUpdateSchema.parse({ cash_flow_role: "operating" })).toEqual({ cash_flow_role: "operating" });
+  });
+});

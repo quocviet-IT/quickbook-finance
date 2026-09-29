@@ -333,13 +333,13 @@ export async function getExceptionReport(
       readOr(unavailable, ["incomeNoCost"], null as string | null, () => earliestEntryDate(sb)),
     ]);
 
-  const detailByAccountId = new Map(accountRows.map((a) => [a.id, a]));
+  const accountById = new Map(accountRows.map((a) => [a.id, a]));
   const accounts: ExceptionAccount[] = balances.map((b: LedgerBalance) => ({
     accountId: b.accountId,
     accountCode: b.accountCode,
     name: b.name,
     accountType: b.accountType,
-    detailType: detailByAccountId.get(b.accountId)?.detail_type ?? null,
+    isContra: accountById.get(b.accountId)?.is_contra ?? false,
     debitBase: b.debitBase,
     creditBase: b.creditBase,
   }));
