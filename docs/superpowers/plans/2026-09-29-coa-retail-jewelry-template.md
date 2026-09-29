@@ -295,6 +295,9 @@ try {
     console.log(`\n${schema}`);
     await client.query("begin");
     try {
+      // Applying 0125 here takes a lock on the live acc_account: give up fast
+      // rather than queue the app's reads behind a lock we are waiting for.
+      await client.query("set local lock_timeout = '5s'");
       await client.query(`set local search_path = ${schema}, extensions`);
       const applied =
         (await client.query(`select 1 from acc_schema_migrations where filename = $1`, [FILE])).rowCount > 0;
