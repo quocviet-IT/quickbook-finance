@@ -424,7 +424,8 @@ const ASSET_GROUPS: ReadonlyArray<{ key: string; title: string; types: AccountTy
   { key: "long", title: "Long-term Assets", types: ["fixed_asset"], always: true },
 ];
 
-const LIABILITY_TYPES: AccountType[] = ["accounts_payable", "credit_card", "current_liability"];
+const CURRENT_LIABILITY_TYPES: AccountType[] = ["accounts_payable", "credit_card", "current_liability"];
+const LONG_TERM_LIABILITY_TYPES: AccountType[] = ["long_term_liability"];
 
 /** `buildBalanceSheet`'s own line for the profit it carries in equity. */
 const isCurrentEarnings = (line: SectionLine) => line.accountId === null && line.name === "Current earnings";
@@ -464,21 +465,37 @@ export function balanceSheetStatement(input: BalanceSheetStatementInput): Statem
   }
   rows.push(makeRow(ctx, { key: "assets:total", kind: "grand", label: "Total Assets", amounts: sheets.map((s) => s.totalAssets), zoomIds: idsOf(assets) }));
 
-  // Liabilities. OneBook has no long-term liability type, so there is one group.
+  // Liabilities: current, then long-term when the chart has any.
   const liabilities = leavesOf(sheets.map((s) => s.liabilities));
+  const longTerm = (leaf: Leaf) => typeOf(leaf) === "long_term_liability";
+  const currentLiabilities = liabilities.filter((leaf) => !longTerm(leaf));
+  const longTermLiabilities = liabilities.filter(longTerm);
   rows.push(spacerRow(ctx, "s-liabilities"));
   rows.push(sectionRow(ctx, "liabilities", "Liabilities"));
   rows.push(classheadRow(ctx, "liabilities:current", "Current Liabilities"));
-  renderTree(forest(liabilities, ctx, ofTypes(...LIABILITY_TYPES)), 1, ctx, rows, "liabilities");
+  renderTree(forest(currentLiabilities, ctx, ofTypes(...CURRENT_LIABILITY_TYPES)), 1, ctx, rows, "liabilities");
   rows.push(
     makeRow(ctx, {
       key: "liabilities:current:total",
       kind: "subtotal",
       label: "Total Current Liabilities",
-      amounts: sumLeaves(liabilities, width),
-      zoomIds: idsOf(liabilities),
+      amounts: sumLeaves(currentLiabilities, width),
+      zoomIds: idsOf(currentLiabilities),
     }),
   );
+  if (longTermLiabilities.length > 0) {
+    rows.push(classheadRow(ctx, "liabilities:long", "Long-term Liabilities"));
+    renderTree(forest(longTermLiabilities, ctx, ofTypes(...LONG_TERM_LIABILITY_TYPES)), 1, ctx, rows, "liabilities:long");
+    rows.push(
+      makeRow(ctx, {
+        key: "liabilities:long:total",
+        kind: "subtotal",
+        label: "Total Long-term Liabilities",
+        amounts: sumLeaves(longTermLiabilities, width),
+        zoomIds: idsOf(longTermLiabilities),
+      }),
+    );
+  }
   rows.push(
     makeRow(ctx, { key: "liabilities:total", kind: "total", label: "Total Liabilities", amounts: sheets.map((s) => s.totalLiabilities), zoomIds: idsOf(liabilities) }),
   );

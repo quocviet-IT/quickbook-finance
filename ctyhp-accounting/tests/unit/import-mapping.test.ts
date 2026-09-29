@@ -72,7 +72,7 @@ describe("translateAccountType", () => {
     expect(translateAccountType("Other Current Asset")).toBe("current_asset");
     expect(translateAccountType("Fixed Asset")).toBe("fixed_asset");
     expect(translateAccountType("Other Current Liability")).toBe("current_liability");
-    expect(translateAccountType("Long Term Liabilities")).toBe("current_liability");
+    expect(translateAccountType("Long Term Liabilities")).toBe("long_term_liability");
     expect(translateAccountType("Equity")).toBe("equity");
     expect(translateAccountType("Income")).toBe("income");
     expect(translateAccountType("Cost of Goods Sold")).toBe("cost_of_goods_sold");

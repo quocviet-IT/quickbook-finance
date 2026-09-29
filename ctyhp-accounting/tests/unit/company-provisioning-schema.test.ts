@@ -31,6 +31,7 @@ describe("companyCreateSchema", () => {
       slug: "north_star",
       is_sample: false,
       display_order: 100,
+      chart_template: "standard",
     });
   });
 

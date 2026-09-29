@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { loadMigrationSources } from "../lib/db/migration-sources.ts";
 import { provisionCompany } from "../lib/services/company-provisioning.ts";
+import { CHART_TEMPLATES } from "../lib/domain/chart-templates.ts";
 
 /** The project root, resolved the way that works on Windows too. */
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -146,6 +147,40 @@ try {
     [`co_${SLUG}`],
   );
   check("anon was given nothing", anonGrants.n === 0, String(anonGrants.n));
+
+  // --- A company built from the Retail & Jewelry chart ------------------------
+  const RETAIL = "verify_retail_probe";
+  await provisionCompany(
+    client,
+    {
+      slug: RETAIL,
+      legalName: "Verify Retail Probe Inc.",
+      isSample: true,
+      displayOrder: 998,
+      adminUserIds: [],
+      chartTemplate: "retail_jewelry",
+    },
+    sources,
+  );
+  const built = new Map(
+    (
+      await client.query(
+        `select a.account_code, a.account_type::text as type, a.is_contra, a.detail_type, p.account_code as parent
+           from co_${RETAIL}.acc_account a
+           left join co_${RETAIL}.acc_account p on p.id = a.parent_account_id`,
+      )
+    ).rows.map((r) => [r.account_code, r]),
+  );
+  const template = CHART_TEMPLATES.retail_jewelry.accounts;
+  check("every Retail & Jewelry account exists", template.every((a) => built.has(a.code)));
+  check("each has its template type", template.every((a) => built.get(a.code)?.type === a.type));
+  check("each has its template parent", template.every((a) => (built.get(a.code)?.parent ?? undefined) === a.parent));
+  check("contra accounts are flagged", template.every((a) => Boolean(built.get(a.code)?.is_contra) === Boolean(a.contra)));
+  check("Undeposited Funds sits with the bank accounts", built.get("1210")?.detail_type === "undeposited_funds");
+  check(
+    "the non-current liabilities are long-term",
+    ["2500", "2600", "2700", "2990"].every((c) => built.get(c)?.type === "long_term_liability"),
+  );
 } catch (error) {
   failed += 1;
   console.log(`  FAIL  provisioning threw — ${error.message}`);

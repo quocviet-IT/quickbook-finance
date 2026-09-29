@@ -27,7 +27,7 @@ const account = (over: Partial<ExceptionAccount> = {}): ExceptionAccount => ({
   accountCode: "1000",
   name: "Cash on Hand",
   accountType: "bank",
-  detailType: null,
+  isContra: false,
   debitBase: 0,
   creditBase: 0,
   ...over,
@@ -54,7 +54,7 @@ describe("wrongWayBalances", () => {
         accountCode: "1590",
         name: "Accumulated Depreciation",
         accountType: "fixed_asset",
-        detailType: "Contra fixed asset",
+        isContra: true,
         creditBase: 42_000_00,
       }),
     ]);
@@ -74,13 +74,12 @@ describe("wrongWayBalances", () => {
     expect(rows.map((r) => r.accountCode)).toEqual(["6200", "6100"]);
   });
 
-  it("still flags a detail_type like 'Contractor Fees' that contains 'Contractor' without a word boundary", () => {
+  it("goes by the contra flag, not by what an account is called", () => {
     const rows = wrongWayBalances([
       account({
         accountCode: "6300",
-        name: "Contractor Fees",
+        name: "Contra Costa Office Rent",
         accountType: "expense",
-        detailType: "Contractor Fees",
         creditBase: 1_000_00,
       }),
     ]);

@@ -87,6 +87,8 @@ export interface AccountRow {
   account_type: AccountType;
   cash_flow_role: CashFlowRole;
   detail_type: string | null;
+  /** Reduces another account in its section (Accumulated Depreciation, Sales Returns, Owner's Draw). */
+  is_contra: boolean;
   parent_account_id: string | null;
   description: string | null;
   default_tax_code_id: string | null;

@@ -17,6 +17,7 @@ export const ACCOUNT_TYPES = [
   "accounts_payable",
   "credit_card",
   "current_liability",
+  "long_term_liability",
   "equity",
   "income",
   "cost_of_goods_sold",
@@ -42,6 +43,7 @@ export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   accounts_payable: "Accounts Payable",
   credit_card: "Credit Card",
   current_liability: "Current Liability",
+  long_term_liability: "Long-term Liability",
   equity: "Equity",
   income: "Income",
   cost_of_goods_sold: "Cost of Goods Sold",
@@ -74,6 +76,18 @@ const PROFIT_AND_LOSS: ReadonlySet<AccountType> = new Set<AccountType>([
 /** The side on which this account type increases. */
 export function normalBalanceOf(type: AccountType): NormalBalance {
   return DEBIT_NORMAL.has(type) ? "debit" : "credit";
+}
+
+/**
+ * The side one account's balance normally sits on: its type's, or the other
+ * side for a contra account — Accumulated Depreciation is a fixed asset that
+ * carries a credit. For reading an account, not for signing amounts, which
+ * stay with `naturalBalance` by type so a contra account still reduces its section.
+ */
+export function accountNormalBalance(type: AccountType, isContra: boolean): NormalBalance {
+  const normal = normalBalanceOf(type);
+  if (!isContra) return normal;
+  return normal === "debit" ? "credit" : "debit";
 }
 
 /** Which financial statement this account type belongs to. */

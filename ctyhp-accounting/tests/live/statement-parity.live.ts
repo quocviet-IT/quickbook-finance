@@ -200,6 +200,13 @@ describe("the five statements agree with the books, figure for figure", () => {
             expect(retained + thisYear, `${label} earnings split`).toBe(earnings);
             const groups = bs.rows.filter((r) => r.kind === "subtotal" && r.key.startsWith("assets:") && r.key.endsWith(":total"));
             expect(groups.reduce((sum, r) => sum + (r.cells[i].amount ?? 0), 0), `${label} asset groups`).toBe(sh.totalAssets);
+            const liabilityGroups = bs.rows.filter(
+              (r) => r.key === "liabilities:current:total" || r.key === "liabilities:long:total",
+            );
+            expect(
+              liabilityGroups.reduce((sum, r) => sum + (r.cells[i].amount ?? 0), 0),
+              `${label} liability groups`,
+            ).toBe(sh.totalLiabilities);
           });
         }
       }

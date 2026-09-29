@@ -4,6 +4,7 @@ import {
   provisionCompany,
   type MigrationSource,
 } from "@/lib/services/company-provisioning";
+import { CHART_TEMPLATES } from "@/lib/domain/chart-templates";
 
 /** A Postgres client that records what it was asked and answers plausibly. */
 function fakeClient(overrides: { failOn?: RegExp } = {}) {
@@ -121,5 +122,54 @@ describe("provisionCompany", () => {
     };
 
     await expect(provisionCompany(client, input, sources)).rejects.toThrow(/acc_journal_entry/);
+  });
+});
+
+/** The fake client, answering the template self-check with `rows`. */
+function templateClient(rows: { account_code: string; parent_code: string | null }[]) {
+  const client = fakeClient();
+  return {
+    sql: client.sql,
+    async query(text: string, params?: unknown[]) {
+      if (/as parent_code/.test(text)) {
+        client.sql.push(text);
+        return { rows };
+      }
+      return client.query(text, params);
+    },
+  };
+}
+
+const RETAIL = CHART_TEMPLATES.retail_jewelry.accounts;
+const RETAIL_ROWS = RETAIL.map((a) => ({ account_code: a.code, parent_code: a.parent ?? null }));
+
+describe("provisionCompany with a chart", () => {
+  it("adds nothing to the Standard chart", async () => {
+    const client = fakeClient();
+    await provisionCompany(client, input, sources);
+    expect(client.sql.some((s) => /insert into acc_account/i.test(s))).toBe(false);
+  });
+
+  it("writes the Retail & Jewelry chart after the migrations and before the company is registered", async () => {
+    const client = templateClient(RETAIL_ROWS);
+    await provisionCompany(client, { ...input, chartTemplate: "retail_jewelry" }, sources);
+
+    expect(client.sql.filter((s) => /insert into acc_account/i.test(s))).toHaveLength(RETAIL.length);
+    expect(client.sql.filter((s) => /set parent_account_id/i.test(s))).toHaveLength(RETAIL.filter((a) => a.parent).length);
+    const order = client.sql.join("\n@@\n");
+    expect(order.indexOf("create table acc_payment")).toBeLessThan(order.search(/insert into acc_account/i));
+    expect(order.search(/set parent_account_id/i)).toBeLessThan(order.indexOf("insert into onebook.company"));
+  });
+
+  it("does not report success when an account is missing or under the wrong parent", async () => {
+    const moved = RETAIL_ROWS.map((r) => (r.account_code === "1230" ? { ...r, parent_code: null } : r));
+    await expect(
+      provisionCompany(templateClient(moved), { ...input, chartTemplate: "retail_jewelry" }, sources),
+    ).rejects.toThrow(/Retail & Jewelry chart — 1230/);
+
+    const missing = RETAIL_ROWS.filter((r) => r.account_code !== "2500");
+    await expect(
+      provisionCompany(templateClient(missing), { ...input, chartTemplate: "retail_jewelry" }, sources),
+    ).rejects.toThrow(/Retail & Jewelry chart — 2500/);
   });
 });

@@ -122,6 +122,7 @@ export function buildBalanceSheet(rows: LedgerBalance[]): BalanceSheet {
     "accounts_payable",
     "credit_card",
     "current_liability",
+    "long_term_liability",
   ]);
   const equity = section("equity", "Equity", rows, ["equity"]);
 
