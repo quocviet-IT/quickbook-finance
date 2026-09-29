@@ -41,6 +41,55 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.67",
+    date: "2026-09-29",
+    headline: "A chart of accounts for jewelry and retail, and a chart you can read by section.",
+    changes: [
+      {
+        kind: "added",
+        title: "Start a new company with the Retail & Jewelry chart",
+        detail:
+          "When creating a company, choose Retail & Jewelry instead of Standard: 84 accounts with every bank account in one section, inventory by kind, fixtures and equipment, customer deposits and gift cards, long-term loans, and jewelry sales and cost of sales, each sub-account under its parent.",
+        route: "/settings/companies",
+      },
+      {
+        kind: "changed",
+        title: "The chart of accounts reads by section",
+        detail:
+          "Accounts are grouped the way the statements read them — bank accounts, receivables and inventory, non-current assets, current and non-current liabilities, equity, income, cost of goods sold, operating expenses — with sub-accounts indented under their parent and codes in number order. Undeposited Funds sits with the bank accounts. A search shows each match in its section, under its parent.",
+        route: "/accounts",
+      },
+      {
+        kind: "added",
+        title: "Non-current liabilities",
+        detail:
+          "A new account type for long-term loans, notes payable and lease liabilities. The Balance Sheet shows them in their own Long-term Liabilities group, and an import from QuickBooks or Wave now files long-term liabilities there instead of with current ones.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "Contra accounts are no longer questioned for running the other way",
+        detail:
+          "An account can be marked Contra — Accumulated Depreciation, Allowance for Doubtful Accounts, Sales Returns, Owner's Draw. The Exception Report no longer lists them as balances pointing the wrong way. The two system contra accounts are marked already.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "changed",
+        title: "A sub-account has its parent's type",
+        detail:
+          "Choosing a parent now offers only accounts of the same type, and a mismatched parent is refused, so a sub-account always adds up inside its parent's section.",
+        route: "/accounts",
+      },
+      {
+        kind: "fixed",
+        title: "Editing an inactive account no longer makes it active again",
+        detail:
+          "Saving a change to an inactive account — its name, its cash flow role — used to set it back to Active. An edit now changes only what was edited; use Activate to bring an account back.",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
     version: "1.66",
     date: "2026-09-28",
     headline: "The five financial statements, set out on paper, with every figure opening onto the entries behind it.",
