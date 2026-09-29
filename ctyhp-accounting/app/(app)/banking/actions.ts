@@ -31,6 +31,8 @@ import {
 import { createPlaidLinkToken } from "@/lib/services/plaid";
 import type { BankTransactionRow } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
+import { CODE_ALL_LIMIT, type CodingSuggestionView } from "@/lib/domain/coding";
+import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -430,4 +432,39 @@ export async function batchCategoriseBankTransactionsAction(
   revalidatePath("/banking");
   revalidatePath("/reports");
   return { ok: true, data: { outcomes } };
+}
+
+/** The coding suggestion for each waiting line in view. Null means every bank account. */
+export async function getCodingSuggestionsAction(
+  bankAccountId: string | null,
+): Promise<ActionResult<CodingSuggestionView[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await codingSuggestions(sb, bankAccountId) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Code every confirmed line from its suggestion. The suggestions are worked
+ * out again on the server, and a line whose suggestion is gone or changed is
+ * reported rather than posted. One line at a time, as the batch action does.
+ */
+export async function codeFromSuggestionsAction(
+  items: CodeItem[],
+): Promise<ActionResult<{ outcomes: CodeOutcome[] }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  if (!items.length) return { ok: false, error: "Nothing to code" };
+  if (items.length > CODE_ALL_LIMIT) return { ok: false, error: `Code at most ${CODE_ALL_LIMIT} lines at a time` };
+  try {
+    const sb = await createSupabaseServerClient();
+    const outcomes = await codeFromSuggestions(sb, items);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: { outcomes } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
 }
