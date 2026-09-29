@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  accountNormalBalance,
   normalBalanceOf,
   statementSectionOf,
   naturalBalance,
@@ -23,6 +24,16 @@ describe("account rules", () => {
     expect(normalBalanceOf("income")).toBe("credit");
     expect(normalBalanceOf("accounts_payable")).toBe("credit");
     expect(normalBalanceOf("equity")).toBe("credit");
+  });
+
+  it("puts a contra account's normal balance on the other side of its type's", () => {
+    // Accumulated Depreciation, Allowance for Doubtful Accounts: assets that carry a credit.
+    expect(accountNormalBalance("fixed_asset", true)).toBe("credit");
+    expect(accountNormalBalance("current_asset", true)).toBe("credit");
+    // Sales Returns, Owner's Draw: income and equity that carry a debit.
+    expect(accountNormalBalance("income", true)).toBe("debit");
+    expect(accountNormalBalance("equity", true)).toBe("debit");
+    expect(accountNormalBalance("fixed_asset", false)).toBe("debit");
   });
 
   it("classifies statement section", () => {

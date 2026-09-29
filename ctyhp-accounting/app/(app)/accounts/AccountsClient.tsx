@@ -22,7 +22,7 @@ import IconActionButton from "@/components/ui/IconActionButton";
 import {
   ACCOUNT_TYPES,
   ACCOUNT_TYPE_LABEL,
-  normalBalanceOf,
+  accountNormalBalance,
   statementSectionOf,
   type AccountType,
 } from "@/lib/domain/accounts";
@@ -197,7 +197,7 @@ export default function AccountsClient({
           const under = [
             detailLabel(account.account_type, account.detail_type),
             CASH_FLOW_ROLE_LABELS[account.cash_flow_role],
-            normalBalanceOf(account.account_type) === "debit" ? "Debit normal" : "Credit normal",
+            accountNormalBalance(account.account_type, account.is_contra) === "debit" ? "Debit normal" : "Credit normal",
             statementSectionOf(account.account_type) === "balance_sheet" ? "Balance Sheet" : "Profit & Loss",
           ]
             .filter(Boolean)
@@ -282,14 +282,15 @@ export default function AccountsClient({
         <Input.Search
           placeholder="Search by code or name"
           allowClear
-          style={{ width: 320 }}
+          style={{ width: 260 }}
           onChange={(e) => setSearch(e.target.value)}
         />
         <Select<AccountType | "all">
           aria-label="Account type"
           value={typeFilter}
           onChange={setTypeFilter}
-          style={{ width: 200 }}
+          style={{ width: 180 }}
+          popupMatchSelectWidth={false}
           options={[
             { value: "all", label: "All types" },
             ...ACCOUNT_TYPES.map((t) => ({ value: t, label: ACCOUNT_TYPE_LABEL[t] })),
@@ -300,7 +301,8 @@ export default function AccountsClient({
           aria-label="Cash flow role"
           value={cashFlowFilter}
           onChange={setCashFlowFilter}
-          style={{ width: 230 }}
+          style={{ width: 200 }}
+          popupMatchSelectWidth={false}
           options={[
             { value: "all", label: "All cash flow roles" },
             ...CASH_FLOW_ROLES.map((role) => ({ value: role, label: CASH_FLOW_ROLE_LABELS[role] })),
