@@ -4,6 +4,7 @@ import { entryDisplayName } from "@/lib/domain/entry-detail";
 import { dayBefore } from "@/lib/domain/fiscal";
 import type { ZoomSpec } from "@/lib/domain/statement";
 import { buildZoom, type ZoomAccount, type ZoomResult } from "@/lib/domain/zoom";
+import { readAllPages, type PageResult } from "@/lib/services/paging";
 import { getLedgerBalances, getTransactionList } from "@/lib/services/reports";
 
 /**
@@ -12,8 +13,6 @@ import { getLedgerBalances, getTransactionList } from "@/lib/services/reports";
  * add up, and would say the books are wrong when they are not.
  */
 export class ZoomError extends Error {}
-
-const PAGE = 1000;
 
 type ChartRow = { id: string; account_code: string; name: string; account_type: AccountType };
 type LineRow = {
@@ -24,17 +23,9 @@ type LineRow = {
   amount_base_minor: number;
   acc_journal_entry: { id: string; entry_number: string; entry_date: string; source_type: string };
 };
-type PageResult = { data: unknown; error: { message: string } | null };
 
-async function readAll<T>(label: string, page: (from: number, to: number) => PromiseLike<PageResult>): Promise<T[]> {
-  const rows: T[] = [];
-  for (let start = 0; ; start += PAGE) {
-    const { data, error } = await page(start, start + PAGE - 1);
-    if (error) throw new ZoomError(`Reading ${label} failed: ${error.message}`);
-    const batch = (data ?? []) as T[];
-    rows.push(...batch);
-    if (batch.length < PAGE) return rows;
-  }
+function readAll<T>(label: string, page: (from: number, to: number) => PromiseLike<PageResult>): Promise<T[]> {
+  return readAllPages<T>(page, (message) => new ZoomError(`Reading ${label} failed: ${message}`));
 }
 
 function readChart(sb: SupabaseClient): Promise<ChartRow[]> {

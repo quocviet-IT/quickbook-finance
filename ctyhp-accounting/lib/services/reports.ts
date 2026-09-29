@@ -1,18 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
-
-const RPC_PAGE = 1000;
+import { readAllPages } from "@/lib/services/paging";
 
 /**
- * Read a set-returning RPC past PostgREST's thousand-row cap.
- *
- * `db-max-rows` caps rows fetched from "a view, table, or stored procedure"
- * alike, and PostgREST reports no error when it truncates — a call that never
- * asks for a range just gets the first page back, silently short past 1,000
- * rows. This pages with `.range()` until a page comes back shorter than the
- * page size, the same loop `transaction-import-preview.ts` and
- * `company-export.ts` use for a table select.
+ * Read a set-returning RPC past PostgREST's thousand-row cap (see
+ * `readAllPages` for why every read must be paged and what "past" means).
  *
  * This is only correct when the RPC orders its result totally, so a row can
  * never straddle a page boundary and shift between two reads. The three
@@ -22,21 +15,15 @@ const RPC_PAGE = 1000;
  * `(month, account_code)` — month plus a unique code. Paging any other RPC
  * first needs the same proof.
  */
-async function pagedRpc<T>(
+function pagedRpc<T>(
   sb: SupabaseClient,
   fn: string,
   args: Record<string, unknown>,
 ): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += RPC_PAGE) {
-    const { data, error } = await sb.rpc(fn, args).range(from, from + RPC_PAGE - 1);
-    if (error) throw new Error(error.message);
-    const page = (data ?? []) as T[];
-    rows.push(...page);
-    // A short page is the last page. Asking again would cost a round trip to
-    // be told the same thing.
-    if (page.length < RPC_PAGE) return rows;
-  }
+  return readAllPages<T>(
+    (from, to) => sb.rpc(fn, args).range(from, to),
+    (message) => new Error(message),
+  );
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   type BeancountPrice,
 } from "@/lib/domain/beancount";
 import { getCurrentCompanySettings } from "@/lib/services/company";
+import { readAllPages, type PageResult } from "@/lib/services/paging";
 import { getTransactionList } from "@/lib/services/reports";
 
 /**
@@ -42,20 +43,9 @@ export const BEANCOUNT_SOURCES = [
   "acc_company_setting_version",
 ] as const;
 
-const PAGE = 1000;
-
-type PageResult = { data: unknown[] | null; error: { message: string } | null };
-
 /** Read every page, stopping on the first short one; throw on any error. */
-async function readAll<T>(label: string, page: (from: number, to: number) => PromiseLike<PageResult>): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await page(from, from + PAGE - 1);
-    if (error) throw new BeancountExportError(`Reading ${label} failed: ${error.message}`);
-    const batch = (data ?? []) as T[];
-    rows.push(...batch);
-    if (batch.length < PAGE) return rows;
-  }
+function readAll<T>(label: string, page: (from: number, to: number) => PromiseLike<PageResult>): Promise<T[]> {
+  return readAllPages<T>(page, (message) => new BeancountExportError(`Reading ${label} failed: ${message}`));
 }
 
 interface AccountRow { id: string; account_code: string; name: string; account_type: AccountType }
