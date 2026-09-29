@@ -41,6 +41,40 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.70",
+    date: "2026-09-29",
+    headline: "Bank lines suggest their own account — from your rules, or from how you coded them before.",
+    changes: [
+      {
+        kind: "added",
+        title: "Suggestions on bank lines waiting to be coded",
+        detail:
+          "A waiting line shows the account it usually goes to — \"Usually 6300 Rent · 11 of 11\" — once the same name has gone to the same account at least twice and at least three times in four. Use posts it; nothing is posted until someone does. A line that already matches an entry in the ledger gets no suggestion.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Code all",
+        detail:
+          "Above Bank Transactions, a count of the waiting lines that have a suggestion, and a button that posts up to 100 of them after listing each one with where it goes and why. A line whose suggestion changed in the meantime is not posted, and says so.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Bank rules",
+        detail:
+          "Banking › Rules: words or a regular expression, money in or out, an amount range, and the account. The first rule that matches suggests the account, ahead of history. Each rule shows how many waiting lines it matches; rules can be reordered, switched off and deleted, and every change is in the audit log.",
+        route: "/banking/rules",
+      },
+      {
+        kind: "added",
+        title: "Create a rule from a bank line",
+        detail: "Create rule under a line's Category opens the rule form filled from that line — its name, its direction and its account.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.69",
     date: "2026-09-29",
     headline: "Banking shows every line, however many there are.",
