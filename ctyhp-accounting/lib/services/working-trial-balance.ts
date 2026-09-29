@@ -7,6 +7,7 @@ import {
   type AdjustingEntry,
   type WorkingTrialBalance,
 } from "@/lib/domain/working-trial-balance";
+import { readAllPages } from "@/lib/services/paging";
 import { getLedgerBalances, getTransactionList } from "@/lib/services/reports";
 
 /**
@@ -18,8 +19,6 @@ import { getLedgerBalances, getTransactionList } from "@/lib/services/reports";
  * wrong trial balance, not a partial one, so any failed read fails the report.
  */
 export class WorkingTrialBalanceError extends Error {}
-
-const PAGE = 1000;
 
 type MarkRow = {
   journal_entry_id: string;
@@ -43,27 +42,24 @@ type MarkRow = {
 };
 
 /** Posted entries dated in the range and marked adjusting, with their lines. Paged. */
-async function readAdjusting(sb: SupabaseClient, from: string, to: string): Promise<MarkRow[]> {
-  const rows: MarkRow[] = [];
-  for (let start = 0; ; start += PAGE) {
-    const { data, error } = await sb
-      .from("acc_adjusting_entry")
-      .select(
-        "journal_entry_id,note," +
-          "acc_journal_entry!inner(id,entry_number,entry_date,description,status," +
-          "acc_journal_line(account_id,debit_minor,credit_minor,amount_base_minor,line_order," +
-          "acc_account(account_code,name,account_type)))",
-      )
-      .eq("acc_journal_entry.status", "posted")
-      .gte("acc_journal_entry.entry_date", from)
-      .lte("acc_journal_entry.entry_date", to)
-      .order("journal_entry_id")
-      .range(start, start + PAGE - 1);
-    if (error) throw new WorkingTrialBalanceError(`Reading the adjusting entries failed: ${error.message}`);
-    const page = (data ?? []) as unknown as MarkRow[];
-    rows.push(...page);
-    if (page.length < PAGE) return rows;
-  }
+function readAdjusting(sb: SupabaseClient, from: string, to: string): Promise<MarkRow[]> {
+  return readAllPages<MarkRow>(
+    (start, end) =>
+      sb
+        .from("acc_adjusting_entry")
+        .select(
+          "journal_entry_id,note," +
+            "acc_journal_entry!inner(id,entry_number,entry_date,description,status," +
+            "acc_journal_line(account_id,debit_minor,credit_minor,amount_base_minor,line_order," +
+            "acc_account(account_code,name,account_type)))",
+        )
+        .eq("acc_journal_entry.status", "posted")
+        .gte("acc_journal_entry.entry_date", from)
+        .lte("acc_journal_entry.entry_date", to)
+        .order("journal_entry_id")
+        .range(start, end),
+    (message) => new WorkingTrialBalanceError(`Reading the adjusting entries failed: ${message}`),
+  );
 }
 
 export async function getWorkingTrialBalance(

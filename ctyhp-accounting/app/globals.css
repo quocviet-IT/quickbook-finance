@@ -1,7 +1,8 @@
 /* Generated from lib/design/tokens.ts. Do not edit by hand — a unit test
    asserts this block still matches cssVariableBlock() exactly, so changing a
    colour means changing the token and copying the new block over. */
-:root {
+:root,
+body.print-report .report-print-area {
   --ob-money-positive: #15803d;
   --ob-money-negative: #b91c1c;
   --ob-money-zero: #475569;
@@ -3682,4 +3683,14 @@ body {
   align-items: center;
   margin-right: 12px;
   min-width: 0;
+}
+
+/* Printing a report prints the report (lib/client/print-report.ts). */
+@media print {
+  /* Printing a report prints the report: every element that neither holds the
+     report nor sits inside it is taken out of the page, so nothing else prints
+     and no blank pages follow. */
+  body.print-report *:not(:has(.report-print-area)):not(.report-print-area):not(.report-print-area *) {
+    display: none !important;
+  }
 }

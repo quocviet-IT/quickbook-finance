@@ -1,74 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  App,
-  Button,
-  DatePicker,
-  InputNumber,
-  Select,
-  Space,
-  Spin,
-  Switch,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
+import { Alert, App, Button, Spin } from "antd";
 import { EditOutlined } from "@ant-design/icons";
-import dayjs, { type Dayjs } from "dayjs";
-import DataTable from "@/components/ui/DataTable";
-import FilterBar from "@/components/ui/FilterBar";
-import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
+import { ComparisonBars, chartColors, type ComparisonBarDatum } from "@/components/charts/FinancialCharts";
 import BudgetEditorDrawer from "@/components/reports/BudgetEditorDrawer";
-import BudgetVsActualView from "@/components/reports/BudgetVsActualView";
-import { ReportAudienceToggle, ReportBody } from "@/components/reports/ReportAudience";
-import StatementOfEquityView from "@/components/reports/StatementOfEquityView";
-import BalanceSheetTrendView, {
-  type TrendPeriod,
-} from "@/components/reports/BalanceSheetTrendView";
-import PnlTrendView, { type PnlTrendPeriod } from "@/components/reports/PnlTrendView";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
-import { formatMoney, formatPercent } from "@/lib/format";
-import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
-import { periodColumnLabel } from "@/lib/domain/period-label";
-import { fromMinor } from "@/lib/domain/money";
-import type { ReportExportSheet } from "@/lib/domain/report-export";
+import { ReportBody } from "@/components/reports/ReportAudience";
+import { ReportFoot, ReportPaper, StatRow, reportPaperStyles as styles, type StatItem } from "@/components/reports/ReportPaper";
+import ReportToolbar from "@/components/reports/ReportToolbar";
+import StatementTable from "@/components/reports/StatementTable";
+import ZoomSheet from "@/components/reports/ZoomSheet";
+import { watchReportPrinting } from "@/lib/client/print-report";
+import { formatMoney } from "@/lib/format";
+import { dayBefore, fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
+import { longDate, presetRange, rangeText, type PeriodPreset } from "@/lib/domain/report-presets";
 import {
   buildBalanceSheet,
   buildProfitAndLoss,
   buildTrialBalance,
-  compareReportLines,
-  nextShowPercentOfIncome,
-  percentOfIncome,
-  PERCENT_OF_INCOME_TOOLTIP,
-  previousPeriodRange,
+  netIncomeOf,
+  sumProfitAndLoss,
   type BalanceSheet,
-  type BudgetVsActual,
   type LedgerBalance,
-  type ReportSection,
-  type StatementOfEquity,
+  type ProfitAndLoss,
 } from "@/lib/domain/reports";
 import {
-  COMPARISON_BASES,
-  comparisonBasisLabel,
-  comparisonDate,
-  MAX_TREND_COLUMNS,
-  monthlyColumns,
-  quarterlyColumns,
-  trailingMonthEnds,
-  trailingYearEnds,
-  trendColumnLimitMessage,
-  type ComparisonBasis,
-} from "@/lib/domain/report-periods";
-import {
-  getBudgetVsActualAction,
-  getLedgerBalancesAction,
-  getStatementOfEquityAction,
-} from "./actions";
+  balanceSheetStatement,
+  budgetStatement,
+  equityStatement,
+  indexAccounts,
+  pnlStatement,
+  statementSheet,
+  trialBalanceStatement,
+  type AccountRef,
+  type Statement,
+  type StatementColumn,
+  type ZoomSpec,
+} from "@/lib/domain/statement";
+import { fiscalYearStartOf, pointColumns, rangeColumns, type CompareMode } from "@/lib/domain/statement-columns";
+import { getBudgetVsActualAction, getLedgerBalancesAction, getStatementOfEquityAction } from "./actions";
 
 interface ReportsClientProps {
   initialReportType: InternalReportId;
@@ -77,490 +50,468 @@ interface ReportsClientProps {
   companyName: string;
   fiscalStartMonth: number;
   canManageBudget: boolean;
+  /** The chart, for nesting accounts under their parent and for what a total opens. */
+  accounts: AccountRef[];
+  today: string;
+  /** The first and last posted entry, for "All dates" and "Last 3 years". */
+  firstEntryDate: string | null;
+  lastEntryDate: string | null;
 }
 
+const TITLES: Record<InternalReportId, string> = {
+  pnl: "Profit and Loss",
+  balance: "Balance Sheet",
+  trial: "Trial Balance",
+  budget: "Budget vs Actual",
+  equity: "Statement of Equity",
+};
+
+interface ChartSpec {
+  title: string;
+  description: string;
+  data: ComparisonBarDatum[];
+}
+
+/** The Management view's chart for a Profit and Loss: as before, income and net per column, or net alone across many. */
+function pnlChart(columns: readonly StatementColumn[], pnls: readonly ProfitAndLoss[]): ChartSpec {
+  const shown = columns.map((c, i) => ({ c, p: pnls[i] })).filter(({ c }) => !c.isTotal);
+  const net = (p: ProfitAndLoss) => (p.netIncome < 0 ? chartColors.negative : chartColors.net);
+  if (shown.length <= 2) {
+    return {
+      title: "Period performance",
+      description: "Income and net income for each column shown.",
+      data: shown.flatMap(({ c, p }) => [
+        { key: `${c.key}-income`, label: `${c.label} income`, value: p.income.total + p.otherIncome.total, color: chartColors.income },
+        { key: `${c.key}-net`, label: `${c.label} net income`, value: p.netIncome, color: net(p) },
+      ]),
+    };
+  }
+  return {
+    title: "Net income by period",
+    description: "Net income for each column shown, oldest to newest.",
+    data: shown.map(({ c, p }) => ({ key: c.key, label: c.label, value: p.netIncome, color: net(p) })),
+  };
+}
+
+/** The Management view's chart for a Balance Sheet. */
+function balanceChart(columns: readonly StatementColumn[], sheets: readonly BalanceSheet[]): ChartSpec {
+  if (columns.length <= 2) {
+    return {
+      title: "Financial position",
+      description: "Assets, liabilities and equity for each column shown.",
+      data: columns.flatMap((c, i) => [
+        { key: `${c.key}-assets`, label: `${c.label} assets`, value: sheets[i].totalAssets, color: chartColors.receivable },
+        { key: `${c.key}-liabilities`, label: `${c.label} liabilities`, value: sheets[i].totalLiabilities, color: chartColors.expense },
+        { key: `${c.key}-equity`, label: `${c.label} equity`, value: sheets[i].totalEquity, color: chartColors.net },
+      ]),
+    };
+  }
+  return {
+    title: "Total assets over the periods shown",
+    description: "Each bar is the balance sheet total for that date.",
+    data: columns.map((c, i) => ({ key: c.key, label: c.label, value: sheets[i].totalAssets, color: chartColors.receivable })),
+  };
+}
+
+/**
+ * The five financial statements, laid out as the client's prototype lays a
+ * statement out (`renderReports`, `reportPL`, `reportBS`, `reportTB`,
+ * `reportBudget`): the toolbar, the report on paper, the statement, and a
+ * footer saying every figure opens onto the entries behind it.
+ *
+ * Every figure comes from the builders in lib/domain/reports.ts, from the same
+ * reads as before; lib/domain/statement.ts only arranges them.
+ */
 export default function ReportsClient({
-  initialReportType,
+  initialReportType: type,
   baseCurrency,
   baseDecimals,
   companyName,
   fiscalStartMonth,
   canManageBudget,
+  accounts,
+  today,
+  firstEntryDate,
+  lastEntryDate,
 }: ReportsClientProps) {
   const { message } = App.useApp();
   const router = useRouter();
-  const today = dayjs();
-  const initialFiscalYear = fiscalYearForDate(today.format("YYYY-MM-DD"), fiscalStartMonth);
-  const [type, setType] = useState<InternalReportId>(initialReportType);
-  const [asOf, setAsOf] = useState<Dayjs>(today);
-  const [range, setRange] = useState<[Dayjs, Dayjs]>([today.startOf("year"), today]);
-  const [rows, setRows] = useState<LedgerBalance[]>([]);
-  const [priorRows, setPriorRows] = useState<LedgerBalance[]>([]);
-  // Balance sheet presentation: what it is compared with, whether the
-  // variance columns are shown, and whether it runs as a period trend.
-  const [comparisonBasis, setComparisonBasis] = useState<ComparisonBasis>("prior_month");
-  // `single` and `comparison` are one balance sheet read; `months` and `years`
-  // are a trend, which is a different query and a different view. Anything
-  // added here has to be sorted into one of those two families below, not
-  // tested for by "is not comparison".
-  const [balanceColumns, setBalanceColumns] = useState<
-    "single" | "comparison" | "months" | "years"
-  >(
-    "comparison",
+  const point = type === "balance" || type === "trial";
+  const index = useMemo(() => indexAccounts(accounts), [accounts]);
+  const presetContext = useMemo(
+    () => ({ today, fiscalStartMonth, firstEntryDate, lastEntryDate }),
+    [today, fiscalStartMonth, firstEntryDate, lastEntryDate],
   );
-  const [showVariance, setShowVariance] = useState(false);
-  /**
-   * How the profit and loss lays its columns out.
-   *
-   * Defaults to the comparison, which is what this report has always shown, so
-   * nobody's saved link changes meaning. A reader who wants the statement on
-   * its own — to hand to a bank, or to read without four columns of arithmetic
-   * — asks for one period and gets one column. `month`/`quarter` are a
-   * different query shape entirely (one read per column, like the balance
-   * sheet trend below), which is why they get their own state — `pnlRows` —
-   * rather than reusing `rows`/`priorRows`.
-   */
-  const [pnlColumns, setPnlColumns] = useState<"single" | "comparison" | "month" | "quarter">(
-    "comparison",
+  const initialRange = useMemo(() => presetRange("year", presetContext), [presetContext]);
+
+  const [preset, setPreset] = useState<PeriodPreset>("year");
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
+  // What each statement opens with. The P&L sits beside the same dates a year
+  // earlier: it opens on the year to date, and the "previous period" of Jan 1 –
+  // Sep 28 is the same number of days before it (Apr 5 – Dec 31), which nobody
+  // reads a year to date against. The Balance Sheet sits beside the previous
+  // month end; the Trial Balance stands on its own.
+  const [compare, setCompare] = useState<CompareMode>(
+    type === "pnl" ? "year" : type === "balance" ? "prev" : "none",
   );
-  /**
-   * Whether each P&L line also carries its share of that column's income.
-   *
-   * Defaults on for one or two columns, where a percent beside each figure
-   * costs nothing to read. Defaults off for a period-by-period view, where it
-   * would double an already-wide table — but stays a click away rather than
-   * being disabled there, because a reader who wants both may still ask for
-   * both.
-   */
-  const [showPercentOfIncome, setShowPercentOfIncome] = useState(true);
-  /**
-   * Whether the reader has flipped the % of Income switch themselves. Before
-   * that, `handlePnlColumnsChange` is free to move the switch to the new
-   * mode's default; after it, the mode change must leave the reader's own
-   * choice alone — see `nextShowPercentOfIncome`.
-   */
-  const [percentOfIncomeTouched, setPercentOfIncomeTouched] = useState(false);
-  const [trendPeriods, setTrendPeriods] = useState<TrendPeriod[]>([]);
-  const [pnlTrendPeriods, setPnlTrendPeriods] = useState<PnlTrendPeriod[]>([]);
-  /**
-   * Set instead of running the query, when the chosen range would need more
-   * columns than a reader could scan. Refusing and naming the fix beats
-   * fetching sixty columns nobody will read one at a time.
-   */
-  const [pnlTrendLimitMessage, setPnlTrendLimitMessage] = useState<string | null>(null);
-  const [budgetReport, setBudgetReport] = useState<BudgetVsActual | null>(null);
-  const [equityReport, setEquityReport] = useState<StatementOfEquity | null>(null);
+  // % of income is on for one or two columns and off for a column per period —
+  // until the reader flips it; from then on it is theirs (as `nextShowPercentOfIncome` has it).
+  const [showPercent, setShowPercent] = useState(true);
+  const [percentTouched, setPercentTouched] = useState(false);
+  const changeCompare = (mode: CompareMode) => {
+    setCompare(mode);
+    if (!percentTouched) setShowPercent(mode === "none" || mode === "prev" || mode === "year");
+  };
+
+  const initialFiscalYear = fiscalYearForDate(today, fiscalStartMonth);
   const [fiscalYear, setFiscalYear] = useState(initialFiscalYear);
-  const months = useMemo(
-    () => fiscalMonths(fiscalYear, fiscalStartMonth),
-    [fiscalYear, fiscalStartMonth],
-  );
-  const initialPeriod = Math.max(
-    1,
-    months.findIndex((month) => today.format("YYYY-MM-DD") >= month.start && today.format("YYYY-MM-DD") <= month.end) + 1,
-  );
+  const months = useMemo(() => fiscalMonths(fiscalYear, fiscalStartMonth), [fiscalYear, fiscalStartMonth]);
   const [budgetFromPeriod, setBudgetFromPeriod] = useState(1);
-  const [budgetToPeriod, setBudgetToPeriod] = useState(initialPeriod || 12);
+  const [budgetToPeriod, setBudgetToPeriod] = useState(() => {
+    const current = fiscalMonths(initialFiscalYear, fiscalStartMonth).findIndex((m) => today >= m.start && today <= m.end);
+    return current === -1 ? 12 : current + 1;
+  });
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  function handleReportTypeChange(nextType: InternalReportId) {
-    setType(nextType);
-    router.replace(`/reports?report=${nextType}`, { scroll: false });
-  }
+  const [statement, setStatement] = useState<Statement | null>(null);
+  // What a Profit and Loss read produced, kept apart from the Statement built from
+  // it: flipping "% of income" only rebuilds this into a Statement (see the
+  // pnlShown memo below); it never triggers another read of the books.
+  const [pnlData, setPnlData] = useState<{
+    columns: readonly StatementColumn[];
+    pnls: readonly ProfitAndLoss[];
+    change: boolean;
+  } | null>(null);
+  const [chart, setChart] = useState<ChartSpec | null>(null);
+  const [stats, setStats] = useState<StatItem[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [ran, setRan] = useState(initialRange);
+  const [loading, setLoading] = useState(true);
+  const [zoom, setZoom] = useState<ZoomSpec | null>(null);
+  // A run-generation guard: a slower, older read that finishes after a newer one
+  // has already started must not call show/refuse/message.error and replace the
+  // statement, or the reader's later request, with the earlier one's result.
+  const latestRun = useRef(0);
 
-  function handlePnlColumnsChange(next: "single" | "comparison" | "month" | "quarter") {
-    setPnlColumns(next);
-    setShowPercentOfIncome((current) => nextShowPercentOfIncome(next, current, percentOfIncomeTouched));
-  }
-
-  const money = useCallback(
-    (minor: number) => formatMoney(minor, baseCurrency, baseDecimals),
-    [baseCurrency, baseDecimals],
-  );
+  const money = useCallback((minor: number) => formatMoney(minor, baseCurrency, baseDecimals), [baseCurrency, baseDecimals]);
 
   const run = useCallback(async () => {
+    const id = ++latestRun.current;
+    const current = () => id === latestRun.current;
+    const read = async (f: string | null, t: string): Promise<LedgerBalance[]> => {
+      const result = await getLedgerBalancesAction(f, t);
+      if (!result.ok || !result.data) throw new Error(result.error ?? "The ledger could not be read.");
+      return result.data;
+    };
+    const show = (next: Statement, nextChart: ChartSpec | null, nextStats: StatItem[] | null, range: { from: string; to: string }) => {
+      if (!current()) return;
+      setStatement(next);
+      setChart(nextChart);
+      setStats(nextStats);
+      setRan(range);
+      setNotice(null);
+    };
+    const refuse = (text: string) => {
+      if (!current()) return;
+      setNotice(text);
+      setStatement(null);
+      setPnlData(null);
+      setChart(null);
+      setStats(null);
+    };
+
     setLoading(true);
     try {
       if (type === "budget") {
-        if (budgetFromPeriod > budgetToPeriod) {
-          message.warning("The first budget period must not be after the last period");
-          return;
-        }
-        const from = months[budgetFromPeriod - 1].start;
-        const to = months[budgetToPeriod - 1].end;
-        const result = await getBudgetVsActualAction(fiscalYear, from, to);
-        if (!result.ok || !result.data) throw new Error(result.error ?? "Failed to load Budget vs Actual");
-        setBudgetReport(result.data);
+        if (budgetFromPeriod > budgetToPeriod) return refuse("The first budget period is after the last.");
+        const bFrom = months[budgetFromPeriod - 1].start;
+        const bTo = months[budgetToPeriod - 1].end;
+        const result = await getBudgetVsActualAction(fiscalYear, bFrom, bTo);
+        if (!result.ok || !result.data) throw new Error(result.error ?? "Budget vs Actual could not be read.");
+        const bva = result.data;
+        const actualIncome = bva.actual.income.total + bva.actual.otherIncome.total;
+        const budgetIncome = bva.budget.income.total + bva.budget.otherIncome.total;
+        const actualExpenses = bva.actual.costOfGoodsSold.total + bva.actual.operatingExpenses.total + bva.actual.otherExpenses.total;
+        const netVariance = bva.actual.netIncome - bva.budget.netIncome;
+        show(
+          budgetStatement({ bva, from: bFrom, to: bTo, accounts: index }),
+          null,
+          [
+            { label: "Actual income", value: money(actualIncome) },
+            { label: "Budget income", value: money(budgetIncome) },
+            { label: "Actual expenses", value: money(actualExpenses) },
+            { label: "Net income variance", value: money(netVariance), danger: netVariance < 0 },
+          ],
+          { from: bFrom, to: bTo },
+        );
         return;
       }
+
       if (type === "equity") {
-        const from = range[0].format("YYYY-MM-DD");
-        const to = range[1].format("YYYY-MM-DD");
+        if (from > to) return refuse("The start date is after the end date.");
         const result = await getStatementOfEquityAction(from, to);
-        if (!result.ok || !result.data) throw new Error(result.error ?? "Failed to load Statement of Equity");
-        setEquityReport(result.data);
-        return;
-      }
-
-      if (type === "balance" && (balanceColumns === "months" || balanceColumns === "years")) {
-        // A trend runs one balance sheet per column; they are independent
-        // reads, so they go out together.
-        const asOfIso = asOf.format("YYYY-MM-DD");
-        const columns =
-          balanceColumns === "months" ? trailingMonthEnds(asOfIso, 12) : trailingYearEnds(asOfIso, 3);
-        const results = await Promise.all(
-          columns.map((column) => getLedgerBalancesAction(null, column.date)),
-        );
-        const failed = results.find((result) => !result.ok || !result.data);
-        if (failed) throw new Error(failed.error ?? "Failed to load the period trend");
-        setTrendPeriods(
-          columns.map((column, index) => ({
-            ...column,
-            sheet: buildBalanceSheet(results[index].data ?? []),
-          })),
+        if (!result.ok || !result.data) throw new Error(result.error ?? "The Statement of Equity could not be read.");
+        const soe = result.data;
+        show(
+          equityStatement({ soe, from, to, accounts: index }),
+          {
+            title: "Equity movement",
+            description: "Beginning equity plus direct equity activity and net income equals ending equity.",
+            data: [
+              { key: "opening", label: "Beginning equity", value: soe.openingEquity, color: chartColors.neutral },
+              { key: "activity", label: "Direct equity activity", value: soe.equityActivity, color: chartColors.payable },
+              { key: "income", label: "Net income", value: soe.netIncome, color: soe.netIncome < 0 ? chartColors.negative : chartColors.income },
+              { key: "closing", label: "Ending equity", value: soe.closingEquity, color: chartColors.net },
+            ],
+          },
+          null,
+          { from, to },
         );
         return;
       }
 
-      if (type === "pnl" && (pnlColumns === "month" || pnlColumns === "quarter")) {
-        // A period-by-period P&L is the same shape as the balance sheet trend
-        // above: one independent read per column, run together. The one thing
-        // it adds is the column count itself can be unbounded — a hand-picked
-        // range, not a fixed trailing count — so it gets checked before any
-        // query goes out rather than after.
-        const currentFrom = range[0].format("YYYY-MM-DD");
-        const currentTo = range[1].format("YYYY-MM-DD");
-        const limitMessage = trendColumnLimitMessage(pnlColumns, currentFrom, currentTo);
-        if (limitMessage) {
-          setPnlTrendLimitMessage(limitMessage);
-          setPnlTrendPeriods([]);
-          return;
-        }
-        setPnlTrendLimitMessage(null);
-        const columns =
-          pnlColumns === "month"
-            ? monthlyColumns(currentFrom, currentTo)
-            : quarterlyColumns(currentFrom, currentTo);
-        const results = await Promise.all(
-          columns.map((column) => getLedgerBalancesAction(column.from, column.to)),
-        );
-        const failed = results.find((result) => !result.ok || !result.data);
-        if (failed) throw new Error(failed.error ?? "Failed to load the period columns");
-        setPnlTrendPeriods(
-          columns.map((column, index) => ({
-            ...column,
-            pnl: buildProfitAndLoss(results[index].data ?? []),
-          })),
-        );
+      if (type === "pnl") {
+        const plan = rangeColumns(compare, from, to, fiscalStartMonth);
+        if (!plan.ok) return refuse(plan.message);
+        const detail = plan.columns.filter((c) => !c.isTotal);
+        const detailPnls = (await Promise.all(detail.map((c) => read(c.from, c.to)))).map(buildProfitAndLoss);
+        const pnls = plan.columns.map((c) => (c.isTotal ? sumProfitAndLoss(detailPnls) : detailPnls[detail.indexOf(c)]));
+        if (!current()) return;
+        // The Statement itself is built by the pnlShown memo below, from this plus
+        // showPercent: toggling "% of income" must not read the books again.
+        setPnlData({ columns: plan.columns, pnls, change: plan.change });
+        setChart(pnlChart(plan.columns, pnls));
+        setStats(null);
+        setRan({ from, to });
+        setNotice(null);
         return;
       }
 
-      const currentFrom = type === "pnl" ? range[0].format("YYYY-MM-DD") : null;
-      const currentTo = type === "pnl" ? range[1].format("YYYY-MM-DD") : asOf.format("YYYY-MM-DD");
-      let priorFrom: string | null = null;
-      let priorTo: string | null = null;
-      // A report asked for on its own reads one period. Leaving priorTo null is
-      // what skips the second query below, so asking for one period costs one
-      // read rather than two.
-      if (type === "pnl" && pnlColumns === "comparison") {
-        const prior = previousPeriodRange(currentFrom!, currentTo);
-        priorFrom = prior.from;
-        priorTo = prior.to;
-      } else if (type === "balance" && balanceColumns === "comparison") {
-        priorTo = comparisonDate(currentTo, comparisonBasis);
+      // The Balance Sheet and the Trial Balance: columns are dates.
+      const plan = pointColumns(compare, to, from, fiscalStartMonth);
+      if (!plan.ok) return refuse(plan.message);
+      const balances = await Promise.all(plan.columns.map((c) => read(null, c.to)));
+      if (type === "trial") {
+        show(trialBalanceStatement({ columns: plan.columns, tbs: balances.map(buildTrialBalance), accounts: index }), null, null, { from, to });
+        return;
       }
-      const [currentResult, priorResult] = await Promise.all([
-        getLedgerBalancesAction(currentFrom, currentTo),
-        priorTo ? getLedgerBalancesAction(priorFrom, priorTo) : Promise.resolve(null),
-      ]);
-      if (!currentResult.ok || !currentResult.data) {
-        throw new Error(currentResult.error ?? "Failed to load report");
-      }
-      if (priorResult && (!priorResult.ok || !priorResult.data)) {
-        throw new Error(priorResult.error ?? "Failed to load prior-period comparison");
-      }
-      setRows(currentResult.data);
-      setPriorRows(priorResult?.data ?? []);
+      const fiscalYearStarts = plan.columns.map((c) => fiscalYearStartOf(c.to, fiscalStartMonth));
+      // Twelve month-end columns share one fiscal year: read each year's earlier profit once.
+      const starts = [...new Set(fiscalYearStarts)];
+      const earlier = new Map(
+        await Promise.all(starts.map(async (start) => [start, netIncomeOf(await read(null, dayBefore(start)))] as const)),
+      );
+      const sheets = balances.map(buildBalanceSheet);
+      show(
+        balanceSheetStatement({
+          columns: plan.columns,
+          sheets,
+          priorEarnings: fiscalYearStarts.map((start) => earlier.get(start) ?? 0),
+          fiscalYearStarts,
+          accounts: index,
+          change: plan.change,
+        }),
+        balanceChart(plan.columns, sheets),
+        null,
+        { from, to },
+      );
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "Failed to load report");
+      if (current()) message.error(error instanceof Error ? error.message : "The report could not be produced.");
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [
     type,
-    range,
-    asOf,
-    comparisonBasis,
-    balanceColumns,
-    pnlColumns,
+    from,
+    to,
+    compare,
     fiscalYear,
     budgetFromPeriod,
     budgetToPeriod,
     months,
+    index,
+    fiscalStartMonth,
+    money,
     message,
   ]);
 
   useEffect(() => {
-    // Data-synchronization effect: report filters intentionally trigger a server load.
+    // Data-synchronization effect: a change of period or comparison reads the books again.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void run();
   }, [run]);
 
-  const resultCount =
+  // Ctrl+P prints the report alone too, not only the Print button.
+  useEffect(() => watchReportPrinting(), []);
+
+  // The P&L Statement, rebuilt from the last read whenever showPercent changes —
+  // a display-only redraw, never another trip to the books (see pnlData above).
+  const pnlShown = useMemo(
+    () =>
+      pnlData ? pnlStatement({ columns: pnlData.columns, pnls: pnlData.pnls, accounts: index, showPercent, change: pnlData.change }) : null,
+    [pnlData, index, showPercent],
+  );
+  // The statement actually on screen: the P&L's own memo for that report, the
+  // plain read result for every other statement.
+  const shownStatement = type === "pnl" ? pnlShown : statement;
+
+  // While a notice is showing, the paper's own read never ran for the dates
+  // currently asked for, so the header must not keep quoting the last
+  // successful run's range — it heads with what is asked for instead. A budget
+  // is asked for by fiscal month, not by the From/To dates.
+  const askedRange =
     type === "budget"
-      ? budgetReport?.lines.length
-      : type === "equity"
-        ? equityReport?.lines.length
-        : type === "pnl" && (pnlColumns === "month" || pnlColumns === "quarter")
-          ? pnlTrendPeriods.length
-          : rows.length;
-  const budgetFrom = months[budgetFromPeriod - 1]?.start ?? months[0].start;
-  const budgetTo = months[budgetToPeriod - 1]?.end ?? months[11].end;
+      ? { from: months[budgetFromPeriod - 1].start, to: months[budgetToPeriod - 1].end }
+      : { from, to };
+  const shownRange = notice ? askedRange : ran;
+  const paperRange = point ? `As of ${longDate(shownRange.to)}` : rangeText(shownRange.from, shownRange.to);
+  const sheet = useMemo(
+    () =>
+      shownStatement && !shownStatement.empty
+        ? statementSheet(shownStatement, {
+            companyName,
+            currencyCode: baseCurrency,
+            decimals: baseDecimals,
+            subtitle: paperRange,
+            fileName: `${TITLES[type]} ${ran.from} to ${ran.to}`,
+          })
+        : null,
+    [shownStatement, companyName, baseCurrency, baseDecimals, paperRange, type, ran],
+  );
+
+  // A month-by-month request that is too wide may still fit by quarter.
+  const quarterFits =
+    compare === "month" &&
+    (point ? pointColumns("quarter", to, from, fiscalStartMonth) : rangeColumns("quarter", from, to, fiscalStartMonth)).ok;
+
+  const body = notice ? (
+    <div className={styles.empty}>
+      {notice}
+      {quarterFits ? (
+        <div style={{ marginTop: 12 }}>
+          <Button size="small" onClick={() => changeCompare("quarter")}>
+            Show it by quarter
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  ) : !shownStatement ? (
+    <div className={styles.empty}>{loading ? "Reading the books…" : "The report has not been run."}</div>
+  ) : shownStatement.empty ? (
+    <div className={styles.empty}>
+      No entries fall in this period.
+      <br />
+      Add entries on the <Link href="/journal">Journal screen</Link>, or widen the date range.
+    </div>
+  ) : (
+    <>
+      {stats ? <StatRow items={stats} /> : null}
+      <StatementTable statement={shownStatement} money={money} onZoom={setZoom} />
+      {shownStatement.outOfBalance !== null ? (
+        <Alert
+          type="error"
+          showIcon
+          className={styles.outOfBalance}
+          title={`${type === "trial" ? "Debits and credits" : "Assets, and liabilities plus equity,"} differ by ${money(Math.abs(shownStatement.outOfBalance))}.`}
+          description="This should not happen while every entry balances. The General Ledger Posting report shows which document did not reach the ledger."
+        />
+      ) : null}
+      <ReportFoot>
+        <strong>Every figure is a QuickZoom.</strong> Click any amount to open the entries behind it, then click a line to
+        open the full double entry.
+      </ReportFoot>
+    </>
+  );
+
+  const paper = (
+    <div className="report-print-area">
+      <ReportPaper companyName={companyName} title={TITLES[type]} range={paperRange} currencyCode={baseCurrency}>
+        {body}
+      </ReportPaper>
+    </div>
+  );
 
   return (
     <div>
-      <FilterBar
-        resultCount={resultCount}
-        ariaLabel="Financial report filters and actions"
-        actions={
-          <>
-            {type === "budget" && canManageBudget && (
-              <Button icon={<EditOutlined />} onClick={() => setBudgetEditorOpen(true)}>
-                Manage budget
-              </Button>
-            )}
-            <Button type="primary" onClick={() => void run()} loading={loading}>
-              Run report
-            </Button>
-          </>
+      <ReportToolbar
+        report={type}
+        onReportChange={(next) => router.replace(`/reports?report=${next}`, { scroll: false })}
+        dates={
+          type === "budget"
+            ? {
+                kind: "budget",
+                fiscalYear,
+                months,
+                fromPeriod: budgetFromPeriod,
+                toPeriod: budgetToPeriod,
+                onFiscalYear: setFiscalYear,
+                onFromPeriod: setBudgetFromPeriod,
+                onToPeriod: setBudgetToPeriod,
+              }
+            : {
+                kind: point ? "point" : "range",
+                preset,
+                from,
+                to,
+                showFrom: !point || compare === "month" || compare === "quarter" || compare === "years",
+                onPreset: (next) => {
+                  setPreset(next);
+                  if (next === "custom") return;
+                  const range = presetRange(next, presetContext);
+                  setFrom(range.from);
+                  setTo(range.to);
+                },
+                onFrom: (date) => {
+                  setFrom(date);
+                  setPreset("custom");
+                },
+                onTo: (date) => {
+                  setTo(date);
+                  setPreset("custom");
+                },
+              }
         }
-      >
-        <ReportAudienceToggle />
-        <Select
-          aria-label="Report type"
-          value={type}
-          style={{ width: 230 }}
-          onChange={handleReportTypeChange}
-          options={[
-            { label: "Trial Balance", value: "trial" },
-            { label: "Profit & Loss Comparison", value: "pnl" },
-            { label: "Balance Sheet Comparison", value: "balance" },
-            { label: "Budget vs Actual", value: "budget" },
-            { label: "Statement of Equity", value: "equity" },
-          ]}
-        />
-        {(type === "pnl" || type === "equity") && (
-          <DatePicker.RangePicker
-            aria-label="Report date range"
-            value={range}
-            allowClear={false}
-            onChange={(value) => value && setRange([value[0]!, value[1]!])}
-          />
-        )}
-        {type === "pnl" && (
-          <>
-            <Select
-              aria-label="Profit and loss columns"
-              value={pnlColumns}
-              style={{ width: 185 }}
-              onChange={handlePnlColumnsChange}
-              options={[
-                { value: "single", label: "One period" },
-                { value: "comparison", label: "Two periods" },
-                { value: "month", label: "By month" },
-                { value: "quarter", label: "By quarter" },
-              ]}
-            />
-            <Space>
-              <Switch
-                size="small"
-                checked={showPercentOfIncome}
-                onChange={(checked) => {
-                  setPercentOfIncomeTouched(true);
-                  setShowPercentOfIncome(checked);
-                }}
-                aria-label="Show % of Income"
-              />
-              <Typography.Text type="secondary">% of Income</Typography.Text>
-            </Space>
-          </>
-        )}
-        {(type === "trial" || type === "balance") && (
-          <Space>
-            <Typography.Text type="secondary">As of</Typography.Text>
-            <DatePicker value={asOf} allowClear={false} onChange={(value) => value && setAsOf(value)} />
-          </Space>
-        )}
-        {type === "balance" && (
-          <>
-            <Select
-              aria-label="Balance sheet columns"
-              value={balanceColumns}
-              style={{ width: 185 }}
-              onChange={setBalanceColumns}
-              options={[
-                { value: "single", label: "One period" },
-                { value: "comparison", label: "Two periods" },
-                { value: "months", label: "Last 12 months" },
-                { value: "years", label: "Last 3 years" },
-              ]}
-            />
-            {balanceColumns === "comparison" && (
-              <>
-                <Select
-                  aria-label="Compared with"
-                  value={comparisonBasis}
-                  style={{ width: 210 }}
-                  onChange={setComparisonBasis}
-                  options={COMPARISON_BASES.map((basis) => ({
-                    value: basis,
-                    label: `vs ${comparisonBasisLabel(basis).toLowerCase()}`,
-                  }))}
-                />
-                <Space>
-                  <Switch
-                    size="small"
-                    checked={showVariance}
-                    onChange={setShowVariance}
-                    aria-label="Show variance columns"
-                  />
-                  <Typography.Text type="secondary">Variance</Typography.Text>
-                </Space>
-              </>
-            )}
-          </>
-        )}
-        {type === "budget" && (
-          <>
-            <Space>
-              <Typography.Text type="secondary">Fiscal year</Typography.Text>
-              <InputNumber
-                aria-label="Fiscal year"
-                min={2000}
-                max={2100}
-                value={fiscalYear}
-                onChange={(value) => setFiscalYear(Number(value ?? initialFiscalYear))}
-              />
-            </Space>
-            <Select
-              aria-label="Budget start period"
-              value={budgetFromPeriod}
-              style={{ width: 145 }}
-              options={months.map((month) => ({ value: month.period, label: `From ${month.label}` }))}
-              onChange={setBudgetFromPeriod}
-            />
-            <Select
-              aria-label="Budget end period"
-              value={budgetToPeriod}
-              style={{ width: 135 }}
-              options={months.map((month) => ({ value: month.period, label: `To ${month.label}` }))}
-              onChange={setBudgetToPeriod}
-            />
-          </>
-        )}
-      </FilterBar>
+        compare={type === "pnl" || point ? { value: compare, onChange: changeCompare } : null}
+        percent={
+          type === "pnl"
+            ? {
+                value: showPercent,
+                onChange: (show) => {
+                  setShowPercent(show);
+                  setPercentTouched(true);
+                },
+              }
+            : null
+        }
+        extraActions={
+          type === "budget" && canManageBudget ? (
+            <Button icon={<EditOutlined />} onClick={() => setBudgetEditorOpen(true)}>
+              Manage budget
+            </Button>
+          ) : null
+        }
+        onRun={() => void run()}
+        loading={loading}
+        sheet={sheet}
+      />
 
-      <Spin spinning={loading}>
+      <Spin spinning={loading && shownStatement !== null} description="Reading the books again…">
         <div aria-live="polite" aria-busy={loading}>
-          {type === "trial" && (
-            <TrialBalanceView
-              rows={rows}
-              asOf={asOf}
-              companyName={companyName}
-              baseCurrency={baseCurrency}
-              baseDecimals={baseDecimals}
-              money={money}
+          {chart ? (
+            <ReportBody
+              numbers={paper}
+              chart={<ComparisonBars title={chart.title} description={chart.description} formatMoney={money} data={chart.data} />}
             />
-          )}
-          {type === "pnl" && (pnlColumns === "single" || pnlColumns === "comparison") && (
-            <PnlComparisonView
-              rows={rows}
-              priorRows={priorRows}
-              range={range}
-              companyName={companyName}
-              baseCurrency={baseCurrency}
-              baseDecimals={baseDecimals}
-              money={money}
-              showPrior={pnlColumns === "comparison"}
-              showPercentOfIncome={showPercentOfIncome}
-            />
-          )}
-          {type === "pnl" &&
-            (pnlColumns === "month" || pnlColumns === "quarter") &&
-            (pnlTrendLimitMessage ? (
-              <PnlTrendLimitNotice
-                message={pnlTrendLimitMessage}
-                companyName={companyName}
-                baseCurrency={baseCurrency}
-                onSwitchToQuarter={
-                  pnlColumns === "month" &&
-                  quarterlyColumns(range[0].format("YYYY-MM-DD"), range[1].format("YYYY-MM-DD"))
-                    .length <= MAX_TREND_COLUMNS
-                    ? () => handlePnlColumnsChange("quarter")
-                    : undefined
-                }
-              />
-            ) : (
-              <PnlTrendView
-                periods={pnlTrendPeriods}
-                showPercentOfIncome={showPercentOfIncome}
-                companyName={companyName}
-                baseCurrency={baseCurrency}
-                baseDecimals={baseDecimals}
-                money={money}
-              />
-            ))}
-          {type === "balance" && (balanceColumns === "comparison" || balanceColumns === "single") && (
-            <BalanceSheetComparisonView
-              rows={rows}
-              priorRows={priorRows}
-              asOf={asOf}
-              comparisonBasis={comparisonBasis}
-              showVariance={showVariance}
-              companyName={companyName}
-              baseCurrency={baseCurrency}
-              baseDecimals={baseDecimals}
-              money={money}
-              showPrior={balanceColumns === "comparison"}
-            />
-          )}
-          {type === "balance" && (balanceColumns === "months" || balanceColumns === "years") && (
-            <BalanceSheetTrendView
-              periods={trendPeriods}
-              companyName={companyName}
-              baseCurrency={baseCurrency}
-              baseDecimals={baseDecimals}
-              money={money}
-            />
-          )}
-          {type === "budget" && budgetReport && (
-            <BudgetVsActualView
-              report={budgetReport}
-              fiscalYear={fiscalYear}
-              from={budgetFrom}
-              to={budgetTo}
-              companyName={companyName}
-              baseCurrency={baseCurrency}
-              baseDecimals={baseDecimals}
-              money={money}
-            />
-          )}
-          {type === "equity" && equityReport && (
-            <StatementOfEquityView
-              report={equityReport}
-              from={range[0].format("YYYY-MM-DD")}
-              to={range[1].format("YYYY-MM-DD")}
-              companyName={companyName}
-              baseCurrency={baseCurrency}
-              baseDecimals={baseDecimals}
-              money={money}
-            />
+          ) : (
+            paper
           )}
         </div>
       </Spin>
 
-      {type === "budget" && canManageBudget && (
+      <ZoomSheet spec={zoom} onClose={() => setZoom(null)} money={money} />
+
+      {type === "budget" && canManageBudget ? (
         <BudgetEditorDrawer
           key={fiscalYear}
           open={budgetEditorOpen}
@@ -574,663 +525,7 @@ export default function ReportsClient({
           baseCurrency={baseCurrency}
           baseDecimals={baseDecimals}
         />
-      )}
+      ) : null}
     </div>
   );
-}
-
-function ReportHeading({
-  title,
-  subtitle,
-  companyName,
-  exportSheet,
-  disabled = false,
-}: {
-  title: string;
-  subtitle: string;
-  /** Whose books these are. A statement that does not name its entity is one
-   *  somebody will eventually file against the wrong company. */
-  companyName?: string;
-  exportSheet: ReportExportSheet;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="report-result__heading">
-      <div>
-        {companyName ? (
-          <Typography.Text strong className="report-result__entity">
-            {companyName}
-          </Typography.Text>
-        ) : null}
-        <Typography.Title level={4}>{title}</Typography.Title>
-        <Typography.Text type="secondary">{subtitle}</Typography.Text>
-      </div>
-      <ReportExportButtons sheet={exportSheet} disabled={disabled} />
-    </div>
-  );
-}
-
-/**
- * What a period-by-period P&L shows instead of a table, when the chosen
- * range would need more columns than `MAX_TREND_COLUMNS`.
- *
- * Refuses rather than fetching and rendering a table nobody would read
- * column by column, and names both ways out — narrowing the range is always
- * an option, switching to quarters only when `onSwitchToQuarter` is given,
- * which the caller only does once it has confirmed quarters would actually
- * fit under the same limit. Never switches on its own: a reader who asked
- * for months and got quarters without being told has been handed a
- * different report than the one they think they are reading.
- */
-function PnlTrendLimitNotice({
-  message,
-  companyName,
-  baseCurrency,
-  onSwitchToQuarter,
-}: {
-  message: string;
-  companyName: string;
-  baseCurrency: string;
-  onSwitchToQuarter?: () => void;
-}) {
-  return (
-    <div className="report-result">
-      <ReportHeading
-        companyName={companyName}
-        title="Profit and Loss by Period"
-        subtitle="Choose a narrower range to see the columns"
-        exportSheet={{
-          fileName: "profit-and-loss-by-period",
-          companyName,
-          title: "Profit and Loss by Period",
-          subtitle: "",
-          currencyCode: baseCurrency,
-          columns: [],
-          rows: [],
-        }}
-        disabled
-      />
-      <DataTable
-        rowKey="key"
-        dataSource={[]}
-        pagination={false}
-        columns={[{ title: "Account", dataIndex: "label" }]}
-        emptyTitle="That range has too many columns to read at once"
-        emptyDescription={message}
-        emptyAction={
-          onSwitchToQuarter ? <Button onClick={onSwitchToQuarter}>Show it by quarter</Button> : undefined
-        }
-      />
-    </div>
-  );
-}
-
-function TrialBalanceView({
-  rows,
-  money,
-  asOf,
-  companyName,
-  baseCurrency,
-  baseDecimals,
-}: {
-  rows: LedgerBalance[];
-  money: (value: number) => string;
-  asOf: Dayjs;
-  companyName: string;
-  baseCurrency: string;
-  baseDecimals: number;
-}) {
-  const report = buildTrialBalance(rows);
-  const to = asOf.format("YYYY-MM-DD");
-  const exportSheet: ReportExportSheet = {
-    fileName: `trial-balance-${to}`,
-    companyName,
-    title: "Trial Balance",
-    subtitle: `As of ${to}`,
-    currencyCode: baseCurrency,
-    columns: [
-      { key: "account", header: "Account", width: 40 },
-      { key: "debit", header: "Debit", kind: "money", width: 18 },
-      { key: "credit", header: "Credit", kind: "money", width: 18 },
-    ],
-    rows: report.lines.map((line) => ({
-      account: `${line.accountCode} — ${line.name}`,
-      debit: fromMinor(line.debit, baseDecimals),
-      credit: fromMinor(line.credit, baseDecimals),
-    })),
-  };
-  return (
-    <div className="report-result">
-      <ReportHeading
-        companyName={companyName}
-        title="Trial Balance"
-        subtitle={`As of ${asOf.format("MMM D, YYYY")}`}
-        exportSheet={exportSheet}
-        disabled={report.lines.length === 0}
-      />
-      <DataTable
-        rowKey="accountId"
-        pagination={false}
-        dataSource={report.lines}
-        emptyTitle="No balances for this date"
-        emptyDescription="Choose another date or confirm that transactions have been posted."
-        columns={[
-          {
-            title: "Account",
-            render: (_, line) => (
-              <Link href={`/reports/general-ledger?account=${line.accountId}&to=${to}`}>
-                {line.accountCode} — {line.name}
-              </Link>
-            ),
-          },
-          { title: "Debit", align: "right", width: 160, render: (_, line) => line.debit ? money(line.debit) : "" },
-          { title: "Credit", align: "right", width: 160, render: (_, line) => line.credit ? money(line.credit) : "" },
-        ]}
-        summary={() => (
-          <Table.Summary.Row className="report-summary-row">
-            <Table.Summary.Cell index={0}>Total</Table.Summary.Cell>
-            <Table.Summary.Cell index={1} align="right">{money(report.totalDebit)}</Table.Summary.Cell>
-            <Table.Summary.Cell index={2} align="right">{money(report.totalCredit)}</Table.Summary.Cell>
-          </Table.Summary.Row>
-        )}
-      />
-      <div className="report-balance-status">
-        <Tag color={report.balanced ? "green" : "red"}>{report.balanced ? "Balanced" : "Out of balance"}</Tag>
-      </div>
-    </div>
-  );
-}
-
-interface ComparisonRow {
-  key: string;
-  label: string;
-  accountId: string | null;
-  current: number;
-  prior: number;
-  variance: number;
-  variancePercent: number | null;
-  kind: "section" | "line" | "total";
-}
-
-function sectionRows(current: ReportSection, prior: ReportSection): ComparisonRow[] {
-  const lines = compareReportLines(current.lines, prior.lines);
-  return [
-    {
-      key: `section:${current.key}`,
-      label: current.title,
-      accountId: null,
-      current: 0,
-      prior: 0,
-      variance: 0,
-      variancePercent: null,
-      kind: "section",
-    },
-    ...lines.map((line) => ({
-      key: `${current.key}:${line.accountId ?? `${line.accountCode}:${line.name}`}`,
-      label: `${line.accountCode ? `${line.accountCode} — ` : ""}${line.name}`,
-      accountId: line.accountId,
-      current: line.current,
-      prior: line.prior,
-      variance: line.variance,
-      variancePercent: line.variancePercent,
-      kind: "line" as const,
-    })),
-    totalRow(`total:${current.key}`, `Total ${current.title}`, current.total, prior.total),
-  ];
-}
-
-function totalRow(key: string, label: string, current: number, prior: number): ComparisonRow {
-  const variance = current - prior;
-  return {
-    key,
-    label,
-    accountId: null,
-    current,
-    prior,
-    variance,
-    variancePercent: prior === 0 ? null : (variance / Math.abs(prior)) * 100,
-    kind: "total",
-  };
-}
-
-function PnlComparisonView({
-  rows,
-  priorRows,
-  money,
-  range,
-  companyName,
-  baseCurrency,
-  baseDecimals,
-  showPrior,
-  showPercentOfIncome,
-}: {
-  rows: LedgerBalance[];
-  priorRows: LedgerBalance[];
-  money: (value: number) => string;
-  range: [Dayjs, Dayjs];
-  companyName: string;
-  baseCurrency: string;
-  baseDecimals: number;
-  showPrior: boolean;
-  showPercentOfIncome: boolean;
-}) {
-  const current = buildProfitAndLoss(rows);
-  const prior = buildProfitAndLoss(priorRows);
-  const currentFrom = range[0].format("YYYY-MM-DD");
-  const currentTo = range[1].format("YYYY-MM-DD");
-  const priorRange = previousPeriodRange(currentFrom, currentTo);
-  const comparisonRows = [
-    ...sectionRows(current.income, prior.income),
-    ...sectionRows(current.costOfGoodsSold, prior.costOfGoodsSold),
-    totalRow("gross-profit", "Gross Profit", current.grossProfit, prior.grossProfit),
-    ...sectionRows(current.operatingExpenses, prior.operatingExpenses),
-    ...sectionRows(current.otherIncome, prior.otherIncome),
-    ...sectionRows(current.otherExpenses, prior.otherExpenses),
-    totalRow("net-income", "Net Income", current.netIncome, prior.netIncome),
-  ];
-  const percentOfIncomeTotals = showPercentOfIncome
-    ? { current: current.income.total, prior: prior.income.total }
-    : undefined;
-  const title = showPrior ? "Profit & Loss Comparison" : "Profit & Loss";
-  const period = `${range[0].format("MMM D, YYYY")} – ${range[1].format("MMM D, YYYY")}`;
-  const exportSheet = comparisonExportSheet({
-    fileName: showPrior
-      ? `profit-and-loss-comparison-${currentFrom}-${currentTo}`
-      : `profit-and-loss-${currentFrom}-${currentTo}`,
-    companyName,
-    title,
-    subtitle: showPrior
-      ? `${currentFrom} to ${currentTo} compared with ${priorRange.from} to ${priorRange.to}`
-      : `${currentFrom} to ${currentTo}`,
-    currencyCode: baseCurrency,
-    baseDecimals,
-    currentLabel: periodColumnLabel(currentFrom, currentTo),
-    priorLabel: periodColumnLabel(priorRange.from, priorRange.to),
-    rows: comparisonRows,
-    showPrior,
-    percentOfIncomeTotals,
-  });
-  return (
-    <div className="report-result">
-      <ReportHeading
-        companyName={companyName}
-        title={title}
-        subtitle={
-          showPrior ? `${period} · Prior ${priorRange.from} – ${priorRange.to}` : period
-        }
-        exportSheet={exportSheet}
-      />
-      <ReportBody
-        numbers={
-          <ComparisonTable
-            rows={comparisonRows}
-            // The periods themselves, not "Current" and "Prior". Those two say
-            // only which came first, leaving the reader to carry the dates from
-            // the subtitle in their head — and a printed page loses even that.
-            // The balance sheet beside this one has always headed its columns
-            // with the date they were struck at.
-            currentLabel={periodColumnLabel(currentFrom, currentTo)}
-            priorLabel={periodColumnLabel(priorRange.from, priorRange.to)}
-            currentRange={{ from: currentFrom, to: currentTo }}
-            priorRange={priorRange}
-            money={money}
-            showPrior={showPrior}
-            percentOfIncomeTotals={percentOfIncomeTotals}
-          />
-        }
-        chart={
-          <ComparisonBars
-            title="Period performance"
-            description="Current period profitability compared with the immediately preceding period."
-            formatMoney={money}
-            data={[
-              { key: "current-income", label: "Current income", value: current.income.total + current.otherIncome.total, color: chartColors.income },
-              { key: "prior-income", label: "Prior income", value: prior.income.total + prior.otherIncome.total, color: chartColors.receivable },
-              { key: "current-net", label: "Current net income", value: current.netIncome, color: current.netIncome < 0 ? chartColors.negative : chartColors.net },
-              { key: "prior-net", label: "Prior net income", value: prior.netIncome, color: chartColors.neutral },
-            ]}
-          />
-        }
-      />
-    </div>
-  );
-}
-
-function BalanceSheetComparisonView({
-  rows,
-  priorRows,
-  money,
-  asOf,
-  comparisonBasis,
-  showVariance,
-  companyName,
-  baseCurrency,
-  baseDecimals,
-  showPrior,
-}: {
-  rows: LedgerBalance[];
-  priorRows: LedgerBalance[];
-  money: (value: number) => string;
-  asOf: Dayjs;
-  comparisonBasis: ComparisonBasis;
-  showVariance: boolean;
-  companyName: string;
-  baseCurrency: string;
-  baseDecimals: number;
-  showPrior: boolean;
-}) {
-  const current = buildBalanceSheet(rows);
-  const prior = buildBalanceSheet(priorRows);
-  const currentTo = asOf.format("YYYY-MM-DD");
-  const priorTo = comparisonDate(currentTo, comparisonBasis);
-  const comparisonRows = balanceComparisonRows(current, prior);
-  const title = showPrior ? "Balance Sheet Comparison" : "Balance Sheet";
-  const exportSheet = comparisonExportSheet({
-    fileName: showPrior ? `balance-sheet-comparison-${currentTo}` : `balance-sheet-${currentTo}`,
-    companyName,
-    title,
-    subtitle: showPrior ? `As of ${currentTo} compared with ${priorTo}` : `As of ${currentTo}`,
-    currencyCode: baseCurrency,
-    baseDecimals,
-    currentLabel: currentTo,
-    priorLabel: priorTo,
-    rows: comparisonRows,
-    showPrior,
-  });
-  return (
-    <div className="report-result">
-      <ReportHeading
-        companyName={companyName}
-        title={title}
-        subtitle={
-          showPrior
-            ? `As of ${asOf.format("MMM D, YYYY")} · ${comparisonBasisLabel(comparisonBasis)} ${priorTo}`
-            : `As of ${asOf.format("MMM D, YYYY")}`
-        }
-        exportSheet={exportSheet}
-      />
-      <ReportBody
-        numbers={
-          <>
-            <ComparisonTable
-              rows={comparisonRows}
-              currentLabel={currentTo}
-              priorLabel={priorTo}
-              currentRange={{ from: "", to: currentTo }}
-              priorRange={{ from: "", to: priorTo }}
-              money={money}
-              showVariance={showVariance}
-              showPrior={showPrior}
-            />
-            <div className="report-balance-status">
-              <Tag color={current.balanced ? "green" : "red"}>
-                {current.balanced ? "Balanced" : "Out of balance"}
-              </Tag>
-            </div>
-          </>
-        }
-        chart={
-          <ComparisonBars
-            title="Financial position comparison"
-            description={`Current assets, liabilities, and equity compared with ${comparisonBasisLabel(comparisonBasis).toLowerCase()} ${priorTo}.`}
-            formatMoney={money}
-            data={[
-              { key: "assets", label: "Current assets", value: current.totalAssets, color: chartColors.receivable },
-              { key: "prior-assets", label: "Prior assets", value: prior.totalAssets, color: chartColors.income },
-              { key: "liabilities", label: "Current liabilities", value: current.totalLiabilities, color: chartColors.expense },
-              { key: "equity", label: "Current equity", value: current.totalEquity, color: chartColors.net },
-            ]}
-          />
-        }
-      />
-    </div>
-  );
-}
-
-function balanceComparisonRows(current: BalanceSheet, prior: BalanceSheet): ComparisonRow[] {
-  return [
-    ...sectionRows(current.assets, prior.assets),
-    ...sectionRows(current.liabilities, prior.liabilities),
-    ...sectionRows(current.equity, prior.equity),
-    totalRow(
-      "liabilities-equity",
-      "Total Liabilities + Equity",
-      current.totalLiabilities + current.totalEquity,
-      prior.totalLiabilities + prior.totalEquity,
-    ),
-  ];
-}
-
-function ComparisonTable({
-  rows,
-  currentLabel,
-  priorLabel,
-  currentRange,
-  priorRange,
-  money,
-  showVariance = true,
-  showPrior = true,
-  percentOfIncomeTotals,
-}: {
-  rows: ComparisonRow[];
-  currentLabel: string;
-  priorLabel: string;
-  currentRange: { from: string; to: string };
-  priorRange: { from: string; to: string };
-  money: (value: number) => string;
-  /** Off by default on the balance sheet: the reader can subtract two columns. */
-  showVariance?: boolean;
-  /**
-   * Off when the reader asked for one period. The prior figures are still in
-   * `rows` — they are simply all zero, because nothing was fetched for them —
-   * so the columns are dropped here rather than the rows being rebuilt. The
-   * variance columns go with them: a variance against nothing is the current
-   * figure repeated, which would read as a fact rather than as a blank.
-   */
-  showPrior?: boolean;
-  /**
-   * The income each column's % of Income is measured against. Undefined
-   * turns the feature off entirely — this table is shared with the balance
-   * sheet, where a percentage of income has no meaning at all.
-   */
-  percentOfIncomeTotals?: { current: number; prior: number };
-}) {
-  const percentCell = (amount: number, income: number) => {
-    const pct = percentOfIncome(amount, income);
-    return pct === null ? "—" : formatPercent(pct);
-  };
-  const percentHeader = (
-    <Tooltip title={PERCENT_OF_INCOME_TOOLTIP}>
-      <span>% of Income</span>
-    </Tooltip>
-  );
-
-  return (
-    <DataTable
-      rowKey="key"
-      dataSource={rows}
-      pagination={false}
-      columns={[
-        {
-          title: "Account",
-          width: 260,
-          render: (_, row) => {
-            if (row.kind === "section") return <strong>{row.label}</strong>;
-            if (row.accountId) {
-              const from = currentRange.from ? `&from=${currentRange.from}` : "";
-              return (
-                <Link href={`/reports/general-ledger?account=${row.accountId}${from}&to=${currentRange.to}`}>
-                  {row.label}
-                </Link>
-              );
-            }
-            return row.label;
-          },
-        },
-        {
-          title: currentLabel,
-          width: 145,
-          align: "right",
-          render: (_, row) =>
-            row.kind === "section"
-              ? ""
-              : row.accountId
-                ? <LedgerAmountLink accountId={row.accountId} range={currentRange} label={money(row.current)} />
-                : money(row.current),
-        },
-        ...(percentOfIncomeTotals
-          ? [
-              {
-                title: percentHeader,
-                width: 100,
-                align: "right" as const,
-                render: (_: unknown, row: ComparisonRow) =>
-                  row.kind === "section" ? "" : percentCell(row.current, percentOfIncomeTotals.current),
-              },
-            ]
-          : []),
-        ...(showPrior
-          ? [
-              {
-                title: priorLabel,
-                width: 145,
-                align: "right" as const,
-                render: (_: unknown, row: ComparisonRow) =>
-                  row.kind === "section"
-                    ? ""
-                    : row.accountId
-                      ? <LedgerAmountLink accountId={row.accountId} range={priorRange} label={money(row.prior)} />
-                      : money(row.prior),
-              },
-            ]
-          : []),
-        ...(showPrior && percentOfIncomeTotals
-          ? [
-              {
-                title: percentHeader,
-                width: 100,
-                align: "right" as const,
-                render: (_: unknown, row: ComparisonRow) =>
-                  row.kind === "section" ? "" : percentCell(row.prior, percentOfIncomeTotals.prior),
-              },
-            ]
-          : []),
-        ...(showPrior && showVariance
-          ? [
-              {
-                title: "Variance",
-                width: 145,
-                align: "right" as const,
-                render: (_: unknown, row: ComparisonRow) =>
-                  row.kind === "section" ? "" : money(row.variance),
-              },
-              {
-                title: "Variance %",
-                width: 110,
-                align: "right" as const,
-                render: (_: unknown, row: ComparisonRow) =>
-                  row.kind === "section" || row.variancePercent === null
-                    ? ""
-                    : formatPercent(row.variancePercent),
-              },
-            ]
-          : []),
-      ]}
-      rowClassName={(row) =>
-        row.kind === "section"
-          ? "report-table-row--section"
-          : row.kind === "total"
-            ? "report-table-row--emphasis"
-            : ""
-      }
-    />
-  );
-}
-
-function LedgerAmountLink({
-  accountId,
-  range,
-  label,
-}: {
-  accountId: string;
-  range: { from: string; to: string };
-  label: string;
-}) {
-  const from = range.from ? `&from=${range.from}` : "";
-  return (
-    <Link href={`/reports/general-ledger?account=${accountId}${from}&to=${range.to}`}>
-      {label}
-    </Link>
-  );
-}
-
-function comparisonExportSheet({
-  fileName,
-  companyName,
-  title,
-  subtitle,
-  currencyCode,
-  baseDecimals,
-  currentLabel,
-  priorLabel,
-  rows,
-  showPrior = true,
-  percentOfIncomeTotals,
-}: {
-  fileName: string;
-  companyName: string;
-  title: string;
-  subtitle: string;
-  currencyCode: string;
-  baseDecimals: number;
-  currentLabel: string;
-  priorLabel: string;
-  rows: ComparisonRow[];
-  /** Matches the table on screen: one period exports one column of figures. */
-  showPrior?: boolean;
-  /** Matches the table on screen: present only when the % of Income switch is on. */
-  percentOfIncomeTotals?: { current: number; prior: number };
-}): ReportExportSheet {
-  const percentCell = (amount: number, income: number, isSection: boolean) =>
-    isSection ? null : percentOfIncome(amount, income);
-  return {
-    fileName,
-    companyName,
-    title,
-    subtitle,
-    currencyCode,
-    columns: [
-      { key: "account", header: "Account", width: 40 },
-      { key: "current", header: currentLabel, kind: "money", width: 18 },
-      ...(percentOfIncomeTotals
-        ? ([{ key: "currentPercentOfIncome", header: "% of Income", kind: "percent", width: 14 }] as const)
-        : []),
-      ...(showPrior
-        ? ([
-            { key: "prior", header: priorLabel, kind: "money", width: 18 },
-            ...(percentOfIncomeTotals
-              ? ([{ key: "priorPercentOfIncome", header: "% of Income", kind: "percent", width: 14 }] as const)
-              : []),
-            { key: "variance", header: "Variance", kind: "money", width: 18 },
-            { key: "variancePercent", header: "Variance %", kind: "percent", width: 14 },
-          ] as const)
-        : []),
-    ],
-    rows: rows.map((row) => {
-      const isSection = row.kind === "section";
-      return {
-        account: row.label,
-        current: isSection ? null : fromMinor(row.current, baseDecimals),
-        ...(percentOfIncomeTotals
-          ? { currentPercentOfIncome: percentCell(row.current, percentOfIncomeTotals.current, isSection) }
-          : {}),
-        prior: isSection ? null : fromMinor(row.prior, baseDecimals),
-        ...(percentOfIncomeTotals
-          ? { priorPercentOfIncome: percentCell(row.prior, percentOfIncomeTotals.prior, isSection) }
-          : {}),
-        variance: isSection ? null : fromMinor(row.variance, baseDecimals),
-        variancePercent: row.variancePercent,
-      };
-    }),
-  };
 }

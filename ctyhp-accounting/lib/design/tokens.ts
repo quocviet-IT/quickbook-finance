@@ -544,7 +544,12 @@ export function cssVariableBlock(): string {
     flattenTheme(theme)
       .map(([path, value]) => `  --ob-${path.replace(".", "-")}: ${value};`)
       .join("\n");
-  return `:root {\n${declare("light")}\n}\n\n:root[data-theme="dark"] {\n${declare("dark")}\n}\n`;
+  // The light values are declared a second time, on the report being printed
+  // (body.print-report .report-print-area). A dark reader's pale text would
+  // print pale on white paper, unreadable, so the printed area's own
+  // declarations take the light values over the dark ones it would otherwise
+  // inherit from <html> — see lib/client/print-report.ts.
+  return `:root,\nbody.print-report .report-print-area {\n${declare("light")}\n}\n\n:root[data-theme="dark"] {\n${declare("dark")}\n}\n`;
 }
 
 /**

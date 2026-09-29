@@ -118,6 +118,19 @@ export function csvWithReportIdentity(
   return `${preamble.join("\n")}\n${csv}`;
 }
 
+/** Decimal places the sheet's currency is written in. */
+function currencyDigits(currencyCode: string): number {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode }).resolvedOptions()
+    .maximumFractionDigits ?? 2;
+}
+
+/** A value as it goes into a text export: money as a plain number in the currency's decimals, a blank as nothing. */
+function exportCellText(v: string | number | null | undefined, kind: ExportCellKind, digits: number): string {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "number" && kind === "money") return v.toFixed(digits);
+  return typeof v === "number" ? String(v) : v;
+}
+
 /**
  * A sheet as CSV, with the report's identity above it: what "Save as CSV"
  * hands over, from the same sheet the PDF and Excel buttons use.
@@ -127,16 +140,29 @@ export function csvWithReportIdentity(
  */
 export function csvFromExportSheet(sheet: ReportExportSheet): string {
   const cell = (value: string): string => (/[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
-  const digits = new Intl.NumberFormat("en-US", { style: "currency", currency: sheet.currencyCode }).resolvedOptions()
-    .maximumFractionDigits ?? 2;
-  const value = (v: string | number | null | undefined, kind: ExportCellKind): string => {
-    if (v === null || v === undefined || v === "") return "";
-    if (typeof v === "number" && kind === "money") return v.toFixed(digits);
-    return typeof v === "number" ? String(v) : v;
-  };
+  const digits = currencyDigits(sheet.currencyCode);
   const lines = [
     sheet.columns.map((c) => cell(c.header)).join(","),
-    ...sheet.rows.map((r) => sheet.columns.map((c) => cell(value(r[c.key], c.kind ?? "text"))).join(",")),
+    ...sheet.rows.map((r) => sheet.columns.map((c) => cell(exportCellText(r[c.key], c.kind ?? "text", digits))).join(",")),
   ];
   return csvWithReportIdentity(lines.join("\n"), sheet);
+}
+
+/**
+ * A sheet as tab-separated text, for "Copy this report": pasted into a
+ * spreadsheet it keeps its columns, with the report's identity above them. A
+ * tab or line break inside a value would split it, so it becomes a space.
+ */
+export function tsvFromExportSheet(sheet: ReportExportSheet): string {
+  const clean = (value: string): string => value.replace(/[\t\r\n]+/g, " ");
+  const digits = currencyDigits(sheet.currencyCode);
+  return [
+    clean(sheet.companyName),
+    clean(sheet.title),
+    clean(sheet.subtitle),
+    `Currency: ${sheet.currencyCode}`,
+    "",
+    sheet.columns.map((c) => clean(c.header)).join("\t"),
+    ...sheet.rows.map((r) => sheet.columns.map((c) => clean(exportCellText(r[c.key], c.kind ?? "text", digits))).join("\t")),
+  ].join("\n");
 }

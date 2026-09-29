@@ -6,6 +6,9 @@ import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import ReportsHub from "@/components/reports/ReportsHub";
 import { isInternalReportId } from "@/lib/domain/report-catalog";
+import { listAccounts } from "@/lib/services/accounts";
+import { todayInTimeZone } from "@/lib/services/dashboard";
+import { postedEntryDateSpan } from "@/lib/services/exceptions";
 import ReportsClient from "./ReportsClient";
 
 export const dynamic = "force-dynamic";
@@ -31,10 +34,13 @@ export default async function ReportsPage({
   }
 
   const sb = await createSupabaseServerClient();
-  const [currencies, company, canManageBudget] = await Promise.all([
+  const [currencies, company, canManageBudget, accountRows, span] = await Promise.all([
     listCurrencies(sb),
     getCurrentCompanySettings(sb),
     hasPermission(sb, "budget.manage"),
+    listAccounts(sb),
+    // The first and last posted entry, for "All dates" and "Last 3 years".
+    postedEntryDateSpan(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
 
@@ -59,6 +65,18 @@ export default async function ReportsPage({
         companyName={company?.legal_name ?? "Company name not set"}
         fiscalStartMonth={company?.fiscal_year_start_month ?? 1}
         canManageBudget={canManageBudget}
+        accounts={accountRows.map((a) => ({
+          id: a.id,
+          code: a.account_code,
+          name: a.name,
+          type: a.account_type,
+          parentId: a.parent_account_id,
+        }))}
+        // The company's own day, as the dashboard reckons it: at 6 p.m. in New York
+        // it is already tomorrow in UTC, and "This month" would run a day ahead.
+        today={todayInTimeZone(company?.time_zone ?? "America/New_York")}
+        firstEntryDate={span.first}
+        lastEntryDate={span.last}
       />
     </div>
   );

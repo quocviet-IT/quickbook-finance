@@ -235,6 +235,7 @@
 
 .detTable .right {
   text-align: right;
+  padding-left: 16px;
   padding-right: 0;
   white-space: nowrap;
 }
@@ -496,4 +497,209 @@
   padding: 40px 0;
   color: var(--ob-text-secondary);
   line-height: 1.7;
+}
+
+/* ---------- a financial statement (the prototype's table.rpt) ----------
+ * A statement is not a list: nothing on it is sorted, filtered or paged. So it
+ * is a plain table, ruled the way a printed statement is ruled. */
+.rptScroll {
+  overflow-x: auto;
+}
+
+.rpt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpt th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ob-text-secondary);
+  text-align: right;
+  padding: 0 0 6px 20px;
+  border-bottom: 1px solid var(--ob-border-muted);
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.rpt th.l {
+  text-align: left;
+  padding-left: 0;
+}
+
+.thSub {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-top: 1px;
+}
+
+.rpt td {
+  padding: 3px 0;
+  vertical-align: top;
+  color: var(--ob-text-body);
+}
+
+.rpt td.r {
+  text-align: right;
+  white-space: nowrap;
+  padding-left: 20px;
+}
+
+.rpt td.pct {
+  color: var(--ob-text-secondary);
+  font-size: 11.5px;
+  text-align: right;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+
+/* Cell-scoped so these win over `.rpt td` and `.rpt td.pct` above: a bare
+ * one-class rule (see `.favorable`/`.unfavorable`/`.negative` below, still used
+ * by other elements) is weaker than either and never showed on a change or
+ * percent cell. */
+.rpt td.favorable {
+  color: var(--ob-intent-success);
+}
+
+.rpt td.unfavorable {
+  color: var(--ob-intent-danger);
+}
+
+.rpt td.negative {
+  color: var(--ob-money-negative);
+}
+
+/* A QuickZoom button in the last column (.zoom's negative margin lets it sit
+ * flush with the figures around it) sticks 3px past .rptScroll without this,
+ * forcing a horizontal scroll on every statement whose last column is a
+ * figure. */
+.rpt th:last-child,
+.rpt td:last-child {
+  padding-right: 3px;
+}
+
+.rpt td.ind0 {
+  padding-left: 0;
+}
+
+.rpt td.ind1 {
+  padding-left: 16px;
+}
+
+.rpt td.ind2 {
+  padding-left: 32px;
+}
+
+.rpt td.ind3 {
+  padding-left: 48px;
+}
+
+.rSection td {
+  padding-top: 20px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ob-text-heading);
+}
+
+.rClasshead td {
+  padding-top: 10px;
+  font-weight: 600;
+  background: var(--ob-surface-subtle);
+}
+
+.rpt .rClasshead td:first-child {
+  padding-left: 8px;
+}
+
+.rSub td {
+  border-top: 1px solid var(--ob-border-default);
+  font-weight: 600;
+  padding-top: 4px;
+}
+
+.rTotal td {
+  border-top: 1px solid var(--ob-border-muted);
+  font-weight: 600;
+  padding-top: 5px;
+}
+
+.rGrand td {
+  border-top: 1px solid var(--ob-border-muted);
+  border-bottom: 3px double var(--ob-border-muted);
+  font-weight: 700;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13.5px;
+}
+
+.rSpacer td {
+  height: 9px;
+  padding: 0;
+}
+
+.rNote td {
+  color: var(--ob-text-secondary);
+}
+
+/* Every figure is a QuickZoom (the prototype's .zoom). */
+.zoom {
+  background: none;
+  border: 0;
+  padding: 1px 3px;
+  margin: -1px -3px -1px 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ob-intent-primary);
+  border-radius: 3px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ob-intent-primary) 35%, transparent);
+  text-underline-offset: 2.5px;
+  text-decoration-thickness: 1px;
+}
+
+.zoom:hover {
+  background: var(--ob-accent-wash);
+  text-decoration-color: currentColor;
+}
+
+.zoom:focus-visible {
+  outline: 2px solid var(--ob-intent-primary);
+  outline-offset: 1px;
+}
+
+.zoomNeg {
+  color: var(--ob-money-negative);
+  text-decoration-color: color-mix(in srgb, var(--ob-money-negative) 35%, transparent);
+}
+
+.favorable {
+  color: var(--ob-intent-success);
+}
+
+.unfavorable {
+  color: var(--ob-intent-danger);
+}
+
+.outOfBalance {
+  margin-top: 12px;
+}
+
+.zoomTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.zoomTotal strong {
+  color: var(--ob-text-heading);
 }

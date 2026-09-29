@@ -121,7 +121,11 @@ describe("CSS custom properties", () => {
     const block = cssVariableBlock();
     expect(block).toContain("--ob-money-negative: #b91c1c;");
     expect(block).toContain("--ob-intent-primary: #0f766e;");
-    expect(block.startsWith(":root {")).toBe(true);
+    // Also declared on the report being printed (lib/client/print-report.ts), so
+    // a print holds to the light palette regardless of the reader's own theme.
+    expect(block.startsWith(':root,\nbody.print-report .report-print-area {')).toBe(true);
+    const [, darkBlock] = block.split("\n\n");
+    expect(darkBlock.startsWith(':root[data-theme="dark"] {')).toBe(true);
     expect(block.endsWith("}\n")).toBe(true);
   });
 

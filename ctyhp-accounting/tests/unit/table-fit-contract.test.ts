@@ -14,13 +14,13 @@ import { describe, expect, it } from "vitest";
  * column count is data rather than design — goes on the list below with its
  * reason, and says so at its own call site.
  */
-const MATRIX = new Map<string, string>([
-  ["components/reports/PnlTrendView.tsx", "one column per period, count chosen by the reader"],
-  [
-    "components/reports/BalanceSheetTrendView.tsx",
-    "one column per period, count chosen by the reader",
-  ],
-]);
+/**
+ * Empty since 2026-09-28: the two per-period statements that were matrices
+ * (PnlTrendView, BalanceSheetTrendView) became columns of the statement table,
+ * a plain table that scrolls inside its own box. A table added here needs its
+ * reason and `fit={false}` at its call site.
+ */
+const MATRIX = new Map<string, string>();
 
 /**
  * Three more were candidates and none of them qualified, which is the point of
