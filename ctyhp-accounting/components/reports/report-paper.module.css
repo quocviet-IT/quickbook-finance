@@ -557,6 +557,22 @@
   white-space: nowrap;
 }
 
+/* Cell-scoped so these win over `.rpt td` and `.rpt td.pct` above: a bare
+ * one-class rule (see `.favorable`/`.unfavorable`/`.negative` below, still used
+ * by other elements) is weaker than either and never showed on a change or
+ * percent cell. */
+.rpt td.favorable {
+  color: var(--ob-intent-success);
+}
+
+.rpt td.unfavorable {
+  color: var(--ob-intent-danger);
+}
+
+.rpt td.negative {
+  color: var(--ob-money-negative);
+}
+
 .rpt td.ind0 {
   padding-left: 0;
 }
