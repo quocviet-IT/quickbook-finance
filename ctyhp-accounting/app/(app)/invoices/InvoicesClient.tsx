@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -160,7 +161,7 @@ export default function InvoicesClient({
   const { message, modal } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm();
-  const [open, setOpen] = useState(initialCreateOpen);
+  const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pdfId, setPdfId] = useState<string | null>(null);

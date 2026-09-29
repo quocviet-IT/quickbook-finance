@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -104,7 +105,7 @@ export default function BillsClient({
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
-  const [open, setOpen] = useState(initialCreateOpen);
+  const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";

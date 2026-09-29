@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Input, Select, Space, Tag } from "antd";
@@ -68,7 +69,7 @@ export default function PurchaseOrdersClient({
   const router = useRouter();
   const [status, setStatus] = useState<PoStatus | "all">("all");
   const [keyword, setKeyword] = useState("");
-  const [formOpen, setFormOpen] = useState(initialCreateOpen);
+  const [formOpen, setFormOpen] = useInitiallyOpen(initialCreateOpen);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
 
   const rows = useMemo(

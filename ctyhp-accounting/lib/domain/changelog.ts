@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.68",
+    date: "2026-09-29",
+    headline: "A New form opened from a link no longer redraws the page.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Opening a New invoice, bill, expense or other form from a link, a refresh or a new tab",
+        detail:
+          "When a page was opened straight to its New form — a bookmarked or shared link, a refresh, or New company from the company list — the browser drew the page twice and logged an error. The form now opens once the page has loaded, the same as when you pick it from the New menu.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "1.67",
     date: "2026-09-29",
     headline: "A chart of accounts for jewelry and retail, and a chart you can read by section.",

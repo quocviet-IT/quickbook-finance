@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -94,7 +95,7 @@ export default function PaymentsClient({
   scannerConfigured: boolean;
 }) {
   const router = useRouter();
-  const [receiveOpen, setReceiveOpen] = useState(initialCreateOpen);
+  const [receiveOpen, setReceiveOpen] = useInitiallyOpen(initialCreateOpen);
   // Bumped on every open, so the form is a fresh mount rather than a reset:
   // yesterday's allocations must never survive into the next receipt.
   const [receiveSession, setReceiveSession] = useState(0);

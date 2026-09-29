@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
@@ -62,7 +63,7 @@ export default function JournalClient({
   const { message, modal } = App.useApp();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(initialCreateOpen);
+  const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [lines, setLines] = useState<LineForm[]>([{}, {}]);
