@@ -73,6 +73,7 @@ export const NAV: NavItem[] = [
       { key: "/banking/overview", label: "Overview" },
       { key: "/banking", label: "Bank Transactions" },
       { key: "/banking/reconcile", label: "Reconcile" },
+      { key: "/banking/rules", label: "Rules" },
     ],
   },
   {
