@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { CASH_FLOW_ROLES, defaultCashFlowRole } from "./cashflow";
+import { CHART_TEMPLATE_KEYS } from "./chart-templates";
 import { passwordPolicyProblems } from "./password-policy";
 import { USD_CURRENCY_CODE } from "./currency";
 import {
@@ -873,5 +874,6 @@ export const companyCreateSchema = z.object({
     ),
   is_sample: z.boolean().default(false),
   display_order: z.number().int().min(0).max(1000).default(100),
+  chart_template: z.enum(CHART_TEMPLATE_KEYS).default("standard"),
 });
 export type CompanyCreateInput = z.infer<typeof companyCreateSchema>;

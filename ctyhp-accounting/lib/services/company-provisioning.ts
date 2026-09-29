@@ -2,6 +2,7 @@
 // module under plain Node, where the `@/` alias does not exist. The type import
 // below may keep the alias — type imports are erased before Node sees them.
 import { planCompanySchema } from "../domain/schema-template.ts";
+import { CHART_TEMPLATES, chartTemplateStatements, type ChartTemplateKey } from "../domain/chart-templates.ts";
 import type { MigrationSource } from "@/lib/db/migration-sources";
 
 export type { MigrationSource };
@@ -31,6 +32,8 @@ export interface ProvisionCompanyInput {
   displayOrder: number;
   /** Given membership in the register and administrator rights inside the books. */
   adminUserIds: readonly string[];
+  /** The chart the requester chose; Standard when absent. */
+  chartTemplate?: ChartTemplateKey;
 }
 
 export interface ProvisionCompanyResult {
@@ -175,6 +178,13 @@ export async function provisionCompany(
     await runBatch(client, batch, i, plan.statements.length);
   }
 
+  // The chart the requester chose, inside the same transaction: a template
+  // that cannot be applied leaves no company behind.
+  const template = CHART_TEMPLATES[input.chartTemplate ?? "standard"];
+  for (const statement of chartTemplateStatements(template.key)) {
+    await client.query(statement.sql, statement.params);
+  }
+
   // The application connects as `authenticated`; row-level security decides
   // what it may see once it is in.
   await client.query(`grant usage on schema ${schema} to authenticated, service_role`);
@@ -218,6 +228,20 @@ export async function provisionCompany(
       `${schema} is not complete — missing tables: ${missingTables.join(", ") || "none"}; ` +
         `missing functions: ${missingRoutines.join(", ") || "none"}`,
     );
+  }
+  if (template.accounts.length > 0) {
+    const { rows } = await client.query(
+      `select a.account_code, p.account_code as parent_code
+         from ${schema}.acc_account a
+         left join ${schema}.acc_account p on p.id = a.parent_account_id`,
+    );
+    const parentOf = new Map(
+      rows.map((r) => [String(r.account_code), r.parent_code == null ? undefined : String(r.parent_code)]),
+    );
+    const wrong = template.accounts.filter((a) => !parentOf.has(a.code) || parentOf.get(a.code) !== a.parent);
+    if (wrong.length > 0) {
+      throw new Error(`${schema} does not have the ${template.label} chart — ${wrong.map((a) => a.code).join(", ")}`);
+    }
   }
 
   return {

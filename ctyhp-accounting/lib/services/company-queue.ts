@@ -7,6 +7,7 @@ import {
   type ProvisionCompanyInput,
   type ProvisionCompanyResult,
 } from "@/lib/services/company-provisioning";
+import type { ChartTemplateKey } from "../domain/chart-templates.ts";
 
 export interface CompanyQueueResult {
   requestId: string;
@@ -70,6 +71,7 @@ export async function runPendingCompanyProvisioning(
             isSample: Boolean(row.is_sample),
             displayOrder: Number(row.display_order ?? 100),
             adminUserIds: row.requested_by ? [row.requested_by as string] : [],
+            chartTemplate: ((row.chart_template as ChartTemplateKey | null | undefined) ?? "standard"),
           },
           sources,
         );

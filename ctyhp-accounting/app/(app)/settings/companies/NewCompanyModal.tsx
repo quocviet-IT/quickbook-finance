@@ -1,7 +1,8 @@
 "use client";
 import { useState, type ChangeEvent } from "react";
-import { Alert, App, Form, Input, InputNumber, Modal, Switch, Typography } from "antd";
+import { Alert, App, Form, Input, InputNumber, Modal, Radio, Switch, Typography } from "antd";
 import { companySlugFromName } from "@/lib/domain/company-slug";
+import { CHART_TEMPLATES, CHART_TEMPLATE_KEYS, type ChartTemplateKey } from "@/lib/domain/chart-templates";
 import { requestCompanyAction } from "./actions";
 
 export interface NewCompanyModalProps {
@@ -16,6 +17,7 @@ interface FormValues {
   slug: string;
   is_sample: boolean;
   display_order: number;
+  chart_template: ChartTemplateKey;
 }
 
 /**
@@ -30,6 +32,7 @@ export default function NewCompanyModal({
 }: NewCompanyModalProps) {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
+  const chartTemplate = (Form.useWatch("chart_template", form) as ChartTemplateKey | undefined) ?? "standard";
   const [saving, setSaving] = useState(false);
 
   /** The key is a suggestion until the user edits it, then it is theirs. */
@@ -79,7 +82,7 @@ export default function NewCompanyModal({
         form={form}
         layout="vertical"
         requiredMark={false}
-        initialValues={{ is_sample: false, display_order: 100 }}
+        initialValues={{ is_sample: false, display_order: 100, chart_template: "standard" }}
       >
         <Form.Item
           name="legal_name"
@@ -107,6 +110,16 @@ export default function NewCompanyModal({
           ]}
         >
           <Input placeholder="north_star" maxLength={41} />
+        </Form.Item>
+        <Form.Item
+          name="chart_template"
+          label="Chart of accounts"
+          extra={CHART_TEMPLATES[chartTemplate].description}
+        >
+          <Radio.Group
+            optionType="button"
+            options={CHART_TEMPLATE_KEYS.map((key) => ({ value: key, label: CHART_TEMPLATES[key].label }))}
+          />
         </Form.Item>
         <Form.Item name="display_order" label="Order in the company list">
           <InputNumber min={0} max={1000} style={{ width: 160 }} />

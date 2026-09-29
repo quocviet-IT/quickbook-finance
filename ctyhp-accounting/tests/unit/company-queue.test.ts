@@ -81,12 +81,30 @@ describe("runPendingCompanyProvisioning", () => {
         isSample: false,
         displayOrder: 100,
         adminUserIds: ["user-1"],
+        chartTemplate: "standard",
       },
       sources,
     );
     const order = client.calls.join("\n@@\n");
     expect(order.indexOf("begin")).toBeLessThan(order.indexOf("commit"));
     expect(order).toContain("complete_company_request");
+  });
+
+  it("builds the chart the request asked for", async () => {
+    const client = fakeClient([{ ...request, chart_template: "retail_jewelry" }, null]);
+    const provision = vi.fn().mockResolvedValue(built);
+
+    await runPendingCompanyProvisioning({
+      createClient: async () => client,
+      provision,
+      loadSources: () => sources,
+    });
+
+    expect(provision).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({ chartTemplate: "retail_jewelry" }),
+      sources,
+    );
   });
 
   it("rolls back and records the message when provisioning refuses", async () => {

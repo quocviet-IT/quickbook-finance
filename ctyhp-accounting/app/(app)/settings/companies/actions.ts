@@ -62,6 +62,7 @@ export async function requestCompanyAction(
       p_legal_name: parsed.data.legal_name,
       p_is_sample: parsed.data.is_sample,
       p_display_order: parsed.data.display_order,
+      p_chart_template: parsed.data.chart_template,
     });
     if (error) return { ok: false, error: error.message };
 

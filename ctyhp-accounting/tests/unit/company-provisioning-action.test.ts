@@ -67,10 +67,33 @@ describe("requestCompanyAction", () => {
       p_legal_name: "North Star Bridal LLC",
       p_is_sample: false,
       p_display_order: 100,
+      p_chart_template: "standard",
     });
     // Scheduled through `after`, so the browser is not holding the connection.
     expect(mocks.after).toHaveBeenCalled();
     expect(mocks.runPending).toHaveBeenCalled();
+  });
+
+  it("passes the chart the requester chose", async () => {
+    const client = registerClient();
+    mocks.createClientForSchema.mockResolvedValue(client);
+
+    await requestCompanyAction({ ...valid, chart_template: "retail_jewelry" });
+
+    expect(client.rpc).toHaveBeenCalledWith(
+      "request_company",
+      expect.objectContaining({ p_chart_template: "retail_jewelry" }),
+    );
+  });
+
+  it("refuses a chart it does not know, before touching the database", async () => {
+    const client = registerClient();
+    mocks.createClientForSchema.mockResolvedValue(client);
+
+    const result = await requestCompanyAction({ ...valid, chart_template: "bakery" });
+
+    expect(result.ok).toBe(false);
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   it("passes the database's refusal through unchanged", async () => {
