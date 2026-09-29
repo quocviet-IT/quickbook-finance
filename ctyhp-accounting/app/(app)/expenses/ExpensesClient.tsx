@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
@@ -55,7 +56,7 @@ export default function ExpensesClient({
   scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
-  const [open, setOpen] = useState(initialCreateOpen);
+  const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";

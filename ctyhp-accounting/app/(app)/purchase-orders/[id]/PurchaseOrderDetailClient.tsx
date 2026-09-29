@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Descriptions, Space, Table, Tag, Typography } from "antd";
@@ -56,7 +57,7 @@ export default function PurchaseOrderDetailClient({
   const { order, lines, receipts, bills, exceptions } = detail;
   const [editOpen, setEditOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [billOpen, setBillOpen] = useState(initialBillOpen);
+  const [billOpen, setBillOpen] = useInitiallyOpen(initialBillOpen);
   const [busy, setBusy] = useState(false);
 
   const decimals = useMemo(

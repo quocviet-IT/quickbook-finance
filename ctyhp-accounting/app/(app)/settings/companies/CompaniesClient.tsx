@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Space, Table, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
@@ -46,7 +47,7 @@ export default function CompaniesClient({
 }) {
   const { message } = App.useApp();
   const router = useRouter();
-  const [open, setOpen] = useState(initialCreateOpen && canCreate);
+  const [open, setOpen] = useInitiallyOpen(initialCreateOpen && canCreate);
   const [watching, setWatching] = useState<string | null>(
     requests.find((r) => r.status === "pending" || r.status === "running")?.id ?? null,
   );
