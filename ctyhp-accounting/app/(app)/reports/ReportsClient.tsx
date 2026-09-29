@@ -147,9 +147,14 @@ export default function ReportsClient({
   const [preset, setPreset] = useState<PeriodPreset>("year");
   const [from, setFrom] = useState(initialRange.from);
   const [to, setTo] = useState(initialRange.to);
-  // What each statement has always opened with: the P&L and the Balance Sheet
-  // beside the previous period, the Trial Balance on its own.
-  const [compare, setCompare] = useState<CompareMode>(type === "pnl" || type === "balance" ? "prev" : "none");
+  // What each statement opens with. The P&L sits beside the same dates a year
+  // earlier: it opens on the year to date, and the "previous period" of Jan 1 –
+  // Sep 28 is the same number of days before it (Apr 5 – Dec 31), which nobody
+  // reads a year to date against. The Balance Sheet sits beside the previous
+  // month end; the Trial Balance stands on its own.
+  const [compare, setCompare] = useState<CompareMode>(
+    type === "pnl" ? "year" : type === "balance" ? "prev" : "none",
+  );
   // % of income is on for one or two columns and off for a column per period —
   // until the reader flips it; from then on it is theirs (as `nextShowPercentOfIncome` has it).
   const [showPercent, setShowPercent] = useState(true);
