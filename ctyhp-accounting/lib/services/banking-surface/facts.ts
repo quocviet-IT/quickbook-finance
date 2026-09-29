@@ -4,6 +4,7 @@ import type {
   StatementReconciliationRow,
 } from "@/lib/db/types";
 import { listBankAccounts, listBankConnections } from "@/lib/services/banking";
+import { readAllPages } from "@/lib/services/paging";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/services/dashboard";
 
@@ -76,18 +77,25 @@ export async function getBankingFacts(
   const [accounts, connections, transactions, sessions] = await Promise.all([
     listBankAccounts(sb),
     listBankConnections(sb),
-    sb
-      .from("acc_bank_transaction")
-      .select("id,bank_account_id,txn_date,description,amount_minor,status,pending,provider_removed_at")
-      .is("provider_removed_at", null)
-      .lte("txn_date", context.asOf)
-      .order("txn_date", { ascending: true }),
+    // Paged: read oldest first and cut at PostgREST's cap, the lines dropped
+    // were the newest — the ones this overview is opened to see.
+    readAllPages<BankTransactionRow>(
+      (from, to) =>
+        sb
+          .from("acc_bank_transaction")
+          .select("id,bank_account_id,txn_date,description,amount_minor,status,pending,provider_removed_at")
+          .is("provider_removed_at", null)
+          .lte("txn_date", context.asOf)
+          .order("txn_date", { ascending: true })
+          .order("id")
+          .range(from, to),
+      (message) => new BankingSurfaceError(message),
+    ),
     sb
       .from("acc_statement_reconciliation")
       .select("id,bank_account_id,statement_ending_date,status,completed_at,created_at")
       .order("statement_ending_date", { ascending: false }),
   ]);
-  if (transactions.error) throw new BankingSurfaceError(transactions.error.message);
   if (sessions.error) throw new BankingSurfaceError(sessions.error.message);
 
   return {
@@ -109,7 +117,7 @@ export async function getBankingFacts(
       lastSyncAt: connection.last_sync_at,
       broken: connection.status !== "active" || Boolean(connection.last_error),
     })),
-    transactions: (transactions.data ?? []) as unknown as BankTransactionRow[],
+    transactions,
     sessions: (sessions.data ?? []) as unknown as StatementReconciliationRow[],
   };
 }
