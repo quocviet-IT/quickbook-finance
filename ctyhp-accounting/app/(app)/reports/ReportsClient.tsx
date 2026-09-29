@@ -353,14 +353,14 @@ export default function ReportsClient({
 
   // While a notice is showing, the paper's own read never ran for the dates
   // currently asked for, so the header must not keep quoting the last
-  // successful run's range — it heads with what is asked for instead.
-  const paperRange = notice
-    ? point
-      ? `As of ${longDate(to)}`
-      : rangeText(from, to)
-    : point
-      ? `As of ${longDate(ran.to)}`
-      : rangeText(ran.from, ran.to);
+  // successful run's range — it heads with what is asked for instead. A budget
+  // is asked for by fiscal month, not by the From/To dates.
+  const askedRange =
+    type === "budget"
+      ? { from: months[budgetFromPeriod - 1].start, to: months[budgetToPeriod - 1].end }
+      : { from, to };
+  const shownRange = notice ? askedRange : ran;
+  const paperRange = point ? `As of ${longDate(shownRange.to)}` : rangeText(shownRange.from, shownRange.to);
   const sheet = useMemo(
     () =>
       shownStatement && !shownStatement.empty
