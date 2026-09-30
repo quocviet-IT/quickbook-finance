@@ -108,7 +108,7 @@ export interface CodingSuggestionView {
   /** "6300 — Rent" */
   accountLabel: string;
   source: "rule" | "history";
-  /** `Rule 3 "gusto"` or "11 of 11". */
+  /** "Rule 3" or "11 of 11" — what fits under a 150px picker; `why` has the rest. */
   short: string;
   /** The whole reason, for a tooltip and the Code all list. */
   why: string;
@@ -123,7 +123,7 @@ export function codingView(line: CodingLine, suggestion: CodingSuggestion, accou
       accountId: suggestion.accountId,
       accountLabel,
       source: "rule",
-      short: `Rule ${suggestion.ruleNumber} "${suggestion.ruleText}"`,
+      short: `Rule ${suggestion.ruleNumber}`,
       why: `Rule ${suggestion.ruleNumber}: "${suggestion.ruleText}" → ${named}`,
     };
   }

@@ -10,7 +10,7 @@
  *
  * Imported by scripts/*.mjs: relative imports only, types only across modules.
  */
-import { directionOf, type CodingDirection } from "./coding-names.ts";
+import { directionOf, nameWords, type CodingDirection } from "./coding-names.ts";
 
 export type RuleMatchKind = "words" | "regex";
 export type RuleDirection = CodingDirection | "any";
@@ -74,6 +74,22 @@ export function firstMatchingRule(
 ): BankRule | null {
   const ordered = [...rules].sort((a, b) => a.position - b.position);
   return ordered.find((rule) => usable(rule.accountId) && ruleMatches(rule, line)) ?? null;
+}
+
+/**
+ * The words a new rule starts from, taken from the bank line it is made from:
+ * the longest run of the line's name words, from the first, that the line
+ * itself contains. A history key would not do — it drops punctuation, so
+ * "harbor power light" never matches "HARBOR POWER & LIGHT". Empty when the
+ * line carries no name, and the person types one.
+ */
+export function ruleSeedText(description: string): string {
+  const words = nameWords(description);
+  for (let n = Math.min(3, words.length); n > 0; n -= 1) {
+    const text = words.slice(0, n).join(" ");
+    if (wordPattern(text).test(description)) return text;
+  }
+  return "";
 }
 
 /** Why a rule cannot be saved, or null when it can. */

@@ -92,18 +92,43 @@ export default function CategoriseCell({
     onChanged();
   }
 
-  // What a rule or the company's own history says this line is, with the whole
-  // reason one hover away. Suggested only: nothing posts until Use is clicked.
-  const hint = suggestion ? (
-    <Tooltip title={suggestion.why}>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }} ellipsis>
-        {suggestion.source === "rule"
-          ? `${suggestion.short} → ${suggestion.accountLabel}`
-          : `Usually ${suggestion.accountLabel} · ${suggestion.short}`}
-      </Typography.Text>
-    </Tooltip>
-  ) : null;
   const linkStyle = { padding: 0, height: "auto", fontSize: 12 } as const;
+  const small = { fontSize: 12 } as const;
+
+  /**
+   * What a rule or the company's own history says this line is. One thing per
+   * line, because the column is 150px: the account first, cut to the column
+   * with the whole reason one hover away, then how sure — "2 of 2" or "Rule 2" —
+   * and Use. Suggested only: nothing posts until Use is clicked.
+   */
+  const suggested = (withUse: boolean) =>
+    suggestion ? (
+      <>
+        <Tooltip title={suggestion.why}>
+          <Typography.Text type="secondary" style={{ ...small, display: "block", maxWidth: "100%" }} ellipsis>
+            {suggestion.source === "history" ? "Usually " : "→ "}
+            {suggestion.accountLabel}
+          </Typography.Text>
+        </Tooltip>
+        <Space size={6}>
+          <Typography.Text type="secondary" style={small}>
+            {suggestion.short}
+          </Typography.Text>
+          {withUse ? (
+            <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => void post(suggestion.accountId)}>
+              Use
+            </Button>
+          ) : null}
+        </Space>
+      </>
+    ) : null;
+  const createRule = onCreateRule ? (
+    <div>
+      <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
+        Create rule
+      </Button>
+    </div>
+  ) : null;
 
   if (posting) {
     const label = `${posting.account_code} — ${posting.account_name}`;
@@ -137,12 +162,8 @@ export default function CategoriseCell({
               Change
             </Button>
           ) : null}
-          {canWrite && onCreateRule ? (
-            <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
-              Create rule
-            </Button>
-          ) : null}
         </Space>
+        {canWrite ? createRule : null}
       </Space>
     );
   }
@@ -154,10 +175,16 @@ export default function CategoriseCell({
     return <Typography.Text type="secondary">Matched elsewhere</Typography.Text>;
   }
 
-  if (!canWrite) return hint ?? <Typography.Text type="secondary">—</Typography.Text>;
+  if (!canWrite) {
+    return suggestion ? (
+      <div style={{ width: "100%", minWidth: 0 }}>{suggested(false)}</div>
+    ) : (
+      <Typography.Text type="secondary">—</Typography.Text>
+    );
+  }
 
   return (
-    <Space direction="vertical" size={0} style={{ width: "100%" }}>
+    <div style={{ width: "100%", minWidth: 0 }}>
       <Tooltip title="Choosing an account posts this line to the ledger">
         <Select
           showSearch
@@ -193,19 +220,8 @@ export default function CategoriseCell({
           onChange={(accountId: string) => void post(accountId)}
         />
       </Tooltip>
-      <Space size={6} wrap>
-        {hint}
-        {suggestion ? (
-          <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => void post(suggestion.accountId)}>
-            Use
-          </Button>
-        ) : null}
-        {onCreateRule ? (
-          <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
-            Create rule
-          </Button>
-        ) : null}
-      </Space>
-    </Space>
+      {suggested(true)}
+      {createRule}
+    </div>
   );
 }

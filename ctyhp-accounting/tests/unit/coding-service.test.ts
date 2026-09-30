@@ -47,7 +47,7 @@ describe("suggestionsFrom", () => {
     const rules = [
       { id: "r", position: 1, matchKind: "words" as const, matchText: "metro", direction: "any" as const, minMinor: null, maxMinor: null, accountId: "fees", isActive: true },
     ];
-    expect(suggestionsFrom(inputs({ rules }))[0]).toMatchObject({ accountId: "fees", source: "rule", short: 'Rule 1 "metro"' });
+    expect(suggestionsFrom(inputs({ rules }))[0]).toMatchObject({ accountId: "fees", source: "rule", short: "Rule 1" });
   });
 });
 

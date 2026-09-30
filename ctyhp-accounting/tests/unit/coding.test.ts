@@ -111,7 +111,7 @@ describe("codingView", () => {
       why: 'Coded to RENT Account rent 11 of the last 11 times for "metro realty"',
     });
     const byRule = codingView(line, { source: "rule", accountId: "rent", ruleId: "r", ruleNumber: 3, ruleText: "gusto" }, rent);
-    expect(byRule.short).toBe('Rule 3 "gusto"');
+    expect(byRule.short).toBe("Rule 3");
     expect(byRule.why).toBe('Rule 3: "gusto" → RENT Account rent');
   });
 });

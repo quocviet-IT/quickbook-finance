@@ -86,7 +86,8 @@ import {
 } from "@/lib/domain/statement-import";
 import { formatMoney } from "@/lib/format";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
-import { directionOf, historyKeys } from "@/lib/domain/coding-names";
+import { ruleSeedText } from "@/lib/domain/bank-rules";
+import { directionOf } from "@/lib/domain/coding-names";
 import CodingSuggestionsBar from "./CodingSuggestionsBar";
 import CodeAllModal, { type CodeAllRow } from "./CodeAllModal";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "./rules/RuleFormModal";
@@ -781,7 +782,8 @@ export default function BankingClient({
         onCreateRule={(row, accountId) =>
           setRuleSeed({
             ...EMPTY_RULE,
-            matchText: historyKeys(row.transaction.merchant_name || row.transaction.description)[0] ?? "",
+            // Rules are tried against the line's own description, so that is where the words come from.
+            matchText: ruleSeedText(row.transaction.description),
             direction: directionOf(Number(row.transaction.amount_minor)),
             accountId,
           })

@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { firstMatchingRule, ruleMatches, validateRuleInput, wordPattern, type BankRule } from "@/lib/domain/bank-rules";
+import {
+  firstMatchingRule,
+  ruleMatches,
+  ruleSeedText,
+  validateRuleInput,
+  wordPattern,
+  type BankRule,
+} from "@/lib/domain/bank-rules";
 
 const rule = (over: Partial<BankRule> = {}): BankRule => ({
   id: "r1",
@@ -81,6 +88,22 @@ describe("validateRuleInput", () => {
     expect(validateRuleInput({ ...input, minMinor: 5000, maxMinor: 1000 })).toMatch(/lowest amount/);
     expect(validateRuleInput({ ...input, minMinor: -1 })).toMatch(/negative/);
     expect(validateRuleInput({ ...input, accountId: "" })).toMatch(/account/);
+  });
+});
+
+describe("ruleSeedText", () => {
+  it("takes the longest run of name words, from the first, that the line itself contains", () => {
+    expect(ruleSeedText("METRO REALTY PARTNERS LLC ACH")).toBe("metro realty partners");
+    expect(ruleSeedText("HARBOR POWER & LIGHT")).toBe("harbor power");
+    expect(ruleSeedText("POS STARBUCKS 12345678 SEATTLE")).toBe("starbucks");
+  });
+  it("gives a rule that matches the line it came from", () => {
+    for (const description of ["HARBOR POWER & LIGHT", "ONLINE TRANSFER TO Metro Realty", "POS STARBUCKS 12345678 SEATTLE"]) {
+      expect(ruleMatches(rule({ matchText: ruleSeedText(description) }), line(description, -100))).toBe(true);
+    }
+  });
+  it("leaves the words to the person when the line has no name in it", () => {
+    expect(ruleSeedText("WIRE TYPE:WIRE IN DATE:260915")).toBe("");
   });
 });
 
