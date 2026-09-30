@@ -891,3 +891,15 @@ export const bankRuleInputSchema = rulePreviewInputSchema.extend({
   accountId: z.uuid("Choose the account the rule codes to"),
   isActive: z.boolean(),
 });
+
+/** What Review import posts: fifty lines at most, each one kind of post. */
+export const reviewPostItemsSchema = z
+  .array(
+    z.discriminatedUnion("kind", [
+      z.object({ transactionId: z.uuid(), kind: z.literal("match"), reconciliationId: z.uuid() }),
+      z.object({ transactionId: z.uuid(), kind: z.literal("document"), documentId: z.uuid() }),
+      z.object({ transactionId: z.uuid(), kind: z.literal("account"), accountId: z.uuid() }),
+    ]),
+  )
+  .min(1, "Nothing to post")
+  .max(50, "Post at most 50 lines at a time");
