@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   App,
@@ -55,7 +56,6 @@ import type {
   BankConnectionView,
   SuggestionView,
 } from "@/lib/services/banking";
-import { parseCsv } from "@/lib/csv";
 
 /**
  * Loaded on demand. `ssr: false` because a dialog nobody has opened has
@@ -80,10 +80,7 @@ import {
 } from "@/lib/domain/transaction-filter";
 import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
-import {
-  describeStatementParse,
-  parseStatementRows,
-} from "@/lib/domain/statement-import";
+import type { StatementLine } from "@/lib/domain/statement-import";
 import { formatMoney } from "@/lib/format";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
@@ -145,15 +142,6 @@ function formatSyncTime(value: string | null): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-interface ParsedRow {
-  txn_date: string;
-  description: string;
-  reference: string | null;
-  amount_minor: number;
-  running_balance_minor: number | null;
-  raw_line: string;
 }
 
 interface PendingPlaidLink {
@@ -241,8 +229,7 @@ export default function BankingClient({
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [parsed, setParsed] = useState<ParsedRow[]>([]);
-  const [fileName, setFileName] = useState("");
+  const router = useRouter();
 
   const [pendingLink, setPendingLink] = useState<PendingPlaidLink | null>(null);
   const [mappingSelections, setMappingSelections] = useState<Record<string, string | undefined>>({});
@@ -462,38 +449,25 @@ export default function BankingClient({
     window.location.reload();
   }
 
-  function handleFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      // Parsing rules live in lib/domain/statement-import.ts, where the shapes
-      // real banks export are covered by tests.
-      const result = parseStatementRows(parseCsv(String(reader.result)), {
-        decimals: decimalPlaces,
-      });
-      setParsed(result.rows);
-      setFileName(file.name);
-      message.info(describeStatementParse(result));
-    };
-    reader.readAsText(file);
-    return false;
-  }
-
-  async function confirmImport() {
-    if (!selectedId || !parsed.length) return;
+  // Reading the file — every format, and a CSV's columns — happens in
+  // ImportStatementModal, from rules in lib/domain that are covered by tests.
+  async function confirmImport(fileName: string, rows: StatementLine[]) {
+    if (!selectedId || !rows.length) return;
     setBusy("import");
-    const result = await importStatementAction(selectedId, fileName, parsed);
+    const result = await importStatementAction(selectedId, fileName, rows);
     setBusy(null);
-    if (result.ok && result.data) {
-      message.success(
-        `Imported ${result.data.inserted} transaction(s); ${result.data.skipped} duplicate(s) skipped`,
-      );
-      setImportOpen(false);
-      setParsed([]);
-      setImportsKey((count) => count + 1);
-      reload();
-    } else {
+    if (!result.ok || !result.data) {
       message.error(result.error ?? "Import failed");
+      return;
     }
+    message.success(
+      `Imported ${result.data.inserted} line(s); ${result.data.skipped} duplicate(s) skipped`,
+    );
+    setImportOpen(false);
+    setImportsKey((count) => count + 1);
+    // Straight on to Review import, where every new line carries a proposal.
+    if (result.data.batchId && result.data.inserted > 0) router.push(`/banking/imports/${result.data.batchId}`);
+    else reload();
   }
 
   async function findMatches() {
@@ -919,18 +893,18 @@ export default function BankingClient({
 
       {/* Fetched when it is opened, not when the page is. See
           ImportStatementModal for why this one screen is worth it. */}
-      {importOpen ? (
+      {importOpen && selected ? (
         <ImportStatementModal
           open={importOpen}
-          parsedCount={parsed.length}
-          fileName={fileName}
-          importing={busy === "import"}
-          onFile={handleFile}
-          onConfirm={confirmImport}
-          onCancel={() => {
-            setImportOpen(false);
-            setParsed([]);
+          bankAccount={{
+            id: selected.id,
+            label: `${selected.bank_name || selected.account_name} · ${selected.account_code}`,
+            maskedNumber: selected.account_number_masked,
+            decimals: decimalPlaces,
           }}
+          importing={busy === "import"}
+          onConfirm={(fileName, rows) => void confirmImport(fileName, rows)}
+          onCancel={() => setImportOpen(false)}
         />
       ) : null}
 

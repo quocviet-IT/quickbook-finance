@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { App, Button, Input, Modal, Table, Tag, Tooltip } from "antd";
+import { App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
 import { getStatementImportsAction, undoStatementImportAction } from "./actions";
 
@@ -93,7 +93,7 @@ export default function BankImportList({
           {
             title: "",
             key: "undo",
-            width: 110,
+            width: 190,
             align: "right",
             render: (_, row) => {
               if (row.status === "voided") {
@@ -103,22 +103,35 @@ export default function BankImportList({
                   </Tooltip>
                 );
               }
-              if (!canWrite) return null;
+              // Review import, again, for as long as the import has lines waiting.
+              const review =
+                row.lines_here > row.locked_lines ? (
+                  <Button size="small" href={`/banking/imports/${row.id}`}>
+                    Review
+                  </Button>
+                ) : null;
+              if (!canWrite) return review;
               if (row.locked_lines > 0) {
                 return (
-                  <Tooltip
-                    title={`${row.locked_lines} line(s) are matched to the ledger. Unmatch them first — removing a line an entry points at would leave the books short.`}
-                  >
-                    <Button size="small" danger disabled>
-                      Undo
-                    </Button>
-                  </Tooltip>
+                  <Space size={6}>
+                    {review}
+                    <Tooltip
+                      title={`${row.locked_lines} line(s) are matched to the ledger. Unmatch them first — removing a line an entry points at would leave the books short.`}
+                    >
+                      <Button size="small" danger disabled>
+                        Undo
+                      </Button>
+                    </Tooltip>
+                  </Space>
                 );
               }
               return (
-                <Button size="small" danger onClick={() => setUndoing(row)}>
-                  Undo
-                </Button>
+                <Space size={6}>
+                  {review}
+                  <Button size="small" danger onClick={() => setUndoing(row)}>
+                    Undo
+                  </Button>
+                </Space>
               );
             },
           },
