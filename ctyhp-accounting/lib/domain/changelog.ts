@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.71",
+    date: "2026-09-30",
+    headline: "Upload a bank statement and it arrives categorised — review it, then post it in one click.",
+    changes: [
+      {
+        kind: "added",
+        title: "Review import",
+        detail:
+          "After a statement is imported, every new line shows what OneBook proposes: a match to an entry already in the books, the one open invoice or bill it pays, or an account from your bank rules or from how the same name was coded before. Change any line, untick any line, then Post. Nothing is posted until you do, and lines you leave stay waiting on Bank Transactions. An import with lines still waiting can be reviewed again from Statement imports.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Statements in OFX, QFX, QBO and QIF",
+        detail:
+          "Import the Quicken or QuickBooks download your bank offers, as well as CSV. A file downloaded twice is recognised by the bank's own transaction id, even when the bank rewords a description, and a file for a different account number is flagged before import.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Choose a CSV's columns",
+        detail:
+          "When a CSV's headings are not ones OneBook knows, choose which column is the date, description, amount or money out and money in, reference and balance, whether dates are day-first, and whether the file writes payments as positive. The choice is remembered for that bank account on this browser.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.70",
     date: "2026-09-29",
     headline: "Bank lines suggest their own account — from your rules, or from how you coded them before.",
