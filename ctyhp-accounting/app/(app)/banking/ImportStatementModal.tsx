@@ -151,8 +151,17 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
     onConfirm(fileName, rows);
   }
 
+  // Choosing the date column reads that column again for which way round its
+  // dates are written; the reader can still override it.
   const setColumn = (key: keyof StatementColumnMap, value: string | null) =>
-    setChoice((current) => (current ? { ...current, columns: { ...current.columns, [key]: value } } : current));
+    setChoice((current) => {
+      if (!current) return current;
+      const dateOrder =
+        key === "date" && value && file.kind === "csv"
+          ? detectDateOrder(file.records.map((record) => record[value] ?? ""))
+          : current.dateOrder;
+      return { ...current, columns: { ...current.columns, [key]: value }, dateOrder };
+    });
 
   return (
     <Modal
@@ -193,12 +202,15 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
             <Space direction="vertical" size={8} style={{ width: "100%" }}>
               <Typography.Text strong>Choose columns</Typography.Text>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                {/* A div, not a label: a label forwards the click to the select
+                    inside it, which opens the list and closes it again. */}
                 {COLUMN_FIELDS.map((field) => (
-                  <label key={field.key}>
+                  <div key={field.key}>
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       {field.label}
                     </Typography.Text>
                     <Select
+                      aria-label={field.label}
                       style={{ width: "100%" }}
                       allowClear={!field.required}
                       placeholder="None"
@@ -206,13 +218,14 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
                       onChange={(value: string | undefined) => setColumn(field.key, value ?? null)}
                       options={file.headers.map((h) => ({ value: h, label: h }))}
                     />
-                  </label>
+                  </div>
                 ))}
-                <label>
+                <div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     Dates
                   </Typography.Text>
                   <Select
+                    aria-label="Dates"
                     style={{ width: "100%" }}
                     value={choice.dateOrder}
                     onChange={(value: DateOrder) => setChoice({ ...choice, dateOrder: value })}
@@ -221,7 +234,7 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
                       { value: "dmy", label: "Day/Month/Year" },
                     ]}
                   />
-                </label>
+                </div>
               </div>
               <Checkbox checked={choice.flipSigns} onChange={(e) => setChoice({ ...choice, flipSigns: e.target.checked })}>
                 Flip signs: my file shows payments as positive

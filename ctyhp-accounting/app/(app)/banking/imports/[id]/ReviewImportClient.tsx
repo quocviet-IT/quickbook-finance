@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/format";
 import type { ImportReview, ReviewLineView, ReviewOutcome } from "@/lib/services/statement-review";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "../../rules/RuleFormModal";
 import { postReviewItemsAction } from "../actions";
+import styles from "./review-import.module.css";
 
 /**
  * One import's lines, each with what OneBook proposes, and the one button that
@@ -43,7 +44,10 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
     for (const line of lines) c[line.proposal.kind] += 1;
     return c;
   }, [lines]);
-  const postable = ticked.filter((id) => choices[id]);
+  // A line handled since the page loaded — posted here, or elsewhere — is never
+  // posted again, whatever its tick says.
+  const open = (id: string) => byId.get(id)?.proposal.kind !== "handled";
+  const postable = ticked.filter((id) => choices[id] && open(id));
   const waiting = lines.filter((l) => l.proposal.kind !== "handled").length - postable.length;
 
   function choose(line: ReviewLineView, value: string | null) {
@@ -68,6 +72,8 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
       setProgress({ done: outcomes.length, total: items.length });
     }
     setProgress(null);
+    const posted = new Set(outcomes.filter((o) => o.ok).map((o) => o.id));
+    setTicked((current) => current.filter((id) => !posted.has(id)));
     const result = summarizeBatchResults(outcomes, 0);
     setSummary(result);
     if (result.failureCount === 0) message.success(describeBatchResult(result));
@@ -162,7 +168,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   ];
 
   return (
-    <div>
+    <div className={styles.review}>
       <Space direction="vertical" size={4} style={{ marginBottom: 12 }}>
         <Typography.Text strong>
           {batch.filename} · {batch.bankLabel} · imported {batch.importedAt.slice(0, 10)}
@@ -207,7 +213,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
         rowSelection={
           canWrite
             ? {
-                selectedRowKeys: ticked,
+                selectedRowKeys: ticked.filter(open),
                 onChange: (keys) => setTicked(keys as string[]),
                 getCheckboxProps: (line: ReviewLineView) => ({ disabled: line.proposal.kind === "handled" || !choices[line.id] }),
               }
