@@ -1,16 +1,27 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite, getUserRole } from "@/lib/auth";
+import { fundingAccountAllowed, suggestFundingAccount } from "@/lib/domain/bank-pairs";
 import { codableAccount, codingAccountOf } from "@/lib/domain/coding";
 import { listAccounts } from "@/lib/services/accounts";
+import { getBankingPreference } from "@/lib/services/banking-preference";
 import { listBankRules, ruleWaitingCounts } from "@/lib/services/coding";
 import PageHeader from "@/components/PageHeader";
+import PairsPreference from "./PairsPreference";
 import RulesClient, { type RuleListRow } from "./RulesClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function BankRulesPage() {
   const sb = await createSupabaseServerClient();
-  const [role, rules, accounts] = await Promise.all([getUserRole(), listBankRules(sb), listAccounts(sb)]);
+  const [role, rules, accounts, preference] = await Promise.all([
+    getUserRole(),
+    listBankRules(sb),
+    listAccounts(sb),
+    getBankingPreference(sb),
+  ]);
+  const liabilities = accounts
+    .filter(fundingAccountAllowed)
+    .map((account) => ({ id: account.id, label: `${account.account_code} — ${account.name}` }));
   const waiting = await ruleWaitingCounts(sb, rules);
   const byId = new Map(accounts.map((account) => [account.id, account]));
   const rows: RuleListRow[] = rules.map((rule) => {
@@ -27,6 +38,12 @@ export default async function BankRulesPage() {
       <PageHeader
         title="Bank Rules"
         description="The words that say which account a bank line belongs to. The first rule that matches suggests the account; history speaks only when no rule does. Nothing is posted until someone uses a suggestion."
+      />
+      <PairsPreference
+        initial={preference}
+        suggestedFundingId={suggestFundingAccount(accounts)}
+        accounts={liabilities}
+        canWrite={canWrite(role)}
       />
       <RulesClient
         rules={rows}
