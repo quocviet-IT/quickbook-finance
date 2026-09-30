@@ -1,14 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountRow, BankTransactionRow } from "@/lib/db/types";
+import { findBankPairs, lastFourDigits, namedTransferTarget, type PairBank, type PairLine } from "@/lib/domain/bank-pairs";
 import { codableAccount, codingAccountOf } from "@/lib/domain/coding";
 import {
   REVIEW_POST_CHUNK,
   reviewProposal,
   type ReviewDocument,
+  type ReviewPairView,
   type ReviewPostItem,
   type ReviewProposal,
 } from "@/lib/domain/statement-review";
 import { listAccounts } from "./accounts";
+import { getBankingPreference } from "./banking-preference";
 import {
   approveReconciliation,
   categoriseBankTransaction,
@@ -121,7 +124,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     status: string;
   };
 
-  const [banks, lines, matches, documents, rules, history, accountRows] = await Promise.all([
+  const [banks, lines, matches, documents, rules, history, accountRows, waiting, preference, baseRow] = await Promise.all([
     listBankAccounts(sb),
     readAllPages<BankTransactionRow>(
       (from, to) =>
@@ -135,15 +138,34 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
           .range(from, to),
       fail,
     ),
-    listSuggestions(sb, batch.bank_account_id),
+    // Every account's: a transfer's other side sits on another bank account.
+    listSuggestions(sb, null),
     openDocuments(sb),
     listBankRules(sb),
     loadHistory(sb),
     listAccounts(sb),
+    // Every line in the company still waiting, for pairing: last month's cheque
+    // can answer this month's deposit, and a transfer's other side is elsewhere.
+    readAllPages<Pick<BankTransactionRow, "id" | "bank_account_id" | "txn_date" | "amount_minor" | "description">>(
+      (from, to) =>
+        sb
+          .from("acc_bank_transaction")
+          .select("id,bank_account_id,txn_date,amount_minor,description")
+          .eq("status", "unmatched")
+          .eq("pending", false)
+          .is("provider_removed_at", null)
+          .order("id")
+          .range(from, to),
+      fail,
+    ),
+    getBankingPreference(sb),
+    sb.from("acc_currency").select("code").eq("is_base", true).maybeSingle(),
   ]);
   const bank = banks.find((b) => b.id === batch.bank_account_id);
   const currencyCode = bank?.currency_code ?? "USD";
   const codable = accountRows.filter((row) => codableAccount(codingAccountOf(row)));
+  if (baseRow.error) throw fail(baseRow.error.message);
+  const baseCode = (baseRow.data as { code: string } | null)?.code ?? "USD";
 
   // Most confident first, so the first seen for a line is its best.
   const bestMatch = new Map<string, { reconciliationId: string; entryNumber: string | null }>();
@@ -159,6 +181,85 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     ]),
   );
 
+  // --- Pairs: transfers between the company's bank accounts, and funding. ---
+  const bankById = new Map(banks.map((b) => [b.id, b]));
+  const bankLabel = (id: string) => {
+    const b = bankById.get(id);
+    return b ? `${b.bank_name || b.account_name} · ${b.account_code}` : "another bank account";
+  };
+  // An open document of exactly this amount says what the money is; such a line never pairs.
+  const hasExactDocument = (amountMinor: number) =>
+    documents.some(
+      (d) =>
+        d.currencyCode === baseCode &&
+        d.balanceDueMinor === Math.abs(amountMinor) &&
+        d.direction === (amountMinor > 0 ? "receivable" : "payable"),
+    );
+  const pairable: PairLine[] = waiting
+    .filter(
+      (w) =>
+        !bestMatch.has(w.id) &&
+        bankById.get(w.bank_account_id)?.currency_code === baseCode &&
+        !hasExactDocument(Number(w.amount_minor)),
+    )
+    .map((w) => ({
+      id: w.id,
+      bankAccountId: w.bank_account_id,
+      txnDate: w.txn_date,
+      amountMinor: Number(w.amount_minor),
+      description: w.description ?? "",
+    }));
+  const facts = findBankPairs(pairable, preference.pairWindowDays, { fundingEnabled: Boolean(preference.fundingAccountId) });
+  const fundingRow = accountRows.find((a) => a.id === preference.fundingAccountId);
+  const fundingLabel = fundingRow ? `${fundingRow.account_code} ${fundingRow.name}` : "";
+  const pairBanks: PairBank[] = banks.map((b) => ({
+    id: b.id,
+    glAccountId: b.account_id,
+    label: bankLabel(b.id),
+    accountName: b.account_name,
+    digits: lastFourDigits(b.account_number_masked, b.account_name, b.bank_name),
+  }));
+  const pairView = (lineId: string, amountMinor: number): { pair: ReviewPairView | null; rivals: number } => {
+    const fact = facts.get(lineId);
+    if (!fact) return { pair: null, rivals: 0 };
+    if (fact.kind === "ambiguous") return { pair: null, rivals: fact.rivals };
+    const other = fact.counterpart;
+    if (fact.kind === "transfer") {
+      const direction = amountMinor < 0 ? "to" : "from";
+      return {
+        pair: {
+          kind: "transfer",
+          counterpartId: other.id,
+          label: `Transfer ${direction} ${bankLabel(other.bankAccountId)}`,
+          why: `The other side is on ${bankLabel(other.bankAccountId)}, ${other.txnDate}, for the same amount. Posting makes one transfer entry and matches both lines.`,
+          also: "",
+        },
+        rivals: 0,
+      };
+    }
+    return {
+      pair: {
+        kind: "funding",
+        counterpartId: other.id,
+        label: `Shareholder funding · ${fundingLabel}`,
+        why: `Answered by ${other.description} of the same amount on ${other.txnDate} — the owner's money in and out, not income or a cost`,
+        also: `possible shareholder funding with ${other.description} on ${other.txnDate}`,
+      },
+      rivals: 0,
+    };
+  };
+  const namedFor = (row: BankTransactionRow) => {
+    if (facts.get(row.id)?.kind === "transfer") return null;
+    const target = namedTransferTarget({ bankAccountId: row.bank_account_id, description: row.description ?? "" }, pairBanks);
+    if (!target) return null;
+    const direction = Number(row.amount_minor) < 0 ? "to" : "from";
+    return {
+      accountId: target.glAccountId,
+      label: `Transfer ${direction} ${target.label}`,
+      why: `Reads as a transfer and names ${target.label}; no line there yet — posting moves the money without touching income or expense`,
+    };
+  };
+
   return {
     batch: {
       id: batch.id,
@@ -170,19 +271,25 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
       bankLabel: bank ? `${bank.bank_name || bank.account_name} · ${bank.account_code}` : "Bank account",
       currencyCode,
     },
-    lines: lines.map((row) => ({
-      id: row.id,
-      txnDate: row.txn_date,
-      description: row.description ?? "",
-      reference: row.reference,
-      amountMinor: Number(row.amount_minor),
-      proposal: reviewProposal({
-        line: { id: row.id, status: row.status, pending: row.pending, amountMinor: Number(row.amount_minor), currencyCode },
-        match: bestMatch.get(row.id) ?? null,
-        documents,
-        coding: coding.get(row.id) ?? null,
-      }),
-    })),
+    lines: lines.map((row) => {
+      const { pair, rivals } = pairView(row.id, Number(row.amount_minor));
+      return {
+        id: row.id,
+        txnDate: row.txn_date,
+        description: row.description ?? "",
+        reference: row.reference,
+        amountMinor: Number(row.amount_minor),
+        proposal: reviewProposal({
+          line: { id: row.id, status: row.status, pending: row.pending, amountMinor: Number(row.amount_minor), currencyCode },
+          match: bestMatch.get(row.id) ?? null,
+          documents,
+          coding: coding.get(row.id) ?? null,
+          pair,
+          pairRivals: rivals,
+          namedTransfer: namedFor(row),
+        }),
+      };
+    }),
     accounts: codable.map((row) => ({ id: row.id, label: `${row.account_code} — ${row.name}` })),
     ruleAccounts: codable,
   };
