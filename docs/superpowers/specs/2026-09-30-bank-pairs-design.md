@@ -51,19 +51,20 @@ A line can pair only when all of these hold:
 
 - it is waiting: `unmatched`, not `pending`, and not removed by the provider;
 - it has no suggested ledger match;
+- no open invoice or bill has exactly its amount (money that pays a document is not the owner's);
 - its bank account is in the base currency.
 
 Pairing looks at every such line in the company, not only the import on screen.
 
 - **Transfer pair.** Two lines on **different** bank accounts, with opposite signs, the same absolute amount, and dates at most *Pair within* days apart.
-- **Funding pair.** Two lines with opposite signs, the same absolute amount, and dates at most *Pair within* days apart. They may be on the same bank account or not, but only one of them may be a transfer candidate.
+- **Funding pair.** Two lines on the **same** bank account, with opposite signs, the same absolute amount, and dates at most *Pair within* days apart. This follows the prototype, which pairs within one statement; across two accounts the same shape is a transfer.
 - **Only when unambiguous.** A line pairs only with its **only** candidate, and only when it is that candidate's only candidate too.
   - Two or more candidates give no pair. **Why** says: "2 lines could be the other side — code it yourself".
   - A line is used in at most one pair.
   - If a pair of lines is a transfer candidate, it is never also offered as funding.
 - **Named transfer.** No transfer pair was found, but the description matches `\b(transfer|xfer|online transfer|internal transfer|book transfer|to savings|from savings)\b` and names another of the company's bank accounts:
   - either the account's last four digits (from the masked number, or from the ledger account's code or name) appear in the description;
-  - or the ledger account's name, three characters or longer, appears in it.
+  - or the ledger account's full name, six characters or longer, appears in it.
 
   The line is proposed as an account post to that other bank account.
 
