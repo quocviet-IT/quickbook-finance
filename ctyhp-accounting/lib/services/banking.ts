@@ -7,7 +7,7 @@ import type {
   BankTransactionRow,
 } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
-import { statementRowHash } from "@/lib/domain/banking-import";
+import { statementLineHash } from "@/lib/domain/banking-import";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -96,6 +96,8 @@ export interface ImportRow {
   amount_minor: number;
   running_balance_minor: number | null;
   raw_line: string;
+  /** The bank's own id (OFX FITID); the duplicate key when present. */
+  external_id?: string | null;
 }
 
 export async function importStatement(
@@ -103,8 +105,8 @@ export async function importStatement(
   bankAccountId: string,
   filename: string,
   rows: ImportRow[],
-): Promise<{ inserted: number; skipped: number }> {
-  if (!rows.length) return { inserted: 0, skipped: 0 };
+): Promise<{ inserted: number; skipped: number; batchId: string | null }> {
+  if (!rows.length) return { inserted: 0, skipped: 0, batchId: null };
 
   const payload = rows.map((r) => ({
     txn_date: r.txn_date,
@@ -113,7 +115,7 @@ export async function importStatement(
     amount_minor: r.amount_minor,
     running_balance_minor: r.running_balance_minor,
     raw_line: r.raw_line,
-    raw_hash: statementRowHash([bankAccountId, r.txn_date, r.amount_minor, r.description, r.reference]),
+    raw_hash: statementLineHash(bankAccountId, r),
     source: "file_upload",
   }));
 
@@ -124,11 +126,12 @@ export async function importStatement(
   });
   if (error) throw new BankingError(error.message);
   const result = (Array.isArray(data) ? data[0] : data) as
-    | { inserted?: number; skipped?: number }
+    | { inserted?: number; skipped?: number; batch_id?: string }
     | null;
   return {
     inserted: Number(result?.inserted ?? 0),
     skipped: Number(result?.skipped ?? rows.length),
+    batchId: result?.batch_id ?? null,
   };
 }
 
