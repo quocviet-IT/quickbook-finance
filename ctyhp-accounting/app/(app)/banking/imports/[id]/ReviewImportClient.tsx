@@ -184,12 +184,13 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
           );
         }
         const p = line.proposal;
-        const own =
-          p.kind === "match" || p.kind === "document" || p.kind === "transfer" || p.kind === "funding"
-            ? [{ value: proposalValue(p) as string, label: p.label }]
-            : [];
+        // The proposal first, under its own label — "Transfer to Sample Savings · 1020"
+        // reads better than the account it posts to.
+        const ownValue = proposalValue(p);
+        const own = ownValue && "label" in p ? [{ value: ownValue, label: p.label }] : [];
         // A funding pair offered beside a rule or history proposal.
         if (p.kind === "account" && p.alternative) own.push({ value: alternativeValue(p) as string, label: p.alternative.label });
+        const others = accountOptions.filter((option) => option.value !== ownValue);
         return (
           <div style={{ minWidth: 0 }}>
             <Select
@@ -200,7 +201,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
               optionFilterProp="label"
               value={choices[line.id] ?? undefined}
               onChange={(value: string | undefined) => choose(line, value ?? null)}
-              options={[...own, ...accountOptions]}
+              options={[...own, ...others]}
             />
             <Typography.Text type="secondary" style={{ fontSize: 12, display: "block" }} ellipsis={{ tooltip: whyOf(line) }}>
               {whyOf(line)}
