@@ -33,11 +33,23 @@ export interface ReviewDocument {
   direction: "receivable" | "payable";
 }
 
+/** A pair this line belongs to, in the words the screen shows. */
+export interface ReviewPairView {
+  kind: "transfer" | "funding";
+  counterpartId: string;
+  label: string;
+  why: string;
+  /** The funding pair as a second choice: "possible shareholder funding with …". */
+  also: string;
+}
+
 export type ReviewProposal =
   | { kind: "handled"; why: string }
   | { kind: "match"; reconciliationId: string; label: string; why: string }
   | { kind: "document"; documentId: string; label: string; why: string }
-  | { kind: "account"; accountId: string; label: string; why: string }
+  | { kind: "transfer"; counterpartId: string; label: string; why: string }
+  | { kind: "funding"; counterpartId: string; label: string; why: string }
+  | { kind: "account"; accountId: string; label: string; why: string; alternative?: ReviewPairView }
   | { kind: "none"; why: string };
 
 export function reviewProposal(input: {
@@ -45,8 +57,14 @@ export function reviewProposal(input: {
   match: ReviewMatch | null;
   documents: readonly ReviewDocument[];
   coding: CodingSuggestionView | null;
+  /** A transfer or funding pair this line belongs to (bank-pairs.ts). */
+  pair?: ReviewPairView | null;
+  /** How many lines could be the other side, when more than one could. */
+  pairRivals?: number;
+  /** Another of the company's bank accounts this line names as a transfer. */
+  namedTransfer?: { accountId: string; label: string; why: string } | null;
 }): ReviewProposal {
-  const { line, match, documents, coding } = input;
+  const { line, match, documents, coding, pair, pairRivals, namedTransfer } = input;
   if (line.pending) return { kind: "handled", why: "Pending at the bank — it can be posted once it clears" };
   if (line.status !== "unmatched") return { kind: "handled", why: "Already handled on Bank Transactions" };
   if (match) {
@@ -76,33 +94,97 @@ export function reviewProposal(input: {
   if (exact.length > 1) {
     return { kind: "none", why: `${exact.length} open ${noun}s of this amount — use Settle on Bank Transactions` };
   }
-  if (coding) return { kind: "account", accountId: coding.accountId, label: coding.accountLabel, why: coding.why };
+  // A transfer is matched against something real — the other line — so it
+  // outranks anything guessed from a word or from history.
+  if (pair?.kind === "transfer") {
+    return { kind: "transfer", counterpartId: pair.counterpartId, label: pair.label, why: pair.why };
+  }
+  if (namedTransfer) {
+    return { kind: "account", accountId: namedTransfer.accountId, label: namedTransfer.label, why: namedTransfer.why };
+  }
+  // Funding is only ever a suggestion: a rule or history keeps its place, and
+  // the pair is offered beside it.
+  const funding = pair?.kind === "funding" ? pair : null;
+  if (coding) {
+    return funding
+      ? {
+          kind: "account",
+          accountId: coding.accountId,
+          label: coding.accountLabel,
+          why: `${coding.why}. Also: ${funding.also}`,
+          alternative: funding,
+        }
+      : { kind: "account", accountId: coding.accountId, label: coding.accountLabel, why: coding.why };
+  }
+  if (funding) return { kind: "funding", counterpartId: funding.counterpartId, label: funding.label, why: funding.why };
+  if (pairRivals && pairRivals > 1) {
+    return { kind: "none", why: `${pairRivals} lines could be the other side — code it yourself` };
+  }
   return { kind: "none", why: "Nothing to go on yet — choose an account, or leave it waiting" };
 }
 
 export type ReviewPostItem =
   | { transactionId: string; kind: "match"; reconciliationId: string }
   | { transactionId: string; kind: "document"; documentId: string }
-  | { transactionId: string; kind: "account"; accountId: string };
+  | { transactionId: string; kind: "account"; accountId: string }
+  | { transactionId: string; kind: "pair"; pairKind: "transfer" | "funding"; counterpartId: string };
 
 /** The Post as picker holds one string per line: the proposal's own, or an account a person picked. */
 export function proposalValue(proposal: ReviewProposal): string | null {
   if (proposal.kind === "match") return `match:${proposal.reconciliationId}`;
   if (proposal.kind === "document") return `document:${proposal.documentId}`;
   if (proposal.kind === "account") return `account:${proposal.accountId}`;
+  if (proposal.kind === "transfer" || proposal.kind === "funding") return `pair:${proposal.kind}:${proposal.counterpartId}`;
   return null;
+}
+
+/** A funding pair offered beside a rule or history proposal. */
+export function alternativeValue(proposal: ReviewProposal): string | null {
+  return proposal.kind === "account" && proposal.alternative ? `pair:funding:${proposal.alternative.counterpartId}` : null;
+}
+
+/** A funding pair is a suggestion only; everything else with a value starts ticked. */
+export function startsTicked(proposal: ReviewProposal): boolean {
+  return proposalValue(proposal) !== null && proposal.kind !== "funding";
 }
 
 export function itemFromValue(transactionId: string, value: string | null): ReviewPostItem | null {
   if (!value) return null;
-  const colon = value.indexOf(":");
-  const kind = value.slice(0, colon);
-  const id = value.slice(colon + 1);
-  if (colon < 1 || !id) return null;
+  const parts = value.split(":");
+  if (parts[0] === "pair") {
+    const [, pairKind, counterpartId] = parts;
+    if (parts.length !== 3 || !counterpartId || (pairKind !== "transfer" && pairKind !== "funding")) return null;
+    return { transactionId, kind: "pair", pairKind, counterpartId };
+  }
+  const kind = parts[0];
+  const id = parts.slice(1).join(":");
+  if (!kind || !id) return null;
   if (kind === "match") return { transactionId, kind, reconciliationId: id };
   if (kind === "document") return { transactionId, kind, documentId: id };
   if (kind === "account") return { transactionId, kind, accountId: id };
   return null;
+}
+
+/** The value the other line of a pair takes when this one chooses the pair. */
+export function reciprocalValue(value: string | null, lineId: string): string | null {
+  const parts = (value ?? "").split(":");
+  return parts[0] === "pair" && parts.length === 3 ? `pair:${parts[1]}:${lineId}` : null;
+}
+
+export function pairKey(item: Extract<ReviewPostItem, { kind: "pair" }>): string {
+  return `${item.pairKind}:${[item.transactionId, item.counterpartId].sort().join(":")}`;
+}
+
+/** A pair ticked on both of its lines is posted once. */
+export function dedupePairItems(items: readonly ReviewPostItem[]): ReviewPostItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (item.kind !== "pair") return true;
+    const key = pairKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function chunked<T>(items: readonly T[], size = REVIEW_POST_CHUNK): T[][] {

@@ -2,7 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite, getUserRole } from "@/lib/auth";
-import { bankRuleInputSchema, rulePreviewInputSchema } from "@/lib/domain/schemas";
+import { bankingPreferenceSchema, bankRuleInputSchema, rulePreviewInputSchema } from "@/lib/domain/schemas";
+import { saveBankingPreference } from "@/lib/services/banking-preference";
 import {
   deleteBankRule,
   previewBankRule,
@@ -71,6 +72,21 @@ export async function reorderBankRulesAction(ids: string[]): Promise<ActionResul
   try {
     const sb = await createSupabaseServerClient();
     await reorderBankRules(sb, ids);
+    refresh();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+}
+
+export async function saveBankingPreferenceAction(raw: unknown): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = bankingPreferenceSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid setting" };
+  try {
+    const sb = await createSupabaseServerClient();
+    await saveBankingPreference(sb, parsed.data);
     refresh();
     return { ok: true };
   } catch (err) {

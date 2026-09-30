@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.72",
+    date: "2026-09-30",
+    headline: "Transfers between your own accounts, and the owner's money in and out, are recognised on Review import.",
+    changes: [
+      {
+        kind: "added",
+        title: "Transfers between your bank accounts",
+        detail:
+          "When money leaves one of your bank accounts and the same amount arrives in another within a few days, Review import offers them as one transfer. Posting makes a single entry and matches both lines, so neither half is coded to income or expense. A line that reads as a transfer and names another of your accounts, by its name or last four digits, is offered as a transfer to it. Change on either line takes the whole transfer back.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Shareholder funding pairs",
+        detail:
+          "Money in and money out of the same amount on one account within a few days is offered as shareholder funding, posted to the account you choose. It is never ticked for you — equal amounts also happen by coincidence — and each entry says what answered it: \"CHECK 1303, answered by WIRE IN on 2026-02-09\".",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "The Pairs setting",
+        detail:
+          "Banking › Rules sets where funding pairs post, suggested from an account named like Shareholder Loan, and how many days apart a pair may be: the same day, or up to 30.",
+        route: "/banking/rules",
+      },
+    ],
+  },
+  {
     version: "1.71",
     date: "2026-09-30",
     headline: "Upload a bank statement and it arrives categorised — review it, then post it in one click.",

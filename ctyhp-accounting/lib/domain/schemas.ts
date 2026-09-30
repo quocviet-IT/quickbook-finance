@@ -899,7 +899,19 @@ export const reviewPostItemsSchema = z
       z.object({ transactionId: z.uuid(), kind: z.literal("match"), reconciliationId: z.uuid() }),
       z.object({ transactionId: z.uuid(), kind: z.literal("document"), documentId: z.uuid() }),
       z.object({ transactionId: z.uuid(), kind: z.literal("account"), accountId: z.uuid() }),
+      z.object({
+        transactionId: z.uuid(),
+        kind: z.literal("pair"),
+        pairKind: z.enum(["transfer", "funding"]),
+        counterpartId: z.uuid(),
+      }),
     ]),
   )
   .min(1, "Nothing to post")
   .max(50, "Post at most 50 lines at a time");
+
+/** The banking preference: where funding pairs post, and how far apart a pair may be. */
+export const bankingPreferenceSchema = z.object({
+  fundingAccountId: z.uuid().nullable(),
+  pairWindowDays: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(7), z.literal(14), z.literal(30)]),
+});

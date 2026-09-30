@@ -9,7 +9,16 @@ import { COLUMN } from "@/lib/design/table-metrics";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
 import { batchResultSeverity, describeBatchResult, summarizeBatchResults, type BatchActionSummary } from "@/lib/domain/bank-transaction-batch";
 import { directionOf } from "@/lib/domain/coding-names";
-import { chunked, itemFromValue, proposalValue, type ReviewPostItem } from "@/lib/domain/statement-review";
+import {
+  alternativeValue,
+  chunked,
+  dedupePairItems,
+  itemFromValue,
+  proposalValue,
+  reciprocalValue,
+  startsTicked,
+  type ReviewPostItem,
+} from "@/lib/domain/statement-review";
 import { formatMoney } from "@/lib/format";
 import type { ImportReview, ReviewLineView, ReviewOutcome } from "@/lib/services/statement-review";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "../../rules/RuleFormModal";
@@ -30,9 +39,8 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const [choices, setChoices] = useState<Record<string, string | null>>(() =>
     Object.fromEntries(lines.map((line) => [line.id, proposalValue(line.proposal)])),
   );
-  const [ticked, setTicked] = useState<string[]>(() =>
-    lines.filter((line) => proposalValue(line.proposal) !== null).map((line) => line.id),
-  );
+  // A funding pair is a suggestion only, so it starts unticked.
+  const [ticked, setTicked] = useState<string[]>(() => lines.filter((line) => startsTicked(line.proposal)).map((line) => line.id));
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [summary, setSummary] = useState<BatchActionSummary | null>(null);
   const [ruleSeed, setRuleSeed] = useState<RuleFormValues | null>(null);
@@ -40,25 +48,70 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const accountOptions = useMemo(() => accounts.map((a) => ({ value: `account:${a.id}`, label: a.label })), [accounts]);
   const byId = useMemo(() => new Map(lines.map((line) => [line.id, line])), [lines]);
   const counts = useMemo(() => {
-    const c = { match: 0, document: 0, account: 0, none: 0, handled: 0 };
+    const c = { match: 0, document: 0, transfer: 0, funding: 0, account: 0, none: 0, handled: 0 };
     for (const line of lines) c[line.proposal.kind] += 1;
     return c;
   }, [lines]);
+  // Funding offered as the proposal, or beside a rule or history proposal.
+  const possibleFunding = lines.filter(
+    (l) => l.proposal.kind === "funding" || (l.proposal.kind === "account" && l.proposal.alternative),
+  ).length;
   // A line handled since the page loaded — posted here, or elsewhere — is never
   // posted again, whatever its tick says.
   const open = (id: string) => byId.get(id)?.proposal.kind !== "handled";
   const postable = ticked.filter((id) => choices[id] && open(id));
   const waiting = lines.filter((l) => l.proposal.kind !== "handled").length - postable.length;
 
+  const pairOf = (id: string, value: string | null | undefined) => {
+    const item = itemFromValue(id, value ?? null);
+    return item?.kind === "pair" ? item : null;
+  };
+
   function choose(line: ReviewLineView, value: string | null) {
-    setChoices((current) => ({ ...current, [line.id]: value }));
-    setTicked((current) => (value ? Array.from(new Set([...current, line.id])) : current.filter((id) => id !== line.id)));
+    const updates: Record<string, string | null> = { [line.id]: value };
+    const tickOn = value ? [line.id] : [];
+    const tickOff = value ? [] : [line.id];
+    // Leaving a pair releases its other line: half a pair cannot be posted.
+    const before = pairOf(line.id, choices[line.id]);
+    if (before && byId.has(before.counterpartId) && choices[before.counterpartId] === reciprocalValue(choices[line.id] ?? null, line.id)) {
+      updates[before.counterpartId] = null;
+      tickOff.push(before.counterpartId);
+    }
+    // Joining a pair brings its other line along, when it is on this page.
+    const after = pairOf(line.id, value);
+    if (after && byId.has(after.counterpartId)) {
+      updates[after.counterpartId] = reciprocalValue(value, line.id);
+      tickOn.push(after.counterpartId);
+    }
+    setChoices((current) => ({ ...current, ...updates }));
+    setTicked((current) => {
+      const next = new Set(current);
+      for (const id of tickOff) next.delete(id);
+      for (const id of tickOn) next.add(id);
+      return [...next];
+    });
+  }
+
+  // Ticking one line of a pair ticks both; unticking one unticks both.
+  function setTicks(keys: string[]) {
+    const next = new Set(keys);
+    const previous = new Set(ticked);
+    for (const id of keys) {
+      const pair = previous.has(id) ? null : pairOf(id, choices[id]);
+      if (pair && byId.has(pair.counterpartId)) next.add(pair.counterpartId);
+    }
+    for (const id of previous) {
+      const pair = next.has(id) ? null : pairOf(id, choices[id]);
+      if (pair) next.delete(pair.counterpartId);
+    }
+    setTicked([...next]);
   }
 
   async function post() {
-    const items = postable
-      .map((id) => itemFromValue(id, choices[id] ?? null))
-      .filter((item): item is ReviewPostItem => item !== null);
+    // A pair ticked on both of its lines is one post.
+    const items = dedupePairItems(
+      postable.map((id) => itemFromValue(id, choices[id] ?? null)).filter((item): item is ReviewPostItem => item !== null),
+    );
     if (!items.length) return;
     const outcomes: ReviewOutcome[] = [];
     setProgress({ done: 0, total: items.length });
@@ -73,6 +126,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
     }
     setProgress(null);
     const posted = new Set(outcomes.filter((o) => o.ok).map((o) => o.id));
+    for (const item of items) if (item.kind === "pair" && posted.has(item.transactionId)) posted.add(item.counterpartId);
     setTicked((current) => current.filter((id) => !posted.has(id)));
     const result = summarizeBatchResults(outcomes, 0);
     setSummary(result);
@@ -83,6 +137,9 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const whyOf = (line: ReviewLineView) => {
     const own = proposalValue(line.proposal);
     const chosen = choices[line.id];
+    if (chosen && line.proposal.kind === "account" && line.proposal.alternative && chosen === alternativeValue(line.proposal)) {
+      return line.proposal.alternative.why;
+    }
     if (chosen && chosen !== own) return "Chosen by you";
     return line.proposal.why;
   };
@@ -126,10 +183,14 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
             </Typography.Text>
           );
         }
-        const own =
-          line.proposal.kind === "match" || line.proposal.kind === "document"
-            ? [{ value: proposalValue(line.proposal) as string, label: line.proposal.label }]
-            : [];
+        const p = line.proposal;
+        // The proposal first, under its own label — "Transfer to Sample Savings · 1020"
+        // reads better than the account it posts to.
+        const ownValue = proposalValue(p);
+        const own = ownValue && "label" in p ? [{ value: ownValue, label: p.label }] : [];
+        // A funding pair offered beside a rule or history proposal.
+        if (p.kind === "account" && p.alternative) own.push({ value: alternativeValue(p) as string, label: p.alternative.label });
+        const others = accountOptions.filter((option) => option.value !== ownValue);
         return (
           <div style={{ minWidth: 0 }}>
             <Select
@@ -140,7 +201,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
               optionFilterProp="label"
               value={choices[line.id] ?? undefined}
               onChange={(value: string | undefined) => choose(line, value ?? null)}
-              options={[...own, ...accountOptions]}
+              options={[...own, ...others]}
             />
             <Typography.Text type="secondary" style={{ fontSize: 12, display: "block" }} ellipsis={{ tooltip: whyOf(line) }}>
               {whyOf(line)}
@@ -175,8 +236,9 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
         </Typography.Text>
         <Typography.Text type="secondary">
           {batch.rowCount} row{batch.rowCount === 1 ? "" : "s"} in the file · {lines.length} line{lines.length === 1 ? "" : "s"} from this
-          import · {counts.match} already in the books · {counts.document} pay a document · {counts.account} have an account ·{" "}
-          {counts.none} need coding · {counts.handled} already handled
+          import · {counts.match} already in the books · {counts.document} pay a document · {counts.transfer} transfer
+          {counts.transfer === 1 ? "" : "s"} · {counts.account} have an account · {possibleFunding} possible funding · {counts.none} need
+          coding · {counts.handled} already handled
         </Typography.Text>
       </Space>
 
@@ -214,7 +276,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
           canWrite
             ? {
                 selectedRowKeys: ticked.filter(open),
-                onChange: (keys) => setTicked(keys as string[]),
+                onChange: (keys) => setTicks(keys as string[]),
                 getCheckboxProps: (line: ReviewLineView) => ({ disabled: line.proposal.kind === "handled" || !choices[line.id] }),
               }
             : undefined
