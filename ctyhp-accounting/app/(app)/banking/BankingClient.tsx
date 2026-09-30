@@ -85,6 +85,12 @@ import {
   parseStatementRows,
 } from "@/lib/domain/statement-import";
 import { formatMoney } from "@/lib/format";
+import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
+import { ruleSeedText } from "@/lib/domain/bank-rules";
+import { directionOf } from "@/lib/domain/coding-names";
+import CodingSuggestionsBar from "./CodingSuggestionsBar";
+import CodeAllModal, { type CodeAllRow } from "./CodeAllModal";
+import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "./rules/RuleFormModal";
 import {
   approveReconciliationAction,
   connectPlaidBankAction,
@@ -93,6 +99,7 @@ import {
   generateSuggestionsAction,
   getSuggestionsAction,
   getBankPostingsAction,
+  getCodingSuggestionsAction,
   getTransactionsAction,
   importStatementAction,
   rejectReconciliationAction,
@@ -227,6 +234,9 @@ export default function BankingClient({
   // render rather than only after some effect catches up.
   const [rawSelectedIds, setRawSelectedIds] = useState<string[]>([]);
   const [batchTarget, setBatchTarget] = useState<BatchAssignTarget | null>(null);
+  const [coding, setCoding] = useState<Map<string, CodingSuggestionView>>(new Map());
+  const [codeAllRows, setCodeAllRows] = useState<CodeAllRow[] | null>(null);
+  const [ruleSeed, setRuleSeed] = useState<RuleFormValues | null>(null);
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
@@ -246,6 +256,11 @@ export default function BankingClient({
         (account) => account.is_posting_account && account.status === "active",
       ),
     [accounts],
+  );
+  // A rule may code only to an account a suggestion could name.
+  const ruleAccounts = useMemo(
+    () => postableAccounts.filter((account) => codableAccount(codingAccountOf(account))),
+    [postableAccounts],
   );
 
   // Undefined in the all-accounts view, which is why anything account-specific
@@ -289,6 +304,10 @@ export default function BankingClient({
     // ALL_ACCOUNTS asks the server for every account at once; the review queue
     // is one list, and which bank a line came from is a column, not a mode.
     const accountFilter = selectedId === ALL_ACCOUNTS ? null : selectedId;
+    // Suggestions arrive on their own: the lines never wait for them.
+    void getCodingSuggestionsAction(accountFilter).then((coded) => {
+      if (coded.ok && coded.data) setCoding(new Map(coded.data.map((s) => [s.transactionId, s])));
+    });
     const [transactions, matches, posted] = await Promise.all([
       getTransactionsAction(accountFilter),
       getSuggestionsAction(accountFilter),
@@ -740,6 +759,14 @@ export default function BankingClient({
         suggestedMatchCount={suggestions.length}
       />
 
+      <CodingSuggestionsBar
+        rows={reviewRows}
+        suggestions={coding}
+        canWrite={canWrite}
+        formatRowMoney={rowMoney}
+        onCodeAll={setCodeAllRows}
+      />
+
       <BankTransactionsTable
         rows={reviewRows}
         loading={loading}
@@ -751,6 +778,16 @@ export default function BankingClient({
         postableAccounts={postableAccounts}
         postings={postings}
         onCategorised={reload}
+        codingSuggestions={coding}
+        onCreateRule={(row, accountId) =>
+          setRuleSeed({
+            ...EMPTY_RULE,
+            // Rules are tried against the line's own description, so that is where the words come from.
+            matchText: ruleSeedText(row.transaction.description),
+            direction: directionOf(Number(row.transaction.amount_minor)),
+            accountId,
+          })
+        }
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}
@@ -805,6 +842,27 @@ export default function BankingClient({
           onChanged={reload}
         />
       </Card>
+
+      <CodeAllModal
+        rows={codeAllRows}
+        onClose={() => setCodeAllRows(null)}
+        onDone={() => {
+          setCodeAllRows(null);
+          reload();
+        }}
+      />
+
+      <RuleFormModal
+        open={ruleSeed !== null}
+        ruleId={null}
+        initial={ruleSeed ?? EMPTY_RULE}
+        accounts={ruleAccounts}
+        onClose={() => setRuleSeed(null)}
+        onSaved={() => {
+          setRuleSeed(null);
+          reload();
+        }}
+      />
 
       <DeleteBankLineModal
         target={deleteTarget}

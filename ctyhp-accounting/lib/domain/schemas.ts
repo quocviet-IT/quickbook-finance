@@ -877,3 +877,17 @@ export const companyCreateSchema = z.object({
   chart_template: z.enum(CHART_TEMPLATE_KEYS).default("standard"),
 });
 export type CompanyCreateInput = z.infer<typeof companyCreateSchema>;
+
+/** A bank rule as the preview reads it: everything but the account. */
+export const rulePreviewInputSchema = z.object({
+  matchKind: z.enum(["words", "regex"]),
+  matchText: z.string().trim().min(1, "Say what the rule looks for").max(200, "A rule looks for at most 200 characters"),
+  direction: z.enum(["in", "out", "any"]),
+  minMinor: z.number().int().min(0).nullable(),
+  maxMinor: z.number().int().min(0).nullable(),
+});
+
+export const bankRuleInputSchema = rulePreviewInputSchema.extend({
+  accountId: z.uuid("Choose the account the rule codes to"),
+  isActive: z.boolean(),
+});
