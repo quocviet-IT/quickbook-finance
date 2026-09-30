@@ -8,6 +8,21 @@ export function statementRowHash(
   return createHash("sha256").update(canonical).digest("hex");
 }
 
+/**
+ * The duplicate key of one statement line. A line that carries the bank's own
+ * id (OFX FITID) is keyed on it, so a re-downloaded file is recognised even when
+ * the bank rewords a description; any other line is keyed as imports always
+ * have been, so it still meets the lines imported before.
+ */
+export function statementLineHash(
+  bankAccountId: string,
+  line: { txn_date: string; amount_minor: number; description: string; reference: string | null; external_id?: string | null },
+): string {
+  return line.external_id
+    ? statementRowHash([bankAccountId, "fitid", line.external_id])
+    : statementRowHash([bankAccountId, line.txn_date, line.amount_minor, line.description, line.reference]);
+}
+
 // --- Review queue ------------------------------------------------------------
 
 /** The parts of a bank account this queue needs to label and format a row. */

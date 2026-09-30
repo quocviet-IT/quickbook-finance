@@ -1,0 +1,15 @@
+/*
+ * On Review import most lines start ticked — a tick means "post this" — so the
+ * default selected-row fill would paint nearly the whole table. A light wash
+ * marks a ticked line instead, and keeps the text readable in both themes.
+ *
+ * `.review.review` and `td.ant-table-cell` outrank Ant Design's own rule, which
+ * is injected after this stylesheet and would otherwise win a tie.
+ */
+.review.review :global(.ant-table-tbody > tr.ant-table-row-selected > td.ant-table-cell) {
+  background: var(--ob-accent-wash);
+}
+
+.review.review :global(.ant-table-tbody > tr.ant-table-row-selected:hover > td.ant-table-cell) {
+  background: var(--ob-surface-subtle);
+}

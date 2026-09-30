@@ -84,13 +84,21 @@ export async function importStatementAction(
   bankAccountId: string,
   filename: string,
   rows: ImportRow[],
-): Promise<ActionResult<{ inserted: number; skipped: number }>> {
+): Promise<ActionResult<{ inserted: number; skipped: number; batchId: string | null }>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
   if (!rows.length) return { ok: false, error: "No rows to import" };
   try {
     const sb = await createSupabaseServerClient();
     const res = await importStatement(sb, bankAccountId, filename, rows);
+    // Review import opens next, and its first proposal is a match to what is
+    // already in the books — so those are looked for now. A failure here costs
+    // the match proposals, not the import.
+    if (res.inserted > 0) {
+      await generateSuggestions(sb, bankAccountId).catch((err) =>
+        console.warn("finding ledger matches after import failed:", err instanceof Error ? err.message : err),
+      );
+    }
     revalidatePath("/banking");
     return { ok: true, data: res };
   } catch (err) {
