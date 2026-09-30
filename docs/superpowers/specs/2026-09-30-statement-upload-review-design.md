@@ -34,7 +34,7 @@ Decided with the user on 2026-09-30:
 2. A CSV whose columns are not recognised shows **Choose columns** before anything can be imported.
 3. **Import N rows** inserts the lines through `acc_import_bank_statement`, as today, and gets back the import's batch id.
 4. The browser goes to **Review import**, `/banking/imports/[id]`.
-5. Ledger match suggestions are generated for the bank account when the review loads, as **Find ledger matches** does today.
+5. Ledger match suggestions are generated for the bank account right after the import, as **Find ledger matches** does today. The review page itself only reads, so a viewer can open it too.
 6. The reader changes what they want and clicks **Post N lines**. Lines not posted stay waiting.
 7. **Statement imports** on Banking shows **Review** on every import that still has waiting lines.
 
