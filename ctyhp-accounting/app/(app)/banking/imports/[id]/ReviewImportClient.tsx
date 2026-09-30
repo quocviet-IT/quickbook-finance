@@ -40,7 +40,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const accountOptions = useMemo(() => accounts.map((a) => ({ value: `account:${a.id}`, label: a.label })), [accounts]);
   const byId = useMemo(() => new Map(lines.map((line) => [line.id, line])), [lines]);
   const counts = useMemo(() => {
-    const c = { match: 0, document: 0, account: 0, none: 0, handled: 0 };
+    const c = { match: 0, document: 0, transfer: 0, funding: 0, account: 0, none: 0, handled: 0 };
     for (const line of lines) c[line.proposal.kind] += 1;
     return c;
   }, [lines]);

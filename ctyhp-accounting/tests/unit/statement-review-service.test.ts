@@ -9,6 +9,7 @@ const deps = (over: Partial<ReviewPostDeps> = {}): ReviewPostDeps => ({
   approve: vi.fn(async () => undefined),
   settle: vi.fn(async () => "pay-1"),
   categorise: vi.fn(async () => ({ entry_number: "JE-000010" })),
+  postPair: vi.fn(async () => ["JE-000011"]),
   ...over,
 });
 

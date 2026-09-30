@@ -202,6 +202,8 @@ export interface ReviewPostDeps {
   approve: (sb: SupabaseClient, reconciliationId: string) => Promise<void>;
   settle: typeof settleFromBankTransaction;
   categorise: (sb: SupabaseClient, transactionId: string, accountId: string) => Promise<{ entry_number: string | null }>;
+  /** Post a transfer or funding pair; returns the entry numbers it made. */
+  postPair: (sb: SupabaseClient, first: string, second: string, kind: "transfer" | "funding") => Promise<string[]>;
 }
 
 const defaultDeps: ReviewPostDeps = {
@@ -222,6 +224,11 @@ const defaultDeps: ReviewPostDeps = {
   approve: approveReconciliation,
   settle: settleFromBankTransaction,
   categorise: categoriseBankTransaction,
+  postPair: async (sb, first, second, kind) => {
+    const { data, error } = await sb.rpc("acc_post_bank_pair", { p_first: first, p_second: second, p_kind: kind });
+    if (error) throw fail(error.message);
+    return ((data as { entries?: (string | null)[] } | null)?.entries ?? []).filter((n): n is string => Boolean(n));
+  },
 };
 
 /** Post what a person ticked, one line after another; a refusal stops only its own line. */
@@ -260,6 +267,10 @@ export async function postReviewItems(
           memo: null,
         });
         outcomes.push({ id, ok: true, detail: "Settled" });
+      } else if (item.kind === "pair") {
+        // Both lines in one database call: either both post, or neither does.
+        const entries = await deps.postPair(sb, id, item.counterpartId, item.pairKind);
+        outcomes.push({ id, ok: true, detail: entries.join(", ") || "Posted" });
       } else {
         const posted = await deps.categorise(sb, id, item.accountId);
         outcomes.push({ id, ok: true, detail: posted.entry_number ?? "Posted" });
