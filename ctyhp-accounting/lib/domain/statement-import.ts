@@ -17,6 +17,8 @@ export interface StatementLine {
   amount_minor: number;
   running_balance_minor: number | null;
   raw_line: string;
+  /** The bank's own id for the transaction (OFX FITID), when the file carries one. */
+  external_id?: string | null;
 }
 
 export interface StatementParseResult {
@@ -98,28 +100,80 @@ function pick(record: Record<string, string>, keys: readonly string[]): string {
   return "";
 }
 
+export type DateOrder = "mdy" | "dmy";
+
+/** Which heading holds what. Headings are lower-cased, as `parseCsv` gives them. */
+export interface StatementColumnMap {
+  date: string | null;
+  description: string | null;
+  amount: string | null;
+  moneyOut: string | null;
+  moneyIn: string | null;
+  reference: string | null;
+  balance: string | null;
+}
+
+/** Enough to read a line: a date, and an amount in one column or two. */
+export function statementColumnsComplete(columns: StatementColumnMap): boolean {
+  return Boolean(columns.date && (columns.amount || columns.moneyOut || columns.moneyIn));
+}
+
+/** The headings this file uses for each fact, as far as the usual names go. */
+export function detectStatementColumns(headers: readonly string[]): { columns: StatementColumnMap; complete: boolean } {
+  const find = (keys: readonly string[]) => keys.find((key) => headers.includes(key)) ?? null;
+  const columns: StatementColumnMap = {
+    date: find(DATE_KEYS),
+    description: find(DESCRIPTION_KEYS),
+    amount: find(AMOUNT_KEYS),
+    moneyOut: find(DEBIT_KEYS),
+    moneyIn: find(CREDIT_KEYS),
+    reference: find(REFERENCE_KEYS),
+    balance: find(BALANCE_KEYS),
+  };
+  return { columns, complete: statementColumnsComplete(columns) };
+}
+
+/**
+ * Which way round a file writes its dates. A first number over 12 can only be
+ * a day; a second one over 12 can only be a day too, so month comes first.
+ * With nothing to tell, month first — the US form, and the prototype's.
+ */
+export function detectDateOrder(values: readonly string[]): DateOrder {
+  for (const value of values) {
+    const parts = (value ?? "").trim().match(/^(\d{1,2})[/-](\d{1,2})[/-]\d{4}$/);
+    if (!parts) continue;
+    if (Number(parts[1]) > 12) return "dmy";
+    if (Number(parts[2]) > 12) return "mdy";
+  }
+  return "mdy";
+}
+
 /**
  * Turn parsed CSV records into statement lines.
  *
  * Handles both shapes banks export: a single signed `amount` column, or
  * separate debit and credit columns — where a debit is money leaving the
- * account and therefore negative.
+ * account and therefore negative. Chosen columns are read as chosen;
+ * otherwise every usual heading is tried.
  */
 export function parseStatementRows(
   records: readonly Record<string, string>[],
-  options: { decimals?: number; dateOrder?: "mdy" | "dmy" } = {},
+  options: { decimals?: number; dateOrder?: DateOrder; columns?: StatementColumnMap; flipSigns?: boolean } = {},
 ): StatementParseResult {
   const decimals = options.decimals ?? 2;
+  const chosen = options.columns;
+  const keys = (column: string | null | undefined, usual: readonly string[]) =>
+    chosen ? (column ? [column] : []) : usual;
   const rows: StatementLine[] = [];
   let skipped = 0;
 
   for (const record of records) {
-    const date = normalizeStatementDate(pick(record, DATE_KEYS), options.dateOrder ?? "mdy");
+    const date = normalizeStatementDate(pick(record, keys(chosen?.date, DATE_KEYS)), options.dateOrder ?? "mdy");
 
-    let amount = parseStatementAmount(pick(record, AMOUNT_KEYS), decimals);
+    let amount = parseStatementAmount(pick(record, keys(chosen?.amount, AMOUNT_KEYS)), decimals);
     if (amount === null) {
-      const debit = parseStatementAmount(pick(record, DEBIT_KEYS), decimals);
-      const credit = parseStatementAmount(pick(record, CREDIT_KEYS), decimals);
+      const debit = parseStatementAmount(pick(record, keys(chosen?.moneyOut, DEBIT_KEYS)), decimals);
+      const credit = parseStatementAmount(pick(record, keys(chosen?.moneyIn, CREDIT_KEYS)), decimals);
       if (debit !== null && debit !== 0) amount = -Math.abs(debit);
       else if (credit !== null && credit !== 0) amount = Math.abs(credit);
     }
@@ -128,13 +182,14 @@ export function parseStatementRows(
       skipped += 1;
       continue;
     }
+    if (options.flipSigns) amount = -amount;
 
     rows.push({
       txn_date: date,
-      description: pick(record, DESCRIPTION_KEYS),
-      reference: pick(record, REFERENCE_KEYS) || null,
+      description: pick(record, keys(chosen?.description, DESCRIPTION_KEYS)),
+      reference: pick(record, keys(chosen?.reference, REFERENCE_KEYS)) || null,
       amount_minor: amount,
-      running_balance_minor: parseStatementAmount(pick(record, BALANCE_KEYS), decimals),
+      running_balance_minor: parseStatementAmount(pick(record, keys(chosen?.balance, BALANCE_KEYS)), decimals),
       raw_line: Object.values(record).join(","),
     });
   }
