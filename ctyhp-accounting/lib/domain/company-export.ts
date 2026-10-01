@@ -59,6 +59,8 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_fixed_asset",
   "acc_asset_depreciation_schedule",
   "acc_bank_account",
+  // Cards and loans (0129): which accounts a bank payment repays.
+  "acc_repayment_account",
   "acc_bank_connection",
   "acc_bank_feed_account",
   "acc_bank_feed_sync_run",
