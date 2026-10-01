@@ -210,6 +210,11 @@ export default function RepaymentsSection({
           ) : allCardsTaken ? (
             <Typography.Text type="secondary">Every Credit Card account is already here.</Typography.Text>
           ) : null}
+          {loanAccounts.length === 0 ? (
+            <Typography.Text type="secondary">Add a liability account in Chart of Accounts to register a loan.</Typography.Text>
+          ) : allLoansTaken ? (
+            <Typography.Text type="secondary">Every liability account is already here.</Typography.Text>
+          ) : null}
           {interestAccounts.length === 0 ? (
             <Typography.Text type="secondary">Add an Interest Expense account in Chart of Accounts to register a loan.</Typography.Text>
           ) : null}

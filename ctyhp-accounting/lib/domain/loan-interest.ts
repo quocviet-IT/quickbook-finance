@@ -125,7 +125,8 @@ export function suggestInterestAccount(accounts: readonly CodingAccount[]): stri
   return (
     [...accounts]
       .filter((a) => a.active && a.posting && (a.type === "expense" || a.type === "other_expense") && /interest/i.test(a.name))
-      .sort((a, b) => a.code.localeCompare(b.code))[0]?.id ?? null
+      // Number order: 410 before 1000.
+      .sort((a, b) => a.code.localeCompare(b.code, "en", { numeric: true }))[0]?.id ?? null
   );
 }
 

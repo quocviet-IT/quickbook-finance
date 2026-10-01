@@ -18,7 +18,8 @@ export function postingsByLine<T extends PostingLike>(rows: readonly T[]): Map<s
   for (const row of rows) groups.set(row.bank_transaction_id, [...(groups.get(row.bank_transaction_id) ?? []), row]);
   const byLine = new Map<string, T & { others: string[] }>();
   for (const [id, group] of groups) {
-    const [first, ...rest] = [...group].sort((a, b) => a.account_code.localeCompare(b.account_code));
+    // Number order: 410 before 1000.
+    const [first, ...rest] = [...group].sort((a, b) => a.account_code.localeCompare(b.account_code, "en", { numeric: true }));
     const label = (r: PostingLike) => `${r.account_code} — ${r.account_name}`;
     const others = [...new Set(rest.map(label))].filter((other) => other !== label(first));
     byLine.set(id, { ...first, others });

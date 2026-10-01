@@ -160,6 +160,14 @@ describe("suggestInterestAccount", () => {
     ).toBe("d");
     expect(suggestInterestAccount([acct("x", "6000", "Rent", "expense")])).toBeNull();
   });
+  it("picks by account number, not by text", () => {
+    expect(
+      suggestInterestAccount([
+        acct("y", "810", "Interest Expense", "other_expense"),
+        acct("x", "1000", "Interest Expense", "other_expense"),
+      ]),
+    ).toBe("y");
+  });
 });
 
 describe("loanSuggestionsFrom", () => {

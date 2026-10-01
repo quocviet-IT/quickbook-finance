@@ -13,4 +13,8 @@ describe("postingsByLine", () => {
     const map = postingsByLine([row("t1", "4000", "Sales"), row("t1", "4000", "Sales"), row("t1", "4100", "Other Sales")]);
     expect(map.get("t1")?.others).toEqual(["4100 — Other Sales"]);
   });
+  it("puts the lower account number first, whatever its width", () => {
+    const map = postingsByLine([row("t1", "1000", "Loan"), row("t1", "410", "Interest")]);
+    expect(map.get("t1")).toMatchObject({ account_code: "410", account_name: "Interest", others: ["1000 — Loan"] });
+  });
 });

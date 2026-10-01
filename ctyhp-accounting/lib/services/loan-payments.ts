@@ -52,6 +52,8 @@ export async function loanSuggestions(sb: SupabaseClient, bankAccountId: string 
   const context = await repaymentContext(sb);
   const ids = loanAccountIds(context.repayments);
   if (!ids.length) return [];
+  // Every waiting line of the company, not just this bank account's: two payments to one loan
+  // carry in date order, and the split must read the same here as on Review import.
   const [lines, matches, accounts, movements] = await Promise.all([
     listBankTransactions(sb, null),
     listSuggestions(sb, null),
