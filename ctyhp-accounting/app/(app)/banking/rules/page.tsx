@@ -4,6 +4,7 @@ import { fundingAccountAllowed, suggestFundingAccount } from "@/lib/domain/bank-
 import { codableAccount, codingAccountOf } from "@/lib/domain/coding";
 import { repaysAccountAllowed, usableRepayment } from "@/lib/domain/repayments";
 import { listAccounts } from "@/lib/services/accounts";
+import { listBankTransactions } from "@/lib/services/banking";
 import { getBankingPreference } from "@/lib/services/banking-preference";
 import { listBankRules, ruleWaitingCounts } from "@/lib/services/coding";
 import { listRepayments } from "@/lib/services/repayment-register";
@@ -17,17 +18,18 @@ export const dynamic = "force-dynamic";
 
 export default async function BankRulesPage() {
   const sb = await createSupabaseServerClient();
-  const [role, rules, accounts, preference, repayments] = await Promise.all([
+  const [role, rules, accounts, preference, repayments, lines] = await Promise.all([
     getUserRole(),
     listBankRules(sb),
     listAccounts(sb),
     getBankingPreference(sb),
     listRepayments(sb),
+    listBankTransactions(sb, null),
   ]);
   const liabilities = accounts
     .filter(fundingAccountAllowed)
     .map((account) => ({ id: account.id, label: `${account.account_code} — ${account.name}` }));
-  const [waiting, stats] = await Promise.all([ruleWaitingCounts(sb, rules), repaymentStats(sb, repayments)]);
+  const [waiting, stats] = await Promise.all([ruleWaitingCounts(sb, rules, lines), repaymentStats(sb, repayments, lines)]);
   const byId = new Map(accounts.map((account) => [account.id, account]));
   const chart = new Map(accounts.map((account) => [account.id, codingAccountOf(account)]));
   const labelOf = (id: string) => {

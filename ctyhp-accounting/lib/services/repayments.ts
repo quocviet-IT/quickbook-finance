@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { codingAccountOf } from "@/lib/domain/coding";
 import type { HistorySource } from "@/lib/domain/coding-history";
+import type { BankTransactionRow } from "@/lib/db/types";
 import {
   interestAccountAllowed,
   phrasesOf,
@@ -13,7 +14,7 @@ import {
 import { listAccounts } from "./accounts";
 import { listBankTransactions } from "./banking";
 import { loadHistory } from "./coding";
-import { RepaymentError, repaymentContext } from "./repayment-register";
+import { RepaymentError, baseCurrencyBankIds } from "./repayment-register";
 
 /**
  * Cards and loans on Banking › Rules: saving an entry, and how its words do —
@@ -50,21 +51,32 @@ export function repaymentStatsFrom(
   };
 }
 
-async function statsGround(sb: SupabaseClient): Promise<{ history: HistorySource[]; waiting: WaitingLine[] }> {
-  const [history, lines, context] = await Promise.all([loadHistory(sb), listBankTransactions(sb, null), repaymentContext(sb)]);
-  const waiting = lines
+async function statsGround(
+  sb: SupabaseClient,
+  lines?: readonly BankTransactionRow[],
+): Promise<{ history: HistorySource[]; waiting: WaitingLine[] }> {
+  const [history, rows, bankIds] = await Promise.all([
+    loadHistory(sb),
+    lines ? Promise.resolve(lines) : listBankTransactions(sb, null),
+    baseCurrencyBankIds(sb),
+  ]);
+  const waiting = rows
     .filter((row) => row.status === "unmatched" && !row.pending)
     .map((row) => ({
       description: row.description ?? "",
       amountMinor: Number(row.amount_minor),
-      inBaseCurrency: context.baseCurrencyBankIds.has(row.bank_account_id),
+      inBaseCurrency: bankIds.has(row.bank_account_id),
     }));
   return { history, waiting };
 }
 
-export async function repaymentStats(sb: SupabaseClient, entries: readonly RepaymentAccount[]): Promise<Record<string, RepaymentStats>> {
+export async function repaymentStats(
+  sb: SupabaseClient,
+  entries: readonly RepaymentAccount[],
+  lines?: readonly BankTransactionRow[],
+): Promise<Record<string, RepaymentStats>> {
   if (!entries.length) return {};
-  const { history, waiting } = await statsGround(sb);
+  const { history, waiting } = await statsGround(sb, lines);
   return Object.fromEntries(entries.map((entry) => [entry.id, repaymentStatsFrom(entry, history, waiting)]));
 }
 

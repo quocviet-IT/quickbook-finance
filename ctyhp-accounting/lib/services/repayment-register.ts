@@ -44,16 +44,18 @@ export interface RepaymentContext {
   baseCurrencyBankIds: Set<string>;
 }
 
-export async function repaymentContext(sb: SupabaseClient): Promise<RepaymentContext> {
-  const [repayments, banks, base] = await Promise.all([
-    listRepayments(sb),
+/** Bank accounts in the base currency: only their lines can be repayments. */
+export async function baseCurrencyBankIds(sb: SupabaseClient): Promise<Set<string>> {
+  const [banks, base] = await Promise.all([
     listBankAccounts(sb),
     sb.from("acc_currency").select("code").eq("is_base", true).maybeSingle(),
   ]);
   if (base.error) throw fail(base.error.message);
   const code = (base.data as { code: string } | null)?.code ?? null;
-  return {
-    repayments,
-    baseCurrencyBankIds: new Set(banks.filter((bank) => code !== null && bank.currency_code === code).map((bank) => bank.id)),
-  };
+  return new Set(banks.filter((bank) => code !== null && bank.currency_code === code).map((bank) => bank.id));
+}
+
+export async function repaymentContext(sb: SupabaseClient): Promise<RepaymentContext> {
+  const [repayments, ids] = await Promise.all([listRepayments(sb), baseCurrencyBankIds(sb)]);
+  return { repayments, baseCurrencyBankIds: ids };
 }

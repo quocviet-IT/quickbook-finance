@@ -234,10 +234,14 @@ export async function previewBankRule(sb: SupabaseClient, input: RulePreviewInpu
 }
 
 /** For Banking › Rules: how many waiting lines each rule matches on its own. */
-export async function ruleWaitingCounts(sb: SupabaseClient, rules: readonly BankRule[]): Promise<Record<string, number>> {
-  const lines = await waitingLines(sb);
+export async function ruleWaitingCounts(
+  sb: SupabaseClient,
+  rules: readonly BankRule[],
+  lines?: readonly BankTransactionRow[],
+): Promise<Record<string, number>> {
+  const waitingRows = lines ? lines.filter(waiting) : await waitingLines(sb);
   return Object.fromEntries(
-    rules.map((rule) => [rule.id, lines.filter((row) => ruleMatches({ ...rule, isActive: true }, asTarget(row))).length]),
+    rules.map((rule) => [rule.id, waitingRows.filter((row) => ruleMatches({ ...rule, isActive: true }, asTarget(row))).length]),
   );
 }
 
