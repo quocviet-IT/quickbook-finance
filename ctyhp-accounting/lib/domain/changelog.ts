@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.75",
+    date: "2026-10-01",
+    headline: "A payment to a credit card is recognised as one, and never suggested as an expense.",
+    changes: [
+      {
+        kind: "added",
+        title: "Cards and loans on Bank Rules",
+        detail:
+          "Add each credit card with the words your bank prints for its payments, or its last four digits — both are filled in from the account's name. While you type, the form shows how many past payments to that card the words catch and lists the ones they miss.",
+        route: "/banking/rules",
+      },
+      {
+        kind: "added",
+        title: "Card payments on Review import and Bank Transactions",
+        detail:
+          "A payment out that carries a card's words or last four is offered as a card payment and posted whole to the card account, before any rule or history — paying a card repays a balance, and the costs were the card's own charges. A line that two cards claim gets no suggestion, so nobody's guess decides which balance it repays.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.74",
     date: "2026-10-01",
     headline: "The transaction list and the Beancount file no longer time out on a large book.",
