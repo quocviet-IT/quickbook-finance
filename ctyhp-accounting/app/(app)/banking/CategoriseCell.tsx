@@ -199,17 +199,18 @@ export default function CategoriseCell({
         {/* Cut to the column, with the whole account name on hover: an account
             is named by whoever set up the chart, and some run long. */}
         <Typography.Text ellipsis={{ tooltip: everyAccount }}>{main}</Typography.Text>
+        {/* Its own line: beside the entry number and Change it does not fit a 150px column. */}
+        {others.length ? (
+          <Tooltip title={everyAccount}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              + {others.length} more account{others.length === 1 ? "" : "s"}
+            </Typography.Text>
+          </Tooltip>
+        ) : null}
         <Space size={6}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
           </Typography.Text>
-          {others.length ? (
-            <Tooltip title={everyAccount}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                +{others.length} more
-              </Typography.Text>
-            </Tooltip>
-          ) : null}
           {canWrite && posting.own_entry ? (
             <Button
               type="link"
