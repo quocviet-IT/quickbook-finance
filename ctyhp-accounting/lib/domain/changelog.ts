@@ -43,7 +43,7 @@ export const RELEASES: Release[] = [
   {
     version: "1.75",
     date: "2026-10-01",
-    headline: "A payment to a credit card is recognised as one, and never suggested as an expense.",
+    headline: "A payment to a credit card is recognized as one, and never suggested as an expense.",
     changes: [
       {
         kind: "added",

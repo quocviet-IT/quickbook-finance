@@ -64,7 +64,7 @@ export default function RepaymentsSection({
   function remove(row: RepaymentListRow) {
     modal.confirm({
       title: "Remove this card?",
-      content: `${row.accountLabel}. Lines already posted stay as they are; new ones are no longer recognised as payments to it.`,
+      content: `${row.accountLabel}. Lines already posted stay as they are; new ones are no longer recognized as payments to it.`,
       okText: "Remove card",
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -89,7 +89,7 @@ export default function RepaymentsSection({
         row.accountUsable ? (
           <Typography.Text ellipsis={{ tooltip: row.accountLabel }}>{row.accountLabel}</Typography.Text>
         ) : (
-          <Tooltip title="This account is inactive, not a posting account, or no longer a Credit Card account. Nothing is recognised as a payment to it until it is changed.">
+          <Tooltip title="This account is inactive, not a posting account, or no longer a Credit Card account. Nothing is recognized as a payment to it until it is changed.">
             <Tag color="orange">{row.accountLabel}</Tag>
           </Tooltip>
         ),
@@ -163,6 +163,10 @@ export default function RepaymentsSection({
           </Button>
           {cardAccounts.length === 0 ? (
             <Typography.Text type="secondary">Add a Credit Card account in Chart of Accounts first.</Typography.Text>
+          ) : cardAccounts.every((a) => taken.has(a.id)) ? (
+            <Typography.Text type="secondary">
+              Every Credit Card account is already here. Add another Credit Card account in Chart of Accounts to register it.
+            </Typography.Text>
           ) : null}
         </Space>
       ) : null}

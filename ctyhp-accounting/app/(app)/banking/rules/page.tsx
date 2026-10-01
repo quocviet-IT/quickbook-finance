@@ -55,7 +55,7 @@ export default async function BankRulesPage() {
     <div>
       <PageHeader
         title="Bank Rules"
-        description="What says which account a bank line belongs to. A card in Cards and loans is recognised first; then the first rule that matches; history speaks only when neither does. Nothing is posted until someone uses a suggestion."
+        description="What says which account a bank line belongs to. A card in Cards and loans is recognized first; then the first rule that matches; history speaks only when neither does. Nothing is posted until someone uses a suggestion."
       />
       <PairsPreference
         initial={preference}

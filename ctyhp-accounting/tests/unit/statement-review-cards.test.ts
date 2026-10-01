@@ -18,6 +18,21 @@ const funding = {
   why: "Answered by …",
   also: "possible shareholder funding with WIRE IN on 2026-02-09",
 };
+const history: CodingSuggestionView = {
+  transactionId: "t1",
+  accountId: "acct-rent",
+  accountLabel: "6000 — Rent",
+  source: "history",
+  short: "2 of 2",
+  why: 'Coded to 6000 Rent 2 of the last 2 times for "metro realty"',
+};
+const transfer = {
+  kind: "transfer" as const,
+  counterpartId: "t2",
+  label: "Transfer to Sample Savings · 1020",
+  why: "…",
+  also: "",
+};
 
 describe("reviewProposal with cards", () => {
   it("labels a card payment as one, marks it, and ticks it", () => {
@@ -40,5 +55,21 @@ describe("reviewProposal with cards", () => {
     expect(reviewProposal({ line, match: null, documents: [doc], coding: null, repaymentRivals: 2 }).kind).toBe("document");
     const named = { accountId: "acct-savings", label: "Transfer to Sample Savings · 1020", why: "Reads as a transfer…" };
     expect(reviewProposal({ line, match: null, documents: [], coding: null, namedTransfer: named, repaymentRivals: 2 }).kind).toBe("account");
+  });
+  it("does not refuse on zero or one repayment rival", () => {
+    for (const repaymentRivals of [0, 1]) {
+      const withCard = reviewProposal({ line, match: null, documents: [], coding: card, repaymentRivals });
+      expect(withCard).toEqual({ kind: "account", accountId: "acct-card", label: "Card payment · 2050 — Example Card", why: card.why, repayment: "card" });
+      const withoutCoding = reviewProposal({ line, match: null, documents: [], coding: null, repaymentRivals });
+      expect(withoutCoding).toEqual({ kind: "none", why: "Nothing to go on yet — choose an account, or leave it waiting" });
+    }
+  });
+  it("lets a transfer pair outrank two repayment rivals", () => {
+    const p = reviewProposal({ line, match: null, documents: [], coding: null, pair: transfer, repaymentRivals: 2 });
+    expect(p).toEqual({ kind: "transfer", counterpartId: "t2", label: "Transfer to Sample Savings · 1020", why: "…" });
+  });
+  it("gives a history proposal no repayment key", () => {
+    const p = reviewProposal({ line, match: null, documents: [], coding: history });
+    expect(p).toEqual({ kind: "account", accountId: "acct-rent", label: "6000 — Rent", why: history.why });
   });
 });
