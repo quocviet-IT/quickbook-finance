@@ -56,6 +56,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const possibleFunding = lines.filter(
     (l) => l.proposal.kind === "funding" || (l.proposal.kind === "account" && l.proposal.alternative),
   ).length;
+  const cardPayments = lines.filter((l) => l.proposal.kind === "account" && l.proposal.repayment === "card").length;
   // A line handled since the page loaded — posted here, or elsewhere — is never
   // posted again, whatever its tick says.
   const open = (id: string) => byId.get(id)?.proposal.kind !== "handled";
@@ -237,7 +238,8 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
         <Typography.Text type="secondary">
           {batch.rowCount} row{batch.rowCount === 1 ? "" : "s"} in the file · {lines.length} line{lines.length === 1 ? "" : "s"} from this
           import · {counts.match} already in the books · {counts.document} pay a document · {counts.transfer} transfer
-          {counts.transfer === 1 ? "" : "s"} · {counts.account} have an account · {possibleFunding} possible funding · {counts.none} need
+          {counts.transfer === 1 ? "" : "s"} · {cardPayments} card payment{cardPayments === 1 ? "" : "s"} · {counts.account - cardPayments} have an
+          account · {possibleFunding} possible funding · {counts.none} need
           coding · {counts.handled} already handled
         </Typography.Text>
       </Space>
