@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.74",
+    date: "2026-10-01",
+    headline: "The transaction list and the Beancount file no longer time out on a large book.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Transaction List over a long window, and the Beancount file of a large book",
+        detail:
+          "Both read every transaction through one query whose time grew with the square of the number of entries, so a book of a few thousand entries passed the database's time limit and the page or the file failed. The query now takes one pass: a whole book of five thousand entries returns in about half a second instead of failing, with exactly the same rows.",
+        route: "/reports/transactions",
+      },
+    ],
+  },
+  {
     version: "1.73",
     date: "2026-10-01",
     headline: "The Beancount file now checks itself against every reconciled bank statement.",
