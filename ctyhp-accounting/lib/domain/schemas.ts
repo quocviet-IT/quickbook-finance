@@ -905,6 +905,12 @@ export const reviewPostItemsSchema = z
         pairKind: z.enum(["transfer", "funding"]),
         counterpartId: z.uuid(),
       }),
+      z.object({
+        transactionId: z.uuid(),
+        kind: z.literal("loan"),
+        repaymentId: z.uuid(),
+        interestMinor: z.number().int().min(0),
+      }),
     ]),
   )
   .min(1, "Nothing to post")
@@ -923,8 +929,22 @@ export const repaymentPreviewSchema = z.object({
   matchDigits: z.string().regex(/^\d{4}$/, "The last four are exactly four digits").nullable(),
 });
 
-/** 1.75 registers cards. Loans, with their interest, arrive in 1.76. */
-export const repaymentInputSchema = repaymentPreviewSchema.extend({
-  kind: z.literal("card"),
-  isActive: z.boolean(),
+/** A card or a loan, as the Cards and loans form saves it. */
+export const repaymentInputSchema = z.discriminatedUnion("kind", [
+  repaymentPreviewSchema.extend({ kind: z.literal("card"), isActive: z.boolean() }),
+  repaymentPreviewSchema.extend({
+    kind: z.literal("loan"),
+    isActive: z.boolean(),
+    interestAccountId: z.uuid("Choose the account interest posts to"),
+    interestMethod: z.enum(["rate", "fixed", "entered"]),
+    annualRate: z.number().min(0, "The rate a year is between 0 and 100%").max(100, "The rate a year is between 0 and 100%").nullable(),
+    fixedInterestMinor: z.number().int().min(0).nullable(),
+  }),
+]);
+
+/** One loan payment from Bank Transactions: the line, the loan, and the interest accepted. */
+export const loanPaymentSchema = z.object({
+  transactionId: z.uuid(),
+  repaymentId: z.uuid(),
+  interestMinor: z.number().int("Interest is a whole number of cents").min(0, "Interest cannot be below zero"),
 });

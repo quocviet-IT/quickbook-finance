@@ -119,13 +119,11 @@ export async function saveRepaymentAction(id: string | null, raw: unknown): Prom
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid entry" };
   try {
     const sb = await createSupabaseServerClient();
-    const saved = await saveRepayment(sb, id, {
-      ...parsed.data,
-      interestAccountId: null,
-      interestMethod: null,
-      annualRate: null,
-      fixedInterestMinor: null,
-    });
+    const input =
+      parsed.data.kind === "card"
+        ? { ...parsed.data, interestAccountId: null, interestMethod: null, annualRate: null, fixedInterestMinor: null }
+        : parsed.data;
+    const saved = await saveRepayment(sb, id, input);
     refresh();
     return { ok: true, data: { id: saved } };
   } catch (err) {

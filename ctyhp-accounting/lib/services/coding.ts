@@ -59,10 +59,15 @@ export async function listBankRules(sb: SupabaseClient): Promise<BankRule[]> {
   return rows.map(ruleFromRow);
 }
 
-export async function loadHistory(sb: SupabaseClient): Promise<HistorySource[]> {
+/** Every finished entry coding learns from; with `accountIds`, only those whose other leg is on one of them. */
+export async function loadHistory(sb: SupabaseClient, accountIds?: readonly string[]): Promise<HistorySource[]> {
+  if (accountIds && accountIds.length === 0) return [];
   // entry_id is unique here: an entry is returned once, for its one bank leg.
   const rows = await readAllPages<Record<string, unknown>>(
-    (from, to) => sb.rpc("acc_coding_history").order("entry_id").range(from, to),
+    (from, to) => {
+      const history = sb.rpc("acc_coding_history");
+      return (accountIds ? history.in("account_id", [...accountIds]) : history).order("entry_id").range(from, to);
+    },
     fail,
   );
   return rows.map((row) => ({
