@@ -20,6 +20,7 @@ import {
   type BankColumnKey,
 } from "./bank-transaction-columns";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
+import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import type { BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
 import CategoriseCell from "./CategoriseCell";
@@ -52,11 +53,13 @@ export interface BankTransactionsTableProps {
   formatRowMoney: (row: BankReviewTableRow) => string;
   /** Every account money may be posted to, for the Category search. */
   postableAccounts: AccountRow[];
-  /** What each matched line was posted to, keyed by transaction. */
-  postings: Map<string, BankPostingRow>;
+  /** What each matched line was posted to, keyed by transaction; `others` names the rest of a split entry. */
+  postings: Map<string, BankPostingRow & { others?: string[] }>;
   onCategorised: () => void;
   /** The coding suggestion for each waiting line, keyed by transaction. */
   codingSuggestions: Map<string, CodingSuggestionView>;
+  /** The proposed split of each waiting loan payment, keyed by transaction. */
+  loanSuggestions: Map<string, LoanSuggestionView>;
   /** Open the rule form for a line; the account is the one it is posted to or suggested for. */
   onCreateRule: (row: BankReviewTableRow, accountId: string | null) => void;
   onSettle: (row: BankReviewTableRow) => void;
@@ -97,6 +100,7 @@ export default function BankTransactionsTable({
   postings,
   onCategorised,
   codingSuggestions,
+  loanSuggestions,
   onCreateRule,
   onSettle,
   onApprove,
@@ -181,6 +185,7 @@ export default function BankTransactionsTable({
             canWrite={canWrite}
             onChanged={onCategorised}
             suggestion={suggestion}
+            loan={loanSuggestions.get(row.transaction.id) ?? null}
             onCreateRule={() => onCreateRule(row, posting?.account_id ?? suggestion?.accountId ?? null)}
           />
         );
