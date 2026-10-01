@@ -146,7 +146,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
   {
     id: "beancount-export",
     title: "Beancount Export",
-    description: "Download the whole ledger as a Beancount v3 file for bean-check and Fava.",
+    description: "Download the whole ledger as a Beancount v3 file, with a balance line per reconciled statement, for bean-check and Fava.",
     href: "/reports/beancount",
     group: "accounting",
   },

@@ -10,6 +10,7 @@
  */
 
 import type { AccountType } from "@/lib/domain/accounts";
+import type { BalanceAssertion } from "@/lib/domain/beancount-balance";
 import { companySlugFromName } from "@/lib/domain/company-slug";
 
 export class BeancountError extends Error {}
@@ -117,6 +118,15 @@ export function formatAmount(minor: number, decimals: number): string {
   const whole = decimals === 0 ? digits : digits.slice(0, -decimals);
   const fraction = decimals === 0 ? "" : `.${digits.slice(-decimals)}`;
   return `${negative ? "-" : ""}${whole}${fraction}`;
+}
+
+/** Minor units with thousands separators, for comments a person reads. */
+function formatGrouped(minor: number, decimals: number): string {
+  const plain = formatAmount(minor, decimals);
+  const negative = plain.startsWith("-");
+  const [whole, fraction] = (negative ? plain.slice(1) : plain).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${negative ? "-" : ""}${grouped}${fraction === undefined ? "" : `.${fraction}`}`;
 }
 
 /** What an entry carries from the document behind it. */
@@ -247,6 +257,8 @@ export interface BeancountInput {
   documentByEntryId: ReadonlyMap<string, BeancountDocument>;
   currencies: readonly BeancountCurrency[];
   prices: readonly BeancountPrice[];
+  /** One per completed bank reconciliation, from `balanceAssertions`. */
+  assertions: readonly BalanceAssertion[];
 }
 
 const MONTHS = [
@@ -285,6 +297,16 @@ export type BeancountTextLine =
       accountStart: number;
     }
   | { kind: "txn" | "meta"; text: string; entryId: string }
+  | { kind: "reconciliation"; text: string; reconciliationId: string }
+  | {
+      kind: "balance";
+      text: string;
+      reconciliationId: string;
+      accountId: string;
+      /** The account name is `text.slice(accountStart, accountEnd)`. */
+      accountStart: number;
+      accountEnd: number;
+    }
   | {
       kind: "posting";
       text: string;
@@ -374,8 +396,12 @@ export function buildBeancountLines(input: BeancountInput): BeancountTextLine[] 
     (x, y) => x.entryDate.localeCompare(y.entryDate) || x.entryNumber.localeCompare(y.entryNumber),
   );
   // Every account opens on the book's first date, which is on or before any
-  // posting to it by construction.
-  const openDate = entries[0]?.entryDate ?? input.generatedAt.slice(0, 10);
+  // posting to it by construction — or on an earlier assertion's date, since a
+  // balance may not be checked on an account before it opens.
+  const openDate =
+    [entries[0]?.entryDate, ...input.assertions.map((a) => a.date)]
+      .filter((d): d is string => d !== undefined)
+      .sort()[0] ?? input.generatedAt.slice(0, 10);
 
   const out: BeancountTextLine[] = [];
   const comment = (text: string) => out.push({ kind: "comment", text });
@@ -451,6 +477,63 @@ export function buildBeancountLines(input: BeancountInput): BeancountTextLine[] 
       }),
     );
     blank();
+  }
+
+  if (input.assertions.length > 0) {
+    const nameOf = (accountId: string) => {
+      const name = names.get(accountId);
+      if (!name) throw new BeancountError("A reconciled bank account is missing from the chart");
+      return name;
+    };
+    comment(";; --- Balance assertions ---");
+    comment(";; One per completed bank reconciliation: the book balance on the statement");
+    comment(";; date as it stood when the reconciliation was completed. Beancount checks a");
+    comment(";; balance at the start of its day, so each is dated the day after the statement.");
+    blank();
+
+    const ordered = [...input.assertions].sort(
+      (x, y) => x.date.localeCompare(y.date) || nameOf(x.accountId).localeCompare(nameOf(y.accountId)),
+    );
+    for (const a of ordered) {
+      const name = nameOf(a.accountId);
+      if (a.kind === "skipped") {
+        const why =
+          a.reason === "currency"
+            ? `it is reconciled in ${base.code}, and ${name} holds ${a.currencyCode}.`
+            : `an entry on ${name} was voided at an unrecorded time, so its balance at completion cannot be rebuilt.`;
+        out.push({
+          kind: "reconciliation",
+          text: `; Statement of ${a.statementDate} not asserted: ${why}`,
+          reconciliationId: a.reconciliationId,
+        });
+      } else {
+        const decimals = decimalsOf.get(a.currencyCode);
+        if (decimals === undefined) {
+          throw new BeancountError(`A reconciliation is in ${a.currencyCode}, which has no currency record`);
+        }
+        const diff = a.amountMinor - a.statementMinor;
+        const uncleared = `${a.unclearedCount} line${a.unclearedCount === 1 ? "" : "s"} not yet cleared`;
+        const agreement =
+          diff === 0
+            ? `Books agree with the statement.${a.unclearedCount > 0 ? ` ${uncleared} net to zero.` : ""}`
+            : `Books differ by ${formatGrouped(diff, decimals)} ${a.currencyCode}${a.unclearedCount > 0 ? `: ${uncleared}.` : "."}`;
+        out.push({
+          kind: "reconciliation",
+          text: `; Statement of ${a.statementDate}: ${formatGrouped(a.statementMinor, decimals)} ${a.currencyCode}. ${agreement}`,
+          reconciliationId: a.reconciliationId,
+        });
+        const prefix = `${a.date} balance `;
+        out.push({
+          kind: "balance",
+          text: `${prefix}${name.padEnd(nameWidth)}${formatAmount(a.amountMinor, decimals).padStart(16)} ${a.currencyCode}`,
+          reconciliationId: a.reconciliationId,
+          accountId: a.accountId,
+          accountStart: prefix.length,
+          accountEnd: prefix.length + name.length,
+        });
+      }
+      blank();
+    }
   }
 
   comment(";; --- End of file ---");

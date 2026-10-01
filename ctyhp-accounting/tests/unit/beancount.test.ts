@@ -17,6 +17,7 @@ import {
   type BeancountEntry,
   type BeancountInput,
 } from "@/lib/domain/beancount";
+import type { BalanceAssertion } from "@/lib/domain/beancount-balance";
 
 const acct = (over: Partial<BeancountAccount> = {}): BeancountAccount => ({
   id: "a1b2c3d4-0000-0000-0000-000000000001",
@@ -201,6 +202,7 @@ const input = (over: Partial<BeancountInput> = {}): BeancountInput => ({
   documentByEntryId: new Map(),
   currencies: [USD, EUR, VND],
   prices: [],
+  assertions: [],
   ...over,
 });
 
@@ -488,5 +490,113 @@ describe("the beancount module", () => {
   it("imports nothing that could write to the books", () => {
     const source = readFileSync("lib/domain/beancount.ts", "utf8");
     expect(source).not.toMatch(/@\/lib\/(db|services)\//);
+  });
+});
+
+describe("balance assertions", () => {
+  const assertion = (over: Partial<Record<string, unknown>> = {}): BalanceAssertion =>
+    ({
+      kind: "balance",
+      reconciliationId: "r-jan",
+      date: "2025-02-01",
+      accountId: "acc-bank",
+      statementDate: "2025-01-31",
+      amountMinor: 1135460,
+      currencyCode: "USD",
+      statementMinor: 1248000,
+      unclearedCount: 1,
+      ...over,
+    }) as BalanceAssertion;
+
+  const BANK_NAME = "Assets:Bank:1010-Operating-Checking";
+
+  it("writes a section after the transactions, with the statement beside each figure", () => {
+    const text = buildBeancountFile(input({ entries: [entry()], assertions: [assertion()] }));
+    expect(text).toContain(
+      [
+        ";; --- Balance assertions ---",
+        ";; One per completed bank reconciliation: the book balance on the statement",
+        ";; date as it stood when the reconciliation was completed. Beancount checks a",
+        ";; balance at the start of its day, so each is dated the day after the statement.",
+        "",
+        "; Statement of 2025-01-31: 12,480.00 USD. Books differ by -1,125.40 USD: 1 line not yet cleared.",
+        `2025-02-01 balance ${BANK_NAME.padEnd(44)}${"11354.60".padStart(16)} USD`,
+        "",
+        ";; --- End of file ---",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("says the books agree when they do", () => {
+    const text = buildBeancountFile(
+      input({ entries: [entry()], assertions: [assertion({ amountMinor: 1248000, unclearedCount: 0 })] }),
+    );
+    expect(text).toContain("; Statement of 2025-01-31: 12,480.00 USD. Books agree with the statement.\n");
+  });
+
+  it("writes a comment and no balance when the account is in another currency", () => {
+    const text = buildBeancountFile(
+      input({
+        entries: [entry()],
+        assertions: [assertion({ kind: "skipped", reason: "currency", currencyCode: "EUR" })],
+      }),
+    );
+    expect(text).toContain(
+      `; Statement of 2025-01-31 not asserted: it is reconciled in USD, and ${BANK_NAME} holds EUR.\n`,
+    );
+    expect(text).not.toMatch(/^\d{4}-\d{2}-\d{2} balance /m);
+  });
+
+  it("writes a comment and no balance when a void time is unknown", () => {
+    const text = buildBeancountFile(
+      input({ entries: [entry()], assertions: [assertion({ kind: "skipped", reason: "unknown-void" })] }),
+    );
+    expect(text).toContain(
+      `; Statement of 2025-01-31 not asserted: an entry on ${BANK_NAME} was voided at an unrecorded time, so its balance at completion cannot be rebuilt.\n`,
+    );
+    expect(text).not.toMatch(/^\d{4}-\d{2}-\d{2} balance /m);
+  });
+
+  it("orders assertions by date, then account name", () => {
+    const savings = acct({ id: "acc-sav", code: "1020", name: "Savings", type: "bank" });
+    const text = buildBeancountFile(
+      input({
+        accounts: [BANK, AR, SALES, savings],
+        entries: [entry()],
+        assertions: [
+          assertion({ reconciliationId: "r-feb", date: "2025-03-01", statementDate: "2025-02-28" }),
+          assertion({ reconciliationId: "r-sav", accountId: "acc-sav" }),
+          assertion(),
+        ],
+      }),
+    );
+    const order = [...text.matchAll(/^(\d{4}-\d{2}-\d{2}) balance (\S+)/gm)].map((m) => `${m[1]} ${m[2]}`);
+    expect(order).toEqual([
+      "2025-02-01 Assets:Bank:1010-Operating-Checking",
+      "2025-02-01 Assets:Bank:1020-Savings",
+      "2025-03-01 Assets:Bank:1010-Operating-Checking",
+    ]);
+  });
+
+  it("opens every account no later than its first assertion", () => {
+    const text = buildBeancountFile(
+      input({ entries: [entry()], assertions: [assertion({ date: "2024-12-01", statementDate: "2024-11-30" })] }),
+    );
+    expect(text).toContain("2024-12-01 open Assets:Bank:1010-Operating-Checking\n");
+    expect(text).not.toContain("2025-01-15 open ");
+  });
+
+  it("writes no section when nothing was reconciled", () => {
+    expect(buildBeancountFile(input({ entries: [entry()] }))).not.toContain("Balance assertions");
+  });
+
+  it("ties each balance line to its account and reconciliation", () => {
+    const lines = buildBeancountLines(input({ entries: [entry()], assertions: [assertion()] }));
+    const balance = lines.find((l) => l.kind === "balance");
+    expect(balance?.kind === "balance" && balance.text.slice(balance.accountStart, balance.accountEnd)).toBe(BANK_NAME);
+    expect(balance?.kind === "balance" && [balance.accountId, balance.reconciliationId]).toEqual(["acc-bank", "r-jan"]);
+    const note = lines.find((l) => l.kind === "reconciliation");
+    expect(note?.kind === "reconciliation" && note.reconciliationId).toBe("r-jan");
   });
 });

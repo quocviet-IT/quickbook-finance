@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Alert, App, Button, Space, Spin } from "antd";
 import { CopyOutlined, DownloadOutlined } from "@ant-design/icons";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
@@ -154,6 +155,26 @@ export default function BeancountClient({
               <span className={styles.cm}>{l.text.slice(l.amountEnd)}</span>
             </>
           );
+        case "reconciliation":
+          return (
+            <a
+              className={styles.cm}
+              href={`/banking/reconcile/${l.reconciliationId}`}
+              target="_blank"
+              rel="noopener"
+              title="Open this reconciliation in a new tab"
+            >
+              {l.text}
+            </a>
+          );
+        case "balance":
+          return (
+            <>
+              <span className={styles.op}>{l.text.slice(0, l.accountStart)}</span>
+              {account(l.accountId, l.text.slice(l.accountStart, l.accountEnd), `a${i}`)}
+              <span className={styles.kw}>{l.text.slice(l.accountEnd)}</span>
+            </>
+          );
       }
     };
     return lines.slice(0, shown).map((l, i) => (
@@ -173,7 +194,8 @@ export default function BeancountClient({
           <h2 className={styles.fileName}>{fileName}</h2>
           <p className={styles.lede}>
             Valid Beancount v3 for {companyName}. Account names and amounts are live — click one to open its ledger or
-            its entry.
+            its entry. Each reconciled bank statement adds a balance line, so bean-check refuses the file if that
+            period changes.
           </p>
         </div>
         {canExport ? (
@@ -204,7 +226,23 @@ export default function BeancountClient({
             { label: "First entry", value: summary.firstDate ? shortDate(summary.firstDate) : "—" },
             { label: "Last entry", value: summary.lastDate ? shortDate(summary.lastDate) : "—" },
             { label: "Currencies", value: summary.currencies.length > 0 ? summary.currencies.join(", ") : "—" },
+            { label: "Reconciled statements", value: summary.reconciledStatements.toLocaleString("en-US") },
           ]}
+        />
+      ) : null}
+
+      {summary && summary.bankAccountsUnreconciled > 0 ? (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`${summary.bankAccountsUnreconciled} of ${summary.bankAccountCount} bank accounts have no completed reconciliation`}
+          description={
+            <>
+              The file asserts a balance only for statements that were reconciled. Reconcile one under{" "}
+              <Link href="/banking/reconcile">Banking › Reconcile</Link> to add its balance line.
+            </>
+          }
         />
       ) : null}
 

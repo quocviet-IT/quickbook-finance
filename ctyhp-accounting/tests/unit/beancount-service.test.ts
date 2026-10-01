@@ -27,7 +27,7 @@ function fakeClient(tables: Record<string, Table>, rpcRows: Row[] = []) {
     let head = false;
     let limitTo: number | null = null;
     const matching = () =>
-      (tables[table]?.rows ?? []).filter((r) => filters.every(([op, col, v]) => (op === "eq" ? r[col] === v : true)));
+      (tables[table]?.rows ?? []).filter((r) => filters.every(([op, col, v]) => (op === "eq" ? r[col] === v : op === "in" ? (v as unknown[]).includes(r[col]) : true)));
     const b: Record<string, unknown> = {
       select: (_cols: string, opts?: { head?: boolean }) => {
         head = Boolean(opts?.head);
@@ -39,6 +39,10 @@ function fakeClient(tables: Record<string, Table>, rpcRows: Row[] = []) {
       },
       not: (col: string, _op: string, v: unknown) => {
         filters.push(["not", col, v]);
+        return b;
+      },
+      in: (col: string, vs: unknown[]) => {
+        filters.push(["in", col, vs]);
         return b;
       },
       order: () => b,
@@ -118,6 +122,10 @@ const baseTables = (entries: Row[]): Record<string, Table> => ({
   acc_exchange_rate: { rows: [] },
   acc_currency: currencies,
   acc_company_setting_version: { rows: settings.rows.map((r) => ({ ...r })) },
+  acc_statement_reconciliation: { rows: [] },
+  acc_bank_account: { rows: [] },
+  acc_reconciliation_line: { rows: [] },
+  acc_journal_line: { rows: [] },
 });
 
 describe("readBeancountInput", () => {
@@ -182,5 +190,108 @@ describe("readBeancountSummary", () => {
     expect(summary.entryCount).toBe(4);
     expect(summary.accountCount).toBe(2);
     expect(summary.currencies).toEqual(["USD"]);
+  });
+});
+
+describe("balance assertion reads", () => {
+  const reconciled = (tables: Record<string, Table>) => {
+    tables.acc_bank_account.rows = [{ id: "bank-1", account_id: "acc-bank", currency_code: "USD" }];
+    tables.acc_statement_reconciliation.rows = [
+      {
+        id: "r-jan",
+        bank_account_id: "bank-1",
+        statement_ending_date: "2025-01-31",
+        statement_ending_balance_minor: "100",
+        completed_at: "2025-02-02T10:00:00+00:00",
+        status: "completed",
+      },
+      {
+        id: "r-feb",
+        bank_account_id: "bank-1",
+        statement_ending_date: "2025-02-28",
+        statement_ending_balance_minor: "0",
+        completed_at: null,
+        status: "in_progress",
+      },
+    ];
+    tables.acc_reconciliation_line.rows = [{ id: "c1", reconciliation_id: "r-jan", journal_line_id: "jl-1" }];
+    const entryOf = (over: Row) => ({
+      entry_date: "2025-01-15",
+      currency_code: "USD",
+      status: "posted",
+      posted_at: "2025-01-15T09:00:00+00:00",
+      voided_at: null,
+      ...over,
+    });
+    tables.acc_journal_line.rows = [
+      { id: "jl-1", account_id: "acc-bank", debit_minor: "100", credit_minor: "0", acc_journal_entry: entryOf({}) },
+      {
+        id: "jl-2",
+        account_id: "acc-bank",
+        debit_minor: "0",
+        credit_minor: "40",
+        acc_journal_entry: entryOf({ status: "void", voided_at: "2025-03-01T09:00:00+00:00" }),
+      },
+      { id: "jl-3", account_id: "acc-sales", debit_minor: "0", credit_minor: "100", acc_journal_entry: entryOf({}) },
+    ];
+    return tables;
+  };
+
+  it("asserts each completed reconciliation, counting entries voided after it", async () => {
+    const { sb } = fakeClient(reconciled(baseTables(entryRows(1))));
+    const input = await readBeancountInput(sb, "2026-09-26T08:00:00.000Z");
+    expect(input.assertions).toEqual([
+      {
+        kind: "balance",
+        reconciliationId: "r-jan",
+        date: "2025-02-01",
+        accountId: "acc-bank",
+        statementDate: "2025-01-31",
+        amountMinor: 60,
+        currencyCode: "USD",
+        statementMinor: 100,
+        unclearedCount: 1,
+      },
+    ]);
+  });
+
+  it("asks only for lines on reconciled bank accounts", async () => {
+    const { sb, calls } = fakeClient(reconciled(baseTables(entryRows(1))));
+    await readBeancountInput(sb, "2026-09-26T08:00:00.000Z");
+    const lineCalls = calls.filter((c) => c.table === "acc_journal_line");
+    expect(lineCalls.length).toBeGreaterThan(0);
+    for (const c of lineCalls) expect(c.filters).toContainEqual(["in", "account_id", ["acc-bank"]]);
+  });
+
+  it("reads completed reconciliations only", async () => {
+    const { sb, calls } = fakeClient(reconciled(baseTables(entryRows(1))));
+    await readBeancountInput(sb, "2026-09-26T08:00:00.000Z");
+    for (const c of calls.filter((x) => x.table === "acc_statement_reconciliation")) {
+      expect(c.filters).toContainEqual(["eq", "status", "completed"]);
+    }
+  });
+
+  it("reads no ledger lines when nothing is reconciled", async () => {
+    const { sb, calls } = fakeClient(baseTables(entryRows(1)));
+    const input = await readBeancountInput(sb, "2026-09-26T08:00:00.000Z");
+    expect(input.assertions).toEqual([]);
+    expect(calls.some((c) => c.table === "acc_journal_line")).toBe(false);
+  });
+
+  it("fails as a whole when the reconciliation read fails", async () => {
+    const tables = reconciled(baseTables(entryRows(1)));
+    tables.acc_statement_reconciliation.failOnPage = 1;
+    const { sb } = fakeClient(tables);
+    await expect(readBeancountInput(sb, "2026-09-26T08:00:00.000Z")).rejects.toThrow(/acc_statement_reconciliation/);
+  });
+
+  it("summarises reconciled statements and the bank accounts with none", async () => {
+    const tables = reconciled(baseTables(entryRows(1)));
+    tables.acc_bank_account.rows.push({ id: "bank-2", account_id: "acc-sav", currency_code: "USD" });
+    const { sb } = fakeClient(tables);
+    const summary = await readBeancountSummary(sb);
+    expect(summary.reconciledStatements).toBe(1);
+    expect(summary.bankAccountCount).toBe(2);
+    expect(summary.bankAccountsUnreconciled).toBe(1);
   });
 });
