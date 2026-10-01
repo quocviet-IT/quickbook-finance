@@ -147,3 +147,8 @@ export function validateRepaymentInput(input: RepaymentInput): string | null {
   }
   return null;
 }
+
+/** A saved entry stays a card or a loan: the accounts and settings of one are not the other's. */
+export function kindChangeProblem(existing: RepaymentKind, next: RepaymentKind): string | null {
+  return existing === next ? null : "A card cannot become a loan, or a loan a card — remove the entry and add it again";
+}

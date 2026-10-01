@@ -2,7 +2,8 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite, getUserRole } from "@/lib/auth";
 import { fundingAccountAllowed, suggestFundingAccount } from "@/lib/domain/bank-pairs";
 import { codableAccount, codingAccountOf } from "@/lib/domain/coding";
-import { repaysAccountAllowed, usableRepayment } from "@/lib/domain/repayments";
+import { interestAccountAllowed, repaysAccountAllowed, usableRepayment } from "@/lib/domain/repayments";
+import { suggestInterestAccount } from "@/lib/domain/loan-interest";
 import { listAccounts } from "@/lib/services/accounts";
 import { listBankTransactions } from "@/lib/services/banking";
 import { getBankingPreference } from "@/lib/services/banking-preference";
@@ -48,6 +49,7 @@ export default async function BankRulesPage() {
   const repaymentRows: RepaymentListRow[] = repayments.map((entry) => ({
     ...entry,
     accountLabel: labelOf(entry.accountId),
+    interestLabel: entry.interestAccountId ? labelOf(entry.interestAccountId) : null,
     accountUsable: usableRepayment({ ...entry, isActive: true }, chart),
     stats: stats[entry.id] ?? { past: 0, caught: 0, waiting: 0, missed: [] },
   }));
@@ -55,7 +57,7 @@ export default async function BankRulesPage() {
     <div>
       <PageHeader
         title="Bank Rules"
-        description="What says which account a bank line belongs to. A card in Cards and loans is recognized first; then the first rule that matches; history speaks only when neither does. Nothing is posted until someone uses a suggestion."
+        description="What says which account a bank line belongs to. A card or loan in Cards and loans is recognized first; then the first rule that matches; history speaks only when neither does. Nothing is posted until someone uses a suggestion."
       />
       <PairsPreference
         initial={preference}
@@ -66,6 +68,9 @@ export default async function BankRulesPage() {
       <RepaymentsSection
         rows={repaymentRows}
         cardAccounts={accounts.filter((account) => repaysAccountAllowed("card", codingAccountOf(account)))}
+        loanAccounts={accounts.filter((account) => repaysAccountAllowed("loan", codingAccountOf(account)))}
+        interestAccounts={accounts.filter((account) => interestAccountAllowed(codingAccountOf(account)))}
+        suggestedInterestId={suggestInterestAccount([...chart.values()])}
         canWrite={canWrite(role)}
       />
       <RulesClient

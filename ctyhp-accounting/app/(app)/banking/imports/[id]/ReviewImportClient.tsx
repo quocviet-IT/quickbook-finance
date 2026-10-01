@@ -9,6 +9,7 @@ import { COLUMN } from "@/lib/design/table-metrics";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
 import { batchResultSeverity, describeBatchResult, summarizeBatchResults, type BatchActionSummary } from "@/lib/domain/bank-transaction-batch";
 import { directionOf } from "@/lib/domain/coding-names";
+import { splitText } from "@/lib/domain/loan-interest";
 import {
   alternativeValue,
   chunked,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/domain/statement-review";
 import { formatMoney } from "@/lib/format";
 import type { ImportReview, ReviewLineView, ReviewOutcome } from "@/lib/services/statement-review";
+import LoanSplitModal from "../../LoanSplitModal";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "../../rules/RuleFormModal";
 import { postReviewItemsAction } from "../actions";
 import styles from "./review-import.module.css";
@@ -44,11 +46,16 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [summary, setSummary] = useState<BatchActionSummary | null>(null);
   const [ruleSeed, setRuleSeed] = useState<RuleFormValues | null>(null);
+  // A loan line's interest: the proposal's estimate until a person changes it in Split….
+  const [interests, setInterests] = useState<Record<string, number | null>>(() =>
+    Object.fromEntries(lines.flatMap((line) => (line.proposal.kind === "loan" ? [[line.id, line.proposal.loan.interestMinor]] : []))),
+  );
+  const [splitting, setSplitting] = useState<ReviewLineView | null>(null);
 
   const accountOptions = useMemo(() => accounts.map((a) => ({ value: `account:${a.id}`, label: a.label })), [accounts]);
   const byId = useMemo(() => new Map(lines.map((line) => [line.id, line])), [lines]);
   const counts = useMemo(() => {
-    const c = { match: 0, document: 0, transfer: 0, funding: 0, account: 0, none: 0, handled: 0 };
+    const c = { match: 0, document: 0, transfer: 0, funding: 0, account: 0, loan: 0, none: 0, handled: 0 };
     for (const line of lines) c[line.proposal.kind] += 1;
     return c;
   }, [lines]);
@@ -60,7 +67,8 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   // A line handled since the page loaded — posted here, or elsewhere — is never
   // posted again, whatever its tick says.
   const open = (id: string) => byId.get(id)?.proposal.kind !== "handled";
-  const postable = ticked.filter((id) => choices[id] && open(id));
+  const itemOf = (id: string) => itemFromValue(id, choices[id] ?? null, interests[id] ?? null);
+  const postable = ticked.filter((id) => choices[id] && open(id) && itemOf(id) !== null);
   const waiting = lines.filter((l) => l.proposal.kind !== "handled").length - postable.length;
 
   const pairOf = (id: string, value: string | null | undefined) => {
@@ -110,9 +118,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
 
   async function post() {
     // A pair ticked on both of its lines is one post.
-    const items = dedupePairItems(
-      postable.map((id) => itemFromValue(id, choices[id] ?? null)).filter((item): item is ReviewPostItem => item !== null),
-    );
+    const items = dedupePairItems(postable.map(itemOf).filter((item): item is ReviewPostItem => item !== null));
     if (!items.length) return;
     const outcomes: ReviewOutcome[] = [];
     setProgress({ done: 0, total: items.length });
@@ -140,6 +146,13 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
     const chosen = choices[line.id];
     if (chosen && line.proposal.kind === "account" && line.proposal.alternative && chosen === alternativeValue(line.proposal)) {
       return line.proposal.alternative.why;
+    }
+    if (line.proposal.kind === "loan" && chosen === own) {
+      const interest = interests[line.id] ?? null;
+      const { loan } = line.proposal;
+      if (interest !== null && interest !== loan.interestMinor) {
+        return `${splitText(loan.paymentMinor - interest, interest, loan.loanAccountLabel, loan.interestAccountLabel)} — chosen by you`;
+      }
     }
     if (chosen && chosen !== own) return "Chosen by you";
     return line.proposal.why;
@@ -207,6 +220,11 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
             <Typography.Text type="secondary" style={{ fontSize: 12, display: "block" }} ellipsis={{ tooltip: whyOf(line) }}>
               {whyOf(line)}
             </Typography.Text>
+            {p.kind === "loan" && choices[line.id] === ownValue ? (
+              <Button type="link" size="small" style={{ padding: 0, height: "auto", fontSize: 12, marginRight: 12 }} onClick={() => setSplitting(line)}>
+                Split…
+              </Button>
+            ) : null}
             <Button
               type="link"
               size="small"
@@ -238,7 +256,8 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
         <Typography.Text type="secondary">
           {batch.rowCount} row{batch.rowCount === 1 ? "" : "s"} in the file · {lines.length} line{lines.length === 1 ? "" : "s"} from this
           import · {counts.match} already in the books · {counts.document} pay a document · {counts.transfer} transfer
-          {counts.transfer === 1 ? "" : "s"} · {cardPayments} card payment{cardPayments === 1 ? "" : "s"} · {counts.account - cardPayments} have an
+          {counts.transfer === 1 ? "" : "s"} · {cardPayments} card payment{cardPayments === 1 ? "" : "s"} · {counts.loan} loan payment
+          {counts.loan === 1 ? "" : "s"} · {counts.account - cardPayments} have an
           account · {possibleFunding} possible funding · {counts.none} need
           coding · {counts.handled} already handled
         </Typography.Text>
@@ -279,7 +298,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
             ? {
                 selectedRowKeys: ticked.filter(open),
                 onChange: (keys) => setTicks(keys as string[]),
-                getCheckboxProps: (line: ReviewLineView) => ({ disabled: line.proposal.kind === "handled" || !choices[line.id] }),
+                getCheckboxProps: (line: ReviewLineView) => ({ disabled: line.proposal.kind === "handled" || !choices[line.id] || itemOf(line.id) === null }),
               }
             : undefined
         }
@@ -297,6 +316,26 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
         <Link href="/banking">Back to Banking</Link>
       </Space>
       {progress ? <Progress style={{ maxWidth: 420 }} percent={Math.round((progress.done / progress.total) * 100)} /> : null}
+
+      {splitting && splitting.proposal.kind === "loan" ? (
+        <LoanSplitModal
+          key={splitting.id}
+          paymentMinor={splitting.proposal.loan.paymentMinor}
+          initialInterestMinor={interests[splitting.id] ?? null}
+          basis={splitting.proposal.loan.basis}
+          loanAccountLabel={splitting.proposal.loan.loanAccountLabel}
+          interestAccountLabel={splitting.proposal.loan.interestAccountLabel}
+          okText="Use this split"
+          onCancel={() => setSplitting(null)}
+          onConfirm={(interestMinor) => {
+            const id = splitting.id;
+            setInterests((current) => ({ ...current, [id]: interestMinor }));
+            // Accepting a split is a person checking the figure: the line is ticked.
+            setTicked((current) => (current.includes(id) ? current : [...current, id]));
+            setSplitting(null);
+          }}
+        />
+      ) : null}
 
       <RuleFormModal
         open={ruleSeed !== null}

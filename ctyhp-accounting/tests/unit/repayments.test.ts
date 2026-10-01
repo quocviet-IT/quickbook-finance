@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CodingAccount } from "@/lib/domain/coding";
 import {
   interestAccountAllowed,
+  kindChangeProblem,
   phrasesOf,
   repaymentFor,
   repaymentMatches,
@@ -167,5 +168,14 @@ describe("the repayments module", () => {
   it("can be imported by plain-Node scripts", () => {
     const src = readFileSync("lib/domain/repayments.ts", "utf8");
     expect(src).not.toMatch(/from "@\//);
+  });
+});
+
+describe("kindChangeProblem", () => {
+  it("lets an entry stay what it is, and refuses a card becoming a loan or a loan a card", () => {
+    expect(kindChangeProblem("card", "card")).toBeNull();
+    expect(kindChangeProblem("loan", "loan")).toBeNull();
+    expect(kindChangeProblem("card", "loan")).toBe("A card cannot become a loan, or a loan a card — remove the entry and add it again");
+    expect(kindChangeProblem("loan", "card")).toBe("A card cannot become a loan, or a loan a card — remove the entry and add it again");
   });
 });

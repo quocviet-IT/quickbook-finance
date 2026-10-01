@@ -68,6 +68,18 @@ describe("loadHistory", () => {
     expect(order).toHaveBeenCalledWith("entry_id");
     expect(range).toHaveBeenCalledWith(0, 999);
   });
+  it("asks only for the accounts named, and nothing at all for none", async () => {
+    const range = vi.fn().mockResolvedValue({ data: [], error: null });
+    const order = vi.fn(() => ({ range }));
+    const inFn = vi.fn(() => ({ order }));
+    const rpc = vi.fn(() => ({ in: inFn }));
+    await loadHistory({ rpc } as unknown as SupabaseClient, ["acct-1"]);
+    expect(rpc).toHaveBeenCalledWith("acc_coding_history");
+    expect(inFn).toHaveBeenCalledWith("account_id", ["acct-1"]);
+    const none = vi.fn();
+    expect(await loadHistory({ rpc: none } as unknown as SupabaseClient, [])).toEqual([]);
+    expect(none).not.toHaveBeenCalled();
+  });
 });
 
 describe("suggestionsFrom with the register", () => {

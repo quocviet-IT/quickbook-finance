@@ -32,7 +32,10 @@ import { createPlaidLinkToken } from "@/lib/services/plaid";
 import type { BankTransactionRow } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { CODE_ALL_LIMIT, type CodingSuggestionView } from "@/lib/domain/coding";
+import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
+import { loanPaymentSchema } from "@/lib/domain/schemas";
 import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
+import { loanSuggestions, postLoanPayment } from "@/lib/services/loan-payments";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -472,6 +475,35 @@ export async function codeFromSuggestionsAction(
     revalidatePath("/banking");
     revalidatePath("/reports");
     return { ok: true, data: { outcomes } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** The proposed split of each waiting loan payment in view. Null means every bank account. */
+export async function getLoanSuggestionsAction(bankAccountId: string | null): Promise<ActionResult<LoanSuggestionView[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await loanSuggestions(sb, bankAccountId) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Post one loan payment with the interest a person accepted. */
+export async function postLoanPaymentAction(
+  raw: unknown,
+): Promise<ActionResult<{ entry_number: string | null; principal_minor: number; interest_minor: number }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = loanPaymentSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid loan payment" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const posted = await postLoanPayment(sb, parsed.data.transactionId, parsed.data.repaymentId, parsed.data.interestMinor);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: posted };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

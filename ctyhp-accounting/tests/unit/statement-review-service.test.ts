@@ -10,6 +10,7 @@ const deps = (over: Partial<ReviewPostDeps> = {}): ReviewPostDeps => ({
   settle: vi.fn(async () => "pay-1"),
   categorise: vi.fn(async () => ({ entry_number: "JE-000010" })),
   postPair: vi.fn(async () => ["JE-000011"]),
+  postLoan: vi.fn(async () => "JE-000012"),
   ...over,
 });
 
@@ -74,5 +75,12 @@ describe("postReviewItems", () => {
   it("refuses more than fifty lines in one call", async () => {
     const items = Array.from({ length: 51 }, (_, i) => ({ transactionId: `t${i}`, kind: "account" as const, accountId: "a" }));
     await expect(postReviewItems(sb, items, deps())).rejects.toThrow(/50/);
+  });
+
+  it("posts a loan item with the interest the person accepted", async () => {
+    const d = deps();
+    const outcomes = await postReviewItems(sb, [{ transactionId: "t1", kind: "loan", repaymentId: "rp1", interestMinor: 40_000 }], d);
+    expect(outcomes).toEqual([{ id: "t1", ok: true, detail: "JE-000012" }]);
+    expect(d.postLoan).toHaveBeenCalledWith(sb, "t1", "rp1", 40_000);
   });
 });

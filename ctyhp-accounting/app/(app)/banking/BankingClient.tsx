@@ -73,6 +73,8 @@ const AttachmentDrawer = dynamic(() => import("@/components/documents/Attachment
   ssr: false,
 });
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
+import { postingsByLine } from "@/lib/domain/bank-postings";
+import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import {
   filterBankTransactions,
   parseAmountFilterInput,
@@ -97,6 +99,7 @@ import {
   getSuggestionsAction,
   getBankPostingsAction,
   getCodingSuggestionsAction,
+  getLoanSuggestionsAction,
   getTransactionsAction,
   importStatementAction,
   rejectReconciliationAction,
@@ -206,7 +209,7 @@ export default function BankingClient({
   // What each matched line was posted to. Fetched beside the transactions so
   // the Category column can show the answer instead of asking over the top of
   // it — fifteen lines read "Uncategorized" beside "Matched".
-  const [postings, setPostings] = useState<Map<string, BankPostingRow>>(new Map());
+  const [postings, setPostings] = useState<Map<string, BankPostingRow & { others: string[] }>>(new Map());
   const [postedToFilter, setPostedToFilter] = useState<string>("all");
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
   const [loading, setLoading] = useState(false);
@@ -223,6 +226,7 @@ export default function BankingClient({
   const [rawSelectedIds, setRawSelectedIds] = useState<string[]>([]);
   const [batchTarget, setBatchTarget] = useState<BatchAssignTarget | null>(null);
   const [coding, setCoding] = useState<Map<string, CodingSuggestionView>>(new Map());
+  const [loans, setLoans] = useState<Map<string, LoanSuggestionView>>(new Map());
   const [codeAllRows, setCodeAllRows] = useState<CodeAllRow[] | null>(null);
   const [ruleSeed, setRuleSeed] = useState<RuleFormValues | null>(null);
 
@@ -295,6 +299,9 @@ export default function BankingClient({
     void getCodingSuggestionsAction(accountFilter).then((coded) => {
       if (coded.ok && coded.data) setCoding(new Map(coded.data.map((s) => [s.transactionId, s])));
     });
+    void getLoanSuggestionsAction(accountFilter).then((res) => {
+      if (res.ok && res.data) setLoans(new Map(res.data.map((view) => [view.transactionId, view])));
+    });
     const [transactions, matches, posted] = await Promise.all([
       getTransactionsAction(accountFilter),
       getSuggestionsAction(accountFilter),
@@ -304,7 +311,7 @@ export default function BankingClient({
     if (transactions.ok && transactions.data) setTxns(transactions.data);
     if (matches.ok && matches.data) setSuggestions(matches.data);
     if (posted.ok && posted.data) {
-      setPostings(new Map(posted.data.map((row) => [row.bank_transaction_id, row])));
+      setPostings(postingsByLine(posted.data));
     }
   }, [selectedId]);
 
@@ -753,6 +760,7 @@ export default function BankingClient({
         postings={postings}
         onCategorised={reload}
         codingSuggestions={coding}
+        loanSuggestions={loans}
         onCreateRule={(row, accountId) =>
           setRuleSeed({
             ...EMPTY_RULE,

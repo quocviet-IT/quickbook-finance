@@ -4,12 +4,14 @@
  * First that applies: a line already handled or still pending is left alone;
  * then a match to an entry already in the books; then the one open invoice or
  * bill whose balance is exactly this amount; then a transfer; then a
- * registered card (1.75), or nothing when two cards or loans claim the line;
- * then a rule or history (1.70).
+ * registered card (1.75) or loan (1.76), or nothing when two cards or loans
+ * claim the line; then a rule or history (1.70). A loan payment is never
+ * ticked for you: its interest is an estimate until a person accepts it.
  * Two open documents of the same amount give no proposal at all — money that
  * probably pays a document must not be coded to income or expense.
  */
 import type { CodingSuggestionView } from "./coding";
+import type { LoanSuggestionView } from "./loan-interest";
 
 export const REVIEW_POST_CHUNK = 50;
 
@@ -52,6 +54,7 @@ export type ReviewProposal =
   | { kind: "transfer"; counterpartId: string; label: string; why: string }
   | { kind: "funding"; counterpartId: string; label: string; why: string }
   | { kind: "account"; accountId: string; label: string; why: string; alternative?: ReviewPairView; repayment?: "card" }
+  | { kind: "loan"; repaymentId: string; label: string; why: string; loan: LoanSuggestionView }
   | { kind: "none"; why: string };
 
 export function reviewProposal(input: {
@@ -67,8 +70,10 @@ export function reviewProposal(input: {
   namedTransfer?: { accountId: string; label: string; why: string } | null;
   /** How many registered cards or loans claim this line, when more than one does. */
   repaymentRivals?: number;
+  /** The registered loan this line repays, with its proposed split (loan-interest.ts). */
+  loan?: LoanSuggestionView | null;
 }): ReviewProposal {
-  const { line, match, documents, coding, pair, pairRivals, namedTransfer, repaymentRivals } = input;
+  const { line, match, documents, coding, pair, pairRivals, namedTransfer, repaymentRivals, loan } = input;
   if (line.pending) return { kind: "handled", why: "Pending at the bank — it can be posted once it clears" };
   if (line.status !== "unmatched") return { kind: "handled", why: "Already handled on Bank Transactions" };
   if (match) {
@@ -111,6 +116,9 @@ export function reviewProposal(input: {
   if (repaymentRivals && repaymentRivals > 1) {
     return { kind: "none", why: `Matches ${repaymentRivals} cards or loans — code it yourself` };
   }
+  // A loan payment is principal and interest; no single account, rule or
+  // funding pair can stand for it.
+  if (loan) return { kind: "loan", repaymentId: loan.repaymentId, label: loan.label, why: loan.why, loan };
   // Funding is only ever a suggestion: a rule or history keeps its place, and
   // the pair is offered beside it.
   const funding = pair?.kind === "funding" ? pair : null;
@@ -136,7 +144,8 @@ export type ReviewPostItem =
   | { transactionId: string; kind: "match"; reconciliationId: string }
   | { transactionId: string; kind: "document"; documentId: string }
   | { transactionId: string; kind: "account"; accountId: string }
-  | { transactionId: string; kind: "pair"; pairKind: "transfer" | "funding"; counterpartId: string };
+  | { transactionId: string; kind: "pair"; pairKind: "transfer" | "funding"; counterpartId: string }
+  | { transactionId: string; kind: "loan"; repaymentId: string; interestMinor: number };
 
 /** The Post as picker holds one string per line: the proposal's own, or an account a person picked. */
 export function proposalValue(proposal: ReviewProposal): string | null {
@@ -144,6 +153,7 @@ export function proposalValue(proposal: ReviewProposal): string | null {
   if (proposal.kind === "document") return `document:${proposal.documentId}`;
   if (proposal.kind === "account") return `account:${proposal.accountId}`;
   if (proposal.kind === "transfer" || proposal.kind === "funding") return `pair:${proposal.kind}:${proposal.counterpartId}`;
+  if (proposal.kind === "loan") return `loan:${proposal.repaymentId}`;
   return null;
 }
 
@@ -152,12 +162,12 @@ export function alternativeValue(proposal: ReviewProposal): string | null {
   return proposal.kind === "account" && proposal.alternative ? `pair:funding:${proposal.alternative.counterpartId}` : null;
 }
 
-/** A funding pair is a suggestion only; everything else with a value starts ticked. */
+/** A funding pair is a suggestion only, and a loan's interest an estimate; everything else with a value starts ticked. */
 export function startsTicked(proposal: ReviewProposal): boolean {
-  return proposalValue(proposal) !== null && proposal.kind !== "funding";
+  return proposalValue(proposal) !== null && proposal.kind !== "funding" && proposal.kind !== "loan";
 }
 
-export function itemFromValue(transactionId: string, value: string | null): ReviewPostItem | null {
+export function itemFromValue(transactionId: string, value: string | null, interestMinor: number | null = null): ReviewPostItem | null {
   if (!value) return null;
   const parts = value.split(":");
   if (parts[0] === "pair") {
@@ -171,6 +181,7 @@ export function itemFromValue(transactionId: string, value: string | null): Revi
   if (kind === "match") return { transactionId, kind, reconciliationId: id };
   if (kind === "document") return { transactionId, kind, documentId: id };
   if (kind === "account") return { transactionId, kind, accountId: id };
+  if (kind === "loan") return interestMinor === null ? null : { transactionId, kind, repaymentId: id, interestMinor };
   return null;
 }
 

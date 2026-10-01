@@ -5,20 +5,26 @@ import type { AccountRow } from "@/lib/db/types";
 import { ACCOUNT_TYPE_LABEL, normalBalanceOf, type AccountType } from "@/lib/domain/accounts";
 import { searchAccounts } from "@/lib/domain/account-search";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
+import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
+import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
+import { formatMoney } from "@/lib/format";
 import type { BankPostingRow } from "@/lib/services/banking";
-import { categoriseBankTransactionAction, uncategoriseBankTransactionAction } from "./actions";
+import LoanSplitModal from "./LoanSplitModal";
+import { categoriseBankTransactionAction, postLoanPaymentAction, uncategoriseBankTransactionAction } from "./actions";
 
 export interface CategoriseCellProps {
   transactionId: string;
   status: string;
   /** Every account money may be posted to, for the search. */
   accounts: AccountRow[];
-  /** What this line was posted to, when it has been. */
-  posting: BankPostingRow | null;
+  /** What this line was posted to, when it has been; `others` names the rest of a split entry. */
+  posting: (BankPostingRow & { others?: string[] }) | null;
   canWrite: boolean;
   onChanged: () => void;
   /** What a rule or history suggests for this line, when it is waiting. */
   suggestion?: CodingSuggestionView | null;
+  /** A registered loan's proposed split, for a waiting loan payment. */
+  loan?: LoanSuggestionView | null;
   /** Opens the rule form, filled from this line. */
   onCreateRule?: () => void;
 }
@@ -46,11 +52,13 @@ export default function CategoriseCell({
   canWrite,
   onChanged,
   suggestion = null,
+  loan = null,
   onCreateRule,
 }: CategoriseCellProps) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [splitting, setSplitting] = useState(false);
 
   /**
    * Ranked here rather than by the dropdown, so the order is ours: an exact
@@ -92,6 +100,23 @@ export default function CategoriseCell({
     onChanged();
   }
 
+  async function postLoan(interestMinor: number) {
+    if (!loan) return;
+    setBusy(true);
+    const res = await postLoanPaymentAction({ transactionId, repaymentId: loan.repaymentId, interestMinor });
+    setBusy(false);
+    if (!res.ok || !res.data) {
+      message.error(res.error ?? "Could not post this loan payment");
+      return;
+    }
+    const money = (minor: number) => formatMoney(minor, USD_CURRENCY_CODE, 2);
+    message.success(
+      `Posted${res.data.entry_number ? ` as ${res.data.entry_number}` : ""}: principal ${money(res.data.principal_minor)}, interest ${money(res.data.interest_minor)}`,
+    );
+    setSplitting(false);
+    onChanged();
+  }
+
   const linkStyle = { padding: 0, height: "auto", fontSize: 12 } as const;
   const small = { fontSize: 12 } as const;
 
@@ -122,6 +147,41 @@ export default function CategoriseCell({
         </Space>
       </>
     ) : null;
+  /** A loan payment is two accounts, so it is posted from the Split dialog, never from Use. */
+  const loanSuggested = (withSplit: boolean) =>
+    loan ? (
+      <>
+        <Tooltip title={loan.why}>
+          <Typography.Text type="secondary" style={{ ...small, display: "block", maxWidth: "100%" }} ellipsis>
+            → {loan.loanAccountLabel}
+          </Typography.Text>
+        </Tooltip>
+        <Space size={6}>
+          <Typography.Text type="secondary" style={small}>
+            Loan
+          </Typography.Text>
+          {withSplit ? (
+            <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => setSplitting(true)}>
+              Split…
+            </Button>
+          ) : null}
+        </Space>
+      </>
+    ) : null;
+  const splitDialog =
+    splitting && loan ? (
+      <LoanSplitModal
+        paymentMinor={loan.paymentMinor}
+        initialInterestMinor={loan.interestMinor}
+        basis={loan.basis}
+        loanAccountLabel={loan.loanAccountLabel}
+        interestAccountLabel={loan.interestAccountLabel}
+        okText="Post"
+        confirmLoading={busy}
+        onCancel={() => setSplitting(false)}
+        onConfirm={(interestMinor) => void postLoan(interestMinor)}
+      />
+    ) : null;
   const createRule = onCreateRule ? (
     <div>
       <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
@@ -131,12 +191,22 @@ export default function CategoriseCell({
   ) : null;
 
   if (posting) {
-    const label = `${posting.account_code} — ${posting.account_name}`;
+    const main = `${posting.account_code} — ${posting.account_name}`;
+    const others = posting.others ?? [];
+    const everyAccount = [main, ...others].join("; ");
     return (
       <Space direction="vertical" size={0} style={{ maxWidth: "100%" }}>
         {/* Cut to the column, with the whole account name on hover: an account
             is named by whoever set up the chart, and some run long. */}
-        <Typography.Text ellipsis={{ tooltip: label }}>{label}</Typography.Text>
+        <Typography.Text ellipsis={{ tooltip: everyAccount }}>{main}</Typography.Text>
+        {/* Its own line: beside the entry number and Change it does not fit a 150px column. */}
+        {others.length ? (
+          <Tooltip title={everyAccount}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              + {others.length} more account{others.length === 1 ? "" : "s"}
+            </Typography.Text>
+          </Tooltip>
+        ) : null}
         <Space size={6}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
@@ -176,8 +246,11 @@ export default function CategoriseCell({
   }
 
   if (!canWrite) {
-    return suggestion ? (
-      <div style={{ width: "100%", minWidth: 0 }}>{suggested(false)}</div>
+    return suggestion || loan ? (
+      <div style={{ width: "100%", minWidth: 0 }}>
+        {suggested(false)}
+        {loanSuggested(false)}
+      </div>
     ) : (
       <Typography.Text type="secondary">—</Typography.Text>
     );
@@ -221,6 +294,8 @@ export default function CategoriseCell({
         />
       </Tooltip>
       {suggested(true)}
+      {loanSuggested(true)}
+      {splitDialog}
       {createRule}
     </div>
   );

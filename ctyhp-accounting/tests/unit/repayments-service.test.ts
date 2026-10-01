@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { repaymentInputSchema, repaymentPreviewSchema } from "@/lib/domain/schemas";
+import { loanPaymentSchema, repaymentInputSchema, repaymentPreviewSchema, reviewPostItemsSchema } from "@/lib/domain/schemas";
 import { repaymentStatsFrom } from "@/lib/services/repayments";
 
 const entry = { accountId: "card1", matchWords: "example card", matchDigits: "4321" };
@@ -46,8 +46,18 @@ describe("repayment schemas", () => {
     expect(repaymentInputSchema.safeParse({ kind: "card", accountId: id, matchWords: "example card", matchDigits: "4321", isActive: true }).success).toBe(true);
     expect(repaymentInputSchema.safeParse({ kind: "card", accountId: id, matchWords: "", matchDigits: "4321", isActive: true }).success).toBe(true);
   });
-  it("refuse a loan until loans ship, and digits that are not four", () => {
-    expect(repaymentInputSchema.safeParse({ kind: "loan", accountId: id, matchWords: "x", matchDigits: null, isActive: true }).success).toBe(false);
+  it("take a loan with its interest account and method, and refuse one without", () => {
+    const loan = { kind: "loan", accountId: id, matchWords: "example loan", matchDigits: null, isActive: true, interestAccountId: id, interestMethod: "rate", annualRate: 4.25, fixedInterestMinor: null };
+    expect(repaymentInputSchema.safeParse(loan).success).toBe(true);
+    expect(repaymentInputSchema.safeParse({ ...loan, interestAccountId: "" }).success).toBe(false);
+    expect(repaymentInputSchema.safeParse({ ...loan, interestMethod: "monthly" }).success).toBe(false);
+    expect(repaymentInputSchema.safeParse({ ...loan, annualRate: 101 }).success).toBe(false);
     expect(repaymentPreviewSchema.safeParse({ accountId: id, matchWords: "", matchDigits: "12a4" }).success).toBe(false);
+  });
+  it("take a loan post item and a loan payment, with whole-cent interest of zero or more", () => {
+    expect(reviewPostItemsSchema.safeParse([{ transactionId: id, kind: "loan", repaymentId: id, interestMinor: 40_000 }]).success).toBe(true);
+    expect(reviewPostItemsSchema.safeParse([{ transactionId: id, kind: "loan", repaymentId: id, interestMinor: -1 }]).success).toBe(false);
+    expect(loanPaymentSchema.safeParse({ transactionId: id, repaymentId: id, interestMinor: 0 }).success).toBe(true);
+    expect(loanPaymentSchema.safeParse({ transactionId: id, repaymentId: id, interestMinor: 1.5 }).success).toBe(false);
   });
 });
