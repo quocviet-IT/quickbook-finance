@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "An entry with several accounts shows all of them on Bank Transactions",
         detail:
-          "A line posted to more than one account — a split loan payment, or a deposit of several items — shows its first account and \"+ 1 more\", with every account named on hover. Before, one of them was shown and the others were not mentioned.",
+          "A line posted to more than one account — a split loan payment, or a deposit of several items — shows its first account with \"+ 1 more account\" under it, and every account named on hover. Before, one of them was shown and the others were not mentioned.",
         route: "/banking",
       },
     ],
