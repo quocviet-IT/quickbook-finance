@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.73",
+    date: "2026-10-01",
+    headline: "The Beancount file now checks itself against every reconciled bank statement.",
+    changes: [
+      {
+        kind: "added",
+        title: "Balance lines from reconciled statements",
+        detail:
+          "Each completed bank reconciliation adds a balance line to the Beancount file: the book balance on the statement date as it stood when the reconciliation was completed, dated the day after. If an entry in that period is later added, voided or missed, bean-check refuses the file. A comment beside each line gives the statement balance and how many lines had not yet cleared.",
+        route: "/reports/beancount",
+      },
+    ],
+  },
+  {
     version: "1.72",
     date: "2026-09-30",
     headline: "Transfers between your own accounts, and the owner's money in and out, are recognised on Review import.",

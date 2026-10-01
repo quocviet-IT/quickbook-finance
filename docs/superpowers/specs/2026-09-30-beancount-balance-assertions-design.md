@@ -61,8 +61,8 @@ A comment takes the line's place and says why. The figure is never guessed.
 
 | Case | Comment |
 |---|---|
-| The GL account's currency is not the base currency, or a line counted is in another currency | `; Not asserted: the statement of <date> is reconciled in <base>, and <account> holds <ccy>.` |
-| A void entry without `voided_at` has a line on the account dated on or before the statement date | `; Not asserted: an entry on <account> was voided at an unrecorded time, so its balance at completion cannot be rebuilt.` |
+| The bank account's currency is not the base currency, or a line counted is in another currency | `; Statement of <date> not asserted: it is reconciled in <base>, and <account> holds <ccy>.` |
+| A void entry without `voided_at`, posted on or before completion, has a line on the account dated on or before the statement date | `; Statement of <date> not asserted: an entry on <account> was voided at an unrecorded time, so its balance at completion cannot be rebuilt.` |
 
 Reconciliation works in base-currency amounts (`amount_base_minor`), while the file posts in each entry's own currency. The two agree only when both are the base currency, which is every bank account today.
 
@@ -92,7 +92,7 @@ Every account opens on the earlier of the book's first entry and the earliest as
 - `readBeancountSummary` adds the number of completed reconciliations and the bank accounts that have none.
 
 **`app/(app)/reports/beancount`**
-- The stat row adds "Balance assertions".
+- The stat row adds "Reconciled statements".
 - When some bank accounts have no completed reconciliation, a note names how many and links to Banking › Reconcile.
 - On screen, a `balance` line's account opens its ledger, and its comment opens the reconciliation (`/banking/reconcile/<id>`).
 
