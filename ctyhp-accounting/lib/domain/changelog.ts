@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.76",
+    date: "2026-10-01",
+    headline: "A loan instalment is split into principal and interest, and only the interest is an expense.",
+    changes: [
+      {
+        kind: "added",
+        title: "Loans in Cards and loans",
+        detail:
+          "Add a loan with the words your bank prints for its payments, the account its interest goes to, and how the interest is worked out: a rate a year, a fixed amount each payment, or typed from the lender's statement each time.",
+        route: "/banking/rules",
+      },
+      {
+        kind: "added",
+        title: "Loan payments split on Review import and Bank Transactions",
+        detail:
+          "A payment to a registered loan is offered as principal to the loan and interest to its expense account, with how the interest was estimated — the balance owed on the books × the rate ÷ 12. Split… changes the interest to the lender's figure; the principal is what is left. A loan payment is never ticked for you and is never part of Code all. Loan payments posted before 1.76 are not changed: correcting earlier interest is an adjusting entry for your accountant.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "An entry with several accounts shows all of them on Bank Transactions",
+        detail:
+          "A line posted to more than one account — a split loan payment, or a deposit of several items — shows its first account and \"+ 1 more\", with every account named on hover. Before, one of them was shown and the others were not mentioned.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.75",
     date: "2026-10-01",
     headline: "A payment to a credit card is recognized as one, and never suggested as an expense.",

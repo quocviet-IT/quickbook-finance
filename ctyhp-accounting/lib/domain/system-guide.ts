@@ -312,14 +312,24 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "instead of asking again, and Change voids the entry and hands the line back.",
       },
       {
-        action: "Tell OneBook which payments repay a credit card",
+        action: "Tell OneBook which payments repay a credit card or a loan",
         control: "Add card",
         route: "/banking/rules",
         note:
           "A payment to a card is never an expense: the costs were the card's own charges. " +
-          "Add the card with the words your bank prints for its payments, or its last four " +
-          "digits, and such a line is offered as a card payment before any rule or history. " +
-          "A line two cards claim gets no suggestion.",
+          "Of a loan payment only the interest is. Add each card with Add card and each loan with " +
+          "Add loan, with the words your bank prints for its payments or its last four digits, and " +
+          "such a line is offered as a card or loan payment before any rule or history. A line two " +
+          "entries claim gets no suggestion.",
+      },
+      {
+        action: "Post a loan payment as principal and interest",
+        control: "Split…",
+        note:
+          "The interest offered is an estimate — the balance owed on the books × the loan's rate ÷ 12, " +
+          "or its fixed amount — shown with how it was reached. Change it to the lender's figure; the " +
+          "principal is what is left. One entry posts the principal to the loan, the interest to its " +
+          "expense account and the payment from the bank, and Change takes it back.",
       },
       {
         action: "Reconcile to a statement balance",
