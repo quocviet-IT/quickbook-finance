@@ -10,6 +10,7 @@ import {
 } from "@/lib/domain/coding";
 import type { BankRule } from "@/lib/domain/bank-rules";
 import { buildHistoryIndex } from "@/lib/domain/coding-history";
+import type { RepaymentAccount } from "@/lib/domain/repayments";
 
 const account = (id: string, over: Partial<CodingAccount> = {}): CodingAccount => ({
   id,
@@ -96,6 +97,46 @@ describe("suggestCoding", () => {
   it("stays quiet when nothing answers", () => {
     const unknown = { id: "t3", amountMinor: -100, description: "Somebody New", merchantName: null };
     expect(suggestCoding({ line: unknown, rules: [], index: history, accounts, hasMatch: false })).toBeNull();
+  });
+});
+
+describe("suggestCoding with cards and loans", () => {
+  const withCard = new Map<string, CodingAccount>([...accounts, ["card1", account("card1", { type: "credit_card", name: "Example Card" })]]);
+  const entry = (over: Partial<RepaymentAccount> = {}): RepaymentAccount => ({
+    id: "rp1",
+    kind: "card",
+    accountId: "card1",
+    matchWords: "metro",
+    matchDigits: null,
+    interestAccountId: null,
+    interestMethod: null,
+    annualRate: null,
+    fixedInterestMinor: null,
+    isActive: true,
+    ...over,
+  });
+  it("puts a card ahead of a rule and of history", () => {
+    const s = suggestCoding({ line, rules: [rule({})], index: history, accounts: withCard, hasMatch: false, repayment: { kind: "one", entry: entry() } });
+    expect(s).toEqual({ source: "card", accountId: "card1", repaymentId: "rp1" });
+  });
+  it("lets a loan, or two entries, silence rule and history", () => {
+    const loan = entry({ kind: "loan", interestAccountId: "rent", interestMethod: "entered" });
+    expect(suggestCoding({ line, rules: [rule({})], index: history, accounts: withCard, hasMatch: false, repayment: { kind: "one", entry: loan } })).toBeNull();
+    expect(suggestCoding({ line, rules: [rule({})], index: history, accounts: withCard, hasMatch: false, repayment: { kind: "rivals", count: 2 } })).toBeNull();
+  });
+  it("still says nothing on a line that already has a match to the ledger", () => {
+    expect(suggestCoding({ line, rules: [], index: history, accounts: withCard, hasMatch: true, repayment: { kind: "one", entry: entry() } })).toBeNull();
+  });
+  it("says why in the screen's words", () => {
+    const view = codingView(line, { source: "card", accountId: "card1", repaymentId: "rp1" }, withCard.get("card1")!);
+    expect(view).toEqual({
+      transactionId: "t1",
+      accountId: "card1",
+      accountLabel: "CARD1 — Example Card",
+      source: "card",
+      short: "Card",
+      why: "Card payment — repays CARD1 Example Card. A card payment is never an expense.",
+    });
   });
 });
 

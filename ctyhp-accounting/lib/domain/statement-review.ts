@@ -3,7 +3,9 @@
  *
  * First that applies: a line already handled or still pending is left alone;
  * then a match to an entry already in the books; then the one open invoice or
- * bill whose balance is exactly this amount; then a rule or history (1.70).
+ * bill whose balance is exactly this amount; then a transfer; then a
+ * registered card (1.75), or nothing when two cards or loans claim the line;
+ * then a rule or history (1.70).
  * Two open documents of the same amount give no proposal at all — money that
  * probably pays a document must not be coded to income or expense.
  */
@@ -49,7 +51,7 @@ export type ReviewProposal =
   | { kind: "document"; documentId: string; label: string; why: string }
   | { kind: "transfer"; counterpartId: string; label: string; why: string }
   | { kind: "funding"; counterpartId: string; label: string; why: string }
-  | { kind: "account"; accountId: string; label: string; why: string; alternative?: ReviewPairView }
+  | { kind: "account"; accountId: string; label: string; why: string; alternative?: ReviewPairView; repayment?: "card" }
   | { kind: "none"; why: string };
 
 export function reviewProposal(input: {
@@ -63,8 +65,10 @@ export function reviewProposal(input: {
   pairRivals?: number;
   /** Another of the company's bank accounts this line names as a transfer. */
   namedTransfer?: { accountId: string; label: string; why: string } | null;
+  /** How many registered cards or loans claim this line, when more than one does. */
+  repaymentRivals?: number;
 }): ReviewProposal {
-  const { line, match, documents, coding, pair, pairRivals, namedTransfer } = input;
+  const { line, match, documents, coding, pair, pairRivals, namedTransfer, repaymentRivals } = input;
   if (line.pending) return { kind: "handled", why: "Pending at the bank — it can be posted once it clears" };
   if (line.status !== "unmatched") return { kind: "handled", why: "Already handled on Bank Transactions" };
   if (match) {
@@ -102,19 +106,24 @@ export function reviewProposal(input: {
   if (namedTransfer) {
     return { kind: "account", accountId: namedTransfer.accountId, label: namedTransfer.label, why: namedTransfer.why };
   }
+  // Two registered cards or loans claim this line: which balance it repays is
+  // a person's call, and a rule or history must not guess it as a cost.
+  if (repaymentRivals && repaymentRivals > 1) {
+    return { kind: "none", why: `Matches ${repaymentRivals} cards or loans — code it yourself` };
+  }
   // Funding is only ever a suggestion: a rule or history keeps its place, and
   // the pair is offered beside it.
   const funding = pair?.kind === "funding" ? pair : null;
   if (coding) {
-    return funding
-      ? {
-          kind: "account",
-          accountId: coding.accountId,
-          label: coding.accountLabel,
-          why: `${coding.why}. Also: ${funding.also}`,
-          alternative: funding,
-        }
-      : { kind: "account", accountId: coding.accountId, label: coding.accountLabel, why: coding.why };
+    const isCard = coding.source === "card";
+    const proposal = {
+      kind: "account" as const,
+      accountId: coding.accountId,
+      label: isCard ? `Card payment · ${coding.accountLabel}` : coding.accountLabel,
+      why: coding.why,
+      ...(isCard ? { repayment: "card" as const } : {}),
+    };
+    return funding ? { ...proposal, why: `${coding.why}. Also: ${funding.also}`, alternative: funding } : proposal;
   }
   if (funding) return { kind: "funding", counterpartId: funding.counterpartId, label: funding.label, why: funding.why };
   if (pairRivals && pairRivals > 1) {

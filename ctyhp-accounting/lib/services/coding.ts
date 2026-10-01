@@ -18,8 +18,10 @@ import {
   type CodingSuggestionView,
 } from "@/lib/domain/coding";
 import type { CodingDirection } from "@/lib/domain/coding-names";
+import { repaymentFor, type RepaymentAccount } from "@/lib/domain/repayments";
 import { listAccounts } from "./accounts";
 import { categoriseBankTransaction, listBankTransactions, listSuggestions } from "./banking";
+import { repaymentContext } from "./repayment-register";
 import { readAllPages } from "./paging";
 
 /**
@@ -81,6 +83,10 @@ export interface CodingInputs {
   accounts: AccountRow[];
   /** Lines with a match suggestion to the ledger: they get no coding suggestion. */
   matchedLineIds: ReadonlySet<string>;
+  /** The register of cards and loans (0129). */
+  repayments?: readonly RepaymentAccount[];
+  /** Bank accounts in the base currency; a line elsewhere is never a repayment. */
+  baseCurrencyBankIds?: ReadonlySet<string>;
 }
 
 const waiting = (row: BankTransactionRow) => row.status === "unmatched" && !row.pending;
@@ -98,7 +104,14 @@ export function suggestionsFrom(inputs: CodingInputs): CodingSuggestionView[] {
       description: row.description ?? "",
       merchantName: row.merchant_name ?? null,
     };
-    const suggestion = suggestCoding({ line, rules: inputs.rules, index, accounts, hasMatch: inputs.matchedLineIds.has(row.id) });
+    const repayment = inputs.repayments?.length
+      ? repaymentFor(
+          inputs.repayments,
+          { description: line.description, amountMinor: line.amountMinor, inBaseCurrency: inputs.baseCurrencyBankIds?.has(row.bank_account_id) ?? false },
+          accounts,
+        )
+      : null;
+    const suggestion = suggestCoding({ line, rules: inputs.rules, index, accounts, hasMatch: inputs.matchedLineIds.has(row.id), repayment });
     const account = suggestion ? accounts.get(suggestion.accountId) : undefined;
     if (suggestion && account) views.push(codingView(line, suggestion, account));
   }
@@ -106,12 +119,13 @@ export function suggestionsFrom(inputs: CodingInputs): CodingSuggestionView[] {
 }
 
 export async function codingSuggestions(sb: SupabaseClient, bankAccountId: string | null): Promise<CodingSuggestionView[]> {
-  const [lines, rules, history, accounts, matches] = await Promise.all([
+  const [lines, rules, history, accounts, matches, context] = await Promise.all([
     listBankTransactions(sb, bankAccountId),
     listBankRules(sb),
     loadHistory(sb),
     listAccounts(sb),
     listSuggestions(sb, bankAccountId),
+    repaymentContext(sb),
   ]);
   return suggestionsFrom({
     lines,
@@ -119,6 +133,8 @@ export async function codingSuggestions(sb: SupabaseClient, bankAccountId: strin
     history,
     accounts,
     matchedLineIds: new Set(matches.map((match) => match.bank_transaction_id)),
+    repayments: context.repayments,
+    baseCurrencyBankIds: context.baseCurrencyBankIds,
   });
 }
 
@@ -218,10 +234,14 @@ export async function previewBankRule(sb: SupabaseClient, input: RulePreviewInpu
 }
 
 /** For Banking › Rules: how many waiting lines each rule matches on its own. */
-export async function ruleWaitingCounts(sb: SupabaseClient, rules: readonly BankRule[]): Promise<Record<string, number>> {
-  const lines = await waitingLines(sb);
+export async function ruleWaitingCounts(
+  sb: SupabaseClient,
+  rules: readonly BankRule[],
+  lines?: readonly BankTransactionRow[],
+): Promise<Record<string, number>> {
+  const waitingRows = lines ? lines.filter(waiting) : await waitingLines(sb);
   return Object.fromEntries(
-    rules.map((rule) => [rule.id, lines.filter((row) => ruleMatches({ ...rule, isActive: true }, asTarget(row))).length]),
+    rules.map((rule) => [rule.id, waitingRows.filter((row) => ruleMatches({ ...rule, isActive: true }, asTarget(row))).length]),
   );
 }
 

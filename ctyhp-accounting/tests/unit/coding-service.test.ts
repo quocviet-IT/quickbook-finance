@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountRow, BankTransactionRow } from "@/lib/db/types";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
+import type { RepaymentAccount } from "@/lib/domain/repayments";
 import { codeFromSuggestions, loadHistory, suggestionsFrom, type CodingInputs } from "@/lib/services/coding";
 
 const sb = {} as SupabaseClient;
@@ -19,6 +20,8 @@ const inputs = (over: Partial<CodingInputs> = {}): CodingInputs => ({
   ],
   accounts: [acct("rent", "Rent"), acct("fees", "Bank Fees")],
   matchedLineIds: new Set(),
+  repayments: [],
+  baseCurrencyBankIds: new Set(),
   ...over,
 });
 
@@ -64,6 +67,36 @@ describe("loadHistory", () => {
     ]);
     expect(order).toHaveBeenCalledWith("entry_id");
     expect(range).toHaveBeenCalledWith(0, 999);
+  });
+});
+
+describe("suggestionsFrom with the register", () => {
+  const card = {
+    id: "rp1",
+    kind: "card" as const,
+    accountId: "card1",
+    matchWords: "metro",
+    matchDigits: null,
+    interestAccountId: null,
+    interestMethod: null,
+    annualRate: null,
+    fixedInterestMinor: null,
+    isActive: true,
+  };
+  const chart = [acct("rent", "Rent"), acct("card1", "Example Card", { account_type: "credit_card" })];
+  const line = txn("t1", "Metro Realty Partners", -420000, { bank_account_id: "bank1" });
+  it("proposes the card ahead of history, on a bank in the base currency", () => {
+    const views = suggestionsFrom(inputs({ lines: [line], accounts: chart, repayments: [card], baseCurrencyBankIds: new Set(["bank1"]) }));
+    expect(views[0]).toMatchObject({ accountId: "card1", source: "card", short: "Card" });
+  });
+  it("leaves a line on a foreign-currency bank to history", () => {
+    const views = suggestionsFrom(inputs({ lines: [line], accounts: chart, repayments: [card], baseCurrencyBankIds: new Set() }));
+    expect(views[0]).toMatchObject({ accountId: "rent", source: "history" });
+  });
+  it("gives no suggestion when two entries claim the line", () => {
+    const other = { ...card, id: "rp2", accountId: "card2" };
+    const twoCards = [...chart, acct("card2", "Other Card", { account_type: "credit_card" })];
+    expect(suggestionsFrom(inputs({ lines: [line], accounts: twoCards, repayments: [card, other], baseCurrencyBankIds: new Set(["bank1"]) }))).toEqual([]);
   });
 });
 

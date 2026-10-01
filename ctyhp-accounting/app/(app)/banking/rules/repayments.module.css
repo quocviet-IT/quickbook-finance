@@ -1,0 +1,22 @@
+/* The Cards and loans section, between Pairs and the rule list. */
+.section {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.lede {
+  margin: 4px 0 12px;
+  max-width: 80ch;
+}
+
+.preview {
+  margin-top: 4px;
+}
+
+.missed {
+  display: block;
+  font-size: 12px;
+}

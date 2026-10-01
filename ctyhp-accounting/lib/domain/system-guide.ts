@@ -312,6 +312,16 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "instead of asking again, and Change voids the entry and hands the line back.",
       },
       {
+        action: "Tell OneBook which payments repay a credit card",
+        control: "Add card",
+        route: "/banking/rules",
+        note:
+          "A payment to a card is never an expense: the costs were the card's own charges. " +
+          "Add the card with the words your bank prints for its payments, or its last four " +
+          "digits, and such a line is offered as a card payment before any rule or history. " +
+          "A line two cards claim gets no suggestion.",
+      },
+      {
         action: "Reconcile to a statement balance",
         control: "New reconciliation",
         route: "/banking/reconcile",
