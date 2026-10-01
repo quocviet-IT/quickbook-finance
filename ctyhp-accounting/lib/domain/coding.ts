@@ -3,8 +3,10 @@
  *
  * In order: a line already matched to the ledger gets none (coding it would
  * post a second entry for money already in the books, and
- * acc_categorise_bank_transaction refuses it anyway); then the first rule that
- * matches; then history; then nothing. Only an account a line can properly be
+ * acc_categorise_bank_transaction refuses it anyway); then a registered card
+ * (repayments.ts) — a loan, or a line two cards or loans claim, gets no
+ * single-account suggestion at all; then the first rule that matches; then
+ * history; then nothing. Only an account a line can properly be
  * coded to is ever suggested — active, posting, not receivable or payable
  * (money from a customer or to a supplier is settled against a document), not a
  * holding account.
@@ -15,6 +17,7 @@ import type { AccountType } from "./accounts.ts";
 import { firstMatchingRule, type BankRule } from "./bank-rules.ts";
 import { suggestFromHistory, type HistoryIndex } from "./coding-history.ts";
 import { directionOf } from "./coding-names.ts";
+import type { RepaymentFact } from "./repayments.ts";
 
 /** The most lines one "Code all" posts. */
 export const CODE_ALL_LIMIT = 100;
@@ -68,6 +71,7 @@ export interface CodingLine {
 }
 
 export type CodingSuggestion =
+  | { source: "card"; accountId: string; repaymentId: string }
   | { source: "rule"; accountId: string; ruleId: string; ruleNumber: number; ruleText: string }
   | { source: "history"; accountId: string; hits: number; of: number; key: string };
 
@@ -77,10 +81,21 @@ export function suggestCoding(input: {
   index: HistoryIndex;
   accounts: ReadonlyMap<string, CodingAccount>;
   hasMatch: boolean;
+  /** What the register says this line repays (repayments.ts), when it says anything. */
+  repayment?: RepaymentFact | null;
 }): CodingSuggestion | null {
-  const { line, rules, index, accounts, hasMatch } = input;
+  const { line, rules, index, accounts, hasMatch, repayment } = input;
   if (hasMatch) return null;
   const usable = (accountId: string) => codableAccount(accounts.get(accountId));
+
+  // What the person registered outranks what is inferred. A loan's split, or a
+  // line two entries claim, is not one account — rule and history stay silent.
+  if (repayment) {
+    if (repayment.kind === "one" && repayment.entry.kind === "card" && usable(repayment.entry.accountId)) {
+      return { source: "card", accountId: repayment.entry.accountId, repaymentId: repayment.entry.id };
+    }
+    return null;
+  }
 
   const ordered = [...rules].sort((a, b) => a.position - b.position);
   const rule = firstMatchingRule(ordered, { description: line.description, amountMinor: line.amountMinor }, usable);
@@ -107,7 +122,7 @@ export interface CodingSuggestionView {
   accountId: string;
   /** "6300 — Rent" */
   accountLabel: string;
-  source: "rule" | "history";
+  source: "rule" | "history" | "card";
   /** "Rule 3" or "11 of 11" — what fits under a 150px picker; `why` has the rest. */
   short: string;
   /** The whole reason, for a tooltip and the Code all list. */
@@ -117,6 +132,16 @@ export interface CodingSuggestionView {
 export function codingView(line: CodingLine, suggestion: CodingSuggestion, account: CodingAccount): CodingSuggestionView {
   const accountLabel = `${account.code} — ${account.name}`;
   const named = `${account.code} ${account.name}`;
+  if (suggestion.source === "card") {
+    return {
+      transactionId: line.id,
+      accountId: suggestion.accountId,
+      accountLabel,
+      source: "card",
+      short: "Card",
+      why: `Card payment — repays ${named}. A card payment is never an expense.`,
+    };
+  }
   if (suggestion.source === "rule") {
     return {
       transactionId: line.id,
