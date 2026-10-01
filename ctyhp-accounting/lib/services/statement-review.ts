@@ -10,6 +10,7 @@ import {
   type ReviewPostItem,
   type ReviewProposal,
 } from "@/lib/domain/statement-review";
+import { repaymentFor } from "@/lib/domain/repayments";
 import { listAccounts } from "./accounts";
 import { getBankingPreference } from "./banking-preference";
 import {
@@ -20,6 +21,7 @@ import {
   settleFromBankTransaction,
 } from "./banking";
 import { listBankRules, loadHistory, suggestionsFrom } from "./coding";
+import { repaymentContext } from "./repayment-register";
 import { readAllPages } from "./paging";
 
 /**
@@ -124,7 +126,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     status: string;
   };
 
-  const [banks, lines, matches, documents, rules, history, accountRows, waiting, preference, baseRow] = await Promise.all([
+  const [banks, lines, matches, documents, rules, history, accountRows, waiting, preference, baseRow, context] = await Promise.all([
     listBankAccounts(sb),
     readAllPages<BankTransactionRow>(
       (from, to) =>
@@ -160,6 +162,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     ),
     getBankingPreference(sb),
     sb.from("acc_currency").select("code").eq("is_base", true).maybeSingle(),
+    repaymentContext(sb),
   ]);
   const bank = banks.find((b) => b.id === batch.bank_account_id);
   const currencyCode = bank?.currency_code ?? "USD";
@@ -175,10 +178,15 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     }
   }
   const coding = new Map(
-    suggestionsFrom({ lines, rules, history, accounts: accountRows, matchedLineIds: new Set(bestMatch.keys()) }).map((s) => [
-      s.transactionId,
-      s,
-    ]),
+    suggestionsFrom({
+      lines,
+      rules,
+      history,
+      accounts: accountRows,
+      matchedLineIds: new Set(bestMatch.keys()),
+      repayments: context.repayments,
+      baseCurrencyBankIds: context.baseCurrencyBankIds,
+    }).map((s) => [s.transactionId, s]),
   );
 
   // --- Pairs: transfers between the company's bank accounts, and funding. ---
@@ -260,6 +268,18 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     };
   };
 
+  // Two cards or loans claiming one line: Review import says so instead of guessing.
+  const chart = new Map(accountRows.map((row) => [row.id, codingAccountOf(row)]));
+  const inBase = context.baseCurrencyBankIds.has(batch.bank_account_id);
+  const repaymentRivalsOf = (row: BankTransactionRow) => {
+    const fact = repaymentFor(
+      context.repayments,
+      { description: row.description ?? "", amountMinor: Number(row.amount_minor), inBaseCurrency: inBase },
+      chart,
+    );
+    return fact?.kind === "rivals" ? fact.count : 0;
+  };
+
   return {
     batch: {
       id: batch.id,
@@ -287,6 +307,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
           pair,
           pairRivals: rivals,
           namedTransfer: namedFor(row),
+          repaymentRivals: repaymentRivalsOf(row),
         }),
       };
     }),
