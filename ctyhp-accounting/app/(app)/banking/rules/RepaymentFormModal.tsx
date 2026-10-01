@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { App, Form, Input, Modal, Select, Switch, Typography } from "antd";
+import { App, Form, Input, InputNumber, Modal, Radio, Select, Switch, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
-import { seedDigits, seedWords } from "@/lib/domain/repayments";
+import { seedDigits, seedWords, type InterestMethod, type RepaymentKind } from "@/lib/domain/repayments";
 import type { RepaymentStats } from "@/lib/services/repayments";
 import { previewRepaymentAction, saveRepaymentAction } from "./actions";
 import styles from "./repayments.module.css";
@@ -12,39 +12,72 @@ export interface RepaymentFormValues {
   matchWords: string;
   matchDigits: string;
   isActive: boolean;
+  /** Loans only. */
+  interestAccountId: string | null;
+  interestMethod: InterestMethod;
+  /** Percent a year. */
+  annualRate: number | null;
+  /** Dollars per payment. */
+  fixedInterest: number | null;
 }
 
-export const EMPTY_CARD: RepaymentFormValues = { accountId: null, matchWords: "", matchDigits: "", isActive: true };
+export const EMPTY_REPAYMENT: RepaymentFormValues = {
+  accountId: null,
+  matchWords: "",
+  matchDigits: "",
+  isActive: true,
+  interestAccountId: null,
+  interestMethod: "rate",
+  annualRate: null,
+  fixedInterest: null,
+};
 
-export function toRepaymentInput(values: RepaymentFormValues) {
+export function toRepaymentInput(kind: RepaymentKind, values: RepaymentFormValues) {
   const digits = (values.matchDigits ?? "").trim();
-  return {
-    kind: "card" as const,
+  const common = {
     accountId: values.accountId ?? "",
     matchWords: (values.matchWords ?? "").trim(),
     matchDigits: digits === "" ? null : digits,
     isActive: values.isActive,
   };
+  if (kind === "card") return { kind: "card" as const, ...common };
+  return {
+    kind: "loan" as const,
+    ...common,
+    interestAccountId: values.interestAccountId ?? "",
+    interestMethod: values.interestMethod,
+    annualRate: values.interestMethod === "rate" ? values.annualRate : null,
+    fixedInterestMinor:
+      values.interestMethod === "fixed" && values.fixedInterest !== null && values.fixedInterest !== undefined
+        ? Math.round(values.fixedInterest * 100)
+        : null,
+  };
 }
 
 /**
- * Add or change a card. Choosing the account fills in the words and last four
- * from its name; the preview then says how many past payments to that account
- * those words catch, and which they miss, before anything is saved.
+ * Add or change a card or a loan. Choosing the account fills in the words and
+ * last four from its name; the preview then says how many past payments to
+ * that account those words catch, and which they miss, before anything is
+ * saved. A loan also says where its interest goes and how it is worked out.
  */
 export default function RepaymentFormModal({
   open,
+  kind,
   repaymentId,
   initial,
   accounts,
+  interestAccounts,
   onClose,
   onSaved,
 }: {
   open: boolean;
+  kind: RepaymentKind;
   repaymentId: string | null;
   initial: RepaymentFormValues;
-  /** Credit card accounts not yet registered, plus this entry's own. */
+  /** Accounts this kind may repay, not yet registered, plus this entry's own. */
   accounts: AccountRow[];
+  /** Active posting expense and other-expense accounts. */
+  interestAccounts: AccountRow[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -53,10 +86,12 @@ export default function RepaymentFormModal({
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<RepaymentStats | null>(null);
   const watched = Form.useWatch([], form) as RepaymentFormValues | undefined;
+  const method = watched?.interestMethod ?? initial.interestMethod;
+  const noun = kind === "card" ? "card" : "loan";
 
   const previewKey = useMemo(() => {
     if (!watched?.accountId) return "";
-    const { accountId, matchWords, matchDigits } = toRepaymentInput({ ...EMPTY_CARD, ...watched });
+    const { accountId, matchWords, matchDigits } = toRepaymentInput("card", { ...EMPTY_REPAYMENT, ...watched });
     if (!matchWords && !matchDigits) return "";
     if (matchDigits && !/^\d{4}$/.test(matchDigits)) return "";
     return JSON.stringify({ accountId, matchWords, matchDigits });
@@ -76,6 +111,10 @@ export default function RepaymentFormModal({
     () => accounts.map((account) => ({ value: account.id, label: `${account.account_code} — ${account.name}` })),
     [accounts],
   );
+  const interestOptions = useMemo(
+    () => interestAccounts.map((account) => ({ value: account.id, label: `${account.account_code} — ${account.name}` })),
+    [interestAccounts],
+  );
 
   function close() {
     setPreview(null);
@@ -94,13 +133,13 @@ export default function RepaymentFormModal({
   async function submit() {
     const values = await form.validateFields();
     setSaving(true);
-    const res = await saveRepaymentAction(repaymentId, toRepaymentInput({ ...EMPTY_CARD, ...values }));
+    const res = await saveRepaymentAction(repaymentId, toRepaymentInput(kind, { ...EMPTY_REPAYMENT, ...values }));
     setSaving(false);
     if (!res.ok) {
-      message.error(res.error ?? "Could not save the card");
+      message.error(res.error ?? `Could not save the ${noun}`);
       return;
     }
-    message.success(repaymentId ? "Card saved" : "Card added");
+    message.success(`${kind === "card" ? "Card" : "Loan"} ${repaymentId ? "saved" : "added"}`);
     setPreview(null);
     onSaved();
   }
@@ -109,8 +148,8 @@ export default function RepaymentFormModal({
   return (
     <Modal
       open={open}
-      title={repaymentId ? "Edit card" : "Add card"}
-      okText={repaymentId ? "Save card" : "Add card"}
+      title={`${repaymentId ? "Edit" : "Add"} ${noun}`}
+      okText={`${repaymentId ? "Save" : "Add"} ${noun}`}
       confirmLoading={saving}
       onOk={submit}
       onCancel={close}
@@ -118,8 +157,18 @@ export default function RepaymentFormModal({
       width={620}
     >
       <Form form={form} layout="vertical" requiredMark={false} initialValues={initial} onValuesChange={onValuesChange}>
-        <Form.Item name="accountId" label="Card account" rules={[{ required: true, message: "Choose the card account" }]}>
-          <Select showSearch optionFilterProp="label" placeholder="Choose a Credit Card account" options={options} disabled={repaymentId !== null} />
+        <Form.Item
+          name="accountId"
+          label={kind === "card" ? "Card account" : "Loan account"}
+          rules={[{ required: true, message: `Choose the ${noun} account` }]}
+        >
+          <Select
+            showSearch
+            optionFilterProp="label"
+            placeholder={kind === "card" ? "Choose a Credit Card account" : "Choose a liability account"}
+            options={options}
+            disabled={repaymentId !== null}
+          />
         </Form.Item>
         <Form.Item
           name="matchWords"
@@ -127,7 +176,7 @@ export default function RepaymentFormModal({
           extra="Separate several with commas. Each is matched as whole words, in any case."
           rules={[{ max: 200, message: "Words are at most 200 characters" }]}
         >
-          <Input placeholder="example card, example card epay" />
+          <Input placeholder={kind === "card" ? "example card, example card epay" : "example loan, loan pmt"} />
         </Form.Item>
         <Form.Item
           name="matchDigits"
@@ -136,6 +185,43 @@ export default function RepaymentFormModal({
         >
           <Input maxLength={4} inputMode="numeric" style={{ width: 120 }} />
         </Form.Item>
+        {kind === "loan" ? (
+          <>
+            <Form.Item name="interestAccountId" label="Interest posts to" rules={[{ required: true, message: "Choose the account interest posts to" }]}>
+              <Select showSearch optionFilterProp="label" placeholder="Choose an expense account" options={interestOptions} />
+            </Form.Item>
+            <Form.Item name="interestMethod" label="Interest on each payment">
+              <Radio.Group
+                optionType="button"
+                options={[
+                  { value: "rate", label: "A rate a year" },
+                  { value: "fixed", label: "A fixed amount" },
+                  { value: "entered", label: "Typed each time" },
+                ]}
+              />
+            </Form.Item>
+            {method === "rate" ? (
+              <Form.Item
+                name="annualRate"
+                label="Rate a year"
+                extra="Interest proposed = balance owed on the books × this rate ÷ 12. You can change it on every payment."
+                rules={[{ required: true, message: "Give the rate a year" }]}
+              >
+                <InputNumber min={0} max={100} precision={3} suffix="%" style={{ width: 160 }} />
+              </Form.Item>
+            ) : null}
+            {method === "fixed" ? (
+              <Form.Item name="fixedInterest" label="Interest on each payment" rules={[{ required: true, message: "Give the fixed interest per payment" }]}>
+                <InputNumber min={0} precision={2} prefix="$" style={{ width: 160 }} />
+              </Form.Item>
+            ) : null}
+            {method === "entered" ? (
+              <Typography.Paragraph type="secondary">
+                No interest is proposed. Each payment waits until the interest from the lender&apos;s statement is typed in.
+              </Typography.Paragraph>
+            ) : null}
+          </>
+        ) : null}
         <Form.Item name="isActive" label="On" valuePropName="checked">
           <Switch />
         </Form.Item>
