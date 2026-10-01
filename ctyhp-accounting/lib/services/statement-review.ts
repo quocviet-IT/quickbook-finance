@@ -23,6 +23,8 @@ import {
 import { listBankRules, loadHistory, suggestionsFrom } from "./coding";
 import { repaymentContext } from "./repayment-register";
 import { readAllPages } from "./paging";
+import { loanSuggestionsFrom } from "@/lib/domain/loan-interest";
+import { loadLoanMovements, loanAccountIds, postLoanPayment } from "./loan-payments";
 
 /**
  * Review import: every line one statement import brought in, with the one
@@ -169,6 +171,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
   const codable = accountRows.filter((row) => codableAccount(codingAccountOf(row)));
   if (baseRow.error) throw fail(baseRow.error.message);
   const baseCode = (baseRow.data as { code: string } | null)?.code ?? "USD";
+  const loanMovements = await loadLoanMovements(sb, loanAccountIds(context.repayments));
 
   // Most confident first, so the first seen for a line is its best.
   const bestMatch = new Map<string, { reconciliationId: string; entryNumber: string | null }>();
@@ -280,6 +283,25 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     return fact?.kind === "rivals" ? fact.count : 0;
   };
 
+  // Loan payments: the same split Bank Transactions shows, worked out over every
+  // waiting line of the company so two payments to one loan carry in date order.
+  const loans = new Map(
+    loanSuggestionsFrom({
+      lines: waiting.map((w) => ({
+        id: w.id,
+        bankAccountId: w.bank_account_id,
+        date: w.txn_date,
+        amountMinor: Number(w.amount_minor),
+        description: w.description ?? "",
+      })),
+      repayments: context.repayments,
+      baseCurrencyBankIds: context.baseCurrencyBankIds,
+      accounts: chart,
+      movements: loanMovements,
+      excludeIds: new Set(bestMatch.keys()),
+    }).map((view) => [view.transactionId, view]),
+  );
+
   return {
     batch: {
       id: batch.id,
@@ -308,6 +330,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
           pairRivals: rivals,
           namedTransfer: namedFor(row),
           repaymentRivals: repaymentRivalsOf(row),
+          loan: loans.get(row.id) ?? null,
         }),
       };
     }),
@@ -332,6 +355,8 @@ export interface ReviewPostDeps {
   categorise: (sb: SupabaseClient, transactionId: string, accountId: string) => Promise<{ entry_number: string | null }>;
   /** Post a transfer or funding pair; returns the entry numbers it made. */
   postPair: (sb: SupabaseClient, first: string, second: string, kind: "transfer" | "funding") => Promise<string[]>;
+  /** Post a loan payment with the interest a person accepted; returns the entry number. */
+  postLoan: (sb: SupabaseClient, transactionId: string, repaymentId: string, interestMinor: number) => Promise<string | null>;
 }
 
 const defaultDeps: ReviewPostDeps = {
@@ -357,6 +382,8 @@ const defaultDeps: ReviewPostDeps = {
     if (error) throw fail(error.message);
     return ((data as { entries?: (string | null)[] } | null)?.entries ?? []).filter((n): n is string => Boolean(n));
   },
+  postLoan: async (sb, transactionId, repaymentId, interestMinor) =>
+    (await postLoanPayment(sb, transactionId, repaymentId, interestMinor)).entry_number,
 };
 
 /** Post what a person ticked, one line after another; a refusal stops only its own line. */
@@ -399,6 +426,10 @@ export async function postReviewItems(
         // Both lines in one database call: either both post, or neither does.
         const entries = await deps.postPair(sb, id, item.counterpartId, item.pairKind);
         outcomes.push({ id, ok: true, detail: entries.join(", ") || "Posted" });
+      } else if (item.kind === "loan") {
+        // The accounts and the principal are the database's; only the interest is ours.
+        const entry = await deps.postLoan(sb, id, item.repaymentId, item.interestMinor);
+        outcomes.push({ id, ok: true, detail: entry ?? "Posted" });
       } else {
         const posted = await deps.categorise(sb, id, item.accountId);
         outcomes.push({ id, ok: true, detail: posted.entry_number ?? "Posted" });
