@@ -107,11 +107,11 @@ export default function RepaymentsSection({
   }
 
   const columns: TableColumnsType<RepaymentListRow> = [
-    { title: "Kind", key: "kind", width: COLUMN.ACTION * 2, render: (_: unknown, row: RepaymentListRow) => <Tag>{row.kind === "card" ? "Card" : "Loan"}</Tag> },
+    { title: "Kind", key: "kind", width: COLUMN.ACTION * 1.5, render: (_: unknown, row: RepaymentListRow) => <Tag>{row.kind === "card" ? "Card" : "Loan"}</Tag> },
     {
       title: "Account",
       key: "account",
-      width: COLUMN.PICKER + COLUMN.ACTION * 2,
+      width: COLUMN.PICKER + COLUMN.ACTION,
       render: (_: unknown, row: RepaymentListRow) =>
         row.accountUsable ? (
           <Typography.Text ellipsis={{ tooltip: row.accountLabel }}>{row.accountLabel}</Typography.Text>
@@ -136,7 +136,7 @@ export default function RepaymentsSection({
     {
       title: "Interest",
       key: "interest",
-      width: COLUMN.RICH_MIN,
+      width: COLUMN.PICKER + COLUMN.ACTION,
       render: (_: unknown, row: RepaymentListRow) => (
         <Typography.Text type={row.kind === "card" ? "secondary" : undefined} ellipsis={{ tooltip: interestText(row) }}>
           {interestText(row)}
@@ -146,7 +146,7 @@ export default function RepaymentsSection({
     {
       title: "Past payments caught",
       key: "past",
-      width: COLUMN.PICKER,
+      width: COLUMN.STATUS,
       align: "right",
       render: (_: unknown, row: RepaymentListRow) => (row.stats.past === 0 ? "—" : `${row.stats.caught} of ${row.stats.past}`),
     },
@@ -160,7 +160,7 @@ export default function RepaymentsSection({
     {
       title: "On",
       key: "active",
-      width: COLUMN.ACTION * 2,
+      width: COLUMN.ACTION * 1.5,
       render: (_: unknown, row: RepaymentListRow) => (
         <Switch size="small" checked={row.isActive} disabled={!canWrite} loading={busy === row.id} onChange={(checked) => void setActive(row, checked)} />
       ),

@@ -153,14 +153,19 @@ export default function CategoriseCell({
       <>
         <Tooltip title={loan.why}>
           <Typography.Text type="secondary" style={{ ...small, display: "block", maxWidth: "100%" }} ellipsis>
-            → {loan.label}
+            → {loan.loanAccountLabel}
           </Typography.Text>
         </Tooltip>
-        {withSplit ? (
-          <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => setSplitting(true)}>
-            Split…
-          </Button>
-        ) : null}
+        <Space size={6}>
+          <Typography.Text type="secondary" style={small}>
+            Loan
+          </Typography.Text>
+          {withSplit ? (
+            <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => setSplitting(true)}>
+              Split…
+            </Button>
+          ) : null}
+        </Space>
       </>
     ) : null;
   const splitDialog =
@@ -188,17 +193,23 @@ export default function CategoriseCell({
   if (posting) {
     const main = `${posting.account_code} — ${posting.account_name}`;
     const others = posting.others ?? [];
-    const label = others.length ? `${main} + ${others.length} more` : main;
     const everyAccount = [main, ...others].join("; ");
     return (
       <Space direction="vertical" size={0} style={{ maxWidth: "100%" }}>
         {/* Cut to the column, with the whole account name on hover: an account
             is named by whoever set up the chart, and some run long. */}
-        <Typography.Text ellipsis={{ tooltip: everyAccount }}>{label}</Typography.Text>
+        <Typography.Text ellipsis={{ tooltip: everyAccount }}>{main}</Typography.Text>
         <Space size={6}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
           </Typography.Text>
+          {others.length ? (
+            <Tooltip title={everyAccount}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                +{others.length} more
+              </Typography.Text>
+            </Tooltip>
+          ) : null}
           {canWrite && posting.own_entry ? (
             <Button
               type="link"
