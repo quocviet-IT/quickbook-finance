@@ -915,3 +915,16 @@ export const bankingPreferenceSchema = z.object({
   fundingAccountId: z.uuid().nullable(),
   pairWindowDays: z.union([z.literal(0), z.literal(1), z.literal(3), z.literal(7), z.literal(14), z.literal(30)]),
 });
+
+/** A card or loan as the preview reads it: the account, and how the bank names its payments. */
+export const repaymentPreviewSchema = z.object({
+  accountId: z.uuid("Choose the account"),
+  matchWords: z.string().max(200, "Words are at most 200 characters"),
+  matchDigits: z.string().regex(/^\d{4}$/, "The last four are exactly four digits").nullable(),
+});
+
+/** 1.75 registers cards. Loans, with their interest, arrive in 1.76. */
+export const repaymentInputSchema = repaymentPreviewSchema.extend({
+  kind: z.literal("card"),
+  isActive: z.boolean(),
+});
