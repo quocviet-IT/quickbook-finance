@@ -28,8 +28,8 @@ For each of the prototype's two books:
 |---|---|---|
 | Every account's balance at every month end, from the first entry to the last | `balancesFor(view("", monthEnd))` | `acc_ledger_balances(null, monthEnd)`, debit − credit |
 | Trial Balance at each fiscal year end: total debits, total credits | the rendered `reportTB()` | `buildTrialBalance` |
-| Profit and Loss for each fiscal year: total income, cost of goods sold, gross profit, total expenses, net operating income, other income, other expenses, net income | the rendered `reportPL()` | `buildProfitAndLoss` + `pnlStatement` |
-| Balance Sheet at each fiscal year end: total assets, total liabilities, total equity, total liabilities and equity | the rendered `reportBS()` | `buildBalanceSheet` + `balanceSheetStatement`, with prior earnings read the way the Reports screen reads them |
+| Profit and Loss for each fiscal year: total income, cost of goods sold, gross profit, total expenses, net operating income, other income, other expenses, net other income, net income | the rendered `reportPL()` | `buildProfitAndLoss` — the totals `pnlStatement` displays |
+| Balance Sheet at each fiscal year end: total assets, total liabilities, total equity, total liabilities and equity | the rendered `reportBS()` | `buildBalanceSheet` — the totals `balanceSheetStatement` displays |
 
 The prototype's figures are read from what the prototype itself computes and shows — its own functions, its own
 rendered reports — never re-derived. OneBook's figures come from the same pure builders the Reports screen uses, fed by
@@ -71,8 +71,8 @@ All inside ONE transaction that is always rolled back, including on error and on
    | `Assets:` matching `Receivable` | `accounts_receivable` |
    | other `Assets:` | `current_asset` |
    | `Liabilities:` matching `LongTerm\|Mortgage\|NotePayable\|LoansPayable\|Debenture\|Bond` | `long_term_liability` |
-   | `Liabilities:` matching `CreditCard\|Card` | `credit_card` |
-   | `Liabilities:` matching `Payable` | `accounts_payable` |
+   | `Liabilities:` matching `CreditCard` | `credit_card` |
+   | `Liabilities:` matching `AccountsPayable` | `accounts_payable` |
    | other `Liabilities:` | `current_liability` |
    | `Equity:` | `equity` |
    | `Income:InterestIncome…` / `Income:OtherIncome…` | `other_income` |
@@ -82,8 +82,8 @@ All inside ONE transaction that is always rolled back, including on error and on
    | other `Expenses:` | `expense` |
 
    The patterns are the prototype's own (`p13` `assetClass`/`liabClass`, `p4` `COGS_RE`/`OTHER_INCOME`/`OTHER_EXPENSE`),
-   so the two systems put each account in the same section. Accounts the chosen chart template created are removed
-   first, so only the prototype's accounts exist.
+   so the two systems put each account in the same section. The prototype's accounts get their own codes (`P0001`
+   onward); the accounts the chart template created are left unposted, so they hold nothing and change no figure.
 3. Post every prototype entry, in date order, through `acc_post_manual_journal` as the company's administrator, in
    batches: a positive posting is a debit, a negative one a credit. An entry that cannot be posted (it does not balance
    in cents, or names an account that was not created) is not forced: it is listed in the report as *not loaded*, and
@@ -98,9 +98,11 @@ roadmap's section 4, or as **new**:
 
 - *closing entry* — the prototype leaves entries flagged as closing out of every P&L view; OneBook has no such flag;
 - *rounding* — a one-cent difference where the prototype rounds a negative half-cent toward zero;
-- *not loaded* — the difference equals the effect of entries listed as not loaded;
-- *presentation* — the same accounts and totals, grouped differently (for example the Balance Sheet's earnings lines);
+- *not loaded* — the book has entries that could not be loaded, and they touch this account or fall in this period;
 - *new* — none of the above. Each *new* difference is a finding for the user.
+
+Presentation differences — how equity is split into prior years' and this year's earnings, how accounts are grouped —
+cannot show in the totals compared here; the interface phases compare them screen by screen.
 
 ### 3.4 The data pass
 
