@@ -61,6 +61,8 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_bank_account",
   // Cards and loans (0129): which accounts a bank payment repays.
   "acc_repayment_account",
+  // Related companies (0131): which account carries what each owes or is owed.
+  "acc_related_company",
   "acc_bank_connection",
   "acc_bank_feed_account",
   "acc_bank_feed_sync_run",
