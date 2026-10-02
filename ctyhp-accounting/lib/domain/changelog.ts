@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "A line two registered entries claim names them",
         detail:
-          "When two cards, loans or related companies claim one line, it gets no suggestion and says which: \"Matches Example Affiliate and 2050 Example Card — code it yourself\".",
+          "When two cards, loans or related companies claim one line, Review import proposes nothing and says which: \"Matches Example Affiliate and 2050 Example Card — code it yourself\". Bank Transactions suggests nothing for it.",
         route: "/banking",
       },
     ],
