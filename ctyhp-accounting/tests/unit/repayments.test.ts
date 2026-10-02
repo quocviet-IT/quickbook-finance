@@ -5,7 +5,6 @@ import {
   interestAccountAllowed,
   kindChangeProblem,
   phrasesOf,
-  repaymentFor,
   repaymentHits,
   repaymentMatches,
   repaysAccountAllowed,
@@ -108,25 +107,6 @@ describe("repaymentMatches", () => {
   });
   it("matches any one of several phrases", () => {
     expect(repaymentMatches(card({ matchWords: "example card, xyz bank epay", matchDigits: null }), "XYZ BANK EPAY")).toBe(true);
-  });
-});
-
-describe("repaymentFor", () => {
-  it("names the one entry a payment out repays", () => {
-    expect(repaymentFor([card()], out("EXAMPLE CARD EPAY"), accounts)).toEqual({ kind: "one", entry: card() });
-  });
-  it("ignores money in, a foreign-currency bank, an entry switched off and an unusable account", () => {
-    expect(repaymentFor([card()], out("EXAMPLE CARD REFUND", 50000), accounts)).toBeNull();
-    expect(repaymentFor([card()], { ...out("EXAMPLE CARD EPAY"), inBaseCurrency: false }, accounts)).toBeNull();
-    expect(repaymentFor([card({ isActive: false })], out("EXAMPLE CARD EPAY"), accounts)).toBeNull();
-    expect(repaymentFor([card({ accountId: "closed" })], out("EXAMPLE CARD EPAY"), accounts)).toBeNull();
-  });
-  it("refuses to choose when two entries claim the line", () => {
-    const other = card({ id: "r2", accountId: "card2", matchWords: "epay", matchDigits: null });
-    expect(repaymentFor([card(), other], out("EXAMPLE CARD EPAY"), accounts)).toEqual({ kind: "rivals", count: 2 });
-  });
-  it("says nothing when no entry matches", () => {
-    expect(repaymentFor([card()], out("METRO REALTY RENT"), accounts)).toBeNull();
   });
 });
 

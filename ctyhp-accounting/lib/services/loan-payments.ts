@@ -71,6 +71,7 @@ export async function loanSuggestions(sb: SupabaseClient, bankAccountId: string 
         description: row.description ?? "",
       })),
     repayments: context.repayments,
+    related: context.related,
     baseCurrencyBankIds: context.baseCurrencyBankIds,
     accounts: new Map(accounts.map((row) => [row.id, codingAccountOf(row)])),
     movements,

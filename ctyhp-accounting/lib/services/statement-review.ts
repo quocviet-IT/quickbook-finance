@@ -10,7 +10,7 @@ import {
   type ReviewPostItem,
   type ReviewProposal,
 } from "@/lib/domain/statement-review";
-import { repaymentFor } from "@/lib/domain/repayments";
+import { registerClaim } from "@/lib/domain/register-claim";
 import { listAccounts } from "./accounts";
 import { getBankingPreference } from "./banking-preference";
 import {
@@ -188,6 +188,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
       accounts: accountRows,
       matchedLineIds: new Set(bestMatch.keys()),
       repayments: context.repayments,
+      related: context.related,
       baseCurrencyBankIds: context.baseCurrencyBankIds,
     }).map((s) => [s.transactionId, s]),
   );
@@ -271,16 +272,17 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     };
   };
 
-  // Two cards or loans claiming one line: Review import says so instead of guessing.
+  // Two of the register claiming one line: Review import names them instead of guessing.
   const chart = new Map(accountRows.map((row) => [row.id, codingAccountOf(row)]));
   const inBase = context.baseCurrencyBankIds.has(batch.bank_account_id);
-  const repaymentRivalsOf = (row: BankTransactionRow) => {
-    const fact = repaymentFor(
-      context.repayments,
-      { description: row.description ?? "", amountMinor: Number(row.amount_minor), inBaseCurrency: inBase },
-      chart,
-    );
-    return fact?.kind === "rivals" ? fact.count : 0;
+  const registerRivalsOf = (row: BankTransactionRow): string[] => {
+    const claim = registerClaim({
+      repayments: context.repayments,
+      related: context.related,
+      line: { description: row.description ?? "", amountMinor: Number(row.amount_minor), inBaseCurrency: inBase },
+      accounts: chart,
+    });
+    return claim?.kind === "rivals" ? claim.labels : [];
   };
 
   // Loan payments: the same split Bank Transactions shows, worked out over every
@@ -295,6 +297,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
         description: w.description ?? "",
       })),
       repayments: context.repayments,
+      related: context.related,
       baseCurrencyBankIds: context.baseCurrencyBankIds,
       accounts: chart,
       movements: loanMovements,
@@ -329,7 +332,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
           pair,
           pairRivals: rivals,
           namedTransfer: namedFor(row),
-          repaymentRivals: repaymentRivalsOf(row),
+          registerRivals: registerRivalsOf(row),
           loan: loans.get(row.id) ?? null,
         }),
       };
