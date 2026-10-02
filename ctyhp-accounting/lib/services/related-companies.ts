@@ -114,6 +114,7 @@ export async function relatedBalances(
       sb
         .rpc("acc_ledger_balances", { p_from: null, p_to: asOf })
         .in("account_id", [...accountIds])
+        // account_id is unique per row, so this order is total and the pages cannot overlap or skip.
         .order("account_id")
         .range(from, to),
     fail,

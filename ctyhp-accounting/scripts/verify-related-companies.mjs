@@ -112,16 +112,30 @@ try {
       const seen = await one(`select count(*)::int n from acc_related_company`);
       check("someone who is not staff reads nothing", seen.n === 0, String(seen.n));
 
-      const viewer = await one(`select id from acc_app_user where role = 'viewer' and status = 'active' limit 1`);
-      if (viewer) {
-        await as(viewer.id);
-        const read = await one(`select count(*)::int n from acc_related_company`);
-        check("a viewer reads the register", read.n === 1, String(read.n));
-        await expectRefusal("a viewer cannot register", ["Verify Other", due2, "other"], /row-level security/);
-      } else {
-        console.log("  SKIP  no active viewer to authenticate as");
-      }
+      // Make the administrator a viewer for a moment, the same move
+      // scripts/verify-access.mjs makes on a user's role: acc_current_role()
+      // reads acc_app_user.role for auth.uid(), and acc_app_user has no update
+      // trigger or last-admin guard. The whole company transaction is rolled
+      // back, so the role is never kept.
+      await client.query("reset role");
+      await client.query("update acc_app_user set role = 'viewer' where id = $1", [admin.id]);
+      await client.query("set local role authenticated");
       await as(admin.id);
+
+      const viewerRead = await one(`select count(*)::int n from acc_related_company`);
+      check("a viewer reads the register", viewerRead.n === 1, String(viewerRead.n));
+      await expectRefusal("a viewer cannot register", ["Verify Other", due2, "other"], /row-level security/);
+      const edited = await client.query(`update acc_related_company set match_words = 'viewer edit' where id = $1`, [company.id]);
+      check("a viewer cannot change an entry", edited.rowCount === 0, String(edited.rowCount));
+      const removed = await client.query(`delete from acc_related_company where id = $1`, [company.id]);
+      check("a viewer cannot remove an entry", removed.rowCount === 0, String(removed.rowCount));
+
+      await client.query("reset role");
+      await client.query("update acc_app_user set role = 'admin' where id = $1", [admin.id]);
+      await client.query("set local role authenticated");
+      await as(admin.id);
+      const untouched = await one(`select match_words from acc_related_company where id = $1`, [company.id]);
+      check("the entry is untouched after the viewer's attempts", untouched?.match_words === "verify affiliate", untouched?.match_words);
 
       const legsOf = async (entryNumber) =>
         (

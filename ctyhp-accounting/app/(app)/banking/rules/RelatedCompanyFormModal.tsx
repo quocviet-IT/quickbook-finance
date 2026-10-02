@@ -133,10 +133,20 @@ export default function RelatedCompanyFormModal({
         <Form.Item
           name="accountId"
           label="Account it owes or is owed on"
-          extra="Money out to this company debits it and money in credits it, so its balance says who owes whom. A current asset or a liability — never income or an expense."
+          extra={
+            relatedId
+              ? "The account is fixed once the company is saved. To use another account, remove this company and add it again."
+              : "Money out to this company debits it and money in credits it, so its balance says who owes whom. A current asset or a liability — never income or an expense."
+          }
           rules={[{ required: true, message: "Choose the account it owes or is owed on" }]}
         >
-          <Select showSearch optionFilterProp="label" placeholder="Choose a current asset or liability account" options={options} />
+          <Select
+            showSearch
+            optionFilterProp="label"
+            placeholder="Choose a current asset or liability account"
+            options={options}
+            disabled={relatedId !== null}
+          />
         </Form.Item>
         <Form.Item name="isActive" label="On" valuePropName="checked">
           <Switch />

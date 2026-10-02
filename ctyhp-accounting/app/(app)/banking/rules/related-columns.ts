@@ -4,7 +4,7 @@ import { COLUMN } from "@/lib/design/table-metrics";
 export const RELATED_COLUMN_WIDTH = {
   name: COLUMN.PICKER,
   account: COLUMN.PICKER + COLUMN.ACTION,
-  balance: COLUMN.PICKER,
+  balance: COLUMN.PICKER + COLUMN.ACTION,
   waiting: COLUMN.QTY,
   active: COLUMN.ACTION * 1.5,
   actions: COLUMN.ACTION * 2,
