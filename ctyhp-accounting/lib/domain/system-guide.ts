@@ -332,6 +332,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "expense account and the payment from the bank, and Change takes it back.",
       },
       {
+        action: "Tell OneBook which companies are your own",
+        control: "Add related company",
+        route: "/banking/rules",
+        note:
+          "Money sent to or received from another company the same owners run is a loan between the two, " +
+          "never income or a cost. Add each with the words your bank prints for it and the one account that " +
+          "carries what it owes or is owed; a line naming it, in or out, is offered to that account before any " +
+          "rule or history. The table shows who owes whom today. The other company's books are not written — " +
+          "record its side there.",
+      },
+      {
         action: "Reconcile to a statement balance",
         control: "New reconciliation",
         route: "/banking/reconcile",
