@@ -160,7 +160,7 @@ It reaches every company through `scripts/migrate.mjs`, and only with the user's
   - `balanceWords(balanceMinor, currency)` — "Owes us …", "We owe …", "Settled".
 - `lib/domain/register-claim.ts` (new) — the claim (3.3):
   - `RegisterClaim` = one card, one loan, one related company, or rivals with their labels;
-  - `registerClaim(repayments, related, line, accounts)` replaces the callers' use of `repaymentFor`. `repaymentFor` stays in `repayments.ts` for the card and loan half.
+  - `registerClaim(repayments, related, line, accounts)` replaces `repaymentFor` everywhere. `repayments.ts` keeps `repaymentHits`, every usable card or loan entry a line claims, which the claim builds on.
   - `rivalsWhy(labels)` returns the sentence in 3.3.
 - `lib/domain/coding.ts`:
   - `suggestCoding` takes the claim in place of the repayment fact;
