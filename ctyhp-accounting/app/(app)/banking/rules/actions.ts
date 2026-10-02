@@ -5,6 +5,8 @@ import { canWrite, getUserRole } from "@/lib/auth";
 import {
   bankingPreferenceSchema,
   bankRuleInputSchema,
+  relatedCompanyInputSchema,
+  relatedCompanyPreviewSchema,
   repaymentInputSchema,
   repaymentPreviewSchema,
   rulePreviewInputSchema,
@@ -18,6 +20,12 @@ import {
   type RulePreview,
 } from "@/lib/services/coding";
 import { deleteRepayment, previewRepayment, saveRepayment, type RepaymentStats } from "@/lib/services/repayments";
+import {
+  deleteRelatedCompany,
+  previewRelated,
+  saveRelatedCompany,
+  type RelatedPreview,
+} from "@/lib/services/related-companies";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -137,6 +145,45 @@ export async function deleteRepaymentAction(id: string): Promise<ActionResult> {
   try {
     const sb = await createSupabaseServerClient();
     await deleteRepayment(sb, id);
+    refresh();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+}
+
+export async function previewRelatedCompanyAction(raw: unknown): Promise<ActionResult<RelatedPreview>> {
+  const parsed = relatedCompanyPreviewSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid words" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await previewRelated(sb, parsed.data) };
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+}
+
+export async function saveRelatedCompanyAction(id: string | null, raw: unknown): Promise<ActionResult<{ id: string }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = relatedCompanyInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid related company" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const saved = await saveRelatedCompany(sb, id, parsed.data);
+    refresh();
+    return { ok: true, data: { id: saved } };
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+}
+
+export async function deleteRelatedCompanyAction(id: string): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    await deleteRelatedCompany(sb, id);
     refresh();
     return { ok: true };
   } catch (err) {

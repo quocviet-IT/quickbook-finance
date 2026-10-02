@@ -8,8 +8,8 @@
  * last four digits. A waiting payment out that carries them is that entry's
  * repayment, recognised before any rule or history (coding.ts).
  *
- * One entry or nothing: a line two entries claim gets no proposal at all, the
- * way two open invoices of one amount get none.
+ * One claimant or nothing: register-claim.ts weighs these entries together
+ * with the related companies, and a line two of them claim gets no proposal.
  *
  * Imported by scripts/*.mjs: relative imports only, types only across modules.
  */
@@ -47,8 +47,6 @@ export interface RepaymentLine {
   /** Its bank account is in the company's base currency. */
   inBaseCurrency: boolean;
 }
-
-export type RepaymentFact = { kind: "one"; entry: RepaymentAccount } | { kind: "rivals"; count: number };
 
 export const REPAYMENT_WORDS_MAX = 200;
 const CARD_ACCOUNT_TYPES: readonly AccountType[] = ["credit_card"];
@@ -105,16 +103,14 @@ export function repaymentMatches(entry: Pick<RepaymentAccount, "matchWords" | "m
   return phrasesOf(entry.matchWords).some((phrase) => wordPattern(phrase).test(description));
 }
 
-/** The one entry a waiting payment out repays, how many claim it when several do, or nothing. */
-export function repaymentFor(
+/** Every usable entry a waiting payment out carries: its words or last four, on a bank in the base currency. */
+export function repaymentHits(
   entries: readonly RepaymentAccount[],
   line: RepaymentLine,
   accounts: ReadonlyMap<string, CodingAccount>,
-): RepaymentFact | null {
-  if (line.amountMinor >= 0 || !line.inBaseCurrency) return null;
-  const hits = entries.filter((entry) => usableRepayment(entry, accounts) && repaymentMatches(entry, line.description));
-  if (hits.length === 0) return null;
-  return hits.length === 1 ? { kind: "one", entry: hits[0] } : { kind: "rivals", count: hits.length };
+): RepaymentAccount[] {
+  if (line.amountMinor >= 0 || !line.inBaseCurrency) return [];
+  return entries.filter((entry) => usableRepayment(entry, accounts) && repaymentMatches(entry, line.description));
 }
 
 /**

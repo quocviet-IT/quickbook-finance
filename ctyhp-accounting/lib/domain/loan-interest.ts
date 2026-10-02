@@ -11,7 +11,9 @@
  * Imported by scripts/*.mjs: relative imports only, types only across modules.
  */
 import type { CodingAccount } from "./coding.ts";
-import { repaymentFor, type InterestMethod, type RepaymentAccount } from "./repayments.ts";
+import { registerClaim } from "./register-claim.ts";
+import type { RelatedCompany } from "./related-companies.ts";
+import type { InterestMethod, RepaymentAccount } from "./repayments.ts";
 
 /** One posted line on a loan account. */
 export interface LoanMovement {
@@ -162,6 +164,8 @@ export interface LoanCandidate {
 export function loanSuggestionsFrom(input: {
   lines: readonly LoanCandidate[];
   repayments: readonly RepaymentAccount[];
+  /** Related companies: a line one of them also names is not a loan payment to propose. */
+  related?: readonly RelatedCompany[];
   baseCurrencyBankIds: ReadonlySet<string>;
   accounts: ReadonlyMap<string, CodingAccount>;
   movements: readonly LoanMovement[];
@@ -171,13 +175,14 @@ export function loanSuggestionsFrom(input: {
   const loanLines: LoanLine[] = [];
   for (const line of input.lines) {
     if (input.excludeIds?.has(line.id)) continue;
-    const fact = repaymentFor(
-      input.repayments,
-      { description: line.description, amountMinor: line.amountMinor, inBaseCurrency: input.baseCurrencyBankIds.has(line.bankAccountId) },
-      input.accounts,
-    );
-    if (fact?.kind !== "one" || fact.entry.kind !== "loan") continue;
-    loanLines.push({ id: line.id, date: line.date, paymentMinor: Math.abs(line.amountMinor), entry: fact.entry });
+    const claim = registerClaim({
+      repayments: input.repayments,
+      related: input.related ?? [],
+      line: { description: line.description, amountMinor: line.amountMinor, inBaseCurrency: input.baseCurrencyBankIds.has(line.bankAccountId) },
+      accounts: input.accounts,
+    });
+    if (claim?.kind !== "repayment" || claim.entry.kind !== "loan") continue;
+    loanLines.push({ id: line.id, date: line.date, paymentMinor: Math.abs(line.amountMinor), entry: claim.entry });
   }
   const plans = planLoanLines(loanLines, input.movements);
   const named = (id: string | null) => {

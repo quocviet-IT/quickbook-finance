@@ -30,7 +30,7 @@ describe("reviewProposal with loans", () => {
   it("lets a document, a transfer and the two-entries refusal come first", () => {
     const doc = { documentId: "b1", documentNumber: "BILL-1", partyName: "Example Vendor", balanceDueMinor: 200_000, currencyCode: "USD", direction: "payable" as const };
     expect(reviewProposal({ line, match: null, documents: [doc], coding: null, loan }).kind).toBe("document");
-    expect(reviewProposal({ line, match: null, documents: [], coding: null, loan, repaymentRivals: 2 }).kind).toBe("none");
+    expect(reviewProposal({ line, match: null, documents: [], coding: null, loan, registerRivals: ["2500 Example Loan", "Example Affiliate"] }).kind).toBe("none");
   });
 });
 

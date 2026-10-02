@@ -10,6 +10,7 @@ import {
 } from "@/lib/domain/coding";
 import type { BankRule } from "@/lib/domain/bank-rules";
 import { buildHistoryIndex } from "@/lib/domain/coding-history";
+import type { RelatedCompany } from "@/lib/domain/related-companies";
 import type { RepaymentAccount } from "@/lib/domain/repayments";
 
 const account = (id: string, over: Partial<CodingAccount> = {}): CodingAccount => ({
@@ -100,8 +101,12 @@ describe("suggestCoding", () => {
   });
 });
 
-describe("suggestCoding with cards and loans", () => {
-  const withCard = new Map<string, CodingAccount>([...accounts, ["card1", account("card1", { type: "credit_card", name: "Example Card" })]]);
+describe("suggestCoding with the register", () => {
+  const withRegister = new Map<string, CodingAccount>([
+    ...accounts,
+    ["card1", account("card1", { type: "credit_card", name: "Example Card" })],
+    ["due", account("due", { type: "current_asset", name: "Due from/to Example Affiliate" })],
+  ]);
   const entry = (over: Partial<RepaymentAccount> = {}): RepaymentAccount => ({
     id: "rp1",
     kind: "card",
@@ -115,27 +120,54 @@ describe("suggestCoding with cards and loans", () => {
     isActive: true,
     ...over,
   });
+  const company: RelatedCompany = { id: "rc1", name: "Example Affiliate", accountId: "due", matchWords: "metro", isActive: true };
+  const ask = (claim: Parameters<typeof suggestCoding>[0]["claim"], hasMatch = false) =>
+    suggestCoding({ line, rules: [rule({})], index: history, accounts: withRegister, hasMatch, claim });
+
   it("puts a card ahead of a rule and of history", () => {
-    const s = suggestCoding({ line, rules: [rule({})], index: history, accounts: withCard, hasMatch: false, repayment: { kind: "one", entry: entry() } });
-    expect(s).toEqual({ source: "card", accountId: "card1", repaymentId: "rp1" });
+    expect(ask({ kind: "repayment", entry: entry() })).toEqual({ source: "card", accountId: "card1", repaymentId: "rp1" });
   });
-  it("lets a loan, or two entries, silence rule and history", () => {
+  it("puts a related company ahead of a rule and of history", () => {
+    expect(ask({ kind: "related", company })).toEqual({
+      source: "related",
+      accountId: "due",
+      relatedId: "rc1",
+      companyName: "Example Affiliate",
+    });
+  });
+  it("lets a loan, or rivals, silence rule and history", () => {
     const loan = entry({ kind: "loan", interestAccountId: "rent", interestMethod: "entered" });
-    expect(suggestCoding({ line, rules: [rule({})], index: history, accounts: withCard, hasMatch: false, repayment: { kind: "one", entry: loan } })).toBeNull();
-    expect(suggestCoding({ line, rules: [rule({})], index: history, accounts: withCard, hasMatch: false, repayment: { kind: "rivals", count: 2 } })).toBeNull();
+    expect(ask({ kind: "repayment", entry: loan })).toBeNull();
+    expect(ask({ kind: "rivals", labels: ["Example Affiliate", "CARD1 Example Card"] })).toBeNull();
   });
   it("still says nothing on a line that already has a match to the ledger", () => {
-    expect(suggestCoding({ line, rules: [], index: history, accounts: withCard, hasMatch: true, repayment: { kind: "one", entry: entry() } })).toBeNull();
+    expect(ask({ kind: "repayment", entry: entry() }, true)).toBeNull();
+    expect(ask({ kind: "related", company }, true)).toBeNull();
+  });
+  it("says nothing for a related company whose account can no longer take the line", () => {
+    expect(ask({ kind: "related", company: { ...company, accountId: "old" } })).toBeNull();
   });
   it("says why in the screen's words", () => {
-    const view = codingView(line, { source: "card", accountId: "card1", repaymentId: "rp1" }, withCard.get("card1")!);
-    expect(view).toEqual({
+    expect(codingView(line, { source: "card", accountId: "card1", repaymentId: "rp1" }, withRegister.get("card1")!)).toEqual({
       transactionId: "t1",
       accountId: "card1",
       accountLabel: "CARD1 — Example Card",
       source: "card",
       short: "Card",
       why: "Card payment — repays CARD1 Example Card. A card payment is never an expense.",
+    });
+    const related = codingView(
+      line,
+      { source: "related", accountId: "due", relatedId: "rc1", companyName: "Example Affiliate" },
+      withRegister.get("due")!,
+    );
+    expect(related).toEqual({
+      transactionId: "t1",
+      accountId: "due",
+      accountLabel: "DUE — Due from/to Example Affiliate",
+      source: "related",
+      short: "Related",
+      why: "Names Example Affiliate, a related company. Money between your companies is owed, never income or a cost.",
     });
   });
 });

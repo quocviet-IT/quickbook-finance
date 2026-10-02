@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.77",
+    date: "2026-10-02",
+    headline: "Money between your own companies is owed, never income or a cost.",
+    changes: [
+      {
+        kind: "added",
+        title: "Related companies in Bank Rules",
+        detail:
+          "Add each company the same owners run with the words your bank prints for it and the one account that carries what it owes you or you owe it — a current asset or a liability, never income or an expense. The table shows the balance with each today: Owes us, We owe, or Settled.",
+        route: "/banking/rules",
+      },
+      {
+        kind: "added",
+        title: "Lines naming a related company go to its account",
+        detail:
+          "On Review import and Bank Transactions, money in or out that names a related company is offered as Between companies, to that company's account, before any rule or history. Lines coded before 1.77 are not changed, and the other company's books are not written: record its side there.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "A line two registered entries claim names them",
+        detail:
+          "When two cards, loans or related companies claim one line, Review import proposes nothing and says which: \"Matches Example Affiliate and 2050 Example Card — code it yourself\". Bank Transactions suggests nothing for it.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.76",
     date: "2026-10-01",
     headline: "A loan instalment is split into principal and interest, and only the interest is an expense.",

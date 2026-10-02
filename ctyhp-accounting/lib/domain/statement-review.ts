@@ -4,14 +4,16 @@
  * First that applies: a line already handled or still pending is left alone;
  * then a match to an entry already in the books; then the one open invoice or
  * bill whose balance is exactly this amount; then a transfer; then a
- * registered card (1.75) or loan (1.76), or nothing when two cards or loans
- * claim the line; then a rule or history (1.70). A loan payment is never
+ * registered card (1.75), loan (1.76) or related company (1.77), or nothing —
+ * naming them — when two of those claim the line; then a rule or history
+ * (1.70). A loan payment is never
  * ticked for you: its interest is an estimate until a person accepts it.
  * Two open documents of the same amount give no proposal at all — money that
  * probably pays a document must not be coded to income or expense.
  */
 import type { CodingSuggestionView } from "./coding";
 import type { LoanSuggestionView } from "./loan-interest";
+import { rivalsWhy } from "./register-claim";
 
 export const REVIEW_POST_CHUNK = 50;
 
@@ -53,7 +55,16 @@ export type ReviewProposal =
   | { kind: "document"; documentId: string; label: string; why: string }
   | { kind: "transfer"; counterpartId: string; label: string; why: string }
   | { kind: "funding"; counterpartId: string; label: string; why: string }
-  | { kind: "account"; accountId: string; label: string; why: string; alternative?: ReviewPairView; repayment?: "card" }
+  | {
+      kind: "account";
+      accountId: string;
+      label: string;
+      why: string;
+      alternative?: ReviewPairView;
+      repayment?: "card";
+      /** A related company's account (related-companies.ts). */
+      related?: true;
+    }
   | { kind: "loan"; repaymentId: string; label: string; why: string; loan: LoanSuggestionView }
   | { kind: "none"; why: string };
 
@@ -68,12 +79,12 @@ export function reviewProposal(input: {
   pairRivals?: number;
   /** Another of the company's bank accounts this line names as a transfer. */
   namedTransfer?: { accountId: string; label: string; why: string } | null;
-  /** How many registered cards or loans claim this line, when more than one does. */
-  repaymentRivals?: number;
+  /** Who claims this line in the register, when more than one does (register-claim.ts). */
+  registerRivals?: readonly string[];
   /** The registered loan this line repays, with its proposed split (loan-interest.ts). */
   loan?: LoanSuggestionView | null;
 }): ReviewProposal {
-  const { line, match, documents, coding, pair, pairRivals, namedTransfer, repaymentRivals, loan } = input;
+  const { line, match, documents, coding, pair, pairRivals, namedTransfer, registerRivals, loan } = input;
   if (line.pending) return { kind: "handled", why: "Pending at the bank — it can be posted once it clears" };
   if (line.status !== "unmatched") return { kind: "handled", why: "Already handled on Bank Transactions" };
   if (match) {
@@ -111,10 +122,10 @@ export function reviewProposal(input: {
   if (namedTransfer) {
     return { kind: "account", accountId: namedTransfer.accountId, label: namedTransfer.label, why: namedTransfer.why };
   }
-  // Two registered cards or loans claim this line: which balance it repays is
+  // Two registered cards, loans or related companies claim this line: which is
   // a person's call, and a rule or history must not guess it as a cost.
-  if (repaymentRivals && repaymentRivals > 1) {
-    return { kind: "none", why: `Matches ${repaymentRivals} cards or loans — code it yourself` };
+  if (registerRivals && registerRivals.length > 1) {
+    return { kind: "none", why: rivalsWhy(registerRivals) };
   }
   // A loan payment is principal and interest; no single account, rule or
   // funding pair can stand for it.
@@ -124,12 +135,18 @@ export function reviewProposal(input: {
   const funding = pair?.kind === "funding" ? pair : null;
   if (coding) {
     const isCard = coding.source === "card";
+    const isRelated = coding.source === "related";
     const proposal = {
       kind: "account" as const,
       accountId: coding.accountId,
-      label: isCard ? `Card payment · ${coding.accountLabel}` : coding.accountLabel,
+      label: isCard
+        ? `Card payment · ${coding.accountLabel}`
+        : isRelated
+          ? `Between companies · ${coding.accountLabel}`
+          : coding.accountLabel,
       why: coding.why,
       ...(isCard ? { repayment: "card" as const } : {}),
+      ...(isRelated ? { related: true as const } : {}),
     };
     return funding ? { ...proposal, why: `${coding.why}. Also: ${funding.also}`, alternative: funding } : proposal;
   }

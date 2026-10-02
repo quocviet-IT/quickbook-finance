@@ -3,13 +3,13 @@
  *
  * In order: a line already matched to the ledger gets none (coding it would
  * post a second entry for money already in the books, and
- * acc_categorise_bank_transaction refuses it anyway); then a registered card
- * (repayments.ts) — a loan, or a line two cards or loans claim, gets no
- * single-account suggestion at all; then the first rule that matches; then
- * history; then nothing. Only an account a line can properly be
- * coded to is ever suggested — active, posting, not receivable or payable
- * (money from a customer or to a supplier is settled against a document), not a
- * holding account.
+ * acc_categorise_bank_transaction refuses it anyway); then what the person
+ * registered (register-claim.ts) — a card it repays, or a related company it
+ * names; a loan, or a line two of them claim, gets no single-account
+ * suggestion at all; then the first rule that matches; then history; then
+ * nothing. Only an account a line can properly be coded to is ever suggested —
+ * active, posting, not receivable or payable (money from a customer or to a
+ * supplier is settled against a document), not a holding account.
  *
  * Imported by scripts/*.mjs: relative imports only, types only across modules.
  */
@@ -17,7 +17,7 @@ import type { AccountType } from "./accounts.ts";
 import { firstMatchingRule, type BankRule } from "./bank-rules.ts";
 import { suggestFromHistory, type HistoryIndex } from "./coding-history.ts";
 import { directionOf } from "./coding-names.ts";
-import type { RepaymentFact } from "./repayments.ts";
+import type { RegisterClaim } from "./register-claim.ts";
 
 /** The most lines one "Code all" posts. */
 export const CODE_ALL_LIMIT = 100;
@@ -72,6 +72,7 @@ export interface CodingLine {
 
 export type CodingSuggestion =
   | { source: "card"; accountId: string; repaymentId: string }
+  | { source: "related"; accountId: string; relatedId: string; companyName: string }
   | { source: "rule"; accountId: string; ruleId: string; ruleNumber: number; ruleText: string }
   | { source: "history"; accountId: string; hits: number; of: number; key: string };
 
@@ -81,18 +82,26 @@ export function suggestCoding(input: {
   index: HistoryIndex;
   accounts: ReadonlyMap<string, CodingAccount>;
   hasMatch: boolean;
-  /** What the register says this line repays (repayments.ts), when it says anything. */
-  repayment?: RepaymentFact | null;
+  /** What the register says about this line (register-claim.ts), when it says anything. */
+  claim?: RegisterClaim | null;
 }): CodingSuggestion | null {
-  const { line, rules, index, accounts, hasMatch, repayment } = input;
+  const { line, rules, index, accounts, hasMatch, claim } = input;
   if (hasMatch) return null;
   const usable = (accountId: string) => codableAccount(accounts.get(accountId));
 
   // What the person registered outranks what is inferred. A loan's split, or a
   // line two entries claim, is not one account — rule and history stay silent.
-  if (repayment) {
-    if (repayment.kind === "one" && repayment.entry.kind === "card" && usable(repayment.entry.accountId)) {
-      return { source: "card", accountId: repayment.entry.accountId, repaymentId: repayment.entry.id };
+  if (claim) {
+    if (claim.kind === "repayment" && claim.entry.kind === "card" && usable(claim.entry.accountId)) {
+      return { source: "card", accountId: claim.entry.accountId, repaymentId: claim.entry.id };
+    }
+    if (claim.kind === "related" && usable(claim.company.accountId)) {
+      return {
+        source: "related",
+        accountId: claim.company.accountId,
+        relatedId: claim.company.id,
+        companyName: claim.company.name,
+      };
     }
     return null;
   }
@@ -122,7 +131,7 @@ export interface CodingSuggestionView {
   accountId: string;
   /** "6300 — Rent" */
   accountLabel: string;
-  source: "rule" | "history" | "card";
+  source: "rule" | "history" | "card" | "related";
   /** "Rule 3" or "11 of 11" — what fits under a 150px picker; `why` has the rest. */
   short: string;
   /** The whole reason, for a tooltip and the Code all list. */
@@ -140,6 +149,16 @@ export function codingView(line: CodingLine, suggestion: CodingSuggestion, accou
       source: "card",
       short: "Card",
       why: `Card payment — repays ${named}. A card payment is never an expense.`,
+    };
+  }
+  if (suggestion.source === "related") {
+    return {
+      transactionId: line.id,
+      accountId: suggestion.accountId,
+      accountLabel,
+      source: "related",
+      short: "Related",
+      why: `Names ${suggestion.companyName}, a related company. Money between your companies is owed, never income or a cost.`,
     };
   }
   if (suggestion.source === "rule") {

@@ -211,6 +211,11 @@ describe("loanSuggestionsFrom", () => {
     });
     expect(views).toEqual([]);
   });
+  it("proposes no split when a related company also claims the line", () => {
+    const withDue = new Map<string, CodingAccount>([...accounts, ["due", acct("due", "1460", "Due from/to Example Affiliate", "current_asset")]]);
+    const company = { id: "rc1", name: "Example Affiliate", accountId: "due", matchWords: "example loan", isActive: true };
+    expect(loanSuggestionsFrom({ ...base, accounts: withDue, related: [company], lines: [line("t1", "EXAMPLE LOAN PMT")] })).toEqual([]);
+  });
 });
 
 describe("the loan-interest module", () => {

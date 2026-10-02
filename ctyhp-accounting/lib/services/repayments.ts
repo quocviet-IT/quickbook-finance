@@ -15,7 +15,7 @@ import {
 } from "@/lib/domain/repayments";
 import { listAccounts } from "./accounts";
 import { loadHistory } from "./coding";
-import { RepaymentError, baseCurrencyBankIds } from "./repayment-register";
+import { RepaymentError, baseCurrencyBankIds, listRelatedCompanies } from "./repayment-register";
 import { readAllPages } from "./paging";
 
 /**
@@ -122,7 +122,11 @@ export async function saveRepayment(sb: SupabaseClient, id: string | null, input
     const changed = kindChangeProblem((existing as { kind: RepaymentKind }).kind, input.kind);
     if (changed) throw new RepaymentError(changed);
   }
-  const chart = new Map((await listAccounts(sb)).map((row) => [row.id, codingAccountOf(row)]));
+  const [chartRows, related] = await Promise.all([listAccounts(sb), listRelatedCompanies(sb)]);
+  const chart = new Map(chartRows.map((row) => [row.id, codingAccountOf(row)]));
+  if (related.some((company) => company.accountId === input.accountId)) {
+    throw new RepaymentError("This account belongs to a related company — a card or loan needs an account of its own");
+  }
   if (!repaysAccountAllowed(input.kind, chart.get(input.accountId))) {
     throw new RepaymentError(
       input.kind === "card"

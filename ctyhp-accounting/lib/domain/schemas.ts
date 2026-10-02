@@ -948,3 +948,15 @@ export const loanPaymentSchema = z.object({
   repaymentId: z.uuid(),
   interestMinor: z.number().int("Interest is a whole number of cents").min(0, "Interest cannot be below zero"),
 });
+
+/** The words a related company's preview tries against the lines waiting now. */
+export const relatedCompanyPreviewSchema = z.object({
+  matchWords: z.string().max(200, "Words are at most 200 characters"),
+});
+
+/** A related company, as the Related companies form saves it. */
+export const relatedCompanyInputSchema = relatedCompanyPreviewSchema.extend({
+  name: z.string().trim().min(1, "Give the company's name").max(120, "The name is at most 120 characters"),
+  accountId: z.uuid("Choose the account it owes or is owed on"),
+  isActive: z.boolean(),
+});
