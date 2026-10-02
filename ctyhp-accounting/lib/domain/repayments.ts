@@ -105,14 +105,23 @@ export function repaymentMatches(entry: Pick<RepaymentAccount, "matchWords" | "m
   return phrasesOf(entry.matchWords).some((phrase) => wordPattern(phrase).test(description));
 }
 
+/** Every usable entry a waiting payment out carries: its words or last four, on a bank in the base currency. */
+export function repaymentHits(
+  entries: readonly RepaymentAccount[],
+  line: RepaymentLine,
+  accounts: ReadonlyMap<string, CodingAccount>,
+): RepaymentAccount[] {
+  if (line.amountMinor >= 0 || !line.inBaseCurrency) return [];
+  return entries.filter((entry) => usableRepayment(entry, accounts) && repaymentMatches(entry, line.description));
+}
+
 /** The one entry a waiting payment out repays, how many claim it when several do, or nothing. */
 export function repaymentFor(
   entries: readonly RepaymentAccount[],
   line: RepaymentLine,
   accounts: ReadonlyMap<string, CodingAccount>,
 ): RepaymentFact | null {
-  if (line.amountMinor >= 0 || !line.inBaseCurrency) return null;
-  const hits = entries.filter((entry) => usableRepayment(entry, accounts) && repaymentMatches(entry, line.description));
+  const hits = repaymentHits(entries, line, accounts);
   if (hits.length === 0) return null;
   return hits.length === 1 ? { kind: "one", entry: hits[0] } : { kind: "rivals", count: hits.length };
 }

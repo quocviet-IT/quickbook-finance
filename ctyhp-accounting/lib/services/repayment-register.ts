@@ -1,18 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RelatedCompany } from "@/lib/domain/related-companies";
 import type { InterestMethod, RepaymentAccount, RepaymentKind } from "@/lib/domain/repayments";
 import { listBankAccounts } from "./banking";
 import { readAllPages } from "./paging";
 
 /**
- * Reading the register of cards and loans (migration 0129), and the facts
- * recognition needs beside it. Writing lives in repayments.ts, which reads
- * coding history; this module is kept free of that so coding.ts can use it.
+ * Reading the register — cards and loans (migration 0129) and related
+ * companies (0131) — and the facts recognition needs beside it. Writing lives
+ * in repayments.ts and related-companies.ts; this module is kept free of them
+ * so coding.ts can use it.
  */
 export class RepaymentError extends Error {}
 const fail = (message: string) => new RepaymentError(message);
 
 const COLUMNS =
   "id,kind,account_id,match_words,match_digits,interest_account_id,interest_method,annual_rate,fixed_interest_minor,is_active";
+const RELATED_COLUMNS = "id,name,account_id,match_words,is_active";
 const numberOrNull = (value: unknown) => (value === null || value === undefined ? null : Number(value));
 
 export function repaymentFromRow(row: Record<string, unknown>): RepaymentAccount {
@@ -38,13 +41,33 @@ export async function listRepayments(sb: SupabaseClient): Promise<RepaymentAccou
   return rows.map(repaymentFromRow);
 }
 
+export function relatedFromRow(row: Record<string, unknown>): RelatedCompany {
+  return {
+    id: row.id as string,
+    name: (row.name as string | null) ?? "",
+    accountId: row.account_id as string,
+    matchWords: (row.match_words as string | null) ?? "",
+    isActive: Boolean(row.is_active),
+  };
+}
+
+/** Every related company, by name. */
+export async function listRelatedCompanies(sb: SupabaseClient): Promise<RelatedCompany[]> {
+  const rows = await readAllPages<Record<string, unknown>>(
+    (from, to) => sb.from("acc_related_company").select(RELATED_COLUMNS).order("name").order("id").range(from, to),
+    fail,
+  );
+  return rows.map(relatedFromRow);
+}
+
 export interface RepaymentContext {
   repayments: RepaymentAccount[];
-  /** Bank accounts in the base currency: only their lines can be repayments. */
+  related: RelatedCompany[];
+  /** Bank accounts in the base currency: only their lines can be claimed by the register. */
   baseCurrencyBankIds: Set<string>;
 }
 
-/** Bank accounts in the base currency: only their lines can be repayments. */
+/** Bank accounts in the base currency: only their lines can be claimed by the register. */
 export async function baseCurrencyBankIds(sb: SupabaseClient): Promise<Set<string>> {
   const [banks, base] = await Promise.all([
     listBankAccounts(sb),
@@ -56,6 +79,6 @@ export async function baseCurrencyBankIds(sb: SupabaseClient): Promise<Set<strin
 }
 
 export async function repaymentContext(sb: SupabaseClient): Promise<RepaymentContext> {
-  const [repayments, ids] = await Promise.all([listRepayments(sb), baseCurrencyBankIds(sb)]);
-  return { repayments, baseCurrencyBankIds: ids };
+  const [repayments, related, ids] = await Promise.all([listRepayments(sb), listRelatedCompanies(sb), baseCurrencyBankIds(sb)]);
+  return { repayments, related, baseCurrencyBankIds: ids };
 }

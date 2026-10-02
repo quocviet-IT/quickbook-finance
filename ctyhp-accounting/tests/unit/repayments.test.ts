@@ -6,6 +6,7 @@ import {
   kindChangeProblem,
   phrasesOf,
   repaymentFor,
+  repaymentHits,
   repaymentMatches,
   repaysAccountAllowed,
   seedDigits,
@@ -126,6 +127,16 @@ describe("repaymentFor", () => {
   });
   it("says nothing when no entry matches", () => {
     expect(repaymentFor([card()], out("METRO REALTY RENT"), accounts)).toBeNull();
+  });
+});
+
+describe("repaymentHits", () => {
+  it("returns every usable entry a payment out carries, and none for money in or a foreign-currency bank", () => {
+    const other = card({ id: "r2", accountId: "card2", matchDigits: null });
+    expect(repaymentHits([card(), other], out("EXAMPLE CARD EPAY"), accounts)).toEqual([card(), other]);
+    expect(repaymentHits([card()], out("EXAMPLE CARD REFUND", 50000), accounts)).toEqual([]);
+    expect(repaymentHits([card()], { ...out("EXAMPLE CARD EPAY"), inBaseCurrency: false }, accounts)).toEqual([]);
+    expect(repaymentHits([card({ isActive: false })], out("EXAMPLE CARD EPAY"), accounts)).toEqual([]);
   });
 });
 
