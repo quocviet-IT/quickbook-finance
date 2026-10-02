@@ -59,16 +59,23 @@ export function compareEntries(prototype: readonly DriftEntry[], onebook: readon
     else unmatched.push(entry);
   }
 
-  // Then: the same date and amounts, other accounts.
+  // Then: the same date and amounts, other accounts. A candidate whose accounts are known is offered first to an
+  // entry whose accounts are known, so a real account difference is never swallowed by a candidate that cannot tell.
+  const side = (entry: DriftEntry) => (entry.accounts === null ? "unknown" : "known");
   const leftovers = new Map<string, DriftEntry[]>();
-  for (const list of exact.values()) for (const entry of list) push(leftovers, driftKey(entry), entry);
+  for (const list of exact.values()) for (const entry of list) push(leftovers, `${driftKey(entry)}#${side(entry)}`, entry);
   for (const entry of unmatched) {
-    const other = leftovers.get(driftKey(entry))?.shift();
+    const key = driftKey(entry);
+    const otherSide = side(entry) === "known" ? "unknown" : "known";
+    const other = leftovers.get(`${key}#${side(entry)}`)?.shift() ?? leftovers.get(`${key}#${otherSide}`)?.shift();
     if (!other) result.onlyPrototype.push(entry);
-    else if (postingsKey(entry) !== null && postingsKey(other) !== null) result.accountsDiffer.push({ prototype: entry, onebook: other });
+    else if (entry.accounts !== null && other.accounts !== null) result.accountsDiffer.push({ prototype: entry, onebook: other });
     else result.matched += 1;
   }
   for (const list of leftovers.values()) result.onlyOnebook.push(...list);
-  result.onlyOnebook.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const byDate = (a: DriftEntry, b: DriftEntry) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
+  result.onlyPrototype.sort(byDate);
+  result.onlyOnebook.sort(byDate);
+  result.accountsDiffer.sort((a, b) => byDate(a.prototype, b.prototype));
   return result;
 }

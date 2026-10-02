@@ -64,4 +64,17 @@ describe("renderParityReport", () => {
     expect(html).toContain("Data pass");
     expect(html).toContain("Rent &lt;January&gt;");
   });
+  it("shows each book's accounts in the summary", () => {
+    const html = renderParityReport(report());
+    expect(html).toContain("<th>Accounts</th>");
+    expect(html).toContain('<td>Example &lt;Co&gt;</td><td class="r">3</td>');
+  });
+  it("says how many entries with other accounts were not shown", () => {
+    const one = { id: "x", date: "2026-01-05", amounts: [500, -500], accounts: ["1000", "6100"], label: "Example" };
+    const accountsDiffer = Array.from({ length: 501 }, () => ({ prototype: one, onebook: { ...one, accounts: ["1000", "6200"] } }));
+    const html = renderParityReport(
+      report({ drift: { schema: "co_example", book: "Example", result: { matched: 0, onlyPrototype: [], onlyOnebook: [], accountsDiffer } } }),
+    );
+    expect(html).toContain("1 more not shown.");
+  });
 });

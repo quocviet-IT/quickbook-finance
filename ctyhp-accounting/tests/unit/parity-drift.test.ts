@@ -42,4 +42,23 @@ describe("compareEntries", () => {
     expect(result.onlyPrototype).toEqual([]);
     expect(result.onlyOnebook).toEqual([]);
   });
+  it("offers a candidate with known accounts first, whatever order the candidates come in", () => {
+    const p1 = entry("p1", "2026-01-05", [500, -500], ["B", "Z"]);
+    const unknown = entry("oNull", "2026-01-05", [500, -500], null);
+    const known = entry("oKnown", "2026-01-05", [500, -500], ["A", "Z"]);
+    for (const onebook of [[unknown, known], [known, unknown]]) {
+      const result = compareEntries([p1], onebook);
+      expect(result.matched).toBe(0);
+      expect(result.accountsDiffer.map((d) => [d.prototype.id, d.onebook.id])).toEqual([["p1", "oKnown"]]);
+      expect(result.onlyOnebook.map((e) => e.id)).toEqual(["oNull"]);
+    }
+  });
+  it("sorts every list by date, then id", () => {
+    const result = compareEntries(
+      [entry("p2", "2026-02-01", [100, -100]), entry("p1", "2026-01-01", [200, -200])],
+      [entry("o2", "2026-03-01", [300, -300]), entry("o1", "2026-01-15", [400, -400])],
+    );
+    expect(result.onlyPrototype.map((e) => e.id)).toEqual(["p1", "p2"]);
+    expect(result.onlyOnebook.map((e) => e.id)).toEqual(["o1", "o2"]);
+  });
 });

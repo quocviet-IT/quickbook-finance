@@ -60,14 +60,14 @@ function summary(books: readonly BookReport[]): string {
   const rows = books
     .map(
       (b) =>
-        `<tr><td>${esc(b.name)}</td><td class="r">${b.loaded} of ${b.entries}</td><td class="r">${b.months}</td>` +
+        `<tr><td>${esc(b.name)}</td><td class="r">${b.accounts}</td><td class="r">${b.loaded} of ${b.entries}</td><td class="r">${b.months}</td>` +
         `<td class="r">${b.fiscalYears}</td><td class="r">${b.comparison.compared}</td><td class="r">${b.comparison.agreed}</td>` +
         TAG_ORDER.map((tag) => `<td class="r">${count(b.comparison.differences, tag)}</td>`).join("") +
         "</tr>",
     )
     .join("");
   return (
-    `<h2>Summary</h2><table><thead><tr><th>Book</th><th>Entries loaded</th><th>Month ends</th><th>Fiscal years</th>` +
+    `<h2>Summary</h2><table><thead><tr><th>Book</th><th>Accounts</th><th>Entries loaded</th><th>Month ends</th><th>Fiscal years</th>` +
     `<th>Figures compared</th><th>Agree</th>${TAG_ORDER.map((t) => `<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`
   );
 }
@@ -84,7 +84,7 @@ function bookSection(book: BookReport): string {
   const rows = shown
     .map(
       (d) =>
-        `<tr class="tag-${d.tag.replace(/\s+/g, "-")}"><td>${esc(d.tag)}</td><td>${esc(KIND_LABEL[d.kind])}</td><td>${esc(period(d))}</td>` +
+        `<tr class="tag-${esc(d.tag.replace(/\s+/g, "-"))}"><td>${esc(d.tag)}</td><td>${esc(KIND_LABEL[d.kind])}</td><td>${esc(period(d))}</td>` +
         `<td>${esc(d.key)}</td><td class="r">${dollars(d.prototypeCents)}</td><td class="r">${dollars(d.onebookCents)}</td>` +
         `<td class="r">${dollars(d.diffCents)}</td></tr>`,
     )
@@ -122,7 +122,8 @@ function driftSection(drift: NonNullable<ParityReport["drift"]>): string {
             `<tr><td>${esc(d.prototype.date)}</td><td>${esc(d.prototype.label)}</td><td>${esc((d.prototype.accounts ?? []).join(", "))}</td><td>${esc((d.onebook.accounts ?? []).join(", "))}</td></tr>`,
         )
         .join("") +
-      "</tbody></table>"
+      "</tbody></table>" +
+      (r.accountsDiffer.length > MAX_DRIFT ? `<p class="note">${r.accountsDiffer.length - MAX_DRIFT} more not shown.</p>` : "")
     : "";
   return (
     `<h2>Data pass — ${esc(drift.book)} against ${esc(drift.schema)}</h2>` +
