@@ -95,10 +95,16 @@ describe("suggestionsFrom with the register", () => {
     fixedInterestMinor: null,
     isActive: true,
   };
-  const chart = [acct("rent", "Rent"), acct("card1", "Example Card", { account_type: "credit_card" })];
+  const company = { id: "rc1", name: "Example Affiliate", accountId: "due", matchWords: "example affiliate", isActive: true };
+  const chart = [
+    acct("rent", "Rent"),
+    acct("card1", "Example Card", { account_type: "credit_card" }),
+    acct("due", "Due from/to Example Affiliate", { account_type: "current_asset" }),
+  ];
   const line = txn("t1", "Metro Realty Partners", -420000, { bank_account_id: "bank1" });
+  const base = new Set(["bank1"]);
   it("proposes the card ahead of history, on a bank in the base currency", () => {
-    const views = suggestionsFrom(inputs({ lines: [line], accounts: chart, repayments: [card], baseCurrencyBankIds: new Set(["bank1"]) }));
+    const views = suggestionsFrom(inputs({ lines: [line], accounts: chart, repayments: [card], baseCurrencyBankIds: base }));
     expect(views[0]).toMatchObject({ accountId: "card1", source: "card", short: "Card" });
   });
   it("leaves a line on a foreign-currency bank to history", () => {
@@ -108,7 +114,20 @@ describe("suggestionsFrom with the register", () => {
   it("gives no suggestion when two entries claim the line", () => {
     const other = { ...card, id: "rp2", accountId: "card2" };
     const twoCards = [...chart, acct("card2", "Other Card", { account_type: "credit_card" })];
-    expect(suggestionsFrom(inputs({ lines: [line], accounts: twoCards, repayments: [card, other], baseCurrencyBankIds: new Set(["bank1"]) }))).toEqual([]);
+    expect(suggestionsFrom(inputs({ lines: [line], accounts: twoCards, repayments: [card, other], baseCurrencyBankIds: base }))).toEqual([]);
+  });
+  it("proposes a related company named on money in, ahead of history", () => {
+    const wire = txn("t2", "WIRE FROM EXAMPLE AFFILIATE", 1500000, { bank_account_id: "bank1" });
+    const views = suggestionsFrom(inputs({ lines: [wire], accounts: chart, related: [company], baseCurrencyBankIds: base }));
+    expect(views).toEqual([
+      expect.objectContaining({ transactionId: "t2", accountId: "due", source: "related", short: "Related" }),
+    ]);
+  });
+  it("gives no suggestion when a related company and a card both claim the line", () => {
+    const both = txn("t3", "METRO CARD PAID FOR EXAMPLE AFFILIATE", -50000, { bank_account_id: "bank1" });
+    expect(
+      suggestionsFrom(inputs({ lines: [both], accounts: chart, repayments: [card], related: [company], baseCurrencyBankIds: base })),
+    ).toEqual([]);
   });
 });
 

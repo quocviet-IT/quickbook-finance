@@ -18,7 +18,9 @@ import {
   type CodingSuggestionView,
 } from "@/lib/domain/coding";
 import type { CodingDirection } from "@/lib/domain/coding-names";
-import { repaymentFor, type RepaymentAccount } from "@/lib/domain/repayments";
+import { registerClaim } from "@/lib/domain/register-claim";
+import type { RelatedCompany } from "@/lib/domain/related-companies";
+import type { RepaymentAccount } from "@/lib/domain/repayments";
 import { listAccounts } from "./accounts";
 import { categoriseBankTransaction, listBankTransactions, listSuggestions } from "./banking";
 import { repaymentContext } from "./repayment-register";
@@ -90,7 +92,9 @@ export interface CodingInputs {
   matchedLineIds: ReadonlySet<string>;
   /** The register of cards and loans (0129). */
   repayments?: readonly RepaymentAccount[];
-  /** Bank accounts in the base currency; a line elsewhere is never a repayment. */
+  /** The register of related companies (0131). */
+  related?: readonly RelatedCompany[];
+  /** Bank accounts in the base currency; a line elsewhere is never claimed by the register. */
   baseCurrencyBankIds?: ReadonlySet<string>;
 }
 
@@ -109,14 +113,20 @@ export function suggestionsFrom(inputs: CodingInputs): CodingSuggestionView[] {
       description: row.description ?? "",
       merchantName: row.merchant_name ?? null,
     };
-    const repayment = inputs.repayments?.length
-      ? repaymentFor(
-          inputs.repayments,
-          { description: line.description, amountMinor: line.amountMinor, inBaseCurrency: inputs.baseCurrencyBankIds?.has(row.bank_account_id) ?? false },
+    const registered = Boolean(inputs.repayments?.length || inputs.related?.length);
+    const claim = registered
+      ? registerClaim({
+          repayments: inputs.repayments ?? [],
+          related: inputs.related ?? [],
+          line: {
+            description: line.description,
+            amountMinor: line.amountMinor,
+            inBaseCurrency: inputs.baseCurrencyBankIds?.has(row.bank_account_id) ?? false,
+          },
           accounts,
-        )
+        })
       : null;
-    const suggestion = suggestCoding({ line, rules: inputs.rules, index, accounts, hasMatch: inputs.matchedLineIds.has(row.id), repayment });
+    const suggestion = suggestCoding({ line, rules: inputs.rules, index, accounts, hasMatch: inputs.matchedLineIds.has(row.id), claim });
     const account = suggestion ? accounts.get(suggestion.accountId) : undefined;
     if (suggestion && account) views.push(codingView(line, suggestion, account));
   }
@@ -139,6 +149,7 @@ export async function codingSuggestions(sb: SupabaseClient, bankAccountId: strin
     accounts,
     matchedLineIds: new Set(matches.map((match) => match.bank_transaction_id)),
     repayments: context.repayments,
+    related: context.related,
     baseCurrencyBankIds: context.baseCurrencyBankIds,
   });
 }
