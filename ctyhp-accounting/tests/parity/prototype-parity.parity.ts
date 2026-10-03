@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import { describe, expect, it } from "vitest";
+import { unreadNetIncome } from "@/lib/parity/read-check";
 import type { ShotRecord } from "@/lib/parity/report-html";
 import type { PrototypeBook } from "@/lib/parity/types";
 import { captureScreens, openPrototype, readPrototype } from "./prototype";
@@ -51,8 +52,11 @@ describe("prototype 2.28 parity", () => {
           );
         }
         console.log(`parity: ${shots.length} screenshot(s), ${shots.filter((s) => s.error).length} failed`);
+        const unread = books.flatMap(unreadNetIncome);
+        console.log(`parity: ${unread.length} Profit and Loss year(s) with Net Income unread`);
         writeFileSync(join(outDir, "prototype-books.json"), JSON.stringify({ books, shots }, null, 2), "utf8");
         expect(books.length).toBeGreaterThan(0);
+        expect(unread).toEqual([]);
       } finally {
         clearTimeout(killer);
       }

@@ -2,10 +2,11 @@
 /* Injected into the prototype's own page after it has booted (see prototype.ts).
    Reads each book and the figures the prototype itself computes — its own
    balancesFor/view and its own rendered reports — in integer cents, and puts
-   the active book back as it was. It changes no book. Plain ES2017 on
-   purpose: it is injected as a script, never bundled. Its free names (DB, S,
-   UI, useBook, allTxns, view, balancesFor, fyStartMonth, reportPL, reportBS,
-   reportTB, render, TABS, REPORTS) are the prototype's globals. */
+   the active book and the screen settings back as they were. It changes no
+   book. Plain ES2017 on purpose: it is injected as a script, never bundled.
+   Its free names (DB, S, UI, useBook, allTxns, view, balancesFor,
+   fyStartMonth, reportPL, reportBS, reportTB, render, TABS, REPORTS) are the
+   prototype's globals. */
 (function () {
   "use strict";
 
@@ -43,7 +44,10 @@
     }
     return out;
   }
-  function labelOf(cell) {
+  /* A cell's own text. Gross Profit and Net Income carry a "% of income" line
+     (.pct-sub) inside the label cell and inside every figure cell; it is
+     dropped before either is read. */
+  function textOf(cell) {
     var copy = cell.cloneNode(true);
     var subs = copy.querySelectorAll(".pct-sub");
     for (var i = 0; i < subs.length; i++) subs[i].parentNode.removeChild(subs[i]);
@@ -63,10 +67,10 @@
     for (var r = 0; r < rows.length; r++) {
       var cells = rows[r].querySelectorAll("td");
       if (cells.length < 2) continue;
-      var label = labelOf(cells[0]);
+      var label = textOf(cells[0]);
       var values = [];
       for (var c = 1; c < cells.length; c++) {
-        var t = cells[c].textContent.replace(/\s+/g, "");
+        var t = textOf(cells[c]).replace(/\s+/g, "");
         if (AMOUNT.test(t)) values.push(amountOf(t));
       }
       if (values.length && !(label in out)) out[label] = values;
@@ -151,12 +155,23 @@
     return book;
   }
 
+  /* The screen settings readBook changes. read() puts them back, so the
+     screenshots taken next show the prototype as a visitor sees it. */
+  var SETTINGS = ["basis", "compare", "showPct", "from", "to"];
+
   window.__parity = {
     read: function () {
       var before = DB.activeId;
+      var settings = {};
+      SETTINGS.forEach(function (k) { settings[k] = UI[k]; });
       try { return DB.books.map(readBook); }
-      finally { useBook(before); }
+      finally {
+        useBook(before);
+        SETTINGS.forEach(function (k) { UI[k] = settings[k]; });
+      }
     },
+    /* For the reader's own test, inpage-reader.parity.ts. */
+    rowsOf: rowsOf,
     books: function () {
       return DB.books.map(function (b) {
         return { id: String(b.id), name: String((b.company && b.company.name) || "Book") };

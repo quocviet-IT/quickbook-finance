@@ -28,8 +28,14 @@ export async function openPrototype(browser: Browser, htmlPath: string): Promise
   return page;
 }
 
+/** The settings a visitor's screen depends on. Reading must leave them as they were. */
+const SCREEN_STATE = "JSON.stringify([DB.activeId, UI.basis, UI.compare, UI.showPct, UI.from, UI.to])";
+
 export async function readPrototype(page: Page): Promise<PrototypeBook[]> {
-  return (await page.evaluate("window.__parity.read()")) as PrototypeBook[];
+  const before = await page.evaluate(SCREEN_STATE);
+  const books = (await page.evaluate("window.__parity.read()")) as PrototypeBook[];
+  if ((await page.evaluate(SCREEN_STATE)) !== before) throw new Error("Reading the prototype changed its screen settings");
+  return books;
 }
 
 /** Every top-level tab and every report, for every book, in light and dark, at the window's 1440 × 900. */
