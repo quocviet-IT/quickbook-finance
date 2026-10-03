@@ -1,13 +1,15 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
 import { chromium } from "playwright";
 import { describe, expect, it } from "vitest";
 import { loadMigrationSources } from "@/lib/db/migration-sources";
 import { compareFigures, pairFigures } from "@/lib/parity/compare";
+import { compareEntries, type DriftEntry } from "@/lib/parity/drift";
 import { unreadNetIncome } from "@/lib/parity/read-check";
 import { renderParityReport, type BookReport, type ParityReport, type ShotRecord } from "@/lib/parity/report-html";
 import type { PrototypeBook } from "@/lib/parity/types";
+import { readLiveEntries } from "./drift-live";
 import { loadIntoThrowaway, readOnebookFigures } from "./onebook";
 import { captureScreens, openPrototype, readPrototype } from "./prototype";
 
@@ -17,6 +19,9 @@ import { captureScreens, openPrototype, readPrototype } from "./prototype";
  *   PARITY_PROTOTYPE_HTML  the built prototype, accounting-system.html (required)
  *   PARITY_OUT_DIR         where results go (default C:/Users/pit010/OneBook-parity-2.28 — outside the repository)
  *   PARITY_SKIP_SHOTS=1    skip the screenshots
+ *   PARITY_LIVE_SCHEMA     a live company's schema (co_…) to compare entry by entry (optional; read-only)
+ *   PARITY_LIVE_BOOK       which prototype book it holds: the book's id, or part of its name (with PARITY_LIVE_SCHEMA)
+ *   PARITY_ACCOUNT_MAP     a local JSON file { "<prototype account>": "<OneBook account code>" } (optional)
  *
  * Each book is posted into a throwaway company inside ONE transaction that is
  * always rolled back. The console prints counts only.
@@ -63,7 +68,7 @@ describe("prototype 2.28 parity", () => {
         });
         await client.connect();
         const reports: BookReport[] = [];
-        const drift: ParityReport["drift"] = null;
+        let drift: ParityReport["drift"] = null;
         try {
           const admin = (
             await client.query("select id from public.acc_app_user where role = 'admin' and status = 'active' order by created_at limit 1")
@@ -98,6 +103,38 @@ describe("prototype 2.28 parity", () => {
               await client.query("rollback");
             }
           }
+
+          const liveSchema = env("PARITY_LIVE_SCHEMA");
+          const liveBook = env("PARITY_LIVE_BOOK");
+          if (liveSchema && liveBook) {
+            const book = books.find((b) => b.id === liveBook || b.name.toLowerCase().includes(liveBook.toLowerCase()));
+            if (!book) throw new Error("PARITY_LIVE_BOOK names no book in the prototype");
+            const mapPath = env("PARITY_ACCOUNT_MAP");
+            const codes = mapPath
+              ? new Map(Object.entries(JSON.parse(readFileSync(mapPath, "utf8")) as Record<string, string>))
+              : null;
+            await client.query("begin read only");
+            try {
+              const live = await readLiveEntries(client, liveSchema, codes !== null);
+              const prototype: DriftEntry[] = book.entries.map((entry) => {
+                const postings = entry.postings.filter((p) => p.cents !== 0);
+                return {
+                  id: entry.id,
+                  date: entry.date,
+                  amounts: postings.map((p) => p.cents),
+                  accounts: codes ? postings.map((p) => codes.get(p.account) ?? `?${p.account}`) : null,
+                  label: entry.description,
+                };
+              });
+              drift = { schema: liveSchema, book: book.name, result: compareEntries(prototype, live) };
+              console.log(
+                `parity: data pass: ${drift.result.matched} matched, ${drift.result.onlyPrototype.length} only in the prototype, ` +
+                  `${drift.result.onlyOnebook.length} only in OneBook, ${drift.result.accountsDiffer.length} on other accounts`,
+              );
+            } finally {
+              await client.query("rollback");
+            }
+          }
         } finally {
           await client.end();
         }
@@ -106,6 +143,7 @@ describe("prototype 2.28 parity", () => {
         writeFileSync(join(outDir, "parity-report.html"), renderParityReport(report), "utf8");
         writeFileSync(join(outDir, "parity-result.json"), JSON.stringify(report, null, 2), "utf8");
         console.log(`parity: report written to ${join(outDir, "parity-report.html")}`);
+        expect(books.length).toBeGreaterThan(0);
         expect(reports).toHaveLength(books.length);
         expect(unread).toEqual([]);
       } finally {
