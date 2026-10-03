@@ -44,19 +44,22 @@ file for the other half of the month too: proving the books against it. Decided 
 
 ### 4.1 Data — migration `0132_reconcile_from_statement.sql` (goes live only with the user's approval)
 
-- `acc_statement_reconciliation` gains `statement_file_name text` (≤ 255), `statement_opening_minor bigint` (the
-  opening balance the statement prints, when it prints one) and `note text` (≤ 500; "Brought forward …").
+- `acc_statement_reconciliation` keeps the statement's file name in its existing, unused `statement_ref` column (now
+  ≤ 255) and gains `statement_opening_minor bigint` and `statement_closing_minor bigint` (the balances the statement
+  prints, when it prints them), `note text` (≤ 500; "Brought forward …") and `brought_forward boolean` (the list and
+  the report read it).
 - New table `acc_reconciliation_statement_line`: `id`, `reconciliation_id` (cascade with its reconciliation),
   `line_no int`, `txn_date date`, `description text`, `reference text` (the cheque number), `amount_minor bigint`
   (≠ 0, positive is money in), `balance_minor bigint` (null when not printed); unique (`reconciliation_id`, `line_no`).
   RLS as `acc_reconciliation_line`: read for staff and viewers, written only through the functions below.
 - `acc_reconciliation_lines` returns one more column, `reference`: the entry's `source_ref`, else the reference of the
-  customer payment or bill payment the entry came from. (The function is dropped and recreated with the same grants,
-  because its result columns change.)
+  customer payment or bill payment the entry came from. (The function is dropped and recreated, because its result
+  columns change; it and the preview are granted to signed-in users only, as 0080 asks of every new function.)
 - New functions, each staff-only, on an in-progress reconciliation unless said, audited like the 0026 functions:
   - `acc_create_reconciliation_from_statement(p_bank_account_id, p_ending_date, p_ending_minor, p_file_name,
     p_opening_minor, p_lines jsonb) returns uuid` — `acc_create_reconciliation` plus the statement, in one transaction.
-  - `acc_set_reconciliation_statement(p_reconciliation_id, p_file_name, p_opening_minor, p_lines jsonb) returns int` —
+  - `acc_set_reconciliation_statement(p_reconciliation_id, p_file_name, p_opening_minor, p_closing_minor,
+    p_lines jsonb) returns int` —
     replaces the statement held by a reconciliation (the Import button inside one).
   - `acc_set_statement_ending(p_reconciliation_id, p_ending_minor) returns void` — takes the closing balance from the
     file when it differs from the one typed.
@@ -77,17 +80,23 @@ A port of `recPair` and `recMatch` in cents:
 ```ts
 export interface PairStatementLine { lineNo: number; date: string; amountMinor: number; reference: string | null }
 export interface PairBookLine { id: string; date: string; amountMinor: number; reference: string | null }
-export type PairHow = "date and amount" | "cheque number" | "amount, within 5 days";
-export interface StatementPairing {
-  pairs: { line: PairStatementLine; book: PairBookLine; how: PairHow }[];
+export interface StatementPair { line: PairStatementLine; book: PairBookLine; how: string } // "date and amount" |
+                                                     // "cheque number" | "amount, within 5 days"
+export interface Pairing {
+  pairs: StatementPair[];
   missing: PairStatementLine[];   // on the statement, not in the books
   unseen: PairBookLine[];         // in the books, not on the statement
+}
+export interface StatementMatch extends Pairing {
   flipped: boolean;               // the statement's signs were read the other way round
   ignored: number;                // statement lines dated after the statement date
 }
-export function pairStatement(lines, book, windowDays = 5): Omit<StatementPairing, "flipped" | "ignored">;
-export function matchStatement(lines, book, statementDate: string): StatementPairing;
+export function pairStatement(lines, book, windowDays = 5): Pairing;
+export function matchStatement(lines, book, statementDate: string): StatementMatch;
 ```
+
+The sentences and standings the screens show — whether an account can be brought forward, the closing and opening
+checks, how each statement line stands — are pure functions beside it, in `lib/domain/reconcile-statement.ts`.
 
 The cheque test compares the statement line's reference, kept to letters, digits and hyphens as the prototype keeps it,
 with the book line's reference; an empty statement reference never matches.
@@ -117,7 +126,8 @@ with the book line's reference; an empty statement reference never matches.
   $5,558.25; this reconciliation says $5,600.00" with **Use $5,558.25**; when its opening balance differs from the
   beginning balance, that is said too (a month is missing, or the last reconciliation closed on a different figure).
 - The statement panel replaces today's read-only list: every statement line with how it paired ("Paired · date and
-  amount", "Paired · cheque number", "Paired · amount, within 5 days") or **Not in the books**; a link **Code the N
+  amount", "Paired · cheque number", "Paired · amount, within 5 days" — marked "not ticked" when its book line was
+  unticked by hand) or **Not in the books**; a link **Code the N
   lines the books do not have** to Bank Transactions; and **Match again**, which pairs the stored lines against the
   books as they are now and ticks any new pairs. The books panel tags unticked lines as **Outstanding**.
 - Completing is unchanged: the difference must be zero (or an adjustment recorded), and a person clicks Complete.
