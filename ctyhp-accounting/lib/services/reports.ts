@@ -26,6 +26,18 @@ function pagedRpc<T>(
   );
 }
 
+/** One row of acc_ledger_balances, as every report reads it. */
+export function ledgerBalanceFromRow(r: Record<string, unknown>): LedgerBalance {
+  return {
+    accountId: r.account_id as string,
+    accountCode: r.account_code as string,
+    name: r.name as string,
+    accountType: r.account_type as LedgerBalance["accountType"],
+    debitBase: Number(r.debit_base),
+    creditBase: Number(r.credit_base),
+  };
+}
+
 /**
  * Per-account debit/credit totals (base-currency minor units) from posted
  * entries within [p_from, p_to]. p_from null = cumulative (for as-of reports).
@@ -40,14 +52,7 @@ export async function getLedgerBalances(
     p_from: from,
     p_to: to,
   });
-  return data.map((r: Record<string, unknown>) => ({
-    accountId: r.account_id as string,
-    accountCode: r.account_code as string,
-    name: r.name as string,
-    accountType: r.account_type as LedgerBalance["accountType"],
-    debitBase: Number(r.debit_base),
-    creditBase: Number(r.credit_base),
-  }));
+  return data.map(ledgerBalanceFromRow);
 }
 
 /**
