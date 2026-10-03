@@ -7,7 +7,7 @@ import type {
   BankTransactionRow,
 } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
-import { statementLineHash } from "@/lib/domain/banking-import";
+import { statementLineHashes } from "@/lib/domain/banking-import";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -108,14 +108,15 @@ export async function importStatement(
 ): Promise<{ inserted: number; skipped: number; batchId: string | null }> {
   if (!rows.length) return { inserted: 0, skipped: 0, batchId: null };
 
-  const payload = rows.map((r) => ({
+  const hashes = statementLineHashes(bankAccountId, rows);
+  const payload = rows.map((r, i) => ({
     txn_date: r.txn_date,
     description: r.description,
     reference: r.reference,
     amount_minor: r.amount_minor,
     running_balance_minor: r.running_balance_minor,
     raw_line: r.raw_line,
-    raw_hash: statementLineHash(bankAccountId, r),
+    raw_hash: hashes[i],
     source: "file_upload",
   }));
 
