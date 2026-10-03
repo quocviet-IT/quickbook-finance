@@ -191,6 +191,10 @@ language plpgsql security definer set search_path = public as $$
 declare v_gl uuid; v_balance bigint; v_id uuid;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to bring a bank account forward'; end if;
+  -- The row lock serialises this with any reconciliation being created for the
+  -- account: an insert into acc_statement_reconciliation holds FOR KEY SHARE on
+  -- this row through its foreign key until it commits, which FOR UPDATE waits
+  -- for; the check below then sees that reconciliation and refuses.
   select account_id into v_gl from acc_bank_account where id = p_bank_account_id for update;
   if v_gl is null then raise exception 'Bank account not found'; end if;
   if exists (select 1 from acc_statement_reconciliation where bank_account_id = p_bank_account_id) then

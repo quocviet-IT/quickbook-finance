@@ -144,13 +144,14 @@ try {
       check("a book line carries its reference", book.find((l) => Number(l.signed_minor) === -12000)?.reference === "1201");
 
       const many = `select acc_set_cleared_many($1, $2::uuid[], true) as n`;
+      const augustLine = (await one(`select journal_line_id from acc_reconciliation_line where reconciliation_id = $1 limit 1`, [forward])).journal_line_id;
+      const twice = await refused(many, [rec, [book[0].journal_line_id, augustLine]]);
+      const tickedAfterRefusal = (await one(`select count(*)::int as n from acc_reconciliation_line where reconciliation_id = $1`, [rec])).n;
+      check("a batch holding a line already reconciled is refused, and ticks nothing", /already reconciled|after the statement ending date|does not belong/.test(twice ?? "") && tickedAfterRefusal === 0, `${twice ?? "accepted"}; ticked ${tickedAfterRefusal}`);
       const ticked = (await one(many, [rec, book.map((l) => l.journal_line_id)])).n;
       check("both lines ticked in one call", ticked === 2, String(ticked));
       const detail = await one(`select * from acc_reconciliation_detail($1)`, [rec]);
       check("out by the fee the books do not have (5.00)", Number(detail.difference_minor) === -500, String(detail.difference_minor));
-      const augustLine = (await one(`select journal_line_id from acc_reconciliation_line where reconciliation_id = $1 limit 1`, [forward])).journal_line_id;
-      const twice = await refused(many, [rec, [book[0].journal_line_id, augustLine]]);
-      check("a line already reconciled is refused, and nothing changes", /already reconciled|after the statement ending date|does not belong/.test(twice ?? ""), twice ?? "accepted");
       const otherLine = (await one(`select l.id from acc_journal_line l where l.account_id = $1 limit 1`, [other])).id;
       const foreign = await refused(many, [rec, [otherLine]]);
       check("a line of another account is refused", /does not belong to this bank account/.test(foreign ?? ""), foreign ?? "accepted");
