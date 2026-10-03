@@ -16,7 +16,8 @@ export const PDF_MESSAGES = {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function shortDate(iso: string, withYear: boolean): string {
+/** "Aug 31" or "Aug 31, 2026". */
+export function shortDate(iso: string, withYear: boolean): string {
   const [y, m, d] = iso.split("-").map(Number);
   return `${MONTHS[m - 1]} ${d}${withYear ? `, ${y}` : ""}`;
 }
