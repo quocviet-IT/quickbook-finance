@@ -49,13 +49,13 @@ describe("detectStatementFormat", () => {
     expect(detectStatementFormat("sept.qbo", "")).toEqual({ format: "ofx" });
     expect(detectStatementFormat("sept.qif", "")).toEqual({ format: "qif" });
     expect(detectStatementFormat("sept.csv", "")).toEqual({ format: "csv" });
-    expect(detectStatementFormat("sept.pdf", "")).toEqual({ unsupported: UNSUPPORTED_STATEMENT });
+    expect(detectStatementFormat("sept.pdf", "")).toEqual({ format: "pdf" });
     expect(detectStatementFormat("sept.xlsx", "")).toEqual({ unsupported: UNSUPPORTED_STATEMENT });
   });
   it("looks inside a file whose name says nothing", () => {
     expect(detectStatementFormat("download", SGML)).toEqual({ format: "ofx" });
     expect(detectStatementFormat("download", "!Type:Bank\nD9/30'26\n^")).toEqual({ format: "qif" });
-    expect(detectStatementFormat("download", "%PDF-1.7")).toEqual({ unsupported: UNSUPPORTED_STATEMENT });
+    expect(detectStatementFormat("download", "%PDF-1.7")).toEqual({ format: "pdf" });
     expect(detectStatementFormat("download.txt", "date,amount")).toEqual({ format: "csv" });
   });
 });

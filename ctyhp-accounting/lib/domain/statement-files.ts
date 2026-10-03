@@ -8,16 +8,18 @@
  */
 import { normalizeStatementDate, parseStatementAmount, type DateOrder, type StatementLine } from "./statement-import";
 
-export type StatementFormat = "csv" | "ofx" | "qif";
+export type StatementFormat = "csv" | "ofx" | "qif" | "pdf";
 
 export const UNSUPPORTED_STATEMENT = "Save the statement as CSV from your bank, or download it as OFX or QFX.";
 
+/** A PDF is read by its layout (pdf-statement.ts); a spreadsheet is not read at all. */
 export function detectStatementFormat(fileName: string, text: string): { format: StatementFormat } | { unsupported: string } {
   const extension = fileName.toLowerCase().split(".").pop() ?? "";
   if (["ofx", "qfx", "qbo"].includes(extension)) return { format: "ofx" };
   if (extension === "qif") return { format: "qif" };
-  if (["pdf", "xls", "xlsx", "xlsm", "numbers"].includes(extension)) return { unsupported: UNSUPPORTED_STATEMENT };
-  if (text.startsWith("%PDF")) return { unsupported: UNSUPPORTED_STATEMENT };
+  if (extension === "pdf") return { format: "pdf" };
+  if (["xls", "xlsx", "xlsm", "numbers"].includes(extension)) return { unsupported: UNSUPPORTED_STATEMENT };
+  if (text.startsWith("%PDF")) return { format: "pdf" };
   const head = text.slice(0, 2000);
   if (/OFXHEADER|<OFX>/i.test(head)) return { format: "ofx" };
   if (/^\s*!Type:/i.test(head)) return { format: "qif" };

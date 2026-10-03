@@ -909,6 +909,7 @@ export default function BankingClient({
             label: `${selected.bank_name || selected.account_name} · ${selected.account_code}`,
             maskedNumber: selected.account_number_masked,
             decimals: decimalPlaces,
+            currencyCode: selected.currency_code,
           }}
           importing={busy === "import"}
           onConfirm={(fileName, rows) => void confirmImport(fileName, rows)}
