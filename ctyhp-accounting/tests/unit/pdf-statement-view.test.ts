@@ -82,6 +82,13 @@ describe("summarizeStatement", () => {
     expect(summary.proves).toBe(false);
     expect(summary.proof).toBe("The statement shows no opening or closing balance, so it cannot prove itself.");
   });
+
+  it("shows nothing paid out as $0.00, not -$0.00", () => {
+    const summary = summarizeStatement(statement({ closingMinor: 150000, lines: [line(50000)] }), usd);
+    expect(summary.moneyOut).toEqual({ count: 0, minor: 0 });
+    expect(Object.is(summary.moneyOut.minor, -0)).toBe(false);
+    expect(usd(summary.moneyOut.minor)).toBe("$0.00");
+  });
 });
 
 describe("skippedNote", () => {

@@ -70,7 +70,7 @@ export function summarizeStatement(s: PdfStatement, money: (minor: number) => st
   }
   return {
     moneyIn: { count: moneyIn.length, minor: moneyIn.reduce((sum, l) => sum + l.amountMinor, 0) },
-    moneyOut: { count: moneyOut.length, minor: -moneyOut.reduce((sum, l) => sum + l.amountMinor, 0) },
+    moneyOut: { count: moneyOut.length, minor: moneyOut.reduce((sum, l) => sum - l.amountMinor, 0) },
     proves: differenceMinor === 0,
     proof,
   };
