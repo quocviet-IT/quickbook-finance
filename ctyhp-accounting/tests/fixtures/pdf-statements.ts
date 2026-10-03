@@ -442,6 +442,63 @@ export const PDF_SCENARIOS: PdfScenario[] = [
     ],
   },
   {
+    name: "signPriority",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Statement period Apr 1 - Apr 30, 2027"]],
+        [730, [40, "Beginning balance"], [500, "1,000.00"]],
+        [718, [40, "Ending balance"], [500, "880.00"]],
+        [700, [40, "Deposits and credits"]],
+        [688, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+        [676, [40, "04/02"], [90, "EXAMPLE MISALIGNED"], [410, "100.00"], [500, "900.00"]],
+        [664, [40, "04/09"], [90, "EXAMPLE PRINTED SIGN"], [410, "-50.00"]],
+        [652, [40, "04/16"], [90, "EXAMPLE COLUMN"], [330, "20.00"]],
+        [640, [40, "04/23"], [90, "EXAMPLE SECTION"], [250, "50.00"], [500, "880.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: "2027-04-01", to: "2027-04-30", opening: 100000, closing: 88000, skipped: 0,
+        lines: [
+          ["2027-04-02",-10000,"EXAMPLE MISALIGNED",null,90000],
+          ["2027-04-09",-5000,"EXAMPLE PRINTED SIGN",null,null],
+          ["2027-04-16",-2000,"EXAMPLE COLUMN",null,null],
+          ["2027-04-23",5000,"EXAMPLE SECTION",null,88000],
+        ],
+      },
+    ],
+  },
+  {
+    name: "summaryFeesAndPayments",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Statement period May 1 - May 31, 2027"]],
+        [730, [40, "Beginning balance"], [500, "600.00"]],
+        [718, [40, "Ending balance"], [500, "668.00"]],
+        [700, [40, "Account summary"]],
+        [688, [40, "Date"], [90, "Description"], [420, "Amount"]],
+        [676, [40, "05/31"], [90, "Interest earned this period"], [420, "1.00"]],
+        [658, [40, "Payments received"]],
+        [646, [40, "Date"], [90, "Description"], [420, "Amount"]],
+        [634, [40, "05/06"], [90, "EXAMPLE CUSTOMER"], [420, "80.00"]],
+        [616, [40, "Fees"]],
+        [604, [40, "Date"], [90, "Description"], [420, "Amount"]],
+        [592, [40, "05/20"], [90, "MONTHLY MAINTENANCE"], [420, "12.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: "2027-05-01", to: "2027-05-31", opening: 60000, closing: 66800, skipped: 0,
+        lines: [
+          ["2027-05-06",8000,"EXAMPLE CUSTOMER",null,null],
+          ["2027-05-20",-1200,"MONTHLY MAINTENANCE",null,null],
+        ],
+      },
+    ],
+  },
+  {
     name: "repeatedLines",
     pages: [
       [

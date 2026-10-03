@@ -6,11 +6,13 @@
  *
  * Pure: the browser turns the file into glyphs (lib/client/pdf-text.ts) and
  * this turns the glyphs into statements. It departs from the prototype in
- * three places, each marked "OneBook:" where it happens:
+ * four places, each marked "OneBook:" where it happens:
  *   1. a figure with two decimals is never a date (the prototype reads 75.00 as
  *      month 75, day 00, and loses a cheque in a grid);
  *   2. "Statement date: November 30, 2026" is read with its whole month name;
- *   3. a line dated a day that does not exist is skipped and counted.
+ *   3. a line dated a day that does not exist is skipped and counted;
+ *   4. a date pdf.js has joined to the words after it is read as the date and
+ *      the words.
  */
 import type { StatementLine } from "./statement-import";
 
