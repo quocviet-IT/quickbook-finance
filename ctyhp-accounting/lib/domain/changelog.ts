@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.78",
+    date: "2026-10-03",
+    headline: "A bank statement in PDF can be imported, and it proves itself before it is.",
+    changes: [
+      {
+        kind: "added",
+        title: "PDF statements on Import statement",
+        detail:
+          "Choose the PDF your bank gives you. OneBook reads its period, its opening and closing balances and every line, and shows whether the opening balance plus the lines comes to the closing balance before anything is imported; if it does not, the button says Import anyway. A PDF that holds several accounts offers each one, and a scanned or password-locked PDF says so. The file never leaves your browser.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Two identical lines in one file are two lines",
+        detail:
+          "Two $5.00 fees on the same day in one statement used to arrive as one. Every file format now keeps both, and importing the same file again still adds nothing.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "1.77",
     date: "2026-10-02",
     headline: "Money between your own companies is owed, never income or a cost.",

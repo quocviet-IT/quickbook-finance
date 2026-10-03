@@ -291,8 +291,18 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Import statement",
         route: "/banking",
         note:
-          "Each line is fingerprinted, so importing the same file twice adds " +
-          "nothing and two genuinely different lines are never merged.",
+          "A PDF, CSV, OFX, QFX, QBO or QIF file. Each line is fingerprinted, so importing the same " +
+          "file twice adds nothing, and two identical lines in one file are both kept.",
+      },
+      {
+        action: "Check a PDF statement before importing it",
+        control: "Import statement",
+        route: "/banking",
+        note:
+          "OneBook reads the period, the opening and closing balances and every line, and shows whether " +
+          "the opening balance plus the lines comes to the closing balance. If it does not, a line may not " +
+          "have been read: check the statement, then Import anyway or use the bank's CSV. A scanned PDF has " +
+          "no text to read.",
       },
       {
         action: "Match lines to the ledger",
