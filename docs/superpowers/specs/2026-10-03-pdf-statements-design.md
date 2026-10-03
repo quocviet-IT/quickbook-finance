@@ -50,7 +50,10 @@ Decided with the user on 2026-10-03:
 |---|---|---|
 | Floating-point dollars rounded with `r2` | every figure read straight into integer cents; no float arithmetic | the rule for money everywhere in OneBook |
 | pdf.js 3.11.174 fetched from a CDN at run time | `pdfjs-dist` 6.x, a pinned dependency bundled with the app, its worker served from OneBook, `isEvalSupported: false` | 3.11.174 has a published flaw (CVE-2024-4367) that lets a crafted PDF run script; no third-party fetch at run time |
-| An impossible date (02/30) becomes a real one | a line whose date does not exist is skipped and counted | as every other OneBook reader does |
+| An impossible date (02/30) is kept as the string `2026-02-30` | a line whose date does not exist is skipped and counted | as every other OneBook reader does |
+| `isDateCell` accepts `.` between month and day, so `75.00` reads as month 75, day 00: in a cheque grid every cheque under $100 starts a false segment and is lost, and a restated cheque table is then only partly recognised and counted twice | a figure with two decimals is never a date | found by running the prototype's own code on the scenarios of section 5: one cheque grid out by $75.00, one restated table out by $150.00 |
+| `as of / statement date / closing date` takes the gap before the month greedily, so "Statement date: November 30, 2026" yields the month "ber"; only three-letter months and "May" work, and a statement dated that way loses every line | the gap is matched lazily; the whole month name is read | same run |
+| pdf.js joins a date to the words printed just after it ("07/02/2026 EXAMPLE DEPOSIT") when the gap is narrow; the cell is then neither a date nor words, and the line is missed | a cell that starts with a date followed by words is read as the date and the words | found reading generated PDFs through pdf.js |
 | The account number is only used to split | the statement's account number is checked against the bank account chosen, as for OFX | an existing OneBook protection |
 | The reader feeds a reconciliation that signs itself off | the lines go to Review import; nothing is posted until a person ticks and clicks Post | OneBook's rule; reconciliation is 1.79 |
 | — | duplicate lines and re-imported files recognised, as for every format | an existing OneBook protection |
@@ -139,6 +142,11 @@ export function toStatementLines(s: PdfStatement): StatementLine[];     // for I
 bank id are unaffected) in file order and passes each its occurrence. Applies to CSV, OFX, QIF and PDF alike.
 
 ## 5. Proving it
+
+Verified before planning: the reader of section 4.2, written out in full, was run on sixteen invented statements next to
+the prototype's own `p44` code. It agrees with the prototype line for line on every statement except the four that
+exercise the departures of section 3, and every one of the sixteen proves (opening + lines = closing) — including the
+four the prototype misreads. Generated as real PDFs and read through `pdfjs-dist` 6.3, all sixteen prove too.
 
 - **Unit tests**, invented data only ("Example Bank", account ending 0000), on synthetic glyph fixtures built by a small
   helper that lays out rows at given x positions: each row of the table in section 2 has at least one test — the money
