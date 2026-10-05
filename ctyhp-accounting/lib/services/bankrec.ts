@@ -2,12 +2,42 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StatementReconciliationRow } from "@/lib/db/types";
 import { readAllPages } from "@/lib/services/paging";
 import type { ReconciliationCreateInput, ReconciliationAdjustmentInput, ReconciliationReopenInput } from "@/lib/domain/schemas";
+import type { StatementLine } from "@/lib/domain/statement-import";
+import { reconciliationStandings, type BroughtForwardPreview, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 
 export class BankRecError extends Error {}
 
 export interface ReconLineView {
   journalLineId: string; entryId: string; entryNumber: string | null; entryDate: string;
   sourceType: string; memo: string | null; signedMinor: number; cleared: boolean;
+  /** The cheque number a statement pairs on: the entry's reference, else its payment's. */
+  reference: string | null;
+}
+
+/** A statement line as a reconciliation keeps it. */
+export interface ReconStatementLine {
+  lineNo: number; txnDate: string; description: string; reference: string | null;
+  amountMinor: number; balanceMinor: number | null;
+}
+
+/** A reconciliation's account and date, and the statement it is reconciled against. */
+export interface ReconStatementHeader {
+  bankAccountId: string; endingDate: string; status: string;
+  fileName: string | null; openingMinor: number | null; closingMinor: number | null;
+  note: string | null; broughtForward: boolean;
+}
+
+/** The statement a reconciliation is reconciled against, with its lines. */
+export interface ReconStatement extends ReconStatementHeader {
+  lines: ReconStatementLine[];
+}
+
+/** A statement file's figures and lines, as a reconciliation takes them. */
+export interface StatementFileInput {
+  fileName: string;
+  openingMinor: number | null;
+  closingMinor: number | null;
+  lines: StatementLine[];
 }
 export interface ReconDetail {
   beginningMinor: number; statementEndingMinor: number; clearedTotalMinor: number;
@@ -54,7 +84,7 @@ export async function reopenReconciliation(sb: SupabaseClient, id: string, input
 
 export async function listReconciliations(sb: SupabaseClient, bankAccountId: string): Promise<StatementReconciliationRow[]> {
   const { data, error } = await sb.from("acc_statement_reconciliation")
-    .select("id,bank_account_id,statement_ending_date,beginning_balance_minor,statement_ending_balance_minor,status,adjustment_entry_id,adjustment_reason,statement_ref,completed_at,created_at")
+    .select("id,bank_account_id,statement_ending_date,beginning_balance_minor,statement_ending_balance_minor,status,adjustment_entry_id,adjustment_reason,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward,completed_at,created_at")
     .eq("bank_account_id", bankAccountId)
     .order("statement_ending_date", { ascending: false });
   if (error) throw new BankRecError(error.message);
@@ -81,6 +111,7 @@ export async function getReconciliationLines(sb: SupabaseClient, id: string): Pr
     entryNumber: (r.entry_number as string) ?? null, entryDate: r.entry_date as string,
     sourceType: r.source_type as string, memo: (r.memo as string) ?? null,
     signedMinor: Number(r.signed_minor), cleared: Boolean(r.cleared),
+    reference: (r.reference as string) ?? null,
   }));
 }
 
@@ -103,4 +134,136 @@ export async function getDiscrepancies(sb: SupabaseClient, bankAccountId: string
     reconciliationId: r.reconciliation_id as string, journalLineId: r.journal_line_id as string,
     entryNumber: (r.entry_number as string) ?? null, entryDate: r.entry_date as string, signedMinor: Number(r.signed_minor),
   }));
+}
+
+// --- A reconciliation reconciled against its statement file -----------------
+
+/** The lines as a reconciliation keeps them. A line of no amount moves no money and is not kept. */
+function statementPayload(lines: readonly StatementLine[]) {
+  return lines
+    .filter((l) => l.amount_minor !== 0)
+    .map((l) => ({
+      txn_date: l.txn_date, description: l.description, reference: l.reference,
+      amount_minor: l.amount_minor, balance_minor: l.running_balance_minor,
+    }));
+}
+
+/** A reconciliation started from a statement: its date and ending balance are the statement's. */
+export async function createReconciliationFromStatement(
+  sb: SupabaseClient, bankAccountId: string, endingDate: string, endingMinor: number, file: StatementFileInput,
+): Promise<string> {
+  const { data, error } = await sb.rpc("acc_create_reconciliation_from_statement", {
+    p_bank_account_id: bankAccountId, p_ending_date: endingDate, p_ending_minor: endingMinor,
+    p_file_name: file.fileName, p_opening_minor: file.openingMinor, p_lines: statementPayload(file.lines),
+  });
+  if (error) throw new BankRecError(error.message);
+  return data as string;
+}
+
+/** Replaces the statement a reconciliation in progress is reconciled against. */
+export async function setReconciliationStatement(sb: SupabaseClient, id: string, file: StatementFileInput): Promise<number> {
+  const { data, error } = await sb.rpc("acc_set_reconciliation_statement", {
+    p_reconciliation_id: id, p_file_name: file.fileName, p_opening_minor: file.openingMinor,
+    p_closing_minor: file.closingMinor, p_lines: statementPayload(file.lines),
+  });
+  if (error) throw new BankRecError(error.message);
+  return Number(data);
+}
+
+export async function setStatementEnding(sb: SupabaseClient, id: string, endingMinor: number): Promise<void> {
+  const { error } = await sb.rpc("acc_set_statement_ending", { p_reconciliation_id: id, p_ending_minor: endingMinor });
+  if (error) throw new BankRecError(error.message);
+}
+
+/** Ticks or unticks many lines at once: every line passes acc_set_cleared's checks, or none changes. */
+export async function setClearedMany(sb: SupabaseClient, id: string, journalLineIds: string[], cleared: boolean): Promise<number> {
+  if (!journalLineIds.length) return 0;
+  const { data, error } = await sb.rpc("acc_set_cleared_many", {
+    p_reconciliation_id: id, p_journal_line_ids: journalLineIds, p_cleared: cleared,
+  });
+  if (error) throw new BankRecError(error.message);
+  return Number(data);
+}
+
+export async function getBroughtForwardPreview(sb: SupabaseClient, bankAccountId: string, through: string): Promise<BroughtForwardPreview> {
+  const { data, error } = await sb.rpc("acc_brought_forward_preview", { p_bank_account_id: bankAccountId, p_through: through });
+  if (error) throw new BankRecError(error.message);
+  const r = (data ?? [])[0] as Record<string, unknown> | undefined;
+  if (!r) throw new BankRecError("Bank account not found");
+  return {
+    hasReconciliations: Boolean(r.has_reconciliations),
+    bookBalanceMinor: Number(r.book_balance_minor),
+    openLines: Number(r.open_lines),
+  };
+}
+
+/** The first reconciliation of an account, brought forward through `through` and signed by whoever asks. */
+export async function bringForward(
+  sb: SupabaseClient, bankAccountId: string, through: string, openingMinor: number, note: string,
+): Promise<string> {
+  const { data, error } = await sb.rpc("acc_bring_forward_reconciliation", {
+    p_bank_account_id: bankAccountId, p_through: through, p_opening_minor: openingMinor, p_note: note,
+  });
+  if (error) throw new BankRecError(error.message);
+  return data as string;
+}
+
+const optionalMinor = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+export async function getReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader> {
+  const { data, error } = await sb.from("acc_statement_reconciliation")
+    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward")
+    .eq("id", id)
+    .single();
+  if (error) throw new BankRecError(error.message);
+  const r = data as Record<string, unknown>;
+  return {
+    bankAccountId: r.bank_account_id as string,
+    endingDate: r.statement_ending_date as string,
+    status: r.status as string,
+    fileName: (r.statement_ref as string) ?? null,
+    openingMinor: optionalMinor(r.statement_opening_minor),
+    closingMinor: optionalMinor(r.statement_closing_minor),
+    note: (r.note as string) ?? null,
+    broughtForward: Boolean(r.brought_forward),
+  };
+}
+
+export async function getReconciliationStatement(sb: SupabaseClient, id: string): Promise<ReconStatement> {
+  const [header, lines] = await Promise.all([
+    getReconciliationHeader(sb, id),
+    // Paged: a statement holds up to 5,000 lines, and line_no is unique within
+    // a reconciliation, so the order is total.
+    readAllPages<Record<string, unknown>>(
+      (from, to) =>
+        sb.from("acc_reconciliation_statement_line")
+          .select("line_no,txn_date,description,reference,amount_minor,balance_minor")
+          .eq("reconciliation_id", id)
+          .order("line_no")
+          .range(from, to),
+      (message) => new BankRecError(message),
+    ),
+  ]);
+  return {
+    ...header,
+    lines: lines.map((l) => ({
+      lineNo: Number(l.line_no), txnDate: l.txn_date as string, description: (l.description as string) ?? "",
+      reference: (l.reference as string) ?? null, amountMinor: Number(l.amount_minor), balanceMinor: optionalMinor(l.balance_minor),
+    })),
+  };
+}
+
+/**
+ * Pairs the statement a reconciliation holds with the books as they are now,
+ * and ticks every pair not ticked yet. No tick is removed, as in the prototype.
+ */
+export async function pairAndTick(sb: SupabaseClient, id: string): Promise<PairingOutcome> {
+  const [statement, book] = await Promise.all([getReconciliationStatement(sb, id), getReconciliationLines(sb, id)]);
+  const result = reconciliationStandings(statement, book);
+  const toTick = result.standings.flatMap((s) => (s.kind === "paired" && !s.ticked ? [s.bookId] : []));
+  const ticked = await setClearedMany(sb, id, toTick, true);
+  return {
+    lines: statement.lines.length, paired: result.paired, ticked,
+    missing: result.missing, after: result.after, flipped: result.flipped,
+  };
 }

@@ -559,7 +559,14 @@ export interface StatementReconciliationRow {
   status: ReconciliationSessionStatus;
   adjustment_entry_id: string | null;
   adjustment_reason: string | null;
+  /** The statement file's name, when the reconciliation was given one. */
   statement_ref: string | null;
+  /** The opening and closing balances the statement prints. */
+  statement_opening_minor: number | null;
+  statement_closing_minor: number | null;
+  note: string | null;
+  /** The first reconciliation of an account, signed off on the opening balance of its first statement. */
+  brought_forward: boolean;
   completed_at: string | null;
   created_at: string;
 }
