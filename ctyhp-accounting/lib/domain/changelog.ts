@@ -41,6 +41,19 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.80",
+    date: "2026-10-05",
+    headline: "Every page downloads less before it can be used.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Pages no longer download the sign-in library until you need it",
+        detail:
+          "Every signed-in page used to download the library behind Sign out and report attachments, whether anyone signed out or attached a file or not. It now loads on that click, so each page carries less, and Sign out or sending a report with a file takes a moment longer the first time. Nothing else changes.",
+      },
+    ],
+  },
+  {
     version: "1.79",
     date: "2026-10-05",
     headline: "A reconciliation can start from the statement's PDF, and the statement's lines pair with the books.",

@@ -21,7 +21,6 @@ import {
   fileFeedbackReportAction,
   recordFeedbackAttachmentsAction,
 } from "@/app/(app)/settings/feedback/actions";
-import { createSupabaseBrowserClient } from "@/lib/db/client";
 import {
   attachmentStoragePath,
   FEEDBACK_ATTACHMENT_ACCEPT,
@@ -122,6 +121,9 @@ export default function ReportDialog({
    */
   async function uploadAttachments(reportId: string) {
     if (files.length === 0) return { stored: 0, failed: 0 };
+    // Fetched here, like the screenshot library: this dialog sits in the shell on
+    // every page, and only a report with files needs the Supabase client.
+    const { createSupabaseBrowserClient } = await import("@/lib/db/client");
     const sb = createSupabaseBrowserClient();
     const uploaded: {
       storage_path: string;

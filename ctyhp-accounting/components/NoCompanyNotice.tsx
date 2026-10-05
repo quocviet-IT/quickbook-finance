@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Card, Result, Typography } from "antd";
-import { createSupabaseBrowserClient } from "@/lib/db/client";
 
 /**
  * What an account entitled to no company sees.
@@ -26,7 +25,11 @@ export default function NoCompanyNotice({
 
   // The same two steps AppShell's account menu takes. There is no /logout
   // route to link to — signing out is a client call.
+  //
+  // The client is fetched on the click. The layout imports this notice, so a
+  // static import here put the Supabase client on every signed-in page.
   async function signOut() {
+    const { createSupabaseBrowserClient } = await import("@/lib/db/client");
     const sb = createSupabaseBrowserClient();
     await sb.auth.signOut();
     router.refresh();
