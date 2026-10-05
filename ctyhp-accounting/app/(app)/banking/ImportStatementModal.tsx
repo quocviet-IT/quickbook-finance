@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Checkbox, Modal, Select, Space, Spin, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { parseCsv } from "@/lib/csv";
@@ -21,16 +21,10 @@ import {
   parseQif,
   type StatementFileResult,
 } from "@/lib/domain/statement-files";
-import { readPdfStatements, toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
-import {
-  PDF_MESSAGES,
-  periodLabel,
-  pickStatement,
-  skippedNote,
-  statementLabel,
-  summarizeStatement,
-} from "@/lib/domain/pdf-statement-view";
+import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
+import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { formatMoney } from "@/lib/format";
+import PdfStatementPreview, { WrongAccountAlert } from "./PdfStatementPreview";
 
 /**
  * The statement import dialog, in its own file so it is fetched when somebody
@@ -40,16 +34,25 @@ import { formatMoney } from "@/lib/format";
  * — and, for a CSV whose headings it does not know, asks which column is which.
  * A PDF is read by its layout, so it needs no columns; before importing, the
  * dialog shows whether its opening balance plus the lines read comes to its
- * closing balance. The import itself is a server action; Review import opens
- * after it.
+ * closing balance. The import itself is a server action of the screen that
+ * opened the dialog: Banking opens Review import after it, and a
+ * reconciliation pairs the lines with the books.
  */
 export interface ImportStatementModalProps {
   open: boolean;
   bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
   importing: boolean;
-  onConfirm: (fileName: string, rows: StatementLine[]) => void;
+  /** `statement` is the PDF statement imported, with its period and balances; null for any other file. */
+  onConfirm: (fileName: string, rows: StatementLine[], statement: PdfStatement | null) => void;
   onCancel: () => void;
+  /** What happens to the lines, said above the file picker. */
+  intro?: ReactNode;
 }
+
+const BANKING_INTRO =
+  "Choose the file your bank gives you: a PDF statement, a CSV, or a Quicken or QuickBooks download (.ofx, .qfx, " +
+  ".qbo, .qif). After the import, Review import proposes an account, a match or a document for every line, and " +
+  "nothing is posted until you click Post.";
 
 interface CsvState {
   kind: "csv";
@@ -94,18 +97,14 @@ const COLUMN_FIELDS: { key: keyof StatementColumnMap; label: string; required?: 
   { key: "balance", label: "Balance" },
 ];
 
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
-        {label}
-      </Typography.Text>
-      <Typography.Text strong>{value}</Typography.Text>
-    </div>
-  );
-}
-
-export default function ImportStatementModal({ open, bankAccount, importing, onConfirm, onCancel }: ImportStatementModalProps) {
+export default function ImportStatementModal({
+  open,
+  bankAccount,
+  importing,
+  onConfirm,
+  onCancel,
+  intro = BANKING_INTRO,
+}: ImportStatementModalProps) {
   const [fileName, setFileName] = useState("");
   const [file, setFile] = useState<FileState>({ kind: "none" });
   const [choice, setChoice] = useState<CsvChoice | null>(null);
@@ -115,29 +114,16 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
   const reading = useRef(0);
 
   async function readPdf(chosen: File, token: number) {
-    if (bankAccount.decimals !== 2) {
-      setFile({ kind: "unsupported", message: PDF_MESSAGES.cents });
-      return;
-    }
     setFile({ kind: "reading" });
-    const { readPdfGlyphs } = await import("@/lib/client/pdf-text");
-    const result = await readPdfGlyphs(await chosen.arrayBuffer());
+    const { readPdfStatementFile } = await import("@/lib/client/pdf-text");
+    const result = await readPdfStatementFile(chosen, bankAccount.decimals);
     if (token !== reading.current) return;
-    if ("failure" in result) {
-      setFile({ kind: "unsupported", message: PDF_MESSAGES[result.failure] });
+    if ("message" in result) {
+      setFile({ kind: "unsupported", message: result.message });
       return;
     }
-    if (!result.glyphs.length) {
-      setFile({ kind: "unsupported", message: PDF_MESSAGES.scanned });
-      return;
-    }
-    const statements = readPdfStatements(result.glyphs).filter((s) => s.lines.length > 0);
-    if (!statements.length) {
-      setFile({ kind: "unsupported", message: PDF_MESSAGES.noLines });
-      return;
-    }
-    setPicked(pickStatement(statements, bankAccount.maskedNumber));
-    setFile({ kind: "pdf", statements });
+    setPicked(pickStatement(result.statements, bankAccount.maskedNumber));
+    setFile({ kind: "pdf", statements: result.statements });
   }
 
   function read(chosen: File) {
@@ -209,6 +195,7 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
   const summary = statement ? summarizeStatement(statement, money) : null;
   const fileAccount = file.kind === "file" ? file.result.accountId : (statement?.accountNumber ?? null);
   const wrongAccount = accountNumberDiffers(fileAccount, bankAccount.maskedNumber);
+  const wrongAccountText = `The file is for an account ending ${(fileAccount ?? "").slice(-4)}, and you are importing into ${bankAccount.label}. Check before importing.`;
 
   const okText = !rows.length
     ? "Import"
@@ -225,7 +212,7 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
         // Remembering the columns is a convenience; the import does not need it.
       }
     }
-    onConfirm(fileName, rows);
+    onConfirm(fileName, rows, statement);
   }
 
   // Choosing the date column reads that column again for which way round its
@@ -252,11 +239,7 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
       width={720}
       destroyOnHidden
     >
-      <Typography.Paragraph type="secondary">
-        Choose the file your bank gives you: a PDF statement, a CSV, or a Quicken or QuickBooks download (.ofx, .qfx,
-        .qbo, .qif). After the import, Review import proposes an account, a match or a document for every line, and
-        nothing is posted until you click Post.
-      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary">{intro}</Typography.Paragraph>
       <Upload.Dragger
         accept=".pdf,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf"
         beforeUpload={read}
@@ -337,49 +320,19 @@ export default function ImportStatementModal({ open, bankAccount, importing, onC
         </div>
       ) : null}
 
-      {file.kind === "pdf" && file.statements.length > 1 ? (
-        <div style={{ marginTop: 12 }}>
-          <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
-            This PDF holds {file.statements.length} statements. Import the one for:
-          </Typography.Text>
-          <Select
-            aria-label="Statement"
-            style={{ width: "100%" }}
-            value={picked}
-            onChange={(value: number) => setPicked(value)}
-            options={file.statements.map((s, i) => ({ value: i, label: statementLabel(s) }))}
-          />
-        </div>
-      ) : null}
+      {wrongAccount && file.kind !== "pdf" ? <WrongAccountAlert description={wrongAccountText} /> : null}
 
-      {wrongAccount ? (
-        <Alert
-          style={{ marginTop: 12 }}
-          type="warning"
-          showIcon
-          title="This file names a different account"
-          description={`The file is for an account ending ${(fileAccount ?? "").slice(-4)}, and you are importing into ${bankAccount.label}. Check before importing.`}
-        />
-      ) : null}
-
-      {statement && summary ? (
-        <div style={{ marginTop: 12 }}>
-          <Typography.Paragraph style={{ marginBottom: 8 }}>
-            <strong>{fileName}</strong> (PDF): {periodLabel(statement.from, statement.to)}
-          </Typography.Paragraph>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
-            <Figure label="Opening balance" value={statement.openingMinor === null ? "—" : money(statement.openingMinor)} />
-            <Figure label={`Money in · ${summary.moneyIn.count}`} value={money(summary.moneyIn.minor)} />
-            <Figure label={`Money out · ${summary.moneyOut.count}`} value={money(summary.moneyOut.minor)} />
-            <Figure label="Closing balance" value={statement.closingMinor === null ? "—" : money(statement.closingMinor)} />
-          </div>
-          <Alert style={{ marginTop: 8 }} type={summary.proves ? "success" : "warning"} showIcon title={summary.proof} />
-          {statement.skipped > 0 ? (
-            <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 4 }}>
-              {skippedNote(statement.skipped)}
-            </Typography.Text>
-          ) : null}
-        </div>
+      {file.kind === "pdf" ? (
+        <PdfStatementPreview
+          fileName={fileName}
+          statements={file.statements}
+          picked={picked}
+          onPick={setPicked}
+          pickPrompt="Import the one for:"
+          money={money}
+        >
+          {wrongAccount ? <WrongAccountAlert description={wrongAccountText} /> : null}
+        </PdfStatementPreview>
       ) : null}
 
       {parsed && !statement ? (
