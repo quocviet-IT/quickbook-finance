@@ -16,6 +16,7 @@ import {
   FEEDBACK_ATTACHMENT_MAX_FILES,
   isAllowedAttachmentType,
 } from "./feedback-attachment";
+import { MAX_RUN_LINES } from "./statement-run";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
 export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
@@ -566,7 +567,11 @@ export const runPreviewSchema = z.object({
       }),
     )
     .min(1, "Choose at least one statement")
-    .max(60, "A run can hold at most 60 statements"),
+    .max(60, "A run can hold at most 60 statements")
+    .refine(
+      (all) => all.reduce((n, s) => n + s.lines.length, 0) <= MAX_RUN_LINES,
+      `A run can hold at most ${MAX_RUN_LINES.toLocaleString("en-US")} statement lines`,
+    ),
 });
 export type RunPreviewInput = z.infer<typeof runPreviewSchema>;
 

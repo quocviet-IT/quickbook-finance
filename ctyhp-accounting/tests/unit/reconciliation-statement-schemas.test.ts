@@ -90,6 +90,14 @@ describe("runPreviewSchema", () => {
     );
   });
 
+  it("takes 10,000 statement lines in all, and refuses one more", () => {
+    const withLines = (n: number) => ({ ...preview.statements[0], lines: Array.from({ length: n }, () => preview.statements[0].lines[0]) });
+    expect(runPreviewSchema.safeParse({ ...preview, statements: [withLines(5000), withLines(5000)] }).success).toBe(true);
+    expect(firstIssue(runPreviewSchema.safeParse({ ...preview, statements: [withLines(5000), withLines(5000), withLines(1)] }))).toBe(
+      "A run can hold at most 10,000 statement lines",
+    );
+  });
+
   it("refuses a statement with no closing balance", () => {
     expect(runPreviewSchema.safeParse({ ...preview, statements: [{ ...preview.statements[0], closing_minor: null }] }).success).toBe(false);
   });
