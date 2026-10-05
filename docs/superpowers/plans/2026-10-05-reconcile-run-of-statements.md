@@ -1,4 +1,4 @@
-# Reconcile a run of statements in one pass (1.80) Implementation Plan
+# Reconcile a run of statements in one pass (1.81) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -484,6 +484,25 @@ describe("simulateRun", () => {
     const turned = statement("2026-07-31", 100000, 140000, [csvLine("2026-07-05", -50000, null), csvLine("2026-07-20", 10000, null)]);
     const preview = simulateRun([turned], [book("a", "2026-07-05", 50000), book("b", "2026-07-20", -10000)], { beginningMinor: 100000, broughtForward: null }, money);
     expect(preview.months[0].outcome).toEqual({ kind: "agrees", paired: 2, of: 2, outstanding: 0 });
+  });
+
+  it("counts a month that reaches zero as agreeing even when lines not in the books net to nothing, as the prototype does", () => {
+    const netNothing = statement("2026-07-31", 100000, 140000, [...july.lines, csvLine("2026-07-10", -500, null), csvLine("2026-07-11", 500, null)]);
+    const preview = simulateRun([netNothing], [book("a", "2026-07-05", 50000), book("b", "2026-07-20", -10000)], { beginningMinor: 100000, broughtForward: null }, money);
+    expect(preview.months[0].outcome).toEqual({ kind: "agrees", paired: 2, of: 4, outstanding: 0 });
+    expect(preview.toSign).toBe(1);
+  });
+
+  it("walks the first month of an account never reconciled from zero when its statement prints no opening balance", () => {
+    const noOpening = statement("2026-07-31", null, 140000, july.lines);
+    const preview = simulateRun(
+      [noOpening],
+      [book("old", "2026-06-10", 90000), book("a", "2026-07-05", 50000), book("b", "2026-07-20", -10000)],
+      { beginningMinor: null, broughtForward: { hasReconciliations: false, bookBalanceMinor: 90000, openLines: 1 } },
+      money,
+    );
+    expect(preview.broughtForward).toBeNull();
+    expect(preview.months[0]).toMatchObject({ beginningMinor: 0, outcome: { kind: "outBy", differenceMinor: 100000, missing: 0 } });
   });
 });
 
@@ -1046,6 +1065,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
 - Create: `app/(app)/banking/reconcile/StandingTag.tsx`
 - Modify: `app/(app)/banking/reconcile/[id]/ReconcileWorkspaceClient.tsx` (whole file below: it imports the tag)
 - Create: `lib/client/run-files.ts`
+- Test: `tests/unit/run-files.test.ts`
 - Modify: `lib/services/bankrec.ts` (whole file below: `getBankOpenLines` at its end)
 
 **Interfaces:**
@@ -1888,14 +1908,60 @@ export default function ReconcileWorkspaceClient({
 }
 ```
 
-- [ ] **Step 3: Reading a run's file.** Create `lib/client/run-files.ts` (with the Write tool — it holds a regular expression):
+- [ ] **Step 3: Reading a run's file.** First create `tests/unit/run-files.test.ts` — the last test pins that a file the browser cannot read stays in the run as a row that says so, never a file that silently drops out:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { readRunFile } from "@/lib/client/run-files";
+import { RUN_MESSAGES } from "@/lib/domain/statement-run";
+
+const bank = { id: "bank-1", maskedNumber: "****7917", decimals: 2 };
+
+describe("readRunFile", () => {
+  it("cuts a CSV with a running balance into months", async () => {
+    const csv = new File(
+      ["Date,Description,Amount,Balance\n07/03/2026,DEPOSIT,500.00,1500.00\n08/04/2026,FEE,-5.00,1495.00\n"],
+      "bank.csv",
+      { type: "text/csv" },
+    );
+    const read = await readRunFile(csv, bank);
+    expect(read.map((s) => [s.fileName, s.to, s.openingMinor, s.closingMinor, s.problem])).toEqual([
+      ["bank.csv (2026-07)", "2026-07-31", 100000, 150000, null],
+      ["bank.csv (2026-08)", "2026-08-31", 150000, 149500, null],
+    ]);
+  });
+
+  it("refuses an OFX file, which carries no running balance", async () => {
+    const ofx = new File(["OFXHEADER:100\n<OFX></OFX>"], "bank.ofx");
+    const [only] = await readRunFile(ofx, bank);
+    expect([only.fileName, only.problem]).toEqual(["bank.ofx", RUN_MESSAGES.noBalanceFormat]);
+  });
+
+  it("says a CSV's columns were not recognized", async () => {
+    const odd = new File(["When,What,How much\n07/03/2026,DEPOSIT,500.00\n"], "odd.csv");
+    const [only] = await readRunFile(odd, bank);
+    expect(only.problem).toBe("Its columns were not recognized — import it once on Banking to choose them");
+  });
+
+  it("keeps a file that cannot be read as a row that says so", async () => {
+    const broken = { name: "broken.csv", type: "text/csv", text: () => Promise.reject(new Error("gone")) } as unknown as File;
+    const [only] = await readRunFile(broken, bank);
+    expect([only.fileName, only.source, only.problem]).toEqual(["broken.csv", "CSV", "This file could not be read"]);
+  });
+});
+```
+
+Run: `npx vitest run tests/unit/run-files.test.ts` — Expected: FAIL (`@/lib/client/run-files` does not exist yet).
+
+Then create `lib/client/run-files.ts` (with the Write tool — it holds a regular expression):
 
 ```ts
 /**
  * One statement file read in the browser into the statements of a run: a PDF
  * by 1.78's reader, a CSV cut into months. The file never leaves the browser;
- * only the lines read are sent. A file that cannot prove a month comes back as
- * one statement saying why, so the person sees every file they chose.
+ * only the lines read are sent. A file that cannot prove a month — or cannot be
+ * read at all — comes back as one statement saying why, so the person sees
+ * every file they chose.
  */
 import { parseCsv } from "@/lib/csv";
 import { rememberedColumns } from "@/lib/client/statement-columns";
@@ -1915,6 +1981,9 @@ export interface RunBankAccount {
 }
 
 const COLUMNS_NOT_RECOGNIZED = "Its columns were not recognized — import it once on Banking to choose them";
+const COULD_NOT_READ = "This file could not be read";
+
+const isPdfFile = (file: File) => /\.pdf$/i.test(file.name) || file.type === "application/pdf";
 
 function unreadable(fileName: string, source: RunSource, problem: string): RunStatement {
   return {
@@ -1938,8 +2007,8 @@ async function readPdf(file: File, bank: RunBankAccount): Promise<RunStatement[]
   return statementsFromPdf(file.name, result.statements, bank.maskedNumber);
 }
 
-export async function readRunFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
-  if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") return readPdf(file, bank);
+async function readFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
+  if (isPdfFile(file)) return readPdf(file, bank);
   const text = await file.text();
   const verdict = detectStatementFormat(file.name, text);
   if ("unsupported" in verdict) return [unreadable(file.name, "CSV", verdict.unsupported)];
@@ -1961,7 +2030,19 @@ export async function readRunFile(file: File, bank: RunBankAccount): Promise<Run
   const months = monthsFromCsv(file.name, rows);
   return months.length ? months : [unreadable(file.name, "CSV", RUN_MESSAGES.noLines)];
 }
+
+export async function readRunFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
+  try {
+    return await readFile(file, bank);
+  } catch {
+    // A file the browser cannot open, or a reader that fails on it, is still a
+    // row that says so — never a file that silently drops out of the run.
+    return [unreadable(file.name, isPdfFile(file) ? "PDF" : "CSV", COULD_NOT_READ)];
+  }
+}
 ```
+
+Run: `npx vitest run tests/unit/run-files.test.ts` — Expected: 4 passed.
 
 - [ ] **Step 4: The open lines, read.** Replace the whole of `lib/services/bankrec.ts` with:
 
@@ -2276,12 +2357,12 @@ export async function getBankOpenLines(sb: SupabaseClient, bankAccountId: string
 
 Run: `npm run typecheck` — Expected: no errors.
 Run: `npx eslint "app/(app)/banking" lib/client lib/services/bankrec.ts` — Expected: prints nothing.
-Run: `npx vitest run tests/unit/reconcile-statement-service.test.ts tests/unit/banking-paged-reads.test.ts tests/unit/statement-run.test.ts` — Expected: all pass.
+Run: `npx vitest run tests/unit/reconcile-statement-service.test.ts tests/unit/banking-paged-reads.test.ts tests/unit/statement-run.test.ts tests/unit/run-files.test.ts` — Expected: all pass.
 
 - [ ] **Step 6: Commit.**
 
 ```bash
-git add lib/client/statement-columns.ts "app/(app)/banking/ImportStatementModal.tsx" "app/(app)/banking/reconcile/StandingTag.tsx" "app/(app)/banking/reconcile/[id]/ReconcileWorkspaceClient.tsx" lib/client/run-files.ts lib/services/bankrec.ts
+git add lib/client/statement-columns.ts "app/(app)/banking/ImportStatementModal.tsx" "app/(app)/banking/reconcile/StandingTag.tsx" "app/(app)/banking/reconcile/[id]/ReconcileWorkspaceClient.tsx" lib/client/run-files.ts tests/unit/run-files.test.ts lib/services/bankrec.ts
 printf 'refactor(reconcile): the column memory, the standing tag and the file reader a run shares\n\nAnd the account'"'"'s open lines read in book order, past the row cap.\n' > ../.superpowers/sdd/commit-msg.txt
 od -c ../.superpowers/sdd/commit-msg.txt | head -1
 git commit -F ../.superpowers/sdd/commit-msg.txt
@@ -2773,7 +2854,7 @@ Create `app/(app)/banking/reconcile/from-files/FromFilesClient.tsx`:
 
 ```tsx
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Space, Spin, Tag, Typography, Upload } from "antd";
@@ -2841,7 +2922,13 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   const [statements, setStatements] = useState<RunStatement[]>([]);
   const [reading, setReading] = useState(0);
   const [preview, setPreview] = useState<RunPreview | null>(null);
+  // The statements the preview was walked on. Signing uses these and nothing
+  // else, so a file added after the preview can never be signed unseen.
+  const [previewed, setPreviewed] = useState<RunStatement[]>([]);
   const [previewing, setPreviewing] = useState(false);
+  // A preview is asked for, then answered; a file added or a fresh start in
+  // between makes the answer stale, and it is dropped.
+  const asked = useRef(0);
   const [progress, setProgress] = useState<string | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const { currencyCode, decimals } = bankAccount;
@@ -2850,7 +2937,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     () => checkRun(statements, context, (minor) => formatMoney(minor, currencyCode, decimals)),
     [statements, context, currencyCode, decimals],
   );
-  const usableByKey = useMemo(() => new Map(check.usable.map((s) => [s.key, s])), [check]);
+  const previewedByKey = useMemo(() => new Map(previewed.map((s) => [s.key, s])), [previewed]);
   const busy = progress !== null;
 
   if (!canWrite) {
@@ -2858,6 +2945,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   }
 
   async function add(file: File) {
+    asked.current += 1;
     setReading((n) => n + 1);
     setPreview(null);
     setDone(null);
@@ -2873,17 +2961,21 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   }
 
   function startAgain() {
+    asked.current += 1;
     setStatements([]);
     setPreview(null);
     setDone(null);
   }
 
   async function runPreview() {
+    const token = ++asked.current;
+    const run = check.usable;
     setPreviewing(true);
+    setPreview(null);
     setDone(null);
     const res = await previewRunAction({
       bank_account_id: bankAccount.id,
-      statements: check.usable.map((s) => ({
+      statements: run.map((s) => ({
         key: s.key,
         from: s.from,
         to: s.to,
@@ -2893,10 +2985,12 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       })),
     });
     setPreviewing(false);
+    if (token !== asked.current) return;
     if (!res.ok || !res.data) {
       message.error(res.error ?? "The statements could not be previewed");
       return;
     }
+    setPreviewed(run);
     setPreview(res.data);
   }
 
@@ -2905,11 +2999,15 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   const signLabel = preview?.toSign
     ? `Sign off ${preview.toSign} month${preview.toSign === 1 ? "" : "s"}`
     : needsLook
-      ? "Start the month that needs a look"
+      ? bringForward
+        ? "Bring the earlier lines forward and start the month that needs a look"
+        : "Start the month that needs a look"
       : null;
 
   async function signOff() {
-    if (!preview) return;
+    if (!preview || previewing || check.stops.length > 0) return;
+    // A preview still on its way was walked before these months were signed.
+    asked.current += 1;
     const toSign = preview.months.slice(0, preview.toSign);
     const total = toSign.length + (bringForward ? 1 : 0);
     let step = 0;
@@ -2920,7 +3018,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       setPreview(null);
       router.refresh();
     };
-    const first = check.usable[0];
+    const first = previewed[0];
     if (bringForward && first?.from && first.openingMinor !== null) {
       step += 1;
       setProgress(`Bringing the earlier lines forward — ${step} of ${total}`);
@@ -2934,7 +3032,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward" });
     }
     for (const month of toSign) {
-      const statement = usableByKey.get(month.key);
+      const statement = previewedByKey.get(month.key);
       if (!statement) break;
       step += 1;
       setProgress(`Signing ${shortDate(month.statementDate, true)} — ${step} of ${total}`);
@@ -2963,7 +3061,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       signed += 1;
     }
     let open: Done["open"] = null;
-    const statement = needsLook ? usableByKey.get(needsLook.key) : undefined;
+    const statement = needsLook ? previewedByKey.get(needsLook.key) : undefined;
     if (needsLook && statement) {
       setProgress(`Starting ${shortDate(needsLook.statementDate, true)}, which needs a look`);
       const res = await reconcileRunMonthAction({
@@ -2997,7 +3095,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
           return false;
         }}
         showUploadList={false}
-        disabled={busy}
+        disabled={busy || previewing}
       >
         <p className="ant-upload-drag-icon">
           <InboxOutlined />
@@ -3050,7 +3148,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             >
               Preview {check.usable.length} statement{check.usable.length === 1 ? "" : "s"}
             </Button>
-            <Button onClick={startAgain} disabled={busy}>
+            <Button onClick={startAgain} disabled={busy || previewing}>
               Start again
             </Button>
           </Space>
@@ -3077,7 +3175,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             expandable={{
               rowExpandable: (m) => m.standings.length > 0,
               expandedRowRender: (m) => {
-                const statement = usableByKey.get(m.key);
+                const statement = previewedByKey.get(m.key);
                 return (
                   <DataTable
                     rowKey={(_, i) => String(i)}
@@ -3096,7 +3194,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             }}
             columns={[
               { title: "Statement", render: (_, m) => shortDate(m.statementDate, true), width: 130 },
-              { title: "File", render: (_, m) => usableByKey.get(m.key)?.fileName ?? "" },
+              { title: "File", render: (_, m) => previewedByKey.get(m.key)?.fileName ?? "" },
               { title: "Beginning", align: "right", render: (_, m) => money(m.beginningMinor) },
               { title: "Closing", align: "right", render: (_, m) => money(m.closingMinor) },
               { title: "Outcome", render: (_, m) => outcomeTag(m.outcome) },
@@ -3105,11 +3203,15 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
           />
           <Space style={{ marginTop: 12 }} wrap>
             {signLabel ? (
-              <Button type="primary" loading={busy} onClick={() => void signOff()}>
+              <Button type="primary" loading={busy} disabled={previewing} onClick={() => void signOff()}>
                 {signLabel}
               </Button>
             ) : null}
-            {progress ? <Typography.Text>{progress}</Typography.Text> : null}
+            {progress ? (
+              <Typography.Text role="status" aria-live="polite">
+                {progress}
+              </Typography.Text>
+            ) : null}
           </Space>
         </div>
       ) : null}
@@ -3320,17 +3422,19 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
 
 ---
 
-### Task 5: Changelog 1.80, the guide, the whole suite
+### Task 5: Changelog 1.81, the guide, the whole suite
+
+Main shipped its own 1.80 while this branch was built (PR #29, the shell loads the Supabase client on demand), so this release is 1.81. Merge `origin/main` into the branch first; the two touch no file in common.
 
 **Files:**
 - Modify: `lib/domain/changelog.ts` (a new first entry of `RELEASES`)
 - Modify: `lib/domain/system-guide.ts` (the "Start a reconciliation from the statement's PDF" step)
 
-- [ ] **Step 1: The release.** In `lib/domain/changelog.ts`, directly after `export const RELEASES: Release[] = [`, insert:
+- [ ] **Step 1: The release.** In `lib/domain/changelog.ts`, directly after `export const RELEASES: Release[] = [` (above main's 1.80), insert:
 
 ```ts
   {
-    version: "1.80",
+    version: "1.81",
     date: "2026-10-05",
     headline: "A year of bank statements is reconciled in one pass, and a person signs it off.",
     changes: [
@@ -3394,14 +3498,15 @@ with
 - [ ] **Step 3: The whole suite and the build.**
 
 Run: `npm run typecheck`, `npm run lint`, then `npm test`
-Expected: no type errors; lint 0 errors (the 14 old warnings stay); every test file passes — the changelog and guide tests included (`APP_VERSION` is now 1.80). `tests/unit/quality-query-timing.test.ts` can fail when the machine is busy; if it alone fails, run it on its own and report both results.
+Expected: no type errors; lint 0 errors (the 14 old warnings stay); every test file passes — the changelog and guide tests included (`APP_VERSION` is now 1.81). `tests/unit/quality-query-timing.test.ts` can fail when the machine is busy; if it alone fails, run it on its own and report both results.
 Run: `npm run build` — Expected: `Compiled successfully`, the route list includes `/banking/reconcile/from-files`, exit code 0.
+Run: `npm run quality:bundle`, then `npm run quality:budget` — Expected: every ceiling in `tests/quality/budgets.json` holds, exit code 0.
 
 - [ ] **Step 4: Commit.**
 
 ```bash
 git add lib/domain/changelog.ts lib/domain/system-guide.ts
-printf 'docs(changelog): 1.80 reconcile a run of statements; the guide step\n' > ../.superpowers/sdd/commit-msg.txt
+printf 'docs(changelog): 1.81 reconcile a run of statements; the guide step\n' > ../.superpowers/sdd/commit-msg.txt
 od -c ../.superpowers/sdd/commit-msg.txt | head -1
 git commit -F ../.superpowers/sdd/commit-msg.txt
 ```
