@@ -1,6 +1,10 @@
+import { notFound } from "next/navigation";
+import { z } from "zod";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listAccounts } from "@/lib/services/accounts";
+import { listBankAccounts } from "@/lib/services/banking";
+import { findReconciliationHeader } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import PageHeader from "@/components/PageHeader";
 import ReconcileWorkspaceClient from "./ReconcileWorkspaceClient";
@@ -9,10 +13,16 @@ export const dynamic = "force-dynamic";
 
 export default async function ReconcileWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // An id that is not a uuid, or that names no reconciliation, is a page that
+  // does not exist. Any other failure is an error, and shows as one.
+  if (!z.uuid().safeParse(id).success) notFound();
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const [accounts, currencies] = await Promise.all([listAccounts(sb), listCurrencies(sb)]);
+  const header = await findReconciliationHeader(sb, id);
+  if (!header) notFound();
+  const [accounts, currencies, banks] = await Promise.all([listAccounts(sb), listCurrencies(sb), listBankAccounts(sb)]);
   const base = currencies.find((c) => c.is_base);
+  const bank = banks.find((b) => b.id === header.bankAccountId);
   const offsets = accounts.filter(
     (a) =>
       ["income", "other_income", "expense", "cost_of_goods_sold", "other_expense"].includes(a.account_type) &&
@@ -29,6 +39,13 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
         offsetAccounts={offsets.map((a) => ({ id: a.id, label: `${a.account_code} ${a.name}` }))}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        bankAccount={{
+          id: header.bankAccountId,
+          label: bank ? `${bank.bank_name || bank.account_name} · ${bank.account_code}` : "this bank account",
+          maskedNumber: bank?.account_number_masked ?? null,
+          decimals: base?.decimal_places ?? 2,
+          currencyCode: bank?.currency_code ?? base?.code ?? "USD",
+        }}
       />
     </div>
   );

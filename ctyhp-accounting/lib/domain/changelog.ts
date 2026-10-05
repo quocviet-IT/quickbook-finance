@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.79",
+    date: "2026-10-05",
+    headline: "A reconciliation can start from the statement's PDF, and the statement's lines pair with the books.",
+    changes: [
+      {
+        kind: "added",
+        title: "Start a reconciliation from a PDF statement",
+        detail:
+          "On Bank Reconciliation, From a PDF statement reads the statement's period, opening and closing balances and lines, and starts a reconciliation dated the statement's last day at its closing balance — nothing retyped. The lines are imported into Bank Transactions, kept with the reconciliation and paired with the books, and every pair is ticked. Nothing is posted, and nothing completes until you click Complete.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "The first reconciliation of an account can be brought forward",
+        detail:
+          "When an account has never been reconciled and the books on the day before the statement's period hold exactly the opening balance the statement prints, Bring forward and start signs off every earlier line as one reconciliation, marked Brought forward with the statement that proved it. When they differ, the dialog says by how much and the earlier lines stay open.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "Import statement inside a reconciliation takes every statement file",
+        detail:
+          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — Paired by date and amount, by check number, or by amount within 5 days, and not ticked when its book line was unticked by hand — or Not in the books, or After the statement date. A link codes the lines the books do not have in Bank Transactions, and Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding. When a PDF closes on another figure than the reconciliation, Use takes the statement's closing balance; when it opens on another figure than the reconciliation begins at, the reconciliation says so. A reconciliation started before 1.79 shows its statement once the statement is imported there.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "1.78",
     date: "2026-10-03",
     headline: "A bank statement in PDF can be imported, and it proves itself before it is.",

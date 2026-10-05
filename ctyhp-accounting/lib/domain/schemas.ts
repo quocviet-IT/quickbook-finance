@@ -518,6 +518,51 @@ export const reconciliationReopenSchema = z.object({
 });
 export type ReconciliationReopenInput = z.infer<typeof reconciliationReopenSchema>;
 
+/** An ISO day that exists: 2026-02-31 is refused here, not by the database. */
+const statementDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "A statement date is required")
+  .refine((day) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+  }, "A statement date must be a real day");
+
+/** A statement file as a reconciliation takes it: its name, the balances it prints, and its lines. */
+export const reconciliationStatementSchema = z.object({
+  file_name: z.string().trim().min(1, "The statement file has no name").max(255),
+  opening_minor: z.number().int().nullable(),
+  closing_minor: z.number().int().nullable(),
+  lines: z
+    .array(
+      z.object({
+        txn_date: statementDay,
+        description: z.string(),
+        reference: z.string().nullable(),
+        amount_minor: z.number().int(),
+        running_balance_minor: z.number().int().nullable(),
+        raw_line: z.string(),
+        external_id: z.string().nullable().optional(),
+      }),
+    )
+    .min(1, "The statement has no lines")
+    .max(5000, "A statement can hold at most 5,000 lines"),
+});
+export type ReconciliationStatementInput = z.infer<typeof reconciliationStatementSchema>;
+
+/** A reconciliation started from a PDF statement: its date and closing balance are the statement's. */
+export const reconciliationFromStatementSchema = reconciliationStatementSchema
+  .extend({
+    bank_account_id: z.uuid("Select a bank account"),
+    period_from: statementDay.nullable(),
+    statement_date: statementDay,
+    closing_minor: z.number().int("The statement prints no closing balance"),
+    bring_forward: z.boolean(),
+  })
+  .refine((v) => !v.bring_forward || (v.period_from !== null && v.opening_minor !== null), {
+    message: "Bringing forward needs the statement's period and opening balance",
+  });
+export type ReconciliationFromStatementInput = z.infer<typeof reconciliationFromStatementSchema>;
+
 // --- Company settings + accounting periods ---
 export const companySettingsSchema = z.object({
   legal_name: z.string().trim().min(1, "Legal name is required").max(200),
