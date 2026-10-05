@@ -4,6 +4,7 @@ import { readAllPages } from "@/lib/services/paging";
 import type { ReconciliationCreateInput, ReconciliationAdjustmentInput, ReconciliationReopenInput } from "@/lib/domain/schemas";
 import type { StatementLine } from "@/lib/domain/statement-import";
 import { reconciliationStandings, type BroughtForwardPreview, type PairingOutcome } from "@/lib/domain/reconcile-statement";
+import type { OpenBookLine } from "@/lib/domain/statement-run";
 
 export class BankRecError extends Error {}
 
@@ -274,4 +275,30 @@ export async function pairAndTick(sb: SupabaseClient, id: string): Promise<Pairi
     lines: statement.lines.length, paired: result.paired, ticked,
     missing: result.missing, after: result.after, flipped: result.flipped,
   };
+}
+
+/**
+ * A bank account's posted lines to a day that no completed reconciliation holds,
+ * in book order — what a run of statements is walked against before anything
+ * is written. Paged: an account carries more than a thousand lines easily, and
+ * the line id settles two lines of one entry.
+ */
+export async function getBankOpenLines(sb: SupabaseClient, bankAccountId: string, through: string): Promise<OpenBookLine[]> {
+  const rows = await readAllPages<Record<string, unknown>>(
+    (from, to) =>
+      sb
+        .rpc("acc_bank_open_lines", { p_bank_account_id: bankAccountId, p_through: through })
+        .order("entry_date")
+        .order("entry_number")
+        .order("journal_line_id")
+        .range(from, to),
+    (message) => new BankRecError(message),
+  );
+  return rows.map((r) => ({
+    id: r.journal_line_id as string,
+    date: r.entry_date as string,
+    amountMinor: Number(r.signed_minor),
+    reference: (r.reference as string) ?? null,
+    entryNumber: (r.entry_number as string) ?? null,
+  }));
 }
