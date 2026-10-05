@@ -9,11 +9,12 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import {
-  reconciliationFromStatementSchema, type ReconciliationStatementInput,
+  reconciliationStatementSchema, reconciliationFromStatementSchema, type ReconciliationStatementInput,
 } from "@/lib/domain/schemas";
 import {
-  createReconciliationFromStatement, getBroughtForwardPreview, bringForward, pairAndTick,
-  BankRecError, type StatementFileInput,
+  createReconciliationFromStatement, setReconciliationStatement, setStatementEnding, getBroughtForwardPreview,
+  bringForward, getReconciliationHeader, getReconciliationStatement, pairAndTick,
+  BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
 import { generateSuggestions, importStatement } from "@/lib/services/banking";
 import {
@@ -61,6 +62,35 @@ async function importIntoBankTransactions(
     );
   }
   return imported;
+}
+
+/**
+ * The statement a reconciliation in progress is reconciled against: kept with
+ * it (replacing any kept before), imported into Bank Transactions, and paired
+ * with the books — every pair is ticked. Nothing is posted.
+ */
+export async function importStatementIntoReconciliationAction(
+  reconciliationId: string,
+  raw: unknown,
+): Promise<ActionResult<StatementImportSummary>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = reconciliationStatementSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const file = statementFile(parsed.data);
+    // Kept first: a completed reconciliation refuses it before anything is imported.
+    await setReconciliationStatement(sb, reconciliationId, file);
+    const { bankAccountId } = await getReconciliationHeader(sb, reconciliationId);
+    const imported = await importIntoBankTransactions(sb, bankAccountId, file);
+    const outcome = await pairAndTick(sb, reconciliationId);
+    revalidatePath(`/banking/reconcile/${reconciliationId}`);
+    revalidatePath("/banking");
+    return { ok: true, data: { inserted: imported.inserted, duplicates: imported.skipped, outcome } };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
 }
 
 export interface StartFromStatementSummary extends StatementImportSummary {
@@ -129,5 +159,25 @@ export async function broughtForwardPreviewAction(
   through: string,
 ): Promise<ActionResult<BroughtForwardPreview>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getBroughtForwardPreview(sb, bankAccountId, through) }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+/** Takes the statement's closing balance as the reconciliation's ending balance. */
+export async function setStatementEndingAction(reconciliationId: string, endingMinor: number): Promise<ActionResult> {
+  const denied = await guard(); if (denied) return { ok: false, error: denied };
+  if (!Number.isSafeInteger(endingMinor)) return { ok: false, error: "Ending balance must be a whole minor-unit amount" };
+  try { const sb = await createSupabaseServerClient(); await setStatementEnding(sb, reconciliationId, endingMinor); return { ok: true }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+/** Pairs the kept statement with the books as they are now and ticks any new pairs. */
+export async function matchAgainAction(reconciliationId: string): Promise<ActionResult<PairingOutcome>> {
+  const denied = await guard(); if (denied) return { ok: false, error: denied };
+  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await pairAndTick(sb, reconciliationId) }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+export async function reconciliationStatementAction(reconciliationId: string): Promise<ActionResult<ReconStatement>> {
+  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getReconciliationStatement(sb, reconciliationId) }; }
   catch (e) { return { ok: false, error: msg(e) }; }
 }

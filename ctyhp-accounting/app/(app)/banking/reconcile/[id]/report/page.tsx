@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
+import { getReconciliationDetail, getReconciliationHeader, getReconciliationLines } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import { fromMinor } from "@/lib/domain/money";
 import PageHeader from "@/components/PageHeader";
@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function ReconciliationReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sb = await createSupabaseServerClient();
-  const [detail, lines, currencies] = await Promise.all([
-    getReconciliationDetail(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
+  const [detail, header, lines, currencies] = await Promise.all([
+    getReconciliationDetail(sb, id), getReconciliationHeader(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   const dec = base?.decimal_places ?? 2;
@@ -21,6 +21,14 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
     <div>
       <PageHeader title="Reconciliation report" description={`Base currency ${base?.code ?? "USD"} · Status ${detail.status}`} />
       <p><Link href={`/banking/reconcile/${id}`}>← Back to session</Link></p>
+      {header.broughtForward ? <p><strong>Brought forward.</strong> {header.note}</p> : null}
+      {header.fileName ? (
+        <p>
+          Statement: {header.fileName}
+          {header.openingMinor !== null ? ` · opens at ${fmt(header.openingMinor)}` : ""}
+          {header.closingMinor !== null ? ` · closes at ${fmt(header.closingMinor)}` : ""}
+        </p>
+      ) : null}
       <table>
         <tbody>
           <tr><td>Beginning balance</td><td style={{ textAlign: "right" }}>{fmt(detail.beginningMinor)}</td></tr>
