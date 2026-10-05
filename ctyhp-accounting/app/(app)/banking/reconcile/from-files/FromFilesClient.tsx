@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Space, Spin, Tag, Typography, Upload } from "antd";
@@ -67,7 +67,13 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   const [statements, setStatements] = useState<RunStatement[]>([]);
   const [reading, setReading] = useState(0);
   const [preview, setPreview] = useState<RunPreview | null>(null);
+  // The statements the preview was walked on. Signing uses these and nothing
+  // else, so a file added after the preview can never be signed unseen.
+  const [previewed, setPreviewed] = useState<RunStatement[]>([]);
   const [previewing, setPreviewing] = useState(false);
+  // A preview is asked for, then answered; a file added or a fresh start in
+  // between makes the answer stale, and it is dropped.
+  const asked = useRef(0);
   const [progress, setProgress] = useState<string | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const { currencyCode, decimals } = bankAccount;
@@ -76,7 +82,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     () => checkRun(statements, context, (minor) => formatMoney(minor, currencyCode, decimals)),
     [statements, context, currencyCode, decimals],
   );
-  const usableByKey = useMemo(() => new Map(check.usable.map((s) => [s.key, s])), [check]);
+  const previewedByKey = useMemo(() => new Map(previewed.map((s) => [s.key, s])), [previewed]);
   const busy = progress !== null;
 
   if (!canWrite) {
@@ -84,6 +90,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   }
 
   async function add(file: File) {
+    asked.current += 1;
     setReading((n) => n + 1);
     setPreview(null);
     setDone(null);
@@ -99,17 +106,20 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   }
 
   function startAgain() {
+    asked.current += 1;
     setStatements([]);
     setPreview(null);
     setDone(null);
   }
 
   async function runPreview() {
+    const token = ++asked.current;
+    const run = check.usable;
     setPreviewing(true);
     setDone(null);
     const res = await previewRunAction({
       bank_account_id: bankAccount.id,
-      statements: check.usable.map((s) => ({
+      statements: run.map((s) => ({
         key: s.key,
         from: s.from,
         to: s.to,
@@ -119,10 +129,12 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       })),
     });
     setPreviewing(false);
+    if (token !== asked.current) return;
     if (!res.ok || !res.data) {
       message.error(res.error ?? "The statements could not be previewed");
       return;
     }
+    setPreviewed(run);
     setPreview(res.data);
   }
 
@@ -131,11 +143,13 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
   const signLabel = preview?.toSign
     ? `Sign off ${preview.toSign} month${preview.toSign === 1 ? "" : "s"}`
     : needsLook
-      ? "Start the month that needs a look"
+      ? bringForward
+        ? "Bring the earlier lines forward and start the month that needs a look"
+        : "Start the month that needs a look"
       : null;
 
   async function signOff() {
-    if (!preview) return;
+    if (!preview || check.stops.length > 0) return;
     const toSign = preview.months.slice(0, preview.toSign);
     const total = toSign.length + (bringForward ? 1 : 0);
     let step = 0;
@@ -146,7 +160,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       setPreview(null);
       router.refresh();
     };
-    const first = check.usable[0];
+    const first = previewed[0];
     if (bringForward && first?.from && first.openingMinor !== null) {
       step += 1;
       setProgress(`Bringing the earlier lines forward — ${step} of ${total}`);
@@ -160,7 +174,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward" });
     }
     for (const month of toSign) {
-      const statement = usableByKey.get(month.key);
+      const statement = previewedByKey.get(month.key);
       if (!statement) break;
       step += 1;
       setProgress(`Signing ${shortDate(month.statementDate, true)} — ${step} of ${total}`);
@@ -189,7 +203,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       signed += 1;
     }
     let open: Done["open"] = null;
-    const statement = needsLook ? usableByKey.get(needsLook.key) : undefined;
+    const statement = needsLook ? previewedByKey.get(needsLook.key) : undefined;
     if (needsLook && statement) {
       setProgress(`Starting ${shortDate(needsLook.statementDate, true)}, which needs a look`);
       const res = await reconcileRunMonthAction({
@@ -223,7 +237,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
           return false;
         }}
         showUploadList={false}
-        disabled={busy}
+        disabled={busy || previewing}
       >
         <p className="ant-upload-drag-icon">
           <InboxOutlined />
@@ -276,7 +290,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             >
               Preview {check.usable.length} statement{check.usable.length === 1 ? "" : "s"}
             </Button>
-            <Button onClick={startAgain} disabled={busy}>
+            <Button onClick={startAgain} disabled={busy || previewing}>
               Start again
             </Button>
           </Space>
@@ -303,7 +317,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             expandable={{
               rowExpandable: (m) => m.standings.length > 0,
               expandedRowRender: (m) => {
-                const statement = usableByKey.get(m.key);
+                const statement = previewedByKey.get(m.key);
                 return (
                   <DataTable
                     rowKey={(_, i) => String(i)}
@@ -322,7 +336,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             }}
             columns={[
               { title: "Statement", render: (_, m) => shortDate(m.statementDate, true), width: 130 },
-              { title: "File", render: (_, m) => usableByKey.get(m.key)?.fileName ?? "" },
+              { title: "File", render: (_, m) => previewedByKey.get(m.key)?.fileName ?? "" },
               { title: "Beginning", align: "right", render: (_, m) => money(m.beginningMinor) },
               { title: "Closing", align: "right", render: (_, m) => money(m.closingMinor) },
               { title: "Outcome", render: (_, m) => outcomeTag(m.outcome) },
@@ -335,7 +349,11 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
                 {signLabel}
               </Button>
             ) : null}
-            {progress ? <Typography.Text>{progress}</Typography.Text> : null}
+            {progress ? (
+              <Typography.Text role="status" aria-live="polite">
+                {progress}
+              </Typography.Text>
+            ) : null}
           </Space>
         </div>
       ) : null}
