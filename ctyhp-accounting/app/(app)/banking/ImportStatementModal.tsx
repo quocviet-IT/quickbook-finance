@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Button, Checkbox, Modal, Select, Space, Spin, Typography, Upload } from "antd";
+import { Button, Checkbox, Modal, Select, Space, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { parseCsv } from "@/lib/csv";
 import {
@@ -24,7 +24,7 @@ import {
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
 import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { formatMoney } from "@/lib/format";
-import PdfStatementPreview, { WrongAccountAlert } from "./PdfStatementPreview";
+import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
 
 /**
  * The statement import dialog, in its own file so it is fetched when somebody
@@ -252,16 +252,9 @@ export default function ImportStatementModal({
         <p className="ant-upload-text">Click or drag a statement file here</p>
       </Upload.Dragger>
 
-      {file.kind === "reading" ? (
-        <Space style={{ marginTop: 12 }}>
-          <Spin size="small" />
-          <Typography.Text type="secondary">Reading the PDF…</Typography.Text>
-        </Space>
-      ) : null}
+      {file.kind === "reading" ? <ReadingPdf /> : null}
 
-      {file.kind === "unsupported" ? (
-        <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={file.message} />
-      ) : null}
+      {file.kind === "unsupported" ? <UnreadableFile message={file.message} /> : null}
 
       {file.kind === "csv" && choice ? (
         <div style={{ marginTop: 12 }}>

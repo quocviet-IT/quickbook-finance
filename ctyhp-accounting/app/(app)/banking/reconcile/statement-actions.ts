@@ -85,6 +85,7 @@ export async function startReconciliationFromStatementAction(
   const input = parsed.data;
   const file = statementFile(input);
   let broughtForward = false;
+  let startedId: string | null = null;
   try {
     const sb = await createSupabaseServerClient();
     if (input.bring_forward && input.period_from && input.opening_minor !== null) {
@@ -100,6 +101,7 @@ export async function startReconciliationFromStatementAction(
     const id = await createReconciliationFromStatement(
       sb, input.bank_account_id, input.statement_date, input.closing_minor, file,
     );
+    startedId = id;
     const imported = await importIntoBankTransactions(sb, input.bank_account_id, file);
     const outcome = await pairAndTick(sb, id);
     revalidatePath("/banking/reconcile");
@@ -107,12 +109,17 @@ export async function startReconciliationFromStatementAction(
     return { ok: true, data: { id, broughtForward, inserted: imported.inserted, duplicates: imported.skipped, outcome } };
   } catch (e) {
     revalidatePath("/banking/reconcile");
-    // Bringing forward is its own step: when what follows fails, the account
-    // stays brought forward and the dialog offers Start.
-    return {
-      ok: false,
-      error: broughtForward ? `The earlier lines were brought forward, but the reconciliation was not started: ${msg(e)}` : msg(e),
-    };
+    revalidatePath("/banking");
+    // Each step stands on its own: say which were done before the one that
+    // failed. A brought-forward account stays brought forward, and the dialog
+    // then offers Start.
+    let error = msg(e);
+    if (startedId) {
+      error = `The reconciliation was started with its statement, but importing or pairing the lines failed: ${error}. Open it and import the statement again.`;
+    } else if (broughtForward) {
+      error = `The earlier lines were brought forward, but the reconciliation was not started: ${error}`;
+    }
+    return { ok: false, error };
   }
 }
 

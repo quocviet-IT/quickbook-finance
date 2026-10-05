@@ -1,13 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
-import { Alert, App, Modal, Space, Spin, Typography, Upload } from "antd";
+import { Alert, App, Modal, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
 import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { bringForwardAdvice, dayBefore, type BringForwardAdvice } from "@/lib/domain/reconcile-statement";
 import { accountNumberDiffers } from "@/lib/domain/statement-files";
 import { formatMoney } from "@/lib/format";
-import PdfStatementPreview, { WrongAccountAlert } from "../PdfStatementPreview";
+import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "../PdfStatementPreview";
 import {
   broughtForwardPreviewAction,
   startReconciliationFromStatementAction,
@@ -47,6 +47,7 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
   const [file, setFile] = useState<FileState>({ kind: "none" });
   const [picked, setPicked] = useState(0);
   const [advice, setAdvice] = useState<BringForwardAdvice | null>(null);
+  const [advising, setAdvising] = useState(false);
   const [starting, setStarting] = useState(false);
   // Reading and asking the books are asynchronous; a later choice makes an earlier answer stale.
   const reading = useRef(0);
@@ -56,18 +57,25 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
   async function advise(statement: PdfStatement) {
     const token = ++asking.current;
     setAdvice(null);
-    if (!statement.from || statement.openingMinor === null) return;
+    if (!statement.from || statement.openingMinor === null) {
+      setAdvising(false);
+      return;
+    }
+    setAdvising(true);
     const res = await broughtForwardPreviewAction(bankAccount.id, dayBefore(statement.from));
     if (token !== asking.current) return;
+    setAdvising(false);
     if (res.ok && res.data) setAdvice(bringForwardAdvice(res.data, statement, money));
     else message.error(res.error ?? "The books could not be read for the statement's opening balance");
   }
 
   async function readFile(chosen: File) {
     const token = ++reading.current;
+    ++asking.current;
     setFileName(chosen.name);
     setFile({ kind: "reading" });
     setAdvice(null);
+    setAdvising(false);
     const { readPdfStatementFile } = await import("@/lib/client/pdf-text");
     const result = await readPdfStatementFile(chosen, bankAccount.decimals);
     if (token !== reading.current) return;
@@ -120,7 +128,7 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
       onOk={() => void start()}
       onCancel={onCancel}
       okText={okText}
-      okButtonProps={{ disabled: !usable, loading: starting }}
+      okButtonProps={{ disabled: !usable || advising, loading: starting }}
       cancelText="Cancel"
       width={720}
       destroyOnHidden
@@ -146,16 +154,9 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
         <p className="ant-upload-text">Click or drag a PDF statement here</p>
       </Upload.Dragger>
 
-      {file.kind === "reading" ? (
-        <Space style={{ marginTop: 12 }}>
-          <Spin size="small" />
-          <Typography.Text type="secondary">Reading the PDF…</Typography.Text>
-        </Space>
-      ) : null}
+      {file.kind === "reading" ? <ReadingPdf /> : null}
 
-      {file.kind === "unsupported" ? (
-        <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={file.message} />
-      ) : null}
+      {file.kind === "unsupported" ? <UnreadableFile message={file.message} /> : null}
 
       {file.kind === "pdf" ? (
         <PdfStatementPreview
@@ -175,6 +176,12 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
       ) : null}
 
       {statement && !usable ? <Alert style={{ marginTop: 12 }} type="error" showIcon title={NO_FIGURES} /> : null}
+
+      {usable && advising ? (
+        <Typography.Text type="secondary" style={{ display: "block", marginTop: 12 }}>
+          Checking the books against the statement&apos;s opening balance…
+        </Typography.Text>
+      ) : null}
 
       {usable && advice ? (
         <Alert

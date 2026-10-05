@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { Alert, Select, Typography } from "antd";
+import { Alert, Select, Space, Spin, Typography } from "antd";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import { periodLabel, skippedNote, statementLabel, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 
@@ -27,6 +27,21 @@ export function WrongAccountAlert({ description }: { description: string }) {
   return (
     <Alert style={{ marginTop: 12 }} type="warning" showIcon title="This file names a different account" description={description} />
   );
+}
+
+/** Said while a PDF is being read. */
+export function ReadingPdf() {
+  return (
+    <Space style={{ marginTop: 12 }}>
+      <Spin size="small" />
+      <Typography.Text type="secondary">Reading the PDF…</Typography.Text>
+    </Space>
+  );
+}
+
+/** Said when a chosen file cannot be read, with why. */
+export function UnreadableFile({ message }: { message: string }) {
+  return <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={message} />;
 }
 
 function Figure({ label, value }: { label: string; value: string }) {
