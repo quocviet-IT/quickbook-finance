@@ -195,13 +195,14 @@ try {
       check("a book line carries its reference", book.find((l) => Number(l.signed_minor) === -12000)?.reference === "1201");
 
       const many = `select acc_set_cleared_many($1, $2::uuid[], true) as n`;
+      const augustLine = (await one(`select journal_line_id from acc_reconciliation_line where reconciliation_id = $1 limit 1`, [forward])).journal_line_id;
+      const twice = await refused(many, [rec, [book[0].journal_line_id, augustLine]]);
+      const tickedAfterRefusal = (await one(`select count(*)::int as n from acc_reconciliation_line where reconciliation_id = $1`, [rec])).n;
+      check("a batch holding a line already reconciled is refused, and ticks nothing", /already reconciled|after the statement ending date|does not belong/.test(twice ?? "") && tickedAfterRefusal === 0, `${twice ?? "accepted"}; ticked ${tickedAfterRefusal}`);
       const ticked = (await one(many, [rec, book.map((l) => l.journal_line_id)])).n;
       check("both lines ticked in one call", ticked === 2, String(ticked));
       const detail = await one(`select * from acc_reconciliation_detail($1)`, [rec]);
       check("out by the fee the books do not have (5.00)", Number(detail.difference_minor) === -500, String(detail.difference_minor));
-      const augustLine = (await one(`select journal_line_id from acc_reconciliation_line where reconciliation_id = $1 limit 1`, [forward])).journal_line_id;
-      const twice = await refused(many, [rec, [book[0].journal_line_id, augustLine]]);
-      check("a line already reconciled is refused, and nothing changes", /already reconciled|after the statement ending date|does not belong/.test(twice ?? ""), twice ?? "accepted");
       const otherLine = (await one(`select l.id from acc_journal_line l where l.account_id = $1 limit 1`, [other])).id;
       const foreign = await refused(many, [rec, [otherLine]]);
       check("a line of another account is refused", /does not belong to this bank account/.test(foreign ?? ""), foreign ?? "accepted");
@@ -469,6 +470,10 @@ language plpgsql security definer set search_path = public as $$
 declare v_gl uuid; v_balance bigint; v_id uuid;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to bring a bank account forward'; end if;
+  -- The row lock serialises this with any reconciliation being created for the
+  -- account: an insert into acc_statement_reconciliation holds FOR KEY SHARE on
+  -- this row through its foreign key until it commits, which FOR UPDATE waits
+  -- for; the check below then sees that reconciliation and refuses.
   select account_id into v_gl from acc_bank_account where id = p_bank_account_id for update;
   if v_gl is null then raise exception 'Bank account not found'; end if;
   if exists (select 1 from acc_statement_reconciliation where bank_account_id = p_bank_account_id) then
@@ -1027,6 +1032,14 @@ describe("bringForwardAdvice", () => {
     });
   });
 
+  it("says the books hold no opening balance when nothing is posted before the statement", () => {
+    expect(bringForwardAdvice({ hasReconciliations: false, bookBalanceMinor: 0, openLines: 0 }, statement, money)).toEqual({
+      canBringForward: false,
+      through: "2026-08-31",
+      text: "The books hold $0.00 on Aug 31, 2026, and the statement opens at $5000.00. The books have nothing before this statement: the difference is an opening balance they do not hold yet.",
+    });
+  });
+
   it("says nothing once the account has a reconciliation, or the statement prints no start or opening", () => {
     const preview = { hasReconciliations: false, bookBalanceMinor: 500000, openLines: 2 };
     expect(bringForwardAdvice({ ...preview, hasReconciliations: true }, statement, money)).toBeNull();
@@ -1152,7 +1165,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * statement's period must equal the opening balance the statement prints.
  * Null when there is nothing to say — the account has been reconciled before,
  * the statement prints no period start or no opening balance, or the books
- * hold nothing earlier.
+ * hold nothing earlier and agree with the statement.
  */
 export function bringForwardAdvice(
   preview: BroughtForwardPreview,
@@ -1167,6 +1180,13 @@ export function bringForwardAdvice(
     if (preview.openLines === 0) return null;
     const lines = preview.openLines === 1 ? "The 1 earlier line" : `The ${preview.openLines} earlier lines`;
     return { canBringForward: true, through, text: `${books} — ${opens}. ${lines} can be brought forward as reconciled.` };
+  }
+  if (preview.openLines === 0) {
+    return {
+      canBringForward: false,
+      through,
+      text: `${books}, and ${opens}. The books have nothing before this statement: the difference is an opening balance they do not hold yet.`,
+    };
   }
   const apart = money(Math.abs(preview.bookBalanceMinor - statement.openingMinor));
   return {
@@ -1303,7 +1323,7 @@ export function pairingMessage(outcome: PairingOutcome): string {
 - [ ] **Step 5: Run it, and the PDF view tests beside it.**
 
 Run: `npx vitest run tests/unit/reconcile-statement.test.ts tests/unit/pdf-statement-view.test.ts`
-Expected: both files pass (reconcile-statement: 12 passed).
+Expected: both files pass (reconcile-statement: 13 passed).
 
 - [ ] **Step 6: Lint and commit.**
 
@@ -1876,7 +1896,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
 - Consumes: Task 3's `bringForwardAdvice`, `broughtForwardNote`, `dayBefore`, `pairingMessage`, `BringForwardAdvice`, `BroughtForwardPreview`, `PairingOutcome`; Task 4's services and schemas; 1.78's `readPdfStatements`, `toStatementLines`, `PdfStatement`, `PDF_MESSAGES`, `pickStatement`, `summarizeStatement`, `periodLabel`, `statementLabel`, `skippedNote`; `accountNumberDiffers` from `lib/domain/statement-files.ts`; `importStatement`, `generateSuggestions` from `lib/services/banking.ts`; `ActionResult` from `app/(app)/banking/reconcile/actions.ts`.
 - Produces:
   - `readPdfStatementFile(file: File, decimals: number): Promise<{ statements: PdfStatement[] } | { message: string }>` in `lib/client/pdf-text.ts`.
-  - `PdfStatementPreview` (default) with props `{ fileName, statements, picked, onPick, pickPrompt, money, children? }`, and `WrongAccountAlert({ description })`.
+  - `PdfStatementPreview` (default) with props `{ fileName, statements, picked, onPick, pickPrompt, money, children? }`, `WrongAccountAlert({ description })`, `ReadingPdf()` and `UnreadableFile({ message })`.
   - `ImportStatementModalProps.onConfirm(fileName, rows, statement: PdfStatement | null)` and an optional `intro` prop. Banking's own call is unchanged.
   - In `statement-actions.ts`: `StatementImportSummary { inserted; duplicates; outcome }`, `StartFromStatementSummary { id; broughtForward } & StatementImportSummary`, `startReconciliationFromStatementAction(raw): Promise<ActionResult<StartFromStatementSummary>>`, `broughtForwardPreviewAction(bankAccountId, through): Promise<ActionResult<BroughtForwardPreview>>`.
   - The list page passes each bank as `{ id, label, maskedNumber, currencyCode }`.
@@ -1936,7 +1956,7 @@ export async function readPdfStatementFile(
 ```tsx
 "use client";
 import type { ReactNode } from "react";
-import { Alert, Select, Typography } from "antd";
+import { Alert, Select, Space, Spin, Typography } from "antd";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import { periodLabel, skippedNote, statementLabel, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 
@@ -1963,6 +1983,21 @@ export function WrongAccountAlert({ description }: { description: string }) {
   return (
     <Alert style={{ marginTop: 12 }} type="warning" showIcon title="This file names a different account" description={description} />
   );
+}
+
+/** Said while a PDF is being read. */
+export function ReadingPdf() {
+  return (
+    <Space style={{ marginTop: 12 }}>
+      <Spin size="small" />
+      <Typography.Text type="secondary">Reading the PDF…</Typography.Text>
+    </Space>
+  );
+}
+
+/** Said when a chosen file cannot be read, with why. */
+export function UnreadableFile({ message }: { message: string }) {
+  return <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={message} />;
 }
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -2033,7 +2068,7 @@ export default function PdfStatementPreview({
 ```tsx
 "use client";
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Button, Checkbox, Modal, Select, Space, Spin, Typography, Upload } from "antd";
+import { Button, Checkbox, Modal, Select, Space, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { parseCsv } from "@/lib/csv";
 import {
@@ -2057,7 +2092,7 @@ import {
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
 import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { formatMoney } from "@/lib/format";
-import PdfStatementPreview, { WrongAccountAlert } from "./PdfStatementPreview";
+import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
 
 /**
  * The statement import dialog, in its own file so it is fetched when somebody
@@ -2285,16 +2320,9 @@ export default function ImportStatementModal({
         <p className="ant-upload-text">Click or drag a statement file here</p>
       </Upload.Dragger>
 
-      {file.kind === "reading" ? (
-        <Space style={{ marginTop: 12 }}>
-          <Spin size="small" />
-          <Typography.Text type="secondary">Reading the PDF…</Typography.Text>
-        </Space>
-      ) : null}
+      {file.kind === "reading" ? <ReadingPdf /> : null}
 
-      {file.kind === "unsupported" ? (
-        <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={file.message} />
-      ) : null}
+      {file.kind === "unsupported" ? <UnreadableFile message={file.message} /> : null}
 
       {file.kind === "csv" && choice ? (
         <div style={{ marginTop: 12 }}>
@@ -2481,6 +2509,7 @@ export async function startReconciliationFromStatementAction(
   const input = parsed.data;
   const file = statementFile(input);
   let broughtForward = false;
+  let startedId: string | null = null;
   try {
     const sb = await createSupabaseServerClient();
     if (input.bring_forward && input.period_from && input.opening_minor !== null) {
@@ -2496,6 +2525,7 @@ export async function startReconciliationFromStatementAction(
     const id = await createReconciliationFromStatement(
       sb, input.bank_account_id, input.statement_date, input.closing_minor, file,
     );
+    startedId = id;
     const imported = await importIntoBankTransactions(sb, input.bank_account_id, file);
     const outcome = await pairAndTick(sb, id);
     revalidatePath("/banking/reconcile");
@@ -2503,12 +2533,17 @@ export async function startReconciliationFromStatementAction(
     return { ok: true, data: { id, broughtForward, inserted: imported.inserted, duplicates: imported.skipped, outcome } };
   } catch (e) {
     revalidatePath("/banking/reconcile");
-    // Bringing forward is its own step: when what follows fails, the account
-    // stays brought forward and the dialog offers Start.
-    return {
-      ok: false,
-      error: broughtForward ? `The earlier lines were brought forward, but the reconciliation was not started: ${msg(e)}` : msg(e),
-    };
+    revalidatePath("/banking");
+    // Each step stands on its own: say which were done before the one that
+    // failed. A brought-forward account stays brought forward, and the dialog
+    // then offers Start.
+    let error = msg(e);
+    if (startedId) {
+      error = `The reconciliation was started with its statement, but importing or pairing the lines failed: ${error}. Open it and import the statement again.`;
+    } else if (broughtForward) {
+      error = `The earlier lines were brought forward, but the reconciliation was not started: ${error}`;
+    }
+    return { ok: false, error };
   }
 }
 
@@ -2527,14 +2562,14 @@ export async function broughtForwardPreviewAction(
 ```tsx
 "use client";
 import { useRef, useState } from "react";
-import { Alert, App, Modal, Space, Spin, Typography, Upload } from "antd";
+import { Alert, App, Modal, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
 import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { bringForwardAdvice, dayBefore, type BringForwardAdvice } from "@/lib/domain/reconcile-statement";
 import { accountNumberDiffers } from "@/lib/domain/statement-files";
 import { formatMoney } from "@/lib/format";
-import PdfStatementPreview, { WrongAccountAlert } from "../PdfStatementPreview";
+import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "../PdfStatementPreview";
 import {
   broughtForwardPreviewAction,
   startReconciliationFromStatementAction,
@@ -2574,6 +2609,7 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
   const [file, setFile] = useState<FileState>({ kind: "none" });
   const [picked, setPicked] = useState(0);
   const [advice, setAdvice] = useState<BringForwardAdvice | null>(null);
+  const [advising, setAdvising] = useState(false);
   const [starting, setStarting] = useState(false);
   // Reading and asking the books are asynchronous; a later choice makes an earlier answer stale.
   const reading = useRef(0);
@@ -2583,18 +2619,25 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
   async function advise(statement: PdfStatement) {
     const token = ++asking.current;
     setAdvice(null);
-    if (!statement.from || statement.openingMinor === null) return;
+    if (!statement.from || statement.openingMinor === null) {
+      setAdvising(false);
+      return;
+    }
+    setAdvising(true);
     const res = await broughtForwardPreviewAction(bankAccount.id, dayBefore(statement.from));
     if (token !== asking.current) return;
+    setAdvising(false);
     if (res.ok && res.data) setAdvice(bringForwardAdvice(res.data, statement, money));
     else message.error(res.error ?? "The books could not be read for the statement's opening balance");
   }
 
   async function readFile(chosen: File) {
     const token = ++reading.current;
+    ++asking.current;
     setFileName(chosen.name);
     setFile({ kind: "reading" });
     setAdvice(null);
+    setAdvising(false);
     const { readPdfStatementFile } = await import("@/lib/client/pdf-text");
     const result = await readPdfStatementFile(chosen, bankAccount.decimals);
     if (token !== reading.current) return;
@@ -2647,7 +2690,7 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
       onOk={() => void start()}
       onCancel={onCancel}
       okText={okText}
-      okButtonProps={{ disabled: !usable, loading: starting }}
+      okButtonProps={{ disabled: !usable || advising, loading: starting }}
       cancelText="Cancel"
       width={720}
       destroyOnHidden
@@ -2673,16 +2716,9 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
         <p className="ant-upload-text">Click or drag a PDF statement here</p>
       </Upload.Dragger>
 
-      {file.kind === "reading" ? (
-        <Space style={{ marginTop: 12 }}>
-          <Spin size="small" />
-          <Typography.Text type="secondary">Reading the PDF…</Typography.Text>
-        </Space>
-      ) : null}
+      {file.kind === "reading" ? <ReadingPdf /> : null}
 
-      {file.kind === "unsupported" ? (
-        <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={file.message} />
-      ) : null}
+      {file.kind === "unsupported" ? <UnreadableFile message={file.message} /> : null}
 
       {file.kind === "pdf" ? (
         <PdfStatementPreview
@@ -2702,6 +2738,12 @@ export default function StartFromStatementModal({ open, bankAccount, onStarted, 
       ) : null}
 
       {statement && !usable ? <Alert style={{ marginTop: 12 }} type="error" showIcon title={NO_FIGURES} /> : null}
+
+      {usable && advising ? (
+        <Typography.Text type="secondary" style={{ display: "block", marginTop: 12 }}>
+          Checking the books against the statement&apos;s opening balance…
+        </Typography.Text>
+      ) : null}
 
       {usable && advice ? (
         <Alert
@@ -3166,6 +3208,7 @@ export async function startReconciliationFromStatementAction(
   const input = parsed.data;
   const file = statementFile(input);
   let broughtForward = false;
+  let startedId: string | null = null;
   try {
     const sb = await createSupabaseServerClient();
     if (input.bring_forward && input.period_from && input.opening_minor !== null) {
@@ -3181,6 +3224,7 @@ export async function startReconciliationFromStatementAction(
     const id = await createReconciliationFromStatement(
       sb, input.bank_account_id, input.statement_date, input.closing_minor, file,
     );
+    startedId = id;
     const imported = await importIntoBankTransactions(sb, input.bank_account_id, file);
     const outcome = await pairAndTick(sb, id);
     revalidatePath("/banking/reconcile");
@@ -3188,12 +3232,17 @@ export async function startReconciliationFromStatementAction(
     return { ok: true, data: { id, broughtForward, inserted: imported.inserted, duplicates: imported.skipped, outcome } };
   } catch (e) {
     revalidatePath("/banking/reconcile");
-    // Bringing forward is its own step: when what follows fails, the account
-    // stays brought forward and the dialog offers Start.
-    return {
-      ok: false,
-      error: broughtForward ? `The earlier lines were brought forward, but the reconciliation was not started: ${msg(e)}` : msg(e),
-    };
+    revalidatePath("/banking");
+    // Each step stands on its own: say which were done before the one that
+    // failed. A brought-forward account stays brought forward, and the dialog
+    // then offers Start.
+    let error = msg(e);
+    if (startedId) {
+      error = `The reconciliation was started with its statement, but importing or pairing the lines failed: ${error}. Open it and import the statement again.`;
+    } else if (broughtForward) {
+      error = `The earlier lines were brought forward, but the reconciliation was not started: ${error}`;
+    }
+    return { ok: false, error };
   }
 }
 
