@@ -70,6 +70,11 @@ describe("pairStatement", () => {
     const result = pairStatement([line(0, "2026-09-28", -700, " ")], [entry("blank", "2026-09-01", -700, "")]);
     expect(summary(result).pairs).toEqual([]);
   });
+
+  it("pairs nothing when either side is empty", () => {
+    expect(summary(pairStatement([], [entry("a", "2026-09-05", 500)]))).toEqual({ pairs: [], missing: [], unseen: ["a"] });
+    expect(summary(pairStatement([line(0, "2026-09-05", 500)], []))).toEqual({ pairs: [], missing: [0], unseen: [] });
+  });
 });
 
 describe("matchStatement", () => {

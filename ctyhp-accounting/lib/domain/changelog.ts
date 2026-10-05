@@ -42,7 +42,7 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     version: "1.79",
-    date: "2026-10-03",
+    date: "2026-10-05",
     headline: "A reconciliation can start from the statement's PDF, and the statement's lines pair with the books.",
     changes: [
       {
@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "Import statement inside a reconciliation takes every statement file",
         detail:
-          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — by date and amount, by check number, or by amount within 5 days — or Not in the books, with a link to code those lines in Bank Transactions; Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding, and a PDF that closes on another figure than the reconciliation offers Use with the statement's.",
+          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — Paired by date and amount, by check number, or by amount within 5 days, and not ticked when its book line was unticked by hand — or Not in the books, or After the statement date. A link codes the lines the books do not have in Bank Transactions, and Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding. When a PDF closes on another figure than the reconciliation, Use takes the statement's closing balance; when it opens on another figure than the reconciliation begins at, the reconciliation says so. A reconciliation started before 1.79 shows its statement once the statement is imported there.",
         route: "/banking/reconcile",
       },
     ],

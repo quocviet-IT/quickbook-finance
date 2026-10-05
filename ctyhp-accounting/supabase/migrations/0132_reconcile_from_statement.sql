@@ -48,7 +48,7 @@ alter table acc_reconciliation_statement_line enable row level security;
 drop policy if exists acc_recon_stmt_line_sel on acc_reconciliation_statement_line;
 create policy acc_recon_stmt_line_sel on acc_reconciliation_statement_line
   for select using (acc_is_staff() or acc_current_role() = 'viewer');
-revoke all on acc_reconciliation_statement_line from public, anon;
+revoke all on acc_reconciliation_statement_line from public, anon, authenticated;
 grant select on acc_reconciliation_statement_line to authenticated;
 grant all on acc_reconciliation_statement_line to service_role;
 
@@ -191,6 +191,7 @@ language plpgsql security definer set search_path = public as $$
 declare v_gl uuid; v_balance bigint; v_id uuid;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to bring a bank account forward'; end if;
+  if p_through > current_date then raise exception 'A bank account cannot be brought forward past today'; end if;
   -- The row lock serialises this with any reconciliation being created for the
   -- account: an insert into acc_statement_reconciliation holds FOR KEY SHARE on
   -- this row through its foreign key until it commits, which FOR UPDATE waits

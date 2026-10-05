@@ -59,8 +59,9 @@ export const PAIRING_WINDOW_DAYS = 5;
 
 const DAY_MS = 86_400_000;
 
-function daysApart(a: string, b: string): number {
-  return Math.abs(Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY_MS));
+/** A day as a whole number, so the window is a subtraction. */
+function dayNumber(iso: string): number {
+  return Math.round(Date.parse(`${iso}T00:00:00Z`) / DAY_MS);
 }
 
 /** A cheque number as the prototype keeps it: letters, digits and hyphens only. */
@@ -73,37 +74,50 @@ export function pairStatement(
   book: readonly PairBookLine[],
   windowDays = PAIRING_WINDOW_DAYS,
 ): Pairing {
+  // Every pass asks for the same amount, so a statement line looks only at the
+  // book lines of its amount, kept in book order: the first free one that fits
+  // is the one the prototype's scan of the whole book finds. A statement of
+  // thousands of lines then costs thousands of steps, not millions.
+  const byAmount = new Map<number, number[]>();
+  book.forEach((entry, index) => {
+    const same = byAmount.get(entry.amountMinor);
+    if (same) same.push(index);
+    else byAmount.set(entry.amountMinor, [index]);
+  });
+  const bookDays = book.map((entry) => dayNumber(entry.date));
   const usedLines = new Set<number>();
-  const usedBook = new Set<string>();
+  const usedBook = new Set<number>();
   const pairs: StatementPair[] = [];
-  const passes: { how: string; fits: (line: PairStatementLine, entry: PairBookLine) => boolean }[] = [
-    { how: "date and amount", fits: (line, entry) => line.date === entry.date && line.amountMinor === entry.amountMinor },
+  const passes: { how: string; fits: (line: PairStatementLine, index: number) => boolean }[] = [
+    { how: "date and amount", fits: (line, index) => book[index].date === line.date },
     {
       how: "cheque number",
-      fits: (line, entry) => {
+      fits: (line, index) => {
         const check = cleanReference(line.reference);
-        return line.amountMinor === entry.amountMinor && check !== "" && (entry.reference ?? "") === check;
+        return check !== "" && (book[index].reference ?? "") === check;
       },
     },
     {
       how: `amount, within ${windowDays} days`,
-      fits: (line, entry) => line.amountMinor === entry.amountMinor && daysApart(line.date, entry.date) <= windowDays,
+      fits: (line, index) => Math.abs(bookDays[index] - dayNumber(line.date)) <= windowDays,
     },
   ];
   for (const pass of passes) {
     for (const line of lines) {
       if (usedLines.has(line.lineNo)) continue;
-      const entry = book.find((candidate) => !usedBook.has(candidate.id) && pass.fits(line, candidate));
-      if (!entry) continue;
+      const index = byAmount
+        .get(line.amountMinor)
+        ?.find((candidate) => !usedBook.has(candidate) && pass.fits(line, candidate));
+      if (index === undefined) continue;
       usedLines.add(line.lineNo);
-      usedBook.add(entry.id);
-      pairs.push({ line, book: entry, how: pass.how });
+      usedBook.add(index);
+      pairs.push({ line, book: book[index], how: pass.how });
     }
   }
   return {
     pairs,
     missing: lines.filter((line) => !usedLines.has(line.lineNo)),
-    unseen: book.filter((entry) => !usedBook.has(entry.id)),
+    unseen: book.filter((_, index) => !usedBook.has(index)),
   };
 }
 

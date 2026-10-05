@@ -77,11 +77,13 @@ export async function importStatementIntoReconciliationAction(
   if (denied) return { ok: false, error: denied };
   const parsed = reconciliationStatementSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  let kept = false;
   try {
     const sb = await createSupabaseServerClient();
     const file = statementFile(parsed.data);
     // Kept first: a completed reconciliation refuses it before anything is imported.
     await setReconciliationStatement(sb, reconciliationId, file);
+    kept = true;
     const { bankAccountId } = await getReconciliationHeader(sb, reconciliationId);
     const imported = await importIntoBankTransactions(sb, bankAccountId, file);
     const outcome = await pairAndTick(sb, reconciliationId);
@@ -89,7 +91,12 @@ export async function importStatementIntoReconciliationAction(
     revalidatePath("/banking");
     return { ok: true, data: { inserted: imported.inserted, duplicates: imported.skipped, outcome } };
   } catch (e) {
-    return { ok: false, error: msg(e) };
+    if (!kept) return { ok: false, error: msg(e) };
+    revalidatePath(`/banking/reconcile/${reconciliationId}`);
+    return {
+      ok: false,
+      error: `The statement was kept with this reconciliation, but importing or pairing its lines failed: ${msg(e)}. Import the statement again.`,
+    };
   }
 }
 

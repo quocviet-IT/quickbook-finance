@@ -518,7 +518,14 @@ export const reconciliationReopenSchema = z.object({
 });
 export type ReconciliationReopenInput = z.infer<typeof reconciliationReopenSchema>;
 
-const statementDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "A statement date is required");
+/** An ISO day that exists: 2026-02-31 is refused here, not by the database. */
+const statementDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "A statement date is required")
+  .refine((day) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+  }, "A statement date must be a real day");
 
 /** A statement file as a reconciliation takes it: its name, the balances it prints, and its lines. */
 export const reconciliationStatementSchema = z.object({

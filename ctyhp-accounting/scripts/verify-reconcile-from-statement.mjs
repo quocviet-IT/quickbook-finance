@@ -113,7 +113,9 @@ try {
       const bringForward = `select acc_bring_forward_reconciliation($1, '2026-08-31', $2, 'Brought forward, proved by the opening balance on the statement for Sep 1 – Sep 30, 2026') as id`;
       const wrong = await refused(bringForward, [bank, 80000]);
       check("bringing forward on a different opening balance is refused", /The books hold 750\.00 on 2026-08-31, and the statement opens at 800\.00/.test(wrong ?? ""), wrong ?? "accepted");
-      const forward = (await one(bringForward, [bank, 75000])).id;
+      const future = await refused(`select acc_bring_forward_reconciliation($1, current_date + 1, 0, 'x')`, [bank]);
+      check("bringing forward past today is refused", /past today/.test(future ?? ""), future ?? "accepted");
+      const forward =(await one(bringForward, [bank, 75000])).id;
       const forwarded = await one(`select * from acc_statement_reconciliation where id = $1`, [forward]);
       check("brought forward: completed through Aug 31 at 750.00", forwarded.status === "completed" && Number(forwarded.statement_ending_balance_minor) === 75000 && String(forwarded.statement_ending_date).length > 0);
       check("brought forward: the note is kept and it is marked brought forward", /^Brought forward/.test(forwarded.note ?? "") && forwarded.brought_forward === true);
@@ -182,6 +184,11 @@ try {
         );
         check(`${fn.split("(")[0]} is closed to anon and open to signed-in users`, grants.anon === false && grants.signed_in === true, JSON.stringify(grants));
       }
+
+      const tableWrites = await one(
+        `select has_table_privilege('authenticated', 'acc_reconciliation_statement_line', 'INSERT, UPDATE, DELETE, TRUNCATE') as writes`,
+      );
+      check("signed-in users hold no write privilege on the statement lines", tableWrites.writes === false, JSON.stringify(tableWrites));
 
       // ---- a viewer reads but cannot write; an outsider can do nothing
       await client.query("reset role");
