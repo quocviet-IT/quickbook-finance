@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getReconciliationDetail, getReconciliationHeader, getReconciliationLines } from "@/lib/services/bankrec";
+import { findReconciliationHeader, getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import { fromMinor } from "@/lib/domain/money";
 import PageHeader from "@/components/PageHeader";
@@ -9,9 +11,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ReconciliationReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!z.uuid().safeParse(id).success) notFound();
   const sb = await createSupabaseServerClient();
-  const [detail, header, lines, currencies] = await Promise.all([
-    getReconciliationDetail(sb, id), getReconciliationHeader(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
+  const header = await findReconciliationHeader(sb, id);
+  if (!header) notFound();
+  const [detail, lines, currencies] = await Promise.all([
+    getReconciliationDetail(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   const dec = base?.decimal_places ?? 2;

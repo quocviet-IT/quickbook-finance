@@ -5,6 +5,7 @@ import {
   closingAdvice,
   dayBefore,
   openingAdvice,
+  pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
   statementStandings,
@@ -126,7 +127,15 @@ describe("pairingMessage", () => {
       "10 of 12 statement lines paired with the books; 3 newly ticked. 2 not in the books — code them in Bank Transactions, then Match again.",
     );
     expect(pairingMessage({ lines: 1, paired: 0, ticked: 0, missing: 1, after: 0, flipped: true })).toBe(
-      "0 of 1 statement line paired with the books; 0 newly ticked. 1 not in the books — code it in Bank Transactions, then Match again. The statement's amounts were read the other way round to pair them.",
+      "0 of 1 statement line paired with the books; 0 newly ticked. 1 not in the books — code it in Bank Transactions, then Match again. The statement's amounts were read the other way around to pair them.",
     );
+  });
+});
+
+describe("pairedHowLabel", () => {
+  it("says check, not cheque, and leaves the other two as they are", () => {
+    expect(pairedHowLabel("cheque number")).toBe("check number");
+    expect(pairedHowLabel("date and amount")).toBe("date and amount");
+    expect(pairedHowLabel("amount, within 5 days")).toBe("amount, within 5 days");
   });
 });

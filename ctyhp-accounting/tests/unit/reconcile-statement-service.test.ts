@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  findReconciliationHeader,
   getBroughtForwardPreview,
+  getReconciliationHeader,
   getReconciliationStatement,
   pairAndTick,
   setReconciliationStatement,
@@ -29,6 +31,7 @@ function fakeClient(tables: Record<string, Rows>, rpcs: Record<string, Rows | Sc
     };
     chain.range = (from: number, to: number) => Promise.resolve(page(from, to));
     chain.single = () => Promise.resolve({ data: rows[0] ?? null, error: null });
+    chain.maybeSingle = () => Promise.resolve({ data: rows[0] ?? null, error: null });
     chain.then = (resolve: (value: unknown) => unknown) => resolve(page(0, cap - 1));
     return chain;
   }
@@ -118,6 +121,12 @@ describe("a reconciliation's kept statement", () => {
       bookBalanceMinor: 75000,
       openLines: 2,
     });
+  });
+
+  it("finds no reconciliation for an id that has none, without an error", async () => {
+    const { sb } = fakeClient({ acc_statement_reconciliation: [] }, {});
+    expect(await findReconciliationHeader(sb, "rec-404")).toBeNull();
+    await expect(getReconciliationHeader(sb, "rec-404")).rejects.toThrow("Reconciliation not found");
   });
 });
 

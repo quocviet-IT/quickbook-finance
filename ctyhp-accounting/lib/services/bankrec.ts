@@ -210,12 +210,14 @@ export async function bringForward(
 
 const optionalMinor = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
-export async function getReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader> {
+/** A reconciliation's account, date and statement, or null when no reconciliation has this id. */
+export async function findReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader | null> {
   const { data, error } = await sb.from("acc_statement_reconciliation")
     .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward")
     .eq("id", id)
-    .single();
+    .maybeSingle();
   if (error) throw new BankRecError(error.message);
+  if (!data) return null;
   const r = data as Record<string, unknown>;
   return {
     bankAccountId: r.bank_account_id as string,
@@ -227,6 +229,12 @@ export async function getReconciliationHeader(sb: SupabaseClient, id: string): P
     note: (r.note as string) ?? null,
     broughtForward: Boolean(r.brought_forward),
   };
+}
+
+export async function getReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader> {
+  const header = await findReconciliationHeader(sb, id);
+  if (!header) throw new BankRecError("Reconciliation not found");
+  return header;
 }
 
 export async function getReconciliationStatement(sb: SupabaseClient, id: string): Promise<ReconStatement> {

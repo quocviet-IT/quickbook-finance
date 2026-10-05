@@ -23,6 +23,7 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   closingAdvice,
   openingAdvice,
+  pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
   type Standing,
@@ -77,7 +78,7 @@ function StandingTag({ standing }: { standing: Standing }) {
   return (
     <Space size={4} direction="vertical">
       <Tag color={standing.ticked ? "green" : "gold"}>
-        Paired · {standing.how}
+        Paired · {pairedHowLabel(standing.how)}
         {standing.ticked ? "" : " · not ticked"}
       </Tag>
       {standing.entryNumber ? (
@@ -341,7 +342,7 @@ export default function ReconcileWorkspaceClient({
         </Space>
         {standings?.flipped ? (
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-            This statement writes money the other way round; its amounts were turned round to pair them.
+            This statement shows money in and out the other way around; its amounts were reversed to pair them.
           </Typography.Paragraph>
         ) : null}
         <Table<ReconStatementLine>

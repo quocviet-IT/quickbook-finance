@@ -98,6 +98,15 @@ export type Standing =
   | { kind: "missing" }
   | { kind: "after" };
 
+/**
+ * How a pair was made, in the screen's words. The pairing keeps the
+ * prototype's own names, and the prototype writes "cheque"; the screen is US
+ * English.
+ */
+export function pairedHowLabel(how: string): string {
+  return how === "cheque number" ? "check number" : how;
+}
+
 export interface StatementStandings {
   /** One per statement line, in the order given. */
   standings: Standing[];
@@ -187,6 +196,6 @@ export function pairingMessage(outcome: PairingOutcome): string {
   if (outcome.missing > 0) {
     text += ` ${outcome.missing} not in the books — code ${outcome.missing === 1 ? "it" : "them"} in Bank Transactions, then Match again.`;
   }
-  if (outcome.flipped) text += " The statement's amounts were read the other way round to pair them.";
+  if (outcome.flipped) text += " The statement's amounts were read the other way around to pair them.";
   return text;
 }
