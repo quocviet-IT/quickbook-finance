@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.81",
+    date: "2026-10-05",
+    headline: "A year of bank statements is reconciled in one pass, and a person signs it off.",
+    changes: [
+      {
+        kind: "added",
+        title: "Reconcile from statement files",
+        detail:
+          "On Bank Reconciliation, From statement files takes one statement or a year of them: PDF statements, or a CSV export with a running balance column, which is cut into calendar months. Each closing balance is read from the file. A month missing from the run, a month already signed off, and a file that prints no closing balance are each said before anything happens.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Preview, then sign off the months that agree",
+        detail:
+          "Preview walks the months oldest first against the books and writes nothing: each month Agrees, Needs a look (it agrees only on its balance, with lines that did not pair), or Does not agree, and every statement line shows how it paired. Sign off signs the months that agree in one click, each checked again as it is signed. The first month that does not agree is started as a reconciliation in progress, with its pairs ticked, for you to finish.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "From a PDF statement is now From statement files",
+        detail:
+          "The button opens a page that takes one file or many, in place of the dialog that took one PDF. A single statement works as before: the account's first reconciliation can still be brought forward, and a month that does not agree opens for you to finish.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "1.80",
     date: "2026-10-05",
     headline: "Every page downloads less before it can be used.",
