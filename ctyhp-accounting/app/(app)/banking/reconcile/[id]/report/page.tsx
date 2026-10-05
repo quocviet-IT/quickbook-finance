@@ -26,7 +26,7 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
     <div>
       <PageHeader title="Reconciliation report" description={`Base currency ${base?.code ?? "USD"} · Status ${detail.status}`} />
       <p><Link href={`/banking/reconcile/${id}`}>← Back to session</Link></p>
-      {header.broughtForward ? <p><strong>Brought forward.</strong> {header.note}</p> : null}
+      {header.broughtForward ? <p><strong>{header.note ?? "Brought forward"}</strong></p> : null}
       {header.fileName ? (
         <p>
           Statement: {header.fileName}
