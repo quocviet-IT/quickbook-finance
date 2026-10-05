@@ -115,7 +115,7 @@ try {
       check("bringing forward on a different opening balance is refused", /The books hold 750\.00 on 2026-08-31, and the statement opens at 800\.00/.test(wrong ?? ""), wrong ?? "accepted");
       const future = await refused(`select acc_bring_forward_reconciliation($1, current_date + 1, 0, 'x')`, [bank]);
       check("bringing forward past today is refused", /past today/.test(future ?? ""), future ?? "accepted");
-      const forward =(await one(bringForward, [bank, 75000])).id;
+      const forward = (await one(bringForward, [bank, 75000])).id;
       const forwarded = await one(`select * from acc_statement_reconciliation where id = $1`, [forward]);
       check("brought forward: completed through Aug 31 at 750.00", forwarded.status === "completed" && Number(forwarded.statement_ending_balance_minor) === 75000 && String(forwarded.statement_ending_date).length > 0);
       check("brought forward: the note is kept and it is marked brought forward", /^Brought forward/.test(forwarded.note ?? "") && forwarded.brought_forward === true);
