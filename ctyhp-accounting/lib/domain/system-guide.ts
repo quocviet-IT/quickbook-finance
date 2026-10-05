@@ -361,6 +361,24 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "adjustment somebody signs for.",
       },
       {
+        action: "Start a reconciliation from the statement's PDF",
+        control: "From a PDF statement",
+        route: "/banking/reconcile",
+        note:
+          "The statement's last day and closing balance start it. Its lines are imported, kept with the " +
+          "reconciliation and paired with the books — by date and amount, by check number, or by amount within " +
+          "5 days — and the pairs are ticked. On an account never reconciled, when the books agree with the " +
+          "statement's opening balance, Bring forward and start signs off the earlier lines first.",
+      },
+      {
+        action: "Code what the statement has and the books do not",
+        control: "Match again",
+        route: "/banking/reconcile",
+        note:
+          "Lines marked Not in the books are coded in Bank Transactions like any bank line. Back in the " +
+          "reconciliation, Match again pairs them and ticks them; no tick is ever removed.",
+      },
+      {
         action: "Reopen a completed reconciliation",
         control: "Reopen",
         note: "Needs permission and a reason, and the reopen is audited.",
