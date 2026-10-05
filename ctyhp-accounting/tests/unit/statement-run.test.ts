@@ -226,6 +226,25 @@ describe("simulateRun", () => {
     const preview = simulateRun([turned], [book("a", "2026-07-05", 50000), book("b", "2026-07-20", -10000)], { beginningMinor: 100000, broughtForward: null }, money);
     expect(preview.months[0].outcome).toEqual({ kind: "agrees", paired: 2, of: 2, outstanding: 0 });
   });
+
+  it("counts a month that reaches zero as agreeing even when lines not in the books net to nothing, as the prototype does", () => {
+    const netNothing = statement("2026-07-31", 100000, 140000, [...july.lines, csvLine("2026-07-10", -500, null), csvLine("2026-07-11", 500, null)]);
+    const preview = simulateRun([netNothing], [book("a", "2026-07-05", 50000), book("b", "2026-07-20", -10000)], { beginningMinor: 100000, broughtForward: null }, money);
+    expect(preview.months[0].outcome).toEqual({ kind: "agrees", paired: 2, of: 4, outstanding: 0 });
+    expect(preview.toSign).toBe(1);
+  });
+
+  it("walks the first month of an account never reconciled from zero when its statement prints no opening balance", () => {
+    const noOpening = statement("2026-07-31", null, 140000, july.lines);
+    const preview = simulateRun(
+      [noOpening],
+      [book("old", "2026-06-10", 90000), book("a", "2026-07-05", 50000), book("b", "2026-07-20", -10000)],
+      { beginningMinor: null, broughtForward: { hasReconciliations: false, bookBalanceMinor: 90000, openLines: 1 } },
+      money,
+    );
+    expect(preview.broughtForward).toBeNull();
+    expect(preview.months[0]).toMatchObject({ beginningMinor: 0, outcome: { kind: "outBy", differenceMinor: 100000, missing: 0 } });
+  });
 });
 
 describe("monthSentence", () => {
