@@ -23,10 +23,8 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   closingAdvice,
   openingAdvice,
-  pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
-  type Standing,
 } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
 import {
@@ -72,7 +70,6 @@ interface Props {
   baseDecimals: number;
   bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
 }
-
 
 export default function ReconcileWorkspaceClient({
   reconciliationId,

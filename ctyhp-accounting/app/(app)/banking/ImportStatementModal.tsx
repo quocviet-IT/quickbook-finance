@@ -68,25 +68,9 @@ type FileState =
   | { kind: "file"; format: "OFX" | "QIF"; result: StatementFileResult }
   | { kind: "pdf"; statements: PdfStatement[] };
 
-interface CsvChoice {
-  columns: StatementColumnMap;
-  dateOrder: DateOrder;
-  flipSigns: boolean;
-}
+type CsvChoice = CsvColumnChoice;
 
-const storageKey = (bankAccountId: string) => `onebook.statement-columns.${bankAccountId}`;
 const isPdfFile = (file: File) => /\.pdf$/i.test(file.name) || file.type === "application/pdf";
-
-function rememberedChoice(bankAccountId: string, headers: string[]): CsvChoice | null {
-  try {
-    const saved = JSON.parse(localStorage.getItem(storageKey(bankAccountId)) ?? "null") as CsvChoice | null;
-    if (!saved) return null;
-    const used = Object.values(saved.columns).filter((c): c is string => Boolean(c));
-    return used.every((c) => headers.includes(c)) ? saved : null;
-  } catch {
-    return null;
-  }
-}
 
 const COLUMN_FIELDS: { key: keyof StatementColumnMap; label: string; required?: boolean }[] = [
   { key: "date", label: "Date", required: true },
@@ -160,7 +144,7 @@ export default function ImportStatementModal({
       const records = parseCsv(text);
       const headers = records.length ? Object.keys(records[0]) : [];
       const detected = detectStatementColumns(headers);
-      const remembered = rememberedChoice(bankAccount.id, headers);
+      const remembered = rememberedColumns(bankAccount.id, headers);
       const next: CsvChoice = remembered ?? {
         columns: detected.columns,
         dateOrder: detectDateOrder(records.map((r) => (detected.columns.date ? r[detected.columns.date] ?? "" : ""))),
@@ -206,13 +190,7 @@ export default function ImportStatementModal({
 
   function confirm() {
     if (!rows.length) return;
-    if (file.kind === "csv" && choice) {
-      try {
-        localStorage.setItem(storageKey(bankAccount.id), JSON.stringify(choice));
-      } catch {
-        // Remembering the columns is a convenience; the import does not need it.
-      }
-    }
+    if (file.kind === "csv" && choice) rememberColumns(bankAccount.id, choice);
     onConfirm(fileName, rows, statement);
   }
 
