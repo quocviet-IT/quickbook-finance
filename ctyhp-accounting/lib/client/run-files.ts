@@ -1,8 +1,9 @@
 /**
  * One statement file read in the browser into the statements of a run: a PDF
  * by 1.78's reader, a CSV cut into months. The file never leaves the browser;
- * only the lines read are sent. A file that cannot prove a month comes back as
- * one statement saying why, so the person sees every file they chose.
+ * only the lines read are sent. A file that cannot prove a month — or cannot be
+ * read at all — comes back as one statement saying why, so the person sees
+ * every file they chose.
  */
 import { parseCsv } from "@/lib/csv";
 import { rememberedColumns } from "@/lib/client/statement-columns";
@@ -22,6 +23,9 @@ export interface RunBankAccount {
 }
 
 const COLUMNS_NOT_RECOGNIZED = "Its columns were not recognized — import it once on Banking to choose them";
+const COULD_NOT_READ = "This file could not be read";
+
+const isPdfFile = (file: File) => /\.pdf$/i.test(file.name) || file.type === "application/pdf";
 
 function unreadable(fileName: string, source: RunSource, problem: string): RunStatement {
   return {
@@ -45,8 +49,8 @@ async function readPdf(file: File, bank: RunBankAccount): Promise<RunStatement[]
   return statementsFromPdf(file.name, result.statements, bank.maskedNumber);
 }
 
-export async function readRunFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
-  if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") return readPdf(file, bank);
+async function readFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
+  if (isPdfFile(file)) return readPdf(file, bank);
   const text = await file.text();
   const verdict = detectStatementFormat(file.name, text);
   if ("unsupported" in verdict) return [unreadable(file.name, "CSV", verdict.unsupported)];
@@ -67,4 +71,14 @@ export async function readRunFile(file: File, bank: RunBankAccount): Promise<Run
   });
   const months = monthsFromCsv(file.name, rows);
   return months.length ? months : [unreadable(file.name, "CSV", RUN_MESSAGES.noLines)];
+}
+
+export async function readRunFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
+  try {
+    return await readFile(file, bank);
+  } catch {
+    // A file the browser cannot open, or a reader that fails on it, is still a
+    // row that says so — never a file that silently drops out of the run.
+    return [unreadable(file.name, isPdfFile(file) ? "PDF" : "CSV", COULD_NOT_READ)];
+  }
 }
