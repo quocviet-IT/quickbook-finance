@@ -116,6 +116,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     const token = ++asked.current;
     const run = check.usable;
     setPreviewing(true);
+    setPreview(null);
     setDone(null);
     const res = await previewRunAction({
       bank_account_id: bankAccount.id,
@@ -149,7 +150,9 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       : null;
 
   async function signOff() {
-    if (!preview || check.stops.length > 0) return;
+    if (!preview || previewing || check.stops.length > 0) return;
+    // A preview still on its way was walked before these months were signed.
+    asked.current += 1;
     const toSign = preview.months.slice(0, preview.toSign);
     const total = toSign.length + (bringForward ? 1 : 0);
     let step = 0;
@@ -345,7 +348,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
           />
           <Space style={{ marginTop: 12 }} wrap>
             {signLabel ? (
-              <Button type="primary" loading={busy} onClick={() => void signOff()}>
+              <Button type="primary" loading={busy} disabled={previewing} onClick={() => void signOff()}>
                 {signLabel}
               </Button>
             ) : null}
