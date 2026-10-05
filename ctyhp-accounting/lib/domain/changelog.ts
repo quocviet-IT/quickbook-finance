@@ -11,8 +11,6 @@
  * links to nothing.
  */
 
-import { RELEASES_ALL_READ } from "./release-marker";
-
 export type ChangeKind = "added" | "changed" | "fixed";
 
 export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
@@ -49,9 +47,9 @@ export const RELEASES: Release[] = [
     changes: [
       {
         kind: "changed",
-        title: "The Guide, Ask AI and Report panels load when you first open them",
+        title: "Pages no longer download the sign-in library until you need it",
         detail:
-          "They used to be downloaded with every page, whether anyone opened them or not. A typical page now carries about 30 KB less, and each panel takes a moment longer the first time it is opened. What the panels show and do is unchanged.",
+          "Every signed-in page used to download the library behind Sign out and report attachments, whether anyone signed out or attached a file or not. It now loads on that click, so each page carries less, and Sign out or sending a report with a file takes a moment longer the first time. Nothing else changes.",
       },
     ],
   },
@@ -2704,7 +2702,6 @@ export function compareVersions(a: string, b: string): number {
  * way is a minute of reading.
  */
 export function releasesSince(seen: string | null): Release[] {
-  if (seen === RELEASES_ALL_READ) return [];
   if (!seen) return RELEASES;
   if (!RELEASES.some((release) => release.version === seen)) return RELEASES;
   return RELEASES.filter((release) => compareVersions(release.version, seen) > 0);

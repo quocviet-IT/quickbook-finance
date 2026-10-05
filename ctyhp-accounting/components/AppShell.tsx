@@ -230,7 +230,6 @@ export default function AppShell({
   canCreateCompany,
   permissionKeys,
   pendingApprovals,
-  appVersion,
   children,
 }: {
   email: string;
@@ -244,8 +243,6 @@ export default function AppShell({
   permissionKeys: readonly string[] | null;
   /** Badge count, so the approvals queue is visible without a sidebar slot. */
   pendingApprovals: number;
-  /** The newest release, for the Guide button's unread dot. */
-  appVersion: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -478,7 +475,7 @@ export default function AppShell({
           <div className="app-shell__content-inner">{children}</div>
         </Content>
       </Layout>
-      <AssistantLauncher appVersion={appVersion} />
+      <AssistantLauncher />
     </Layout>
   );
 }

@@ -3,26 +3,23 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The app shell is on every signed-in page, so everything it imports statically
- * is JavaScript every page downloads before anyone can use it. The help drawers,
- * the release notes and the Supabase browser client are opened by a click — the
- * page does not need them to draw — and together they were most of the shell's
- * own weight (the changelog alone is over 120 KB of source). They are loaded on
- * demand; this test keeps them that way by following the shell's static imports
- * and naming the chain that reaches one of them.
+ * Every client component the signed-in layout imports is JavaScript every page
+ * downloads — Next lists them for each route below the layout whether or not
+ * this request renders them, which is how the no-company notice shipped the
+ * Supabase browser client to every page. The shell needs that client for one
+ * thing, signing out, so it is fetched on that click; this test follows the
+ * layout's client imports and names the chain if it ever comes back.
+ *
+ * Why only this: the help panels were tried the same way and taken back. They
+ * share Ant Design's Modal, Drawer and Form with most pages, so moving them out
+ * of the shell split that shared code into a copy per page — each first visit
+ * got smaller, the app as a whole grew by about 330 KB, and the bundle budget
+ * (tests/quality/budgets.json) refused it, rightly. The Supabase client is a
+ * package of its own, used by nothing else here, so it leaves cleanly.
  */
 const ROOT = process.cwd();
-const SHELL = join(ROOT, "components", "AppShell.tsx");
-
-const ON_DEMAND = [
-  "components/ai/AskAiPanel.tsx",
-  "components/feedback/ReportDialog.tsx",
-  "components/guide/SystemGuideDrawer.tsx",
-  "lib/domain/changelog.ts",
-  "lib/domain/system-guide.ts",
-  "lib/domain/screen-context.ts",
-  "lib/db/client.ts",
-];
+const LAYOUT = join(ROOT, "app", "(app)", "layout.tsx");
+const BROWSER_CLIENT = join(ROOT, "lib", "db", "client.ts");
 
 // `import … from "x"`, `export … from "x"` and `import "x"`. `import type` is
 // erased at build time, and `import("x")` is the on-demand form this test exists
@@ -30,11 +27,15 @@ const ON_DEMAND = [
 const STATIC_IMPORT =
   /^\s*(?:import|export)\s+(?!type\s)[^;]*?\sfrom\s+["']([^"']+)["']|^\s*import\s+["']([^"']+)["']/gm;
 
+function specifiers(file: string): string[] {
+  return [...readFileSync(file, "utf8").matchAll(STATIC_IMPORT)].map((m) => m[1] ?? m[2]);
+}
+
 function resolveModule(importer: string, specifier: string): string | null {
   let base: string;
   if (specifier.startsWith("@/")) base = join(ROOT, specifier.slice(2));
   else if (specifier.startsWith(".")) base = resolve(dirname(importer), specifier);
-  else return null; // a package: measured by the bundle report, not here
+  else return null; // a package: checked by name below, measured by the bundle report
   for (const candidate of [
     base,
     `${base}.ts`,
@@ -47,14 +48,25 @@ function resolveModule(importer: string, specifier: string): string | null {
   return null;
 }
 
-/** Every file the entry reaches statically, mapped to the file that imported it. */
-function staticGraph(entry: string): Map<string, string | null> {
-  const importedBy = new Map<string, string | null>([[entry, null]]);
-  const queue = [entry];
+function isClientComponent(file: string): boolean {
+  return /^\s*["']use client["']/.test(readFileSync(file, "utf8"));
+}
+
+// A client file that imports a Server Action gets a reference to call, not the
+// action's code, so nothing behind a "use server" module reaches the browser.
+function isServerActionModule(file: string): boolean {
+  return /^\s*["']use server["']/.test(readFileSync(file, "utf8"));
+}
+
+/** Every file the entries reach statically, mapped to the file that imported it. */
+function staticGraph(entries: string[]): Map<string, string | null> {
+  const importedBy = new Map<string, string | null>(entries.map((entry) => [entry, null]));
+  const queue = [...entries];
   while (queue.length > 0) {
     const file = queue.shift()!;
-    for (const match of readFileSync(file, "utf8").matchAll(STATIC_IMPORT)) {
-      const target = resolveModule(file, match[1] ?? match[2]);
+    if (isServerActionModule(file)) continue;
+    for (const specifier of specifiers(file)) {
+      const target = resolveModule(file, specifier);
       if (target && !importedBy.has(target)) {
         importedBy.set(target, file);
         queue.push(target);
@@ -72,19 +84,29 @@ function chainTo(graph: Map<string, string | null>, file: string): string {
   return steps.join(" → ");
 }
 
-const graph = staticGraph(SHELL);
+const layoutClients = specifiers(LAYOUT)
+  .map((specifier) => resolveModule(LAYOUT, specifier))
+  .filter((file): file is string => file !== null && isClientComponent(file));
+const graph = staticGraph(layoutClients);
 
-describe("the app shell's static imports", () => {
-  it("are followed through the launcher and its helpers", () => {
+describe("the signed-in layout's client imports", () => {
+  it("are found and followed", () => {
     // Without this, a walker that found nothing would pass every check below.
+    expect(layoutClients.map((file) => relative(ROOT, file).replaceAll("\\", "/")).sort()).toEqual(
+      ["components/AppShell.tsx", "components/NoCompanyNotice.tsx"],
+    );
     expect(graph.has(join(ROOT, "components", "assistant", "AssistantLauncher.tsx"))).toBe(true);
-    expect(graph.has(join(ROOT, "lib", "client", "release-notes.ts"))).toBe(true);
   });
 
-  it.each(ON_DEMAND)("leave %s to be loaded when it is opened", (module) => {
-    const target = join(ROOT, module);
-    // A renamed file would otherwise make this pass by being absent.
-    expect(existsSync(target)).toBe(true);
-    expect(graph.has(target) ? chainTo(graph, target) : null).toBeNull();
+  it("leave the Supabase browser client to the sign-out click", () => {
+    expect(existsSync(BROWSER_CLIENT)).toBe(true);
+    expect(graph.has(BROWSER_CLIENT) ? chainTo(graph, BROWSER_CLIENT) : null).toBeNull();
+  });
+
+  it("import no Supabase package directly", () => {
+    const direct = [...graph.keys()]
+      .filter((file) => specifiers(file).some((specifier) => specifier.startsWith("@supabase/")))
+      .map((file) => chainTo(graph, file));
+    expect(direct).toEqual([]);
   });
 });

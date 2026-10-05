@@ -3,7 +3,6 @@ import { createSupabaseServerClient, createSupabaseServerClientForSchema } from 
 import { isPlatformAdmin, resolveActiveCompany } from "@/lib/db/company";
 import { countPendingApprovals } from "@/lib/services/access";
 import { currentAccess } from "@/lib/db/settings-access";
-import { APP_VERSION } from "@/lib/domain/changelog";
 import AppShell from "@/components/AppShell";
 import NoCompanyNotice from "@/components/NoCompanyNotice";
 
@@ -65,7 +64,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }))}
       permissionKeys={permissionKeys}
       pendingApprovals={pendingApprovals}
-      appVersion={APP_VERSION}
     >
       {children}
     </AppShell>
