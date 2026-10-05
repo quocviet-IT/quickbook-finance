@@ -56,6 +56,9 @@ export const RUN_MESSAGES = {
   noLines: "No dated amounts could be read out of this file",
 } as const;
 
+/** The most statement lines one run previews: its request stays well under the server's 1 MB body limit. */
+export const MAX_RUN_LINES = 10_000;
+
 const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 /**
@@ -160,9 +163,11 @@ export interface RunContext {
   /** Statement dates of the account's completed reconciliations. */
   completedDates: readonly string[];
   inProgress: { id: string; date: string } | null;
+  /** The company's today: a statement that runs past it is not over yet. */
+  today: string;
 }
 
-export type RunState = "usable" | "unreadable" | "duplicate" | "already" | "before";
+export type RunState = "usable" | "unreadable" | "notOver" | "duplicate" | "already" | "before";
 
 export interface CheckedStatement {
   statement: RunStatement;
@@ -186,6 +191,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * Which statements a run can reconcile, and what stops it: a gap between two
  * statements (p44b.html: the run is disabled), a first statement that does not
  * open where the last reconciliation closed, or a reconciliation in progress.
+ * It also sorts out a month not over yet.
  */
 export function checkRun(
   statements: readonly RunStatement[],
@@ -197,6 +203,7 @@ export function checkRun(
   const kept = new Set<string>();
   const checked: CheckedStatement[] = ordered.map((statement) => {
     if (statement.problem || !statement.to) return { statement, state: "unreadable", note: statement.problem ?? RUN_MESSAGES.noDate };
+    if (statement.to > context.today) return { statement, state: "notOver", note: "Not over yet" };
     if (completed.has(statement.to)) return { statement, state: "already", note: "Already signed off" };
     if (context.lastCompleted && statement.to < context.lastCompleted.date) {
       return { statement, state: "before", note: "Before the last reconciliation" };
@@ -216,6 +223,13 @@ export function checkRun(
     );
   }
   if (!usable.length) stops.push("Nothing here can be reconciled yet.");
+  const lineCount = usable.reduce((n, s) => n + s.lines.length, 0);
+  if (lineCount > MAX_RUN_LINES) {
+    stops.push(
+      `These statements hold ${lineCount.toLocaleString("en-US")} lines, and a run can hold at most ` +
+        `${MAX_RUN_LINES.toLocaleString("en-US")}. Choose fewer months.`,
+    );
+  }
   const first = usable[0];
   if (first && context.lastCompleted && first.openingMinor !== null && first.openingMinor !== context.lastCompleted.endingMinor) {
     stops.push(
@@ -233,6 +247,20 @@ export function checkRun(
     );
   }
   return { statements: checked, usable, stops };
+}
+
+/**
+ * Why the server will not start a month of a run, or null. A month not over
+ * yet cannot be proven; a month at or before the account's last completed
+ * reconciliation is signed already — by this run in another tab, or by a
+ * second click.
+ */
+export function monthRefusal(statementDate: string, today: string, lastCompletedDate: string | null): string | null {
+  if (statementDate > today) return `The month to ${shortDate(statementDate, true)} is not over yet.`;
+  if (lastCompletedDate && statementDate <= lastCompletedDate) {
+    return `This account is already reconciled to ${shortDate(lastCompletedDate, true)}, so the month to ${shortDate(statementDate, true)} is not signed off again.`;
+  }
+  return null;
 }
 
 /** A book line not yet in a completed reconciliation, in book order (date, entry, line). */

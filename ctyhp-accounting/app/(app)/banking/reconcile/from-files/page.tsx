@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listBankAccounts } from "@/lib/services/banking";
+import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { listReconciliations } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import type { RunContext } from "@/lib/domain/statement-run";
@@ -17,10 +18,11 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
   if (!account || !z.uuid().safeParse(account).success) notFound();
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const [banks, currencies, reconciliations] = await Promise.all([
+  const [banks, currencies, reconciliations, { asOf }] = await Promise.all([
     listBankAccounts(sb),
     listCurrencies(sb),
     listReconciliations(sb, account),
+    getBankingContext(sb),
   ]);
   const bank = banks.find((b) => b.id === account);
   if (!bank) notFound();
@@ -34,6 +36,7 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
       : null,
     completedDates: completed.map((r) => r.statement_ending_date),
     inProgress: inProgress ? { id: inProgress.id, date: inProgress.statement_ending_date } : null,
+    today: asOf,
   };
   return (
     <div>

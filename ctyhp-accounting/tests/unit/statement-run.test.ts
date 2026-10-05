@@ -4,6 +4,7 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   RUN_MESSAGES,
   checkRun,
+  monthRefusal,
   monthSentence,
   monthsFromCsv,
   simulateRun,
@@ -35,7 +36,7 @@ const statement = (to: string, opening: number | null, closing: number | null, l
   outByMinor: null,
   ...extra,
 });
-const noContext: RunContext = { lastCompleted: null, completedDates: [], inProgress: null };
+const noContext: RunContext = { lastCompleted: null, completedDates: [], inProgress: null, today: "2026-12-31" };
 const book = (id: string, date: string, amount: number, reference: string | null = null): OpenBookLine => ({
   id,
   date,
@@ -132,7 +133,7 @@ describe("checkRun", () => {
         statement("2026-05-31", 800, 900),
         statement("2026-10-31", null, null, [], { to: null, problem: RUN_MESSAGES.noDate }),
       ],
-      { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null },
+      { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null, today: "2026-12-31" },
       money,
     );
     expect(result.statements.map((c) => [c.statement.key, c.state])).toEqual([
@@ -151,7 +152,7 @@ describe("checkRun", () => {
   it("stops a run with a gap, with a first statement that does not open where the last reconciliation closed, and with one in progress", () => {
     const result = checkRun(
       [statement("2026-07-31", 1000, 1100), statement("2026-08-31", 1200, 1300)],
-      { lastCompleted: { date: "2026-06-30", endingMinor: 900 }, completedDates: ["2026-06-30"], inProgress: { id: "r", date: "2026-07-31" } },
+      { lastCompleted: { date: "2026-06-30", endingMinor: 900 }, completedDates: ["2026-06-30"], inProgress: { id: "r", date: "2026-07-31" }, today: "2026-12-31" },
       money,
     );
     expect(result.stops).toEqual([
@@ -170,6 +171,50 @@ describe("checkRun", () => {
   it("notes a statement that does not prove itself", () => {
     const [only] = checkRun([statement("2026-07-31", 1000, 1100, [csvLine("2026-07-05", 100, null)], { outByMinor: -2000 })], noContext, money).statements;
     expect(only.note).toBe("1 line — does not prove itself, out by $20.00");
+  });
+
+  it("marks a month that runs past the company's today as not over yet", () => {
+    const result = checkRun(
+      [statement("2026-07-31", 1000, 1100), statement("2026-08-31", 1100, 1300)],
+      { lastCompleted: null, completedDates: [], inProgress: null, today: "2026-08-15" },
+      money,
+    );
+    expect(result.statements.map((c) => [c.statement.to, c.state])).toEqual([
+      ["2026-07-31", "usable"],
+      ["2026-08-31", "notOver"],
+    ]);
+    expect(result.statements[1].note).toBe("Not over yet");
+    expect(result.usable.map((s) => s.to)).toEqual(["2026-07-31"]);
+    expect(result.stops).toEqual([]);
+  });
+
+  it("stops a run of more than 10,000 statement lines, and not one of exactly 10,000", () => {
+    const lines = (n: number) => Array.from({ length: n }, (_, i) => csvLine("2026-07-05", 1, null, `L${i}`));
+    const over = checkRun([statement("2026-07-31", 1000, 1100, lines(10001))], noContext, money);
+    expect(over.stops).toContain("These statements hold 10,001 lines, and a run can hold at most 10,000. Choose fewer months.");
+    const exact = checkRun([statement("2026-07-31", 1000, 1100, lines(10000))], noContext, money);
+    expect(exact.stops.filter((s) => s.includes("a run can hold at most"))).toEqual([]);
+  });
+});
+
+describe("monthRefusal", () => {
+  it("refuses a month not over yet", () => {
+    expect(monthRefusal("2026-10-31", "2026-10-05", null)).toBe("The month to Oct 31, 2026 is not over yet.");
+  });
+
+  it("refuses a month at or before the last completed reconciliation", () => {
+    expect(monthRefusal("2026-07-31", "2026-10-05", "2026-07-31")).toBe(
+      "This account is already reconciled to Jul 31, 2026, so the month to Jul 31, 2026 is not signed off again.",
+    );
+    expect(monthRefusal("2026-06-30", "2026-10-05", "2026-07-31")).toBe(
+      "This account is already reconciled to Jul 31, 2026, so the month to Jun 30, 2026 is not signed off again.",
+    );
+  });
+
+  it("lets through a month after the last one, a first month, and a month ending today", () => {
+    expect(monthRefusal("2026-08-31", "2026-10-05", "2026-07-31")).toBeNull();
+    expect(monthRefusal("2026-08-31", "2026-10-05", null)).toBeNull();
+    expect(monthRefusal("2026-10-05", "2026-10-05", null)).toBeNull();
   });
 });
 

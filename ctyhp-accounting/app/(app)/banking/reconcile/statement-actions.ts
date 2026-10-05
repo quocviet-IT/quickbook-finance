@@ -13,7 +13,7 @@ import { shortDate } from "@/lib/domain/pdf-statement-view";
 import {
   reconciliationStatementSchema, runMonthSchema, runPreviewSchema, type ReconciliationStatementInput,
 } from "@/lib/domain/schemas";
-import { simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
+import { monthRefusal, simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
 import {
   createReconciliationFromStatement, setReconciliationStatement, setStatementEnding, getBroughtForwardPreview,
   bringForward, getReconciliationHeader, getReconciliationStatement, pairAndTick, getBankOpenLines,
@@ -21,6 +21,7 @@ import {
   BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
 import { generateSuggestions, importStatement } from "@/lib/services/banking";
+import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
 import type { ActionResult } from "./actions";
@@ -176,7 +177,8 @@ export interface RunMonthResult {
  * started from its statement — imported into Bank Transactions, paired and
  * ticked, then completed when `sign` is set and it reaches zero. A month that
  * no longer reaches zero (the books changed since the preview) is left in
- * progress and says by how much.
+ * progress and says by how much. The server refuses a month at or before the
+ * last completed reconciliation, or not over yet.
  */
 export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResult<RunMonthResult>> {
   const denied = await guard();
@@ -198,6 +200,14 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
       revalidatePath("/banking/reconcile");
       return { ok: true, data: { id, signed: true, differenceMinor: 0 } };
     }
+    const [{ asOf }, reconciliations] = await Promise.all([getBankingContext(sb), listReconciliations(sb, input.bank_account_id)]);
+    // Newest first, as listReconciliations orders them.
+    const refusal = monthRefusal(
+      input.statement_date,
+      asOf,
+      reconciliations.find((r) => r.status === "completed")?.statement_ending_date ?? null,
+    );
+    if (refusal) return { ok: false, error: refusal };
     const file = statementFile(input);
     const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, input.closing_minor, file);
     startedId = id;

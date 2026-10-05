@@ -38,11 +38,23 @@ interface Done {
   /** The month left in progress for a person, when there is one. */
   open: { id: string; date: string; sentence: string } | null;
   error: string | null;
+  /** The account's earlier lines were brought forward before any month. */
+  broughtForward: boolean;
+}
+
+/** What was done before a run stopped on an error, said after the error. */
+function before(done: Done): string | null {
+  const parts = [
+    done.broughtForward ? "The earlier lines were brought forward" : null,
+    done.signed > 0 ? `${done.signed} month${done.signed === 1 ? "" : "s"} signed off` : null,
+  ].filter((p): p is string => p !== null);
+  return parts.length ? `${parts.join(" and ")} before this.` : null;
 }
 
 const STATE_COLOR: Record<CheckedStatement["state"], string | undefined> = {
   usable: "green",
   unreadable: "red",
+  notOver: undefined,
   already: "blue",
   before: undefined,
   duplicate: undefined,
@@ -97,8 +109,16 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     try {
       const read = await readRunFile(file, bankAccount);
       setStatements((current) => {
+        // A file chosen twice, or two files of one name, stay as rows: the
+        // table says "Same month as another file" rather than one vanishing.
         const keys = new Set(current.map((s) => s.key));
-        return [...current, ...read.filter((s) => !keys.has(s.key))];
+        const fresh = read.map((s) => {
+          let key = s.key;
+          for (let n = 2; keys.has(key); n += 1) key = `${s.key}~${n}`;
+          keys.add(key);
+          return key === s.key ? s : { ...s, key };
+        });
+        return [...current, ...fresh];
       });
     } finally {
       setReading((n) => n - 1);
@@ -157,10 +177,16 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     const total = toSign.length + (bringForward ? 1 : 0);
     let step = 0;
     let signed = 0;
+    let broughtForward = false;
     const finish = (result: Done) => {
       setProgress(null);
       setDone(result);
       setPreview(null);
+      if (result.error === null && result.open === null) {
+        // Every month is signed: the table would only say "Already signed off".
+        setStatements([]);
+        setPreviewed([]);
+      }
       router.refresh();
     };
     const first = previewed[0];
@@ -174,7 +200,8 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         statement_date: first.to,
         opening_minor: first.openingMinor,
       });
-      if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward" });
+      if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward", broughtForward });
+      broughtForward = true;
     }
     for (const month of toSign) {
       const statement = previewedByKey.get(month.key);
@@ -191,7 +218,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         lines: statement.lines,
         sign: true,
       });
-      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "A month could not be signed off" });
+      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "A month could not be signed off", broughtForward });
       if (!res.data.signed) {
         return finish({
           signed,
@@ -201,6 +228,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             sentence: `The books changed since the preview: this month is now out by ${money(Math.abs(res.data.differenceMinor))}.`,
           },
           error: null,
+          broughtForward,
         });
       }
       signed += 1;
@@ -219,10 +247,12 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         lines: statement.lines,
         sign: false,
       });
-      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "The month that needs a look could not be started" });
+      if (!res.ok || !res.data) {
+        return finish({ signed, open: null, error: res.error ?? "The month that needs a look could not be started", broughtForward });
+      }
       open = { id: res.data.id, date: needsLook.statementDate, sentence: monthSentence(needsLook.outcome, money) };
     }
-    finish({ signed, open, error: null });
+    finish({ signed, open, error: null, broughtForward });
   }
 
   return (
@@ -374,11 +404,14 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
           description={
             done.open ? (
               <span>
+                {done.broughtForward ? "The earlier lines were brought forward. " : ""}
                 {done.open.sentence} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
                 <Link href={`/banking/reconcile/${done.open.id}`}>Open it</Link>
               </span>
-            ) : done.error && done.signed ? (
-              `${done.signed} month${done.signed === 1 ? "" : "s"} signed off before this.`
+            ) : done.error ? (
+              before(done)
+            ) : done.broughtForward ? (
+              "The earlier lines were brought forward first."
             ) : null
           }
         />
