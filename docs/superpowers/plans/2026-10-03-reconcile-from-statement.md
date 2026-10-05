@@ -966,7 +966,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
 
 **Interfaces:**
 - Consumes: `periodLabel` from `lib/domain/pdf-statement-view.ts`; `matchStatement`, `PairBookLine`, `PairStatementLine` (Task 2).
-- Produces: `shortDate(iso, withYear): string` (now exported); `BroughtForwardPreview { hasReconciliations; bookBalanceMinor; openLines }`; `BringForwardAdvice { canBringForward; through; text }`; `dayBefore(iso)`; `bringForwardAdvice(preview, { from, openingMinor }, money): BringForwardAdvice | null`; `broughtForwardNote(from, to): string`; `closingAdvice(closingMinor, endingMinor, money): string | null`; `openingAdvice(openingMinor, beginningMinor, money): string | null`; `StandingBookLine`; `Standing` = `{ kind: "paired"; how; bookId; entryNumber; ticked } | { kind: "missing" } | { kind: "after" }`; `StatementStandings { standings; paired; missing; after; flipped; outstanding }`; `statementStandings(lines, book, statementDate)`; `reconciliationStandings(statement: { endingDate; lines: { lineNo; txnDate; amountMinor; reference }[] }, book: { journalLineId; entryDate; signedMinor; reference; entryNumber; cleared }[])`; `PairingOutcome { lines; paired; ticked; missing; after; flipped }`; `pairingMessage(outcome): string`.
+- Produces: `shortDate(iso, withYear): string` (now exported); `BroughtForwardPreview { hasReconciliations; bookBalanceMinor; openLines }`; `BringForwardAdvice { canBringForward; through; text }`; `dayBefore(iso)`; `bringForwardAdvice(preview, { from, openingMinor }, money): BringForwardAdvice | null`; `broughtForwardNote(from, to): string`; `closingAdvice(closingMinor, endingMinor, money): string | null`; `openingAdvice(openingMinor, beginningMinor, money): string | null`; `StandingBookLine`; `Standing` = `{ kind: "paired"; how; bookId; entryNumber; ticked } | { kind: "missing" } | { kind: "after" }`; `StatementStandings { standings; paired; missing; after; flipped; outstanding }`; `statementStandings(lines, book, statementDate)`; `reconciliationStandings(statement: { endingDate; lines: { lineNo; txnDate; amountMinor; reference }[] }, book: { journalLineId; entryDate; signedMinor; reference; entryNumber; cleared }[])`; `PairingOutcome { lines; paired; ticked; missing; after; flipped }`; `pairingMessage(outcome): string`; `pairedHowLabel(how): string` (the screen's words for how a pair was made: "check number" for the prototype's "cheque number").
 
 - [ ] **Step 1: Export the short date.** In `lib/domain/pdf-statement-view.ts` replace
 
@@ -991,6 +991,7 @@ import {
   closingAdvice,
   dayBefore,
   openingAdvice,
+  pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
   statementStandings,
@@ -1112,8 +1113,16 @@ describe("pairingMessage", () => {
       "10 of 12 statement lines paired with the books; 3 newly ticked. 2 not in the books — code them in Bank Transactions, then Match again.",
     );
     expect(pairingMessage({ lines: 1, paired: 0, ticked: 0, missing: 1, after: 0, flipped: true })).toBe(
-      "0 of 1 statement line paired with the books; 0 newly ticked. 1 not in the books — code it in Bank Transactions, then Match again. The statement's amounts were read the other way round to pair them.",
+      "0 of 1 statement line paired with the books; 0 newly ticked. 1 not in the books — code it in Bank Transactions, then Match again. The statement's amounts were read the other way around to pair them.",
     );
+  });
+});
+
+describe("pairedHowLabel", () => {
+  it("says check, not cheque, and leaves the other two as they are", () => {
+    expect(pairedHowLabel("cheque number")).toBe("check number");
+    expect(pairedHowLabel("date and amount")).toBe("date and amount");
+    expect(pairedHowLabel("amount, within 5 days")).toBe("amount, within 5 days");
   });
 });
 ```
@@ -1226,6 +1235,15 @@ export type Standing =
   | { kind: "missing" }
   | { kind: "after" };
 
+/**
+ * How a pair was made, in the screen's words. The pairing keeps the
+ * prototype's own names, and the prototype writes "cheque"; the screen is US
+ * English.
+ */
+export function pairedHowLabel(how: string): string {
+  return how === "cheque number" ? "check number" : how;
+}
+
 export interface StatementStandings {
   /** One per statement line, in the order given. */
   standings: Standing[];
@@ -1315,7 +1333,7 @@ export function pairingMessage(outcome: PairingOutcome): string {
   if (outcome.missing > 0) {
     text += ` ${outcome.missing} not in the books — code ${outcome.missing === 1 ? "it" : "them"} in Bank Transactions, then Match again.`;
   }
-  if (outcome.flipped) text += " The statement's amounts were read the other way round to pair them.";
+  if (outcome.flipped) text += " The statement's amounts were read the other way around to pair them.";
   return text;
 }
 ```
@@ -1323,7 +1341,7 @@ export function pairingMessage(outcome: PairingOutcome): string {
 - [ ] **Step 5: Run it, and the PDF view tests beside it.**
 
 Run: `npx vitest run tests/unit/reconcile-statement.test.ts tests/unit/pdf-statement-view.test.ts`
-Expected: both files pass (reconcile-statement: 13 passed).
+Expected: both files pass (reconcile-statement: 14 passed).
 
 - [ ] **Step 6: Lint and commit.**
 
@@ -1351,7 +1369,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
 - Produces:
   - `StatementReconciliationRow` gains `statement_opening_minor: number | null`, `statement_closing_minor: number | null`, `note: string | null`, `brought_forward: boolean`.
   - `reconciliationStatementSchema` → `{ file_name, opening_minor, closing_minor, lines }` and `ReconciliationStatementInput`; `reconciliationFromStatementSchema` → that plus `{ bank_account_id, period_from, statement_date, closing_minor (required), bring_forward }` and `ReconciliationFromStatementInput`.
-  - In `lib/services/bankrec.ts`: `ReconLineView.reference: string | null`; `ReconStatementLine { lineNo; txnDate; description; reference; amountMinor; balanceMinor }`; `ReconStatementHeader { bankAccountId; endingDate; status; fileName; openingMinor; closingMinor; note; broughtForward }`; `ReconStatement extends ReconStatementHeader { lines }`; `StatementFileInput { fileName; openingMinor; closingMinor; lines: StatementLine[] }`; `createReconciliationFromStatement(sb, bankAccountId, endingDate, endingMinor, file): Promise<string>`; `setReconciliationStatement(sb, id, file): Promise<number>`; `setStatementEnding(sb, id, endingMinor): Promise<void>`; `setClearedMany(sb, id, journalLineIds, cleared): Promise<number>`; `getBroughtForwardPreview(sb, bankAccountId, through): Promise<BroughtForwardPreview>`; `bringForward(sb, bankAccountId, through, openingMinor, note): Promise<string>`; `getReconciliationHeader(sb, id): Promise<ReconStatementHeader>`; `getReconciliationStatement(sb, id): Promise<ReconStatement>`; `pairAndTick(sb, id): Promise<PairingOutcome>`.
+  - In `lib/services/bankrec.ts`: `ReconLineView.reference: string | null`; `ReconStatementLine { lineNo; txnDate; description; reference; amountMinor; balanceMinor }`; `ReconStatementHeader { bankAccountId; endingDate; status; fileName; openingMinor; closingMinor; note; broughtForward }`; `ReconStatement extends ReconStatementHeader { lines }`; `StatementFileInput { fileName; openingMinor; closingMinor; lines: StatementLine[] }`; `createReconciliationFromStatement(sb, bankAccountId, endingDate, endingMinor, file): Promise<string>`; `setReconciliationStatement(sb, id, file): Promise<number>`; `setStatementEnding(sb, id, endingMinor): Promise<void>`; `setClearedMany(sb, id, journalLineIds, cleared): Promise<number>`; `getBroughtForwardPreview(sb, bankAccountId, through): Promise<BroughtForwardPreview>`; `bringForward(sb, bankAccountId, through, openingMinor, note): Promise<string>`; `findReconciliationHeader(sb, id): Promise<ReconStatementHeader | null>` (null when no reconciliation has this id); `getReconciliationHeader(sb, id): Promise<ReconStatementHeader>` (throws "Reconciliation not found"); `getReconciliationStatement(sb, id): Promise<ReconStatement>`; `pairAndTick(sb, id): Promise<PairingOutcome>`.
 
 - [ ] **Step 1: The row type.** In `lib/db/types.ts`, inside `export interface StatementReconciliationRow`, replace
 
@@ -1426,7 +1444,9 @@ export type ReconciliationFromStatementInput = z.infer<typeof reconciliationFrom
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  findReconciliationHeader,
   getBroughtForwardPreview,
+  getReconciliationHeader,
   getReconciliationStatement,
   pairAndTick,
   setReconciliationStatement,
@@ -1454,6 +1474,7 @@ function fakeClient(tables: Record<string, Rows>, rpcs: Record<string, Rows | Sc
     };
     chain.range = (from: number, to: number) => Promise.resolve(page(from, to));
     chain.single = () => Promise.resolve({ data: rows[0] ?? null, error: null });
+    chain.maybeSingle = () => Promise.resolve({ data: rows[0] ?? null, error: null });
     chain.then = (resolve: (value: unknown) => unknown) => resolve(page(0, cap - 1));
     return chain;
   }
@@ -1543,6 +1564,12 @@ describe("a reconciliation's kept statement", () => {
       bookBalanceMinor: 75000,
       openLines: 2,
     });
+  });
+
+  it("finds no reconciliation for an id that has none, without an error", async () => {
+    const { sb } = fakeClient({ acc_statement_reconciliation: [] }, {});
+    expect(await findReconciliationHeader(sb, "rec-404")).toBeNull();
+    await expect(getReconciliationHeader(sb, "rec-404")).rejects.toThrow("Reconciliation not found");
   });
 });
 
@@ -1803,12 +1830,14 @@ export async function bringForward(
 
 const optionalMinor = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
-export async function getReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader> {
+/** A reconciliation's account, date and statement, or null when no reconciliation has this id. */
+export async function findReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader | null> {
   const { data, error } = await sb.from("acc_statement_reconciliation")
     .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward")
     .eq("id", id)
-    .single();
+    .maybeSingle();
   if (error) throw new BankRecError(error.message);
+  if (!data) return null;
   const r = data as Record<string, unknown>;
   return {
     bankAccountId: r.bank_account_id as string,
@@ -1820,6 +1849,12 @@ export async function getReconciliationHeader(sb: SupabaseClient, id: string): P
     note: (r.note as string) ?? null,
     broughtForward: Boolean(r.brought_forward),
   };
+}
+
+export async function getReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader> {
+  const header = await findReconciliationHeader(sb, id);
+  if (!header) throw new BankRecError("Reconciliation not found");
+  return header;
 }
 
 export async function getReconciliationStatement(sb: SupabaseClient, id: string): Promise<ReconStatement> {
@@ -1865,7 +1900,7 @@ export async function pairAndTick(sb: SupabaseClient, id: string): Promise<Pairi
 - [ ] **Step 6: Run the tests.**
 
 Run: `npx vitest run tests/unit/reconcile-statement-service.test.ts tests/unit/banking-paged-reads.test.ts`
-Expected: both files pass (reconcile-statement-service: 5 passed).
+Expected: both files pass (reconcile-statement-service: 6 passed).
 
 - [ ] **Step 7: Typecheck, lint, commit.**
 
@@ -3304,6 +3339,7 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   closingAdvice,
   openingAdvice,
+  pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
   type Standing,
@@ -3358,7 +3394,7 @@ function StandingTag({ standing }: { standing: Standing }) {
   return (
     <Space size={4} direction="vertical">
       <Tag color={standing.ticked ? "green" : "gold"}>
-        Paired · {standing.how}
+        Paired · {pairedHowLabel(standing.how)}
         {standing.ticked ? "" : " · not ticked"}
       </Tag>
       {standing.entryNumber ? (
@@ -3622,7 +3658,7 @@ export default function ReconcileWorkspaceClient({
         </Space>
         {standings?.flipped ? (
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-            This statement writes money the other way round; its amounts were turned round to pair them.
+            This statement shows money in and out the other way around; its amounts were reversed to pair them.
           </Typography.Paragraph>
         ) : null}
         <Table<ReconStatementLine>
@@ -3732,11 +3768,12 @@ export default function ReconcileWorkspaceClient({
 
 ```tsx
 import { notFound } from "next/navigation";
+import { z } from "zod";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts } from "@/lib/services/banking";
-import { getReconciliationHeader } from "@/lib/services/bankrec";
+import { findReconciliationHeader } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import PageHeader from "@/components/PageHeader";
 import ReconcileWorkspaceClient from "./ReconcileWorkspaceClient";
@@ -3745,9 +3782,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ReconcileWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // An id that is not a uuid, or that names no reconciliation, is a page that
+  // does not exist. Any other failure is an error, and shows as one.
+  if (!z.uuid().safeParse(id).success) notFound();
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const header = await getReconciliationHeader(sb, id).catch(() => null);
+  const header = await findReconciliationHeader(sb, id);
   if (!header) notFound();
   const [accounts, currencies, banks] = await Promise.all([listAccounts(sb), listCurrencies(sb), listBankAccounts(sb)]);
   const base = currencies.find((c) => c.is_base);
@@ -3785,8 +3825,10 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
 
 ```tsx
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getReconciliationDetail, getReconciliationHeader, getReconciliationLines } from "@/lib/services/bankrec";
+import { findReconciliationHeader, getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import { fromMinor } from "@/lib/domain/money";
 import PageHeader from "@/components/PageHeader";
@@ -3795,9 +3837,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ReconciliationReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!z.uuid().safeParse(id).success) notFound();
   const sb = await createSupabaseServerClient();
-  const [detail, header, lines, currencies] = await Promise.all([
-    getReconciliationDetail(sb, id), getReconciliationHeader(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
+  const header = await findReconciliationHeader(sb, id);
+  if (!header) notFound();
+  const [detail, lines, currencies] = await Promise.all([
+    getReconciliationDetail(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   const dec = base?.decimal_places ?? 2;
@@ -3892,7 +3937,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
         kind: "changed",
         title: "Import statement inside a reconciliation takes every statement file",
         detail:
-          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — by date and amount, by cheque number, or by amount within 5 days — or Not in the books, with a link to code those lines in Bank Transactions; Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding, and a PDF that closes on another figure than the reconciliation offers Use with the statement's.",
+          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — by date and amount, by check number, or by amount within 5 days — or Not in the books, with a link to code those lines in Bank Transactions; Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding, and a PDF that closes on another figure than the reconciliation offers Use with the statement's.",
         route: "/banking/reconcile",
       },
     ],
@@ -3929,7 +3974,7 @@ with
         route: "/banking/reconcile",
         note:
           "The statement's last day and closing balance start it. Its lines are imported, kept with the " +
-          "reconciliation and paired with the books — by date and amount, by cheque number, or by amount within " +
+          "reconciliation and paired with the books — by date and amount, by check number, or by amount within " +
           "5 days — and the pairs are ticked. On an account never reconciled, when the books agree with the " +
           "statement's opening balance, Bring forward and start signs off the earlier lines first.",
       },
