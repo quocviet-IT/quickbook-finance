@@ -24,6 +24,7 @@ import {
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
 import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { formatMoney } from "@/lib/format";
+import { rememberColumns, rememberedColumns, type CsvColumnChoice } from "@/lib/client/statement-columns";
 import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
 
 /**
