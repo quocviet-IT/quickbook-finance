@@ -37,7 +37,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * statement's period must equal the opening balance the statement prints.
  * Null when there is nothing to say — the account has been reconciled before,
  * the statement prints no period start or no opening balance, or the books
- * hold nothing earlier.
+ * hold nothing earlier and agree with the statement.
  */
 export function bringForwardAdvice(
   preview: BroughtForwardPreview,
@@ -52,6 +52,13 @@ export function bringForwardAdvice(
     if (preview.openLines === 0) return null;
     const lines = preview.openLines === 1 ? "The 1 earlier line" : `The ${preview.openLines} earlier lines`;
     return { canBringForward: true, through, text: `${books} — ${opens}. ${lines} can be brought forward as reconciled.` };
+  }
+  if (preview.openLines === 0) {
+    return {
+      canBringForward: false,
+      through,
+      text: `${books}, and ${opens}. The books have nothing before this statement: the difference is an opening balance they do not hold yet.`,
+    };
   }
   const apart = money(Math.abs(preview.bookBalanceMinor - statement.openingMinor));
   return {

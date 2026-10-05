@@ -46,6 +46,14 @@ describe("bringForwardAdvice", () => {
     });
   });
 
+  it("says the books hold no opening balance when nothing is posted before the statement", () => {
+    expect(bringForwardAdvice({ hasReconciliations: false, bookBalanceMinor: 0, openLines: 0 }, statement, money)).toEqual({
+      canBringForward: false,
+      through: "2026-08-31",
+      text: "The books hold $0.00 on Aug 31, 2026, and the statement opens at $5000.00. The books have nothing before this statement: the difference is an opening balance they do not hold yet.",
+    });
+  });
+
   it("says nothing once the account has a reconciliation, or the statement prints no start or opening", () => {
     const preview = { hasReconciliations: false, bookBalanceMinor: 500000, openLines: 2 };
     expect(bringForwardAdvice({ ...preview, hasReconciliations: true }, statement, money)).toBeNull();
