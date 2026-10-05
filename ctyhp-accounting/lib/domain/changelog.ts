@@ -49,7 +49,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Reconcile from statement files",
         detail:
-          "On Bank Reconciliation, From statement files takes one statement or a year of them: PDF statements, or a CSV export with a running balance column, which is cut into calendar months. Each closing balance is read from the file. A month missing from the run, a month already signed off, and a file that prints no closing balance are each said before anything happens.",
+          "On Bank Reconciliation, From statement files takes one statement or a year of them: PDF statements, or a CSV export with a running balance column, which is cut into calendar months. Each closing balance is read from the file. A month missing from the run, a month already signed off, a month not over yet, a reconciliation already in progress on the account, and a file that prints no closing balance are each said before anything happens.",
         route: "/banking/reconcile",
       },
       {
@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "From a PDF statement is now From statement files",
         detail:
-          "The button opens a page that takes one file or many, in place of the dialog that took one PDF. A single statement works as before: the account's first reconciliation can still be brought forward, and a month that does not agree opens for you to finish.",
+          "The button opens a page that takes one file or many, in place of the dialog that took one PDF. As before, the account's first reconciliation can be brought forward, and a month that does not agree opens for you to finish.",
         route: "/banking/reconcile",
       },
     ],

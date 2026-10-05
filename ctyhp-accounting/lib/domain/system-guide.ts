@@ -366,11 +366,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking/reconcile",
         note:
           "Choose PDF statements, or a CSV export with a running balance column, which is cut into months. " +
-          "Each closing balance comes from the file; a month missing from the run stops it. Preview pairs every " +
-          "month with the books — by date and amount, by check number, or by amount within 5 days — and writes " +
-          "nothing. Sign off signs the months that agree, oldest first; the first that does not is started, with " +
-          "its pairs ticked, for you to finish. On an account never reconciled, the earlier lines are brought " +
-          "forward first when the books agree with the first statement's opening balance.",
+          "Each closing balance comes from the file; a month missing from the run, or a reconciliation already in " +
+          "progress, stops it. Preview pairs the months with the books oldest first — by date and amount, by check " +
+          "number, or by amount within 5 days — up to the first that does not agree, and writes nothing. Sign off " +
+          "signs the months that agree; the first that does not is started, with its pairs ticked, for you to " +
+          "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +
+          "agree with the first statement's opening balance.",
       },
       {
         action: "Code what the statement has and the books do not",
