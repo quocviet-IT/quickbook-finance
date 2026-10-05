@@ -56,7 +56,12 @@ export const RUN_MESSAGES = {
   noLines: "No dated amounts could be read out of this file",
 } as const;
 
-/** The most statement lines one run previews: its request stays well under the server's 1 MB body limit. */
+/**
+ * The most statement lines one run previews. A line travels as its date, amount
+ * and reference — about 70 bytes, more with a long reference — so a run this
+ * size stays under the server's 1 MB body limit when references are short; a
+ * run of long references can still exceed it, and is refused whole, writing nothing.
+ */
 export const MAX_RUN_LINES = 10_000;
 
 const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
