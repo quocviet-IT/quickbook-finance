@@ -11,6 +11,8 @@
  * links to nothing.
  */
 
+import { RELEASES_ALL_READ } from "./release-marker";
+
 export type ChangeKind = "added" | "changed" | "fixed";
 
 export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
@@ -40,6 +42,19 @@ export interface Release {
 
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
+  {
+    version: "1.80",
+    date: "2026-10-05",
+    headline: "Every page downloads less before it can be used.",
+    changes: [
+      {
+        kind: "changed",
+        title: "The Guide, Ask AI and Report panels load when you first open them",
+        detail:
+          "They used to be downloaded with every page, whether anyone opened them or not. A typical page now carries about 30 KB less, and each panel takes a moment longer the first time it is opened. What the panels show and do is unchanged.",
+      },
+    ],
+  },
   {
     version: "1.79",
     date: "2026-10-05",
@@ -2689,6 +2704,7 @@ export function compareVersions(a: string, b: string): number {
  * way is a minute of reading.
  */
 export function releasesSince(seen: string | null): Release[] {
+  if (seen === RELEASES_ALL_READ) return [];
   if (!seen) return RELEASES;
   if (!RELEASES.some((release) => release.version === seen)) return RELEASES;
   return RELEASES.filter((release) => compareVersions(release.version, seen) > 0);

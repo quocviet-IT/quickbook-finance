@@ -31,7 +31,6 @@ import {
   MenuOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { AppRole } from "@/lib/db/types";
 import {
   findActiveGroup,
@@ -231,6 +230,7 @@ export default function AppShell({
   canCreateCompany,
   permissionKeys,
   pendingApprovals,
+  appVersion,
   children,
 }: {
   email: string;
@@ -244,6 +244,8 @@ export default function AppShell({
   permissionKeys: readonly string[] | null;
   /** Badge count, so the approvals queue is visible without a sidebar slot. */
   pendingApprovals: number;
+  /** The newest release, for the Guide button's unread dot. */
+  appVersion: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -271,6 +273,9 @@ export default function AppShell({
   const activePageKey = activePage?.key ?? "";
   const activeGroupKey = activePage ? findActiveGroup(activePage.key) : undefined;
   async function signOut() {
+    // Fetched on the click: the Supabase client is otherwise unused by the shell,
+    // and every page would download it for this one button.
+    const { createSupabaseBrowserClient } = await import("@/lib/db/client");
     const sb = createSupabaseBrowserClient();
     await sb.auth.signOut();
     router.refresh();
@@ -473,7 +478,7 @@ export default function AppShell({
           <div className="app-shell__content-inner">{children}</div>
         </Content>
       </Layout>
-      <AssistantLauncher />
+      <AssistantLauncher appVersion={appVersion} />
     </Layout>
   );
 }

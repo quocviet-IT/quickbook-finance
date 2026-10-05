@@ -10,20 +10,22 @@
  * browser-only value into a rendered tree here — see the server snapshot below.
  */
 
-import { APP_VERSION } from "@/lib/domain/changelog";
+// Not the changelog: this module rides with the Guide button on every page, and
+// the changelog is loaded only when the guide is opened (see release-marker.ts).
+import { RELEASES_ALL_READ } from "@/lib/domain/release-marker";
 
 const SEEN_KEY = "onebook.release-notes.seen";
 
 const listeners = new Set<() => void>();
 
 export function lastReleaseSeen(): string | null {
-  if (typeof window === "undefined") return APP_VERSION;
+  if (typeof window === "undefined") return RELEASES_ALL_READ;
   try {
     return window.localStorage.getItem(SEEN_KEY);
   } catch {
     // A private-mode browser throws. Treat it as read: a dot that can never be
     // cleared is worse than no dot at all.
-    return APP_VERSION;
+    return RELEASES_ALL_READ;
   }
 }
 
@@ -36,10 +38,11 @@ export function lastReleaseSeen(): string | null {
  * people learn to ignore a badge.
  */
 export function lastReleaseSeenServerSnapshot(): string | null {
-  return APP_VERSION;
+  return RELEASES_ALL_READ;
 }
 
-export function markReleasesSeen(version: string = APP_VERSION): void {
+/** `version` is the newest release, `APP_VERSION`, which the caller already holds. */
+export function markReleasesSeen(version: string): void {
   if (typeof window !== "undefined") {
     try {
       window.localStorage.setItem(SEEN_KEY, version);

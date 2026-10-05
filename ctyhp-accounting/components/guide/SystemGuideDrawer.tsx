@@ -142,7 +142,7 @@ export default function SystemGuideDrawer({
   const [unread] = useState(() => releasesSince(lastReleaseSeen()));
 
   useEffect(() => {
-    if (open && unread.length > 0) markReleasesSeen();
+    if (open && unread.length > 0) markReleasesSeen(GUIDE_VERSION);
   }, [open, unread.length]);
 
   const screen = useMemo(() => screenContextFor(pathname), [pathname]);
