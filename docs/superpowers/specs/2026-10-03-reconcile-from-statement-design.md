@@ -51,7 +51,8 @@ file for the other half of the month too: proving the books against it. Decided 
 - New table `acc_reconciliation_statement_line`: `id`, `reconciliation_id` (cascade with its reconciliation),
   `line_no int`, `txn_date date`, `description text`, `reference text` (the cheque number), `amount_minor bigint`
   (≠ 0, positive is money in), `balance_minor bigint` (null when not printed); unique (`reconciliation_id`, `line_no`).
-  RLS as `acc_reconciliation_line`: read for staff and viewers, written only through the functions below.
+  RLS as `acc_reconciliation_line`: read for staff and viewers, written only through the functions below (signed-in
+  users hold no write privilege on it).
 - `acc_reconciliation_lines` returns one more column, `reference`: the entry's `source_ref`, else the reference of the
   customer payment or bill payment the entry came from. (The function is dropped and recreated, because its result
   columns change; it and the preview are granted to signed-in users only, as 0080 asks of every new function.)
@@ -68,7 +69,8 @@ file for the other half of the month too: proving the books against it. Decided 
   - `acc_brought_forward_preview(p_bank_account_id, p_through date)` returns `(has_reconciliations boolean,
     book_balance_minor bigint, open_lines int)` — read only.
   - `acc_bring_forward_reconciliation(p_bank_account_id, p_through, p_opening_minor, p_note) returns uuid` — refused if
-    the account has any reconciliation, completed or in progress; refused unless the book balance through `p_through`
+    the account has any reconciliation, completed or in progress; refused for a day after today; refused unless the
+    book balance through `p_through`
     equals `p_opening_minor` ("The books hold $X on Aug 31, and the statement opens at $Y."); otherwise records one
     completed reconciliation through `p_through` (beginning 0, ending `p_opening_minor`) with every posted line up to
     that date cleared, and the note.
@@ -99,7 +101,10 @@ The sentences and standings the screens show — whether an account can be broug
 checks, how each statement line stands — are pure functions beside it, in `lib/domain/reconcile-statement.ts`.
 
 The cheque test compares the statement line's reference, kept to letters, digits and hyphens as the prototype keeps it,
-with the book line's reference; an empty statement reference never matches.
+with the book line's reference; an empty statement reference never matches. The pairing keeps the prototype's names for
+the passes ("cheque number"); the screen, in US English, says "check number". Every pass requires the same amount, so
+book lines are indexed by amount: a line looks only at the book lines of its amount, in book order, which finds the same
+pair the prototype's scan of the whole book finds (5,000 by 5,000 lines pair in milliseconds).
 
 ### 4.3 Starting from a PDF — the New reconciliation dialog
 
@@ -112,9 +117,12 @@ with the book line's reference; an empty statement reference never matches.
   statement that does not prove can still be used, after the person has seen by how much it is out.
 - **First reconciliation of the account** (it has none at all) and the statement prints both a period start and an
   opening balance: the preview is run for the day before the period. When the book balance equals the opening balance,
-  the dialog says "The books hold $5,000.00 on Aug 31 — the statement opens at $5,000.00. The 214 earlier lines can be
-  brought forward as reconciled." and the start button reads **Bring forward and start**. When they differ it says by
-  how much, says the earlier lines stay open, and the button reads **Start**.
+  the dialog says "The books hold $5,000.00 on Aug 31, 2026 — the statement opens at $5,000.00. The 214 earlier lines
+  can be brought forward as reconciled." and the start button reads **Bring forward and start**. When they differ it
+  says by how much, says the earlier lines stay open, and the button reads **Start**; when the books hold nothing
+  before the statement, it says the difference is an opening balance they do not hold yet. The date carries its year
+  (the user's choice, 2026-10-03: statements of earlier years are reconciled after a migration). **Start** waits until
+  the books have been read, so the chance to bring forward is never skipped by a quick click.
 - Starting imports the statement's lines into Bank Transactions as Import statement does (duplicates skipped), stores
   them with the reconciliation, pairs them and ticks the pairs, then opens the reconciliation.
 
@@ -126,10 +134,12 @@ with the book line's reference; an empty statement reference never matches.
   $5,558.25; this reconciliation says $5,600.00" with **Use $5,558.25**; when its opening balance differs from the
   beginning balance, that is said too (a month is missing, or the last reconciliation closed on a different figure).
 - The statement panel replaces today's read-only list: every statement line with how it paired ("Paired · date and
-  amount", "Paired · cheque number", "Paired · amount, within 5 days" — marked "not ticked" when its book line was
-  unticked by hand) or **Not in the books**; a link **Code the N
+  amount", "Paired · check number", "Paired · amount, within 5 days" — marked "not ticked" when its book line was
+  unticked by hand), **Not in the books**, or **After the statement date**; a link **Code the N
   lines the books do not have** to Bank Transactions; and **Match again**, which pairs the stored lines against the
-  books as they are now and ticks any new pairs. The books panel tags unticked lines as **Outstanding**.
+  books as they are now and ticks any new pairs. The books panel tags as **Outstanding** the book lines the statement
+  does not show and that are not ticked (a line the statement shows but that was unticked by hand is "not ticked" on
+  the statement side, not outstanding).
 - Completing is unchanged: the difference must be zero (or an adjustment recorded), and a person clicks Complete.
 - A brought-forward reconciliation reads "Brought forward" in the list and on its report, with its note.
 

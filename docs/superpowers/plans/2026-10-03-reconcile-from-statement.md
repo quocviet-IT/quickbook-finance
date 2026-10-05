@@ -22,7 +22,7 @@
 - The reconciliation screens read the columns 0132 adds, so 0132 goes live before this code is deployed (Task 8 applies it, with the user's approval, before anything is pushed).
 - Stage files by name; never `git add -A`. Write commit messages with `printf` in Git Bash to `../.superpowers/sdd/commit-msg.txt` (never PowerShell — it writes a BOM), check with `od -c ../.superpowers/sdd/commit-msg.txt | head -1` that the first bytes are not `357 273 277`, then `git commit -F ../.superpowers/sdd/commit-msg.txt`. No Co-Authored-By trailer.
 
-Every file below was run before this plan was written, at each task's boundary: the migration through the verify script on all six companies (210 passed, 0 failed, rolled back); the pairing against the prototype's own `recMatch` (5,000 random statements identical in Node, 400 in the prototype's page); `tsc --noEmit` and `eslint` after Task 5 and after Task 7; the whole unit suite (275 files, 2,931 tests) and `next build` after Task 7.
+Every file below was run before this plan was written, at each task's boundary: the migration through the verify script on all six companies (222 passed, 0 failed, rolled back); the pairing against the prototype's own `recMatch` (5,000 random statements identical in Node, 400 in the prototype's page); `tsc --noEmit` and `eslint` after Task 5 and after Task 7; the whole unit suite (276 files, 2,942 tests) and `next build` after the whole-branch review's fixes. The code below is the code as merged: each task's review fixes are carried into its task, and the whole-branch review's fixes into the tasks they touch (see the section after Task 7).
 
 ---
 
@@ -164,6 +164,8 @@ try {
       const bringForward = `select acc_bring_forward_reconciliation($1, '2026-08-31', $2, 'Brought forward, proved by the opening balance on the statement for Sep 1 – Sep 30, 2026') as id`;
       const wrong = await refused(bringForward, [bank, 80000]);
       check("bringing forward on a different opening balance is refused", /The books hold 750\.00 on 2026-08-31, and the statement opens at 800\.00/.test(wrong ?? ""), wrong ?? "accepted");
+      const future = await refused(`select acc_bring_forward_reconciliation($1, current_date + 1, 0, 'x')`, [bank]);
+      check("bringing forward past today is refused", /past today/.test(future ?? ""), future ?? "accepted");
       const forward = (await one(bringForward, [bank, 75000])).id;
       const forwarded = await one(`select * from acc_statement_reconciliation where id = $1`, [forward]);
       check("brought forward: completed through Aug 31 at 750.00", forwarded.status === "completed" && Number(forwarded.statement_ending_balance_minor) === 75000 && String(forwarded.statement_ending_date).length > 0);
@@ -233,6 +235,11 @@ try {
         );
         check(`${fn.split("(")[0]} is closed to anon and open to signed-in users`, grants.anon === false && grants.signed_in === true, JSON.stringify(grants));
       }
+
+      const tableWrites = await one(
+        `select has_table_privilege('authenticated', 'acc_reconciliation_statement_line', 'INSERT, UPDATE, DELETE, TRUNCATE') as writes`,
+      );
+      check("signed-in users hold no write privilege on the statement lines", tableWrites.writes === false, JSON.stringify(tableWrites));
 
       // ---- a viewer reads but cannot write; an outsider can do nothing
       await client.query("reset role");
@@ -327,7 +334,7 @@ alter table acc_reconciliation_statement_line enable row level security;
 drop policy if exists acc_recon_stmt_line_sel on acc_reconciliation_statement_line;
 create policy acc_recon_stmt_line_sel on acc_reconciliation_statement_line
   for select using (acc_is_staff() or acc_current_role() = 'viewer');
-revoke all on acc_reconciliation_statement_line from public, anon;
+revoke all on acc_reconciliation_statement_line from public, anon, authenticated;
 grant select on acc_reconciliation_statement_line to authenticated;
 grant all on acc_reconciliation_statement_line to service_role;
 
@@ -470,6 +477,7 @@ language plpgsql security definer set search_path = public as $$
 declare v_gl uuid; v_balance bigint; v_id uuid;
 begin
   if not acc_is_staff() then raise exception 'Not authorized to bring a bank account forward'; end if;
+  if p_through > current_date then raise exception 'A bank account cannot be brought forward past today'; end if;
   -- The row lock serialises this with any reconciliation being created for the
   -- account: an insert into acc_statement_reconciliation holds FOR KEY SHARE on
   -- this row through its foreign key until it commits, which FOR UPDATE waits
@@ -545,7 +553,7 @@ grant execute on function acc_reconciliation_lines(uuid) to authenticated, servi
 - [ ] **Step 4: Run the proof.**
 
 Run (Git Bash): `node --env-file=.env.local scripts/verify-reconcile-from-statement.mjs`
-Expected: every company prints its checks with `ok`, none `FAIL`, and the last line is `210 passed, 0 failed` (35 checks for each of the six active companies). Everything it does is rolled back. If the database cannot be reached (`ECONNREFUSED`, `ETIMEDOUT`, `HARD TIMEOUT`), stop and report BLOCKED — do not apply the migration any other way.
+Expected: every company prints its checks with `ok`, none `FAIL`, and the last line is `222 passed, 0 failed` (37 checks for each of the six active companies). Everything it does is rolled back. If the database cannot be reached (`ECONNREFUSED`, `ETIMEDOUT`, `HARD TIMEOUT`), stop and report BLOCKED — do not apply the migration any other way.
 
 - [ ] **Step 5: The unit suite still passes.**
 
@@ -648,6 +656,11 @@ describe("pairStatement", () => {
   it("never pairs on an empty cheque number", () => {
     const result = pairStatement([line(0, "2026-09-28", -700, " ")], [entry("blank", "2026-09-01", -700, "")]);
     expect(summary(result).pairs).toEqual([]);
+  });
+
+  it("pairs nothing when either side is empty", () => {
+    expect(summary(pairStatement([], [entry("a", "2026-09-05", 500)]))).toEqual({ pairs: [], missing: [], unseen: ["a"] });
+    expect(summary(pairStatement([line(0, "2026-09-05", 500)], []))).toEqual({ pairs: [], missing: [0], unseen: [] });
   });
 });
 
@@ -755,8 +768,9 @@ export const PAIRING_WINDOW_DAYS = 5;
 
 const DAY_MS = 86_400_000;
 
-function daysApart(a: string, b: string): number {
-  return Math.abs(Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY_MS));
+/** A day as a whole number, so the window is a subtraction. */
+function dayNumber(iso: string): number {
+  return Math.round(Date.parse(`${iso}T00:00:00Z`) / DAY_MS);
 }
 
 /** A cheque number as the prototype keeps it: letters, digits and hyphens only. */
@@ -769,37 +783,50 @@ export function pairStatement(
   book: readonly PairBookLine[],
   windowDays = PAIRING_WINDOW_DAYS,
 ): Pairing {
+  // Every pass asks for the same amount, so a statement line looks only at the
+  // book lines of its amount, kept in book order: the first free one that fits
+  // is the one the prototype's scan of the whole book finds. A statement of
+  // thousands of lines then costs thousands of steps, not millions.
+  const byAmount = new Map<number, number[]>();
+  book.forEach((entry, index) => {
+    const same = byAmount.get(entry.amountMinor);
+    if (same) same.push(index);
+    else byAmount.set(entry.amountMinor, [index]);
+  });
+  const bookDays = book.map((entry) => dayNumber(entry.date));
   const usedLines = new Set<number>();
-  const usedBook = new Set<string>();
+  const usedBook = new Set<number>();
   const pairs: StatementPair[] = [];
-  const passes: { how: string; fits: (line: PairStatementLine, entry: PairBookLine) => boolean }[] = [
-    { how: "date and amount", fits: (line, entry) => line.date === entry.date && line.amountMinor === entry.amountMinor },
+  const passes: { how: string; fits: (line: PairStatementLine, index: number) => boolean }[] = [
+    { how: "date and amount", fits: (line, index) => book[index].date === line.date },
     {
       how: "cheque number",
-      fits: (line, entry) => {
+      fits: (line, index) => {
         const check = cleanReference(line.reference);
-        return line.amountMinor === entry.amountMinor && check !== "" && (entry.reference ?? "") === check;
+        return check !== "" && (book[index].reference ?? "") === check;
       },
     },
     {
       how: `amount, within ${windowDays} days`,
-      fits: (line, entry) => line.amountMinor === entry.amountMinor && daysApart(line.date, entry.date) <= windowDays,
+      fits: (line, index) => Math.abs(bookDays[index] - dayNumber(line.date)) <= windowDays,
     },
   ];
   for (const pass of passes) {
     for (const line of lines) {
       if (usedLines.has(line.lineNo)) continue;
-      const entry = book.find((candidate) => !usedBook.has(candidate.id) && pass.fits(line, candidate));
-      if (!entry) continue;
+      const index = byAmount
+        .get(line.amountMinor)
+        ?.find((candidate) => !usedBook.has(candidate) && pass.fits(line, candidate));
+      if (index === undefined) continue;
       usedLines.add(line.lineNo);
-      usedBook.add(entry.id);
-      pairs.push({ line, book: entry, how: pass.how });
+      usedBook.add(index);
+      pairs.push({ line, book: book[index], how: pass.how });
     }
   }
   return {
     pairs,
     missing: lines.filter((line) => !usedLines.has(line.lineNo)),
-    unseen: book.filter((entry) => !usedBook.has(entry.id)),
+    unseen: book.filter((_, index) => !usedBook.has(index)),
   };
 }
 
@@ -1399,7 +1426,13 @@ with
 - [ ] **Step 2: The schemas.** In `lib/domain/schemas.ts`, directly after the line `export type ReconciliationReopenInput = z.infer<typeof reconciliationReopenSchema>;`, insert (with the Edit tool — it holds a regular expression):
 
 ```ts
-const statementDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "A statement date is required");
+const statementDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "A statement date is required")
+  .refine((day) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+  }, "A statement date must be a real day");
 
 /** A statement file as a reconciliation takes it: its name, the balances it prints, and its lines. */
 export const reconciliationStatementSchema = z.object({
@@ -3205,11 +3238,13 @@ export async function importStatementIntoReconciliationAction(
   if (denied) return { ok: false, error: denied };
   const parsed = reconciliationStatementSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  let kept = false;
   try {
     const sb = await createSupabaseServerClient();
     const file = statementFile(parsed.data);
     // Kept first: a completed reconciliation refuses it before anything is imported.
     await setReconciliationStatement(sb, reconciliationId, file);
+    kept = true;
     const { bankAccountId } = await getReconciliationHeader(sb, reconciliationId);
     const imported = await importIntoBankTransactions(sb, bankAccountId, file);
     const outcome = await pairAndTick(sb, reconciliationId);
@@ -3217,7 +3252,12 @@ export async function importStatementIntoReconciliationAction(
     revalidatePath("/banking");
     return { ok: true, data: { inserted: imported.inserted, duplicates: imported.skipped, outcome } };
   } catch (e) {
-    return { ok: false, error: msg(e) };
+    if (!kept) return { ok: false, error: msg(e) };
+    revalidatePath(`/banking/reconcile/${reconciliationId}`);
+    return {
+      ok: false,
+      error: `The statement was kept with this reconciliation, but importing or pairing its lines failed: ${msg(e)}. Import the statement again.`,
+    };
   }
 }
 
@@ -3916,7 +3956,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
 ```ts
   {
     version: "1.79",
-    date: "2026-10-03",
+    date: "2026-10-05",
     headline: "A reconciliation can start from the statement's PDF, and the statement's lines pair with the books.",
     changes: [
       {
@@ -3937,7 +3977,7 @@ git commit -F ../.superpowers/sdd/commit-msg.txt
         kind: "changed",
         title: "Import statement inside a reconciliation takes every statement file",
         detail:
-          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — by date and amount, by check number, or by amount within 5 days — or Not in the books, with a link to code those lines in Bank Transactions; Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding, and a PDF that closes on another figure than the reconciliation offers Use with the statement's.",
+          "A PDF, CSV, OFX, QFX, QBO or QIF file, where it took only CSV. Each statement line says how it paired — Paired by date and amount, by check number, or by amount within 5 days, and not ticked when its book line was unticked by hand — or Not in the books, or After the statement date. A link codes the lines the books do not have in Bank Transactions, and Match again pairs them once they are posted. Book lines the statement does not show are marked Outstanding. When a PDF closes on another figure than the reconciliation, Use takes the statement's closing balance; when it opens on another figure than the reconciliation begins at, the reconciliation says so. A reconciliation started before 1.79 shows its statement once the statement is imported there.",
         route: "/banking/reconcile",
       },
     ],
@@ -4002,6 +4042,92 @@ printf 'docs(changelog): 1.79 reconcile a statement from its file; guide steps\n
 od -c ../.superpowers/sdd/commit-msg.txt | head -1
 git commit -F ../.superpowers/sdd/commit-msg.txt
 ```
+
+---
+
+### After Task 7: the whole-branch review (done, c873e37)
+
+The review of the whole branch (73dba41..c4267d9) found no Critical issue. What it asked for is already in the tasks above:
+
+- the pairing indexes book lines by amount (every pass requires the same amount), so 5,000 by 5,000 lines pair in milliseconds and still exactly as the prototype pairs them (Task 2's code; 5,000 random statements identical in Node, 400 in the prototype's page);
+- a statement day must exist — 2026-02-31 is refused by the schema, not by the database (Task 4's schemas), with these tests in `tests/unit/reconciliation-statement-schemas.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { reconciliationFromStatementSchema, reconciliationStatementSchema } from "@/lib/domain/schemas";
+
+const line = {
+  txn_date: "2026-09-05",
+  description: "FEE",
+  reference: null,
+  amount_minor: -500,
+  running_balance_minor: null,
+  raw_line: "x",
+};
+const statement = { file_name: "september.pdf", opening_minor: 75000, closing_minor: 74500, lines: [line] };
+const start = {
+  ...statement,
+  bank_account_id: "6f1c1d4e-0a3b-4c2d-9e8f-1a2b3c4d5e6f",
+  period_from: "2026-09-01",
+  statement_date: "2026-09-30",
+  closing_minor: 74500,
+  bring_forward: true,
+};
+const firstIssue = (result: { error?: { issues: { message: string }[] } }) => result.error?.issues[0]?.message;
+
+describe("reconciliationStatementSchema", () => {
+  it("takes a statement with its lines", () => {
+    expect(reconciliationStatementSchema.safeParse(statement).success).toBe(true);
+  });
+
+  it("takes up to 5,000 lines, and refuses none or more", () => {
+    expect(reconciliationStatementSchema.safeParse({ ...statement, lines: Array.from({ length: 5000 }, () => line) }).success).toBe(true);
+    expect(firstIssue(reconciliationStatementSchema.safeParse({ ...statement, lines: [] }))).toBe("The statement has no lines");
+    expect(firstIssue(reconciliationStatementSchema.safeParse({ ...statement, lines: Array.from({ length: 5001 }, () => line) }))).toBe(
+      "A statement can hold at most 5,000 lines",
+    );
+  });
+
+  it("refuses a day that does not exist, and a date that is not an ISO day", () => {
+    expect(firstIssue(reconciliationStatementSchema.safeParse({ ...statement, lines: [{ ...line, txn_date: "2026-02-31" }] }))).toBe(
+      "A statement date must be a real day",
+    );
+    expect(firstIssue(reconciliationStatementSchema.safeParse({ ...statement, lines: [{ ...line, txn_date: "09/05/2026" }] }))).toBe(
+      "A statement date is required",
+    );
+  });
+
+  it("refuses an amount that is not whole cents", () => {
+    expect(reconciliationStatementSchema.safeParse({ ...statement, lines: [{ ...line, amount_minor: 1.5 }] }).success).toBe(false);
+  });
+});
+
+describe("reconciliationFromStatementSchema", () => {
+  it("takes a statement to start from, brought forward", () => {
+    expect(reconciliationFromStatementSchema.safeParse(start).success).toBe(true);
+  });
+
+  it("refuses bringing forward without the period's start or the opening balance", () => {
+    const message = "Bringing forward needs the statement's period and opening balance";
+    expect(firstIssue(reconciliationFromStatementSchema.safeParse({ ...start, period_from: null }))).toBe(message);
+    expect(firstIssue(reconciliationFromStatementSchema.safeParse({ ...start, opening_minor: null }))).toBe(message);
+    expect(
+      reconciliationFromStatementSchema.safeParse({ ...start, period_from: null, opening_minor: null, bring_forward: false }).success,
+    ).toBe(true);
+  });
+
+  it("refuses a start with no closing balance or no statement date", () => {
+    expect(reconciliationFromStatementSchema.safeParse({ ...start, closing_minor: null }).success).toBe(false);
+    expect(reconciliationFromStatementSchema.safeParse({ ...start, statement_date: "" }).success).toBe(false);
+  });
+});
+```
+
+- an import inside a reconciliation that fails after the statement was kept says so (Task 6's `statement-actions.ts`);
+- signed-in users hold no write privilege on the kept lines, and nothing is brought forward past today (Task 1's migration, with two more verify checks);
+- the changelog says what the screen says, dated 2026-10-05 (Task 7).
+
+Its finding that a bank account in another currency would be paired against base-currency books was withdrawn: migration 0051 puts `CHECK (currency_code = 'USD')` on `acc_bank_account` in every company, and the app is USD-only by design.
 
 ---
 
