@@ -9,6 +9,10 @@ import {
   uncategoriseBankTransaction,
   listBankTransactionPostings,
   type BankPostingRow,
+  listBankRecodes,
+  recodeUncategorized,
+  undoRecode,
+  type BankRecodeRow,
   listBankStatementImports,
   undoBankStatementImport,
   deleteBankTransactionWithVoid,
@@ -209,6 +213,53 @@ export async function uncategoriseBankTransactionAction(
     revalidatePath("/banking");
     revalidatePath("/reports");
     return { ok: true, data: { voided } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Move a line from Uncategorized to the account it belongs in, by a second
+ * entry the same day; the line's own entry, and any month reconciled with it,
+ * stay as they are.
+ */
+export async function recodeUncategorizedAction(
+  transactionId: string,
+  accountId: string,
+): Promise<ActionResult<{ entry_number: string | null; account_code: string; account_name: string }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const recoded = await recodeUncategorized(sb, transactionId, accountId);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: recoded };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Take a recode back: its entry is voided and the line is in Uncategorized again. */
+export async function undoRecodeAction(transactionId: string): Promise<ActionResult<{ entry_number: string | null }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const undone = await undoRecode(sb, transactionId);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: undone };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Reads only: which coded lines were recoded out of Uncategorized, and to what. */
+export async function getBankRecodesAction(bankAccountId: string | null): Promise<ActionResult<BankRecodeRow[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listBankRecodes(sb, bankAccountId) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

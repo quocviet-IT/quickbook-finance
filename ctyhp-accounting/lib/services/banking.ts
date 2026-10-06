@@ -299,6 +299,55 @@ export async function uncategoriseBankTransaction(
   return Number(data ?? 0);
 }
 
+/** A line coded to Uncategorized and moved on: the recode entry and where it put the money. */
+export interface BankRecodeRow {
+  bank_transaction_id: string;
+  original_entry_id: string;
+  recode_entry_id: string;
+  entry_number: string | null;
+  account_id: string;
+  account_code: string;
+  account_name: string;
+}
+
+/** Reads only: which coded lines have been recoded out of Uncategorized, and to what. */
+export async function listBankRecodes(sb: SupabaseClient, bankAccountId: string | null): Promise<BankRecodeRow[]> {
+  return readAllPages<BankRecodeRow>(
+    (from, to) =>
+      sb
+        .rpc("acc_bank_recodes", { p_bank_account_id: bankAccountId })
+        .order("bank_transaction_id")
+        .order("recode_entry_id")
+        .range(from, to),
+    (message) => new BankingError(message),
+  );
+}
+
+/**
+ * Move a line from Uncategorized to the account it belongs in. The line's own
+ * entry stays as it is; a second entry, the same day, moves the amount — so a
+ * month already reconciled is untouched.
+ */
+export async function recodeUncategorized(
+  sb: SupabaseClient,
+  transactionId: string,
+  accountId: string,
+): Promise<{ entry_number: string | null; account_code: string; account_name: string }> {
+  const { data, error } = await sb.rpc("acc_recode_uncategorized", {
+    p_bank_transaction_id: transactionId,
+    p_account_id: accountId,
+  });
+  if (error) throw new BankingError(error.message);
+  return (Array.isArray(data) ? data[0] : data) as { entry_number: string | null; account_code: string; account_name: string };
+}
+
+/** Take a recode back: its entry is voided, and the line is in Uncategorized again. */
+export async function undoRecode(sb: SupabaseClient, transactionId: string): Promise<{ entry_number: string | null }> {
+  const { data, error } = await sb.rpc("acc_undo_recode", { p_bank_transaction_id: transactionId });
+  if (error) throw new BankingError(error.message);
+  return (Array.isArray(data) ? data[0] : data) as { entry_number: string | null };
+}
+
 /** Null means every bank account, for the review queue that spans them all. */
 export async function listBankTransactions(
   sb: SupabaseClient,

@@ -1,16 +1,23 @@
 "use client";
 import { useMemo, useState } from "react";
-import { App, Button, Select, Space, Tooltip, Typography } from "antd";
+import { App, Button, Select, Space, Tag, Tooltip, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
 import { ACCOUNT_TYPE_LABEL, normalBalanceOf, type AccountType } from "@/lib/domain/accounts";
 import { searchAccounts } from "@/lib/domain/account-search";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
+import { isHoldingDetail } from "@/lib/domain/uncategorized";
 import { formatMoney } from "@/lib/format";
-import type { BankPostingRow } from "@/lib/services/banking";
+import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
 import LoanSplitModal from "./LoanSplitModal";
-import { categoriseBankTransactionAction, postLoanPaymentAction, uncategoriseBankTransactionAction } from "./actions";
+import {
+  categoriseBankTransactionAction,
+  postLoanPaymentAction,
+  recodeUncategorizedAction,
+  uncategoriseBankTransactionAction,
+  undoRecodeAction,
+} from "./actions";
 
 export interface CategoriseCellProps {
   transactionId: string;
@@ -27,6 +34,10 @@ export interface CategoriseCellProps {
   loan?: LoanSuggestionView | null;
   /** Opens the rule form, filled from this line. */
   onCreateRule?: () => void;
+  /** The line is posted to an Uncategorized account (migration 0134). */
+  holding?: boolean;
+  /** Where a recode moved this line out of Uncategorized, when it has been. */
+  recode?: BankRecodeRow | null;
 }
 
 /**
@@ -54,11 +65,14 @@ export default function CategoriseCell({
   suggestion = null,
   loan = null,
   onCreateRule,
+  holding = false,
+  recode = null,
 }: CategoriseCellProps) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [splitting, setSplitting] = useState(false);
+  const [recoding, setRecoding] = useState(false);
 
   /**
    * Ranked here rather than by the dropdown, so the order is ours: an exact
@@ -84,6 +98,39 @@ export default function CategoriseCell({
       })),
     [accounts, query],
   );
+  // A recode moves money out of Uncategorized, so it never goes back into one,
+  // and a bank account is not a category (acc_recode_uncategorized refuses both).
+  const recodeOptions = useMemo(() => {
+    const holdingIds = new Set(accounts.filter((a) => isHoldingDetail(a.detail_type)).map((a) => a.id));
+    return options.filter((option) => !holdingIds.has(option.value) && option.type !== "bank");
+  }, [accounts, options]);
+
+  async function recodeTo(accountId: string) {
+    setBusy(true);
+    const res = await recodeUncategorizedAction(transactionId, accountId);
+    setBusy(false);
+    if (!res.ok || !res.data) {
+      message.error(res.error ?? "Could not recode this line");
+      return;
+    }
+    message.success(
+      `Recoded to ${res.data.account_code} — ${res.data.account_name}` + (res.data.entry_number ? ` (${res.data.entry_number})` : ""),
+    );
+    setRecoding(false);
+    onChanged();
+  }
+
+  async function takeRecodeBack() {
+    setBusy(true);
+    const res = await undoRecodeAction(transactionId);
+    setBusy(false);
+    if (!res.ok) {
+      message.error(res.error ?? "Could not take the recode back");
+      return;
+    }
+    message.success("Recode taken back. The line is in Uncategorized again.");
+    onChanged();
+  }
 
   async function post(accountId: string) {
     setBusy(true);
@@ -119,6 +166,43 @@ export default function CategoriseCell({
 
   const linkStyle = { padding: 0, height: "auto", fontSize: 12 } as const;
   const small = { fontSize: 12 } as const;
+
+  /** The account search, for posting a waiting line and for recoding one out of Uncategorized. */
+  const accountSelect = (list: typeof options, placeholder: string, onPick: (accountId: string) => void) => (
+    <Select
+      showSearch
+      // Fills its column rather than declaring a minimum wider than one. A
+      // 240px minimum inside a 150px column does not widen the column — it
+      // spills over the Match column beside it, which is the fault a reader
+      // screenshotted on the triage screen in its other form.
+      style={{ width: "100%" }}
+      // The dropdown is free to be wider than the cell, and needs to be: an
+      // account reads "5000 — Cost of Goods Sold".
+      popupMatchSelectWidth={320}
+      placeholder={placeholder}
+      loading={busy}
+      disabled={busy}
+      // The list is already filtered and ranked; antd must not filter again.
+      filterOption={false}
+      searchValue={query}
+      onSearch={setQuery}
+      options={list}
+      // Which report the money will land in, and which side of the books it
+      // sits on — the reader asked for exactly this: "if it is debit, if it
+      // is credit, anything".
+      optionRender={(option) => (
+        <Space direction="vertical" size={0}>
+          <span>{option.data.label}</span>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {ACCOUNT_TYPE_LABEL[option.data.type as AccountType]} ·{" "}
+            {normalBalanceOf(option.data.type as AccountType) === "debit" ? "Debit" : "Credit"}
+            {option.data.via ? ` · matched on “${option.data.via}”` : ""}
+          </Typography.Text>
+        </Space>
+      )}
+      onChange={onPick}
+    />
+  );
 
   /**
    * What a rule or the company's own history says this line is. One thing per
@@ -191,9 +275,12 @@ export default function CategoriseCell({
   ) : null;
 
   if (posting) {
-    const main = `${posting.account_code} — ${posting.account_name}`;
-    const others = posting.others ?? [];
+    // A recoded line shows where its money went; the entry that put it in
+    // Uncategorized stays as it was, under the recode.
+    const main = recode ? `${recode.account_code} — ${recode.account_name}` : `${posting.account_code} — ${posting.account_name}`;
+    const others = recode ? [] : (posting.others ?? []);
     const everyAccount = [main, ...others].join("; ");
+    const mayChange = canWrite && posting.own_entry;
     return (
       <Space direction="vertical" size={0} style={{ maxWidth: "100%" }}>
         {/* Cut to the column, with the whole account name on hover: an account
@@ -207,11 +294,30 @@ export default function CategoriseCell({
             </Typography.Text>
           </Tooltip>
         ) : null}
-        <Space size={6}>
+        {recode ? (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            recoded from Uncategorized{recode.entry_number ? ` · ${recode.entry_number}` : ""}
+          </Typography.Text>
+        ) : holding ? (
+          <div>
+            <Tag color="gold">needs coding</Tag>
+          </div>
+        ) : null}
+        <Space size={6} wrap>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
           </Typography.Text>
-          {canWrite && posting.own_entry ? (
+          {mayChange && holding && !recode ? (
+            <Button type="link" size="small" style={linkStyle} disabled={busy} onClick={() => setRecoding((open) => !open)}>
+              Recode
+            </Button>
+          ) : null}
+          {mayChange && recode ? (
+            <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => void takeRecodeBack()}>
+              Undo recode
+            </Button>
+          ) : null}
+          {mayChange ? (
             <Button
               type="link"
               size="small"
@@ -233,6 +339,11 @@ export default function CategoriseCell({
             </Button>
           ) : null}
         </Space>
+        {recoding && !recode ? (
+          <Tooltip title="Choosing an account posts a second entry that moves this line out of Uncategorized">
+            {accountSelect(recodeOptions, "Recode to…", (accountId) => void recodeTo(accountId))}
+          </Tooltip>
+        ) : null}
         {canWrite ? createRule : null}
       </Space>
     );
@@ -259,39 +370,7 @@ export default function CategoriseCell({
   return (
     <div style={{ width: "100%", minWidth: 0 }}>
       <Tooltip title="Choosing an account posts this line to the ledger">
-        <Select
-          showSearch
-          // Fills its column rather than declaring a minimum wider than one. A
-          // 240px minimum inside a 150px column does not widen the column — it
-          // spills over the Match column beside it, which is the fault a reader
-          // screenshotted on the triage screen in its other form.
-          style={{ width: "100%" }}
-          // The dropdown is free to be wider than the cell, and needs to be: an
-          // account reads "5000 — Cost of Goods Sold".
-          popupMatchSelectWidth={320}
-          placeholder="Search accounts…"
-          loading={busy}
-          disabled={busy}
-          // The list is already filtered and ranked; antd must not filter again.
-          filterOption={false}
-          searchValue={query}
-          onSearch={setQuery}
-          options={options}
-          // Which report the money will land in, and which side of the books it
-          // sits on — the reader asked for exactly this: "if it is debit, if it
-          // is credit, anything".
-          optionRender={(option) => (
-            <Space direction="vertical" size={0}>
-              <span>{option.data.label}</span>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {ACCOUNT_TYPE_LABEL[option.data.type as AccountType]} ·{" "}
-                {normalBalanceOf(option.data.type as AccountType) === "debit" ? "Debit" : "Credit"}
-                {option.data.via ? ` · matched on “${option.data.via}”` : ""}
-              </Typography.Text>
-            </Space>
-          )}
-          onChange={(accountId: string) => void post(accountId)}
-        />
+        {accountSelect(options, "Search accounts…", (accountId) => void post(accountId))}
       </Tooltip>
       {suggested(true)}
       {loanSuggested(true)}

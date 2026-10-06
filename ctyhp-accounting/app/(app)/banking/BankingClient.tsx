@@ -50,7 +50,7 @@ import type {
   BankTxnStatus,
   CurrencyRow,
 } from "@/lib/db/types";
-import type { BankPostingRow } from "@/lib/services/banking";
+import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
 import type {
   BankAccountWithGl,
   BankConnectionView,
@@ -74,6 +74,7 @@ const AttachmentDrawer = dynamic(() => import("@/components/documents/Attachment
 });
 import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
 import { postingsByLine } from "@/lib/domain/bank-postings";
+import { holdingAccountIds, needsCoding } from "@/lib/domain/uncategorized";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import {
   filterBankTransactions,
@@ -98,6 +99,7 @@ import {
   generateSuggestionsAction,
   getSuggestionsAction,
   getBankPostingsAction,
+  getBankRecodesAction,
   getCodingSuggestionsAction,
   getLoanSuggestionsAction,
   getTransactionsAction,
@@ -211,6 +213,8 @@ export default function BankingClient({
   // it — fifteen lines read "Uncategorized" beside "Matched".
   const [postings, setPostings] = useState<Map<string, BankPostingRow & { others: string[] }>>(new Map());
   const [postedToFilter, setPostedToFilter] = useState<string>("all");
+  // Lines moved out of Uncategorized by a recode, and where their money went.
+  const [recodes, setRecodes] = useState<Map<string, BankRecodeRow>>(new Map());
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -248,6 +252,8 @@ export default function BankingClient({
       ),
     [accounts],
   );
+  // The chart's Uncategorized accounts: a line posted to one needs coding.
+  const holdingIds = useMemo(() => holdingAccountIds(accounts), [accounts]);
   // A rule may code only to an account a suggestion could name.
   const ruleAccounts = useMemo(
     () => postableAccounts.filter((account) => codableAccount(codingAccountOf(account))),
@@ -302,16 +308,20 @@ export default function BankingClient({
     void getLoanSuggestionsAction(accountFilter).then((res) => {
       if (res.ok && res.data) setLoans(new Map(res.data.map((view) => [view.transactionId, view])));
     });
-    const [transactions, matches, posted] = await Promise.all([
+    const [transactions, matches, posted, recoded] = await Promise.all([
       getTransactionsAction(accountFilter),
       getSuggestionsAction(accountFilter),
       getBankPostingsAction(accountFilter),
+      getBankRecodesAction(accountFilter),
     ]);
     setLoading(false);
     if (transactions.ok && transactions.data) setTxns(transactions.data);
     if (matches.ok && matches.data) setSuggestions(matches.data);
     if (posted.ok && posted.data) {
       setPostings(postingsByLine(posted.data));
+    }
+    if (recoded.ok && recoded.data) {
+      setRecodes(new Map(recoded.data.map((row) => [row.bank_transaction_id, row])));
     }
   }, [selectedId]);
 
@@ -573,8 +583,15 @@ export default function BankingClient({
     // "Not categorised yet" means still awaiting review, not merely "no account
     // to show" — a line settled against an invoice is posted and has neither.
     if (postedToFilter === "none") return transaction.status === "unmatched";
+    if (postedToFilter === "needs_coding") {
+      return needsCoding(postings.get(transaction.id)?.account_id, holdingIds, recodes.has(transaction.id));
+    }
     return postings.get(transaction.id)?.account_id === postedToFilter;
   });
+  // Lines added to Uncategorized and not recoded yet — the review queue for them.
+  const needsCodingCount = txns.filter((transaction) =>
+    needsCoding(postings.get(transaction.id)?.account_id, holdingIds, recodes.has(transaction.id)),
+  ).length;
 
   // RQ-02: keyword (Description, Reference) and amount, composed with the
   // account/status/posted-to filters above rather than replacing them — all
@@ -721,6 +738,7 @@ export default function BankingClient({
         postedToFilter={postedToFilter}
         onPostedTo={setPostedToFilter}
         postings={postings}
+        needsCodingCount={needsCodingCount}
         keyword={keyword}
         onKeyword={setKeyword}
         suggestionRows={categorized}
@@ -758,6 +776,8 @@ export default function BankingClient({
         formatRowMoney={rowMoney}
         postableAccounts={postableAccounts}
         postings={postings}
+        holdingIds={holdingIds}
+        recodes={recodes}
         onCategorised={reload}
         codingSuggestions={coding}
         loanSuggestions={loans}
