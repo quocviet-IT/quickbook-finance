@@ -15,7 +15,7 @@ The prototype records them all from the reconciliation with one button. 1.82 doe
 1. **Like the prototype, a line no suggestion can place goes to an Uncategorized account** — "Uncategorized Income" for money in, "Uncategorized Expense" for money out — and is recoded later. No per-line choice before posting; the preview is read only.
 2. **A line is recoded later by a reclassifying entry**, not by voiding and re-posting: the bank line is never touched, so a month already signed off stays exactly as it was.
 3. **Only OneBook's existing suggestions** decide the account (card repayment, related company, bank rule, history). Transfers between own accounts, open invoices or bills, and loan principal/interest splits are not recognised in this release; such lines go to Uncategorized.
-4. **Approach A:** one SQL function posts every line in one transaction — all or nothing. The statement line is linked to its bank transaction by recomputing the import hash; no new column.
+4. **Approach A:** one SQL function posts every line in one transaction — all or nothing. The statement line is linked to its bank transaction by date, amount, description and reference — the n-th identical line to the n-th — with no new column. (The import hash cannot simply be recomputed: an OFX line is keyed by the bank's FITID, which the kept statement does not hold.)
 5. Undo in Bank Transactions **refuses a line cleared in a completed reconciliation** (a behaviour change, approved).
 
 ## 3. The screen
@@ -32,10 +32,14 @@ When the reconciliation has a statement and at least one statement line stands "
 
 Lines that cannot be added are listed under the table with the reason, and are not counted in N:
 
-- **No bank transaction for this line** (its import was undone, or it was never imported): "Import the statement again to add it."
+- **No bank transaction for this line** (its import was undone, or it was never imported): "Not in Bank Transactions — import the statement again, or add it there."
 - **Its bank transaction is already coded or matched** elsewhere: "Already in the books — click Match again."
+- **Its bank transaction is excluded** in Bank Transactions: "Excluded in Bank Transactions — include it there to add it."
+- **Bank Transactions suggests a match in the books for it**: "Bank Transactions suggests a match in the books for it — approve or reject that first." (Coding it would refuse while that suggestion stands.)
 
-When every missing line is in one of those two groups, the button is not shown. When more than 500 lines could be added, the button is not shown either and the box says: "More than 500 lines — code them in Bank Transactions."
+When every missing line is in one of those groups, the button is not shown. Nor is it — and the box says why — when more than 500 lines could be added ("More than 500 lines — code them in Bank Transactions."), when the pairing read the statement with money in and out the other way around from the books (its bank lines carry the reversed signs, so coding them would post the wrong direction), or when the chart lacks the Uncategorized account a line needs.
+
+The server works the list out again on the click and posts only if it is the list the person was shown; if a suggestion or a bank line changed in between, nothing is posted, the message says so, and the box is drawn again.
 
 Clicking the button posts every line or none (§4.2). Then the reconciliation is paired and ticked again (the existing `pairAndTick`), and a message says: "N entries added from the statement and ticked." — with "; K went to Uncategorized." when K > 0. The reconciliation is **not** completed; when the difference reaches zero, Complete lights as it does today and the person clicks it.
 
@@ -44,7 +48,8 @@ If the database refuses (a closed period, a line changed since the page was draw
 ### 3.2 In Bank Transactions (`/banking`)
 
 - A line whose entry posts to an Uncategorized account shows that account with the tag **needs coding** and an action **Recode**: choose the right account → "Recoded to <account> (<entry number>)". The cell then reads "<account> · recoded from Uncategorized" with **Undo recode**.
-- A quick filter **"Needs coding (K)"** shows the lines still sitting in Uncategorized (coded there and not recoded).
+- The **Posted to** filter gains **"Needs coding (K)"**, which shows the lines still sitting in Uncategorized (coded there and not recoded). A line a transactions import owns shows the tag but not Recode.
+- **Create rule** on a recoded line fills the rule with the account it was recoded to, never Uncategorized.
 - **Undo** (uncategorise) on a line whose bank journal line is cleared in a **completed** reconciliation is refused: "This line is reconciled to <date>. Recode it instead, or reopen that reconciliation." (§4.4)
 
 ### 3.3 The run of statements (1.81)
@@ -69,7 +74,7 @@ For every company schema, for each of the two:
 2. Else, if an account of the right type is named exactly "Uncategorized Income" / "Uncategorized Expense" (case-insensitive), it is given the `detail_type` (one company's chart already holds such accounts under other codes).
 3. Else the account is created: posting, active, cash-flow role operating, with code 4999 / 6999 — or, if that code is taken, the highest free code from 4998 down to 4950 / 6998 down to 6950. If none is free the migration fails for that company and says so.
 
-Both chart templates (`standard`, `retail_jewelry` in `lib/domain/chart-templates.ts`) gain the two accounts as system accounts, so a new company has them from the start; the company-provisioning self-check confirms them.
+A new company has them from the start without touching the chart templates: the provisioner replays every migration into the new schema, 0134 included. The company-provisioning self-check confirms them. The chart shows their detail type as "Holding account — money in not yet coded" / "— money out not yet coded".
 
 ### 4.2 `acc_add_statement_lines_to_books(p_reconciliation_id uuid, p_items jsonb) returns jsonb`
 
@@ -90,15 +95,16 @@ Then, for each item in order, it calls the existing `acc_categorise_bank_transac
 
 `acc_recode_uncategorized` requires that:
 - the caller is staff;
-- the bank transaction is coded: it has an approved `acc_reconciliation` row to a posted entry with `source_type = 'bank'`;
-- that entry's non-bank line is on an Uncategorized account;
-- it has no posted recode yet;
-- the new account is active, posting, not an Uncategorized account, and not the bank's ledger account.
+- the bank transaction does not belong to a transactions import (that import's Undo voids the entries it made, and would leave a recode it knows nothing of behind);
+- the bank transaction is coded: it has an approved `acc_reconciliation` row to a posted entry with `source_type = 'bank'` and no `source_id`;
+- that entry has two lines, and its non-bank line is on an Uncategorized account;
+- it has no posted recode yet (the original entry is locked while this is checked, so two clicks cannot both recode);
+- the new account is active, posting, not an Uncategorized account, and not a bank account.
 
 It posts one entry through `acc_post_entry`:
 - **date:** the original entry's date (a closed period refuses, as any posting does, and the message says the period is closed);
 - **description:** "Recode: <original description>";
-- **source:** `source_type = 'recode'`, `source_id` = the original entry;
+- **source:** `source_type = 'bank'`, `source_id` = the original entry. (Not a new `recode` source: a value added to the `acc_journal_source` enum cannot be used in the transaction that adds it, which the rolled-back verify script needs. Every check meaning "an entry Bank Transactions coded" asks for `source_id is null`, so a recode is never mistaken for one.)
 - **lines:**
   - money out: Dr the new account / Cr Uncategorized Expense;
   - money in: Dr Uncategorized Income / Cr the new account.
@@ -109,7 +115,7 @@ It returns `{ entry_id, entry_number }` and writes an audit row.
 
 ### 4.4 Undo refuses a reconciled line
 
-`acc_uncategorise_bank_transaction` (last replaced in 0127) gains one check, before anything is voided. If the bank-side journal line of the entry is in `acc_reconciliation_line` for a reconciliation whose status is completed, it raises "This line is reconciled to <statement date>. Recode it instead, or reopen that reconciliation." Everything else in the function is unchanged. A line ticked only in a reconciliation still in progress can still be undone, as today.
+`acc_uncategorise_bank_transaction` (last replaced in 0127) gains one check, before anything is voided. If the bank-side journal line of the entry is in `acc_reconciliation_line` for a reconciliation whose status is completed, it raises "This line is reconciled to <statement date>. Recode it instead, or reopen that reconciliation." for a line in Uncategorized, and "This line is reconciled to <statement date>. Reopen that reconciliation to change it." for any other. Taking back a line that has a recode voids the recode too — left alone it would move money off an Uncategorized account that no longer holds any. Everything else in the function is unchanged. A line ticked only in a reconciliation still in progress can still be undone, as today; deleting a bank line (0114), which takes its entry back through this function, is refused the same way.
 
 ### 4.5 Coding history learns through recodes
 
@@ -125,10 +131,10 @@ The machine therefore never suggests Uncategorized, and a fee recoded once to Ba
   - the lines to add, each with its account and where it came from;
   - the lines that cannot be added, each with its reason.
   
-  The link to the bank transaction is the import hash recomputed with `statementLineHashes(bankAccountId, keptLines)`, over all kept lines in `line_no` order. These are the same inputs, in the same order, as the import, so occurrences of identical lines on one day get the same hashes.
+  The link to the bank transaction is the line itself: the same date, amount, description (cut to 500 characters, as the statement keeps it) and reference (trimmed and cut to 80), the n-th identical line taking the n-th identical bank line, oldest first.
 - **Service:** reads the bank transactions by `(bank_account_id, raw_hash)` (paged — see the paged-reads rule) and the coding suggestions for that bank account (`codingSuggestions`), finds the two Uncategorized accounts by `detail_type`, and calls the RPCs.
 - **Server actions** (in `statement-actions.ts` and `app/(app)/banking/actions.ts`):
-  - `addMissingLinesAction(reconciliationId)` builds the list again on the server — never trusting the browser's list — posts, then runs `pairAndTick`;
+  - `addMissingLinesAction(reconciliationId, shown)` builds the list again on the server — never trusting the browser's list — and posts it only if it matches what the person was shown (`shown`: each line and its account), then runs `pairAndTick`;
   - `recodeUncategorizedAction(bankTransactionId, accountId)`;
   - `undoRecodeAction(bankTransactionId)`.
   
