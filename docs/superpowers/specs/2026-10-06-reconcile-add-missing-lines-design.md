@@ -36,6 +36,8 @@ Lines that cannot be added are listed under the table with the reason, and are n
 - **Its bank transaction is already coded or matched** elsewhere: "Already in the books — click Match again."
 - **Its bank transaction is excluded** in Bank Transactions: "Excluded in Bank Transactions — include it there to add it."
 - **Bank Transactions suggests a match in the books for it**: "Bank Transactions suggests a match in the books for it — approve or reject that first." (Coding it would refuse while that suggestion stands.)
+- **It is dated in a month already reconciled** — on or before the statement date of the account's newest completed reconciliation before this one: "Dated in a month already reconciled — add it in Bank Transactions if it belongs there." Posting it would change the books of a month somebody signed off; `acc_add_statement_lines_to_books` refuses it too. (A brought-forward reconciliation ends the day before the statement period, so its lines are never caught.)
+- **It is for 0.00**: "A line of 0.00 has nothing to post." (A kept statement never holds one — they are dropped when it is stored — so this is a guard.)
 
 When every missing line is in one of those groups, the button is not shown. Nor is it — and the box says why — when more than 500 lines could be added ("More than 500 lines — code them in Bank Transactions."), when the pairing read the statement with money in and out the other way around from the books (its bank lines carry the reversed signs, so coding them would post the wrong direction), or when the chart lacks the Uncategorized account a line needs.
 

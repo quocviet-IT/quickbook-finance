@@ -26,7 +26,7 @@ Spec: `docs/superpowers/specs/2026-10-06-reconcile-add-missing-lines-design.md`.
 - New tables on new screens use `components/ui/DataTable` (enforced by `tests/unit/table-adoption.test.ts`).
 - Stage files by name; never `git add -A`. Write commit messages with `printf` in Git Bash to `../.superpowers/sdd/commit-msg.txt` (never PowerShell — it writes a BOM), check with `od -c ../.superpowers/sdd/commit-msg.txt | head -1` that the first bytes are not `357 273 277`, then `git commit -F ../.superpowers/sdd/commit-msg.txt`. No Co-Authored-By trailer. After each task, `git status --short --untracked-files=all` (from the repository root) shows no file the task did not name, and `ls -b app` shows no stray directory.
 
-Every file below was run before this plan was written: the migration through its verify script on all six companies (270 passed, 0 failed, rolled back) and through the company-provisioning self-check (17 passed, rolled back); the domain tests; `tsc --noEmit`, `eslint`, the whole unit suite and `next build` with every task's files in place.
+Every file below was run before this plan was written: the migration through its verify script on all six companies (288 passed, 0 failed, rolled back) and through the company-provisioning self-check (17 passed, rolled back); the domain tests; `tsc --noEmit`, `eslint`, the whole unit suite and `next build` with every task's files in place.
 
 Where a step says "apply these edits", each edit is a find/replace: find the exact text (it occurs once), replace it with the text given. The edits were worked out from the checked files and proved by applying them to the file as it is on the branch.
 
@@ -236,10 +236,24 @@ try {
       await refused("another bank account's transaction is refused", ADD,
         add([{ ...items.shop, bank_transaction_id: elsewhere }]), "is not among this bank account's transactions");
       await refused("a line dated after the statement is refused", ADD, add([items.after]), "is dated after the statement");
+      await thenUndo(async () => {
+        await client.query("reset role");
+        await client.query(
+          `insert into acc_statement_reconciliation (bank_account_id, statement_ending_date, beginning_balance_minor, statement_ending_balance_minor, status)
+           values ($1, '2026-07-20', 0, 0, 'completed')`,
+          [bank],
+        );
+        await client.query("set local role authenticated");
+        await as(admin.id);
+        await refused("a line dated in a month already signed off is refused", ADD, add([items.wire]),
+          "is dated in a month already reconciled, to Jul 20, 2026");
+      });
       await refused("a line listed twice is refused", ADD, add([items.fee, items.fee]), "listed twice");
       await refused("more than 500 lines are refused", ADD,
         add(Array.from({ length: 501 }, (_, i) => ({ ...items.fee, line_no: i }))), "At most 500");
       await refused("an empty list is refused", ADD, add([]), "nothing to add");
+      await refused("an item missing its bank line is refused, said as such", ADD,
+        add([{ line_no: items.fee.line_no, account_id: charges }]), "needs its line_no, bank_transaction_id and account_id");
       await thenUndo(async () => {
         await one(`select acc_categorise_bank_transaction($1, $2)`, [fee, charges]);
         await refused("a line already coded in Bank Transactions is refused, with the line named", ADD,
@@ -367,6 +381,8 @@ try {
       );
       check("recoding leaves the signed-off month exactly as it was", (await cleared()) === signedTotal);
       await refused("a second recode is refused", RECODE, [shop, sales], "already recoded");
+      await refused("taking back a recoded line in a signed-off month points to Undo recode", `select acc_uncategorise_bank_transaction($1)`, [shop],
+        "To move it to another account, Undo recode and recode it again");
       const inRecode = (await one(RECODE, [wire, sales])).out;
       const inLines = await all(`select account_id, debit_minor, credit_minor from acc_journal_line where journal_entry_id = $1 order by debit_minor desc`, [inRecode.entry_id]);
       check("money in is recoded Dr Uncategorized Income, Cr the account",
@@ -523,6 +539,7 @@ declare
   v_out    jsonb := '[]'::jsonb;
   v_count  int;
   v_what   text;
+  v_signed_through date;
 begin
   if not acc_is_staff() then
     raise exception 'Not authorized to add statement lines to the books';
@@ -540,7 +557,19 @@ begin
   if v_rec.status <> 'in_progress' then
     raise exception 'This reconciliation is not in progress';
   end if;
+  -- The newest month this account has signed off before this one: a line dated
+  -- in it would change that month's books, so it is not added from here.
+  select max(statement_ending_date) into v_signed_through
+    from acc_statement_reconciliation
+   where bank_account_id = v_rec.bank_account_id and status = 'completed'
+     and statement_ending_date < v_rec.statement_ending_date;
 
+  if exists (
+    select 1 from jsonb_array_elements(p_items) x
+     where x->>'line_no' is null or x->>'bank_transaction_id' is null or x->>'account_id' is null
+  ) then
+    raise exception 'Each line to add needs its line_no, bank_transaction_id and account_id';
+  end if;
   if (select count(distinct x->>'line_no') from jsonb_array_elements(p_items) x) <> v_count
      or (select count(distinct x->>'bank_transaction_id') from jsonb_array_elements(p_items) x) <> v_count then
     raise exception 'A statement line or a bank line is listed twice';
@@ -558,6 +587,10 @@ begin
                      to_char(v_line.amount_minor::numeric / 100, 'FM999999999990.00'));
     if v_line.txn_date > v_rec.statement_ending_date then
       raise exception 'The line % is dated after the statement', v_what;
+    end if;
+    if v_signed_through is not null and v_line.txn_date <= v_signed_through then
+      raise exception 'The line % is dated in a month already reconciled, to %', v_what,
+        to_char(v_signed_through, 'Mon FMDD, YYYY');
     end if;
 
     select * into v_txn from acc_bank_transaction where id = (v_item->>'bank_transaction_id')::uuid for update;
@@ -633,8 +666,13 @@ begin
   if v_entry.status <> 'posted' or v_entry.source_type <> 'bank' or v_entry.source_id is not null then
     raise exception 'Only a line coded in Bank Transactions can be recoded';
   end if;
-  -- One recode at a time: a second click waits here, then finds the first.
-  perform 1 from acc_journal_entry where id = v_entry.id for update;
+  -- One recode at a time, and never against an entry taken back meanwhile: a
+  -- second click, or Change in another tab, waits here — then the entry is
+  -- read again, as whatever finished first left it.
+  select * into v_entry from acc_journal_entry where id = v_entry.id for update;
+  if v_entry.status <> 'posted' then
+    raise exception 'This line''s entry was taken back meanwhile, so there is nothing to recode';
+  end if;
 
   select count(*) into v_lines from acc_journal_line where journal_entry_id = v_entry.id;
   select * into v_other from acc_journal_line where journal_entry_id = v_entry.id and account_id <> v_gl limit 1;
@@ -805,6 +843,9 @@ begin
       'This line was matched by something that owns its entry (%), not by categorising it.',
       v_source;
   end if;
+  -- Locked as a recode locks it, so the two never cross: one waits for the
+  -- other, and the recode then finds the entry voided, or this finds its recode.
+  perform 1 from acc_journal_entry where id = v_entry for update;
 
   -- A line ticked in a completed reconciliation belongs to a month somebody
   -- signed off. Voiding it would change that month without a word.
@@ -821,6 +862,10 @@ begin
        where l.journal_entry_id = v_entry
          and coalesce(a.detail_type, '') in ('uncategorized_income', 'uncategorized_expense')
     ) into v_holding;
+    if exists (select 1 from acc_journal_entry where source_type = 'bank' and source_id = v_entry and status = 'posted') then
+      raise exception 'This line is reconciled to %. To move it to another account, Undo recode and recode it again — or reopen that reconciliation.',
+        to_char(v_signed, 'Mon FMDD, YYYY');
+    end if;
     if v_holding then
       raise exception 'This line is reconciled to %. Recode it instead, or reopen that reconciliation.',
         to_char(v_signed, 'Mon FMDD, YYYY');
@@ -927,7 +972,7 @@ grant execute on function acc_coding_history() to authenticated, service_role;
 - [ ] **Step 4: Run the verify script again.**
 
 Run: `node --env-file=.env.local scripts/verify-add-missing-lines.mjs`
-Expected: every company prints `(0134 applied inside the transaction, never committed)`; the last line reads `270 passed, 0 failed`. Nothing is committed to the database: every company's transaction is rolled back.
+Expected: every company prints `(0134 applied inside the transaction, never committed)`; the last line reads `288 passed, 0 failed`. Nothing is committed to the database: every company's transaction is rolled back.
 
 - [ ] **Step 5: A new company has the accounts.** In `scripts/verify-company-provisioning.mjs` apply this edit:
 
@@ -1002,6 +1047,7 @@ import {
   CANNOT_ADD_NOTE,
   UNCATEGORIZED_WHY,
   addedMessage,
+  addedNotPairedMessage,
   planAddMissing,
   type AddBankLine,
   type AddStatementLine,
@@ -1118,6 +1164,40 @@ describe("planAddMissing", () => {
     ]);
   });
 
+  it("leaves out a line of 0.00 and a line dated in a month already signed off", () => {
+    const zero = line(1, "2026-07-10", 0, "ZERO");
+    const old = line(2, "2026-06-28", -900, "LATE CHARGE");
+    const plan = planAddMissing({
+      lines: [zero, old, fee],
+      standings: [missing, missing, missing],
+      flipped: false,
+      transactions: [txn("t-zero", zero), txn("t-old", old), txn("t-fee", fee)],
+      suggestions: new Map([["t-fee", rule]]),
+      holding,
+      signedThrough: "2026-06-30",
+    });
+    expect(plan.cannot.map((x) => [x.lineNo, x.reason, x.note])).toEqual([
+      [1, "zero", CANNOT_ADD_NOTE.zero],
+      [2, "signed", CANNOT_ADD_NOTE.signed],
+    ]);
+    expect(plan.items.map((i) => i.transactionId)).toEqual(["t-fee"]);
+  });
+
+  it("never gives one bank line to two statement lines", () => {
+    const one = line(1, "2026-07-30", -500, "ATM FEE");
+    const two = line(2, "2026-07-30", -500, "ATM FEE");
+    const plan = planAddMissing({
+      lines: [one, two],
+      standings: [missing, missing],
+      flipped: false,
+      transactions: [txn("only", one)],
+      suggestions: new Map(),
+      holding,
+    });
+    expect(plan.items.map((i) => [i.lineNo, i.transactionId])).toEqual([[1, "only"]]);
+    expect(plan.cannot.map((x) => [x.lineNo, x.reason])).toEqual([[2, "not-found"]]);
+  });
+
   it("adds nothing from a statement read the other way around", () => {
     const plan = planAddMissing({
       lines: [fee],
@@ -1167,6 +1247,15 @@ describe("addedMessage", () => {
   it("says how many were added, and how many went to Uncategorized", () => {
     expect(addedMessage(3, 1)).toBe("3 entries added from the statement and ticked; 1 went to Uncategorized.");
     expect(addedMessage(1, 0)).toBe("1 entry added from the statement and ticked.");
+  });
+
+  it("says the lines are in the books when pairing them afterwards failed", () => {
+    expect(addedNotPairedMessage(2, 1, "timeout")).toBe(
+      "2 entries added from the statement, 1 to Uncategorized, but pairing them with the statement failed (timeout). Click Match again to tick them.",
+    );
+    expect(addedNotPairedMessage(1, 0, "timeout")).toBe(
+      "1 entry added from the statement, but pairing it with the statement failed (timeout). Click Match again to tick it.",
+    );
   });
 });
 
@@ -1349,7 +1438,7 @@ export interface AddItem {
   why: string;
 }
 
-export type CannotAddReason = "not-found" | "coded" | "ignored" | "suggested";
+export type CannotAddReason = "not-found" | "coded" | "ignored" | "suggested" | "zero" | "signed";
 
 export interface CannotAdd {
   lineNo: number;
@@ -1376,13 +1465,15 @@ export const CANNOT_ADD_NOTE: Record<CannotAddReason, string> = {
   coded: "Already in the books — click Match again.",
   ignored: "Excluded in Bank Transactions — include it there to add it.",
   suggested: "Bank Transactions suggests a match in the books for it — approve or reject that first.",
+  zero: "A line of 0.00 has nothing to post.",
+  signed: "Dated in a month already reconciled — add it in Bank Transactions if it belongs there.",
 };
 
 export const ADD_BLOCKED = {
   flipped:
     "This statement shows money in and out the other way around from the books, so nothing is added from here. Check the signs of its lines in Bank Transactions.",
   tooMany: `More than ${ADD_MISSING_LIMIT} lines — code them in Bank Transactions.`,
-  noHolding: "This company has no Uncategorized accounts yet, so lines nothing places cannot be added from here.",
+  noHolding: "This company has no active Uncategorized accounts, so lines nothing places cannot be added from here.",
 } as const;
 
 export const UNCATEGORIZED_WHY = "Nothing places this line, so it goes to Uncategorized, to recode later.";
@@ -1407,6 +1498,12 @@ export function planAddMissing(input: {
   /** The suggestion for each waiting bank line, by its id. */
   suggestions: ReadonlyMap<string, AddSuggestion>;
   holding: HoldingAccounts;
+  /**
+   * The statement date of the account's newest completed reconciliation before
+   * this one, when there is one: a line dated on or before it belongs to a
+   * month somebody signed off, and is not added from here.
+   */
+  signedThrough?: string | null;
 }): AddMissingPlan {
   const missingLines = input.lines.filter((_, i) => input.standings[i]?.kind === "missing");
   const empty = (blocked: string | null): AddMissingPlan => ({
@@ -1432,6 +1529,11 @@ export function planAddMissing(input: {
     const group = groups.get(lineKey(line.txnDate, line.amountMinor, line.description, line.reference)) ?? [];
     const free = group.find((txn) => !taken.has(txn.id) && txn.status === "unmatched" && !txn.suggested);
     const said = { lineNo: line.lineNo, txnDate: line.txnDate, description: line.description, amountMinor: line.amountMinor };
+    if (line.amountMinor === 0 || (input.signedThrough && line.txnDate <= input.signedThrough)) {
+      const reason: CannotAddReason = line.amountMinor === 0 ? "zero" : "signed";
+      cannot.push({ ...said, reason, note: CANNOT_ADD_NOTE[reason] });
+      continue;
+    }
     if (!free) {
       const rest = group.filter((txn) => !taken.has(txn.id));
       const reason: CannotAddReason = rest.some((t) => t.status === "unmatched" && t.suggested)
@@ -1479,6 +1581,14 @@ export function planAddMissing(input: {
     uncategorized: blocked ? 0 : items.filter((item) => item.source === "uncategorized").length,
     blocked,
   };
+}
+
+/** When the lines were posted but pairing them afterwards failed: they are in the books, not yet ticked. */
+export function addedNotPairedMessage(added: number, uncategorized: number, problem: string): string {
+  const them = added === 1 ? "it" : "them";
+  const head = `${added} ${added === 1 ? "entry" : "entries"} added from the statement`;
+  const holding = uncategorized ? `, ${uncategorized} to Uncategorized` : "";
+  return `${head}${holding}, but pairing ${them} with the statement failed (${problem}). Click Match again to tick ${them}.`;
 }
 
 /** The message after adding: "3 entries added from the statement and ticked; 1 went to Uncategorized." */
@@ -1543,7 +1653,7 @@ export function detailLabel(type: AccountType, detail: string | null): string | 
 - [ ] **Step 4: Run them — they pass.**
 
 Run: `npx vitest run tests/unit/add-missing.test.ts tests/unit/account-detail.test.ts`
-Expected: both files pass (add-missing: 11 tests).
+Expected: both files pass (add-missing: 14 tests).
 Run: `npx eslint lib/domain/uncategorized.ts lib/domain/add-missing.ts lib/domain/account-detail.ts tests/unit/add-missing.test.ts tests/unit/account-detail.test.ts` — Expected: prints nothing.
 
 - [ ] **Step 5: Commit.**
@@ -1584,7 +1694,7 @@ import { reconciliationStandings, type PairingOutcome } from "@/lib/domain/recon
 import { holdingAccountsOf } from "@/lib/domain/uncategorized";
 import { listAccounts } from "./accounts";
 import { listSuggestions } from "./banking";
-import { getReconciliationLines, getReconciliationStatement, pairAndTick } from "./bankrec";
+import { getReconciliationLines, getReconciliationStatement, listReconciliations, pairAndTick } from "./bankrec";
 import { codingSuggestions } from "./coding";
 import { readAllPages } from "./paging";
 
@@ -1629,12 +1739,20 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
   }
 
   const bankAccountId = statement.bankAccountId;
-  const [rows, matches, coding, accounts] = await Promise.all([
+  const [rows, matches, coding, accounts, reconciliations] = await Promise.all([
     bankLinesBetween(sb, bankAccountId, missingDates[0], missingDates[missingDates.length - 1]),
     listSuggestions(sb, bankAccountId),
     codingSuggestions(sb, bankAccountId),
     listAccounts(sb),
+    listReconciliations(sb, bankAccountId),
   ]);
+  // The newest month signed off before this one: a line dated in it is not added from here.
+  const signedThrough =
+    reconciliations
+      .filter((r) => r.status === "completed" && r.statement_ending_date < statement.endingDate)
+      .map((r) => r.statement_ending_date)
+      .sort()
+      .at(-1) ?? null;
   const suggested = new Set(matches.map((m) => m.bank_transaction_id));
   const transactions: AddBankLine[] = rows.map((row) => ({
     id: row.id as string,
@@ -1655,13 +1773,17 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
     transactions,
     suggestions,
     holding: holdingAccountsOf(accounts),
+    signedThrough,
   });
 }
 
 export interface AddedLines {
   added: number;
   uncategorized: number;
-  outcome: PairingOutcome;
+  /** Null when pairing failed after the lines were posted. */
+  outcome: PairingOutcome | null;
+  /** Why pairing failed, when it did: the lines are in the books, not yet ticked. */
+  pairingError: string | null;
 }
 
 /** Shown to the person: a line and the account it would post to. */
@@ -1692,8 +1814,14 @@ export async function addMissingLines(sb: SupabaseClient, reconciliationId: stri
     p_items: plan.items.map((item) => ({ line_no: item.lineNo, bank_transaction_id: item.transactionId, account_id: item.accountId })),
   });
   if (error) throw new AddMissingError(error.message);
-  const outcome = await pairAndTick(sb, reconciliationId);
-  return { added: plan.items.length, uncategorized: plan.uncategorized, outcome };
+  // The lines are in the books now, whatever happens next: a pairing that fails
+  // is said as such, never as lines that were not added.
+  const added = { added: plan.items.length, uncategorized: plan.uncategorized };
+  try {
+    return { ...added, outcome: await pairAndTick(sb, reconciliationId), pairingError: null };
+  } catch (e) {
+    return { ...added, outcome: null, pairingError: e instanceof Error ? e.message : "an unexpected error" };
+  }
 }
 ```
 
@@ -1948,7 +2076,7 @@ import {
   reconciliationStatementAction,
   setStatementEndingAction,
 } from "../statement-actions";
-import { addedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
+import { addedMessage, addedNotPairedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
 import AddMissingBox from "./AddMissingBox";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -1972,7 +2100,8 @@ replace with:
   const [statementLinesPageSize, setStatementLinesPageSize] = useState<number>(
     STATEMENT_LINES_DEFAULT_PAGE_SIZE,
   );
-  const [addPlan, setAddPlan] = useState<AddMissingPlan | null>(null);
+  // The plan, with the lines it was worked out for.
+  const [addPlan, setAddPlan] = useState<{ key: string; plan: AddMissingPlan } | null>(null);
   const [adding, setAdding] = useState(false);
   // Asks for the plan again when an add was refused because it changed.
   const [planAsked, setPlanAsked] = useState(0);
@@ -2011,16 +2140,24 @@ replace with:
   useEffect(() => {
     if (!missingKey || !working) return;
     let live = true;
+    const key = missingKey;
     void addMissingPlanAction(reconciliationId).then((res) => {
       if (!live) return;
-      if (res.ok && res.data) setAddPlan(res.data);
-      else message.error(res.error ?? "Could not work out what to add");
+      if (res.ok && res.data) {
+        setAddPlan({ key, plan: res.data });
+      } else {
+        setAddPlan(null);
+        message.error(res.error ?? "Could not work out what to add");
+      }
     });
     return () => {
       live = false;
     };
   }, [missingKey, working, reconciliationId, planAsked, message]);
-  const shownPlan = missingKey && working && addPlan && addPlan.missing > 0 ? addPlan : null;
+  // Shown only for the lines it was worked out for: while the next plan is on
+  // its way, the box waits rather than offering the last one.
+  const shownPlan =
+    missingKey && working && addPlan && addPlan.key === missingKey && addPlan.plan.missing > 0 ? addPlan.plan : null;
 
   async function addAll() {
     if (!shownPlan) return;
@@ -2032,10 +2169,14 @@ replace with:
     setAdding(false);
     if (!res.ok || !res.data) {
       message.error(res.error ?? "The lines could not be added");
+      setAddPlan(null);
       setPlanAsked((n) => n + 1);
       return;
     }
-    message.success(addedMessage(res.data.added, res.data.uncategorized), 8);
+    const { added, uncategorized, pairingError } = res.data;
+    if (pairingError) message.warning(addedNotPairedMessage(added, uncategorized, pairingError), 10);
+    else message.success(addedMessage(added, uncategorized), 8);
+    setAddPlan(null);
     void load();
   }
   const statementClosing = statement?.closingMinor ?? null;
@@ -3032,6 +3173,7 @@ Edit 7 of 10 — find:
   }, [selectedId]);
 
   useEffect(() => {
+    // Intentional synchronization after the selected account changes.
 ```
 
 replace with:
@@ -3042,10 +3184,13 @@ replace with:
     }
     if (recoded.ok && recoded.data) {
       setRecodes(new Map(recoded.data.map((row) => [row.bank_transaction_id, row])));
+    } else {
+      message.warning("Recodes could not be read, so recoded lines may show as needing coding. Reload the page.");
     }
-  }, [selectedId]);
+  }, [selectedId, message]);
 
   useEffect(() => {
+    // Intentional synchronization after the selected account changes.
 ```
 
 Edit 8 of 10 — find:
@@ -3179,21 +3324,21 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Add all to the books",
         detail:
-          "In a reconciliation, a box above the statement lines lists each line the bank shows and the books do not, with the account it would post to: the card, related company, rule or history that places it, or Uncategorized Income or Uncategorized Expense when nothing does. Add all posts every one, dated as the bank has it — or, if any one cannot be posted, none — then pairs and ticks them. Completing the reconciliation is still your click.",
+          "In a reconciliation, a box above the statement lines lists each line the bank shows and the books do not, with the account it would post to: the card, related company, rule or history that places it, or Uncategorized Income or Uncategorized Expense when nothing does. Add all posts every one, dated as the bank has it — or, if any one cannot be posted, none — then pairs and ticks them. A line dated in a month already reconciled is not added from here. Completing the reconciliation is still your click.",
         route: "/banking/reconcile",
       },
       {
         kind: "added",
         title: "Recode a line from Uncategorized",
         detail:
-          "In Bank Transactions, Posted to › Needs coding lists the lines still in Uncategorized. Recode moves a line to the account it belongs in with a second entry on the same day, so the line's own entry and any month it was reconciled in stay exactly as they were; Undo recode takes it back. Coding history learns from it: the next line like it is suggested to the account it was recoded to.",
+          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode moves a line to the account it belongs in with a second entry on the same day, so the line's own entry and any month it was reconciled in stay exactly as they were; Undo recode takes it back. Coding history learns from it: the next line like it is suggested to the account it was recoded to.",
         route: "/banking",
       },
       {
         kind: "added",
         title: "Uncategorized Income and Uncategorized Expense in every chart",
         detail:
-          "Every company's chart of accounts has the two holding accounts, at 4999 and 6999 unless the chart already had them under codes of its own.",
+          "Every company's chart of accounts has the two holding accounts: the ones it already had under those names, or new ones at 4999 and 6999 — or the nearest free code below.",
         route: "/accounts",
       },
       {
@@ -3249,9 +3394,9 @@ replace with:
         control: "Recode",
         route: "/banking",
         note:
-          "In Bank Transactions, Posted to › Needs coding lists the lines still in Uncategorized. Recode posts a " +
+          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode posts a " +
           "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
-          "any reconciliation it is in, stay as they were. Undo recode takes it back. A line in a signed-off month " +
+          "any reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a signed-off month " +
           "cannot be taken back with Change — recode it instead.",
       },
       {
@@ -3282,6 +3427,6 @@ No new code. Every step that writes to the live database waits for the user.
 
 - [ ] **Step 1:** Ask the user to approve applying 0134 to every company. Only then run `node --env-file=.env.local scripts/migrate.mjs`, run `scripts/verify-add-missing-lines.mjs` again (rolled back) and `npm run verify:company-provisioning`.
 - [ ] **Step 2:** On the sample company PC-Test only: a new bank account never reconciled; posted entries for a month; an invented statement PDF of that month carrying a service fee and one unknown line the books do not have; a bank rule "SERVICE FEE → Bank Charges".
-- [ ] **Step 3:** In a real browser (`next start` started detached with its working directory set): start the month from the statement → the box lists both lines, the fee to Bank Charges (Rule) and the unknown line to Uncategorized Expense (needs coding) → **Add all 2 to the books** → the message, the difference zero → Complete → Bank Transactions → Posted to › Needs coding (1) → Recode to an expense account → the reconciliation's figures unchanged → Change on that line refused with "Recode it instead" → Undo recode → Recode again.
+- [ ] **Step 3:** In a real browser (`next start` started detached with its working directory set): start the month from the statement → the box lists both lines, the fee to Bank Charges (Rule) and the unknown line to Uncategorized Expense (needs coding) → **Add all 2 to the books** → the message, the difference zero → Complete → Bank Transactions → Posted to › Needs coding (1) → Recode to an expense account → the reconciliation's figures unchanged → Change on that line refused, pointing to Undo recode → Undo recode → Recode again.
 - [ ] **Step 4:** Screenshots of each, light and dark, scrolled to the top before each full-page shot; an approval page beside them. Nothing is pushed until the user approves.
 - [ ] **Step 5:** Ask the user whether what the check recorded on PC-Test stays as the sample company's history.
