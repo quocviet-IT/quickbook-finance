@@ -263,6 +263,7 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   RUN_MESSAGES,
   checkRun,
+  monthRefusal,
   monthSentence,
   monthsFromCsv,
   simulateRun,
@@ -294,7 +295,7 @@ const statement = (to: string, opening: number | null, closing: number | null, l
   outByMinor: null,
   ...extra,
 });
-const noContext: RunContext = { lastCompleted: null, completedDates: [], inProgress: null };
+const noContext: RunContext = { lastCompleted: null, completedDates: [], inProgress: null, today: "2026-12-31" };
 const book = (id: string, date: string, amount: number, reference: string | null = null): OpenBookLine => ({
   id,
   date,
@@ -391,7 +392,7 @@ describe("checkRun", () => {
         statement("2026-05-31", 800, 900),
         statement("2026-10-31", null, null, [], { to: null, problem: RUN_MESSAGES.noDate }),
       ],
-      { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null },
+      { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null, today: "2026-12-31" },
       money,
     );
     expect(result.statements.map((c) => [c.statement.key, c.state])).toEqual([
@@ -410,7 +411,7 @@ describe("checkRun", () => {
   it("stops a run with a gap, with a first statement that does not open where the last reconciliation closed, and with one in progress", () => {
     const result = checkRun(
       [statement("2026-07-31", 1000, 1100), statement("2026-08-31", 1200, 1300)],
-      { lastCompleted: { date: "2026-06-30", endingMinor: 900 }, completedDates: ["2026-06-30"], inProgress: { id: "r", date: "2026-07-31" } },
+      { lastCompleted: { date: "2026-06-30", endingMinor: 900 }, completedDates: ["2026-06-30"], inProgress: { id: "r", date: "2026-07-31" }, today: "2026-12-31" },
       money,
     );
     expect(result.stops).toEqual([
@@ -429,6 +430,50 @@ describe("checkRun", () => {
   it("notes a statement that does not prove itself", () => {
     const [only] = checkRun([statement("2026-07-31", 1000, 1100, [csvLine("2026-07-05", 100, null)], { outByMinor: -2000 })], noContext, money).statements;
     expect(only.note).toBe("1 line — does not prove itself, out by $20.00");
+  });
+
+  it("marks a month that runs past the company's today as not over yet", () => {
+    const result = checkRun(
+      [statement("2026-07-31", 1000, 1100), statement("2026-08-31", 1100, 1300)],
+      { lastCompleted: null, completedDates: [], inProgress: null, today: "2026-08-15" },
+      money,
+    );
+    expect(result.statements.map((c) => [c.statement.to, c.state])).toEqual([
+      ["2026-07-31", "usable"],
+      ["2026-08-31", "notOver"],
+    ]);
+    expect(result.statements[1].note).toBe("Not over yet");
+    expect(result.usable.map((s) => s.to)).toEqual(["2026-07-31"]);
+    expect(result.stops).toEqual([]);
+  });
+
+  it("stops a run of more than 10,000 statement lines, and not one of exactly 10,000", () => {
+    const lines = (n: number) => Array.from({ length: n }, (_, i) => csvLine("2026-07-05", 1, null, `L${i}`));
+    const over = checkRun([statement("2026-07-31", 1000, 1100, lines(10001))], noContext, money);
+    expect(over.stops).toContain("These statements hold 10,001 lines, and a run can hold at most 10,000. Choose fewer months.");
+    const exact = checkRun([statement("2026-07-31", 1000, 1100, lines(10000))], noContext, money);
+    expect(exact.stops.filter((s) => s.includes("a run can hold at most"))).toEqual([]);
+  });
+});
+
+describe("monthRefusal", () => {
+  it("refuses a month not over yet", () => {
+    expect(monthRefusal("2026-10-31", "2026-10-05", null)).toBe("The month to Oct 31, 2026 is not over yet.");
+  });
+
+  it("refuses a month at or before the last completed reconciliation", () => {
+    expect(monthRefusal("2026-07-31", "2026-10-05", "2026-07-31")).toBe(
+      "This account is already reconciled to Jul 31, 2026, so the month to Jul 31, 2026 is not signed off again.",
+    );
+    expect(monthRefusal("2026-06-30", "2026-10-05", "2026-07-31")).toBe(
+      "This account is already reconciled to Jul 31, 2026, so the month to Jun 30, 2026 is not signed off again.",
+    );
+  });
+
+  it("lets through a month after the last one, a first month, and a month ending today", () => {
+    expect(monthRefusal("2026-08-31", "2026-10-05", "2026-07-31")).toBeNull();
+    expect(monthRefusal("2026-08-31", "2026-10-05", null)).toBeNull();
+    expect(monthRefusal("2026-10-05", "2026-10-05", null)).toBeNull();
   });
 });
 
@@ -582,6 +627,14 @@ export const RUN_MESSAGES = {
   noLines: "No dated amounts could be read out of this file",
 } as const;
 
+/**
+ * The most statement lines one run previews. A line travels as its date, amount
+ * and reference — about 70 bytes, more with a long reference — so a run this
+ * size stays under the server's 1 MB body limit when references are short; a
+ * run of long references can still exceed it, and is refused whole, writing nothing.
+ */
+export const MAX_RUN_LINES = 10_000;
+
 const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 /**
@@ -686,9 +739,11 @@ export interface RunContext {
   /** Statement dates of the account's completed reconciliations. */
   completedDates: readonly string[];
   inProgress: { id: string; date: string } | null;
+  /** The company's today: a statement that runs past it is not over yet. */
+  today: string;
 }
 
-export type RunState = "usable" | "unreadable" | "duplicate" | "already" | "before";
+export type RunState = "usable" | "unreadable" | "notOver" | "duplicate" | "already" | "before";
 
 export interface CheckedStatement {
   statement: RunStatement;
@@ -712,6 +767,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * Which statements a run can reconcile, and what stops it: a gap between two
  * statements (p44b.html: the run is disabled), a first statement that does not
  * open where the last reconciliation closed, or a reconciliation in progress.
+ * It also sorts out a month not over yet.
  */
 export function checkRun(
   statements: readonly RunStatement[],
@@ -723,6 +779,7 @@ export function checkRun(
   const kept = new Set<string>();
   const checked: CheckedStatement[] = ordered.map((statement) => {
     if (statement.problem || !statement.to) return { statement, state: "unreadable", note: statement.problem ?? RUN_MESSAGES.noDate };
+    if (statement.to > context.today) return { statement, state: "notOver", note: "Not over yet" };
     if (completed.has(statement.to)) return { statement, state: "already", note: "Already signed off" };
     if (context.lastCompleted && statement.to < context.lastCompleted.date) {
       return { statement, state: "before", note: "Before the last reconciliation" };
@@ -742,6 +799,13 @@ export function checkRun(
     );
   }
   if (!usable.length) stops.push("Nothing here can be reconciled yet.");
+  const lineCount = usable.reduce((n, s) => n + s.lines.length, 0);
+  if (lineCount > MAX_RUN_LINES) {
+    stops.push(
+      `These statements hold ${lineCount.toLocaleString("en-US")} lines, and a run can hold at most ` +
+        `${MAX_RUN_LINES.toLocaleString("en-US")}. Choose fewer months.`,
+    );
+  }
   const first = usable[0];
   if (first && context.lastCompleted && first.openingMinor !== null && first.openingMinor !== context.lastCompleted.endingMinor) {
     stops.push(
@@ -759,6 +823,20 @@ export function checkRun(
     );
   }
   return { statements: checked, usable, stops };
+}
+
+/**
+ * Why the server will not start a month of a run, or null. A month not over
+ * yet cannot be proven; a month at or before the account's last completed
+ * reconciliation is signed already — by this run in another tab, or by a
+ * second click.
+ */
+export function monthRefusal(statementDate: string, today: string, lastCompletedDate: string | null): string | null {
+  if (statementDate > today) return `The month to ${shortDate(statementDate, true)} is not over yet.`;
+  if (lastCompletedDate && statementDate <= lastCompletedDate) {
+    return `This account is already reconciled to ${shortDate(lastCompletedDate, true)}, so the month to ${shortDate(statementDate, true)} is not signed off again.`;
+  }
+  return null;
 }
 
 /** A book line not yet in a completed reconciliation, in book order (date, entry, line). */
@@ -2406,7 +2484,11 @@ export const runPreviewSchema = z.object({
       }),
     )
     .min(1, "Choose at least one statement")
-    .max(60, "A run can hold at most 60 statements"),
+    .max(60, "A run can hold at most 60 statements")
+    .refine(
+      (all) => all.reduce((n, s) => n + s.lines.length, 0) <= MAX_RUN_LINES,
+      `A run can hold at most ${MAX_RUN_LINES.toLocaleString("en-US")} statement lines`,
+    ),
 });
 export type RunPreviewInput = z.infer<typeof runPreviewSchema>;
 
@@ -2529,6 +2611,14 @@ describe("runPreviewSchema", () => {
     );
   });
 
+  it("takes 10,000 statement lines in all, and refuses one more", () => {
+    const withLines = (n: number) => ({ ...preview.statements[0], lines: Array.from({ length: n }, () => preview.statements[0].lines[0]) });
+    expect(runPreviewSchema.safeParse({ ...preview, statements: [withLines(5000), withLines(5000)] }).success).toBe(true);
+    expect(firstIssue(runPreviewSchema.safeParse({ ...preview, statements: [withLines(5000), withLines(5000), withLines(1)] }))).toBe(
+      "A run can hold at most 10,000 statement lines",
+    );
+  });
+
   it("refuses a statement with no closing balance", () => {
     expect(runPreviewSchema.safeParse({ ...preview, statements: [{ ...preview.statements[0], closing_minor: null }] }).success).toBe(false);
   });
@@ -2555,7 +2645,7 @@ import { shortDate } from "@/lib/domain/pdf-statement-view";
 import {
   reconciliationStatementSchema, runMonthSchema, runPreviewSchema, type ReconciliationStatementInput,
 } from "@/lib/domain/schemas";
-import { simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
+import { monthRefusal, simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
 import {
   createReconciliationFromStatement, setReconciliationStatement, setStatementEnding, getBroughtForwardPreview,
   bringForward, getReconciliationHeader, getReconciliationStatement, pairAndTick, getBankOpenLines,
@@ -2563,6 +2653,7 @@ import {
   BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
 import { generateSuggestions, importStatement } from "@/lib/services/banking";
+import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
 import type { ActionResult } from "./actions";
@@ -2718,7 +2809,8 @@ export interface RunMonthResult {
  * started from its statement — imported into Bank Transactions, paired and
  * ticked, then completed when `sign` is set and it reaches zero. A month that
  * no longer reaches zero (the books changed since the preview) is left in
- * progress and says by how much.
+ * progress and says by how much. The server refuses a month at or before the
+ * last completed reconciliation, or not over yet.
  */
 export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResult<RunMonthResult>> {
   const denied = await guard();
@@ -2740,6 +2832,14 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
       revalidatePath("/banking/reconcile");
       return { ok: true, data: { id, signed: true, differenceMinor: 0 } };
     }
+    const [{ asOf }, reconciliations] = await Promise.all([getBankingContext(sb), listReconciliations(sb, input.bank_account_id)]);
+    // Newest first, as listReconciliations orders them.
+    const refusal = monthRefusal(
+      input.statement_date,
+      asOf,
+      reconciliations.find((r) => r.status === "completed")?.statement_ending_date ?? null,
+    );
+    if (refusal) return { ok: false, error: refusal };
     const file = statementFile(input);
     const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, input.closing_minor, file);
     startedId = id;
@@ -2794,6 +2894,7 @@ import { z } from "zod";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listBankAccounts } from "@/lib/services/banking";
+import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { listReconciliations } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import type { RunContext } from "@/lib/domain/statement-run";
@@ -2807,10 +2908,11 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
   if (!account || !z.uuid().safeParse(account).success) notFound();
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const [banks, currencies, reconciliations] = await Promise.all([
+  const [banks, currencies, reconciliations, { asOf }] = await Promise.all([
     listBankAccounts(sb),
     listCurrencies(sb),
     listReconciliations(sb, account),
+    getBankingContext(sb),
   ]);
   const bank = banks.find((b) => b.id === account);
   if (!bank) notFound();
@@ -2824,6 +2926,7 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
       : null,
     completedDates: completed.map((r) => r.statement_ending_date),
     inProgress: inProgress ? { id: inProgress.id, date: inProgress.statement_ending_date } : null,
+    today: asOf,
   };
   return (
     <div>
@@ -2893,11 +2996,23 @@ interface Done {
   /** The month left in progress for a person, when there is one. */
   open: { id: string; date: string; sentence: string } | null;
   error: string | null;
+  /** The account's earlier lines were brought forward before any month. */
+  broughtForward: boolean;
+}
+
+/** What was done before a run stopped on an error, said after the error. */
+function before(done: Done): string | null {
+  const parts = [
+    done.broughtForward ? "The earlier lines were brought forward" : null,
+    done.signed > 0 ? `${done.signed} month${done.signed === 1 ? "" : "s"} signed off` : null,
+  ].filter((p): p is string => p !== null);
+  return parts.length ? `${parts.join(" and ")} before this.` : null;
 }
 
 const STATE_COLOR: Record<CheckedStatement["state"], string | undefined> = {
   usable: "green",
   unreadable: "red",
+  notOver: undefined,
   already: "blue",
   before: undefined,
   duplicate: undefined,
@@ -2952,8 +3067,16 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     try {
       const read = await readRunFile(file, bankAccount);
       setStatements((current) => {
+        // A file chosen twice, or two files of one name, stay as rows: the
+        // table says "Same month as another file" rather than one vanishing.
         const keys = new Set(current.map((s) => s.key));
-        return [...current, ...read.filter((s) => !keys.has(s.key))];
+        const fresh = read.map((s) => {
+          let key = s.key;
+          for (let n = 2; keys.has(key); n += 1) key = `${s.key}~${n}`;
+          keys.add(key);
+          return key === s.key ? s : { ...s, key };
+        });
+        return [...current, ...fresh];
       });
     } finally {
       setReading((n) => n - 1);
@@ -3012,10 +3135,16 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     const total = toSign.length + (bringForward ? 1 : 0);
     let step = 0;
     let signed = 0;
+    let broughtForward = false;
     const finish = (result: Done) => {
       setProgress(null);
       setDone(result);
       setPreview(null);
+      if (result.error === null && result.open === null) {
+        // Every month is signed: the table would only say "Already signed off".
+        setStatements([]);
+        setPreviewed([]);
+      }
       router.refresh();
     };
     const first = previewed[0];
@@ -3029,7 +3158,8 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         statement_date: first.to,
         opening_minor: first.openingMinor,
       });
-      if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward" });
+      if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward", broughtForward });
+      broughtForward = true;
     }
     for (const month of toSign) {
       const statement = previewedByKey.get(month.key);
@@ -3046,7 +3176,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         lines: statement.lines,
         sign: true,
       });
-      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "A month could not be signed off" });
+      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "A month could not be signed off", broughtForward });
       if (!res.data.signed) {
         return finish({
           signed,
@@ -3056,6 +3186,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             sentence: `The books changed since the preview: this month is now out by ${money(Math.abs(res.data.differenceMinor))}.`,
           },
           error: null,
+          broughtForward,
         });
       }
       signed += 1;
@@ -3074,10 +3205,12 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         lines: statement.lines,
         sign: false,
       });
-      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "The month that needs a look could not be started" });
+      if (!res.ok || !res.data) {
+        return finish({ signed, open: null, error: res.error ?? "The month that needs a look could not be started", broughtForward });
+      }
       open = { id: res.data.id, date: needsLook.statementDate, sentence: monthSentence(needsLook.outcome, money) };
     }
-    finish({ signed, open, error: null });
+    finish({ signed, open, error: null, broughtForward });
   }
 
   return (
@@ -3195,7 +3328,12 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             columns={[
               { title: "Statement", render: (_, m) => shortDate(m.statementDate, true), width: 130 },
               { title: "File", render: (_, m) => previewedByKey.get(m.key)?.fileName ?? "" },
-              { title: "Beginning", align: "right", render: (_, m) => money(m.beginningMinor) },
+              {
+                title: "Beginning",
+                align: "right",
+                // A waiting month begins wherever the month that stopped the run ends, which nobody knows yet.
+                render: (_, m) => (m.outcome.kind === "waiting" ? "—" : money(m.beginningMinor)),
+              },
               { title: "Closing", align: "right", render: (_, m) => money(m.closingMinor) },
               { title: "Outcome", render: (_, m) => outcomeTag(m.outcome) },
               { title: "What happened", render: (_, m) => monthSentence(m.outcome, money) },
@@ -3229,11 +3367,14 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
           description={
             done.open ? (
               <span>
-                {done.open.sentence} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
+                {done.broughtForward ? "The earlier lines were brought forward. " : ""}
+                {done.open.sentence.replace(/\.?$/, ".")} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
                 <Link href={`/banking/reconcile/${done.open.id}`}>Open it</Link>
               </span>
-            ) : done.error && done.signed ? (
-              `${done.signed} month${done.signed === 1 ? "" : "s"} signed off before this.`
+            ) : done.error ? (
+              before(done)
+            ) : done.broughtForward ? (
+              "The earlier lines were brought forward first."
             ) : null
           }
         />
@@ -3442,7 +3583,7 @@ Main shipped its own 1.80 while this branch was built (PR #29, the shell loads t
         kind: "added",
         title: "Reconcile from statement files",
         detail:
-          "On Bank Reconciliation, From statement files takes one statement or a year of them: PDF statements, or a CSV export with a running balance column, which is cut into calendar months. Each closing balance is read from the file. A month missing from the run, a month already signed off, and a file that prints no closing balance are each said before anything happens.",
+          "On Bank Reconciliation, From statement files takes one statement or a year of them: PDF statements, or a CSV export with a running balance column, which is cut into calendar months. Each closing balance is read from the file. A month missing from the run, a month already signed off, a month not over yet, a reconciliation already in progress on the account, and a file that prints no closing balance are each said before anything happens.",
         route: "/banking/reconcile",
       },
       {
@@ -3456,7 +3597,7 @@ Main shipped its own 1.80 while this branch was built (PR #29, the shell loads t
         kind: "changed",
         title: "From a PDF statement is now From statement files",
         detail:
-          "The button opens a page that takes one file or many, in place of the dialog that took one PDF. A single statement works as before: the account's first reconciliation can still be brought forward, and a month that does not agree opens for you to finish.",
+          "The button opens a page that takes one file or many, in place of the dialog that took one PDF. As before, the account's first reconciliation can be brought forward, and a month that does not agree opens for you to finish.",
         route: "/banking/reconcile",
       },
     ],
@@ -3487,11 +3628,12 @@ with
         route: "/banking/reconcile",
         note:
           "Choose PDF statements, or a CSV export with a running balance column, which is cut into months. " +
-          "Each closing balance comes from the file; a month missing from the run stops it. Preview pairs every " +
-          "month with the books — by date and amount, by check number, or by amount within 5 days — and writes " +
-          "nothing. Sign off signs the months that agree, oldest first; the first that does not is started, with " +
-          "its pairs ticked, for you to finish. On an account never reconciled, the earlier lines are brought " +
-          "forward first when the books agree with the first statement's opening balance.",
+          "Each closing balance comes from the file; a month missing from the run, or a reconciliation already in " +
+          "progress, stops it. Preview pairs the months with the books oldest first — by date and amount, by check " +
+          "number, or by amount within 5 days — up to the first that does not agree, and writes nothing. Sign off " +
+          "signs the months that agree; the first that does not is started, with its pairs ticked, for you to " +
+          "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +
+          "agree with the first statement's opening balance.",
       },
 ```
 
