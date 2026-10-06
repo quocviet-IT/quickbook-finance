@@ -6,6 +6,7 @@
  * The session itself — ticking, completing, reopening — is in actions.ts.
  */
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
@@ -21,6 +22,8 @@ import {
   BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
 import { generateSuggestions, importStatement } from "@/lib/services/banking";
+import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } from "@/lib/services/add-missing";
+import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
@@ -30,7 +33,9 @@ async function guard(): Promise<string | null> {
   const role = await getUserRole();
   return canWrite(role) ? null : "You do not have permission to perform this action";
 }
-function msg(e: unknown): string { return e instanceof BankRecError || e instanceof Error ? e.message : "An unexpected error occurred"; }
+function msg(e: unknown): string {
+  return e instanceof BankRecError || e instanceof AddMissingError || e instanceof Error ? e.message : "An unexpected error occurred";
+}
 
 export interface StatementImportSummary {
   /** New lines in Bank Transactions; a line already there is a duplicate. */
@@ -250,4 +255,37 @@ export async function matchAgainAction(reconciliationId: string): Promise<Action
 export async function reconciliationStatementAction(reconciliationId: string): Promise<ActionResult<ReconStatement>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getReconciliationStatement(sb, reconciliationId) }; }
   catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+/** What "Add all N to the books" would add to this reconciliation, and what it cannot. Reads only. */
+export async function addMissingPlanAction(reconciliationId: string): Promise<ActionResult<AddMissingPlan>> {
+  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getAddMissingPlan(sb, reconciliationId) }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+const shownSchema = z
+  .array(z.object({ lineNo: z.number().int().nonnegative(), accountId: z.uuid() }))
+  .min(1, "There is nothing to add")
+  .max(ADD_MISSING_LIMIT, `At most ${ADD_MISSING_LIMIT} lines can be added at a time`);
+
+/**
+ * Adds the statement lines the books do not have — every one or none — as the
+ * person was shown them, then pairs and ticks. The reconciliation is not
+ * completed: Complete stays the person's click.
+ */
+export async function addMissingLinesAction(reconciliationId: string, shown: unknown): Promise<ActionResult<AddedLines>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = shownSchema.safeParse(shown);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const added = await addMissingLines(sb, reconciliationId, parsed.data);
+    revalidatePath(`/banking/reconcile/${reconciliationId}`);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: added };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
 }
