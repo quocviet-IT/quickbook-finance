@@ -181,6 +181,15 @@ try {
     "the non-current liabilities are long-term",
     ["2500", "2600", "2700", "2990"].every((c) => built.get(c)?.type === "long_term_liability"),
   );
+  // Migration 0134: a line nothing places goes to one of these.
+  const holding = [...built.values()].filter((a) => a.detail_type === "uncategorized_income" || a.detail_type === "uncategorized_expense");
+  check(
+    "one Uncategorized Income and one Uncategorized Expense",
+    holding.length === 2 &&
+      holding.some((a) => a.detail_type === "uncategorized_income" && a.type === "income") &&
+      holding.some((a) => a.detail_type === "uncategorized_expense" && a.type === "expense"),
+    holding.map((a) => a.account_code).join(", "),
+  );
 } catch (error) {
   failed += 1;
   console.log(`  FAIL  provisioning threw — ${error.message}`);
