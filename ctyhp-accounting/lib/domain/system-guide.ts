@@ -388,9 +388,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Recode",
         route: "/banking",
         note:
-          "In Bank Transactions, Posted to › Needs coding lists the lines still in Uncategorized. Recode posts a " +
+          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode posts a " +
           "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
-          "any reconciliation it is in, stay as they were. Undo recode takes it back. A line in a signed-off month " +
+          "any reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a signed-off month " +
           "cannot be taken back with Change — recode it instead.",
       },
       {

@@ -49,21 +49,21 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Add all to the books",
         detail:
-          "In a reconciliation, a box above the statement lines lists each line the bank shows and the books do not, with the account it would post to: the card, related company, rule or history that places it, or Uncategorized Income or Uncategorized Expense when nothing does. Add all posts every one, dated as the bank has it — or, if any one cannot be posted, none — then pairs and ticks them. Completing the reconciliation is still your click.",
+          "In a reconciliation, a box above the statement lines lists each line the bank shows and the books do not, with the account it would post to: the card, related company, rule or history that places it, or Uncategorized Income or Uncategorized Expense when nothing does. Add all posts every one, dated as the bank has it — or, if any one cannot be posted, none — then pairs and ticks them. A line dated in a month already reconciled is not added from here. Completing the reconciliation is still your click.",
         route: "/banking/reconcile",
       },
       {
         kind: "added",
         title: "Recode a line from Uncategorized",
         detail:
-          "In Bank Transactions, Posted to › Needs coding lists the lines still in Uncategorized. Recode moves a line to the account it belongs in with a second entry on the same day, so the line's own entry and any month it was reconciled in stay exactly as they were; Undo recode takes it back. Coding history learns from it: the next line like it is suggested to the account it was recoded to.",
+          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode moves a line to the account it belongs in with a second entry on the same day, so the line's own entry and any month it was reconciled in stay exactly as they were; Undo recode takes it back. Coding history learns from it: the next line like it is suggested to the account it was recoded to.",
         route: "/banking",
       },
       {
         kind: "added",
         title: "Uncategorized Income and Uncategorized Expense in every chart",
         detail:
-          "Every company's chart of accounts has the two holding accounts, at 4999 and 6999 unless the chart already had them under codes of its own.",
+          "Every company's chart of accounts has the two holding accounts: the ones it already had under those names, or new ones at 4999 and 6999 — or the nearest free code below.",
         route: "/accounts",
       },
       {
