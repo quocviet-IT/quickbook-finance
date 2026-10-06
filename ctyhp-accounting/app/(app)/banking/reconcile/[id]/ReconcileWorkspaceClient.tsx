@@ -36,11 +36,15 @@ import {
   reopenReconciliationAction,
 } from "../actions";
 import {
+  addMissingLinesAction,
+  addMissingPlanAction,
   importStatementIntoReconciliationAction,
   matchAgainAction,
   reconciliationStatementAction,
   setStatementEndingAction,
 } from "../statement-actions";
+import { addedMessage, addedNotPairedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
+import AddMissingBox from "./AddMissingBox";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import StandingTag from "../StandingTag";
@@ -93,6 +97,11 @@ export default function ReconcileWorkspaceClient({
   const [statementLinesPageSize, setStatementLinesPageSize] = useState<number>(
     STATEMENT_LINES_DEFAULT_PAGE_SIZE,
   );
+  // The plan, with the lines it was worked out for.
+  const [addPlan, setAddPlan] = useState<{ key: string; plan: AddMissingPlan } | null>(null);
+  const [adding, setAdding] = useState(false);
+  // Asks for the plan again when an add was refused because it changed.
+  const [planAsked, setPlanAsked] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +140,58 @@ export default function ReconcileWorkspaceClient({
   const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
   const completed = detail?.status === "completed";
   const working = canWrite && !completed;
+
+  // What "Add all" would add is worked out on the server, and only when the
+  // lines the books do not have change — ticking a line does not change them.
+  const missingKey = useMemo(
+    () =>
+      statement && standings
+        ? statement.lines.filter((_, i) => standings.standings[i]?.kind === "missing").map((line) => line.lineNo).join(",")
+        : "",
+    [statement, standings],
+  );
+  useEffect(() => {
+    if (!missingKey || !working) return;
+    let live = true;
+    const key = missingKey;
+    void addMissingPlanAction(reconciliationId).then((res) => {
+      if (!live) return;
+      if (res.ok && res.data) {
+        setAddPlan({ key, plan: res.data });
+      } else {
+        setAddPlan(null);
+        message.error(res.error ?? "Could not work out what to add");
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [missingKey, working, reconciliationId, planAsked, message]);
+  // Shown only for the lines it was worked out for: while the next plan is on
+  // its way, the box waits rather than offering the last one.
+  const shownPlan =
+    missingKey && working && addPlan && addPlan.key === missingKey && addPlan.plan.missing > 0 ? addPlan.plan : null;
+
+  async function addAll() {
+    if (!shownPlan) return;
+    setAdding(true);
+    const res = await addMissingLinesAction(
+      reconciliationId,
+      shownPlan.items.map((item) => ({ lineNo: item.lineNo, accountId: item.accountId })),
+    );
+    setAdding(false);
+    if (!res.ok || !res.data) {
+      message.error(res.error ?? "The lines could not be added");
+      setAddPlan(null);
+      setPlanAsked((n) => n + 1);
+      return;
+    }
+    const { added, uncategorized, pairingError } = res.data;
+    if (pairingError) message.warning(addedNotPairedMessage(added, uncategorized, pairingError), 10);
+    else message.success(addedMessage(added, uncategorized), 8);
+    setAddPlan(null);
+    void load();
+  }
   const statementClosing = statement?.closingMinor ?? null;
   const closing = detail ? closingAdvice(statementClosing, detail.statementEndingMinor, money) : null;
   const opening = statement && detail ? openingAdvice(statement.openingMinor, detail.beginningMinor, money) : null;
@@ -300,6 +361,9 @@ export default function ReconcileWorkspaceClient({
           Reopen
         </Button>
       )}
+      {shownPlan ? (
+        <AddMissingBox plan={shownPlan} bankAccountId={bankAccount.id} money={money} adding={adding} onAdd={() => void addAll()} />
+      ) : null}
       <div>
         <Space size="small" style={{ marginBottom: 8 }} wrap>
           <Typography.Text strong>Statement lines</Typography.Text>
@@ -314,11 +378,6 @@ export default function ReconcileWorkspaceClient({
               {standings.missing > 0 ? <Tag color="orange">{standings.missing} not in the books</Tag> : null}
               {standings.after > 0 ? <Tag>{standings.after} after the statement date</Tag> : null}
             </Space>
-          ) : null}
-          {standings && standings.missing > 0 ? (
-            <Link href="/banking">
-              Code the {standings.missing} line{standings.missing === 1 ? "" : "s"} the books do not have
-            </Link>
           ) : null}
         </Space>
         {standings?.flipped ? (

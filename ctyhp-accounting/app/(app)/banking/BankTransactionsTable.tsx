@@ -28,7 +28,7 @@ import DescriptionCell from "./DescriptionCell";
 import MatchCell from "./MatchCell";
 import DeleteRowAction from "./DeleteRowAction";
 import type { AccountRow } from "@/lib/db/types";
-import type { BankPostingRow } from "@/lib/services/banking";
+import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
 import { TOKENS } from "@/lib/design/tokens";
 import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
@@ -55,6 +55,10 @@ export interface BankTransactionsTableProps {
   postableAccounts: AccountRow[];
   /** What each matched line was posted to, keyed by transaction; `others` names the rest of a split entry. */
   postings: Map<string, BankPostingRow & { others?: string[] }>;
+  /** The chart's Uncategorized accounts, for telling a line that needs coding. */
+  holdingIds: ReadonlySet<string>;
+  /** Where each recoded line's money went, keyed by transaction. */
+  recodes: Map<string, BankRecodeRow>;
   onCategorised: () => void;
   /** The coding suggestion for each waiting line, keyed by transaction. */
   codingSuggestions: Map<string, CodingSuggestionView>;
@@ -98,6 +102,8 @@ export default function BankTransactionsTable({
   formatRowMoney,
   postableAccounts,
   postings,
+  holdingIds,
+  recodes,
   onCategorised,
   codingSuggestions,
   loanSuggestions,
@@ -186,7 +192,19 @@ export default function BankTransactionsTable({
             onChanged={onCategorised}
             suggestion={suggestion}
             loan={loanSuggestions.get(row.transaction.id) ?? null}
-            onCreateRule={() => onCreateRule(row, posting?.account_id ?? suggestion?.accountId ?? null)}
+            // A rule is filled with where the money belongs: the recode's account,
+            // never Uncategorized, which a rule may not target.
+            onCreateRule={() =>
+              onCreateRule(
+                row,
+                recodes.get(row.transaction.id)?.account_id ??
+                  (posting && !holdingIds.has(posting.account_id) ? posting.account_id : null) ??
+                  suggestion?.accountId ??
+                  null,
+              )
+            }
+            holding={Boolean(posting && holdingIds.has(posting.account_id))}
+            recode={recodes.get(row.transaction.id) ?? null}
           />
         );
       },

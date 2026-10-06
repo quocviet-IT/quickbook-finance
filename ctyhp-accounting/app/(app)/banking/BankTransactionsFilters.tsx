@@ -22,6 +22,8 @@ export interface BankTransactionsFiltersProps {
   postedToFilter: string;
   onPostedTo: (value: string) => void;
   postings: Map<string, BankPostingRow>;
+  /** Lines in Uncategorized not recoded yet. */
+  needsCodingCount: number;
 
   keyword: string;
   onKeyword: (value: string) => void;
@@ -76,6 +78,7 @@ export default function BankTransactionsFilters({
   postedToFilter,
   onPostedTo,
   postings,
+  needsCodingCount,
   keyword,
   onKeyword,
   suggestionRows,
@@ -219,6 +222,8 @@ export default function BankTransactionsFilters({
         options={[
           { value: "all", label: "All accounts posted to" },
           { value: "none", label: "Not categorised yet" },
+          // Lines added to Uncategorized and not recoded yet: the review queue for them.
+          { value: "needs_coding", label: `Needs coding${needsCodingCount ? ` (${needsCodingCount})` : ""}` },
           // Only accounts these lines actually use: the whole chart here
           // would be a list of things that filter to nothing.
           ...[...new Map([...postings.values()].map((p) => [p.account_id, p])).values()]
