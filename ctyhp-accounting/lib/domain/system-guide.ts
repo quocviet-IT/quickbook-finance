@@ -374,12 +374,24 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "agree with the first statement's opening balance.",
       },
       {
-        action: "Code what the statement has and the books do not",
-        control: "Match again",
+        action: "Add what the statement has and the books do not",
+        control: "Add all to the books",
         route: "/banking/reconcile",
         note:
-          "Lines marked Not in the books are coded in Bank Transactions like any bank line. Back in the " +
-          "reconciliation, Match again pairs them and ticks them; no tick is ever removed.",
+          "The box above the statement lines shows each line the books do not have and the account it would " +
+          "post to — by card, related company, rule or history, or else Uncategorized Income or Expense. Add all " +
+          "posts every one, dated as the bank has it, or none, then pairs and ticks them; Complete stays yours. " +
+          "Or code them one by one in Bank Transactions and click Match again; no tick is ever removed.",
+      },
+      {
+        action: "Recode a line from Uncategorized",
+        control: "Recode",
+        route: "/banking",
+        note:
+          "In Bank Transactions, Posted to › Needs coding lists the lines still in Uncategorized. Recode posts a " +
+          "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
+          "any reconciliation it is in, stay as they were. Undo recode takes it back. A line in a signed-off month " +
+          "cannot be taken back with Change — recode it instead.",
       },
       {
         action: "Reopen a completed reconciliation",
