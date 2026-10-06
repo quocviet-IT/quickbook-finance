@@ -370,7 +370,12 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             columns={[
               { title: "Statement", render: (_, m) => shortDate(m.statementDate, true), width: 130 },
               { title: "File", render: (_, m) => previewedByKey.get(m.key)?.fileName ?? "" },
-              { title: "Beginning", align: "right", render: (_, m) => money(m.beginningMinor) },
+              {
+                title: "Beginning",
+                align: "right",
+                // A waiting month begins wherever the month that stopped the run ends, which nobody knows yet.
+                render: (_, m) => (m.outcome.kind === "waiting" ? "—" : money(m.beginningMinor)),
+              },
               { title: "Closing", align: "right", render: (_, m) => money(m.closingMinor) },
               { title: "Outcome", render: (_, m) => outcomeTag(m.outcome) },
               { title: "What happened", render: (_, m) => monthSentence(m.outcome, money) },
@@ -405,7 +410,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
             done.open ? (
               <span>
                 {done.broughtForward ? "The earlier lines were brought forward. " : ""}
-                {done.open.sentence} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
+                {done.open.sentence.replace(/\.?$/, ".")} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
                 <Link href={`/banking/reconcile/${done.open.id}`}>Open it</Link>
               </span>
             ) : done.error ? (
