@@ -43,7 +43,7 @@ import {
   reconciliationStatementAction,
   setStatementEndingAction,
 } from "../statement-actions";
-import { addedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
+import { addedMessage, addedNotPairedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
 import AddMissingBox from "./AddMissingBox";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -97,7 +97,8 @@ export default function ReconcileWorkspaceClient({
   const [statementLinesPageSize, setStatementLinesPageSize] = useState<number>(
     STATEMENT_LINES_DEFAULT_PAGE_SIZE,
   );
-  const [addPlan, setAddPlan] = useState<AddMissingPlan | null>(null);
+  // The plan, with the lines it was worked out for.
+  const [addPlan, setAddPlan] = useState<{ key: string; plan: AddMissingPlan } | null>(null);
   const [adding, setAdding] = useState(false);
   // Asks for the plan again when an add was refused because it changed.
   const [planAsked, setPlanAsked] = useState(0);
@@ -152,16 +153,24 @@ export default function ReconcileWorkspaceClient({
   useEffect(() => {
     if (!missingKey || !working) return;
     let live = true;
+    const key = missingKey;
     void addMissingPlanAction(reconciliationId).then((res) => {
       if (!live) return;
-      if (res.ok && res.data) setAddPlan(res.data);
-      else message.error(res.error ?? "Could not work out what to add");
+      if (res.ok && res.data) {
+        setAddPlan({ key, plan: res.data });
+      } else {
+        setAddPlan(null);
+        message.error(res.error ?? "Could not work out what to add");
+      }
     });
     return () => {
       live = false;
     };
   }, [missingKey, working, reconciliationId, planAsked, message]);
-  const shownPlan = missingKey && working && addPlan && addPlan.missing > 0 ? addPlan : null;
+  // Shown only for the lines it was worked out for: while the next plan is on
+  // its way, the box waits rather than offering the last one.
+  const shownPlan =
+    missingKey && working && addPlan && addPlan.key === missingKey && addPlan.plan.missing > 0 ? addPlan.plan : null;
 
   async function addAll() {
     if (!shownPlan) return;
@@ -173,10 +182,13 @@ export default function ReconcileWorkspaceClient({
     setAdding(false);
     if (!res.ok || !res.data) {
       message.error(res.error ?? "The lines could not be added");
+      setAddPlan(null);
       setPlanAsked((n) => n + 1);
       return;
     }
-    message.success(addedMessage(res.data.added, res.data.uncategorized), 8);
+    const { added, uncategorized, pairingError } = res.data;
+    if (pairingError) message.warning(addedNotPairedMessage(added, uncategorized, pairingError), 10);
+    else message.success(addedMessage(added, uncategorized), 8);
     void load();
   }
   const statementClosing = statement?.closingMinor ?? null;

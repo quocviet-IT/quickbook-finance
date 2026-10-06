@@ -87,7 +87,10 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
 export interface AddedLines {
   added: number;
   uncategorized: number;
-  outcome: PairingOutcome;
+  /** Null when pairing failed after the lines were posted. */
+  outcome: PairingOutcome | null;
+  /** Why pairing failed, when it did: the lines are in the books, not yet ticked. */
+  pairingError: string | null;
 }
 
 /** Shown to the person: a line and the account it would post to. */
@@ -118,6 +121,12 @@ export async function addMissingLines(sb: SupabaseClient, reconciliationId: stri
     p_items: plan.items.map((item) => ({ line_no: item.lineNo, bank_transaction_id: item.transactionId, account_id: item.accountId })),
   });
   if (error) throw new AddMissingError(error.message);
-  const outcome = await pairAndTick(sb, reconciliationId);
-  return { added: plan.items.length, uncategorized: plan.uncategorized, outcome };
+  // The lines are in the books now, whatever happens next: a pairing that fails
+  // is said as such, never as lines that were not added.
+  const added = { added: plan.items.length, uncategorized: plan.uncategorized };
+  try {
+    return { ...added, outcome: await pairAndTick(sb, reconciliationId), pairingError: null };
+  } catch (e) {
+    return { ...added, outcome: null, pairingError: e instanceof Error ? e.message : "an unexpected error" };
+  }
 }

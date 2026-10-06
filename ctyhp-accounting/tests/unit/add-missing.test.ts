@@ -5,6 +5,7 @@ import {
   CANNOT_ADD_NOTE,
   UNCATEGORIZED_WHY,
   addedMessage,
+  addedNotPairedMessage,
   planAddMissing,
   type AddBankLine,
   type AddStatementLine,
@@ -170,6 +171,15 @@ describe("addedMessage", () => {
   it("says how many were added, and how many went to Uncategorized", () => {
     expect(addedMessage(3, 1)).toBe("3 entries added from the statement and ticked; 1 went to Uncategorized.");
     expect(addedMessage(1, 0)).toBe("1 entry added from the statement and ticked.");
+  });
+
+  it("says the lines are in the books when pairing them afterwards failed", () => {
+    expect(addedNotPairedMessage(2, 1, "timeout")).toBe(
+      "2 entries added from the statement, 1 to Uncategorized, but pairing them with the statement failed (timeout). Click Match again to tick them.",
+    );
+    expect(addedNotPairedMessage(1, 0, "timeout")).toBe(
+      "1 entry added from the statement, but pairing it with the statement failed (timeout). Click Match again to tick it.",
+    );
   });
 });
 

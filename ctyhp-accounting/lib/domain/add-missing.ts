@@ -190,6 +190,14 @@ export function planAddMissing(input: {
   };
 }
 
+/** When the lines were posted but pairing them afterwards failed: they are in the books, not yet ticked. */
+export function addedNotPairedMessage(added: number, uncategorized: number, problem: string): string {
+  const them = added === 1 ? "it" : "them";
+  const head = `${added} ${added === 1 ? "entry" : "entries"} added from the statement`;
+  const holding = uncategorized ? `, ${uncategorized} to Uncategorized` : "";
+  return `${head}${holding}, but pairing ${them} with the statement failed (${problem}). Click Match again to tick ${them}.`;
+}
+
 /** The message after adding: "3 entries added from the statement and ticked; 1 went to Uncategorized." */
 export function addedMessage(added: number, uncategorized: number): string {
   const head = `${added} ${added === 1 ? "entry" : "entries"} added from the statement and ticked`;
