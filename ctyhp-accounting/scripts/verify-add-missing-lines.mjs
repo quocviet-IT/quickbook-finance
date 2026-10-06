@@ -186,6 +186,8 @@ try {
       await refused("more than 500 lines are refused", ADD,
         add(Array.from({ length: 501 }, (_, i) => ({ ...items.fee, line_no: i }))), "At most 500");
       await refused("an empty list is refused", ADD, add([]), "nothing to add");
+      await refused("an item missing its bank line is refused, said as such", ADD,
+        add([{ line_no: items.fee.line_no, account_id: charges }]), "needs its line_no, bank_transaction_id and account_id");
       await thenUndo(async () => {
         await one(`select acc_categorise_bank_transaction($1, $2)`, [fee, charges]);
         await refused("a line already coded in Bank Transactions is refused, with the line named", ADD,

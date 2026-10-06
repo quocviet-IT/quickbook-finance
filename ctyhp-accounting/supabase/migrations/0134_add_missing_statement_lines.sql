@@ -113,6 +113,12 @@ begin
     raise exception 'This reconciliation is not in progress';
   end if;
 
+  if exists (
+    select 1 from jsonb_array_elements(p_items) x
+     where x->>'line_no' is null or x->>'bank_transaction_id' is null or x->>'account_id' is null
+  ) then
+    raise exception 'Each line to add needs its line_no, bank_transaction_id and account_id';
+  end if;
   if (select count(distinct x->>'line_no') from jsonb_array_elements(p_items) x) <> v_count
      or (select count(distinct x->>'bank_transaction_id') from jsonb_array_elements(p_items) x) <> v_count then
     raise exception 'A statement line or a bank line is listed twice';
@@ -205,8 +211,13 @@ begin
   if v_entry.status <> 'posted' or v_entry.source_type <> 'bank' or v_entry.source_id is not null then
     raise exception 'Only a line coded in Bank Transactions can be recoded';
   end if;
-  -- One recode at a time: a second click waits here, then finds the first.
-  perform 1 from acc_journal_entry where id = v_entry.id for update;
+  -- One recode at a time, and never against an entry taken back meanwhile: a
+  -- second click, or Change in another tab, waits here — then the entry is
+  -- read again, as whatever finished first left it.
+  select * into v_entry from acc_journal_entry where id = v_entry.id for update;
+  if v_entry.status <> 'posted' then
+    raise exception 'This line''s entry was taken back meanwhile, so there is nothing to recode';
+  end if;
 
   select count(*) into v_lines from acc_journal_line where journal_entry_id = v_entry.id;
   select * into v_other from acc_journal_line where journal_entry_id = v_entry.id and account_id <> v_gl limit 1;
@@ -377,6 +388,9 @@ begin
       'This line was matched by something that owns its entry (%), not by categorising it.',
       v_source;
   end if;
+  -- Locked as a recode locks it, so the two never cross: one waits for the
+  -- other, and the recode then finds the entry voided, or this finds its recode.
+  perform 1 from acc_journal_entry where id = v_entry for update;
 
   -- A line ticked in a completed reconciliation belongs to a month somebody
   -- signed off. Voiding it would change that month without a word.
