@@ -6,6 +6,7 @@ import {
   savedReportRegisterSchema,
   savedReportArchiveSchema,
   savedReportStoragePath,
+  savedReportView,
   validateSavedReportFile,
   SAVED_REPORT_MAX_BYTES,
 } from "@/lib/domain/saved-reports";
@@ -25,19 +26,33 @@ describe("parseCsvGrid", () => {
 });
 
 describe("savedReportStoragePath", () => {
-  it("puts the company first so an object can be traced back from the bucket", () => {
+  it("puts the company's schema first so an object can be traced back from the bucket", () => {
     const path = savedReportStoragePath(
-      "6d0f1e2a-1111-4222-8333-444455556666",
+      "co_example",
       "text/csv",
       "aaaabbbb-cccc-4ddd-8eee-ffff00001111",
     );
-    expect(path).toBe(
-      "6d0f1e2a-1111-4222-8333-444455556666/aaaabbbb-cccc-4ddd-8eee-ffff00001111.csv",
-    );
+    expect(path).toBe("co_example/aaaabbbb-cccc-4ddd-8eee-ffff00001111.csv");
+  });
+
+  it("keeps a bank download as text", () => {
+    expect(savedReportStoragePath("public", "text/plain", "o")).toBe("public/o.txt");
   });
 
   it("uses the extension the mime type implies, not the one the file claimed", () => {
     expect(savedReportStoragePath("c", "application/pdf", "o")).toBe("c/o.pdf");
+  });
+});
+
+describe("savedReportView", () => {
+  it("draws a PDF, tables a CSV, shows a bank download as text, and only downloads the rest", () => {
+    expect(savedReportView("application/pdf")).toBe("pdf");
+    expect(savedReportView("text/csv")).toBe("table");
+    expect(savedReportView("text/plain")).toBe("text");
+    expect(savedReportView("image/png")).toBe("download");
+    expect(
+      savedReportView("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ).toBe("download");
   });
 });
 
