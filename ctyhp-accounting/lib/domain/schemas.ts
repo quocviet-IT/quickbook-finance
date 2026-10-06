@@ -16,6 +16,7 @@ import {
   FEEDBACK_ATTACHMENT_MAX_FILES,
   isAllowedAttachmentType,
 } from "./feedback-attachment";
+import { MAX_RUN_LINES } from "./statement-run";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
 export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
@@ -549,19 +550,53 @@ export const reconciliationStatementSchema = z.object({
 });
 export type ReconciliationStatementInput = z.infer<typeof reconciliationStatementSchema>;
 
-/** A reconciliation started from a PDF statement: its date and closing balance are the statement's. */
-export const reconciliationFromStatementSchema = reconciliationStatementSchema
-  .extend({
+/** A run of statements as its preview reads them: each statement's dates and balances, and its lines' dates, amounts and references. */
+export const runPreviewSchema = z.object({
+  bank_account_id: z.uuid("Select a bank account"),
+  statements: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(400),
+        from: statementDay.nullable(),
+        to: statementDay,
+        opening_minor: z.number().int().nullable(),
+        closing_minor: z.number().int(),
+        lines: z
+          .array(z.object({ txn_date: statementDay, amount_minor: z.number().int(), reference: z.string().nullable() }))
+          .max(5000, "A statement can hold at most 5,000 lines"),
+      }),
+    )
+    .min(1, "Choose at least one statement")
+    .max(60, "A run can hold at most 60 statements")
+    .refine(
+      (all) => all.reduce((n, s) => n + s.lines.length, 0) <= MAX_RUN_LINES,
+      `A run can hold at most ${MAX_RUN_LINES.toLocaleString("en-US")} statement lines`,
+    ),
+});
+export type RunPreviewInput = z.infer<typeof runPreviewSchema>;
+
+/**
+ * One step of a run, signed on the server: bringing the account's earlier lines
+ * forward, or one month started from its statement — completed when `sign` is
+ * set and it reaches zero, left in progress otherwise.
+ */
+export const runMonthSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("bring_forward"),
     bank_account_id: z.uuid("Select a bank account"),
-    period_from: statementDay.nullable(),
+    period_from: statementDay,
+    statement_date: statementDay,
+    opening_minor: z.number().int(),
+  }),
+  reconciliationStatementSchema.extend({
+    kind: z.literal("month"),
+    bank_account_id: z.uuid("Select a bank account"),
     statement_date: statementDay,
     closing_minor: z.number().int("The statement prints no closing balance"),
-    bring_forward: z.boolean(),
-  })
-  .refine((v) => !v.bring_forward || (v.period_from !== null && v.opening_minor !== null), {
-    message: "Bringing forward needs the statement's period and opening balance",
-  });
-export type ReconciliationFromStatementInput = z.infer<typeof reconciliationFromStatementSchema>;
+    sign: z.boolean(),
+  }),
+]);
+export type RunMonthInput = z.infer<typeof runMonthSchema>;
 
 // --- Company settings + accounting periods ---
 export const companySettingsSchema = z.object({

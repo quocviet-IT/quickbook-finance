@@ -23,10 +23,8 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   closingAdvice,
   openingAdvice,
-  pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
-  type Standing,
 } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
 import {
@@ -45,6 +43,7 @@ import {
 } from "../statement-actions";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import StandingTag from "../StandingTag";
 
 /** The statement dialog Banking uses, fetched when somebody opens it. */
 const ImportStatementModal = dynamic(() => import("../../ImportStatementModal"), { ssr: false });
@@ -70,24 +69,6 @@ interface Props {
   baseCurrency: string;
   baseDecimals: number;
   bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
-}
-
-function StandingTag({ standing }: { standing: Standing }) {
-  if (standing.kind === "after") return <Tag>After the statement date</Tag>;
-  if (standing.kind === "missing") return <Tag color="orange">Not in the books</Tag>;
-  return (
-    <Space size={4} direction="vertical">
-      <Tag color={standing.ticked ? "green" : "gold"}>
-        Paired · {pairedHowLabel(standing.how)}
-        {standing.ticked ? "" : " · not ticked"}
-      </Tag>
-      {standing.entryNumber ? (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          with {standing.entryNumber}
-        </Typography.Text>
-      ) : null}
-    </Space>
-  );
 }
 
 export default function ReconcileWorkspaceClient({

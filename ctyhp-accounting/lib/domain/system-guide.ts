@@ -361,14 +361,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "adjustment somebody signs for.",
       },
       {
-        action: "Start a reconciliation from the statement's PDF",
-        control: "From a PDF statement",
+        action: "Reconcile from the statement files, one month or a year",
+        control: "From statement files",
         route: "/banking/reconcile",
         note:
-          "The statement's last day and closing balance start it. Its lines are imported, kept with the " +
-          "reconciliation and paired with the books — by date and amount, by check number, or by amount within " +
-          "5 days — and the pairs are ticked. On an account never reconciled, when the books agree with the " +
-          "statement's opening balance, Bring forward and start signs off the earlier lines first.",
+          "Choose PDF statements, or a CSV export with a running balance column, which is cut into months. " +
+          "Each closing balance comes from the file; a month missing from the run, or a reconciliation already in " +
+          "progress, stops it. Preview pairs the months with the books oldest first — by date and amount, by check " +
+          "number, or by amount within 5 days — up to the first that does not agree, and writes nothing. Sign off " +
+          "signs the months that agree; the first that does not is started, with its pairs ticked, for you to " +
+          "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +
+          "agree with the first statement's opening balance.",
       },
       {
         action: "Code what the statement has and the books do not",

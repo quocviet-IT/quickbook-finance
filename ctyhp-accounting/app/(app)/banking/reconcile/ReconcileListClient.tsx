@@ -1,23 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
 import { fromMinor, toMinor } from "@/lib/domain/money";
-import { pairingMessage } from "@/lib/domain/reconcile-statement";
 import { createReconciliationAction, listReconciliationsAction } from "./actions";
-import type { StartFromStatementSummary } from "./statement-actions";
 import type { StatementReconciliationRow } from "@/lib/db/types";
-
-/** Fetched, with pdf.js, when somebody starts from a PDF rather than when they open the list. */
-const StartFromStatementModal = dynamic(() => import("./StartFromStatementModal"), { ssr: false });
 
 interface Bank {
   id: string;
   label: string;
-  maskedNumber: string | null;
-  currencyCode: string;
 }
 interface Props {
   canWrite: boolean;
@@ -32,8 +24,6 @@ export default function ReconcileListClient({ canWrite, banks, baseDecimals }: P
   const [rows, setRows] = useState<StatementReconciliationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [fromPdfOpen, setFromPdfOpen] = useState(false);
-  const bank = banks.find((b) => b.id === bankId);
   const [form] = Form.useForm();
 
   const load = async (id: string | undefined) => {
@@ -69,16 +59,6 @@ export default function ReconcileListClient({ canWrite, banks, baseDecimals }: P
     }
   };
 
-  const started = (summary: StartFromStatementSummary) => {
-    setFromPdfOpen(false);
-    message.success(
-      `${summary.broughtForward ? "The earlier lines were brought forward and the reconciliation started" : "Reconciliation started"}. ` +
-        pairingMessage(summary.outcome),
-      8,
-    );
-    router.push(`/banking/reconcile/${summary.id}`);
-  };
-
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <Space wrap>
@@ -94,8 +74,8 @@ export default function ReconcileListClient({ canWrite, banks, baseDecimals }: P
           </Button>
         )}
         {canWrite && (
-          <Button onClick={() => setFromPdfOpen(true)} disabled={!bankId}>
-            From a PDF statement
+          <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
+            From statement files
           </Button>
         )}
       </Space>
@@ -134,20 +114,6 @@ export default function ReconcileListClient({ canWrite, banks, baseDecimals }: P
           </Form.Item>
         </Form>
       </Modal>
-      {fromPdfOpen && bank ? (
-        <StartFromStatementModal
-          open={fromPdfOpen}
-          bankAccount={{
-            id: bank.id,
-            label: bank.label,
-            maskedNumber: bank.maskedNumber,
-            decimals: baseDecimals,
-            currencyCode: bank.currencyCode,
-          }}
-          onStarted={started}
-          onCancel={() => setFromPdfOpen(false)}
-        />
-      ) : null}
     </Space>
   );
 }
