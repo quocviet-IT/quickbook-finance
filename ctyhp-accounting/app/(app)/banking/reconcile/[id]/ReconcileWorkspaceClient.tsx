@@ -189,6 +189,7 @@ export default function ReconcileWorkspaceClient({
     const { added, uncategorized, pairingError } = res.data;
     if (pairingError) message.warning(addedNotPairedMessage(added, uncategorized, pairingError), 10);
     else message.success(addedMessage(added, uncategorized), 8);
+    setAddPlan(null);
     void load();
   }
   const statementClosing = statement?.closingMinor ?? null;

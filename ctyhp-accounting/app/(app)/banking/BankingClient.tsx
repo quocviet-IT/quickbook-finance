@@ -322,8 +322,10 @@ export default function BankingClient({
     }
     if (recoded.ok && recoded.data) {
       setRecodes(new Map(recoded.data.map((row) => [row.bank_transaction_id, row])));
+    } else {
+      message.warning("Recodes could not be read, so recoded lines may show as needing coding. Reload the page.");
     }
-  }, [selectedId]);
+  }, [selectedId, message]);
 
   useEffect(() => {
     // Intentional synchronization after the selected account changes.

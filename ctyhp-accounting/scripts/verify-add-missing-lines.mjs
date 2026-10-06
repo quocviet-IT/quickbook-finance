@@ -182,6 +182,18 @@ try {
       await refused("another bank account's transaction is refused", ADD,
         add([{ ...items.shop, bank_transaction_id: elsewhere }]), "is not among this bank account's transactions");
       await refused("a line dated after the statement is refused", ADD, add([items.after]), "is dated after the statement");
+      await thenUndo(async () => {
+        await client.query("reset role");
+        await client.query(
+          `insert into acc_statement_reconciliation (bank_account_id, statement_ending_date, beginning_balance_minor, statement_ending_balance_minor, status)
+           values ($1, '2026-07-20', 0, 0, 'completed')`,
+          [bank],
+        );
+        await client.query("set local role authenticated");
+        await as(admin.id);
+        await refused("a line dated in a month already signed off is refused", ADD, add([items.wire]),
+          "is dated in a month already reconciled, to Jul 20, 2026");
+      });
       await refused("a line listed twice is refused", ADD, add([items.fee, items.fee]), "listed twice");
       await refused("more than 500 lines are refused", ADD,
         add(Array.from({ length: 501 }, (_, i) => ({ ...items.fee, line_no: i }))), "At most 500");
@@ -315,6 +327,8 @@ try {
       );
       check("recoding leaves the signed-off month exactly as it was", (await cleared()) === signedTotal);
       await refused("a second recode is refused", RECODE, [shop, sales], "already recoded");
+      await refused("taking back a recoded line in a signed-off month points to Undo recode", `select acc_uncategorise_bank_transaction($1)`, [shop],
+        "To move it to another account, Undo recode and recode it again");
       const inRecode = (await one(RECODE, [wire, sales])).out;
       const inLines = await all(`select account_id, debit_minor, credit_minor from acc_journal_line where journal_entry_id = $1 order by debit_minor desc`, [inRecode.entry_id]);
       check("money in is recoded Dr Uncategorized Income, Cr the account",

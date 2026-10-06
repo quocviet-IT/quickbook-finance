@@ -10,7 +10,7 @@ import { reconciliationStandings, type PairingOutcome } from "@/lib/domain/recon
 import { holdingAccountsOf } from "@/lib/domain/uncategorized";
 import { listAccounts } from "./accounts";
 import { listSuggestions } from "./banking";
-import { getReconciliationLines, getReconciliationStatement, pairAndTick } from "./bankrec";
+import { getReconciliationLines, getReconciliationStatement, listReconciliations, pairAndTick } from "./bankrec";
 import { codingSuggestions } from "./coding";
 import { readAllPages } from "./paging";
 
@@ -55,12 +55,20 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
   }
 
   const bankAccountId = statement.bankAccountId;
-  const [rows, matches, coding, accounts] = await Promise.all([
+  const [rows, matches, coding, accounts, reconciliations] = await Promise.all([
     bankLinesBetween(sb, bankAccountId, missingDates[0], missingDates[missingDates.length - 1]),
     listSuggestions(sb, bankAccountId),
     codingSuggestions(sb, bankAccountId),
     listAccounts(sb),
+    listReconciliations(sb, bankAccountId),
   ]);
+  // The newest month signed off before this one: a line dated in it is not added from here.
+  const signedThrough =
+    reconciliations
+      .filter((r) => r.status === "completed" && r.statement_ending_date < statement.endingDate)
+      .map((r) => r.statement_ending_date)
+      .sort()
+      .at(-1) ?? null;
   const suggested = new Set(matches.map((m) => m.bank_transaction_id));
   const transactions: AddBankLine[] = rows.map((row) => ({
     id: row.id as string,
@@ -81,6 +89,7 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
     transactions,
     suggestions,
     holding: holdingAccountsOf(accounts),
+    signedThrough,
   });
 }
 

@@ -122,6 +122,40 @@ describe("planAddMissing", () => {
     ]);
   });
 
+  it("leaves out a line of 0.00 and a line dated in a month already signed off", () => {
+    const zero = line(1, "2026-07-10", 0, "ZERO");
+    const old = line(2, "2026-06-28", -900, "LATE CHARGE");
+    const plan = planAddMissing({
+      lines: [zero, old, fee],
+      standings: [missing, missing, missing],
+      flipped: false,
+      transactions: [txn("t-zero", zero), txn("t-old", old), txn("t-fee", fee)],
+      suggestions: new Map([["t-fee", rule]]),
+      holding,
+      signedThrough: "2026-06-30",
+    });
+    expect(plan.cannot.map((x) => [x.lineNo, x.reason, x.note])).toEqual([
+      [1, "zero", CANNOT_ADD_NOTE.zero],
+      [2, "signed", CANNOT_ADD_NOTE.signed],
+    ]);
+    expect(plan.items.map((i) => i.transactionId)).toEqual(["t-fee"]);
+  });
+
+  it("never gives one bank line to two statement lines", () => {
+    const one = line(1, "2026-07-30", -500, "ATM FEE");
+    const two = line(2, "2026-07-30", -500, "ATM FEE");
+    const plan = planAddMissing({
+      lines: [one, two],
+      standings: [missing, missing],
+      flipped: false,
+      transactions: [txn("only", one)],
+      suggestions: new Map(),
+      holding,
+    });
+    expect(plan.items.map((i) => [i.lineNo, i.transactionId])).toEqual([[1, "only"]]);
+    expect(plan.cannot.map((x) => [x.lineNo, x.reason])).toEqual([[2, "not-found"]]);
+  });
+
   it("adds nothing from a statement read the other way around", () => {
     const plan = planAddMissing({
       lines: [fee],

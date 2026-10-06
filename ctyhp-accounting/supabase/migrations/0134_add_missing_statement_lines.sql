@@ -95,6 +95,7 @@ declare
   v_out    jsonb := '[]'::jsonb;
   v_count  int;
   v_what   text;
+  v_signed_through date;
 begin
   if not acc_is_staff() then
     raise exception 'Not authorized to add statement lines to the books';
@@ -112,6 +113,12 @@ begin
   if v_rec.status <> 'in_progress' then
     raise exception 'This reconciliation is not in progress';
   end if;
+  -- The newest month this account has signed off before this one: a line dated
+  -- in it would change that month's books, so it is not added from here.
+  select max(statement_ending_date) into v_signed_through
+    from acc_statement_reconciliation
+   where bank_account_id = v_rec.bank_account_id and status = 'completed'
+     and statement_ending_date < v_rec.statement_ending_date;
 
   if exists (
     select 1 from jsonb_array_elements(p_items) x
@@ -136,6 +143,10 @@ begin
                      to_char(v_line.amount_minor::numeric / 100, 'FM999999999990.00'));
     if v_line.txn_date > v_rec.statement_ending_date then
       raise exception 'The line % is dated after the statement', v_what;
+    end if;
+    if v_signed_through is not null and v_line.txn_date <= v_signed_through then
+      raise exception 'The line % is dated in a month already reconciled, to %', v_what,
+        to_char(v_signed_through, 'Mon FMDD, YYYY');
     end if;
 
     select * into v_txn from acc_bank_transaction where id = (v_item->>'bank_transaction_id')::uuid for update;
@@ -407,6 +418,10 @@ begin
        where l.journal_entry_id = v_entry
          and coalesce(a.detail_type, '') in ('uncategorized_income', 'uncategorized_expense')
     ) into v_holding;
+    if exists (select 1 from acc_journal_entry where source_type = 'bank' and source_id = v_entry and status = 'posted') then
+      raise exception 'This line is reconciled to %. To move it to another account, Undo recode and recode it again — or reopen that reconciliation.',
+        to_char(v_signed, 'Mon FMDD, YYYY');
+    end if;
     if v_holding then
       raise exception 'This line is reconciled to %. Recode it instead, or reopen that reconciliation.',
         to_char(v_signed, 'Mon FMDD, YYYY');

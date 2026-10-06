@@ -58,7 +58,7 @@ export interface AddItem {
   why: string;
 }
 
-export type CannotAddReason = "not-found" | "coded" | "ignored" | "suggested";
+export type CannotAddReason = "not-found" | "coded" | "ignored" | "suggested" | "zero" | "signed";
 
 export interface CannotAdd {
   lineNo: number;
@@ -85,13 +85,15 @@ export const CANNOT_ADD_NOTE: Record<CannotAddReason, string> = {
   coded: "Already in the books — click Match again.",
   ignored: "Excluded in Bank Transactions — include it there to add it.",
   suggested: "Bank Transactions suggests a match in the books for it — approve or reject that first.",
+  zero: "A line of 0.00 has nothing to post.",
+  signed: "Dated in a month already reconciled — add it in Bank Transactions if it belongs there.",
 };
 
 export const ADD_BLOCKED = {
   flipped:
     "This statement shows money in and out the other way around from the books, so nothing is added from here. Check the signs of its lines in Bank Transactions.",
   tooMany: `More than ${ADD_MISSING_LIMIT} lines — code them in Bank Transactions.`,
-  noHolding: "This company has no Uncategorized accounts yet, so lines nothing places cannot be added from here.",
+  noHolding: "This company has no active Uncategorized accounts, so lines nothing places cannot be added from here.",
 } as const;
 
 export const UNCATEGORIZED_WHY = "Nothing places this line, so it goes to Uncategorized, to recode later.";
@@ -116,6 +118,12 @@ export function planAddMissing(input: {
   /** The suggestion for each waiting bank line, by its id. */
   suggestions: ReadonlyMap<string, AddSuggestion>;
   holding: HoldingAccounts;
+  /**
+   * The statement date of the account's newest completed reconciliation before
+   * this one, when there is one: a line dated on or before it belongs to a
+   * month somebody signed off, and is not added from here.
+   */
+  signedThrough?: string | null;
 }): AddMissingPlan {
   const missingLines = input.lines.filter((_, i) => input.standings[i]?.kind === "missing");
   const empty = (blocked: string | null): AddMissingPlan => ({
@@ -141,6 +149,11 @@ export function planAddMissing(input: {
     const group = groups.get(lineKey(line.txnDate, line.amountMinor, line.description, line.reference)) ?? [];
     const free = group.find((txn) => !taken.has(txn.id) && txn.status === "unmatched" && !txn.suggested);
     const said = { lineNo: line.lineNo, txnDate: line.txnDate, description: line.description, amountMinor: line.amountMinor };
+    if (line.amountMinor === 0 || (input.signedThrough && line.txnDate <= input.signedThrough)) {
+      const reason: CannotAddReason = line.amountMinor === 0 ? "zero" : "signed";
+      cannot.push({ ...said, reason, note: CANNOT_ADD_NOTE[reason] });
+      continue;
+    }
     if (!free) {
       const rest = group.filter((txn) => !taken.has(txn.id));
       const reason: CannotAddReason = rest.some((t) => t.status === "unmatched" && t.suggested)
