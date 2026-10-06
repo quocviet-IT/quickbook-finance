@@ -9,6 +9,13 @@
  */
 import type { AccountType } from "./accounts";
 import { BANK_DETAIL_TYPES, bankDetailLabel } from "./bank-account-detail";
+import { isHoldingDetail, type HoldingDetailType } from "./uncategorized";
+
+/** The two holding accounts migration 0134 gives every chart. */
+const HOLDING_LABELS: Record<HoldingDetailType, string> = {
+  uncategorized_income: "Holding account — money in not yet coded",
+  uncategorized_expense: "Holding account — money out not yet coded",
+};
 
 export const CURRENT_ASSET_DETAIL_TYPES = ["undeposited_funds", "transfer_clearing"] as const;
 export type CurrentAssetDetailType = (typeof CURRENT_ASSET_DETAIL_TYPES)[number];
@@ -37,5 +44,6 @@ export function detailTypeOptions(type: AccountType): { value: string; label: st
 export function detailLabel(type: AccountType, detail: string | null): string | null {
   if (type === "bank") return bankDetailLabel(detail);
   if (isCurrentAssetDetail(detail)) return CURRENT_ASSET_LABELS[detail];
+  if (isHoldingDetail(detail)) return HOLDING_LABELS[detail];
   return detail;
 }

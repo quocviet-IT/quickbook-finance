@@ -27,6 +27,11 @@ describe("detail types", () => {
     expect(detailLabel("fixed_asset", "Contra fixed asset")).toBe("Contra fixed asset");
     expect(detailLabel("expense", null)).toBeNull();
   });
+
+  it("says what the two Uncategorized holding accounts are for", () => {
+    expect(detailLabel("income", "uncategorized_income")).toBe("Holding account — money in not yet coded");
+    expect(detailLabel("expense", "uncategorized_expense")).toBe("Holding account — money out not yet coded");
+  });
 });
 
 describe("the contra flag on an account", () => {
