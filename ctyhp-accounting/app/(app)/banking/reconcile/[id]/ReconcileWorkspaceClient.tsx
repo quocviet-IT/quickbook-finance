@@ -49,7 +49,7 @@ import {
   setStatementEndingAction,
 } from "../statement-actions";
 import { addedMessage, addedNotPairedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
-import { completedMessage } from "@/lib/domain/statement-bank-lines";
+import { bankLinesToCheck, completedMessage } from "@/lib/domain/statement-bank-lines";
 import AddMissingBox from "./AddMissingBox";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -230,7 +230,7 @@ export default function ReconcileWorkspaceClient({
     const r = await completeReconciliationAction(reconciliationId);
     if (r.ok) {
       const said = completedMessage(r.data?.matched ?? null, r.data?.matchError ?? null);
-      if (r.data?.matchError) message.warning(said, 10);
+      if (r.data?.matchError || (r.data?.matched && bankLinesToCheck(r.data.matched) > 0)) message.warning(said, 10);
       else message.success(said, 8);
       void load();
     } else {

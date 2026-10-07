@@ -139,6 +139,31 @@ describe("matching a completed reconciliation's bank lines", () => {
     });
   });
 
+  it("hands the pairs over ordered by bank line id, whatever order they were imported in", async () => {
+    const { sb, calls } = fakeClient(
+      {
+        acc_statement_reconciliation: [session],
+        acc_reconciliation_statement_line: [
+          statementLine(1, "2026-09-03", 700, "ZED PAYMENT"),
+          statementLine(2, "2026-09-10", 800, "ALPHA PAYMENT"),
+        ],
+        acc_bank_transaction: [
+          bankRow("t-z", "2026-09-03", 700, "ZED PAYMENT"),
+          bankRow("t-a", "2026-09-10", 800, "ALPHA PAYMENT"),
+        ],
+      },
+      {
+        acc_reconciliation_lines: [bookLine("jl-z", "2026-09-03", 700, true), bookLine("jl-a", "2026-09-10", 800, true)],
+        acc_match_reconciled_bank_lines: () => ({ data: { matched: 2, already: 0, elsewhere: 0, ignored: 0, differs: 0 }, error: null }),
+      },
+    );
+    await matchReconciledBankLines(sb, "rec-1");
+    expect(calls.find((c) => c.fn === "acc_match_reconciled_bank_lines")?.args.p_pairs).toEqual([
+      { bank_transaction_id: "t-a", journal_line_id: "jl-a" },
+      { bank_transaction_id: "t-z", journal_line_id: "jl-z" },
+    ]);
+  });
+
   it("asks nothing of the database when no line is paired and ticked", async () => {
     const { sb, calls } = fakeClient(tables, { acc_reconciliation_lines: [bookLine("jl-fee", "2026-09-10", -500, false)] });
     expect(await matchReconciledBankLines(sb, "rec-1")).toEqual({ matched: 0, already: 0, elsewhere: 0, ignored: 0, differs: 0 });

@@ -3,6 +3,7 @@ import type { Standing } from "@/lib/domain/reconcile-statement";
 import {
   NO_BANK_LINE_MATCHES,
   addMatchCounts,
+  bankLinesToCheck,
   bankLinesMatchedSentence,
   bankLinesNotMatchedSentence,
   completedMessage,
@@ -146,6 +147,11 @@ describe("reconciledBankPairs", () => {
 
 describe("what matching says", () => {
   const counts = (extra: Partial<typeof NO_BANK_LINE_MATCHES>) => ({ ...NO_BANK_LINE_MATCHES, ...extra });
+
+  it("counts the bank lines left for the person to check", () => {
+    expect(bankLinesToCheck(counts({ matched: 5, already: 2 }))).toBe(0);
+    expect(bankLinesToCheck(counts({ matched: 1, elsewhere: 1, ignored: 2, differs: 1 }))).toBe(4);
+  });
 
   it("adds two runs' counts", () => {
     expect(addMatchCounts(counts({ matched: 2, ignored: 1 }), counts({ matched: 3, already: 4, elsewhere: 1, differs: 2 }))).toEqual({

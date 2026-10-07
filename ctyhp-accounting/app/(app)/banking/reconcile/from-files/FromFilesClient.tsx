@@ -24,6 +24,7 @@ import {
   addMatchCounts,
   bankLinesMatchedSentence,
   bankLinesNotMatchedSentence,
+  bankLinesToCheck,
   type BankLineMatchCounts,
 } from "@/lib/domain/statement-bank-lines";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
@@ -464,7 +465,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
 
       {done ? (
         <Alert
-          type={done.error ? "error" : done.open ? "warning" : "success"}
+          type={done.error ? "error" : done.open || done.unmatched.length > 0 || bankLinesToCheck(done.matched) > 0 ? "warning" : "success"}
           showIcon
           title={
             done.error ??

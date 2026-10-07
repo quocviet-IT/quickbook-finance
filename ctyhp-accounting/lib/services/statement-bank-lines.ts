@@ -93,7 +93,10 @@ export async function matchReconciledBankLines(sb: SupabaseClient, reconciliatio
   if (!pairs.length) return NO_BANK_LINE_MATCHES;
   const { data, error } = await sb.rpc("acc_match_reconciled_bank_lines", {
     p_reconciliation_id: reconciliationId,
-    p_pairs: pairs.map((p) => ({ bank_transaction_id: p.bankTransactionId, journal_line_id: p.journalLineId })),
+    // One lock order: the database locks bank lines row by row in this order, so overlapping completions cannot deadlock.
+    p_pairs: [...pairs]
+      .sort((a, b) => (a.bankTransactionId < b.bankTransactionId ? -1 : a.bankTransactionId > b.bankTransactionId ? 1 : 0))
+      .map((p) => ({ bank_transaction_id: p.bankTransactionId, journal_line_id: p.journalLineId })),
   });
   if (error) throw new StatementBankLinesError(error.message);
   return matchCountsOf(data);

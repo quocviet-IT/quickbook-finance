@@ -48,6 +48,8 @@ describe("the statement screens", () => {
 
   it("say what Complete and a run of months matched in Bank Transactions", () => {
     expect(workspace).toContain("completedMessage(r.data?.matched ?? null, r.data?.matchError ?? null)");
+    expect(workspace).toContain("bankLinesToCheck(r.data.matched) > 0");
+    expect(fromFiles).toContain("bankLinesToCheck(done.matched) > 0");
     expect(fromFiles).toContain("bankLinesMatchedSentence(done.matched)");
     expect(fromFiles).toContain("bankLinesNotMatchedSentence(res.data.matchError");
   });

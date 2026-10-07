@@ -105,6 +105,11 @@ export interface BankLineMatchCounts {
 
 export const NO_BANK_LINE_MATCHES: BankLineMatchCounts = { matched: 0, already: 0, elsewhere: 0, ignored: 0, differs: 0 };
 
+/** Bank lines matching left as they were, for the person to check: matched elsewhere, ignored, or of the opposite sign. */
+export function bankLinesToCheck(counts: BankLineMatchCounts): number {
+  return counts.elsewhere + counts.ignored + counts.differs;
+}
+
 export function addMatchCounts(a: BankLineMatchCounts, b: BankLineMatchCounts): BankLineMatchCounts {
   return {
     matched: a.matched + b.matched,
