@@ -358,7 +358,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking/reconcile",
         note:
           "Completing a session requires either zero unexplained difference or an " +
-          "adjustment somebody signs for.",
+          "adjustment somebody signs for. Complete then matches, in Bank Transactions, each bank line to the " +
+          "book line its statement line paired with; a bank line already matched to another entry, ignored, or " +
+          "of the opposite sign is left as it was, and the message says how many to check there.",
       },
       {
         action: "Reconcile from the statement files, one month or a year",
@@ -371,7 +373,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "number, or by amount within 5 days — up to the first that does not agree, and writes nothing. Sign off " +
           "signs the months that agree; the first that does not is started, with its pairs ticked, for you to " +
           "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +
-          "agree with the first statement's opening balance.",
+          "agree with the first statement's opening balance. Each month signed matches its bank lines in Bank " +
+          "Transactions, as Complete does.",
       },
       {
         action: "Add what the statement has and the books do not",
@@ -391,7 +394,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode posts a " +
           "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
           "any reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a signed-off month " +
-          "cannot be taken back with Change — recode it instead.",
+          "cannot be taken back with Change — recode it instead. A recoded line offers Undo recode, not Change: to code it " +
+          "again, Undo recode first.",
       },
       {
         action: "View the statement file",
