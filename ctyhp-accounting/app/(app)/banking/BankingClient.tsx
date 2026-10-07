@@ -86,6 +86,7 @@ import SettleFromBankModal, { type SettleTarget } from "@/components/banking/Set
 import type { StatementLine } from "@/lib/domain/statement-import";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import { keepFailureMessage, linesSpan, statementFileAccount } from "@/lib/domain/statement-evidence";
+import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { formatMoney } from "@/lib/format";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
@@ -477,12 +478,18 @@ export default function BankingClient({
     setBusy("import");
     // The file is kept first, so the import can point at it (1.83). A file
     // that cannot be kept costs only the file: the lines are imported anyway.
-    const { keepStatementFile } = await import("@/lib/client/keep-statement-file");
-    const kept = await keepStatementFile(
-      file,
-      statementFileAccount(selected.bank_name || selected.account_name, selected.account_number_masked),
-      pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows),
-    );
+    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+      .then(({ keepStatementFile }) =>
+        keepStatementFile(
+          file,
+          statementFileAccount(selected.bank_name || selected.account_name, selected.account_number_masked),
+          pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows),
+        ),
+      )
+      .catch((error: unknown): KeptStatementFile => ({
+        ok: false,
+        reason: error instanceof Error ? error.message : "the upload could not start",
+      }));
     const result = await importStatementAction(selectedId, fileName, rows, kept.ok ? kept.id : null);
     setBusy(null);
     if (!result.ok || !result.data) {
