@@ -41,6 +41,19 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.84",
+    date: "2026-10-07",
+    headline: "Every page starts sooner: it asks the database fewer questions one after another.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Pages begin to appear sooner",
+        detail:
+          "Before drawing anything, each page used to ask the database seven questions in a row — which company is open (several times over), who is signed in, and what they may do. It now asks the ones that do not depend on each other at the same time, and asks each only once, so the wait before a page starts to appear is three questions long instead of seven. Nothing on the pages changes.",
+      },
+    ],
+  },
+  {
     version: "1.83",
     date: "2026-10-06",
     headline: "The bank's statement file is kept with what was read from it, and can be opened later as evidence.",

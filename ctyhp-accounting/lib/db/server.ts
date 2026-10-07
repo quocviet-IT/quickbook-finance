@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -59,7 +60,10 @@ export async function createSupabaseServerClientForSchema(
  * In Next.js 16 `cookies()` is async, so this factory is async too. Acts as the
  * authenticated user — Row Level Security applies within the company, and the
  * schema decides which company that is.
+ *
+ * One client per request: a page and its layout ask for it a dozen times, and
+ * the company it is bound to cannot change within a render.
  */
-export async function createSupabaseServerClient(): Promise<SupabaseClient> {
+export const createSupabaseServerClient = cache(async (): Promise<SupabaseClient> => {
   return createSupabaseServerClientForSchema(await activeSchema());
-}
+});

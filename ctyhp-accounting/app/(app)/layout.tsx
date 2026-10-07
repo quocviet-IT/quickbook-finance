@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient, createSupabaseServerClientForSchema } from "@/lib/db/server";
-import { isPlatformAdmin, resolveActiveCompany } from "@/lib/db/company";
+import { createSupabaseServerClient } from "@/lib/db/server";
+import { currentUser, isPlatformAdmin, resolveActiveCompany } from "@/lib/db/company";
 import { countPendingApprovals } from "@/lib/services/access";
 import { currentAccess } from "@/lib/db/settings-access";
 import AppShell from "@/components/AppShell";
@@ -15,18 +15,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // company" before establishing that there was one. Now that `activeSchema()`
   // fails closed rather than guessing `public`, that call would throw here and
   // take the whole shell down instead of explaining itself.
-  const { active, options } = await resolveActiveCompany();
-
-  // Signing in is not a company question, so this client is bound to the
-  // register rather than to books this account may not have.
-  const control = await createSupabaseServerClientForSchema("onebook");
-  const {
-    data: { user },
-  } = await control.auth.getUser();
+  //
+  // The company, the signed-in user (a register question, not a company one)
+  // and whether this account may create companies are independent, so they are
+  // asked together: one after another they were three round trips before the
+  // first byte of every page. Each is memoised for the request, so the page
+  // below and currentAccess() reuse these answers rather than asking again.
+  const [{ active, options }, user, canCreateCompany] = await Promise.all([
+    resolveActiveCompany(),
+    currentUser(),
+    isPlatformAdmin(),
+  ]);
   if (!user) redirect("/login");
-
-  // Answered here so every screen's header can offer a new company, or not.
-  const canCreateCompany = await isPlatformAdmin();
 
   if (!active) {
     // Entitled to nothing. Say so — the alternative was reading the first

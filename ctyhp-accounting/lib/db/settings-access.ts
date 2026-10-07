@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { currentUser } from "@/lib/db/company";
 import {
   canShowNavItem,
   settingsGateFor,
@@ -17,10 +18,7 @@ import type { AppRole } from "@/lib/db/types";
  * React's cache() collapses them into one pair of queries per request.
  */
 export const currentAccess = cache(async (): Promise<NavigationAccess> => {
-  const sb = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
+  const [sb, user] = await Promise.all([createSupabaseServerClient(), currentUser()]);
   if (!user) return { role: null, permissionKeys: [] };
 
   const [profile, allowed] = await Promise.all([

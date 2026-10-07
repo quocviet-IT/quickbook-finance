@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClient }));
+// The signed-in user is the request's shared answer (lib/db/company.ts), not a
+// call on the company client.
+vi.mock("@/lib/db/company", () => ({ currentUser: async () => ({ id: "u1" }) }));
 
 import { settingsGateFor } from "@/lib/domain/navigation";
 import { requireSettingsPermission } from "@/lib/db/settings-access";
@@ -27,7 +30,6 @@ describe("settingsGateFor", () => {
 /** A signed-in admin holding exactly the given permission keys. */
 function clientWith(grants: readonly string[]) {
   return {
-    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "u1" } } })) },
     from: (table: string) => {
       if (table === "acc_app_user") {
         const chain = {
