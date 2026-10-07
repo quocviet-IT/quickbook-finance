@@ -26,6 +26,18 @@ export interface ReconStatementHeader {
   bankAccountId: string; endingDate: string; status: string;
   fileName: string | null; openingMinor: number | null; closingMinor: number | null;
   note: string | null; broughtForward: boolean;
+  /** The kept statement file (1.83), in Reports › Saved; null when none was kept. */
+  statementFileId: string | null;
+  /** That file as this person may read it — null when there is none, or they may not read saved files. */
+  statementFile: KeptStatementFileRef | null;
+}
+
+/** A kept statement file as a reconciliation names it: enough to show it, find it and match a printout to it. */
+export interface KeptStatementFileRef {
+  id: string;
+  fileName: string;
+  keptAt: string;
+  sha256: string;
 }
 
 /** The statement a reconciliation is reconciled against, with its lines. */
@@ -39,6 +51,8 @@ export interface StatementFileInput {
   openingMinor: number | null;
   closingMinor: number | null;
   lines: StatementLine[];
+  /** The file itself, kept in Reports › Saved (1.83); null when it could not be kept. */
+  statementFileId: string | null;
 }
 export interface ReconDetail {
   beginningMinor: number; statementEndingMinor: number; clearedTotalMinor: number;
@@ -156,16 +170,18 @@ export async function createReconciliationFromStatement(
   const { data, error } = await sb.rpc("acc_create_reconciliation_from_statement", {
     p_bank_account_id: bankAccountId, p_ending_date: endingDate, p_ending_minor: endingMinor,
     p_file_name: file.fileName, p_opening_minor: file.openingMinor, p_lines: statementPayload(file.lines),
+    p_statement_file_id: file.statementFileId,
   });
   if (error) throw new BankRecError(error.message);
   return data as string;
 }
 
-/** Replaces the statement a reconciliation in progress is reconciled against. */
+/** Replaces the statement a reconciliation in progress is reconciled against — and its kept file with it. */
 export async function setReconciliationStatement(sb: SupabaseClient, id: string, file: StatementFileInput): Promise<number> {
   const { data, error } = await sb.rpc("acc_set_reconciliation_statement", {
     p_reconciliation_id: id, p_file_name: file.fileName, p_opening_minor: file.openingMinor,
     p_closing_minor: file.closingMinor, p_lines: statementPayload(file.lines),
+    p_statement_file_id: file.statementFileId,
   });
   if (error) throw new BankRecError(error.message);
   return Number(data);
@@ -214,7 +230,7 @@ const optionalMinor = (v: unknown) => (v === null || v === undefined ? null : Nu
 /** A reconciliation's account, date and statement, or null when no reconciliation has this id. */
 export async function findReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader | null> {
   const { data, error } = await sb.from("acc_statement_reconciliation")
-    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward")
+    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward,statement_file_id,statement_file:acc_saved_report(id,file_name,uploaded_at,sha256)")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new BankRecError(error.message);
@@ -229,6 +245,19 @@ export async function findReconciliationHeader(sb: SupabaseClient, id: string): 
     closingMinor: optionalMinor(r.statement_closing_minor),
     note: (r.note as string) ?? null,
     broughtForward: Boolean(r.brought_forward),
+    statementFileId: (r.statement_file_id as string) ?? null,
+    statementFile: keptFileRef(r.statement_file),
+  };
+}
+
+function keptFileRef(value: unknown): KeptStatementFileRef | null {
+  const row = (Array.isArray(value) ? value[0] : value) as Record<string, unknown> | null | undefined;
+  if (!row?.id) return null;
+  return {
+    id: row.id as string,
+    fileName: row.file_name as string,
+    keptAt: row.uploaded_at as string,
+    sha256: row.sha256 as string,
   };
 }
 

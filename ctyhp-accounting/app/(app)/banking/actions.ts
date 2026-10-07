@@ -40,6 +40,7 @@ import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import { loanPaymentSchema } from "@/lib/domain/schemas";
 import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
 import { loanSuggestions, postLoanPayment } from "@/lib/services/loan-payments";
+import { linkImportBatchStatementFile } from "@/lib/services/statement-files";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -91,6 +92,7 @@ export async function importStatementAction(
   bankAccountId: string,
   filename: string,
   rows: ImportRow[],
+  statementFileId: string | null = null,
 ): Promise<ActionResult<{ inserted: number; skipped: number; batchId: string | null }>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
@@ -98,6 +100,13 @@ export async function importStatementAction(
   try {
     const sb = await createSupabaseServerClient();
     const res = await importStatement(sb, bankAccountId, filename, rows);
+    // The file the lines were read from, kept already (1.83). Linking it costs
+    // nothing the import did if it fails: the file stays in Reports › Saved.
+    if (res.batchId && statementFileId) {
+      await linkImportBatchStatementFile(sb, res.batchId, statementFileId).catch((err) =>
+        console.warn("linking the statement file to its import failed:", err instanceof Error ? err.message : err),
+      );
+    }
     // Review import opens next, and its first proposal is a match to what is
     // already in the books — so those are looked for now. A failure here costs
     // the match proposals, not the import.

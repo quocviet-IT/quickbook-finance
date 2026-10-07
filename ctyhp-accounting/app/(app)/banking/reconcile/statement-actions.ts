@@ -27,6 +27,7 @@ import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
+import { linkImportBatchStatementFile, linkReconciliationStatementFile } from "@/lib/services/statement-files";
 import type { ActionResult } from "./actions";
 
 async function guard(): Promise<string | null> {
@@ -50,7 +51,13 @@ function statementFile(input: ReconciliationStatementInput): StatementFileInput 
     openingMinor: input.opening_minor,
     closingMinor: input.closing_minor,
     lines: input.lines,
+    statementFileId: input.statement_file_id,
   };
+}
+
+/** A link the statement file could not make costs nothing done with it: the file stays in Reports › Saved. */
+function warnUnlinked(err: unknown) {
+  console.warn("linking the statement file failed:", err instanceof Error ? err.message : err);
 }
 
 /**
@@ -65,6 +72,9 @@ async function importIntoBankTransactions(
   file: StatementFileInput,
 ) {
   const imported = await importStatement(sb, bankAccountId, file.fileName, file.lines);
+  if (imported.batchId && file.statementFileId) {
+    await linkImportBatchStatementFile(sb, imported.batchId, file.statementFileId).catch(warnUnlinked);
+  }
   if (imported.inserted > 0) {
     await generateSuggestions(sb, bankAccountId).catch((err) =>
       console.warn("finding ledger matches after import failed:", err instanceof Error ? err.message : err),
@@ -75,8 +85,9 @@ async function importIntoBankTransactions(
 
 /**
  * The statement a reconciliation in progress is reconciled against: kept with
- * it (replacing any kept before), imported into Bank Transactions, and paired
- * with the books — every pair is ticked. Nothing is posted.
+ * it (replacing any kept before, its file with it), imported into Bank
+ * Transactions, and paired with the books — every pair is ticked. Nothing is
+ * posted.
  */
 export async function importStatementIntoReconciliationAction(
   reconciliationId: string,
@@ -202,6 +213,8 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
         input.opening_minor,
         broughtForwardNote(input.period_from, input.statement_date),
       );
+      // Brought forward on the opening balance its statement prints: that file is its evidence too.
+      if (input.statement_file_id) await linkReconciliationStatementFile(sb, id, input.statement_file_id).catch(warnUnlinked);
       revalidatePath("/banking/reconcile");
       return { ok: true, data: { id, signed: true, differenceMinor: 0 } };
     }
