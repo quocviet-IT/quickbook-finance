@@ -33,9 +33,13 @@ export async function keepStatementFile(
 
     const { path, token, bucket } = prepared.data.ticket;
     const { createSupabaseBrowserClient } = await import("@/lib/db/client");
+    // A File goes up as form data carrying its own type, not `contentType`; a
+    // browser gives an .ofx/.qfx/.qbo/.qif no type the store accepts. The same
+    // bytes are sent as the type the file is kept as.
+    const body = file.slice(0, file.size, mimeType);
     const upload = await createSupabaseBrowserClient()
       .storage.from(bucket)
-      .uploadToSignedUrl(path, token, file, { contentType: mimeType });
+      .uploadToSignedUrl(path, token, body, { contentType: mimeType });
     if (upload.error) return { ok: false, reason: upload.error.message };
 
     const kept = await keepStatementFileAction({
