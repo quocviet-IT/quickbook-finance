@@ -51,7 +51,8 @@ export async function keepStatementFile(
  * effort — an orphan left behind costs storage, not correctness.
  */
 export async function removeUnkeptUpload(sb: SupabaseClient, folder: string, path: string): Promise<void> {
-  if (!path.startsWith(`${folder}/`) || path.includes("..")) return;
+  if (!/^[a-z0-9_]+$/.test(folder)) return;
+  if (!new RegExp(`^${folder}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(pdf|csv|txt)$`).test(path)) return;
   const { data, error } = await sb.from("acc_saved_report").select("id").eq("storage_path", path).maybeSingle();
   if (error || data) return;
   await createSavedReportStorageClient().storage.from(SAVED_REPORT_BUCKET).remove([path]);

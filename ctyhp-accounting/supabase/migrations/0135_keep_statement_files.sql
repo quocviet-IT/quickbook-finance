@@ -212,11 +212,16 @@ grant execute on function acc_keep_statement_file(text, date, date, text, text, 
 --    last argument; the old shapes go first so a call cannot match two.
 -- ----------------------------------------------------------------------------
 create or replace function acc_statement_file_is_kept(p_file_id uuid) returns void
-language plpgsql stable set search_path = public as $$
+language plpgsql set search_path = public as $$
 begin
-  if p_file_id is not null
-     and not exists (select 1 from acc_saved_report where id = p_file_id and status = 'active') then
-    raise exception 'That statement file is not kept here';
+  -- Not stable: it takes the file row FOR SHARE, so archiving the file (which
+  -- takes the same row FOR UPDATE) waits for a link in progress, and a link
+  -- that starts after the archive sees the file as no longer active.
+  if p_file_id is not null then
+    perform 1 from acc_saved_report where id = p_file_id and status = 'active' for share;
+    if not found then
+      raise exception 'That statement file is not kept here';
+    end if;
   end if;
 end;
 $$;
@@ -231,8 +236,8 @@ create or replace function acc_create_reconciliation_from_statement(
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid;
 begin
-  perform acc_statement_file_is_kept(p_statement_file_id);
   v_id := acc_create_reconciliation(p_bank_account_id, p_ending_date, p_ending_minor);
+  perform acc_statement_file_is_kept(p_statement_file_id);
   perform set_config('acc.statement_file_change', 'on', true);
   update acc_statement_reconciliation
      set statement_ref = nullif(left(btrim(coalesce(p_file_name, '')), 255), ''),
@@ -372,6 +377,13 @@ begin
   end if;
   if btrim(coalesce(p_reason, '')) = '' then
     raise exception 'Say why this report is being archived';
+  end if;
+
+  -- Lock the file row first: a link in progress takes the same row for share
+  -- (acc_statement_file_is_kept), so a link and an archive cannot both pass.
+  perform 1 from acc_saved_report where id = p_id and status = 'active' for update;
+  if not found then
+    raise exception 'Report not found, or already archived';
   end if;
 
   select statement_ending_date into v_date

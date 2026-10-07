@@ -10,6 +10,9 @@ import { loadPdfjs } from "@/lib/client/pdf-text";
 /** The most pages drawn; a statement is a few pages, and Download has the rest. */
 export const PDF_PAGE_LIMIT = 40;
 
+/** The most pixels one page's canvas may have. */
+const PDF_CANVAS_PIXEL_LIMIT = 16_000_000;
+
 export interface PdfPageImages {
   /** PNG data URLs, one per page drawn, in order. */
   images: string[];
@@ -32,7 +35,11 @@ export async function pdfPageImages(
       if (isCancelled?.()) break;
       const page = await pdf.getPage(n);
       const base = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({ scale: (cssWidth / base.width) * ratio });
+      let scale = (cssWidth / base.width) * ratio;
+      // A crafted page size must not make a huge canvas.
+      const pixels = base.width * scale * base.height * scale;
+      if (pixels > PDF_CANVAS_PIXEL_LIMIT) scale *= Math.sqrt(PDF_CANVAS_PIXEL_LIMIT / pixels);
+      const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
