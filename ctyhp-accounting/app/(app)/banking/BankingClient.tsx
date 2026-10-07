@@ -85,7 +85,7 @@ import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import type { StatementLine } from "@/lib/domain/statement-import";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
-import { keepFailureMessage, linesSpan, statementFileAccount } from "@/lib/domain/statement-evidence";
+import { keepFailureMessage, linesSpan, serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { formatMoney } from "@/lib/format";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
@@ -476,35 +476,41 @@ export default function BankingClient({
   async function confirmImport(fileName: string, rows: StatementLine[], pdf: PdfStatement | null, file: File) {
     if (!selectedId || !selected || !rows.length) return;
     setBusy("import");
-    // The file is kept first, so the import can point at it (1.83). A file
-    // that cannot be kept costs only the file: the lines are imported anyway.
-    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
-      .then(({ keepStatementFile }) =>
-        keepStatementFile(
-          file,
-          statementFileAccount(selected.bank_name || selected.account_name, selected.account_number_masked),
-          pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows),
-        ),
-      )
-      .catch((error: unknown): KeptStatementFile => ({
-        ok: false,
-        reason: error instanceof Error ? error.message : "the upload could not start",
-      }));
-    const result = await importStatementAction(selectedId, fileName, rows, kept.ok ? kept.id : null);
-    setBusy(null);
-    if (!result.ok || !result.data) {
-      message.error(result.error ?? "Import failed");
-      return;
+    try {
+      // The file is kept first, so the import can point at it (1.83). A file
+      // that cannot be kept costs only the file: the lines are imported anyway.
+      const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+        .then(({ keepStatementFile }) =>
+          keepStatementFile(
+            file,
+            statementFileAccount(selected.bank_name || selected.account_name, selected.account_number_masked),
+            pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows),
+          ),
+        )
+        .catch((error: unknown): KeptStatementFile => ({
+          ok: false,
+          reason: error instanceof Error ? error.message : "the upload could not start",
+        }));
+      const result = await importStatementAction(selectedId, fileName, rows, kept.ok ? kept.id : null);
+      if (!result.ok || !result.data) {
+        message.error(result.error ?? "Import failed");
+        return;
+      }
+      message.success(
+        `Imported ${result.data.inserted} line(s); ${result.data.skipped} duplicate(s) skipped`,
+      );
+      if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "import"), 8);
+      if (result.data.fileWarning) message.warning(result.data.fileWarning, 10);
+      setImportOpen(false);
+      setImportsKey((count) => count + 1);
+      // Straight on to Review import, where every new line carries a proposal.
+      if (result.data.batchId && result.data.inserted > 0) router.push(`/banking/imports/${result.data.batchId}`);
+      else reload();
+    } catch (error) {
+      message.error(`Import failed: ${serverFailure(error)}`, 10);
+    } finally {
+      setBusy(null);
     }
-    message.success(
-      `Imported ${result.data.inserted} line(s); ${result.data.skipped} duplicate(s) skipped`,
-    );
-    if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "import"), 8);
-    setImportOpen(false);
-    setImportsKey((count) => count + 1);
-    // Straight on to Review import, where every new line carries a proposal.
-    if (result.data.batchId && result.data.inserted > 0) router.push(`/banking/imports/${result.data.batchId}`);
-    else reload();
   }
 
   async function findMatches() {

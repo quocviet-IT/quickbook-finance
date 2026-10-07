@@ -28,7 +28,7 @@ import {
 } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
 import { shortDate } from "@/lib/domain/pdf-statement-view";
-import { keepFailureMessage, linesSpan, statementFileMismatch } from "@/lib/domain/statement-evidence";
+import { keepFailureMessage, linesSpan, serverFailure, statementFileMismatch } from "@/lib/domain/statement-evidence";
 import { downloadSavedFile } from "@/lib/client/saved-file-download";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { attachStatementFileAction } from "../../statement-file-actions";
@@ -49,6 +49,7 @@ import {
   setStatementEndingAction,
 } from "../statement-actions";
 import { addedMessage, addedNotPairedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
+import { completedMessage } from "@/lib/domain/statement-bank-lines";
 import AddMissingBox from "./AddMissingBox";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -228,7 +229,9 @@ export default function ReconcileWorkspaceClient({
   const complete = async () => {
     const r = await completeReconciliationAction(reconciliationId);
     if (r.ok) {
-      message.success("Reconciliation completed");
+      const said = completedMessage(r.data?.matched ?? null, r.data?.matchError ?? null);
+      if (r.data?.matchError) message.warning(said, 10);
+      else message.success(said, 8);
       void load();
     } else {
       message.error(r.error ?? "Failed");
@@ -271,35 +274,41 @@ export default function ReconcileWorkspaceClient({
    */
   async function importStatement(fileName: string, rows: StatementLine[], pdf: PdfStatement | null, file: File) {
     setImporting(true);
-    // Kept first, so the reconciliation takes its file with its lines (1.83);
-    // a file that cannot be kept costs only the file.
-    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
-      .then(({ keepStatementFile }) =>
-        keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
-      )
-      .catch((error: unknown): KeptStatementFile => ({
-        ok: false,
-        reason: error instanceof Error ? error.message : "the upload could not start",
-      }));
-    const res = await importStatementIntoReconciliationAction(reconciliationId, {
-      file_name: fileName,
-      opening_minor: pdf?.openingMinor ?? null,
-      closing_minor: pdf?.closingMinor ?? null,
-      lines: rows,
-      statement_file_id: kept.ok ? kept.id : null,
-    });
-    setImporting(false);
-    if (!res.ok || !res.data) {
-      message.error(res.error ?? "Failed to import the statement");
-      return;
+    try {
+      // Kept first, so the reconciliation takes its file with its lines (1.83);
+      // a file that cannot be kept costs only the file.
+      const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+        .then(({ keepStatementFile }) =>
+          keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
+        )
+        .catch((error: unknown): KeptStatementFile => ({
+          ok: false,
+          reason: error instanceof Error ? error.message : "the upload could not start",
+        }));
+      const res = await importStatementIntoReconciliationAction(reconciliationId, {
+        file_name: fileName,
+        opening_minor: pdf?.openingMinor ?? null,
+        closing_minor: pdf?.closingMinor ?? null,
+        lines: rows,
+        statement_file_id: kept.ok ? kept.id : null,
+      });
+      if (!res.ok || !res.data) {
+        message.error(res.error ?? "Failed to import the statement");
+        return;
+      }
+      setImportOpen(false);
+      message.success(
+        `${res.data.inserted} new in Bank Transactions, ${res.data.duplicates} already there. ${pairingMessage(res.data.outcome)}`,
+        8,
+      );
+      if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "reconciliation"), 10);
+      if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
+      void load();
+    } catch (error) {
+      message.error(`Failed to import the statement: ${serverFailure(error)}`, 10);
+    } finally {
+      setImporting(false);
     }
-    setImportOpen(false);
-    message.success(
-      `${res.data.inserted} new in Bank Transactions, ${res.data.duplicates} already there. ${pairingMessage(res.data.outcome)}`,
-      8,
-    );
-    if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "reconciliation"), 10);
-    void load();
   }
 
   /**
@@ -328,34 +337,38 @@ export default function ReconcileWorkspaceClient({
       return;
     }
     setAttaching(true);
-    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
-      .then(({ keepStatementFile }) =>
-        keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
-      )
-      .catch((error: unknown): KeptStatementFile => ({
-        ok: false,
-        reason: error instanceof Error ? error.message : "the upload could not start",
-      }));
-    if (!kept.ok) {
+    try {
+      const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+        .then(({ keepStatementFile }) =>
+          keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
+        )
+        .catch((error: unknown): KeptStatementFile => ({
+          ok: false,
+          reason: error instanceof Error ? error.message : "the upload could not start",
+        }));
+      if (!kept.ok) {
+        message.error(`The statement file could not be kept: ${kept.reason}.`, 10);
+        return;
+      }
+      const res = await attachStatementFileAction({
+        reconciliation_id: reconciliationId,
+        file_id: kept.id,
+        to: read.to,
+        closing_minor: read.closingMinor,
+        lines: read.lines,
+      });
+      if (!res.ok) {
+        message.error(res.error ?? "Failed to attach the statement", 10);
+        return;
+      }
+      setAttachOpen(false);
+      message.success("The statement file is attached to this reconciliation.");
+      void load();
+    } catch (error) {
+      message.error(`Failed to attach the statement: ${serverFailure(error)}`, 10);
+    } finally {
       setAttaching(false);
-      message.error(`The statement file could not be kept: ${kept.reason}.`, 10);
-      return;
     }
-    const res = await attachStatementFileAction({
-      reconciliation_id: reconciliationId,
-      file_id: kept.id,
-      to: read.to,
-      closing_minor: read.closingMinor,
-      lines: read.lines,
-    });
-    setAttaching(false);
-    if (!res.ok) {
-      message.error(res.error ?? "Failed to attach the statement", 10);
-      return;
-    }
-    setAttachOpen(false);
-    message.success("The statement file is attached to this reconciliation.");
-    void load();
   }
 
   async function download(id: string) {
@@ -461,7 +474,7 @@ export default function ReconcileWorkspaceClient({
             <>
               <Typography.Text type="secondary">No statement file</Typography.Text>
               {canWrite ? (
-                <Button type="link" size="small" onClick={() => setAttachOpen(true)}>
+                <Button type="link" size="small" disabled={!detail} onClick={() => setAttachOpen(true)}>
                   Attach the statement
                 </Button>
               ) : null}
