@@ -1,5 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
+import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClientForSchema } from "./server";
 
 /**
@@ -41,8 +43,13 @@ export interface ActiveCompany {
  *
  * One round trip: the list is what the switcher shows *and* what the cookie is
  * validated against, so a forbidden slug cannot resolve by construction.
+ *
+ * Asked once per request. Every company-bound client asks it (through
+ * `activeSchema`), and the answer cannot change within one render. A Server
+ * Action is not a render, so `switchCompanyAction` still reads fresh, and the
+ * render after it is a new request that reads the new cookie.
  */
-export async function resolveActiveCompany(): Promise<ActiveCompany> {
+export const resolveActiveCompany = cache(async (): Promise<ActiveCompany> => {
   const control = await createSupabaseServerClientForSchema("onebook");
   const { data, error } = await control.rpc("my_companies");
   if (error) {
@@ -66,7 +73,23 @@ export async function resolveActiveCompany(): Promise<ActiveCompany> {
   const wanted = store.get(COMPANY_COOKIE)?.value;
   const active = options.find((c) => c.slug === wanted) ?? options[0];
   return { active, options };
-}
+});
+
+/**
+ * Who is signed in, asked once per request.
+ *
+ * Signing in is not a company question, so this reads through the register's
+ * client rather than one bound to books this account may not have. The layout,
+ * `currentAccess` and `getSessionUser` all ask it; before it was shared each of
+ * them made its own call to the auth server.
+ */
+export const currentUser = cache(async (): Promise<User | null> => {
+  const control = await createSupabaseServerClientForSchema("onebook");
+  const {
+    data: { user },
+  } = await control.auth.getUser();
+  return user;
+});
 
 /**
  * Raised when a request needs books to read and this account is entitled to
@@ -109,9 +132,9 @@ export async function activeSchema(): Promise<string> {
  * question: not "whose books may I open" but "may I make new ones". A refusal
  * here only hides a button; `onebook.request_company` refuses again regardless.
  */
-export async function isPlatformAdmin(): Promise<boolean> {
+export const isPlatformAdmin = cache(async (): Promise<boolean> => {
   const control = await createSupabaseServerClientForSchema("onebook");
   const { data, error } = await control.rpc("is_platform_admin");
   if (error) return false;
   return Boolean(data);
-}
+});
