@@ -44,7 +44,7 @@ export interface BankLinePair {
  * The pairs a completed reconciliation matches: each statement line paired
  * with a ticked book line, and the bank line it was imported as. Identical
  * lines are one group: a bank line already matched to one of the group's book
- * lines keeps it, and the rest pair in order, the first with the first. A
+ * lines keeps it, and the rest pair in order, unmatched bank lines first. A
  * statement line with no bank line left gives no pair.
  */
 export function reconciledBankPairs(
@@ -80,8 +80,11 @@ export function reconciledBankPairs(
       pairs.push({ bankTransactionId: free[kept].id, journalLineId });
       free.splice(kept, 1);
     }
+    const unmatched = free.filter((txn) => txn.status === "unmatched");
+    const others = free.filter((txn) => txn.status !== "unmatched");
+    const sortedFree = [...unmatched, ...others];
     open.forEach((journalLineId, i) => {
-      if (free[i]) pairs.push({ bankTransactionId: free[i].id, journalLineId });
+      if (sortedFree[i]) pairs.push({ bankTransactionId: sortedFree[i].id, journalLineId });
     });
   }
   return pairs;

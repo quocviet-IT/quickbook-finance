@@ -113,6 +113,35 @@ describe("reconciledBankPairs", () => {
       reconciledBankPairs([deposit], [paired("jl-dep")], [txn("t-dep", deposit, { status: "matched", approvedLineId: "jl-other" })]),
     ).toEqual([{ bankTransactionId: "t-dep", journalLineId: "jl-dep" }]);
   });
+
+  it("gives an identical bank line still unmatched before one matched elsewhere", () => {
+    expect(
+      reconciledBankPairs(
+        [fee],
+        [paired("jl-1")],
+        [txn("t-1", fee, { status: "matched", approvedLineId: "jl-other" }), txn("t-2", fee)],
+      ),
+    ).toEqual([{ bankTransactionId: "t-2", journalLineId: "jl-1" }]);
+  });
+
+  it("hands over the rest when there are more book lines than unmatched bank lines", () => {
+    expect(
+      reconciledBankPairs(
+        [fee, fee],
+        [paired("jl-1"), paired("jl-2")],
+        [txn("t-1", fee, { status: "ignored" }), txn("t-2", fee)],
+      ),
+    ).toEqual([
+      { bankTransactionId: "t-2", journalLineId: "jl-1" },
+      { bankTransactionId: "t-1", journalLineId: "jl-2" },
+    ]);
+  });
+
+  it("gives more book lines than bank lines no pair for the extra", () => {
+    expect(
+      reconciledBankPairs([fee, fee], [paired("jl-1"), paired("jl-2")], [txn("t-1", fee)]),
+    ).toEqual([{ bankTransactionId: "t-1", journalLineId: "jl-1" }]);
+  });
 });
 
 describe("what matching says", () => {
