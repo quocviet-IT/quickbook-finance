@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { findReconciliationHeader, getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import { fromMinor } from "@/lib/domain/money";
+import { shortSha } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,17 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
           {header.closingMinor !== null ? ` · closes at ${fmt(header.closingMinor)}` : ""}
         </p>
       ) : null}
+      {/* The kept file, named so a printed report can be matched to it (1.83). */}
+      {header.statementFile ? (
+        <p>
+          Statement file: {header.statementFile.fileName} · kept {header.statementFile.keptAt.slice(0, 10)} · SHA-256{" "}
+          {shortSha(header.statementFile.sha256)} · <Link href={`/banking/statement-files/${header.statementFile.id}`}>View</Link>
+        </p>
+      ) : header.statementFileId ? (
+        <p>A statement file is kept with this reconciliation.</p>
+      ) : (
+        <p>No statement file is kept with this reconciliation.</p>
+      )}
       <table>
         <tbody>
           <tr><td>Beginning balance</td><td style={{ textAlign: "right" }}>{fmt(detail.beginningMinor)}</td></tr>

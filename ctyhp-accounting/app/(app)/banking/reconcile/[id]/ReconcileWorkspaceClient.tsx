@@ -16,7 +16,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { PaperClipOutlined, UploadOutlined } from "@ant-design/icons";
 import { fromMinor } from "@/lib/domain/money";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import type { StatementLine } from "@/lib/domain/statement-import";
@@ -27,6 +27,11 @@ import {
   reconciliationStandings,
 } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
+import { shortDate } from "@/lib/domain/pdf-statement-view";
+import { keepFailureMessage, linesSpan, statementFileMismatch } from "@/lib/domain/statement-evidence";
+import { downloadSavedFile } from "@/lib/client/saved-file-download";
+import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
+import { attachStatementFileAction } from "../../statement-file-actions";
 import {
   reconciliationLinesAction,
   reconciliationDetailAction,
@@ -73,6 +78,8 @@ interface Props {
   baseCurrency: string;
   baseDecimals: number;
   bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
+  /** The account a kept statement file is named after: "Example Bank ****1183". */
+  fileAccount: string;
 }
 
 export default function ReconcileWorkspaceClient({
@@ -83,6 +90,7 @@ export default function ReconcileWorkspaceClient({
   baseCurrency,
   baseDecimals,
   bankAccount,
+  fileAccount,
 }: Props) {
   const { message, modal } = App.useApp();
   const [lines, setLines] = useState<ReconLineView[]>([]);
@@ -91,6 +99,8 @@ export default function ReconcileWorkspaceClient({
   const [loading, setLoading] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const [matching, setMatching] = useState(false);
   const [adjOpen, setAdjOpen] = useState(false);
   const [form] = Form.useForm();
@@ -259,13 +269,24 @@ export default function ReconcileWorkspaceClient({
    * Transactions and paired with the books — without leaving the page the
    * statement is being worked from.
    */
-  async function importStatement(fileName: string, rows: StatementLine[], pdf: PdfStatement | null) {
+  async function importStatement(fileName: string, rows: StatementLine[], pdf: PdfStatement | null, file: File) {
     setImporting(true);
+    // Kept first, so the reconciliation takes its file with its lines (1.83);
+    // a file that cannot be kept costs only the file.
+    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+      .then(({ keepStatementFile }) =>
+        keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
+      )
+      .catch((error: unknown): KeptStatementFile => ({
+        ok: false,
+        reason: error instanceof Error ? error.message : "the upload could not start",
+      }));
     const res = await importStatementIntoReconciliationAction(reconciliationId, {
       file_name: fileName,
       opening_minor: pdf?.openingMinor ?? null,
       closing_minor: pdf?.closingMinor ?? null,
       lines: rows,
+      statement_file_id: kept.ok ? kept.id : null,
     });
     setImporting(false);
     if (!res.ok || !res.data) {
@@ -277,7 +298,69 @@ export default function ReconcileWorkspaceClient({
       `${res.data.inserted} new in Bank Transactions, ${res.data.duplicates} already there. ${pairingMessage(res.data.outcome)}`,
       8,
     );
+    if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "reconciliation"), 10);
     void load();
+  }
+
+  /**
+   * Attach the statement to a reconciliation that has no file: read here with
+   * the same readers, attached only when it is this reconciliation's statement
+   * — otherwise nothing is kept and the message says what differs.
+   */
+  async function attachStatement(rows: StatementLine[], pdf: PdfStatement | null, file: File) {
+    if (!statement || !detail) return;
+    const read = {
+      to: pdf?.to ?? null,
+      closingMinor: pdf?.closingMinor ?? null,
+      lines: rows.map((r) => ({ txn_date: r.txn_date, amount_minor: r.amount_minor })),
+    };
+    const mismatch = statementFileMismatch(
+      read,
+      {
+        endingDate: statement.endingDate,
+        endingMinor: detail.statementEndingMinor,
+        keptLines: statement.lines.map((l) => ({ txn_date: l.txnDate, amount_minor: l.amountMinor })),
+      },
+      money,
+    );
+    if (mismatch) {
+      message.error(mismatch, 10);
+      return;
+    }
+    setAttaching(true);
+    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+      .then(({ keepStatementFile }) =>
+        keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
+      )
+      .catch((error: unknown): KeptStatementFile => ({
+        ok: false,
+        reason: error instanceof Error ? error.message : "the upload could not start",
+      }));
+    if (!kept.ok) {
+      setAttaching(false);
+      message.error(`The statement file could not be kept: ${kept.reason}.`, 10);
+      return;
+    }
+    const res = await attachStatementFileAction({
+      reconciliation_id: reconciliationId,
+      file_id: kept.id,
+      to: read.to,
+      closing_minor: read.closingMinor,
+      lines: read.lines,
+    });
+    setAttaching(false);
+    if (!res.ok) {
+      message.error(res.error ?? "Failed to attach the statement", 10);
+      return;
+    }
+    setAttachOpen(false);
+    message.success("The statement file is attached to this reconciliation.");
+    void load();
+  }
+
+  async function download(id: string) {
+    const problem = await downloadSavedFile(id);
+    if (problem) message.error(problem);
   }
 
   async function matchAgain() {
@@ -361,6 +444,31 @@ export default function ReconcileWorkspaceClient({
           Reopen
         </Button>
       )}
+      {statement ? (
+        <Space size={4} wrap>
+          <PaperClipOutlined />
+          {statement.statementFile ? (
+            <>
+              <Typography.Text>Statement file: {statement.statementFile.fileName}</Typography.Text>
+              <Link href={`/banking/statement-files/${statement.statementFile.id}`}>View</Link>
+              <Button type="link" size="small" onClick={() => void download(statement.statementFile!.id)}>
+                Download
+              </Button>
+            </>
+          ) : statement.statementFileId ? (
+            <Typography.Text type="secondary">A statement file is kept with this reconciliation.</Typography.Text>
+          ) : (
+            <>
+              <Typography.Text type="secondary">No statement file</Typography.Text>
+              {canWrite ? (
+                <Button type="link" size="small" onClick={() => setAttachOpen(true)}>
+                  Attach the statement
+                </Button>
+              ) : null}
+            </>
+          )}
+        </Space>
+      ) : null}
       {shownPlan ? (
         <AddMissingBox plan={shownPlan} bankAccountId={bankAccount.id} money={money} adding={adding} onAdd={() => void addAll()} />
       ) : null}
@@ -479,8 +587,24 @@ export default function ReconcileWorkspaceClient({
           bankAccount={bankAccount}
           importing={importing}
           intro={IMPORT_INTRO}
-          onConfirm={(fileName, rows, pdf) => void importStatement(fileName, rows, pdf)}
+          onConfirm={(fileName, rows, pdf, file) => void importStatement(fileName, rows, pdf, file)}
           onCancel={() => setImportOpen(false)}
+        />
+      ) : null}
+      {attachOpen && statement ? (
+        <ImportStatementModal
+          open={attachOpen}
+          bankAccount={bankAccount}
+          importing={attaching}
+          title="Attach the statement"
+          okLabel="Attach"
+          intro={
+            `Choose the bank's statement to ${shortDate(statement.endingDate, true)}. OneBook reads it here and attaches it ` +
+            "only if it is this reconciliation's statement: the same closing balance and, when this reconciliation kept " +
+            "the statement's lines, the same lines. Nothing in the reconciliation changes."
+          }
+          onConfirm={(_fileName, rows, pdf, file) => void attachStatement(rows, pdf, file)}
+          onCancel={() => setAttachOpen(false)}
         />
       ) : null}
     </Space>
