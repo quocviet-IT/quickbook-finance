@@ -39,24 +39,21 @@ export default function RecodedCategory({
         {entryNumber ?? "posted"}
         {recode.entry_number ? ` → ${recode.entry_number}` : ""}
       </Typography.Text>
-      {onUndo || onCreateRule ? (
-        <Space size={4} wrap>
-          {onUndo ? (
-            <Button type="link" size="small" style={linkStyle} loading={undoing} onClick={onUndo}>
-              Undo recode
-            </Button>
-          ) : null}
-          {onUndo && onCreateRule ? (
-            <Typography.Text type="secondary" style={small}>
-              ·
-            </Typography.Text>
-          ) : null}
-          {onCreateRule ? (
-            <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
-              Create rule
-            </Button>
-          ) : null}
-        </Space>
+      {/* One link to a line: the Category column is too narrow for both, and a
+          separator left at the end of a wrapped line reads as a stray mark. */}
+      {onUndo ? (
+        <div>
+          <Button type="link" size="small" style={linkStyle} loading={undoing} onClick={onUndo}>
+            Undo recode
+          </Button>
+        </div>
+      ) : null}
+      {onCreateRule ? (
+        <div>
+          <Button type="link" size="small" style={linkStyle} onClick={onCreateRule}>
+            Create rule
+          </Button>
+        </div>
       ) : null}
     </Space>
   );
