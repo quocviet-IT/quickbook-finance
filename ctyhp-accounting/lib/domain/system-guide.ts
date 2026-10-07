@@ -394,6 +394,26 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "cannot be taken back with Change — recode it instead.",
       },
       {
+        action: "View the statement file",
+        control: "View",
+        route: "/banking/reconcile",
+        note:
+          "Every statement OneBook reads is kept as the bank gave it, once however many reconciliations use it. " +
+          "A reconciliation shows Statement file with View and Download, and its report names the file and the " +
+          "first 12 characters of its SHA-256. View shows it inside OneBook — a PDF drawn page by page, a CSV as " +
+          "a table, a bank download as text — without the browser ever opening the file.",
+      },
+      {
+        action: "Attach the statement",
+        control: "Attach the statement",
+        route: "/banking/reconcile",
+        note:
+          "A reconciliation with no statement file — made before 1.83, or whose file could not be kept — takes " +
+          "one here. The file is read in the browser and attached only if it is that reconciliation's statement: " +
+          "the same closing balance and, when it kept the statement's lines, the same lines. Otherwise nothing " +
+          "is kept and the message says what differs; the reconciliation's figures never change.",
+      },
+      {
         action: "Reopen a completed reconciliation",
         control: "Reopen",
         note: "Needs permission and a reason, and the reopen is audited.",
