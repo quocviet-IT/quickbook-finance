@@ -3705,6 +3705,10 @@ body {
   gap: 16px;
 }
 
+.statement-file-pages > .ant-alert {
+  align-self: stretch;
+}
+
 .statement-file-pages img {
   display: block;
   width: 100%;

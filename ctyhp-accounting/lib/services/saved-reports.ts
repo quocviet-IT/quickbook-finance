@@ -11,6 +11,9 @@ import {
 
 export class SavedReportError extends Error {}
 
+/** The row is not there for this session: gone, or not one this person may read. */
+export class SavedReportNotFoundError extends SavedReportError {}
+
 export interface SavedReportRow {
   id: string;
   title: string;
@@ -106,7 +109,7 @@ async function requireReadableRow(sb: SupabaseClient, id: string): Promise<Saved
     .eq("id", id)
     .maybeSingle();
   if (error) throw new SavedReportError(error.message);
-  if (!data) throw new SavedReportError("Report not found");
+  if (!data) throw new SavedReportNotFoundError("Report not found");
   return data as unknown as SavedReportRow;
 }
 

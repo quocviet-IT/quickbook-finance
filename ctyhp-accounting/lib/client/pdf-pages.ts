@@ -19,6 +19,8 @@ export interface PdfPageImages {
 export async function pdfPageImages(
   data: ArrayBuffer,
   cssWidth: number,
+  /** True once nobody wants the pages any more; drawing stops and the file is released. */
+  isCancelled?: () => boolean,
 ): Promise<PdfPageImages | { failure: PdfReadFailure }> {
   const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument({ data: new Uint8Array(data), verbosity: 0, enableXfa: false });
@@ -27,6 +29,7 @@ export async function pdfPageImages(
     const images: string[] = [];
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     for (let n = 1; n <= Math.min(pdf.numPages, PDF_PAGE_LIMIT); n++) {
+      if (isCancelled?.()) break;
       const page = await pdf.getPage(n);
       const base = page.getViewport({ scale: 1 });
       const viewport = page.getViewport({ scale: (cssWidth / base.width) * ratio });

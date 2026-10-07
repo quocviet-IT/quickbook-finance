@@ -13,6 +13,7 @@ vi.mock("@/lib/db/storage-admin", () => ({
 
 const {
   SavedReportError,
+  SavedReportNotFoundError,
   archiveSavedReport,
   createSavedReportDownloadUrl,
   createSavedReportUploadTicket,
@@ -24,6 +25,7 @@ const {
 function stubClient(options: {
   row?: Record<string, unknown> | null;
   rpcError?: { message: string; code?: string };
+  readError?: { message: string };
 }) {
   return {
     rpc: vi.fn(async () => ({
@@ -33,7 +35,10 @@ function stubClient(options: {
     from: () => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: options.row ?? null, error: null }),
+          maybeSingle: async () => ({
+            data: options.readError ? null : (options.row ?? null),
+            error: options.readError ?? null,
+          }),
         }),
       }),
     }),
@@ -121,7 +126,16 @@ describe("readSavedReportText", () => {
   it("refuses a report this company cannot see", async () => {
     const sb = stubClient({ row: null });
     await expect(readSavedReportText(sb, csvRow.id)).rejects.toThrow("Report not found");
+    await expect(readSavedReportText(sb, csvRow.id)).rejects.toBeInstanceOf(SavedReportNotFoundError);
     expect(storage.download).not.toHaveBeenCalled();
+  });
+
+  it("does not call a database error on the row read a missing report", async () => {
+    const sb = stubClient({ readError: { message: "connection reset" } });
+    const failure = await readSavedReportText(sb, csvRow.id).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SavedReportError);
+    expect(failure).not.toBeInstanceOf(SavedReportNotFoundError);
+    expect((failure as Error).message).toBe("connection reset");
   });
 
   it("returns the text once the session client has confirmed the row", async () => {

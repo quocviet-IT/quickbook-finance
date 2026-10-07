@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getSavedReport, SavedReportError, type SavedReportRow } from "@/lib/services/saved-reports";
+import { getSavedReport, SavedReportNotFoundError, type SavedReportRow } from "@/lib/services/saved-reports";
 import PageHeader from "@/components/PageHeader";
 import StatementFileClient from "./StatementFileClient";
 
@@ -21,7 +21,7 @@ export default async function StatementFilePage({ params }: { params: Promise<{ 
   try {
     file = await getSavedReport(sb, id);
   } catch (error) {
-    if (error instanceof SavedReportError) notFound();
+    if (error instanceof SavedReportNotFoundError) notFound();
     throw error;
   }
   return (

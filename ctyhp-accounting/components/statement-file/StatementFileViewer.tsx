@@ -27,17 +27,17 @@ type Loaded =
   | { id: string; kind: "text"; text: string }
   | { id: string; problem: string };
 
-async function load(id: string, mimeType: string): Promise<Loaded> {
+async function load(id: string, mimeType: string, signal: AbortSignal): Promise<Loaded> {
   const view = savedReportView(mimeType);
   if (view === "pdf") {
     // The bytes come through a link that lives a minute, and are drawn here —
     // the browser is never handed the file to open.
     const link = await savedReportDownloadUrlAction(id);
     if (!link.ok || !link.data) return { id, problem: link.error ?? "Could not read the file" };
-    const response = await fetch(link.data.url);
+    const response = await fetch(link.data.url, { signal });
     if (!response.ok) return { id, problem: "Could not read the file" };
     const { pdfPageImages } = await import("@/lib/client/pdf-pages");
-    const drawn = await pdfPageImages(await response.arrayBuffer(), PAGE_WIDTH);
+    const drawn = await pdfPageImages(await response.arrayBuffer(), PAGE_WIDTH, () => signal.aborted);
     if ("failure" in drawn) return { id, problem: PDF_MESSAGES[drawn.failure] };
     return { id, kind: "pdf", ...drawn };
   }
@@ -61,13 +61,15 @@ export default function StatementFileViewer({ id, mimeType }: StatementFileViewe
   useEffect(() => {
     if (view === "download") return;
     let cancelled = false;
-    load(id, mimeType)
+    const controller = new AbortController();
+    load(id, mimeType, controller.signal)
       .catch((error: unknown) => ({ id, problem: error instanceof Error ? error.message : "Could not read the file" }))
       .then((result) => {
         if (!cancelled) setLoaded(result);
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [id, mimeType, view]);
 
@@ -100,7 +102,7 @@ export default function StatementFileViewer({ id, mimeType }: StatementFileViewe
         ) : null}
         {current.images.map((src, index) => (
           // eslint-disable-next-line @next/next/no-img-element -- a page drawn in the browser, not a file Next can optimise
-          <img key={index} src={src} alt={`Page ${index + 1}`} />
+          <img key={index} src={src} alt={`Page ${index + 1} of ${current.pageCount}`} />
         ))}
       </div>
     );
