@@ -84,6 +84,9 @@ import {
 import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import type { StatementLine } from "@/lib/domain/statement-import";
+import type { PdfStatement } from "@/lib/domain/pdf-statement";
+import { keepFailureMessage, linesSpan, statementFileAccount } from "@/lib/domain/statement-evidence";
+import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { formatMoney } from "@/lib/format";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
@@ -470,10 +473,24 @@ export default function BankingClient({
 
   // Reading the file — every format, and a CSV's columns — happens in
   // ImportStatementModal, from rules in lib/domain that are covered by tests.
-  async function confirmImport(fileName: string, rows: StatementLine[]) {
-    if (!selectedId || !rows.length) return;
+  async function confirmImport(fileName: string, rows: StatementLine[], pdf: PdfStatement | null, file: File) {
+    if (!selectedId || !selected || !rows.length) return;
     setBusy("import");
-    const result = await importStatementAction(selectedId, fileName, rows);
+    // The file is kept first, so the import can point at it (1.83). A file
+    // that cannot be kept costs only the file: the lines are imported anyway.
+    const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
+      .then(({ keepStatementFile }) =>
+        keepStatementFile(
+          file,
+          statementFileAccount(selected.bank_name || selected.account_name, selected.account_number_masked),
+          pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows),
+        ),
+      )
+      .catch((error: unknown): KeptStatementFile => ({
+        ok: false,
+        reason: error instanceof Error ? error.message : "the upload could not start",
+      }));
+    const result = await importStatementAction(selectedId, fileName, rows, kept.ok ? kept.id : null);
     setBusy(null);
     if (!result.ok || !result.data) {
       message.error(result.error ?? "Import failed");
@@ -482,6 +499,7 @@ export default function BankingClient({
     message.success(
       `Imported ${result.data.inserted} line(s); ${result.data.skipped} duplicate(s) skipped`,
     );
+    if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "import"), 8);
     setImportOpen(false);
     setImportsKey((count) => count + 1);
     // Straight on to Review import, where every new line carries a proposal.
@@ -934,7 +952,7 @@ export default function BankingClient({
             currencyCode: selected.currency_code,
           }}
           importing={busy === "import"}
-          onConfirm={(fileName, rows) => void confirmImport(fileName, rows)}
+          onConfirm={(fileName, rows, pdf, file) => void confirmImport(fileName, rows, pdf, file)}
           onCancel={() => setImportOpen(false)}
         />
       ) : null}

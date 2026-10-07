@@ -52,6 +52,8 @@ const EXTENSIONS: Record<string, string> = {
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
   "image/png": "png",
   "image/jpeg": "jpg",
+  // A bank's own download, kept as a statement file (1.83).
+  "text/plain": "txt",
 };
 
 export function savedReportExtension(mimeType: string): string {
@@ -59,23 +61,40 @@ export function savedReportExtension(mimeType: string): string {
 }
 
 /**
- * `<company id>/<object id>.<ext>`.
+ * `<company schema>/<object id>.<ext>`.
  *
- * The company id is there so an object found in the bucket can be traced back
- * to the books it belongs to. Nothing authorises on it — authorisation happens
- * before a signed URL is minted, never from a path.
+ * The folder is the company's schema, so an object found in the bucket can be
+ * traced back to the books it belongs to — and, since 1.83, so the database can
+ * refuse to register a path outside its own folder (`current_schema()`).
+ * Files saved before 1.83 sit under the company's id; they are left where they
+ * are. Reading never authorises on a path — a signed URL is minted only after
+ * the row was read through the session.
  */
 export function savedReportStoragePath(
-  companyId: string,
+  folder: string,
   mimeType: string,
   objectId: string,
 ): string {
-  return `${companyId}/${objectId}.${savedReportExtension(mimeType)}`;
+  return `${folder}/${objectId}.${savedReportExtension(mimeType)}`;
 }
 
 /** Whether the viewer can show this file as a table rather than a download. */
 export function isTabularSavedReport(mimeType: string): boolean {
   return mimeType === "text/csv";
+}
+
+/**
+ * How a saved file is shown inside OneBook. Nothing in the store is scanned, so
+ * nothing is handed to the browser to open: a PDF is drawn as images, a CSV is
+ * a table, a bank download is text. Anything else is Download only.
+ */
+export type SavedReportView = "pdf" | "table" | "text" | "download";
+
+export function savedReportView(mimeType: string): SavedReportView {
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType === "text/csv") return "table";
+  if (mimeType === "text/plain") return "text";
+  return "download";
 }
 
 export function validateSavedReportFile(file: {

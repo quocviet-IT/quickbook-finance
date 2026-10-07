@@ -15,19 +15,26 @@ import { describe, expect, it } from "vitest";
  * reason, and says so at its own call site.
  */
 /**
- * Empty since 2026-09-28: the two per-period statements that were matrices
+ * Empty from 2026-09-28, when the two per-period statements that were matrices
  * (PnlTrendView, BalanceSheetTrendView) became columns of the statement table,
- * a plain table that scrolls inside its own box. A table added here needs its
- * reason and `fit={false}` at its call site.
+ * a plain table that scrolls inside its own box, until 1.83 moved the saved
+ * file preview onto DataTable. A table added here needs its reason and
+ * `fit={false}` at its call site.
  */
-const MATRIX = new Map<string, string>();
+const MATRIX = new Map<string, string>([
+  [
+    "components/statement-file/StatementFileViewer.tsx",
+    "A saved CSV shown as it arrived: its columns are the file's own, as many as the file has, so they cannot be designed to fit.",
+  ],
+]);
 
 /**
  * Three more were candidates and none of them qualified, which is the point of
- * checking rather than listing: the permission grid and the saved-report
- * viewer reach for Ant Design's Table directly, so this boundary never covered
- * them (see tests/unit/table-adoption.test.ts), and the budget view turned out
- * to pass no `scroll.x` at all.
+ * checking rather than listing: the permission grid reaches for Ant Design's
+ * Table directly, so this boundary never covered it (see
+ * tests/unit/table-adoption.test.ts), and the budget view turned out to pass
+ * no `scroll.x` at all. The saved-report viewer was the third; since 1.83 its
+ * preview is the matrix above.
  */
 
 /** The implementation itself declares the default; it is exempt by path. */

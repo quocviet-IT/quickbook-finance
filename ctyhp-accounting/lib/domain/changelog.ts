@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.83",
+    date: "2026-10-06",
+    headline: "The bank's statement file is kept with what was read from it, and can be opened later as evidence.",
+    changes: [
+      {
+        kind: "added",
+        title: "The statement file is kept",
+        detail:
+          "Every statement OneBook reads is now kept as the bank gave it: from Banking › Import statement, from Bank Reconciliation › From statement files, and from Import statement inside a reconciliation. Nothing to tick. The same file is kept once, however many reconciliations are made from it — a CSV year cut into twelve months is one file. If a file cannot be kept (larger than 10 MB, or the network fails), the import or the reconciliation goes on and the message says so.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "View the statement file",
+        detail:
+          "A reconciliation shows Statement file with View and Download, and its report names the file, the day it was kept and the first 12 characters of its SHA-256, so a printed report can be matched to the file. Statement imports on Banking show View beside the file name. View opens the file inside OneBook: a PDF drawn page by page, a CSV as a table, an OFX, QFX, QBO or QIF download as text — the file itself is never opened by the browser.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Attach the statement",
+        detail:
+          "A reconciliation without its file — one made before this release, or one whose file could not be kept — offers Attach the statement. The file chosen is read here and attached only if it is that reconciliation's statement: the same closing balance and, when the reconciliation kept the statement's lines, the same lines. Otherwise nothing is kept and the message says what differs. Attaching changes none of the reconciliation's figures.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "Reports › Saved shows PDFs and bank downloads",
+        detail:
+          "Kept statement files are listed in Reports › Saved under Bank. Its viewer now draws a PDF page by page and shows a bank download as text, besides the CSV table it already had. A file that is the statement of a reconciliation or an import cannot be archived.",
+        route: "/reports/saved",
+      },
+    ],
+  },
+  {
     version: "1.82",
     date: "2026-10-06",
     headline: "What the bank shows and the books do not is added from the reconciliation, in one click.",

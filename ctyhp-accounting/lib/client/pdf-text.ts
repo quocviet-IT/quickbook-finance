@@ -12,11 +12,17 @@ import { readPdfStatements, type PdfGlyph, type PdfStatement } from "@/lib/domai
 import { glyphsFromDocument, pdfFailure, type PdfReadFailure } from "@/lib/domain/pdf-glyphs";
 import { PDF_MESSAGES } from "@/lib/domain/pdf-statement-view";
 
-export async function readPdfGlyphs(data: ArrayBuffer): Promise<{ glyphs: PdfGlyph[] } | { failure: PdfReadFailure }> {
+/** pdf.js and its worker, loaded the first time a PDF is read or drawn. */
+export async function loadPdfjs() {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
   }
+  return pdfjs;
+}
+
+export async function readPdfGlyphs(data: ArrayBuffer): Promise<{ glyphs: PdfGlyph[] } | { failure: PdfReadFailure }> {
+  const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument({ data: new Uint8Array(data), verbosity: 0 });
   try {
     return { glyphs: await glyphsFromDocument(await task.promise) };

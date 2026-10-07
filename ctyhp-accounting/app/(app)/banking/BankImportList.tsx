@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
 import { getStatementImportsAction, undoStatementImportAction } from "./actions";
@@ -71,7 +72,20 @@ export default function BankImportList({
         dataSource={rows}
         locale={{ emptyText: "No statement has been imported into this company yet." }}
         columns={[
-          { title: "File", dataIndex: "filename" },
+          {
+            title: "File",
+            dataIndex: "filename",
+            // The file itself, kept when it was read (1.83); imports before then kept only its name.
+            render: (filename: string, row) =>
+              row.statement_file_id ? (
+                <Space size={8}>
+                  <span>{filename}</span>
+                  <Link href={`/banking/statement-files/${row.statement_file_id}`}>View</Link>
+                </Space>
+              ) : (
+                filename
+              ),
+          },
           {
             title: "Into",
             width: 240,

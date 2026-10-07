@@ -43,11 +43,17 @@ export interface ImportStatementModalProps {
   open: boolean;
   bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
   importing: boolean;
-  /** `statement` is the PDF statement imported, with its period and balances; null for any other file. */
-  onConfirm: (fileName: string, rows: StatementLine[], statement: PdfStatement | null) => void;
+  /**
+   * `statement` is the PDF statement imported, with its period and balances;
+   * null for any other file. `file` is the file itself, kept as evidence (1.83).
+   */
+  onConfirm: (fileName: string, rows: StatementLine[], statement: PdfStatement | null, file: File) => void;
   onCancel: () => void;
   /** What happens to the lines, said above the file picker. */
   intro?: ReactNode;
+  /** The dialog's title and button when the file is read for something other than importing it (Attach the statement). */
+  title?: string;
+  okLabel?: string;
 }
 
 const BANKING_INTRO =
@@ -89,8 +95,11 @@ export default function ImportStatementModal({
   onConfirm,
   onCancel,
   intro = BANKING_INTRO,
+  title,
+  okLabel,
 }: ImportStatementModalProps) {
   const [fileName, setFileName] = useState("");
+  const [chosen, setChosen] = useState<File | null>(null);
   const [file, setFile] = useState<FileState>({ kind: "none" });
   const [choice, setChoice] = useState<CsvChoice | null>(null);
   const [showColumns, setShowColumns] = useState(false);
@@ -114,6 +123,7 @@ export default function ImportStatementModal({
   function read(chosen: File) {
     const token = ++reading.current;
     setFileName(chosen.name);
+    setChosen(chosen);
     setShowColumns(false);
     setChoice(null);
     if (isPdfFile(chosen)) {
@@ -182,16 +192,18 @@ export default function ImportStatementModal({
   const wrongAccount = accountNumberDiffers(fileAccount, bankAccount.maskedNumber);
   const wrongAccountText = `The file is for an account ending ${(fileAccount ?? "").slice(-4)}, and you are importing into ${bankAccount.label}. Check before importing.`;
 
-  const okText = !rows.length
-    ? "Import"
-    : summary
-      ? `Import ${rows.length} line${rows.length === 1 ? "" : "s"}${summary.proves ? "" : " anyway"}`
-      : `Import ${rows.length} rows`;
+  const okText =
+    okLabel ??
+    (!rows.length
+      ? "Import"
+      : summary
+        ? `Import ${rows.length} line${rows.length === 1 ? "" : "s"}${summary.proves ? "" : " anyway"}`
+        : `Import ${rows.length} rows`);
 
   function confirm() {
-    if (!rows.length) return;
+    if (!rows.length || !chosen) return;
     if (file.kind === "csv" && choice) rememberColumns(bankAccount.id, choice);
-    onConfirm(fileName, rows, statement);
+    onConfirm(fileName, rows, statement, chosen);
   }
 
   // Choosing the date column reads that column again for which way round its
@@ -208,7 +220,7 @@ export default function ImportStatementModal({
 
   return (
     <Modal
-      title={`Import a statement into ${bankAccount.label}`}
+      title={title ?? `Import a statement into ${bankAccount.label}`}
       open={open}
       onOk={confirm}
       onCancel={onCancel}

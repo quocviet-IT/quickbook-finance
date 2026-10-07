@@ -90,6 +90,8 @@ describe("a reconciliation's kept statement", () => {
       openingMinor: 75000,
       closingMinor: null,
       broughtForward: false,
+      statementFileId: null,
+      statementFile: null,
     });
     expect(statement.lines[5]).toEqual({
       lineNo: 5, txnDate: "2026-09-01", description: "Line 5", reference: null, amountMinor: 105, balanceMinor: null,
@@ -106,10 +108,25 @@ describe("a reconciliation's kept statement", () => {
         { txn_date: "2026-09-05", description: "FEE", reference: null, amount_minor: -500, running_balance_minor: 74500, raw_line: "x" },
         { txn_date: "2026-09-06", description: "NOTHING", reference: null, amount_minor: 0, running_balance_minor: 74500, raw_line: "y" },
       ],
+      statementFileId: null,
     });
     expect(calls[0].args.p_lines).toEqual([
       { txn_date: "2026-09-05", description: "FEE", reference: null, amount_minor: -500, balance_minor: 74500 },
     ]);
+    // No file kept: the reconciliation's file goes with its old statement.
+    expect(calls[0].args.p_statement_file_id).toBeNull();
+  });
+
+  it("sends the kept file with the statement it was read from", async () => {
+    const { sb, calls } = fakeClient({}, { acc_set_reconciliation_statement: () => 1 });
+    await setReconciliationStatement(sb, "rec-1", {
+      fileName: "september.pdf",
+      openingMinor: 75000,
+      closingMinor: 74500,
+      lines: [{ txn_date: "2026-09-05", description: "FEE", reference: null, amount_minor: -500, running_balance_minor: 74500, raw_line: "x" }],
+      statementFileId: "file-1",
+    });
+    expect(calls[0].args.p_statement_file_id).toBe("file-1");
   });
 
   it("reads what bringing an account forward would sign off", async () => {

@@ -547,6 +547,8 @@ export const reconciliationStatementSchema = z.object({
     )
     .min(1, "The statement has no lines")
     .max(5000, "A statement can hold at most 5,000 lines"),
+  /** The statement file, kept in Reports › Saved (1.83); null when it could not be kept. */
+  statement_file_id: z.uuid().nullable().default(null),
 });
 export type ReconciliationStatementInput = z.infer<typeof reconciliationStatementSchema>;
 
@@ -587,6 +589,7 @@ export const runMonthSchema = z.discriminatedUnion("kind", [
     period_from: statementDay,
     statement_date: statementDay,
     opening_minor: z.number().int(),
+    statement_file_id: z.uuid().nullable().default(null),
   }),
   reconciliationStatementSchema.extend({
     kind: z.literal("month"),

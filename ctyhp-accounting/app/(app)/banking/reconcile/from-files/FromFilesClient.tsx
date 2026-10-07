@@ -18,6 +18,8 @@ import {
   type RunStatement,
 } from "@/lib/domain/statement-run";
 import { formatMoney } from "@/lib/format";
+import { keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
+import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { previewRunAction, reconcileRunMonthAction } from "../statement-actions";
 import StandingTag from "../StandingTag";
 
@@ -30,8 +32,13 @@ import StandingTag from "../StandingTag";
 interface Props {
   canWrite: boolean;
   bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
+  /** The account a kept statement file is named after: "Example Bank ****1183". */
+  fileAccount: string;
   context: RunContext;
 }
+
+/** A statement read from a file, with the file — kept as its evidence when its month is signed (1.83). */
+type ChosenStatement = RunStatement & { file?: File };
 
 interface Done {
   signed: number;
@@ -73,10 +80,10 @@ function outcomeTag(outcome: MonthOutcome) {
   }
 }
 
-export default function FromFilesClient({ canWrite, bankAccount, context }: Props) {
+export default function FromFilesClient({ canWrite, bankAccount, fileAccount, context }: Props) {
   const { message } = App.useApp();
   const router = useRouter();
-  const [statements, setStatements] = useState<RunStatement[]>([]);
+  const [statements, setStatements] = useState<ChosenStatement[]>([]);
   const [reading, setReading] = useState(0);
   const [preview, setPreview] = useState<RunPreview | null>(null);
   // The statements the preview was walked on. Signing uses these and nothing
@@ -107,7 +114,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     setPreview(null);
     setDone(null);
     try {
-      const read = await readRunFile(file, bankAccount);
+      const read: ChosenStatement[] = (await readRunFile(file, bankAccount)).map((s) => ({ ...s, file }));
       setStatements((current) => {
         // A file chosen twice, or two files of one name, stay as rows: the
         // table says "Same month as another file" rather than one vanishing.
@@ -190,6 +197,41 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       router.refresh();
     };
     const first = previewed[0];
+    const statementOfNeedsLook = needsLook ? previewedByKey.get(needsLook.key) : undefined;
+
+    // Each file is kept once, before the first month is signed, and every
+    // reconciliation made from it points at it: a CSV year cut into twelve
+    // months is twelve reconciliations and one file. A file that cannot be kept
+    // costs only the file — the months are signed all the same.
+    const fileOfKey = new Map(statements.map((s) => [s.key, s.file]));
+    const used = [
+      ...(bringForward && first ? [first] : []),
+      ...toSign.map((m) => previewedByKey.get(m.key)),
+      statementOfNeedsLook,
+    ].filter((st): st is RunStatement => Boolean(st));
+    const byFile = new Map<File, RunStatement[]>();
+    for (const st of used) {
+      const file = fileOfKey.get(st.key);
+      if (file) byFile.set(file, [...(byFile.get(file) ?? []).filter((s) => s.key !== st.key), st]);
+    }
+    const fileIdOf = new Map<string, string>();
+    if (byFile.size) {
+      const keep: typeof import("@/lib/client/keep-statement-file").keepStatementFile = await import("@/lib/client/keep-statement-file")
+        .then((module) => module.keepStatementFile)
+        .catch((error: unknown) => {
+          const reason = error instanceof Error ? error.message : "the upload could not start";
+          return async (): Promise<KeptStatementFile> => ({ ok: false, reason });
+        });
+      let kept = 0;
+      for (const [file, read] of byFile) {
+        kept += 1;
+        setProgress(`Keeping the statement file${byFile.size === 1 ? "" : "s"} — ${kept} of ${byFile.size}`);
+        const result = await keep(file, fileAccount, statementFileSpan(read));
+        if (result.ok) for (const st of read) fileIdOf.set(st.key, result.id);
+        else message.warning(keepFailureMessage(`${file.name}: ${result.reason}`, "reconciliation"), 10);
+      }
+    }
+
     if (bringForward && first?.from && first.openingMinor !== null) {
       step += 1;
       setProgress(`Bringing the earlier lines forward — ${step} of ${total}`);
@@ -199,6 +241,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         period_from: first.from,
         statement_date: first.to,
         opening_minor: first.openingMinor,
+        statement_file_id: fileIdOf.get(first.key) ?? null,
       });
       if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward", broughtForward });
       broughtForward = true;
@@ -216,6 +259,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         closing_minor: statement.closingMinor,
         statement_date: month.statementDate,
         lines: statement.lines,
+        statement_file_id: fileIdOf.get(statement.key) ?? null,
         sign: true,
       });
       if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "A month could not be signed off", broughtForward });
@@ -234,7 +278,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
       signed += 1;
     }
     let open: Done["open"] = null;
-    const statement = needsLook ? previewedByKey.get(needsLook.key) : undefined;
+    const statement = statementOfNeedsLook;
     if (needsLook && statement) {
       setProgress(`Starting ${shortDate(needsLook.statementDate, true)}, which needs a look`);
       const res = await reconcileRunMonthAction({
@@ -245,6 +289,7 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
         closing_minor: statement.closingMinor,
         statement_date: needsLook.statementDate,
         lines: statement.lines,
+        statement_file_id: fileIdOf.get(statement.key) ?? null,
         sign: false,
       });
       if (!res.ok || !res.data) {
@@ -259,8 +304,8 @@ export default function FromFilesClient({ canWrite, bankAccount, context }: Prop
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
         Bank account <strong>{bankAccount.label}</strong>. Choose PDF statements, or a CSV export with a running balance
-        column — one file or many. Every closing balance is read out of the file itself, never taken from the books. The
-        files stay in your browser, and nothing is written until you sign off.
+        column — one file or many. Every closing balance is read out of the file itself, never taken from the books.
+        Nothing is written until you sign off; then each file is kept, once, with the reconciliations made from it.
       </Typography.Paragraph>
       <Upload.Dragger
         multiple

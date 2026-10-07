@@ -43,7 +43,7 @@ export async function createSavedReportUploadTicketAction(
   const company = await resolveActiveCompany();
   if (!company.active) return { ok: false, error: "No company is selected" };
   try {
-    const ticket = await createSavedReportUploadTicket(company.active.id, mimeType);
+    const ticket = await createSavedReportUploadTicket(company.active.schemaName, mimeType);
     return { ok: true, data: { ...ticket, bucket: SAVED_REPORT_BUCKET } };
   } catch (error) {
     return { ok: false, error: msg(error) };

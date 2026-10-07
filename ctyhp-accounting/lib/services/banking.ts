@@ -152,6 +152,8 @@ export interface BankStatementImportRow {
   status: "active" | "voided";
   voided_at: string | null;
   void_reason: string | null;
+  /** The file the lines were read from, kept in Reports › Saved (1.83); null before then or when it could not be kept. */
+  statement_file_id: string | null;
 }
 
 /** Statement imports, newest first. Null means every bank account. */

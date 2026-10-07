@@ -8,6 +8,7 @@ import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { listReconciliations } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import type { RunContext } from "@/lib/domain/statement-run";
+import { statementFileAccount } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
 import FromFilesClient from "./FromFilesClient";
 
@@ -56,6 +57,7 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
           decimals: base?.decimal_places ?? 2,
           currencyCode: bank.currency_code,
         }}
+        fileAccount={statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked)}
         context={context}
       />
     </div>

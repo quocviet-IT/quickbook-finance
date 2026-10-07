@@ -6,6 +6,7 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts } from "@/lib/services/banking";
 import { findReconciliationHeader } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
+import { statementFileAccount } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
 import ReconcileWorkspaceClient from "./ReconcileWorkspaceClient";
 
@@ -46,6 +47,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
           decimals: base?.decimal_places ?? 2,
           currencyCode: bank?.currency_code ?? base?.code ?? "USD",
         }}
+        fileAccount={bank ? statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked) : "Bank account"}
       />
     </div>
   );
