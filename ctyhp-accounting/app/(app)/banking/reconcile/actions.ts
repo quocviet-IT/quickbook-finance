@@ -9,6 +9,7 @@ import {
   BankRecError, type ReconLineView, type ReconDetail, type DiscrepancyRow,
 } from "@/lib/services/bankrec";
 import type { StatementReconciliationRow } from "@/lib/db/types";
+import { matchAfterCompletion, type CompletionMatching } from "@/lib/services/statement-bank-lines";
 import {
   executeOrSubmitForApproval,
   toControlledActionResponse,
@@ -44,9 +45,17 @@ export async function recordAdjustmentAction(reconciliationId: string, raw: unkn
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 
-export async function completeReconciliationAction(id: string): Promise<ActionResult> {
+/** Completes a reconciliation, then matches its bank lines in Bank Transactions (1.85); a matching failure is said, not undone. */
+export async function completeReconciliationAction(id: string): Promise<ActionResult<CompletionMatching>> {
   const denied = await guard(); if (denied) return { ok: false, error: denied };
-  try { const sb = await createSupabaseServerClient(); await completeReconciliation(sb, id); revalidatePath("/banking/reconcile"); return { ok: true }; }
+  try {
+    const sb = await createSupabaseServerClient();
+    await completeReconciliation(sb, id);
+    const matching = await matchAfterCompletion(sb, id);
+    revalidatePath("/banking/reconcile");
+    revalidatePath("/banking");
+    return { ok: true, data: matching };
+  }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 

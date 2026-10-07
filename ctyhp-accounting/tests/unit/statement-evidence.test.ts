@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   keepFailureMessage,
+  unlinkedFileMessage,
   linesSpan,
   shortSha,
   statementFileAccount,
@@ -136,6 +137,20 @@ describe("keepFailureMessage", () => {
   });
 });
 
+describe("unlinkedFileMessage", () => {
+  it("says an import's file is kept, and where to find it", () => {
+    expect(unlinkedFileMessage("permission denied.", "import")).toBe(
+      "The statement file was kept but could not be tied to this import: permission denied. It is in Reports › Saved.",
+    );
+  });
+
+  it("points a reconciliation to Attach the statement", () => {
+    expect(unlinkedFileMessage("", "reconciliation")).toBe(
+      "The statement file was kept but could not be tied to this reconciliation: an unexpected error occurred. Attach it on the reconciliation.",
+    );
+  });
+});
+
 describe("statementFileMismatch", () => {
   const MAY: EvidenceTarget = {
     endingDate: "2026-05-31",
@@ -180,7 +195,7 @@ describe("statementFileMismatch", () => {
   it("refuses a statement with a line more or less", () => {
     const read = { to: "2026-05-31", closingMinor: 616001, lines: MAY.keptLines.slice(0, 1) };
     expect(statementFileMismatch(read, MAY, money)).toBe(
-      "This file has 1 line from May 4, 2026 to May 31, 2026; this reconciliation kept 2 lines from its statement.",
+      "This reconciliation kept 2 lines from May 4, 2026 to May 31, 2026; this file has 1 line in those days.",
     );
   });
 
@@ -204,7 +219,7 @@ describe("statementFileMismatch", () => {
 
   it("refuses a bank download whose lines are not the kept ones", () => {
     const lines = [{ txn_date: "2026-05-04", amount_minor: -1200 }];
-    expect(statementFileMismatch({ to: null, closingMinor: null, lines }, MAY, money)).toMatch(/^This file has 1 line /);
+    expect(statementFileMismatch({ to: null, closingMinor: null, lines }, MAY, money)).toMatch(/; this file has 1 line in those days\.$/);
   });
 
   it("needs a closing balance when the reconciliation kept no lines", () => {
