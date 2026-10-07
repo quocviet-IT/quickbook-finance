@@ -3694,3 +3694,37 @@ body {
     display: none !important;
   }
 }
+
+/* A kept statement file, drawn inside OneBook (1.83): each PDF page a picture
+   of paper, as the bank printed it — white in dark mode too, because it is the
+   bank's page, not OneBook's. A bank download is shown as the text it is. */
+.statement-file-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.statement-file-pages img {
+  display: block;
+  width: 100%;
+  max-width: 860px;
+  height: auto;
+  border: 1px solid var(--ob-border-default);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.statement-file-text {
+  margin: 0;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 12px 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ob-text-body);
+  background: var(--ob-surface-subtle);
+  border: 1px solid var(--ob-border-default);
+  border-radius: 6px;
+}
