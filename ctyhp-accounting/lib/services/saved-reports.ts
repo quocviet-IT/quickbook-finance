@@ -2,9 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSavedReportStorageClient } from "@/lib/db/storage-admin";
 import {
-  isTabularSavedReport,
   SAVED_REPORT_BUCKET,
   savedReportStoragePath,
+  savedReportView,
   type SavedReportRegisterInput,
   type SavedReportSource,
 } from "@/lib/domain/saved-reports";
@@ -45,13 +45,14 @@ const PREVIEW_BYTES = 1_000_000;
  *
  * The caller has already established that this session may write in this
  * company. The path is minted here rather than accepted from the client, so a
- * request cannot name a path belonging to another company.
+ * request cannot name a path belonging to another company; `folder` is the
+ * company's schema, the folder the database checks a registered path against.
  */
 export async function createSavedReportUploadTicket(
-  companyId: string,
+  folder: string,
   mimeType: string,
 ): Promise<{ path: string; token: string }> {
-  const path = savedReportStoragePath(companyId, mimeType, crypto.randomUUID());
+  const path = savedReportStoragePath(folder, mimeType, crypto.randomUUID());
   const admin = createSavedReportStorageClient();
   const { data, error } = await admin.storage.from(SAVED_REPORT_BUCKET).createSignedUploadUrl(path);
   if (error || !data) {
@@ -109,6 +110,11 @@ async function requireReadableRow(sb: SupabaseClient, id: string): Promise<Saved
   return data as unknown as SavedReportRow;
 }
 
+/** One saved file, read through the session: null-safe callers get "Report not found". */
+export async function getSavedReport(sb: SupabaseClient, id: string): Promise<SavedReportRow> {
+  return requireReadableRow(sb, id);
+}
+
 export async function createSavedReportDownloadUrl(
   sb: SupabaseClient,
   id: string,
@@ -123,13 +129,14 @@ export async function createSavedReportDownloadUrl(
 }
 
 /**
- * The text of a saved CSV, read by the server so the browser never holds a
- * storage credential for a preview it only renders.
+ * The text of a saved CSV or bank download, read by the server so the browser
+ * never holds a storage credential for a preview it only renders.
  */
 export async function readSavedReportText(sb: SupabaseClient, id: string): Promise<string> {
   const row = await requireReadableRow(sb, id);
-  if (!isTabularSavedReport(row.mime_type)) {
-    throw new SavedReportError("This report cannot be shown as a table. Download it instead.");
+  const view = savedReportView(row.mime_type);
+  if (view !== "table" && view !== "text") {
+    throw new SavedReportError("This report cannot be shown as text. Download it instead.");
   }
   const admin = createSavedReportStorageClient();
   const { data, error } = await admin.storage.from(SAVED_REPORT_BUCKET).download(row.storage_path);

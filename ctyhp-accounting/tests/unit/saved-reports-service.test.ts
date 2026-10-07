@@ -103,12 +103,19 @@ describe("registerSavedReport", () => {
 });
 
 describe("readSavedReportText", () => {
-  it("refuses a format the viewer cannot render, rather than returning bytes as text", async () => {
+  it("refuses a format the viewer does not show as text, rather than returning bytes as text", async () => {
     const sb = stubClient({ row: { ...csvRow, mime_type: "application/pdf" } });
     await expect(readSavedReportText(sb, csvRow.id)).rejects.toThrow(
-      "This report cannot be shown as a table",
+      "This report cannot be shown as text",
     );
     expect(storage.download).not.toHaveBeenCalled();
+  });
+
+  it("reads a bank download kept as a statement file", async () => {
+    storage.download.mockResolvedValue({ data: new Blob(["OFXHEADER:100\n<OFX>"]), error: null });
+    await expect(
+      readSavedReportText(stubClient({ row: { ...csvRow, mime_type: "text/plain" } }), csvRow.id),
+    ).resolves.toContain("OFXHEADER:100");
   });
 
   it("refuses a report this company cannot see", async () => {
