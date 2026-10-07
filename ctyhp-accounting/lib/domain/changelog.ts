@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.85",
+    date: "2026-10-07",
+    headline: "Bank lines reconciled from a statement are matched in Bank Transactions when the month is signed off.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Reconciled bank lines no longer wait for review",
+        detail:
+          "A statement imported into a reconciliation, or through From statement files, put its lines in Bank Transactions and ticked the book lines they paired with — but never matched the two, so every line of a signed-off month still showed For review with Approve and Reject. Now Complete, and each month From statement files signs, matches each bank line to the book line its statement line paired with, and says how many. A bank line already matched to another entry, ignored, or of the opposite sign to the books is left as it was, and the message says how many to check. The months signed off before this release were matched once in the same way, so their bank lines now show as matched in Bank Transactions instead of For review; no figure in the books changes.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "A recoded line's Category is easier to read",
+        detail:
+          "The Category cell of a line recoded out of Uncategorized now shows the account, then Recoded from Uncategorized, then the line's own entry and the recode entry (JE-… → JE-…), with Undo recode and Create rule. Change is no longer offered on a recoded line: it sat beside Undo recode and voided the line's own entry when pressed by mistake. To code a recoded line again, Undo recode first.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "A statement file that cannot be tied to its import says so",
+        detail:
+          "When a kept statement file could not be tied to its import, or to a reconciliation brought forward from it, only the server's log knew. The screen now says so, and where the file is: in Reports › Saved, or to be attached on the reconciliation.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Attach the statement: a clearer message, and no stuck dialogs",
+        detail:
+          "When the file chosen has a different number of lines, the message now reads \"This reconciliation kept N lines from <first day> to <statement date>; this file has M lines in those days.\" Attach the statement waits until the reconciliation's figures have loaded, and the Attach and Import dialogs stop spinning and say why when the server cannot be reached.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "1.84",
     date: "2026-10-07",
     headline: "Every page starts sooner: it asks the database fewer questions one after another.",

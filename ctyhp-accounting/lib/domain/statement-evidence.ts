@@ -80,11 +80,26 @@ export function shortSha(sha256: string): string {
 /** Where a file that could not be kept can be attached later, and what was done without it. */
 export type KeepFailureWhere = "reconciliation" | "import";
 
+const reasonText = (reason: string) => reason.trim().replace(/[.\s]+$/, "") || "an unexpected error occurred";
+
 export function keepFailureMessage(reason: string, where: KeepFailureWhere): string {
-  const why = reason.trim().replace(/[.\s]+$/, "") || "an unexpected error occurred";
+  const why = reasonText(reason);
   return where === "reconciliation"
     ? `The statement file could not be kept: ${why}. Attach it on the reconciliation.`
     : `The statement file could not be kept: ${why}. Its lines were imported without it.`;
+}
+
+/** Why a call to the server failed outright — its own words, or that it did not answer — for a dialog's message. */
+export function serverFailure(error: unknown): string {
+  return error instanceof Error && error.message.trim() ? reasonText(error.message) : "the server did not answer";
+}
+
+/** Said when a kept file could not be tied to the import or reconciliation it came with: the file is kept, only the link is missing. */
+export function unlinkedFileMessage(reason: string, where: KeepFailureWhere): string {
+  const why = reasonText(reason);
+  return where === "reconciliation"
+    ? `The statement file was kept but could not be tied to this reconciliation: ${why}. Attach it on the reconciliation.`
+    : `The statement file was kept but could not be tied to this import: ${why}. It is in Reports › Saved.`;
 }
 
 // --- Attach the statement: is this file the reconciliation's statement? -----
@@ -152,8 +167,8 @@ export function statementFileMismatch(
   const plural = (n: number) => `${n} line${n === 1 ? "" : "s"}`;
   if (month.length !== kept.length) {
     return (
-      `This file has ${plural(month.length)} from ${date(firstKeptDay)} to ${date(target.endingDate)}; ` +
-      `this reconciliation kept ${plural(kept.length)} from its statement.`
+      `This reconciliation kept ${plural(kept.length)} from ${date(firstKeptDay)} to ${date(target.endingDate)}; ` +
+      `this file has ${plural(month.length)} in those days.`
     );
   }
   const at = firstDifference(month);

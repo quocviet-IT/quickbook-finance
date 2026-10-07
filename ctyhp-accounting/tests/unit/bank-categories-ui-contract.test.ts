@@ -14,6 +14,24 @@ const read = (file: string) => readFileSync(join(process.cwd(), ...route, file),
  * not categorise a transaction. These assertions pin the replacement.
  */
 describe("the banking category column", () => {
+  it("offers a recoded line Undo recode and Create rule, never Change", () => {
+    // Change voids the entry under the recode, and sat beside Undo recode
+    // where it was pressed by mistake. A recoded line is taken back first (1.85).
+    const cell = read("CategoriseCell.tsx");
+    const start = cell.indexOf("if (posting && recode) {");
+    const end = cell.indexOf("if (posting) {", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(cell.slice(start, end)).toContain("<RecodedCategory");
+    const recoded = read("RecodedCategory.tsx");
+    expect(recoded).toContain("Recoded from Uncategorized");
+    expect(recoded).toContain("` → ${recode.entry_number}`");
+    expect(recoded).toContain("Undo recode");
+    expect(recoded).toContain("Create rule");
+    expect(recoded).not.toMatch(/^\s*Change\s*$/m);
+    expect(recoded).not.toContain("uncategoriseBankTransactionAction");
+  });
+
   it("puts the control in its own component, and posting is what it does", () => {
     const cell = read("CategoriseCell.tsx");
     expect(cell).toContain("categoriseBankTransactionAction");

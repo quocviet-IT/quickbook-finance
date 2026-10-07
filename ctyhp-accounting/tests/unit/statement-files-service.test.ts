@@ -7,7 +7,7 @@ vi.mock("@/lib/db/storage-admin", () => ({
   createSavedReportStorageClient: () => ({ storage: { from: () => storage } }),
 }));
 
-const { removeUnkeptUpload } = await import("@/lib/services/statement-files");
+const { removeUnkeptUpload, tieKeptStatementFile } = await import("@/lib/services/statement-files");
 
 const folder = "co_example";
 const good = `${folder}/6d0f1e2a-1111-4222-8333-444455556666.pdf`;
@@ -50,5 +50,45 @@ describe("removeUnkeptUpload", () => {
   it("does not delete a well-formed path a row names", async () => {
     await removeUnkeptUpload(stubClient({ id: "row" }), folder, good);
     expect(storage.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("tieKeptStatementFile", () => {
+  /** A client whose link RPCs answer `error`, recording what they were called with. */
+  function rpcClient(error: { message: string } | null) {
+    const calls: { fn: string; args: Record<string, unknown> }[] = [];
+    const sb = {
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push({ fn, args });
+        return { data: null, error };
+      },
+    } as never;
+    return { sb, calls };
+  }
+
+  it("ties a file to its import, and says nothing", async () => {
+    const { sb, calls } = rpcClient(null);
+    expect(await tieKeptStatementFile(sb, "import", "batch-1", "file-1")).toBeNull();
+    expect(calls).toEqual([{ fn: "acc_link_import_batch_statement_file", args: { p_batch_id: "batch-1", p_file_id: "file-1" } }]);
+  });
+
+  it("ties a file to a reconciliation", async () => {
+    const { sb, calls } = rpcClient(null);
+    expect(await tieKeptStatementFile(sb, "reconciliation", "rec-1", "file-1")).toBeNull();
+    expect(calls).toEqual([
+      { fn: "acc_link_reconciliation_statement_file", args: { p_reconciliation_id: "rec-1", p_file_id: "file-1" } },
+    ]);
+  });
+
+  it("returns what the screen says when the file cannot be tied, instead of failing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sb } = rpcClient({ message: "This import already has a statement file" });
+    expect(await tieKeptStatementFile(sb, "import", "batch-1", "file-1")).toBe(
+      "The statement file was kept but could not be tied to this import: This import already has a statement file. It is in Reports › Saved.",
+    );
+    expect(await tieKeptStatementFile(sb, "reconciliation", "rec-1", "file-1")).toBe(
+      "The statement file was kept but could not be tied to this reconciliation: This import already has a statement file. Attach it on the reconciliation.",
+    );
+    warn.mockRestore();
   });
 });

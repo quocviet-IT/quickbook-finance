@@ -12,28 +12,9 @@ import { listAccounts } from "./accounts";
 import { listSuggestions } from "./banking";
 import { getReconciliationLines, getReconciliationStatement, listReconciliations, pairAndTick } from "./bankrec";
 import { codingSuggestions } from "./coding";
-import { readAllPages } from "./paging";
+import { bankLinesBetween } from "./statement-bank-lines";
 
 export class AddMissingError extends Error {}
-
-async function bankLinesBetween(sb: SupabaseClient, bankAccountId: string, from: string, to: string) {
-  // Paged, oldest first; the id settles lines of one day, so identical lines
-  // keep one order however many pages the read takes.
-  return readAllPages<Record<string, unknown>>(
-    (start, end) =>
-      sb
-        .from("acc_bank_transaction")
-        .select("id,txn_date,description,reference,amount_minor,status")
-        .eq("bank_account_id", bankAccountId)
-        .is("provider_removed_at", null)
-        .gte("txn_date", from)
-        .lte("txn_date", to)
-        .order("txn_date")
-        .order("id")
-        .range(start, end),
-    (message) => new AddMissingError(message),
-  );
-}
 
 /** What "Add all N to the books" would add to this reconciliation, and what it cannot. */
 export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: string): Promise<AddMissingPlan> {
@@ -71,13 +52,13 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
       .at(-1) ?? null;
   const suggested = new Set(matches.map((m) => m.bank_transaction_id));
   const transactions: AddBankLine[] = rows.map((row) => ({
-    id: row.id as string,
-    txnDate: row.txn_date as string,
-    description: (row.description as string | null) ?? null,
-    reference: (row.reference as string | null) ?? null,
-    amountMinor: Number(row.amount_minor),
-    status: row.status as string,
-    suggested: suggested.has(row.id as string),
+    id: row.id,
+    txnDate: row.txnDate,
+    description: row.description,
+    reference: row.reference,
+    amountMinor: row.amountMinor,
+    status: row.status,
+    suggested: suggested.has(row.id),
   }));
   const suggestions = new Map<string, AddSuggestion>(
     coding.map((s) => [s.transactionId, { accountId: s.accountId, accountLabel: s.accountLabel, source: s.source, short: s.short, why: s.why }]),

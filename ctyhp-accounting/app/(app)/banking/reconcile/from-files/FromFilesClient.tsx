@@ -19,6 +19,14 @@ import {
 } from "@/lib/domain/statement-run";
 import { formatMoney } from "@/lib/format";
 import { keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
+import {
+  NO_BANK_LINE_MATCHES,
+  addMatchCounts,
+  bankLinesMatchedSentence,
+  bankLinesNotMatchedSentence,
+  bankLinesToCheck,
+  type BankLineMatchCounts,
+} from "@/lib/domain/statement-bank-lines";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { previewRunAction, reconcileRunMonthAction } from "../statement-actions";
 import StandingTag from "../StandingTag";
@@ -47,6 +55,15 @@ interface Done {
   error: string | null;
   /** The account's earlier lines were brought forward before any month. */
   broughtForward: boolean;
+  /** What matching the signed months' bank lines did (1.85). */
+  matched: BankLineMatchCounts;
+  /** A sentence for each signed month whose bank lines could not be matched. */
+  unmatched: string[];
+}
+
+/** What matching the signed months' bank lines said, after the run's own summary. */
+function matchedSaid(done: Done): string | null {
+  return [bankLinesMatchedSentence(done.matched), ...done.unmatched].filter(Boolean).join(" ") || null;
 }
 
 /** What was done before a run stopped on an error, said after the error. */
@@ -185,9 +202,11 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
     let step = 0;
     let signed = 0;
     let broughtForward = false;
-    const finish = (result: Done) => {
+    let matched: BankLineMatchCounts = NO_BANK_LINE_MATCHES;
+    const unmatched: string[] = [];
+    const finish = (result: Pick<Done, "open" | "error">) => {
       setProgress(null);
-      setDone(result);
+      setDone({ ...result, signed, broughtForward, matched, unmatched });
       setPreview(null);
       if (result.error === null && result.open === null) {
         // Every month is signed: the table would only say "Already signed off".
@@ -243,8 +262,9 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         opening_minor: first.openingMinor,
         statement_file_id: fileIdOf.get(first.key) ?? null,
       });
-      if (!res.ok) return finish({ signed, open: null, error: res.error ?? "The earlier lines could not be brought forward", broughtForward });
+      if (!res.ok) return finish({ open: null, error: res.error ?? "The earlier lines could not be brought forward" });
       broughtForward = true;
+      if (res.data?.fileWarning) message.warning(res.data.fileWarning, 10);
     }
     for (const month of toSign) {
       const statement = previewedByKey.get(month.key);
@@ -262,20 +282,21 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         statement_file_id: fileIdOf.get(statement.key) ?? null,
         sign: true,
       });
-      if (!res.ok || !res.data) return finish({ signed, open: null, error: res.error ?? "A month could not be signed off", broughtForward });
+      if (!res.ok || !res.data) return finish({ open: null, error: res.error ?? "A month could not be signed off" });
+      if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
       if (!res.data.signed) {
         return finish({
-          signed,
           open: {
             id: res.data.id,
             date: month.statementDate,
             sentence: `The books changed since the preview: this month is now out by ${money(Math.abs(res.data.differenceMinor))}.`,
           },
           error: null,
-          broughtForward,
         });
       }
       signed += 1;
+      if (res.data.matched) matched = addMatchCounts(matched, res.data.matched);
+      if (res.data.matchError) unmatched.push(bankLinesNotMatchedSentence(res.data.matchError, shortDate(month.statementDate, true)));
     }
     let open: Done["open"] = null;
     const statement = statementOfNeedsLook;
@@ -293,11 +314,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         sign: false,
       });
       if (!res.ok || !res.data) {
-        return finish({ signed, open: null, error: res.error ?? "The month that needs a look could not be started", broughtForward });
+        return finish({ open: null, error: res.error ?? "The month that needs a look could not be started" });
       }
+      if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
       open = { id: res.data.id, date: needsLook.statementDate, sentence: monthSentence(needsLook.outcome, money) };
     }
-    finish({ signed, open, error: null, broughtForward });
+    finish({ open, error: null });
   }
 
   return (
@@ -443,7 +465,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
 
       {done ? (
         <Alert
-          type={done.error ? "error" : done.open ? "warning" : "success"}
+          type={done.error ? "error" : done.open || done.unmatched.length > 0 || bankLinesToCheck(done.matched) > 0 ? "warning" : "success"}
           showIcon
           title={
             done.error ??
@@ -455,14 +477,15 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
             done.open ? (
               <span>
                 {done.broughtForward ? "The earlier lines were brought forward. " : ""}
+                {matchedSaid(done) ? `${matchedSaid(done)} ` : ""}
                 {done.open.sentence.replace(/\.?$/, ".")} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
                 <Link href={`/banking/reconcile/${done.open.id}`}>Open it</Link>
               </span>
             ) : done.error ? (
-              before(done)
-            ) : done.broughtForward ? (
-              "The earlier lines were brought forward first."
-            ) : null
+              [before(done), matchedSaid(done)].filter(Boolean).join(" ") || null
+            ) : (
+              [done.broughtForward ? "The earlier lines were brought forward first." : null, matchedSaid(done)].filter(Boolean).join(" ") || null
+            )
           }
         />
       ) : null}

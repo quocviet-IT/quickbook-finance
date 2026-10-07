@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSavedReportStorageClient } from "@/lib/db/storage-admin";
 import { SAVED_REPORT_BUCKET } from "@/lib/domain/saved-reports";
-import type { StatementFileKeepInput } from "@/lib/domain/statement-evidence";
+import { unlinkedFileMessage, type KeepFailureWhere, type StatementFileKeepInput } from "@/lib/domain/statement-evidence";
 
 /**
  * The statement file kept beside what was read from it (1.83), in the
@@ -71,4 +71,27 @@ export async function linkReconciliationStatementFile(sb: SupabaseClient, reconc
 export async function linkImportBatchStatementFile(sb: SupabaseClient, batchId: string, fileId: string): Promise<void> {
   const { error } = await sb.rpc("acc_link_import_batch_statement_file", { p_batch_id: batchId, p_file_id: fileId });
   if (error) throw new StatementFileError(error.message);
+}
+
+/**
+ * Ties a file kept a moment ago to the import or the reconciliation it came
+ * with. A failure costs nothing done with the file — it stays in Reports ›
+ * Saved — so it is returned as the warning the screen shows, not thrown. Null
+ * when the file is tied.
+ */
+export async function tieKeptStatementFile(
+  sb: SupabaseClient,
+  where: KeepFailureWhere,
+  id: string,
+  fileId: string,
+): Promise<string | null> {
+  try {
+    if (where === "import") await linkImportBatchStatementFile(sb, id, fileId);
+    else await linkReconciliationStatementFile(sb, id, fileId);
+    return null;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`linking the statement file to its ${where} failed:`, reason);
+    return unlinkedFileMessage(reason, where);
+  }
 }

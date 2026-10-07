@@ -10,6 +10,7 @@
  * that cannot be added says why. Pure: the service reads, this decides.
  */
 import type { Standing } from "./reconcile-statement";
+import { statementLineKey } from "./statement-bank-lines";
 import type { HoldingAccounts } from "./uncategorized";
 
 /** The most lines one click adds; matches acc_add_statement_lines_to_books. */
@@ -98,16 +99,6 @@ export const ADD_BLOCKED = {
 
 export const UNCATEGORIZED_WHY = "Nothing places this line, so it goes to Uncategorized, to recode later.";
 
-/**
- * The key a statement line and its bank line share. The statement keeps a
- * description cut to 500 characters and a reference trimmed to 80, where the
- * bank line keeps them as the file gave them — so both are read the same way.
- */
-function lineKey(txnDate: string, amountMinor: number, description: string | null, reference: string | null): string {
-  const ref = (reference ?? "").trim().slice(0, 80);
-  return JSON.stringify([txnDate, amountMinor, (description ?? "").slice(0, 500), ref]);
-}
-
 export function planAddMissing(input: {
   lines: readonly AddStatementLine[];
   /** One per line, in the same order (reconciliationStandings). */
@@ -138,7 +129,7 @@ export function planAddMissing(input: {
 
   const groups = new Map<string, AddBankLine[]>();
   for (const txn of input.transactions) {
-    const key = lineKey(txn.txnDate, txn.amountMinor, txn.description, txn.reference);
+    const key = statementLineKey(txn);
     groups.set(key, [...(groups.get(key) ?? []), txn]);
   }
   const taken = new Set<string>();
@@ -146,7 +137,7 @@ export function planAddMissing(input: {
   const items: AddItem[] = [];
   const cannot: CannotAdd[] = [];
   for (const line of missingLines) {
-    const group = groups.get(lineKey(line.txnDate, line.amountMinor, line.description, line.reference)) ?? [];
+    const group = groups.get(statementLineKey(line)) ?? [];
     const free = group.find((txn) => !taken.has(txn.id) && txn.status === "unmatched" && !txn.suggested);
     const said = { lineNo: line.lineNo, txnDate: line.txnDate, description: line.description, amountMinor: line.amountMinor };
     if (line.amountMinor === 0 || (input.signedThrough && line.txnDate <= input.signedThrough)) {

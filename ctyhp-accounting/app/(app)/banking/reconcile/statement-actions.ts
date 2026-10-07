@@ -27,7 +27,9 @@ import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
-import { linkImportBatchStatementFile, linkReconciliationStatementFile } from "@/lib/services/statement-files";
+import { tieKeptStatementFile } from "@/lib/services/statement-files";
+import { matchAfterCompletion } from "@/lib/services/statement-bank-lines";
+import type { BankLineMatchCounts } from "@/lib/domain/statement-bank-lines";
 import type { ActionResult } from "./actions";
 
 async function guard(): Promise<string | null> {
@@ -43,6 +45,8 @@ export interface StatementImportSummary {
   inserted: number;
   duplicates: number;
   outcome: PairingOutcome;
+  /** Said when the kept file could not be tied to the import; null when it was, or none was kept. */
+  fileWarning: string | null;
 }
 
 function statementFile(input: ReconciliationStatementInput): StatementFileInput {
@@ -53,11 +57,6 @@ function statementFile(input: ReconciliationStatementInput): StatementFileInput 
     lines: input.lines,
     statementFileId: input.statement_file_id,
   };
-}
-
-/** A link the statement file could not make costs nothing done with it: the file stays in Reports › Saved. */
-function warnUnlinked(err: unknown) {
-  console.warn("linking the statement file failed:", err instanceof Error ? err.message : err);
 }
 
 /**
@@ -72,15 +71,14 @@ async function importIntoBankTransactions(
   file: StatementFileInput,
 ) {
   const imported = await importStatement(sb, bankAccountId, file.fileName, file.lines);
-  if (imported.batchId && file.statementFileId) {
-    await linkImportBatchStatementFile(sb, imported.batchId, file.statementFileId).catch(warnUnlinked);
-  }
+  const fileWarning =
+    imported.batchId && file.statementFileId ? await tieKeptStatementFile(sb, "import", imported.batchId, file.statementFileId) : null;
   if (imported.inserted > 0) {
     await generateSuggestions(sb, bankAccountId).catch((err) =>
       console.warn("finding ledger matches after import failed:", err instanceof Error ? err.message : err),
     );
   }
-  return imported;
+  return { ...imported, fileWarning };
 }
 
 /**
@@ -109,7 +107,7 @@ export async function importStatementIntoReconciliationAction(
     const outcome = await pairAndTick(sb, reconciliationId);
     revalidatePath(`/banking/reconcile/${reconciliationId}`);
     revalidatePath("/banking");
-    return { ok: true, data: { inserted: imported.inserted, duplicates: imported.skipped, outcome } };
+    return { ok: true, data: { inserted: imported.inserted, duplicates: imported.skipped, outcome, fileWarning: imported.fileWarning } };
   } catch (e) {
     if (!kept) return { ok: false, error: msg(e) };
     revalidatePath(`/banking/reconcile/${reconciliationId}`);
@@ -185,6 +183,12 @@ export interface RunMonthResult {
   signed: boolean;
   /** What is left between the statement and the books; zero when signed. */
   differenceMinor: number;
+  /** What matching the month's bank lines did once it was signed; null when it was not signed, or brought forward. */
+  matched: BankLineMatchCounts | null;
+  /** Why the signed month's bank lines could not be matched; the month stays signed. */
+  matchError: string | null;
+  /** Said when the kept file could not be tied to the import or reconciliation; null otherwise. */
+  fileWarning: string | null;
 }
 
 /**
@@ -214,9 +218,11 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
         broughtForwardNote(input.period_from, input.statement_date),
       );
       // Brought forward on the opening balance its statement prints: that file is its evidence too.
-      if (input.statement_file_id) await linkReconciliationStatementFile(sb, id, input.statement_file_id).catch(warnUnlinked);
+      const fileWarning = input.statement_file_id
+        ? await tieKeptStatementFile(sb, "reconciliation", id, input.statement_file_id)
+        : null;
       revalidatePath("/banking/reconcile");
-      return { ok: true, data: { id, signed: true, differenceMinor: 0 } };
+      return { ok: true, data: { id, signed: true, differenceMinor: 0, matched: null, matchError: null, fileWarning } };
     }
     const [{ asOf }, reconciliations] = await Promise.all([getBankingContext(sb), listReconciliations(sb, input.bank_account_id)]);
     // Newest first, as listReconciliations orders them.
@@ -229,14 +235,15 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
     const file = statementFile(input);
     const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, input.closing_minor, file);
     startedId = id;
-    await importIntoBankTransactions(sb, input.bank_account_id, file);
+    const { fileWarning } = await importIntoBankTransactions(sb, input.bank_account_id, file);
     await pairAndTick(sb, id);
     const { differenceMinor } = await getReconciliationDetail(sb, id);
     const signed = input.sign && differenceMinor === 0;
     if (signed) await completeReconciliation(sb, id);
+    const { matched, matchError } = signed ? await matchAfterCompletion(sb, id) : { matched: null, matchError: null };
     revalidatePath("/banking/reconcile");
     revalidatePath("/banking");
-    return { ok: true, data: { id, signed, differenceMinor } };
+    return { ok: true, data: { id, signed, differenceMinor, matched, matchError, fileWarning } };
   } catch (e) {
     revalidatePath("/banking/reconcile");
     revalidatePath("/banking");

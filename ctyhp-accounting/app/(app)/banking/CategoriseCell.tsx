@@ -10,6 +10,7 @@ import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import { isHoldingDetail } from "@/lib/domain/uncategorized";
 import { formatMoney } from "@/lib/format";
 import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
+import RecodedCategory from "./RecodedCategory";
 import LoanSplitModal from "./LoanSplitModal";
 import {
   categoriseBankTransactionAction,
@@ -274,11 +275,21 @@ export default function CategoriseCell({
     </div>
   ) : null;
 
+  if (posting && recode) {
+    return (
+      <RecodedCategory
+        recode={recode}
+        entryNumber={posting.entry_number}
+        onUndo={canWrite && posting.own_entry ? () => void takeRecodeBack() : null}
+        undoing={busy}
+        onCreateRule={canWrite && onCreateRule ? onCreateRule : null}
+      />
+    );
+  }
+
   if (posting) {
-    // A recoded line shows where its money went; the entry that put it in
-    // Uncategorized stays as it was, under the recode.
-    const main = recode ? `${recode.account_code} — ${recode.account_name}` : `${posting.account_code} — ${posting.account_name}`;
-    const others = recode ? [] : (posting.others ?? []);
+    const main = `${posting.account_code} — ${posting.account_name}`;
+    const others = posting.others ?? [];
     const everyAccount = [main, ...others].join("; ");
     const mayChange = canWrite && posting.own_entry;
     return (
@@ -294,11 +305,7 @@ export default function CategoriseCell({
             </Typography.Text>
           </Tooltip>
         ) : null}
-        {recode ? (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            recoded from Uncategorized{recode.entry_number ? ` · ${recode.entry_number}` : ""}
-          </Typography.Text>
-        ) : holding ? (
+        {holding ? (
           <div>
             <Tag color="gold">needs coding</Tag>
           </div>
@@ -307,14 +314,9 @@ export default function CategoriseCell({
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
           </Typography.Text>
-          {mayChange && holding && !recode ? (
+          {mayChange && holding ? (
             <Button type="link" size="small" style={linkStyle} disabled={busy} onClick={() => setRecoding((open) => !open)}>
               Recode
-            </Button>
-          ) : null}
-          {mayChange && recode ? (
-            <Button type="link" size="small" style={linkStyle} loading={busy} onClick={() => void takeRecodeBack()}>
-              Undo recode
             </Button>
           ) : null}
           {mayChange ? (
@@ -339,7 +341,7 @@ export default function CategoriseCell({
             </Button>
           ) : null}
         </Space>
-        {recoding && !recode ? (
+        {recoding ? (
           <Tooltip title="Choosing an account posts a second entry that moves this line out of Uncategorized">
             {accountSelect(recodeOptions, "Recode to…", (accountId) => void recodeTo(accountId))}
           </Tooltip>

@@ -3,7 +3,8 @@ import { defineConfig } from "vitest/config";
 
 /**
  * Read-only checks against the live books (tests/live). Never part of `npm test`:
- * they need `.env.local`, sign in as the smoke user, and take minutes.
+ * they need `.env.local`, sign in as the smoke user, and take minutes. The one
+ * file that can write, match-signed-months, does nothing unless asked by name.
  */
 export default defineConfig({
   resolve: {
