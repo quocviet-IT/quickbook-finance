@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.93",
+    date: "2026-10-08",
+    headline: "An invoice's or payment's details open in one request instead of several.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Invoice and payment details open sooner",
+        detail:
+          "View lines on an invoice used to make three requests one after another — its lines, its payments, its change history — and a payment's details two. Each now opens with a single request, so the wait is one trip to the server instead of three or two. The Feedback queue refreshes the same way after a report is moved. What each window shows is unchanged.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "1.92",
     date: "2026-10-08",
     headline: "Bank Transactions shows its lines sooner, and says when it is still loading.",

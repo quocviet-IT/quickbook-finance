@@ -28,8 +28,7 @@ vi.mock("@/lib/services/invoicing", async (importOriginal) => ({
 
 import {
   correctPaymentAction,
-  getPaymentAuditAction,
-  getPaymentDetailAction,
+  getPaymentDrawerAction,
   updatePaymentDetailsAction,
 } from "@/app/(app)/payments/actions";
 
@@ -70,36 +69,40 @@ describe("payment detail and correction actions", () => {
     mocks.searchAudit.mockResolvedValue([{ id: "audit-1" }]);
   });
 
-  it("reads a detail through the company-bound client", async () => {
-    await expect(getPaymentDetailAction({ id, journal_entry_id: "entry-1" })).resolves.toEqual({
-      ok: true,
-      data: { allocations: [], journal: null },
+  it("reads a detail through the company-bound client, and no history it was not asked for", async () => {
+    await expect(getPaymentDrawerAction({ id, journal_entry_id: "entry-1" }, false)).resolves.toEqual({
+      detail: { ok: true, data: { allocations: [], journal: null } },
+      audit: null,
     });
     expect(mocks.getPaymentDetail).toHaveBeenCalledWith(
       { marker: "company-bound" },
       { id, journal_entry_id: "entry-1" },
     );
-  });
-
-  it("refuses the audit trail without the audit.read permission", async () => {
-    mocks.hasPermission.mockResolvedValue(false);
-
-    await expect(getPaymentAuditAction(id)).resolves.toEqual({
-      ok: false,
-      error: "You do not have permission to perform this action",
-    });
+    expect(mocks.hasPermission).not.toHaveBeenCalled();
     expect(mocks.searchAudit).not.toHaveBeenCalled();
   });
 
-  it("asks the audit log for this payment's own record", async () => {
-    await expect(getPaymentAuditAction(id)).resolves.toEqual({
-      ok: true,
-      data: [{ id: "audit-1" }],
+  it("refuses the audit trail without the audit.read permission, and still shows the detail", async () => {
+    mocks.hasPermission.mockResolvedValue(false);
+
+    const drawer = await getPaymentDrawerAction({ id, journal_entry_id: "entry-1" }, true);
+    expect(drawer.audit).toEqual({
+      ok: false,
+      error: "You do not have permission to perform this action",
     });
+    expect(drawer.detail.ok).toBe(true);
+    expect(mocks.searchAudit).not.toHaveBeenCalled();
+  });
+
+  it("asks the audit log for this payment's own record, on the same client as the detail", async () => {
+    const drawer = await getPaymentDrawerAction({ id, journal_entry_id: "entry-1" }, true);
+    expect(drawer.audit).toEqual({ ok: true, data: [{ id: "audit-1" }] });
     expect(mocks.searchAudit).toHaveBeenCalledWith(
       { marker: "company-bound" },
       expect.objectContaining({ table_name: "acc_payment", record_id: id, limit: 200 }),
     );
+    // One request, one client: the drawer's two reads used to be two queued actions.
+    expect(mocks.createClient).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a description edit from a non-writer before opening a client", async () => {

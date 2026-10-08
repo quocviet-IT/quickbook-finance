@@ -48,9 +48,7 @@ import { formatBytes } from "@/lib/domain/feedback-attachment";
 import {
   feedbackAttachmentUrlAction,
   feedbackScreenshotUrlAction,
-  listFeedbackAttachmentsAction,
-  listFeedbackImprovementsAction,
-  listFeedbackReportsAction,
+  getFeedbackTriageAction,
   setFeedbackStatusAction,
 } from "./actions";
 
@@ -124,11 +122,9 @@ export default function FeedbackTriageClient({
 
   async function reload() {
     setLoading(true);
-    const [res, files, ranked] = await Promise.all([
-      listFeedbackReportsAction(),
-      listFeedbackAttachmentsAction(),
-      listFeedbackImprovementsAction(),
-    ]);
+    // One request: Next runs Server Actions one at a time, so the three reads
+    // sent as separate actions were three trips in a row, after every move too.
+    const { reports: res, attachments: files, improvements: ranked } = await getFeedbackTriageAction();
     setLoading(false);
     if (res.ok && res.data) setReports(res.data);
     else message.error(res.error ?? "Failed to load reports");
