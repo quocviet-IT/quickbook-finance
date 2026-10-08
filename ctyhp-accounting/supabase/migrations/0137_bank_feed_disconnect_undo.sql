@@ -429,6 +429,11 @@ begin
 
   -- Lock the lines first: a person approving a match or coding a line at the
   -- same moment waits for the undo, so an approved match is never cascaded away.
+  -- Their matches are locked before the lines themselves, in the order
+  -- acc_decide_bank_match takes them, so the two cannot deadlock.
+  perform 1 from acc_reconciliation
+   where bank_transaction_id in (select bank_transaction_id from acc_bank_feed_sync_change where run_id = p_run_id)
+     for update;
   perform 1 from acc_bank_transaction
    where id in (select bank_transaction_id from acc_bank_feed_sync_change where run_id = p_run_id)
      for update;
