@@ -52,6 +52,18 @@ describe("0137_bank_feed_disconnect_undo", () => {
     expect(code).toMatch(/drop function if exists acc_apply_bank_feed_page\(uuid, jsonb, jsonb, jsonb\);/);
   });
 
+  it("decides a sync was cut off in one place, and every reader asks it", () => {
+    expect(code.match(/interval '15 minutes'/g)).toHaveLength(1);
+    expect(code.match(/The sync stopped before it finished/g)).toHaveLength(3);
+    const cutOff = body("acc_bank_feed_sync_cut_off");
+    expect(cutOff).toMatch(/acc_current_role\(\) is not null/);
+    expect(cutOff).toMatch(/security definer set search_path = public/);
+    expect(code).toMatch(/revoke all on function acc_bank_feed_sync_cut_off\(text, timestamptz\) from public, anon/);
+    for (const fn of ["acc_begin_bank_feed_sync", "acc_bank_feed_sync_is_newest", "acc_bank_feed_syncs", "acc_undo_bank_feed_sync"]) {
+      expect(body(fn), fn).toMatch(/acc_bank_feed_sync_cut_off\(/);
+    }
+  });
+
   it("runs whole in every company schema", () => {
     const plan = planCompanySchema([{ file: FILE, sql }], "co_example");
     expect(plan.skipped).toEqual([]);

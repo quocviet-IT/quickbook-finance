@@ -22,7 +22,7 @@ const client = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ss
 const killer = setTimeout(() => {
   console.error("HARD TIMEOUT");
   process.exit(2);
-}, 8 * 60 * 1000);
+}, 15 * 60 * 1000);
 await client.connect();
 
 let passed = 0;
@@ -216,6 +216,45 @@ try {
       check("while a newer sync runs, run 2 is no longer the one to undo", busyListed?.is_newest === false, JSON.stringify(busyListed));
       await refused("…and its undo waits for the running sync", UNDO, [run2, "verify"], "Undo the newer syncs of this bank connection first");
       await finish(runBusy);
+
+      // ---- a sync that was cut off (still running 15 minutes on) counts as failed
+      await client.query("savepoint cutoff");
+      // Every earlier run moves two hours back, so the cut-off run below is the newest.
+      await asOwner(admin.id, () =>
+        client.query(`update acc_bank_feed_sync_run set started_at = started_at - interval '2 hours' where connection_id = $1`, [conn]),
+      );
+      const backdate = (run) =>
+        asOwner(admin.id, () => client.query(`update acc_bank_feed_sync_run set started_at = clock_timestamp() - interval '20 minutes' where id = $1`, [run]));
+      const CUT_OFF_MESSAGE = "The sync stopped before it finished";
+      const runCut = await begin();
+      await backdate(runCut);
+      const cutListed = await all(SYNCS, [bank]);
+      check("a run still running 20 minutes on does not block the undo of the one before it",
+        cutListed.find((r) => r.run_id === run2)?.is_newest === true, JSON.stringify(cutListed.find((r) => r.run_id === run2)));
+      const cutRow = (await all(`select status, error_message from acc_bank_feed_syncs($1) where run_id = $2`, [bank, runCut]))[0];
+      check("…and the list reports it as failed, with the message",
+        cutRow?.status === "failed" && cutRow?.error_message === CUT_OFF_MESSAGE, JSON.stringify(cutRow));
+      await apply(runCut, [line("e7", "2026-09-07", 800, "DEPOSIT SEVEN")]);
+      const afterCutApply = await all(SYNCS, [bank]);
+      check("a cut-off run that changed something is the one to undo, and holds the older runs back",
+        afterCutApply.find((r) => r.run_id === runCut)?.is_newest === true && afterCutApply.find((r) => r.run_id === run2)?.is_newest === false,
+        JSON.stringify(afterCutApply));
+      check("…it is undone from failed, and its added line is gone",
+        (await one(UNDO, [runCut, "Verify: undo a run that was cut off"])).out.removed === 1 && !(await txn("e7")));
+      const cutRun = await one(`select status, completed_at, error_message from acc_bank_feed_sync_run where id = $1`, [runCut]);
+      check("…it ends undone, having been marked failed with the message on the way",
+        cutRun.status === "undone" && cutRun.completed_at !== null && cutRun.error_message === CUT_OFF_MESSAGE, JSON.stringify(cutRun));
+      check("…and the run before it can be undone again",
+        (await all(SYNCS, [bank])).find((r) => r.run_id === run2)?.is_newest === true);
+      const runCut2 = await begin();
+      await backdate(runCut2);
+      const runNext = await begin();
+      const cutAfterBegin = await one(`select status, completed_at, error_message from acc_bank_feed_sync_run where id = $1`, [runCut2]);
+      check("beginning a sync marks a cut-off run of the same connection failed",
+        cutAfterBegin.status === "failed" && cutAfterBegin.completed_at !== null && cutAfterBegin.error_message === CUT_OFF_MESSAGE, JSON.stringify(cutAfterBegin));
+      check("…and leaves the sync it began running",
+        (await one(`select status from acc_bank_feed_sync_run where id = $1`, [runNext])).status === "running");
+      await client.query("rollback to savepoint cutoff");
 
       // ---- undo run 2: its lines go, the lines it retired come back as they were
       await asOwner(admin.id, () =>

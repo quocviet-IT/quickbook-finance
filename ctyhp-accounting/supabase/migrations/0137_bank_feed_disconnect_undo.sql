@@ -15,6 +15,11 @@
 -- do not come back with the next sync; connecting again fetches the history.
 -- A sync that failed part-way never moved the cursor, so the next sync fetches
 -- its changes again.
+--
+-- A sync whose function was killed (a timeout, a crash, a deploy) never reaches
+-- acc_finish_bank_feed_sync and would stay `running` for good, blocking every
+-- undo of its connection. The sync route stops after 300 seconds, so a run still
+-- running 15 minutes after it began was cut off: it counts as failed.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -246,6 +251,19 @@ grant execute on function acc_apply_bank_feed_page(uuid, uuid, jsonb, jsonb, jso
 --    time, not the transaction's: two syncs started in one transaction would
 --    otherwise share a moment, and "newest first" would be a coin toss.
 -- ----------------------------------------------------------------------------
+-- The one place that says a run was cut off: still running 15 minutes after it
+-- began, though the sync route stops after 300 seconds.
+create or replace function acc_bank_feed_sync_cut_off(p_status text, p_started_at timestamptz)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select acc_current_role() is not null
+     and p_status = 'running'
+     and p_started_at < now() - interval '15 minutes';
+$$;
+
+revoke all on function acc_bank_feed_sync_cut_off(text, timestamptz) from public, anon;
+grant execute on function acc_bank_feed_sync_cut_off(text, timestamptz) to authenticated, service_role;
+
 create or replace function acc_begin_bank_feed_sync(p_connection_id uuid)
 returns uuid
 language plpgsql security definer set search_path = public as $$
@@ -257,6 +275,12 @@ begin
   if not exists (select 1 from acc_bank_connection where id = p_connection_id and status <> 'disconnected') then
     raise exception 'Active bank connection was not found';
   end if;
+  -- Runs of this connection that were cut off stop looking as if they ran.
+  update acc_bank_feed_sync_run
+     set status = 'failed', completed_at = clock_timestamp(),
+         error_message = coalesce(error_message, 'The sync stopped before it finished')
+   where connection_id = p_connection_id
+     and acc_bank_feed_sync_cut_off(status, started_at);
   insert into acc_bank_feed_sync_run (connection_id, started_by, started_at)
   values (p_connection_id, auth.uid(), clock_timestamp())
   returning id into v_run;
@@ -324,7 +348,8 @@ grant execute on function acc_finish_bank_feed_sync(uuid, text, int, int, int, i
 --
 --    A failed sync can be undone too, if it changed something. It never moved
 --    the connection's cursor, so after its undo the next sync fetches its
---    changes again.
+--    changes again. A cut-off run counts as failed here: it does not block
+--    older syncs as a running one does, and it can itself be undone.
 -- ----------------------------------------------------------------------------
 create or replace function acc_bank_feed_sync_is_newest(p_run_id uuid)
 returns boolean
@@ -333,13 +358,13 @@ language sql stable security definer set search_path = public as $$
     select 1 from acc_bank_feed_sync_run r
      where r.id = p_run_id
        and acc_current_role() is not null
-       and r.status in ('succeeded', 'failed')
+       and (r.status in ('succeeded', 'failed') or acc_bank_feed_sync_cut_off(r.status, r.started_at))
        and exists (select 1 from acc_bank_feed_sync_change c where c.run_id = r.id)
        and not exists (
          select 1 from acc_bank_feed_sync_run n
           where n.connection_id = r.connection_id
             and n.id <> r.id
-            and (n.status = 'running'
+            and ((n.status = 'running' and not acc_bank_feed_sync_cut_off(n.status, n.started_at))
                  or (n.status <> 'undone'
                      and (n.started_at, n.id) > (r.started_at, r.id)
                      and exists (select 1 from acc_bank_feed_sync_change c2 where c2.run_id = n.id)))
@@ -380,8 +405,12 @@ returns table (
 )
 language sql stable security definer set search_path = public as $$
   select r.id, r.connection_id, c.institution_name, c.status,
-         r.status, r.started_at, r.completed_at,
-         r.added_count, r.modified_count, r.removed_count, r.error_message,
+         case when acc_bank_feed_sync_cut_off(r.status, r.started_at) then 'failed' else r.status end,
+         r.started_at, r.completed_at,
+         r.added_count, r.modified_count, r.removed_count,
+         case when acc_bank_feed_sync_cut_off(r.status, r.started_at)
+              then coalesce(r.error_message, 'The sync stopped before it finished')
+              else r.error_message end,
          r.undone_at, r.undo_reason,
          (select count(*)::int from acc_bank_feed_sync_change x where x.run_id = r.id),
          acc_bank_feed_sync_is_newest(r.id),
@@ -421,6 +450,14 @@ begin
   -- One undo of a connection at a time.
   perform 1 from acc_bank_connection where id = v_run.connection_id for update;
   if v_run.status = 'undone' then raise exception 'This sync has already been undone'; end if;
+  if acc_bank_feed_sync_cut_off(v_run.status, v_run.started_at) then
+    -- Cut off, not running: it ends as failed before it is undone.
+    update acc_bank_feed_sync_run
+       set status = 'failed', completed_at = clock_timestamp(),
+           error_message = coalesce(error_message, 'The sync stopped before it finished')
+     where id = p_run_id;
+    v_run.status := 'failed';
+  end if;
   if v_run.status = 'running' then raise exception 'This sync is still running'; end if;
   if not exists (select 1 from acc_bank_feed_sync_change where run_id = p_run_id) then
     raise exception 'This sync changed nothing in Bank Transactions';
