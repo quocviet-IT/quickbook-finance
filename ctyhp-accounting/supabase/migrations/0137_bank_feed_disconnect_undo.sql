@@ -1,5 +1,5 @@
 -- ============================================================================
--- 1.86 — a bank feed can be disconnected, and a sync can be undone.
+-- 1.87 — a bank feed can be disconnected, and a sync can be undone.
 --
 -- A connection whose sync failed stayed "attention required" for good: the
 -- status `disconnected` existed, and a sync refused it, but nothing set it —
@@ -13,6 +13,8 @@
 -- what it did, and an undo plays that back: the lines it added go, the lines it
 -- retired come back as they were. The sync cursor is not rewound — undone lines
 -- do not come back with the next sync; connecting again fetches the history.
+-- A sync that failed part-way never moved the cursor, so the next sync fetches
+-- its changes again.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------

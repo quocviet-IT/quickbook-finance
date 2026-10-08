@@ -430,7 +430,7 @@ export async function bankFeedSyncsAction(bankAccountId: string): Promise<Action
   }
 }
 
-/** Takes one bank-feed sync back; the lines it added do not come back with the next sync. */
+/** Takes one bank-feed sync back; the lines it added do not come back with the next sync, unless it failed part-way. */
 export async function undoBankFeedSyncAction(
   runId: string,
   reason: string,

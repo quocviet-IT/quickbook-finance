@@ -56,7 +56,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Undo a bank-feed sync",
         detail:
-          "Bank feed syncs, below the bank connection, lists the syncs that changed something. Undo takes back the newest: the lines it added are removed, and the lines it changed or removed come back as they were. Syncs are taken back newest first, and a sync is held while a line it added has been matched, coded or ignored. Undone lines do not come back with the next sync; to fetch them again, disconnect the bank and connect it again.",
+          "Bank feed syncs, below the bank connection, lists the syncs that changed something or failed. Undo takes back the newest: the lines it added are removed, and the lines it changed or removed come back as they were. Syncs are taken back newest first, and a sync is held while a line it added has been matched, coded or ignored. Both ask for a reason. Undone lines do not come back with the next sync; to fetch them again, disconnect the bank and connect it again. A sync that failed part-way is the exception: the next sync fetches its changes again.",
         route: "/banking",
       },
     ],
