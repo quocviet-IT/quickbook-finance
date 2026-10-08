@@ -41,6 +41,8 @@ import { loanPaymentSchema } from "@/lib/domain/schemas";
 import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
 import { loanSuggestions, postLoanPayment } from "@/lib/services/loan-payments";
 import { tieKeptStatementFile } from "@/lib/services/statement-files";
+import { disconnectBankConnection, listBankFeedSyncs, undoBankFeedSync, type DisconnectOutcome } from "@/lib/services/bank-feeds";
+import type { BankFeedSyncView } from "@/lib/domain/bank-feeds";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -389,6 +391,55 @@ export async function syncBankConnectionAction(
   try {
     const sb = await createSupabaseServerClient();
     const result = await syncBankConnection(sb, connectionId);
+    revalidatePath("/banking");
+    return { ok: true, data: result };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Removes a bank connection at Plaid, then disconnects it here (1.87). When
+ * Plaid does not confirm, nothing changes and the answer says so, unless the
+ * person ticked Disconnect in OneBook only. The lines it brought in stay.
+ */
+export async function disconnectBankConnectionAction(
+  connectionId: string,
+  reason: string,
+  onlyInOneBook: boolean,
+): Promise<ActionResult<DisconnectOutcome>> {
+  const denied = await guardPermission("bank_feed.manage");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const outcome = await disconnectBankConnection(sb, connectionId, reason, onlyInOneBook);
+    if (outcome.disconnected) revalidatePath("/banking");
+    return { ok: true, data: outcome };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** The syncs of every connection that ever fed this bank account, newest first. Reads only. */
+export async function bankFeedSyncsAction(bankAccountId: string): Promise<ActionResult<BankFeedSyncView[]>> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listBankFeedSyncs(sb, bankAccountId) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Takes one bank-feed sync back; the lines it added do not come back with the next sync. */
+export async function undoBankFeedSyncAction(
+  runId: string,
+  reason: string,
+): Promise<ActionResult<{ removed: number; restored: number }>> {
+  const denied = await guardPermission("bank_feed.manage");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const result = await undoBankFeedSync(sb, runId, reason);
     revalidatePath("/banking");
     return { ok: true, data: result };
   } catch (err) {
