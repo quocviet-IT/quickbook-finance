@@ -74,6 +74,7 @@ create or replace function acc_apply_bank_feed_page(
 language plpgsql security definer set search_path = public as $$
 declare
   v_row jsonb;
+  v_conn_status text;
   v_provider_id text;
   v_bank_account_id uuid;
   v_revision int;
@@ -92,7 +93,10 @@ begin
   ) then
     raise exception 'This sync run is not running for this bank connection';
   end if;
-  if exists (select 1 from acc_bank_connection where id = p_connection_id and status = 'disconnected') then
+  -- Held while the page is written: a disconnect waits for this page instead of
+  -- committing under it.
+  select status into v_conn_status from acc_bank_connection where id = p_connection_id for share;
+  if v_conn_status = 'disconnected' then
     raise exception 'This bank connection was disconnected';
   end if;
 
@@ -315,6 +319,10 @@ grant execute on function acc_finish_bank_feed_sync(uuid, text, int, int, int, i
 --    One place decides, so the button and the undo cannot disagree. A sync is
 --    taken back newest first: only a connection's newest sync that changed
 --    something, is not undone, and is not followed by a running one.
+--
+--    A failed sync can be undone too, if it changed something. It never moved
+--    the connection's cursor, so after its undo the next sync fetches its
+--    changes again.
 -- ----------------------------------------------------------------------------
 create or replace function acc_bank_feed_sync_is_newest(p_run_id uuid)
 returns boolean
@@ -322,6 +330,7 @@ language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from acc_bank_feed_sync_run r
      where r.id = p_run_id
+       and acc_current_role() is not null
        and r.status in ('succeeded', 'failed')
        and exists (select 1 from acc_bank_feed_sync_change c where c.run_id = r.id)
        and not exists (
@@ -343,6 +352,7 @@ language sql stable security definer set search_path = public as $$
     from acc_bank_feed_sync_change c
     join acc_bank_transaction t on t.id = c.bank_transaction_id
    where c.run_id = p_run_id
+     and acc_current_role() is not null
      and c.kind = 'added'
      -- A line a later sync retired comes back only when that sync is undone.
      and t.provider_removed_at is null
@@ -416,6 +426,12 @@ begin
   if not acc_bank_feed_sync_is_newest(p_run_id) then
     raise exception 'Undo the newer syncs of this bank connection first';
   end if;
+
+  -- Lock the lines first: a person approving a match or coding a line at the
+  -- same moment waits for the undo, so an approved match is never cascaded away.
+  perform 1 from acc_bank_transaction
+   where id in (select bank_transaction_id from acc_bank_feed_sync_change where run_id = p_run_id)
+     for update;
 
   v_locked := acc_bank_feed_sync_locked_lines(p_run_id);
   if v_locked > 0 then

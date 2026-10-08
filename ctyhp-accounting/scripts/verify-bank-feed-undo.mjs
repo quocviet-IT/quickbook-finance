@@ -196,6 +196,12 @@ try {
       await asOwner(admin.id, () => client.query(`update acc_bank_transaction set status = 'matched' where id = $1`, [e4.id]));
       await refused("a sync whose line was coded is refused, with the count", UNDO, [run2, "verify"], "1 line(s) of this sync have been matched, coded or ignored");
       await client.query("rollback to savepoint coded");
+      await client.query("savepoint approved");
+      await asOwner(admin.id, () =>
+        client.query(`insert into acc_reconciliation (bank_transaction_id, status, confidence) values ($1, 'approved', 1)`, [e4.id]),
+      );
+      await refused("a sync whose line has an approved match is refused", UNDO, [run2, "verify"], "1 line(s) of this sync");
+      await client.query("rollback to savepoint approved");
       if (viewer) {
         await as(viewer.id);
         await refused("a viewer cannot undo", UNDO, [run2, "verify"], "permission");
@@ -203,6 +209,13 @@ try {
       await as(OUTSIDER);
       await refused("someone outside the company cannot undo", UNDO, [run2, "verify"], "permission");
       await as(admin.id);
+
+      // ---- a sync still running blocks the undo of the one before it
+      const runBusy = await begin();
+      const busyListed = (await all(SYNCS, [bank])).find((r) => r.run_id === run2);
+      check("while a newer sync runs, run 2 is no longer the one to undo", busyListed?.is_newest === false, JSON.stringify(busyListed));
+      await refused("…and its undo waits for the running sync", UNDO, [run2, "verify"], "Undo the newer syncs of this bank connection first");
+      await finish(runBusy);
 
       // ---- undo run 2: its lines go, the lines it retired come back as they were
       await asOwner(admin.id, () =>
@@ -230,6 +243,19 @@ try {
       await asOwner(admin.id, () => client.query(`update acc_bank_transaction set status = 'unmatched' where id = $1`, [e3.id]));
       const undo1 = (await one(UNDO, [run1, "Verify: these lines were imported from a CSV already"])).out;
       check("undoing run 1 removes its three lines", undo1.removed === 3 && undo1.restored === 0 && (await activeLines()) === 0, JSON.stringify(undo1));
+
+      // ---- a failed sync that changed something can be undone; it never moved the cursor
+      const cursorOf = async () => (await one(`select sync_cursor from acc_bank_connection where id = $1`, [conn])).sync_cursor;
+      const cursorBefore = await cursorOf();
+      const runFailed = await begin();
+      await apply(runFailed, [line("e6", "2026-09-06", 600, "DEPOSIT SIX")]);
+      await finish(runFailed, "verify failure");
+      const failedListed = (await all(SYNCS, [bank])).find((r) => r.run_id === runFailed);
+      check("a failed sync that changed something is listed, and is the one to undo",
+        failedListed?.status === "failed" && failedListed?.is_newest === true && failedListed?.changes === 1, JSON.stringify(failedListed));
+      check("…the failed sync's undo removes its line", (await one(UNDO, [runFailed, "Verify: undo what a failed sync added"])).out.removed === 1 && !(await txn("e6")));
+      check("…and the connection's cursor is as it was: the next sync fetches those changes again",
+        (await cursorOf()) === cursorBefore, `${cursorBefore} -> ${await cursorOf()}`);
 
       // ---- disconnect, with a sync running
       const run4 = await begin();
