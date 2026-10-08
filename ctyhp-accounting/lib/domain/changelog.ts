@@ -41,6 +41,19 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.91",
+    date: "2026-10-08",
+    headline: "Every request checks your sign-in without waiting on the sign-in service.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Pages no longer wait twice on the sign-in service",
+        detail:
+          "Before every page, menu click and save, the app used to ask the sign-in service who you are, and then ask it again while drawing the page. The first check now reads your sign-in from its digital signature, which needs no call at all, so each request waits on the sign-in service once instead of twice — and a slow moment there no longer holds up every click. Signing in, signing out and staying signed in work as before.",
+      },
+    ],
+  },
+  {
     version: "1.90",
     date: "2026-10-08",
     headline: "Reverse on Journal Entries works.",
