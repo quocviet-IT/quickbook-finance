@@ -165,3 +165,26 @@ Common to all ten:
   - "Save all" and "Print all";
   - pinned reports;
   - "show accounts with no balance" on the Balance Sheet and Trial Balance.
+
+## Amendments from pre-building (08/10)
+
+Before the plan was written, the ten reports were built on a local branch and run, read-only, against all six companies. These are the points where the code and the data changed what is written above.
+
+1. **Who can see each report.** No existing report page is gated; Row Level Security lets every company member read. "Follows the screen its data comes from" therefore means open to every member, except the Change Log (`audit.read`).
+2. **Proof lines.** Open Invoices, Customer Balances, Unpaid Bills and Vendor Balances are held to the **control account**: A/R or A/P.
+   - They read the same open-item list as the A/R and A/P Aging, so tying to the aging would prove nothing. The aging total is shown as a line instead.
+   - OneBook's aging is the current open position of documents dated on or before the as-of date, not a historical one, and these reports follow it.
+3. **Sales by Customer is read from the ledger.**
+   - It adds every posting to an income account, under the customer of the invoice, credit memo or payment behind it.
+   - In base currency, so sales tax is never in it and foreign-currency invoices count at their posted rate.
+   - Income with no customer document goes to a "(No customer)" row, so the total equals Income on the Profit and Loss.
+4. **Expenses by Vendor** includes cost of sales and other expenses, so its total equals the P&L's cost of sales + expenses + other expenses. Bill payments (early-payment discounts) count for their vendor.
+5. **Voided and Reversed Entries.**
+   - Entries voided before the books kept the time of a void (10 in one company) are dated by their entry date, and When reads "Not recorded".
+   - Who voided a document comes from the audit log, so only for readers with `audit.read`.
+   - The reason sits under the description.
+6. **Change Log.**
+   - It shows the newest 1,000 entries, the audit search's ceiling, and says when there are more.
+   - The Detail column leaves out ids, links, stamps and hashes.
+7. **File layout.** Modules are `lib/domain/<name>.ts`, reads are `lib/services/party-reports.ts` and `review-reports.ts`, and the pages share one `SimpleReport` frame. `lib/domain/reports.ts` and `lib/services/reports.ts` are already files, so no `reports/` folder.
+8. **Beancount** gets its own loading screen. Otherwise the Accounting overview's dashboard skeleton would show while the file builds.
