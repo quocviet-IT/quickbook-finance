@@ -106,6 +106,14 @@ begin
   if v_conn_status = 'disconnected' then
     raise exception 'This bank connection was disconnected';
   end if;
+  -- Asked again under that lock: an undo may have settled this run while the
+  -- page waited, and a run cut off writes nothing more.
+  if not exists (
+    select 1 from acc_bank_feed_sync_run
+     where id = p_run_id and status = 'running' and not acc_bank_feed_sync_cut_off(status, started_at)
+  ) then
+    raise exception 'This sync run is not running for this bank connection';
+  end if;
 
   for v_row in select value from jsonb_array_elements(coalesce(p_removed, '[]'::jsonb)) loop
     v_provider_id := case when jsonb_typeof(v_row) = 'string'
@@ -252,12 +260,12 @@ grant execute on function acc_apply_bank_feed_page(uuid, uuid, jsonb, jsonb, jso
 --    otherwise share a moment, and "newest first" would be a coin toss.
 -- ----------------------------------------------------------------------------
 -- The one place that says a run was cut off: still running 15 minutes after it
--- began, though the sync route stops after 300 seconds.
+-- began, though the sync route stops after 300 seconds. It reads no table, so
+-- it answers the daily sync (the service role, nobody signed in) as well.
 create or replace function acc_bank_feed_sync_cut_off(p_status text, p_started_at timestamptz)
 returns boolean
 language sql stable security definer set search_path = public as $$
-  select acc_current_role() is not null
-     and p_status = 'running'
+  select p_status = 'running'
      and p_started_at < now() - interval '15 minutes';
 $$;
 
@@ -320,7 +328,10 @@ begin
          matched_count = coalesce(p_matched_count, 0),
          error_message = p_error_message,
          completed_at = now()
-   where id = p_run_id;
+   where id = p_run_id and status = 'running';
+  -- A run already settled (undone, or marked failed when cut off) stays as it
+  -- is, and a late finish moves neither its connection's cursor nor its status.
+  if not found then return; end if;
 
   update acc_bank_connection
      set sync_cursor = case when p_error_message is null and status <> 'disconnected' then p_cursor else sync_cursor end,

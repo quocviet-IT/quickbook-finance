@@ -234,7 +234,12 @@ try {
       const cutRow = (await all(`select status, error_message from acc_bank_feed_syncs($1) where run_id = $2`, [bank, runCut]))[0];
       check("…and the list reports it as failed, with the message",
         cutRow?.status === "failed" && cutRow?.error_message === CUT_OFF_MESSAGE, JSON.stringify(cutRow));
+      await refused("…and a page for it is refused: a run cut off writes nothing more", APPLY,
+        [conn, runCut, JSON.stringify([line("e7", "2026-09-07", 800, "DEPOSIT SEVEN")]), "[]", "[]"], "is not running for this bank connection");
+      // The page it wrote before it was cut off.
+      await asOwner(admin.id, () => client.query(`update acc_bank_feed_sync_run set started_at = clock_timestamp() where id = $1`, [runCut]));
       await apply(runCut, [line("e7", "2026-09-07", 800, "DEPOSIT SEVEN")]);
+      await backdate(runCut);
       const afterCutApply = await all(SYNCS, [bank]);
       check("a cut-off run that changed something is the one to undo, and holds the older runs back",
         afterCutApply.find((r) => r.run_id === runCut)?.is_newest === true && afterCutApply.find((r) => r.run_id === run2)?.is_newest === false,
@@ -246,6 +251,13 @@ try {
         cutRun.status === "undone" && cutRun.completed_at !== null && cutRun.error_message === CUT_OFF_MESSAGE, JSON.stringify(cutRun));
       check("…and the run before it can be undone again",
         (await all(SYNCS, [bank])).find((r) => r.run_id === run2)?.is_newest === true);
+      await client.query(`select acc_finish_bank_feed_sync($1, 'cursor-late', 0, 0, 0, 0, null)`, [runCut]);
+      const lateFinish = await one(
+        `select r.status, c.sync_cursor from acc_bank_feed_sync_run r join acc_bank_connection c on c.id = r.connection_id where r.id = $1`,
+        [runCut],
+      );
+      check("a late finish of an undone run leaves it undone and moves no cursor",
+        lateFinish.status === "undone" && lateFinish.sync_cursor !== "cursor-late", JSON.stringify(lateFinish));
       const runCut2 = await begin();
       await backdate(runCut2);
       const runNext = await begin();

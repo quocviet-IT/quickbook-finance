@@ -56,12 +56,17 @@ describe("0137_bank_feed_disconnect_undo", () => {
     expect(code.match(/interval '15 minutes'/g)).toHaveLength(1);
     expect(code.match(/The sync stopped before it finished/g)).toHaveLength(3);
     const cutOff = body("acc_bank_feed_sync_cut_off");
-    expect(cutOff).toMatch(/acc_current_role\(\) is not null/);
+    // It reads no table, so the daily sync (service role, nobody signed in) gets the same answer.
+    expect(cutOff).not.toMatch(/acc_current_role|\bfrom\b/);
     expect(cutOff).toMatch(/security definer set search_path = public/);
     expect(code).toMatch(/revoke all on function acc_bank_feed_sync_cut_off\(text, timestamptz\) from public, anon/);
-    for (const fn of ["acc_begin_bank_feed_sync", "acc_bank_feed_sync_is_newest", "acc_bank_feed_syncs", "acc_undo_bank_feed_sync"]) {
+    for (const fn of ["acc_begin_bank_feed_sync", "acc_bank_feed_sync_is_newest", "acc_bank_feed_syncs", "acc_undo_bank_feed_sync", "acc_apply_bank_feed_page"]) {
       expect(body(fn), fn).toMatch(/acc_bank_feed_sync_cut_off\(/);
     }
+  });
+
+  it("leaves a settled run alone when a late finish arrives", () => {
+    expect(body("acc_finish_bank_feed_sync")).toMatch(/where id = p_run_id and status = 'running';\s*if not found then return; end if;/);
   });
 
   it("runs whole in every company schema", () => {
