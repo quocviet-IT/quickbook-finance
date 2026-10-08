@@ -193,6 +193,10 @@ describe("checkWhen", () => {
   it("refuses anything else before a query runs", () => {
     expect(() => checkWhen({ from: "2026-10-08", to: "2026-01-01" }, "range")).toThrow("The start date is after the end date.");
     expect(() => checkWhen({ to: "2026-13-40" }, "asOf")).toThrow("Choose the date the report runs to.");
+    // A day the month does not have is refused, not rolled over into the next month.
+    expect(() => checkWhen({ to: "2026-02-31" }, "asOf")).toThrow("Choose the date the report runs to.");
+    expect(() => checkWhen({ from: "2026-04-31", to: "2026-05-01" }, "range")).toThrow("Choose the date the report runs from.");
+    expect(checkWhen({ to: "2028-02-29" }, "asOf").to).toBe("2028-02-29");
     expect(() => checkWhen({ to: "2026-10-08'; drop" }, "asOf")).toThrow();
     expect(() => checkWhen({ fiscalYear: 1999 }, "fiscalYear")).toThrow("Choose a fiscal year between 2000 and 2100.");
     expect(() => checkWhen(null, "range")).toThrow();

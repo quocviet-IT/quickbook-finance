@@ -27,8 +27,12 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function checkWhen(when: unknown, needs: "asOf" | "range" | "fiscalYear" | "none"): ReportWhen {
   const w = (when ?? {}) as Partial<ReportWhen>;
-  const isDate = (value: unknown): value is string =>
-    typeof value === "string" && ISO_DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+  const isDate = (value: unknown): value is string => {
+    if (typeof value !== "string" || !ISO_DATE.test(value)) return false;
+    // Date.parse rolls 2026-02-31 over to March 3; only a date that reads back as itself is real.
+    const day = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === value;
+  };
   if (needs === "fiscalYear") {
     const year = Number(w.fiscalYear);
     if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new Error("Choose a fiscal year between 2000 and 2100.");
