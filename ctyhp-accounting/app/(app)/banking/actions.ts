@@ -263,38 +263,80 @@ export async function undoRecodeAction(transactionId: string): Promise<ActionRes
   }
 }
 
-/** Reads only: which coded lines were recoded out of Uncategorized, and to what. */
-export async function getBankRecodesAction(bankAccountId: string | null): Promise<ActionResult<BankRecodeRow[]>> {
+/** One part of a combined read: its own answer or its own error, never the others'. */
+async function settled<T>(read: () => Promise<T>): Promise<ActionResult<T>> {
   try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listBankRecodes(sb, bankAccountId) };
+    return { ok: true, data: await read() };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
 }
 
-/** Reads only: what each matched line on this account was posted to. */
-export async function getBankPostingsAction(
-  bankAccountId: string | null,
-): Promise<ActionResult<BankPostingRow[]>> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listBankTransactionPostings(sb, bankAccountId) };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
+export interface BankingView {
+  transactions: ActionResult<BankTransactionRow[]>;
+  /** Proposed matches between the lines and the books. */
+  suggestions: ActionResult<SuggestionView[]>;
+  /** What each matched line was posted to — the Category column's answer. */
+  postings: ActionResult<BankPostingRow[]>;
+  /** Which coded lines were recoded out of Uncategorized, and to what. */
+  recodes: ActionResult<BankRecodeRow[]>;
 }
 
-/** `null` asks for every bank account, which is how the review queue spans them. */
-export async function getTransactionsAction(
-  bankAccountId: string | null,
-): Promise<ActionResult<BankTransactionRow[]>> {
+/**
+ * Reads only: everything the banking screen draws its lines with, in one
+ * request. `null` asks for every bank account, which is how the review queue
+ * spans them.
+ *
+ * These were four Server Actions sent together with Promise.all. Next
+ * dispatches Server Actions one at a time per client (Server Actions and
+ * Mutations, "Sequential dispatch"), so the four ran one after another — with
+ * the two hint reads queued ahead of them — and the table read "No bank
+ * transactions" for four to six seconds (production, 08/10). Here the reads run
+ * side by side on the server, on one client, and each keeps its own error, so
+ * one failed read does not blank the others.
+ */
+export async function getBankingViewAction(bankAccountId: string | null): Promise<BankingView> {
+  let sb: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listBankTransactions(sb, bankAccountId) };
+    sb = await createSupabaseServerClient();
   } catch (err) {
-    return { ok: false, error: msg(err) };
+    const failed = { ok: false, error: msg(err) };
+    return { transactions: failed, suggestions: failed, postings: failed, recodes: failed };
   }
+  const [transactions, suggestions, postings, recodes] = await Promise.all([
+    settled(() => listBankTransactions(sb, bankAccountId)),
+    settled(() => listSuggestions(sb, bankAccountId)),
+    settled(() => listBankTransactionPostings(sb, bankAccountId)),
+    settled(() => listBankRecodes(sb, bankAccountId)),
+  ]);
+  return { transactions, suggestions, postings, recodes };
+}
+
+export interface BankingHints {
+  /** The coding suggestion for each waiting line in view. */
+  coding: ActionResult<CodingSuggestionView[]>;
+  /** The proposed split of each waiting loan payment in view. */
+  loans: ActionResult<LoanSuggestionView[]>;
+}
+
+/**
+ * Reads only: both kinds of suggestion, in one request. Null means every bank
+ * account. The screen sends this after getBankingViewAction, so in Next's
+ * queue the lines come first and the hints follow.
+ */
+export async function getBankingHintsAction(bankAccountId: string | null): Promise<BankingHints> {
+  let sb: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  try {
+    sb = await createSupabaseServerClient();
+  } catch (err) {
+    const failed = { ok: false, error: msg(err) };
+    return { coding: failed, loans: failed };
+  }
+  const [coding, loans] = await Promise.all([
+    settled(() => codingSuggestions(sb, bankAccountId)),
+    settled(() => loanSuggestions(sb, bankAccountId)),
+  ]);
+  return { coding, loans };
 }
 
 export async function generateSuggestionsAction(bankAccountId: string): Promise<ActionResult<{ count: number }>> {
@@ -304,17 +346,6 @@ export async function generateSuggestionsAction(bankAccountId: string): Promise<
     const sb = await createSupabaseServerClient();
     const count = await generateSuggestions(sb, bankAccountId);
     return { ok: true, data: { count } };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
-}
-
-export async function getSuggestionsAction(
-  bankAccountId: string | null,
-): Promise<ActionResult<SuggestionView[]>> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listSuggestions(sb, bankAccountId) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
@@ -553,18 +584,6 @@ export async function batchCategoriseBankTransactionsAction(
   return { ok: true, data: { outcomes } };
 }
 
-/** The coding suggestion for each waiting line in view. Null means every bank account. */
-export async function getCodingSuggestionsAction(
-  bankAccountId: string | null,
-): Promise<ActionResult<CodingSuggestionView[]>> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await codingSuggestions(sb, bankAccountId) };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
-}
-
 /**
  * Code every confirmed line from its suggestion. The suggestions are worked
  * out again on the server, and a line whose suggestion is gone or changed is
@@ -583,16 +602,6 @@ export async function codeFromSuggestionsAction(
     revalidatePath("/banking");
     revalidatePath("/reports");
     return { ok: true, data: { outcomes } };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
-}
-
-/** The proposed split of each waiting loan payment in view. Null means every bank account. */
-export async function getLoanSuggestionsAction(bankAccountId: string | null): Promise<ActionResult<LoanSuggestionView[]>> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await loanSuggestions(sb, bankAccountId) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

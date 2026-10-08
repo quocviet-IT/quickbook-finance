@@ -46,8 +46,8 @@ export interface BankTransactionsFiltersProps {
   /** Suggested ledger matches awaiting a decision, for the note at the end. */
   suggestedMatchCount: number;
 
-  /** How many rows the table is showing, reported by the bar. */
-  resultCount: number;
+  /** How many rows the table is showing, reported by the bar. Undefined while they load: no count is shown. */
+  resultCount: number | undefined;
   /** Connect bank, Find ledger matches, Import statement — the write actions. */
   actions: ReactNode;
 }

@@ -55,6 +55,8 @@ export default function DataTable<RecordType extends object>({
     dataSource,
     pagination: page ? pagination : fallbackPagination(pagination, fallbackSize, setFallbackSize),
   });
+  const isLoading =
+    typeof props.loading === "object" ? Boolean(props.loading?.spinning) : Boolean(props.loading);
 
   return (
     <div className={`accounting-data-table${fit ? " accounting-table--fit" : ""}`}>
@@ -82,7 +84,13 @@ export default function DataTable<RecordType extends object>({
         }
         locale={{
           ...locale,
-          emptyText: locale?.emptyText ?? (
+          // A table that is still loading has not found nothing. Ant Design
+          // keeps the empty placeholder under its spinner, so "No bank
+          // transactions" read through it for seconds while the lines were on
+          // their way. While loading, the placeholder holds the space only.
+          emptyText: locale?.emptyText ?? (isLoading ? (
+            <div style={{ minHeight: 96 }} aria-hidden="true" />
+          ) : (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={null}>
               <Typography.Text strong>{emptyTitle}</Typography.Text>
               {emptyDescription && (
@@ -92,7 +100,7 @@ export default function DataTable<RecordType extends object>({
               )}
               {emptyAction && <div className="accounting-empty-action">{emptyAction}</div>}
             </Empty>
-          ),
+          )),
         }}
       />
     </div>

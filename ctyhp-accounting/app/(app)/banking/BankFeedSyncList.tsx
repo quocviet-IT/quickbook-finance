@@ -45,6 +45,9 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
   const [busy, setBusy] = useState(false);
 
   const [readError, setReadError] = useState<string | null>(null);
+  // Until the first answer the list is loading, not empty: it reads after the
+  // bank lines in Next's one-at-a-time queue of Server Actions.
+  const [loaded, setLoaded] = useState(false);
   /** Counts reads, so only the latest one may set the rows: a slow answer for another account is dropped. */
   const latestRead = useRef(0);
 
@@ -60,11 +63,13 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
           setRows([]);
           setReadError(result.error ?? "The bank feed syncs could not be read");
         }
+        setLoaded(true);
       })
       .catch((error) => {
         if (read !== latestRead.current) return;
         setRows([]);
         setReadError(`The bank feed syncs could not be read: ${serverFailure(error)}`);
+        setLoaded(true);
       });
   }, [bankAccountId]);
 
@@ -115,6 +120,7 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
       <DataTable<BankFeedSyncView>
         rowKey="runId"
         dataSource={rows}
+        loading={!loaded}
         columns={[
           { title: "Started", dataIndex: "startedAt", width: 190, render: (value: string) => when(value) },
           {
