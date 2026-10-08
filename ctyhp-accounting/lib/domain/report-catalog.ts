@@ -29,7 +29,16 @@ export interface ReportDefinition {
   href: string;
   group: ReportGroupId;
   internalReport?: InternalReportId;
+  /**
+   * Permissions any one of which opens the report, as a sidebar item declares
+   * them. Absent: anybody in the company may open it. The page enforces the
+   * same rule on the server; the Report Center only hides what would refuse.
+   */
+  anyPermissions?: readonly string[];
 }
+
+/** The Change Log reads the audit log, which only these permissions may read. */
+export const CHANGE_LOG_PERMISSIONS = ["audit.read"] as const;
 
 export const REPORT_GROUPS: ReportGroupDefinition[] = [
   {
