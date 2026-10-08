@@ -28,6 +28,8 @@ import BankTransactionsFilters, { ALL_ACCOUNTS } from "./BankTransactionsFilters
 import { EmptyState } from "@/components/ui/PageStates";
 import BankTransactionsTable from "./BankTransactionsTable";
 import BankImportList from "./BankImportList";
+import BankFeedSyncList from "./BankFeedSyncList";
+import DisconnectBankModal from "./DisconnectBankModal";
 import dynamic from "next/dynamic";
 import DeleteBankLineModal, {
   type DeleteBankLineTarget,
@@ -225,6 +227,7 @@ export default function BankingClient({
   const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
   // Bumped after an import so the register below picks the new batch up.
   const [importsKey, setImportsKey] = useState(0);
+  const [disconnecting, setDisconnecting] = useState<BankConnectionView | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteBankLineTarget | null>(null);
   // RQ-03: the raw picks a reader has made. Never read directly — always
   // through the `selectedIds` projection below, which is what stays true to
@@ -462,6 +465,8 @@ export default function BankingClient({
     setBusy(null);
     if (!result.ok || !result.data) {
       message.error(result.error ?? "Bank feed synchronization failed");
+      // A sync that failed part-way is on the list, and is what Undo is for.
+      setImportsKey((count) => count + 1);
       return;
     }
     message.success(
@@ -687,6 +692,11 @@ export default function BankingClient({
             </Tag>
           ) : null}
           {plaidEnvironment !== "production" ? <Tag color="blue">{plaidEnvironment}</Tag> : null}
+          {selectedConnection && canWrite ? (
+            <Button size="small" type="link" danger onClick={() => setDisconnecting(selectedConnection)}>
+              Disconnect
+            </Button>
+          ) : null}
         </Space>
         {selectedConnection?.last_error ? (
           <Alert type="warning" showIcon message="The last synchronization needs attention" description={selectedConnection.last_error} style={{ marginTop: 12 }} />
@@ -870,6 +880,17 @@ export default function BankingClient({
           onChanged={reload}
         />
       </Card>
+
+      {/* One account's feed at a time, as Sync now: a sync belongs to a connection, and a connection to accounts. */}
+      {selectedId && !allAccounts ? (
+        <BankFeedSyncList bankAccountId={selectedId} canWrite={canWrite} reloadKey={importsKey} onChanged={reload} />
+      ) : null}
+
+      <DisconnectBankModal
+        connection={disconnecting}
+        onClose={() => setDisconnecting(null)}
+        onDisconnected={() => window.location.reload()}
+      />
 
       <CodeAllModal
         rows={codeAllRows}
