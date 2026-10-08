@@ -67,49 +67,62 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionResult<{ 
   }
 }
 
-export async function getInvoiceLinesAction(id: string): Promise<ActionResult<InvoiceLineRow[]>> {
+/** One part of a combined read: its own answer or its own error, never the others'. */
+async function settled<T>(read: () => Promise<T>): Promise<ActionResult<T>> {
   try {
-    const sb = await createSupabaseServerClient();
-    const lines = await getInvoiceLines(sb, id);
-    return { ok: true, data: lines };
+    return { ok: true, data: await read() };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
+}
+
+export interface InvoiceDetail {
+  lines: ActionResult<InvoiceLineRow[]>;
+  /** Payments, credits and write-offs against the invoice, oldest first. */
+  settlements: ActionResult<SettlementEvent[]>;
+  /** The change history, newest first; null when it was not asked for. */
+  audit: ActionResult<AuditEntryRow[]> | null;
 }
 
 /**
- * The change history of one invoice, newest first. `acc_audit_search` refuses
- * the call without `audit.read`, so the drawer only asks for it when the page
- * already established the viewer holds that permission.
+ * Reads only: what the invoice drawer shows, in one request.
+ *
+ * These were three Server Actions — lines and settlements in a Promise.all,
+ * then the change history — and Next dispatches Server Actions one at a time
+ * per client ("Sequential dispatch" in its Server Actions guide), so opening an
+ * invoice was three trips in a row. Here the reads run side by side on one
+ * client, each keeping its own error.
+ *
+ * `withAudit` is the page's answer to whether the viewer holds `audit.read`.
+ * It decides only whether the history is asked for: `acc_audit_search` refuses
+ * the call without that permission whatever the browser sends.
  */
-export async function getInvoiceAuditAction(id: string): Promise<ActionResult<AuditEntryRow[]>> {
+export async function getInvoiceDetailAction(id: string, withAudit: boolean): Promise<InvoiceDetail> {
+  let sb: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   try {
-    const sb = await createSupabaseServerClient();
-    const entries = await searchAudit(sb, {
-      table_name: "acc_invoice",
-      record_id: id,
-      actor_id: null,
-      action: null,
-      from: null,
-      to: null,
-      limit: 200,
-    });
-    return { ok: true, data: entries };
+    sb = await createSupabaseServerClient();
   } catch (err) {
-    return { ok: false, error: msg(err) };
+    const failed = { ok: false, error: msg(err) };
+    return { lines: failed, settlements: failed, audit: withAudit ? failed : null };
   }
-}
-
-/** Payments, credits and write-offs against one invoice, oldest first. */
-export async function getInvoiceSettlementsAction(
-  id: string,
-): Promise<ActionResult<SettlementEvent[]>> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listInvoiceSettlements(sb, id) };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
+  const [lines, settlements, audit] = await Promise.all([
+    settled(() => getInvoiceLines(sb, id)),
+    settled(() => listInvoiceSettlements(sb, id)),
+    withAudit
+      ? settled(() =>
+          searchAudit(sb, {
+            table_name: "acc_invoice",
+            record_id: id,
+            actor_id: null,
+            action: null,
+            from: null,
+            to: null,
+            limit: 200,
+          }),
+        )
+      : Promise.resolve(null),
+  ]);
+  return { lines, settlements, audit };
 }
 
 /**

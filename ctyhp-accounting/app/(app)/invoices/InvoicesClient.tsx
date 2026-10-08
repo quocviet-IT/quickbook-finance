@@ -73,10 +73,8 @@ import {
   createCustomerAction,
   issueInvoiceAction,
   voidInvoiceAction,
-  getInvoiceLinesAction,
-  getInvoiceAuditAction,
+  getInvoiceDetailAction,
   getInvoiceDocumentAction,
-  getInvoiceSettlementsAction,
 } from "./actions";
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
@@ -453,19 +451,17 @@ export default function InvoicesClient({
     setViewSettlements([]);
     setLinesOpen(true);
     setSettlementsLoading(true);
-    const [res, settled] = await Promise.all([
-      getInvoiceLinesAction(inv.id),
-      getInvoiceSettlementsAction(inv.id),
-    ]);
+    if (canReadAudit) setAuditLoading(true);
+    // One request: Next runs Server Actions one at a time, so these three
+    // reads sent as separate actions were three trips in a row.
+    const { lines: res, settlements: settled, audit: trail } = await getInvoiceDetailAction(inv.id, canReadAudit);
     setSettlementsLoading(false);
+    setAuditLoading(false);
     if (res.ok && res.data) setViewLines(res.data);
     else message.error(res.error ?? "Failed to load lines");
     if (settled.ok && settled.data) setViewSettlements(settled.data);
     else message.error(settled.error ?? "Failed to load the payment history");
-    if (!canReadAudit) return;
-    setAuditLoading(true);
-    const trail = await getInvoiceAuditAction(inv.id);
-    setAuditLoading(false);
+    if (!trail) return;
     if (trail.ok && trail.data) setViewAudit(trail.data);
     else message.error(trail.error ?? "Failed to load the change history");
   }

@@ -4,7 +4,7 @@ import { Alert, Descriptions, Drawer, Table, Tag, Typography } from "antd";
 import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
 import type { AuditEntryRow, PaymentDetail, PaymentRow } from "@/lib/db/types";
 import { formatMoney } from "@/lib/format";
-import { getPaymentAuditAction, getPaymentDetailAction } from "./actions";
+import { getPaymentDrawerAction } from "./actions";
 
 export interface PaymentDetailDrawerProps {
   payment: (PaymentRow & { customer_name: string }) | null;
@@ -36,10 +36,12 @@ export default function PaymentDetailDrawer({
     let cancelled = false;
     void (async () => {
       setLoading(true);
-      const [detailResult, auditResult] = await Promise.all([
-        getPaymentDetailAction({ id: payment.id, journal_entry_id: payment.journal_entry_id }),
-        canReadAudit ? getPaymentAuditAction(payment.id) : Promise.resolve(null),
-      ]);
+      // One request: Next runs Server Actions one at a time, so the detail and
+      // the history sent as two actions were two trips in a row.
+      const { detail: detailResult, audit: auditResult } = await getPaymentDrawerAction(
+        { id: payment.id, journal_entry_id: payment.journal_entry_id },
+        canReadAudit,
+      );
       if (cancelled) return;
       setLoading(false);
       if (detailResult.ok && detailResult.data) {
