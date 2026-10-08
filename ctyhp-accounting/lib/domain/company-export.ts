@@ -75,6 +75,8 @@ export const EXPORT_TABLES: readonly string[] = [
   // schema's own foreign keys at restore time, not from this list.
   "acc_import_batch",
   "acc_bank_transaction",
+  // What each bank-feed sync added or retired (0137), so a sync can be undone.
+  "acc_bank_feed_sync_change",
   "acc_reconciliation",
   "acc_reconciliation_line",
   "acc_statement_reconciliation",
