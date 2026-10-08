@@ -126,14 +126,14 @@ export default function PartyActivityReport({
                 <strong>How it counts.</strong> Every posting to an income account in the period, in base currency, so
                 sales tax is never in it. A posting from an invoice, credit memo or customer payment counts for that
                 customer; Documents counts their invoices. Postings from anything else — a bank deposit coded to income,
-                a journal entry — are on the line &quot;(No customer)&quot;.
+                a journal entry — are on the line {"“(No customer)”"}.
               </>
             ) : (
               <>
                 <strong>How it counts.</strong> Every posting to a cost of sales, expense or other expense account in the
                 period, in base currency. A posting from a bill, expense, vendor credit or bill payment counts for that
                 vendor; Entries counts each entry once per account it touches. Postings from anything else — bank lines
-                coded to an expense, journal entries, depreciation — are on the line &quot;(No vendor)&quot;.
+                coded to an expense, journal entries, depreciation — are on the line {"“(No vendor)”"}.
               </>
             )}
           </ReportFoot>
