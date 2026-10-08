@@ -627,6 +627,8 @@ export async function syncBankConnection(
     for (let index = 0; index < pageCount; index++) {
       const { data: applied, error: applyError } = await sb.rpc("acc_apply_bank_feed_page", {
         p_connection_id: connectionId,
+        // Each page records what it changed under this run, so the sync can be undone (1.86).
+        p_run_id: runId,
         p_added: addedChunks[index] ?? [],
         p_modified: modifiedChunks[index] ?? [],
         p_removed: removedChunks[index] ?? [],

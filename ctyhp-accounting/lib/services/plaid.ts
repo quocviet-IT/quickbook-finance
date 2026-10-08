@@ -179,3 +179,11 @@ export async function syncPlaidTransactions(
   if (cursor) body.cursor = cursor;
   return plaidRequest<PlaidSyncResponse>("/transactions/sync", body);
 }
+
+/**
+ * Removes the connection (Plaid's "item") at Plaid: its access token stops
+ * working and, on a paid plan, Plaid stops billing for it.
+ */
+export async function removePlaidItem(accessToken: string): Promise<void> {
+  await plaidRequest<{ request_id?: string }>("/item/remove", { access_token: accessToken });
+}
