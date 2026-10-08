@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { App, Button, Card, Input, Modal, Space, Tag, Tooltip, Typography } from "antd";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, App, Button, Card, Input, Modal, Space, Tag, Tooltip, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import {
   SYNC_STATUS_LABEL,
@@ -44,13 +44,37 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [readError, setReadError] = useState<string | null>(null);
+  /** Counts reads, so only the latest one may set the rows: a slow answer for another account is dropped. */
+  const latestRead = useRef(0);
+
   const refresh = useCallback(() => {
-    void bankFeedSyncsAction(bankAccountId).then((result) => {
-      if (result.ok && result.data) setRows(result.data);
-    });
+    const read = ++latestRead.current;
+    void bankFeedSyncsAction(bankAccountId)
+      .then((result) => {
+        if (read !== latestRead.current) return;
+        if (result.ok && result.data) {
+          setRows(result.data);
+          setReadError(null);
+        } else {
+          setRows([]);
+          setReadError(result.error ?? "The bank feed syncs could not be read");
+        }
+      })
+      .catch((error) => {
+        if (read !== latestRead.current) return;
+        setRows([]);
+        setReadError(`The bank feed syncs could not be read: ${serverFailure(error)}`);
+      });
   }, [bankAccountId]);
 
-  useEffect(refresh, [refresh, reloadKey]);
+  useEffect(() => {
+    refresh();
+    // Leaving the account, or the screen, drops the read still in flight.
+    return () => {
+      latestRead.current += 1;
+    };
+  }, [refresh, reloadKey]);
 
   const close = () => {
     setUndoing(null);
@@ -77,6 +101,13 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
     }
   };
 
+  if (readError) {
+    return (
+      <Card size="small" title="Bank feed syncs" style={{ marginTop: 16 }}>
+        <Alert type="error" showIcon message={readError} />
+      </Card>
+    );
+  }
   if (rows.length === 0) return null;
 
   return (

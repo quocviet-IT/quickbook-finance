@@ -465,6 +465,8 @@ export default function BankingClient({
     setBusy(null);
     if (!result.ok || !result.data) {
       message.error(result.error ?? "Bank feed synchronization failed");
+      // A sync that failed part-way is on the list, and is what Undo is for.
+      setImportsKey((count) => count + 1);
       return;
     }
     message.success(

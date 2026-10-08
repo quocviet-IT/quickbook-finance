@@ -38,6 +38,26 @@ describe("bank feed screens", () => {
     expect(list).toContain("<DataTable<BankFeedSyncView>");
   });
 
+  it("refreshes the sync list after a sync that failed, not only after one that worked", () => {
+    const failure = banking.slice(banking.indexOf("async function synchronizeFeed"));
+    const failed = failure.slice(failure.indexOf("if (!result.ok || !result.data) {"), failure.indexOf("message.success"));
+    expect(failed).toContain("setImportsKey((count) => count + 1);");
+    expect(failed.indexOf("setImportsKey")).toBeLessThan(failed.indexOf("return;"));
+  });
+
+  it("drops the answer of a read that was overtaken, so one account never shows another's syncs", () => {
+    expect(list).toContain("const read = ++latestRead.current;");
+    expect(list).toContain("if (read !== latestRead.current) return;");
+    expect(list).toMatch(/return \(\) => \{\s*latestRead\.current \+= 1;/);
+  });
+
+  it("says in the card when the syncs cannot be read, and shows no old rows", () => {
+    expect(list).toMatch(/setRows\(\[\]\);\s*setReadError\(/);
+    expect(list).toContain('<Alert type="error" showIcon message={readError} />');
+    expect(list.indexOf("if (readError) {")).toBeGreaterThan(-1);
+    expect(list.indexOf("if (readError) {")).toBeLessThan(list.indexOf("if (rows.length === 0) return null;"));
+  });
+
   it("puts Disconnect on the connection card for people who may write, and the syncs under one account", () => {
     expect(banking).toContain("{selectedConnection && canWrite ? (");
     expect(banking).toContain("setDisconnecting(selectedConnection)");
