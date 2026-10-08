@@ -1,15 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 vi.mock("server-only", () => ({}));
 
-/** What the stand-in for Plaid does: configured or not, and what /item/remove answers. */
-const plaid = { configured: true, remove: vi.fn<(token: string) => Promise<void>>() };
+/** What the stand-in for Plaid does: configured or not, its settings readable or not, and what /item/remove answers. */
+const plaid = { configured: true, envError: null as string | null, remove: vi.fn<(token: string) => Promise<void>>() };
 vi.mock("@/lib/services/plaid", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/services/plaid")>();
   return {
     ...actual,
-    plaidConfiguration: () => ({ configured: plaid.configured, environment: "sandbox", clientName: "One Book" }),
+    plaidConfiguration: () => {
+      if (plaid.envError) throw new actual.PlaidError(plaid.envError);
+      return { configured: plaid.configured, environment: "sandbox", clientName: "One Book" };
+    },
     removePlaidItem: (token: string) => plaid.remove(token),
   };
 });
@@ -43,8 +46,15 @@ function fakeClient(answers: Record<string, Answer | Record<string, unknown>[]>)
 
 beforeEach(() => {
   plaid.configured = true;
+  plaid.envError = null;
   plaid.remove.mockReset();
   plaid.remove.mockResolvedValue(undefined);
+  // A removal Plaid did not confirm is logged for support; the tests read the outcome instead.
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("disconnecting a bank connection", () => {
@@ -106,6 +116,27 @@ describe("disconnecting a bank connection", () => {
     const { sb, calls } = fakeClient(token);
     await expect(disconnectBankConnection(sb, "conn-1", "  ", true)).rejects.toThrow("Say why this bank connection is being disconnected");
     expect(calls).toEqual([]);
+  });
+
+  it("takes Plaid settings it cannot read as not confirmed, and still allows Disconnect in OneBook only", async () => {
+    plaid.envError = "PLAID_ENV must be sandbox, development, or production";
+    const refused = fakeClient(token);
+    expect(await disconnectBankConnection(refused.sb, "conn-1", "Closed", false)).toEqual({
+      disconnected: false,
+      unconfirmed:
+        "Plaid did not confirm the removal: PLAID_ENV must be sandbox, development, or production. Try again, or tick Disconnect in OneBook only.",
+    });
+    const onlyHere = fakeClient(token);
+    expect(await disconnectBankConnection(onlyHere.sb, "conn-1", "Closed", true)).toEqual({ disconnected: true, confirmedByPlaid: false });
+  });
+
+  it("says plainly when the stored token is missing", async () => {
+    const { sb } = fakeClient({ acc_get_bank_connection_token: { data: null, error: null } });
+    expect(await disconnectBankConnection(sb, "conn-1", "Closed", false)).toEqual({
+      disconnected: false,
+      unconfirmed: "Plaid did not confirm the removal: the stored token was not found. Try again, or tick Disconnect in OneBook only.",
+    });
+    expect(plaid.remove).not.toHaveBeenCalled();
   });
 
   it("says why the database refused", async () => {

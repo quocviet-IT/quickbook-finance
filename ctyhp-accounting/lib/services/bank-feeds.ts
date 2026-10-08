@@ -80,17 +80,22 @@ export async function disconnectBankConnection(
   if (!why) throw new BankFeedError("Say why this bank connection is being disconnected");
 
   let problem: string | null = null;
-  if (!plaidConfiguration().configured) {
-    problem = "OneBook has no Plaid keys";
-  } else {
-    try {
+  // Everything that can stop Plaid confirming — its settings included — lands
+  // here, so Disconnect in OneBook only stays open whatever went wrong.
+  try {
+    if (!plaidConfiguration().configured) {
+      problem = "OneBook has no Plaid keys";
+    } else {
       const { data: encrypted, error } = await sb.rpc("acc_get_bank_connection_token", { p_connection_id: connectionId });
       if (error) throw new BankFeedError(error.message);
-      await removePlaidItem(decryptBankToken(encrypted as string));
-    } catch (e) {
-      if (!(e instanceof PlaidError && plaidItemAlreadyGone(e.code))) {
-        problem = e instanceof Error ? e.message : "an unexpected error";
-      }
+      if (typeof encrypted !== "string" || encrypted === "") throw new BankFeedError("the stored token was not found");
+      await removePlaidItem(decryptBankToken(encrypted));
+    }
+  } catch (e) {
+    if (!(e instanceof PlaidError && plaidItemAlreadyGone(e.code))) {
+      problem = e instanceof Error ? e.message : "an unexpected error";
+      const request = e instanceof PlaidError && e.requestId ? ` (Plaid request ${e.requestId})` : "";
+      console.warn(`removing the bank connection at Plaid failed: ${problem}${request}`);
     }
   }
   if (problem && !onlyInOneBook) return { disconnected: false, unconfirmed: unconfirmedRemovalMessage(problem) };
