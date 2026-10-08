@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.92",
+    date: "2026-10-08",
+    headline: "Bank Transactions shows its lines sooner, and says when it is still loading.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Bank Transactions no longer says it has no lines while they are loading",
+        detail:
+          "Opening Bank Transactions waited on eight requests in a row before the first line appeared — two to eight seconds — and all that time the table said \"No bank transactions\" and \"0 results\". The lines now come in one request, ahead of everything else on the screen, and until they do the table shows that it is loading, as do the Statement imports and Bank feed syncs lists underneath. The lines, suggestions and matches shown are the same as before.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "A table that is still loading no longer says it is empty",
+        detail:
+          "Every list in the app now shows only its loading spinner until its rows arrive, instead of its empty message faintly underneath. The empty message appears only when the list has loaded and found nothing.",
+      },
+    ],
+  },
+  {
     version: "1.91",
     date: "2026-10-08",
     headline: "Every request checks your sign-in without waiting on the sign-in service.",

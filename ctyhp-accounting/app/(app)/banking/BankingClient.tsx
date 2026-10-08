@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import {
@@ -102,12 +102,8 @@ import {
   createBankAccountAction,
   createPlaidLinkTokenAction,
   generateSuggestionsAction,
-  getSuggestionsAction,
-  getBankPostingsAction,
-  getBankRecodesAction,
-  getCodingSuggestionsAction,
-  getLoanSuggestionsAction,
-  getTransactionsAction,
+  getBankingHintsAction,
+  getBankingViewAction,
   importStatementAction,
   rejectReconciliationAction,
   syncBankConnectionAction,
@@ -221,7 +217,11 @@ export default function BankingClient({
   // Lines moved out of Uncategorized by a recode, and where their money went.
   const [recodes, setRecodes] = useState<Map<string, BankRecodeRow>>(new Map());
   const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Loading from the first paint when there is an account to load: the lines
+  // arrive after hydration, and until then an empty table read as "No bank
+  // transactions" — for four to six seconds, on a screen people come to for
+  // exactly those lines.
+  const [loading, setLoading] = useState(selectedId !== undefined);
   const [busy, setBusy] = useState<string | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
   const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
@@ -307,19 +307,15 @@ export default function BankingClient({
     // ALL_ACCOUNTS asks the server for every account at once; the review queue
     // is one list, and which bank a line came from is a column, not a mode.
     const accountFilter = selectedId === ALL_ACCOUNTS ? null : selectedId;
-    // Suggestions arrive on their own: the lines never wait for them.
-    void getCodingSuggestionsAction(accountFilter).then((coded) => {
+    // Next runs Server Actions one at a time, in the order they are sent, so
+    // the lines go first as one request and the suggestions queue behind them:
+    // the lines never wait for the hints.
+    const view = getBankingViewAction(accountFilter);
+    void getBankingHintsAction(accountFilter).then(({ coding: coded, loans: loanHints }) => {
       if (coded.ok && coded.data) setCoding(new Map(coded.data.map((s) => [s.transactionId, s])));
+      if (loanHints.ok && loanHints.data) setLoans(new Map(loanHints.data.map((v) => [v.transactionId, v])));
     });
-    void getLoanSuggestionsAction(accountFilter).then((res) => {
-      if (res.ok && res.data) setLoans(new Map(res.data.map((view) => [view.transactionId, view])));
-    });
-    const [transactions, matches, posted, recoded] = await Promise.all([
-      getTransactionsAction(accountFilter),
-      getSuggestionsAction(accountFilter),
-      getBankPostingsAction(accountFilter),
-      getBankRecodesAction(accountFilter),
-    ]);
+    const { transactions, suggestions: matches, postings: posted, recodes: recoded } = await view;
     setLoading(false);
     if (transactions.ok && transactions.data) setTxns(transactions.data);
     if (matches.ok && matches.data) setSuggestions(matches.data);
@@ -333,7 +329,12 @@ export default function BankingClient({
     }
   }, [selectedId, message]);
 
-  useEffect(() => {
+  // A layout effect so the lines are first in Next's queue of Server Actions.
+  // The registers below the table (BankImportList, BankFeedSyncList) read
+  // their own data in useEffect, and React runs a child's effects before its
+  // parent's — so a useEffect here sent both registers ahead of the lines.
+  // Every layout effect runs before any passive one.
+  useLayoutEffect(() => {
     // Intentional synchronization after the selected account changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
@@ -713,7 +714,7 @@ export default function BankingClient({
       </Card>
 
       <BankTransactionsFilters
-        resultCount={reviewRows.length}
+        resultCount={loading ? undefined : reviewRows.length}
         actions={
           canWrite ? (
             <Space wrap>
