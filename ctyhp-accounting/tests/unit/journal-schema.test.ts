@@ -46,8 +46,15 @@ describe("manualJournalSchema", () => {
 
 describe("reverseEntrySchema", () => {
   it("requires a non-empty reason", () => {
-    expect(reverseEntrySchema.safeParse({ entry_id: uuid, reason: "" }).success).toBe(false);
-    expect(reverseEntrySchema.safeParse({ entry_id: uuid, reason: "dup" }).success).toBe(true);
+    expect(reverseEntrySchema.safeParse({ entry_id: uuid, reason: "", reversal_date: "2026-02-02" }).success).toBe(false);
+    expect(reverseEntrySchema.safeParse({ entry_id: uuid, reason: "dup", reversal_date: "2026-02-02" }).success).toBe(true);
+  });
+
+  it("requires the date the reversal posts on — acc_reverse_entry has no default for it", () => {
+    const missing = reverseEntrySchema.safeParse({ entry_id: uuid, reason: "dup" });
+    expect(missing.success).toBe(false);
+    expect(missing.error?.issues[0]?.message).toBe("Choose the date the reversal posts on");
+    expect(reverseEntrySchema.safeParse({ entry_id: uuid, reason: "dup", reversal_date: "02/02/2026" }).success).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
-import type { Dayjs } from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import IconActionButton from "@/components/ui/IconActionButton";
 import dynamic from "next/dynamic";
@@ -155,20 +155,40 @@ export default function JournalClient({
 
   const reverse = (entry: JournalEntrySummary) => {
     let reason = "";
+    // The reversal posts on a date of its own; the entry's date is where an
+    // entry that should never have been posted is taken back.
+    let reversalDate: Dayjs | null = dayjs(entry.entryDate);
     modal.confirm({
       title: `Reverse ${entry.entryNumber}?`,
       content: (
-        <Input
-          placeholder="Reason for reversal"
-          onChange={(e) => {
-            reason = e.target.value;
-          }}
-        />
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Input
+            placeholder="Reason for reversal"
+            onChange={(e) => {
+              reason = e.target.value;
+            }}
+          />
+          <div>
+            <div style={{ marginBottom: 4 }}>Reversal date</div>
+            <DatePicker
+              defaultValue={reversalDate}
+              allowClear={false}
+              style={{ width: "100%" }}
+              onChange={(value) => {
+                reversalDate = value;
+              }}
+            />
+          </div>
+        </Space>
       ),
       okText: "Reverse",
       okButtonProps: { danger: true },
       onOk: async () => {
-        const r = await reverseEntryAction({ entry_id: entry.id, reason });
+        if (!reversalDate) {
+          message.error("Choose the date the reversal posts on");
+          throw new Error("Choose the date the reversal posts on");
+        }
+        const r = await reverseEntryAction({ entry_id: entry.id, reason, reversal_date: reversalDate.format("YYYY-MM-DD") });
         if (r.ok) {
           message.success("Reversal posted");
           void load();

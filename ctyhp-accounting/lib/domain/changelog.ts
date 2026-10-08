@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.86",
+    date: "2026-10-08",
+    headline: "Reverse on Journal Entries works.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Reverse a journal entry",
+        detail:
+          "Reverse on Journal Entries always failed with \"Could not find the function … acc_reverse_entry … in the schema cache\": the dialog did not send the date the reversal posts on, which the books require. The dialog now asks for it, starting from the entry's own date — change it to post the reversal in another period. The original entry stays as it was; the reversal is a new entry that undoes it.",
+        route: "/journal",
+      },
+    ],
+  },
+  {
     version: "1.85",
     date: "2026-10-07",
     headline: "Bank lines reconciled from a statement are matched in Bank Transactions when the month is signed off.",
