@@ -420,7 +420,9 @@ export type OpeningBalanceInput = z.infer<typeof openingBalanceSchema>;
 export const reverseEntrySchema = z.object({
   entry_id: z.uuid(),
   reason: z.string().trim().min(1, "A reversal reason is required").max(300),
-  reversal_date: z.string().optional(),
+  reversal_date: z
+    .string({ error: "Choose the date the reversal posts on" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the date the reversal posts on"),
 });
 export type ReverseEntryInput = z.infer<typeof reverseEntrySchema>;
 

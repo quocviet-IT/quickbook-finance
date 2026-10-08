@@ -13,7 +13,7 @@ export interface DisconnectBankModalProps {
 }
 
 /**
- * Disconnect a bank feed (1.87). The connection is removed at Plaid first;
+ * Disconnect a bank feed (1.89). The connection is removed at Plaid first;
  * when Plaid does not confirm, nothing changes and the dialog says why and
  * offers to disconnect in OneBook only — never silently, because a connection
  * Plaid still holds keeps running (and, on a paid plan, billing) unseen.

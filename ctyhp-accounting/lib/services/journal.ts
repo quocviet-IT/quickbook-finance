@@ -93,7 +93,9 @@ export async function reverseEntry(sb: SupabaseClient, input: ReverseEntryInput)
   const { data, error } = await sb.rpc("acc_reverse_entry", {
     p_entry_id: input.entry_id,
     p_reason: input.reason,
-    p_reversal_date: input.reversal_date || undefined,
+    // Always sent: the function has no default for it, and a missing argument
+    // makes PostgREST look for a two-argument function that does not exist.
+    p_reversal_date: input.reversal_date,
   });
   if (error) throw new JournalError(error.message);
   return data as string;

@@ -41,20 +41,21 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "1.88",
+    version: "1.90",
     date: "2026-10-08",
-    headline: "Opening a page no longer sets off a request for every menu link on it.",
+    headline: "Reverse on Journal Entries works.",
     changes: [
       {
-        kind: "changed",
-        title: "Menu links load ahead only when you point at them",
+        kind: "fixed",
+        title: "Reverse a journal entry",
         detail:
-          "The menu used to load every page it listed in the background as soon as a page opened — about twenty requests each time, each one asking the server who you are and which company is open. Now a menu link loads ahead when the pointer is over it, the keyboard focus is on it, or a finger touches it, so the page you are about to open still gets its head start and the server is not kept busy with pages nobody opened.",
+          "Reverse on Journal Entries always failed with \"Could not find the function … acc_reverse_entry … in the schema cache\": the dialog did not send the date the reversal posts on, which the books require. The dialog now asks for it, starting from the entry's own date — change it to post the reversal in another period. The original entry stays as it was; the reversal is a new entry that undoes it.",
+        route: "/journal",
       },
     ],
   },
   {
-    version: "1.87",
+    version: "1.89",
     date: "2026-10-08",
     headline: "A bank feed can be disconnected, and a bank-feed sync can be undone.",
     changes: [
@@ -71,6 +72,19 @@ export const RELEASES: Release[] = [
         detail:
           "Bank feed syncs, below the bank connection, lists the syncs that changed something or failed. Undo takes back the newest: the lines it added are removed, and the lines it changed or removed come back as they were. Syncs are taken back newest first, and a sync is held while a line it added has been matched, coded or ignored. Disconnect and Undo both ask for a reason. Undone lines do not come back with the next sync; to fetch them again, disconnect the bank and connect it again. A sync that failed part-way is the exception: the next sync fetches its changes again.",
         route: "/banking",
+      },
+    ],
+  },
+  {
+    version: "1.88",
+    date: "2026-10-08",
+    headline: "Opening a page no longer sets off a request for every menu link on it.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Menu links load ahead only when you point at them",
+        detail:
+          "The menu used to load every page it listed in the background as soon as a page opened — about twenty requests each time, each one asking the server who you are and which company is open. Now a menu link loads ahead when the pointer is over it, the keyboard focus is on it, or a finger touches it, so the page you are about to open still gets its head start and the server is not kept busy with pages nobody opened.",
       },
     ],
   },

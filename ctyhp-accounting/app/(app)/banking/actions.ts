@@ -399,7 +399,7 @@ export async function syncBankConnectionAction(
 }
 
 /**
- * Removes a bank connection at Plaid, then disconnects it here (1.87). When
+ * Removes a bank connection at Plaid, then disconnects it here (1.89). When
  * Plaid does not confirm, nothing changes and the answer says so, unless the
  * person ticked Disconnect in OneBook only. The lines it brought in stay.
  */
