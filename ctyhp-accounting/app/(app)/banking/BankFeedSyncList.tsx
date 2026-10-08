@@ -32,7 +32,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /**
- * Bank feed syncs, and the way back out of one (1.87). Shown only for an
+ * Bank feed syncs, and the way back out of one (1.89). Shown only for an
  * account a bank feed has fed. Undo is offered on one sync at a time — the
  * connection's newest that changed something — and the button says why when
  * it is shut instead of failing when pressed.

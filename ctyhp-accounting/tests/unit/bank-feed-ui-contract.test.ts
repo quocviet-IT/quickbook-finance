@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const read = (file: string) => readFileSync(join(process.cwd(), "app", "(app)", "banking", file), "utf8");
 
 /**
- * Disconnect and Undo for bank feeds (1.87): what the screens must keep true.
+ * Disconnect and Undo for bank feeds (1.89): what the screens must keep true.
  * A connection is never dropped in OneBook while Plaid keeps it unless the
  * person chose that, and Undo is offered only where the database will accept it.
  */

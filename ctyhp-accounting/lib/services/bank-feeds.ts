@@ -1,5 +1,5 @@
 /**
- * Disconnecting a bank feed and undoing a bank-feed sync (1.87). The rules are
+ * Disconnecting a bank feed and undoing a bank-feed sync (1.89). The rules are
  * in the database (0137); this removes the connection at Plaid first, and says
  * so when Plaid does not confirm, so a connection is never dropped in OneBook
  * while Plaid keeps it — unless the person chose that.

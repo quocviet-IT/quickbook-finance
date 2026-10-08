@@ -1,5 +1,5 @@
 /**
- * Disconnecting a bank feed and undoing a bank-feed sync (1.87): what Plaid's
+ * Disconnecting a bank feed and undoing a bank-feed sync (1.89): what Plaid's
  * answer to a removal means, what each screen says, and whether a sync can be
  * undone now. Pure, so the wording is tested where it is written.
  */
