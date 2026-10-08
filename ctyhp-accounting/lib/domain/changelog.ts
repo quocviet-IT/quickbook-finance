@@ -41,7 +41,7 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "1.88",
+    version: "1.86",
     date: "2026-10-08",
     headline: "Opening a page no longer sets off a request for every menu link on it.",
     changes: [
