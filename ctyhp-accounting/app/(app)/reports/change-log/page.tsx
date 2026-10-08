@@ -36,7 +36,7 @@ export default async function ChangeLogPage() {
       ) : (
         <EmptyState
           title="This report reads the audit log"
-          description="Your role cannot read the audit log. An administrator can give it the permission to under Settings › Permissions."
+          description="Your role cannot read the audit log. An administrator can give your role that permission under Settings › Permissions."
         />
       )}
     </div>

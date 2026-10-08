@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Alert, App, Button, DatePicker, InputNumber, Select, Space, Spin } from "antd";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
+import { Alert, App, Button, DatePicker, InputNumber, Select, Space, Spin, type TablePaginationConfig } from "antd";
 import { CopyOutlined, PrinterOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { ReportPaper, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
+import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { downloadTextFile } from "@/lib/client/download";
 import { printReport, watchReportPrinting } from "@/lib/client/print-report";
 import { csvFromExportSheet, tsvFromExportSheet, type ReportExportSheet } from "@/lib/domain/report-export";
@@ -27,6 +29,26 @@ export type SimpleReportPeriod =
   | { kind: "fiscalYear"; current: number }
   | { kind: "none"; today: string; caption: string };
 
+/** What the page is being drawn for: the screen, or the printer. */
+export interface ReportView {
+  /** True while the browser prints: every row is drawn, not one page of them. */
+  printing: boolean;
+}
+
+/**
+ * A report table's pagination: one page at a time on screen, every row while
+ * printing — a printed report whose proof line states a total its rows do not
+ * reach is worse than no print at all. `pageSize` is the caller's state.
+ */
+export function reportPagination(
+  printing: boolean,
+  pageSize: number,
+  setPageSize: (pageSize: number) => void,
+  defaultSize: number,
+): TablePaginationConfig | false {
+  return printing ? false : clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(defaultSize));
+}
+
 export interface SimpleReportProps<T> {
   companyName: string;
   /** The report's printed heading. */
@@ -35,12 +57,14 @@ export interface SimpleReportProps<T> {
   period: SimpleReportPeriod;
   /** The page's server action. */
   load: (when: ReportWhen) => Promise<ReportRunResult<T>>;
+  /** Told about each answer the screen shows — never about one a newer run overtook. */
+  onLoaded?: (data: T) => void;
   /** What the screen shows of the data — the filters the page keeps for itself. */
   view?: (data: T) => T;
   /** What Copy, CSV, PDF and Excel hand over; built from the same view as the screen. */
   sheet: (data: T, when: ReportWhen) => ReportExportSheet;
   /** The report itself, on the paper. */
-  render: (data: T, when: ReportWhen) => ReactNode;
+  render: (data: T, when: ReportWhen, view: ReportView) => ReactNode;
   /** Filters of the page's own, beside the dates. */
   filters?: ReactNode;
   /** What the spinner says while the report is run. */
@@ -84,7 +108,7 @@ function caption(period: SimpleReportPeriod, when: ReportWhen): string {
  */
 export default function SimpleReport<T>(props: SimpleReportProps<T>) {
   const { message } = App.useApp();
-  const { period, load, view, sheet: buildSheet } = props;
+  const { period, load, onLoaded, view, sheet: buildSheet } = props;
   const first = useMemo(() => initialWhen(period), [period]);
 
   const [preset, setPreset] = useState<PeriodPreset>(period.kind === "range" ? period.preset : "custom");
@@ -93,8 +117,24 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  /** Counts runs, so only the newest one's answer is shown. */
+  const latestRun = useRef(0);
 
-  useEffect(() => watchReportPrinting(), []);
+  useEffect(() => {
+    const stop = watchReportPrinting();
+    // Synchronous on purpose: the browser takes its print snapshot right after
+    // `beforeprint`, so every row must be in the page by the time it returns.
+    const before = () => flushSync(() => setPrinting(true));
+    const after = () => setPrinting(false);
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+      stop();
+    };
+  }, []);
 
   const run = useCallback(
     async (when: ReportWhen) => {
@@ -102,23 +142,29 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
         setError("The start date is after the end date.");
         return;
       }
+      const thisRun = ++latestRun.current;
+      // A newer run has started: its answer, not this one, is what the reader asked for.
+      const overtaken = () => thisRun !== latestRun.current;
       setLoading(true);
       setError(null);
       try {
         const result = await load(when);
+        if (overtaken()) return;
         if (!result.ok || result.data === undefined) {
           setError(result.error ?? "The report could not be produced.");
           return;
         }
         setData(result.data);
         setRan(when);
+        onLoaded?.(result.data);
       } catch {
+        if (overtaken()) return;
         setError("The report could not be produced. Check the connection and run it again.");
       } finally {
-        setLoading(false);
+        if (!overtaken()) setLoading(false);
       }
     },
-    [load],
+    [load, onLoaded],
   );
 
   useEffect(() => {
@@ -157,7 +203,7 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
     <div className="report-print-area">
       <ReportPaper companyName={props.companyName} title={props.title} range={caption(period, ran)} currencyCode={props.currencyCode}>
         {shown !== null ? (
-          props.render(shown, ran)
+          props.render(shown, ran, { printing })
         ) : (
           <div style={{ textAlign: "center", padding: "48px 0" }}>
             {loading ? (

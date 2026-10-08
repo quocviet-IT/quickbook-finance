@@ -3,11 +3,10 @@
 import { useCallback, useState } from "react";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { TOTALS_STYLE } from "@/components/reports/OpenDocumentsReport";
 import ProofLine from "@/components/reports/ProofLine";
 import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import SimpleReport from "@/components/reports/SimpleReport";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney } from "@/lib/format";
 import { partyActivitySheet, type PartyActivityLine } from "@/lib/domain/party-activity";
@@ -58,7 +57,7 @@ export default function PartyActivityReport({
       load={load}
       sheet={sheet}
       runningText={sales ? "Adding up the sales…" : "Adding up the spending…"}
-      render={({ report, proof }) => (
+      render={({ report, proof }, _when, { printing }) => (
         <>
           <StatRow
             items={[
@@ -72,7 +71,7 @@ export default function PartyActivityReport({
           <DataTable<PartyActivityLine>
             rowKey={(line) => line.partyId ?? "none"}
             dataSource={report.lines}
-            pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAGE_SIZE))}
+            pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
             emptyTitle={sales ? "No sales in this period" : "No spending in this period"}
             emptyDescription="Widen the dates."
             columns={[

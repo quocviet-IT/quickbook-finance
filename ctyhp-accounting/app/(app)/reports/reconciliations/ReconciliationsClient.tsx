@@ -5,9 +5,8 @@ import Link from "next/link";
 import { Select, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import SimpleReport from "@/components/reports/SimpleReport";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney } from "@/lib/format";
 import {
@@ -57,18 +56,11 @@ export default function ReconciliationsClient({
       reconciliationListSheet(report, { companyName, today, currencyCode, baseDecimals: decimals, timeZone }),
     [companyName, today, currencyCode, decimals, timeZone],
   );
-  const loadAndList = useCallback(
-    async (when: ReportWhen) => {
-      const result = await load(when);
-      if (result.ok && result.data) {
-        const seen = new Map<string, string>();
-        for (const line of result.data.lines) seen.set(line.bankAccountId, line.bankAccountName);
-        setAccounts([...seen].map(([value, label]) => ({ value, label })));
-      }
-      return result;
-    },
-    [load],
-  );
+  const listAccounts = useCallback((report: ReconciliationListReport) => {
+    const seen = new Map<string, string>();
+    for (const line of report.lines) seen.set(line.bankAccountId, line.bankAccountName);
+    setAccounts([...seen].map(([value, label]) => ({ value, label })));
+  }, []);
   const caption = useMemo(() => `Signed-off reconciliations, as of ${longDate(today)}`, [today]);
 
   return (
@@ -77,7 +69,8 @@ export default function ReconciliationsClient({
       title="Reconciliation Report"
       currencyCode={currencyCode}
       period={{ kind: "none", today, caption }}
-      load={loadAndList}
+      load={load}
+      onLoaded={listAccounts}
       view={view}
       sheet={sheet}
       runningText="Checking every signed-off reconciliation…"
@@ -92,7 +85,7 @@ export default function ReconciliationsClient({
           options={accounts}
         />
       }
-      render={(report) => (
+      render={(report, _when, { printing }) => (
         <>
           <StatRow
             items={[
@@ -103,9 +96,13 @@ export default function ReconciliationsClient({
           <DataTable<ReconciliationListLine>
             rowKey="id"
             dataSource={report.lines}
-            pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAGE_SIZE))}
-            emptyTitle="No reconciliation has been signed off"
-            emptyDescription="Reconcile a bank account against its statement under Banking › Reconcile."
+            pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
+            emptyTitle={account ? "No signed-off reconciliation for this bank account" : "No reconciliation has been signed off"}
+            emptyDescription={
+              account
+                ? "Choose All bank accounts, or another account."
+                : "Reconcile a bank account against its statement under Banking › Reconcile."
+            }
             columns={[
               flexColumn<ReconciliationListLine>({ title: "Bank account", dataIndex: "bankAccountName" }),
               {

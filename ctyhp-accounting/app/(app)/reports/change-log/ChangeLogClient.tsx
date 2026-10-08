@@ -4,9 +4,8 @@ import { useCallback, useState } from "react";
 import { Alert, Select, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import SimpleReport from "@/components/reports/SimpleReport";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { changeLogSheet, CHANGE_LOG_LIMIT, type ChangeLogEntry, type ChangeLogReport } from "@/lib/domain/change-log";
 import type { PresetContext } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
@@ -53,14 +52,9 @@ export default function ChangeLogClient({
       changeLogSheet(report, { companyName, from: when.from ?? when.to, to: when.to, currencyCode, timeZone }),
     [companyName, currencyCode, timeZone],
   );
-  const loadAndList = useCallback(
-    async (when: ReportWhen) => {
-      const result = await load(when);
-      if (result.ok && result.data) setRecords([...new Set(result.data.lines.map((line) => line.record))].sort());
-      return result;
-    },
-    [load],
-  );
+  const listRecords = useCallback((report: ChangeLogReport) => {
+    setRecords([...new Set(report.lines.map((line) => line.record))].sort());
+  }, []);
 
   return (
     <SimpleReport<ChangeLogReport>
@@ -68,7 +62,8 @@ export default function ChangeLogClient({
       title="Change Log"
       currencyCode={currencyCode}
       period={{ kind: "range", ctx: presets, preset: "month" }}
-      load={loadAndList}
+      load={load}
+      onLoaded={listRecords}
       view={view}
       sheet={sheet}
       runningText="Reading the audit log…"
@@ -83,7 +78,7 @@ export default function ChangeLogClient({
           options={records.map((value) => ({ value, label: value }))}
         />
       }
-      render={(report) => (
+      render={(report, _when, { printing }) => (
         <>
           <StatRow items={[{ label: "Changes", value: report.lines.length.toLocaleString("en-US") }]} />
           {report.truncated ? (
@@ -98,9 +93,9 @@ export default function ChangeLogClient({
           <DataTable<ChangeLogEntry>
             rowKey="id"
             dataSource={report.lines}
-            pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAGE_SIZE))}
-            emptyTitle="Nothing changed in this period"
-            emptyDescription="Widen the dates."
+            pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
+            emptyTitle={record ? "No change to this kind of record in this period" : "Nothing changed in this period"}
+            emptyDescription={record ? "Choose All records, or widen the dates." : "Widen the dates."}
             columns={[
               { title: "When", dataIndex: "at", width: 150, render: (at: string) => stampInTimeZone(at, timeZone) },
               { title: "Who", dataIndex: "who", width: 220, ellipsis: true },

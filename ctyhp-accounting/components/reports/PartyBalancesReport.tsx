@@ -3,11 +3,10 @@
 import { useCallback, useState } from "react";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { TOTALS_STYLE } from "@/components/reports/OpenDocumentsReport";
 import ProofLine from "@/components/reports/ProofLine";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import SimpleReport from "@/components/reports/SimpleReport";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney } from "@/lib/format";
 import { partyBalancesSheet, type PartyBalanceLine } from "@/lib/domain/open-items";
@@ -54,7 +53,7 @@ export default function PartyBalancesReport({
       load={load}
       sheet={sheet}
       runningText="Reading the balances…"
-      render={({ report, control }) => (
+      render={({ report, control }, _when, { printing }) => (
         <>
           <StatRow
             items={[
@@ -65,7 +64,7 @@ export default function PartyBalancesReport({
           <DataTable<PartyBalanceLine>
             rowKey="partyId"
             dataSource={report.lines}
-            pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAGE_SIZE))}
+            pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
             emptyTitle={customers ? "No customer owes anything" : "Nothing is owed to any vendor"}
             emptyDescription="Every document dated by this day is settled."
             columns={[

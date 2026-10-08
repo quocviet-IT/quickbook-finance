@@ -4,10 +4,9 @@ import { useCallback, useState } from "react";
 import { Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import SimpleReport from "@/components/reports/SimpleReport";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney } from "@/lib/format";
 import type { PresetContext } from "@/lib/domain/report-presets";
@@ -72,7 +71,7 @@ export default function VoidedEntriesClient({
         load={load}
         sheet={sheet}
         runningText="Reading the voided and reversed entries…"
-        render={(report) => (
+        render={(report, _when, { printing }) => (
           <>
             <StatRow
               items={[
@@ -83,7 +82,7 @@ export default function VoidedEntriesClient({
             <DataTable<VoidedEntriesLine>
               rowKey="key"
               dataSource={report.lines}
-              pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAGE_SIZE))}
+              pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
               emptyTitle="Nothing was voided or reversed in this period"
               emptyDescription="Widen the dates."
               columns={[
@@ -110,7 +109,7 @@ export default function VoidedEntriesClient({
                 {
                   title: "Action",
                   key: "action",
-                  width: 170,
+                  width: 210,
                   render: (_: unknown, line: VoidedEntriesLine) => (
                     <span style={{ whiteSpace: "nowrap" }}>
                       <Tag color={line.action === "Voided" ? "red" : "orange"}>{line.action}</Tag>

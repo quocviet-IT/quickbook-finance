@@ -4,10 +4,9 @@ import { useCallback, useState } from "react";
 import { Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import ProofLine from "@/components/reports/ProofLine";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import SimpleReport from "@/components/reports/SimpleReport";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney } from "@/lib/format";
 import { ageLabel, openDocumentsSheet, type OpenDocumentLine } from "@/lib/domain/open-items";
@@ -58,7 +57,7 @@ export default function OpenDocumentsReport({
       load={load}
       sheet={sheet}
       runningText={invoices ? "Reading the open invoices…" : "Reading the unpaid bills…"}
-      render={({ report, control }) => {
+      render={({ report, control }, _when, { printing }) => {
         const overdue = report.lines.filter((line) => line.daysPastDue > 0).reduce((sum, line) => sum + line.openMinor, 0);
         return (
           <>
@@ -72,7 +71,7 @@ export default function OpenDocumentsReport({
             <DataTable<OpenDocumentLine>
               rowKey="key"
               dataSource={report.lines}
-              pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAGE_SIZE))}
+              pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
               emptyTitle={invoices ? "No open invoices" : "No unpaid bills"}
               emptyDescription={invoices ? "Every invoice dated by this day is paid." : "Every bill dated by this day is paid."}
               columns={[
