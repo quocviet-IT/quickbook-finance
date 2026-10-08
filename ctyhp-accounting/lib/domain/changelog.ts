@@ -41,6 +41,19 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.88",
+    date: "2026-10-08",
+    headline: "Opening a page no longer sets off a request for every menu link on it.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Menu links load ahead only when you point at them",
+        detail:
+          "The menu used to load every page it listed in the background as soon as a page opened — about twenty requests each time, each one asking the server who you are and which company is open. Now a menu link loads ahead when the pointer is over it, the keyboard focus is on it, or a finger touches it, so the page you are about to open still gets its head start and the server is not kept busy with pages nobody opened.",
+      },
+    ],
+  },
+  {
     version: "1.85",
     date: "2026-10-07",
     headline: "Bank lines reconciled from a statement are matched in Bank Transactions when the month is signed off.",

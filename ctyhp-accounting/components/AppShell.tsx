@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import Link from "next/link";
+import IntentLink from "./IntentLink";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Avatar,
@@ -182,7 +182,7 @@ function NavigationMenu({
           children: item.children.map((child) => ({
             key: child.key,
             label: (
-              <Link
+              <IntentLink
                 href={child.key}
                 onClick={() => {
                   if (storageKey) {
@@ -194,7 +194,7 @@ function NavigationMenu({
                 }}
               >
                 {child.label}
-              </Link>
+              </IntentLink>
             ),
             title: child.label,
           })),
@@ -202,7 +202,7 @@ function NavigationMenu({
       : {
           key: item.key,
           icon: NAV_ICONS[item.key],
-          label: <Link href={item.key}>{item.label}</Link>,
+          label: <IntentLink href={item.key}>{item.label}</IntentLink>,
           title: item.label,
         };
 
@@ -482,7 +482,7 @@ export default function AppShell({
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
-    <Link
+    <IntentLink
       href="/dashboard"
       aria-label="One Book dashboard"
       className={`app-shell__brand${collapsed ? " app-shell__brand--collapsed" : ""}`}
@@ -498,7 +498,7 @@ function Brand({ collapsed }: { collapsed: boolean }) {
           <span className="app-shell__brand-subtitle">Jewelry operations</span>
         </span>
       )}
-    </Link>
+    </IntentLink>
   );
 }
 
@@ -522,7 +522,7 @@ function ApprovalsLink({
 
   return (
     <Tooltip title={compact ? title : ""}>
-      <Link
+      <IntentLink
         href="/approvals"
         aria-label={title}
         aria-current={active ? "page" : undefined}
@@ -550,7 +550,7 @@ function ApprovalsLink({
             .filter(Boolean)
             .join(" ")}
         />
-      </Link>
+      </IntentLink>
     </Tooltip>
   );
 }
