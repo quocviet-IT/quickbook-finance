@@ -305,6 +305,25 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "no text to read.",
       },
       {
+        action: "Take back a bank-feed sync",
+        control: "Undo",
+        route: "/banking",
+        note:
+          "Under Bank feed syncs, Undo takes back the newest sync that changed something: the lines it added go, " +
+          "and the lines it changed or removed come back as they were. Syncs are taken back newest first, and a " +
+          "sync is held while a line it added is matched, coded or ignored. The next sync does not bring the lines " +
+          "back; to fetch them again, disconnect the bank and connect it again.",
+      },
+      {
+        action: "Disconnect a bank feed",
+        control: "Disconnect",
+        route: "/banking",
+        note:
+          "Removes the connection at Plaid, then here. The lines already in Bank Transactions stay, and the account " +
+          "can be connected again. If Plaid does not confirm the removal, nothing changes unless you tick " +
+          "Disconnect in OneBook only.",
+      },
+      {
         action: "Match lines to the ledger",
         control: "Suggest matches",
         note: "Suggestions are one-to-one and need approval before they take effect.",
