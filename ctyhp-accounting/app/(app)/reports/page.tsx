@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { hasPermission } from "@/lib/services/access";
+import { currentAccess } from "@/lib/db/settings-access";
 import PageHeader from "@/components/PageHeader";
 import ReportsHub from "@/components/reports/ReportsHub";
 import { isInternalReportId } from "@/lib/domain/report-catalog";
@@ -22,13 +23,14 @@ export default async function ReportsPage({
   const requestedReport = Array.isArray(params.report) ? params.report[0] : params.report;
 
   if (!isInternalReportId(requestedReport)) {
+    const access = await currentAccess();
     return (
       <div>
         <PageHeader
           title="Report Center"
           description="Find financial, customer, vendor, accounting, inventory, and tax reports."
         />
-        <ReportsHub />
+        <ReportsHub permissionKeys={access.permissionKeys} />
       </div>
     );
   }

@@ -153,13 +153,6 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
-    id: "beancount-export",
-    title: "Beancount Export",
-    description: "Download the whole ledger as a Beancount v3 file, with a balance line per reconciled statement, for bean-check and Fava.",
-    href: "/reports/beancount",
-    group: "accounting",
-  },
-  {
     id: "accounts-receivable-aging",
     title: "Accounts Receivable Aging",
     description: "Prioritize collections by customer and overdue age.",
@@ -181,6 +174,27 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "receivables",
   },
   {
+    id: "open-invoices",
+    title: "Open Invoices",
+    description: "Every invoice still open on a date, by customer and due date, with how long it is past due.",
+    href: "/reports/open-invoices",
+    group: "receivables",
+  },
+  {
+    id: "customer-balances",
+    title: "Customer Balances",
+    description: "What each customer owes on a date, credits netted, held to the receivables account.",
+    href: "/reports/customer-balances",
+    group: "receivables",
+  },
+  {
+    id: "sales-by-customer",
+    title: "Sales by Customer",
+    description: "A period's income by customer, largest first, adding up to Income on the Profit and Loss.",
+    href: "/reports/sales-by-customer",
+    group: "receivables",
+  },
+  {
     id: "accounts-payable-aging",
     title: "Accounts Payable Aging",
     description: "Monitor vendor balances by due date and overdue age.",
@@ -192,6 +206,27 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     title: "Vendor Statements",
     description: "Review bills, credits, payments, and vendor balances.",
     href: "/reports/vendor-statement",
+    group: "payables",
+  },
+  {
+    id: "unpaid-bills",
+    title: "Unpaid Bills",
+    description: "Every bill still unpaid on a date, by vendor and due date, with how long it is past due.",
+    href: "/reports/unpaid-bills",
+    group: "payables",
+  },
+  {
+    id: "vendor-balances",
+    title: "Vendor Balances",
+    description: "What is owed to each vendor on a date, credits netted, held to the payables account.",
+    href: "/reports/vendor-balances",
+    group: "payables",
+  },
+  {
+    id: "expenses-by-vendor",
+    title: "Expenses by Vendor",
+    description: "A period's spending by vendor, largest first, adding up to cost of sales and expenses on the Profit and Loss.",
+    href: "/reports/expenses-by-vendor",
     group: "payables",
   },
   {
@@ -262,6 +297,35 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "reconciliation-report",
+    title: "Reconciliation Report",
+    description: "Every bank reconciliation that was signed off, and whether it still agrees with the books.",
+    href: "/reports/reconciliations",
+    group: "accounting",
+  },
+  {
+    id: "change-log",
+    title: "Change Log",
+    description: "What changed in the books, when, and by whom, from the audit log.",
+    href: "/reports/change-log",
+    group: "accounting",
+    anyPermissions: CHANGE_LOG_PERMISSIONS,
+  },
+  {
+    id: "month-end-close-log",
+    title: "Month-End Close Log",
+    description: "Every close and reopen of a fiscal year's months, with when, by whom and why.",
+    href: "/reports/close-log",
+    group: "accounting",
+  },
+  {
+    id: "voided-entries",
+    title: "Voided and Reversed Entries",
+    description: "Every entry voided or reversed in a period. Nothing is deleted in OneBook, so nothing is lost.",
+    href: "/reports/voided-entries",
+    group: "accounting",
+  },
+  {
     id: "inventory-valuation",
     title: "Inventory Valuation",
     description: "Analyze jewelry quantities, unit costs, and inventory value.",
@@ -287,6 +351,19 @@ const INTERNAL_REPORT_IDS: InternalReportId[] = [
 
 export function isInternalReportId(value: unknown): value is InternalReportId {
   return typeof value === "string" && INTERNAL_REPORT_IDS.includes(value as InternalReportId);
+}
+
+/**
+ * Whether a reader may open a report. A permission list that could not be read
+ * (null) refuses a report that asks for one: a hidden card costs a click, a
+ * card that opens onto a refusal costs trust.
+ */
+export function canOpenReport(
+  report: Pick<ReportDefinition, "anyPermissions">,
+  permissionKeys: readonly string[] | null,
+): boolean {
+  if (!report.anyPermissions?.length) return true;
+  return permissionKeys !== null && report.anyPermissions.some((key) => permissionKeys.includes(key));
 }
 
 export function getReportGroup(groupId: ReportGroupId) {
