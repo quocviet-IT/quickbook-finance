@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { AccountType } from "@/lib/domain/accounts";
+import { percentOfBudget } from "@/lib/domain/budget-grid";
 import {
   buildBalanceSheet,
   buildBudgetVsActual,
@@ -345,6 +346,7 @@ describe("budgetStatement", () => {
     acct("rent", "6100", "Rent", "expense"),
     acct("ads", "6300", "Advertising", "expense"),
     acct("misc", "6400", "Miscellaneous", "expense"),
+    acct("travel", "6500", "Travel", "expense"),
   ]);
   const b = (id: string, debitBase: number, creditBase: number): LedgerBalance => {
     const a = BUDGET_ACCOUNTS.get(id)!;
@@ -355,18 +357,18 @@ describe("budgetStatement", () => {
     return { accountId: a.id, accountCode: a.code, name: a.name, accountType: a.type, amountMinor };
   };
   const bva = buildBudgetVsActual(
-    [b("sales", 0, 1_000_000), b("cogs", 300_000, 0), b("rent", 150_000, 0), b("misc", 0, 0)],
+    [b("sales", 0, 1_000_000), b("cogs", 300_000, 0), b("rent", 150_000, 0), b("misc", 0, 0), b("travel", 40_000, 0)],
     [budgetOf("sales", 900_000), budgetOf("cogs", 250_000), budgetOf("rent", 200_000), budgetOf("ads", 50_000)],
   );
   const s = budgetStatement({ bva, from: "2026-01-01", to: "2026-06-30", accounts: BUDGET_ACCOUNTS });
 
   it("sets actual beside budget, with the builder's variance", () => {
     expect(s.columns.map((c) => c.label)).toEqual(["Actual", "Budget"]);
-    expect(s.changeLabels).toEqual(["Variance", "%"]);
-    for (const line of bva.lines.filter((l) => l.current !== 0 || l.prior !== 0)) {
+    expect(s.changeLabels).toEqual(["Over / Under", "% of Budget"]);
+    for (const line of bva.lines.filter((l) => (l.current !== 0 || l.prior !== 0) && l.hasBudget)) {
       const r = s.rows.find((x) => x.kind === "account" && x.accountId === line.accountId);
       expect(r?.cells.map((c) => c.amount)).toEqual([line.current, line.prior]);
-      expect(r?.change).toEqual({ amount: line.variance, percent: line.variancePercent });
+      expect(r?.change).toEqual({ amount: line.variance, percent: percentOfBudget(line.current, line.prior) });
     }
     expect(amounts(s, "net-income")).toEqual([bva.actual.netIncome, bva.budget.netIncome]);
   });
@@ -382,6 +384,35 @@ describe("budgetStatement", () => {
   it("opens the actual figure and never the budget, which is not in the books", () => {
     expect(row(s, "income:a:sales")?.cells[0].zoom?.accountIds).toEqual(["sales"]);
     expect(row(s, "income:a:sales")?.cells[1].zoom).toBeNull();
+  });
+
+  it("gives % of Budget as actual over budget to one decimal place", () => {
+    expect(row(s, "income:a:sales")?.change?.percent).toBe(111.1);
+    expect(row(s, "opex:a:rent")?.change?.percent).toBe(75);
+    expect(row(s, "opex:a:ads")?.change?.percent).toBe(0);
+    expect(s.percentFixed).toBe(true);
+  });
+
+  it("shows a dash, not a variance, for an account with no budget", () => {
+    const travel = row(s, "opex:a:travel");
+    expect(travel?.noBudget).toBe(true);
+    expect(travel?.change).toBeNull();
+    expect(travel?.tone).toBeNull();
+    expect(travel?.cells[0].amount).toBe(40_000); // the actual is still shown, and still opens
+    expect(travel?.cells[0].zoom?.accountIds).toEqual(["travel"]);
+    expect(row(s, "opex:a:rent")?.noBudget).toBeUndefined();
+  });
+
+  it("leaves the totals' own variance alone when only an account lacks a budget", () => {
+    const opex = row(s, "opex:total");
+    expect(opex?.noBudget).toBeUndefined();
+    expect(opex?.change?.amount).toBe(190_000 - 250_000);
+  });
+
+  it("exports an unbudgeted account with a blank Budget and no variance", () => {
+    const sheet = statementSheet(s, { companyName: "Test Co", currencyCode: "USD", decimals: 2, subtitle: "", fileName: "x" });
+    const out = sheet.rows.find((r) => String(r.account).includes("6500"));
+    expect(out).toMatchObject({ c0: 400, c1: null, change: null, changePct: null });
   });
 
   it("leaves out an account with neither an actual nor a budget", () => {

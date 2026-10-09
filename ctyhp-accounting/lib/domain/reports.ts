@@ -280,6 +280,8 @@ export interface BudgetAccountAmount {
 export interface BudgetVarianceLine extends ComparativeLine {
   accountType: AccountType;
   favorable: boolean | null;
+  /** False when nothing is budgeted for the account: its actual is not a variance. */
+  hasBudget: boolean;
 }
 
 export interface BudgetVsActual {
@@ -336,6 +338,7 @@ export function buildBudgetVsActual(
         variancePercent:
           budgetAmount === 0 ? null : (variance / Math.abs(budgetAmount)) * 100,
         favorable: variance === 0 ? null : isIncome ? variance > 0 : variance < 0,
+        hasBudget: budgetAmount !== 0,
       };
     })
     .sort((a, b) => a.accountCode.localeCompare(b.accountCode));

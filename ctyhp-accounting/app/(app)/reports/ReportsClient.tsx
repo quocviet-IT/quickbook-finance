@@ -7,6 +7,7 @@ import { Alert, App, Button, Spin } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 import { ComparisonBars, chartColors, type ComparisonBarDatum } from "@/components/charts/FinancialCharts";
 import BudgetEditorDrawer from "@/components/reports/BudgetEditorDrawer";
+import BudgetMonthTable from "@/components/reports/BudgetMonthTable";
 import { ReportBody } from "@/components/reports/ReportAudience";
 import { ReportFoot, ReportPaper, StatRow, reportPaperStyles as styles, type StatItem } from "@/components/reports/ReportPaper";
 import ReportToolbar from "@/components/reports/ReportToolbar";
@@ -14,6 +15,7 @@ import StatementTable from "@/components/reports/StatementTable";
 import ZoomSheet from "@/components/reports/ZoomSheet";
 import { watchReportPrinting } from "@/lib/client/print-report";
 import { formatMoney } from "@/lib/format";
+import type { MonthResult } from "@/lib/domain/budget-grid";
 import { dayBefore, fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
 import { longDate, presetRange, rangeText, type PeriodPreset } from "@/lib/domain/report-presets";
@@ -185,6 +187,8 @@ export default function ReportsClient({
   } | null>(null);
   const [chart, setChart] = useState<ChartSpec | null>(null);
   const [stats, setStats] = useState<StatItem[] | null>(null);
+  // Budget vs Actual: each month of the range against its budget (empty for a single month).
+  const [monthly, setMonthly] = useState<MonthResult[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [ran, setRan] = useState(initialRange);
   const [loading, setLoading] = useState(true);
@@ -219,6 +223,7 @@ export default function ReportsClient({
       setPnlData(null);
       setChart(null);
       setStats(null);
+      setMonthly([]);
     };
 
     setLoading(true);
@@ -234,6 +239,7 @@ export default function ReportsClient({
         const budgetIncome = bva.budget.income.total + bva.budget.otherIncome.total;
         const actualExpenses = bva.actual.costOfGoodsSold.total + bva.actual.operatingExpenses.total + bva.actual.otherExpenses.total;
         const netVariance = bva.actual.netIncome - bva.budget.netIncome;
+        if (current()) setMonthly(bva.monthly);
         show(
           budgetStatement({ bva, from: bFrom, to: bTo, accounts: index }),
           null,
@@ -408,6 +414,7 @@ export default function ReportsClient({
     <>
       {stats ? <StatRow items={stats} /> : null}
       <StatementTable statement={shownStatement} money={money} onZoom={setZoom} />
+      {type === "budget" ? <BudgetMonthTable months={monthly} money={money} /> : null}
       {shownStatement.outOfBalance !== null ? (
         <Alert
           type="error"
@@ -516,8 +523,9 @@ export default function ReportsClient({
           key={fiscalYear}
           open={budgetEditorOpen}
           onClose={() => setBudgetEditorOpen(false)}
-          onSaved={() => {
-            setBudgetEditorOpen(false);
+          onSaved={({ complete }) => {
+            // A save that stopped part-way keeps the grid open, so the message naming the unsaved months stays in view.
+            if (complete) setBudgetEditorOpen(false);
             void run();
           }}
           fiscalYear={fiscalYear}

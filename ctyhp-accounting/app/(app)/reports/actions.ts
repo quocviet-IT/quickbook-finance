@@ -2,13 +2,18 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole } from "@/lib/auth";
 import { getLedgerBalances } from "@/lib/services/reports";
-import { getBudgetAccountAmounts, saveBudgetMonth, BudgetError } from "@/lib/services/budgets";
+import {
+  getBudgetGrid,
+  getBudgetVsActual,
+  saveBudgetMonth,
+  BudgetError,
+  type BudgetGridData,
+  type BudgetVsActualReport,
+} from "@/lib/services/budgets";
+import { getCurrentCompanySettings } from "@/lib/services/company";
 import { dayBefore } from "@/lib/domain/fiscal";
 import {
-  buildBudgetVsActual,
   buildStatementOfEquity,
-  type BudgetAccountAmount,
-  type BudgetVsActual,
   type LedgerBalance,
   type StatementOfEquity,
 } from "@/lib/domain/reports";
@@ -46,40 +51,29 @@ export async function getBudgetVsActualAction(
   fiscalYear: number,
   from: string,
   to: string,
-): Promise<ActionResult<BudgetVsActual>> {
+): Promise<ActionResult<BudgetVsActualReport>> {
   const role = await getUserRole();
   if (!role) return { ok: false, error: "Not authorized" };
   try {
     cashFlowRangeSchema.parse({ from, to });
+    if (!from.endsWith("-01")) return { ok: false, error: "A budget report starts on the first day of a month" };
+    if (from > to) return { ok: false, error: "Report end date must not be before its start date" };
     const sb = await createSupabaseServerClient();
-    const [actual, budget] = await Promise.all([
-      getLedgerBalances(sb, from, to),
-      getBudgetAccountAmounts(sb, fiscalYear, from, to),
-    ]);
-    return { ok: true, data: buildBudgetVsActual(actual, budget) };
+    return { ok: true, data: await getBudgetVsActual(sb, fiscalYear, from, to) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to load Budget vs Actual" };
   }
 }
 
-export async function getBudgetMonthAction(
-  fiscalYear: number,
-  periodStart: string,
-): Promise<ActionResult<BudgetAccountAmount[]>> {
+/** The full-year budget grid's starting data: the accounts, the budget, and two years of actuals. Reads only. */
+export async function getBudgetGridAction(fiscalYear: number): Promise<ActionResult<BudgetGridData>> {
   const role = await getUserRole();
   if (!role) return { ok: false, error: "Not authorized" };
   try {
-    const parsed = budgetMonthSaveSchema.pick({
-      fiscal_year: true,
-      period_start: true,
-    }).parse({ fiscal_year: fiscalYear, period_start: periodStart });
+    const parsed = budgetMonthSaveSchema.pick({ fiscal_year: true }).parse({ fiscal_year: fiscalYear });
     const sb = await createSupabaseServerClient();
-    const data = await getBudgetAccountAmounts(
-      sb,
-      parsed.fiscal_year,
-      parsed.period_start,
-      parsed.period_start,
-    );
+    const settings = await getCurrentCompanySettings(sb);
+    const data = await getBudgetGrid(sb, parsed.fiscal_year, settings?.fiscal_year_start_month ?? 1);
     return { ok: true, data };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to load budget" };

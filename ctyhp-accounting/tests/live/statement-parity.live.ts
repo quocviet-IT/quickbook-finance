@@ -40,6 +40,7 @@ import {
 } from "@/lib/domain/statement";
 import { COMPARE_OPTIONS, fiscalYearStartOf, pointColumns, rangeColumns } from "@/lib/domain/statement-columns";
 import { listAccounts } from "@/lib/services/accounts";
+import { percentOfBudget } from "@/lib/domain/budget-grid";
 import { getBudgetAccountAmounts } from "@/lib/services/budgets";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/services/dashboard";
@@ -226,7 +227,11 @@ describe("the five statements agree with the books, figure for figure", () => {
       for (const line of bva.lines.filter((l) => l.current !== 0 || l.prior !== 0)) {
         const row = accountRow(b, line.accountId!);
         expect(row?.cells.map((cell) => cell.amount), `${c.name} budget ${line.accountCode}`).toEqual([line.current, line.prior]);
-        expect(row?.change, `${c.name} budget variance ${line.accountCode}`).toEqual({ amount: line.variance, percent: line.variancePercent });
+        if (line.hasBudget) {
+          expect(row?.change, `${c.name} budget variance ${line.accountCode}`).toEqual({ amount: line.variance, percent: percentOfBudget(line.current, line.prior) });
+        } else {
+          expect(row?.noBudget, `${c.name} budget dash ${line.accountCode}`).toBe(true);
+        }
       }
       expect(byKey(b, "net-income")?.cells.map((cell) => cell.amount)).toEqual([bva.actual.netIncome, bva.budget.netIncome]);
 

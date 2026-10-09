@@ -32,7 +32,11 @@ const TONE_TITLE = {
 } as const;
 
 /** A percentage cell: blank when there is no percentage to give (nothing to divide by). */
-const percentText = (value: number | null | undefined): string => (value == null ? "" : formatPercent(value));
+const percentText = (value: number | null | undefined, fixed = false): string =>
+  value == null ? "" : fixed ? `${value.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` : formatPercent(value);
+
+/** What a Budget vs Actual cell reads when nothing is budgeted. */
+const NO_BUDGET = "—";
 
 /**
  * The class for a cell holding a signed value: the row's tone when it has one
@@ -66,6 +70,7 @@ export default function StatementTable({
 
   const amount = (row: StatementRow, i: number): ReactNode => {
     const cell = row.cells[i];
+    if (row.noBudget && i === 1) return NO_BUDGET;
     if (cell.amount === null) return "";
     const text = money(cell.amount);
     const negative = cell.amount < 0;
@@ -155,11 +160,11 @@ export default function StatementTable({
                       className={`${styles.r}${signClass(row.change?.amount, toneClass)}`}
                       title={row.tone ? TONE_TITLE[row.tone] : undefined}
                     >
-                      {row.change ? money(row.change.amount) : ""}
+                      {row.change ? money(row.change.amount) : row.noBudget ? NO_BUDGET : ""}
                       {row.tone ? <span className="accounting-sr-only">{` ${row.tone}`}</span> : null}
                     </td>
                     <td className={`${styles.pct}${signClass(row.change?.percent, toneClass)}`}>
-                      {percentText(row.change?.percent)}
+                      {row.noBudget ? NO_BUDGET : percentText(row.change?.percent, statement.percentFixed)}
                     </td>
                   </>
                 ) : null}

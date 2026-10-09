@@ -12,6 +12,7 @@
  */
 
 import { ACCOUNT_TYPES, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
+import { percentOfBudget } from "@/lib/domain/budget-grid";
 import { dayBefore } from "@/lib/domain/fiscal";
 import { fromMinor } from "@/lib/domain/money";
 import {
@@ -77,6 +78,8 @@ export interface StatementRow {
   change?: { amount: number; percent: number | null } | null;
   /** Budget vs Actual: whether the variance is good news. */
   tone?: StatementTone;
+  /** Budget vs Actual: nothing is budgeted, so the Budget, Over / Under and % cells read "—". */
+  noBudget?: boolean;
 }
 
 export type StatementColumn = StatementColumnSpec;
@@ -91,6 +94,8 @@ export interface Statement {
   empty: boolean;
   /** When a statement should balance and does not: by how much, in the first column that does not. */
   outOfBalance: number | null;
+  /** Show the change % with exactly one decimal place (Budget vs Actual's % of Budget). */
+  percentFixed?: boolean;
 }
 
 /* ------------------------------------------------------------------- rows */
@@ -665,7 +670,7 @@ function toneOf(variance: number, incomeSide: boolean): StatementTone {
   return (incomeSide ? variance > 0 : variance < 0) ? "favorable" : "unfavorable";
 }
 
-/** Following `reportBudget`: Actual, Budget, Variance and %, by the P&L's sections. */
+/** Following `reportBudget`: Actual, Budget, Over / Under and % of Budget, by the P&L's sections. */
 export function budgetStatement(input: BudgetStatementInput): Statement {
   const { bva } = input;
   const columns: StatementColumn[] = [
@@ -675,9 +680,18 @@ export function budgetStatement(input: BudgetStatementInput): Statement {
   const ctx: Ctx = { columns, accounts: input.accounts, percentBase: null, change: true };
   const rows: StatementRow[] = [];
   const shown = bva.lines.filter((l) => l.current !== 0 || l.prior !== 0);
-  const budgetRow = (spec: RowSpec, incomeSide: boolean): StatementRow => {
+  const budgetRow = (spec: RowSpec, incomeSide: boolean, unbudgeted = false): StatementRow => {
     const row = makeRow(ctx, spec);
     row.cells[1] = { amount: row.cells[1].amount, zoom: null }; // a budget is not in the books
+    if (unbudgeted) {
+      // An account with no budget: its whole actual is not a variance.
+      row.noBudget = true;
+      row.change = null;
+      row.tone = null;
+      return row;
+    }
+    // Over / Under is actual less budget; the percent is actual as a share of budget.
+    row.change = row.change ? { amount: row.change.amount, percent: percentOfBudget(row.cells[0].amount ?? 0, row.cells[1].amount ?? 0) } : null;
     row.tone = row.change ? toneOf(row.change.amount, incomeSide) : null;
     return row;
   };
@@ -703,6 +717,7 @@ export function budgetStatement(input: BudgetStatementInput): Statement {
             zoomIds: line.accountId ? [line.accountId] : null,
           },
           section.incomeSide,
+          !line.hasBudget,
         ),
       );
     }
@@ -746,7 +761,7 @@ export function budgetStatement(input: BudgetStatementInput): Statement {
       true,
     ),
   );
-  return { title: "Budget vs Actual", columns, changeLabels: ["Variance", "%"], percent: false, rows, empty: shown.length === 0, outOfBalance: null };
+  return { title: "Budget vs Actual", columns, changeLabels: ["Over / Under", "% of Budget"], percent: false, rows, empty: shown.length === 0, outOfBalance: null, percentFixed: true };
 }
 
 /* ----------------------------------------------------- Statement of Equity */
@@ -852,7 +867,7 @@ export function statementSheet(statement: Statement, meta: StatementSheetMeta): 
     .map((r) => {
       const out: Record<string, string | number | null> = { account: `${"  ".repeat(r.depth)}${r.label}` };
       r.cells.forEach((cell, i) => {
-        out[`c${i}`] = cell.amount === null ? null : fromMinor(cell.amount, meta.decimals);
+        out[`c${i}`] = cell.amount === null || (r.noBudget && i === 1) ? null : fromMinor(cell.amount, meta.decimals);
         if (statement.percent) out[`p${i}`] = r.percent?.[i] ?? null;
       });
       if (statement.changeLabels) {

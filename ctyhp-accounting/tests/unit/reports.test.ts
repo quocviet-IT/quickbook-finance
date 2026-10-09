@@ -141,6 +141,14 @@ describe("Budget vs Actual", () => {
       favorable: false,
     });
   });
+
+  it("marks an account with nothing budgeted, so its actual is not read as a variance", () => {
+    const report = buildBudgetVsActual(actual, [
+      { accountId: "income", accountCode: "4000", name: "Sales", accountType: "income", amountMinor: 100000 },
+    ]);
+    expect(report.lines.find((line) => line.accountId === "income")?.hasBudget).toBe(true);
+    expect(report.lines.find((line) => line.accountId === "expense")?.hasBudget).toBe(false);
+  });
 });
 
 describe("percentOfIncome", () => {
