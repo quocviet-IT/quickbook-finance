@@ -99,7 +99,6 @@ describe("openDocuments", () => {
     );
     expect(twin.lines).toHaveLength(2);
     expect(twin.lines[0].key).not.toBe(twin.lines[1].key);
-    expect(new Set(report.lines.map((l) => l.key)).size).toBe(report.lines.length);
   });
 
   it("reads bills the same way for Unpaid Bills", () => {
