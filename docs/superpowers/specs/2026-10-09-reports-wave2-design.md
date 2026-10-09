@@ -282,3 +282,33 @@ Before any code was written, the rules above were run read-only against all six 
    - As in the mockup, occurrences before today are not counted.
    - A note under the table says how many templates are behind, so a missing payment is not silent.
 8. **Ratios.** No probe was needed. The workings come from the same builders as the Balance Sheet and the Profit and Loss, and the live test asserts that they match.
+
+## Amendments from pre-building (09/10)
+
+All five were built on a local pre-build branch. They were then run read-only against every company and smoke-tested on the sample company, with 23 of 23 checks passing. These points changed or were settled there.
+
+1. **Purchases and Inventory proof.**
+   - With the amended rules, the year identity holds by construction. The one exception is an opening or equity entry that also carries a cost-of-sales line.
+   - The footnote therefore says the year adds up and nothing more. It does not claim to catch write-downs.
+   - The live check also asserts that the last closing stock equals the inventory accounts' ledger balance.
+2. **Sales Tax Liability.**
+   - **The name rule.** A name "reads as sales tax" unless it also names payroll, income, withholding, employer, federal, property, corporate, franchise, excise or VAT tax. Before this exclusion, one sample book's Income Tax Payable and Payroll Tax Payable raised false warnings. The warning now fires only on an ambiguous "Taxes Payable" in one imported book.
+   - **An Adjustments column** appears only when adjustments are not zero, so the running balance adds up on the page.
+   - **The live check** also asserts the real check: Gross sales equals Income on the Profit and Loss for the same dates, which shows that every income line lands in Taxable or Exempt.
+   - **Record a payment.** The Sales Tax Center's dialog is now one shared component. After a payment the report refreshes: `SimpleReport` gains an optional `refreshKey`.
+3. **Total rows** sit inside their tables, through `ReportTable`'s `summary`. `ReportTable` gains `SummaryRow` and `SummaryCell`, so no screen imports Ant Design's `Table`.
+4. **The forecast.**
+   - The old page had no chart. A chart of cash at week end, with money in and out per week, is added.
+   - The open-item and settlement-lag reads are paged in a total order: side and document id, and all four columns, respectively.
+   - A template whose payload names a currency other than the base currency is left out, and a note counts it.
+   - Invoice templates count before tax.
+5. **Budget vs Actual.**
+   - **Dashes.** A line shows "—" when its budget over the range is zero. Section totals show $0.00.
+   - **Month by month** ends with a Total row on screen.
+   - **Seeding** sets a negative net actual to zero.
+   - **"Clear this year"** zeroes the cells and keeps the rows.
+   - **After a partial save failure** the grid stays open, and Save retries only the months not yet saved.
+   - **Reads.** The grid and the monthly table read the budget tables directly; opening the grid costs six requests, not fifteen.
+   - **Fit.** The grid fits a 1440-pixel window: Account 200 px, each month 84 px, Year 96 px. Month headers read "Jan", with the full label in a title.
+6. **Financial Ratios.** The comparison column is headed "Change". The export is text, because one column mixes money, percent and days.
+7. **Guide.** It had no budget flow to update, so a new four-step "budget" flow is added.
