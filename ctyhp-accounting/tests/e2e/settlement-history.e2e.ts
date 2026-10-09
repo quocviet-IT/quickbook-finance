@@ -5,7 +5,7 @@ import {
   recordPayment,
 } from "@/lib/services/invoicing";
 import { listInvoiceSettlements } from "@/lib/services/settlements";
-import { getCashFlowForecast } from "@/lib/services/forecast";
+import { getCashForecast } from "@/lib/services/forecast";
 import { buildSettlementHistory } from "@/lib/domain/settlement";
 import { closeE2eSession, openE2eSession } from "./support/session";
 import { sweepMarker } from "./support/cleanup";
@@ -116,10 +116,9 @@ describe("settlement history and forecast over HTTPS", () => {
       expect(history.reconciles, "the settlements must add up to the ledger balance").toBe(true);
 
       // The forecast reads the same open balance, on the invoice's due date.
-      const forecast = await getCashFlowForecast(sb, { asOf: today, weeks: 13 });
-      const projectedIn = forecast.buckets.reduce((sum, b) => sum + b.expectedInMinor, 0);
+      const { due: forecast } = await getCashForecast(sb, { today, baseCurrency: "USD" });
       expect(
-        projectedIn + forecast.beyondHorizonInMinor,
+        forecast.insideInMinor + forecast.beyondHorizonInMinor,
         "every open receivable belongs somewhere in the projection",
       ).toBe(forecast.totalOpenInMinor);
       expect(forecast.totalOpenInMinor).toBeGreaterThanOrEqual(350_00);

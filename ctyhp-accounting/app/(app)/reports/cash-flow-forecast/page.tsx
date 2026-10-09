@@ -1,34 +1,29 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getCashFlowForecast, listOpenItems, FORECAST_WEEKS } from "@/lib/services/forecast";
-import { resolveActiveCompany } from "@/lib/db/company";
-import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
-import CashFlowForecastClient from "./CashFlowForecastClient";
+import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
+import CashForecastReport from "@/components/reports/CashForecastReport";
+import { reportPageContext } from "@/lib/services/report-context";
+import { cashForecastAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function CashFlowForecastPage() {
   const sb = await createSupabaseServerClient();
-  const entity = await resolveActiveCompany();
-  const asOf = new Date().toISOString().slice(0, 10);
-  const [forecast, openItems] = await Promise.all([
-    getCashFlowForecast(sb, { asOf, weeks: FORECAST_WEEKS }),
-    listOpenItems(sb, asOf),
-  ]);
-
+  const ctx = await reportPageContext(sb);
   return (
     <div>
       <PageHeader
-        meta={
-          <ReportEntityBadge
-            companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"}
-            isSample={entity.active?.isSample ?? false}
-          />
-        }
-        title="Cash Flow Forecast"
-        description="Money still owed to you and by you, projected onto the weeks ahead — on the dates the documents say, and on the dates people actually pay."
+        meta={<ReportEntityBadge companyName={ctx.companyName} isSample={ctx.isSample} />}
+        title="13 Week Cash Forecast"
+        description="Receipts and payments expected over the next thirteen weeks."
       />
-      <CashFlowForecastClient forecast={forecast} openItems={openItems} companyName={entity.active?.dbaName || entity.active?.legalName || "No company selected"} />
+      <CashForecastReport
+        companyName={ctx.companyName}
+        currencyCode={ctx.currencyCode}
+        decimals={ctx.decimals}
+        today={ctx.today}
+        load={cashForecastAction}
+      />
     </div>
   );
 }
