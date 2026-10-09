@@ -33,7 +33,7 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 
 const LOAD_PROBLEM = "The budget could not be read. Close this and try again.";
 
-const zeros =(): number[] => new Array<number>(GRID_MONTHS).fill(0);
+const zeros = (): number[] => new Array<number>(GRID_MONTHS).fill(0);
 const byCode = (a: GridAccount, b: GridAccount) => a.accountCode.localeCompare(b.accountCode);
 
 /**
