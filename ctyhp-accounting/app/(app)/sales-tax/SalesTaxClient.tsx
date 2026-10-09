@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import {
   App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, Typography,
 } from "antd";
@@ -13,11 +14,13 @@ import {
   stateName,
   type StateLiabilityLine,
 } from "@/lib/domain/tax-jurisdiction";
-import { formatMoney, toMinorUnits } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import {
-  liabilityAction, recordTaxPaymentAction, voidTaxPaymentAction,
+  liabilityAction, voidTaxPaymentAction,
   createTaxCodeAction, updateTaxCodeAction, setTaxCodeActiveAction,
 } from "./actions";
+import RecordTaxPaymentModal from "@/components/sales-tax/RecordTaxPaymentModal";
+import { LIABILITY_REPORT_LINK_LABEL } from "@/lib/domain/sales-tax-liability";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 // See table-pagination.ts for why this has to live in state rather than as a
@@ -80,32 +83,6 @@ export default function SalesTaxClient(props: Props) {
 
   // --- Record payment ---
   const [payOpen, setPayOpen] = useState(false);
-  const [paySaving, setPaySaving] = useState(false);
-  const [payForm] = Form.useForm();
-
-  async function submitPayment() {
-    const v = await payForm.validateFields();
-    setPaySaving(true);
-    const res = await recordTaxPaymentAction({
-      tax_account_id: v.tax_account_id,
-      bank_account_id: v.bank_account_id,
-      currency_code: baseCurrency,
-      amount_minor: toMinorUnits(Number(v.amount ?? 0), decimalsOf(baseCurrency)),
-      payment_date: v.payment_date ? v.payment_date.format("YYYY-MM-DD") : undefined,
-      period_start: v.period ? v.period[0].format("YYYY-MM-DD") : null,
-      period_end: v.period ? v.period[1].format("YYYY-MM-DD") : null,
-      memo: v.memo ?? null,
-    });
-    setPaySaving(false);
-    if (res.ok) {
-      message.success("Tax payment recorded");
-      setPayOpen(false);
-      payForm.resetFields();
-      reloadLiability(range);
-    } else {
-      message.error(res.error ?? "Failed to record payment");
-    }
-  }
 
   function confirmVoidPayment(id: string) {
     modal.confirm({
@@ -168,6 +145,7 @@ export default function SalesTaxClient(props: Props) {
                 {props.canWrite && (
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => setPayOpen(true)}>Record payment</Button>
                 )}
+                <Link href="/reports/sales-tax-liability">{LIABILITY_REPORT_LINK_LABEL}</Link>
               </Space>
               {/* A return is filed per state, so the state total comes first and
                   the codes behind it stay below. */}
@@ -294,23 +272,15 @@ export default function SalesTaxClient(props: Props) {
       ]}
       tabBarExtraContent={
         <>
-          {/* Record payment modal */}
-          <Modal title="Record tax payment" open={payOpen} onOk={submitPayment} onCancel={() => setPayOpen(false)} confirmLoading={paySaving} okText="Record">
-            <Form form={payForm} layout="vertical">
-              <Form.Item name="tax_account_id" label="Sales Tax Payable account" rules={[{ required: true, message: "Select the tax account" }]}>
-                <Select showSearch optionFilterProp="label" options={props.taxPayableAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))} />
-              </Form.Item>
-              <Form.Item name="bank_account_id" label="Pay from" rules={[{ required: true, message: "Select a bank account" }]}>
-                <Select showSearch optionFilterProp="label" options={props.bankAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))} />
-              </Form.Item>
-              <Form.Item name="amount" label="Amount" rules={[{ required: true, message: "Enter an amount" }]}>
-                <InputNumber min={0} precision={decimalsOf(baseCurrency)} prefix="$" style={{ width: 200 }} />
-              </Form.Item>
-              <Form.Item name="payment_date" label="Payment date"><DatePicker /></Form.Item>
-              <Form.Item name="period" label="Period covered"><DatePicker.RangePicker /></Form.Item>
-              <Form.Item name="memo" label="Memo"><Input.TextArea rows={2} /></Form.Item>
-            </Form>
-          </Modal>
+          <RecordTaxPaymentModal
+            open={payOpen}
+            onClose={() => setPayOpen(false)}
+            onRecorded={() => reloadLiability(range)}
+            taxPayableAccounts={props.taxPayableAccounts}
+            bankAccounts={props.bankAccounts}
+            baseCurrency={baseCurrency}
+            decimals={decimalsOf(baseCurrency)}
+          />
 
           {/* Tax code modal */}
           <Modal title={tcEditing ? "Edit rate" : "New rate"} open={tcOpen} onOk={submitTaxCode} onCancel={() => setTcOpen(false)} confirmLoading={tcSaving} okText={tcEditing ? "Save" : "Create"}>

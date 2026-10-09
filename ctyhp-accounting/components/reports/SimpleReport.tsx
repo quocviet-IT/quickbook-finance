@@ -69,6 +69,8 @@ export interface SimpleReportProps<T> {
   filters?: ReactNode;
   /** What the spinner says while the report is run. */
   runningText?: string;
+  /** Changing this runs the report again over the dates it last ran, for a page whose own action changed its figures. */
+  refreshKey?: number;
 }
 
 function initialWhen(period: SimpleReportPeriod): ReportWhen {
@@ -173,6 +175,16 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
     // Run once on arrival; afterwards a period choice or Run runs it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const refreshKey = props.refreshKey;
+  const lastRefresh = useRef(refreshKey);
+  useEffect(() => {
+    if (lastRefresh.current === refreshKey) return;
+    lastRefresh.current = refreshKey;
+    void run(ran);
+    // Only a new key runs it again, over the dates last run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const shown = useMemo(() => (data === null ? null : view ? view(data) : data), [data, view]);
   const sheet = useMemo(() => (shown === null ? null : buildSheet(shown, ran)), [shown, ran, buildSheet]);
