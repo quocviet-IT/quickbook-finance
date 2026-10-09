@@ -41,6 +41,49 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.95",
+    date: "2026-10-09",
+    headline:
+      "Three new reports, a 13 Week Cash Forecast that starts from the cash you have, and a full-year budget grid.",
+    changes: [
+      {
+        kind: "added",
+        title: "Financial Ratios",
+        detail:
+          "In the Report Center under Analysis. Fifteen ratios for liquidity, leverage and margin, worked out from the Balance Sheet and the Profit and Loss, each next to the same dates a year earlier with a Change column. Under them, The figures behind them lists the totals every ratio was divided from, so you can check any one by hand. A ratio that cannot be worked out, such as one divided by zero, is left blank rather than shown as zero.",
+        route: "/reports/financial-ratios",
+      },
+      {
+        kind: "added",
+        title: "Purchases and Inventory",
+        detail:
+          "In the Report Center under Inventory & Tax. A table by year: Opening stock plus Bought net of returns plus Count adjustment, less Cost of sales, comes to Closing stock, and the report says if a year is off. Below it, Who it was bought from, with each supplier’s share, and Month by month. Stock brought in on an opening-balance entry is not counted as bought.",
+        route: "/reports/purchases-inventory",
+      },
+      {
+        kind: "added",
+        title: "Sales Tax Liability",
+        detail:
+          "In the Report Center under Inventory & Tax. What was collected, what was paid over and what is still owed, month by month, quarter by quarter or year by year (Monthly, Quarterly, Yearly). It is read from the entries themselves, and a proof line under the table says whether the amount owed agrees with the sales tax accounts. When something is owed, Record a payment opens the same payment dialog as the Sales Tax Center, and the report refreshes when you save. The Sales Tax Center now links to this report.",
+        route: "/reports/sales-tax-liability",
+      },
+      {
+        kind: "changed",
+        title: "13 Week Cash Forecast replaces the Cash Flow Forecast",
+        detail:
+          "Same place in the Report Center, under Business Overview. The forecast now starts from the cash in the bank accounts today, where it used to start from zero, so its running figure reads differently from before. It also counts recurring templates that are due inside the thirteen weeks, and notes any template that is behind schedule. A switch chooses how customers and suppliers are expected to settle: By due date, or As they usually pay, which uses how late each one has paid in the past.",
+        route: "/reports/cash-flow-forecast",
+      },
+      {
+        kind: "changed",
+        title: "Budget vs Actual: % of Budget, month by month, and a full-year grid",
+        detail:
+          "The report gains a % of Budget column (a dash for an account with no budget) and a Month by month table under the statement. Manage budget now opens the whole fiscal year as one grid instead of one month at a time. Type a figure in the Year column and it is spread evenly over the twelve months. Start from last year’s actuals or Start from this year’s actuals fills the grid from the books, with an Uplift percent added on top. Nothing is saved until you press Save, which writes only the months you changed.",
+        route: "/reports?report=budget",
+      },
+    ],
+  },
+  {
     version: "1.94",
     date: "2026-10-09",
     headline: "Ten more reports from the client's mockup, and Beancount in the sidebar.",

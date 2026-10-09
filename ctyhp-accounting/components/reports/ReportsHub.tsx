@@ -67,6 +67,7 @@ const REPORT_ICONS: Record<string, ReactNode> = {
   "change-log": <HistoryOutlined />,
   "month-end-close-log": <ClockCircleOutlined />,
   "voided-entries": <StopOutlined />,
+  "financial-ratios": <PercentageOutlined />,
 };
 
 function reportsFromIds(catalog: readonly ReportDefinition[], ids: string[]) {

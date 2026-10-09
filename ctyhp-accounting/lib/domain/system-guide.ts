@@ -163,6 +163,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Customer Balances nets each customer's credits; both end with the A/R Aging total and say whether it " +
           "agrees with the receivables account. Sales by Customer adds up a period's income by customer.",
       },
+      {
+        action: "Look ahead at the cash the next thirteen weeks should bring",
+        control: "13 Week Cash Forecast",
+        route: "/reports/cash-flow-forecast",
+        note:
+          "It starts from the cash on hand today, then adds what customers owe and takes off what is owed to " +
+          "suppliers, week by week, plus recurring templates that fall due. By due date uses the dates on the " +
+          "documents; As they usually pay moves each one by how late that customer or supplier has paid before.",
+      },
     ],
   },
   {
@@ -292,6 +301,53 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Inventory valuation",
         route: "/reports/inventory-valuation",
         note: "Valued at weighted average cost.",
+      },
+      {
+        action: "See what was bought, and that the stock adds up",
+        control: "Purchases and Inventory",
+        route: "/reports/purchases-inventory",
+        note:
+          "Year by year, Opening stock plus Bought net of returns plus Count adjustment, less Cost of sales, comes " +
+          "to Closing stock; a year that does not is marked off by the difference. Who it was bought from and " +
+          "Month by month follow the dates you pick.",
+      },
+    ],
+  },
+  {
+    id: "budget",
+    title: "Set a budget and compare it with the books",
+    purpose: "Plan the year's income and spending, then see how the actual figures are tracking.",
+    route: "/reports",
+    steps: [
+      {
+        action: "Open the budget report",
+        control: "Budget vs Actual",
+        route: "/reports",
+        note:
+          "Pick the first and last period. Each line shows Actual, Budget, Over / Under and % of Budget; an " +
+          "account with no budget shows a dash. A Month by month table sits under the statement.",
+      },
+      {
+        action: "Open the whole year as one grid",
+        control: "Manage budget",
+        note:
+          "Needs permission to manage the budget. Twelve month columns and a Year column for every account " +
+          "with a budget; Add an account brings in more.",
+      },
+      {
+        action: "Fill it from the books, or by hand",
+        control: "Start from last year’s actuals",
+        note:
+          "Start from this year’s actuals does the same with the current year. Uplift adds a percentage on top " +
+          "and may be negative. Typing a figure in a Year cell spreads it evenly over the twelve months. " +
+          "Clear this year empties the grid.",
+      },
+      {
+        action: "Save",
+        control: "Save",
+        note:
+          "Nothing reaches the books until you press Save, which writes only the months you changed. If one " +
+          "month fails, the others are kept and the notice names the month and the reason; Save tries the rest.",
       },
     ],
   },
@@ -502,6 +558,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note: "When, by whom, and the reason given at the time, month by month.",
       },
       {
+        action: "Read the year's ratios against the same dates a year earlier",
+        control: "Financial Ratios",
+        route: "/reports/financial-ratios",
+        note:
+          "Fifteen ratios for liquidity, leverage and margin, with the figures behind them listed underneath. " +
+          "A ratio with nothing to divide by is left blank.",
+      },
+      {
         action: "Take the whole ledger as one plain-text file",
         control: "Beancount",
         route: "/accounting/beancount",
@@ -535,6 +599,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "A filed period is locked; a later correction becomes a linked adjustment " +
           "rather than an edit.",
+      },
+      {
+        action: "See what was collected, paid over and owed, period by period",
+        control: "Sales Tax Liability by period",
+        route: "/reports/sales-tax-liability",
+        note:
+          "Choose Monthly, Quarterly or Yearly. It is read from the entries, and a proof line says whether the " +
+          "amount owed agrees with the tax accounts. Record a payment there opens the same dialog as above.",
       },
     ],
   },
