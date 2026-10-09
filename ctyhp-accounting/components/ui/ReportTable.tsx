@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Table } from "antd";
 import DataTable, { type DataTableProps } from "./DataTable";
 
@@ -32,4 +32,14 @@ export default function ReportTable<RecordType extends object>({
       summary={summary ? (rows) => <Table.Summary fixed>{summary(rows)}</Table.Summary> : undefined}
     />
   );
+}
+
+/** A row of a report's summary. Callers use this so no screen reaches for antd's Table. */
+export function SummaryRow(props: ComponentProps<typeof Table.Summary.Row>) {
+  return <Table.Summary.Row {...props} />;
+}
+
+/** A cell of a summary row (`index`, `colSpan`, `align`, `className`). Callers use this so no screen reaches for antd's Table. */
+export function SummaryCell(props: ComponentProps<typeof Table.Summary.Cell>) {
+  return <Table.Summary.Cell {...props} />;
 }

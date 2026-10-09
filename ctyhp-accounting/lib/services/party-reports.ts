@@ -171,7 +171,7 @@ interface PartyRef {
 }
 
 /** id → the customer (or vendor) on it, for one document table, every row. */
-async function partyOfDocuments(
+export async function partyOfDocuments(
   sb: SupabaseClient,
   table: string,
   partyColumn: "customer_id" | "vendor_id",
@@ -183,7 +183,7 @@ async function partyOfDocuments(
   return new Map(rows.map((r) => [r.id as string, { partyId: (r[partyColumn] as string | null) ?? null }]));
 }
 
-async function partyNames(sb: SupabaseClient, table: "acc_customer" | "acc_vendor"): Promise<Map<string, string>> {
+export async function partyNames(sb: SupabaseClient, table: "acc_customer" | "acc_vendor"): Promise<Map<string, string>> {
   const rows = await readAllPages<Record<string, unknown>>(
     (from, to) => sb.from(table).select("id,name").order("id").range(from, to),
     fail,
