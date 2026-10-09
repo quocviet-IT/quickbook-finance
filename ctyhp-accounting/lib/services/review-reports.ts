@@ -243,11 +243,16 @@ async function entryAmounts(sb: SupabaseClient, entryIds: readonly string[]): Pr
  * a reader who may read the audit log; for anybody else the column stays empty
  * rather than reading around the permission.
  */
-async function voidedBy(sb: SupabaseClient, from: string, to: string): Promise<Map<string, string>> {
+async function voidedBy(
+  sb: SupabaseClient,
+  from: string,
+  to: string,
+): Promise<{ by: Map<string, string>; incomplete: boolean }> {
   const rows = await searchAudit(sb, { action: "void", from, to, limit: CHANGE_LOG_LIMIT });
   const by = new Map<string, string>();
   for (const row of rows) if (row.record_id && row.actor_email) by.set(row.record_id, row.actor_email);
-  return by;
+  // The search keeps the newest rows up to the limit; older voids get no name.
+  return { by, incomplete: rows.length >= CHANGE_LOG_LIMIT };
 }
 
 export async function getVoidedEntries(
@@ -297,7 +302,7 @@ export async function getVoidedEntries(
       fail,
     ),
     actorNames(sb),
-    canReadAudit ? voidedBy(sb, range.from, range.to) : Promise.resolve(new Map<string, string>()),
+    canReadAudit ? voidedBy(sb, range.from, range.to) : Promise.resolve({ by: new Map<string, string>(), incomplete: false }),
     // The voided entries' debits, read by the same windows as the entries
     // themselves rather than id by id: a re-imported book can hold thousands.
     readPagesSideBySide<Record<string, unknown>>((from, to, withCount) =>
@@ -340,11 +345,14 @@ export async function getVoidedEntries(
     orig: r.orig as EntryRef,
     rev: r.rev as EntryRef,
   }));
-  // A reversed entry is still posted, so its debits are read by its id.
-  const amounts = await entryAmounts(sb, links.map((l) => l.orig.id));
+  // A reversed entry is still posted, so its debits are read by its id. Kept
+  // apart from the voided lines: an entry both reversed and voided in the period
+  // would otherwise add its debits twice.
+  const reversedAmounts = await entryAmounts(sb, links.map((l) => l.orig.id));
+  const voidAmounts = new Map<string, number>();
   for (const r of [...timedLines, ...untimedLines]) {
     const id = r.journal_entry_id as string;
-    amounts.set(id, (amounts.get(id) ?? 0) + Number(r.amount_base_minor));
+    voidAmounts.set(id, (voidAmounts.get(id) ?? 0) + Number(r.amount_base_minor));
   }
 
   const voided: VoidedEntry[] = voidRows.map((r) => ({
@@ -352,21 +360,21 @@ export async function getVoidedEntries(
     entryNumber: r.entry_number as string,
     entryDate: r.entry_date as string,
     description: (r.description as string | null) ?? "",
-    amountMinor: amounts.get(r.id as string) ?? 0,
+    amountMinor: voidAmounts.get(r.id as string) ?? 0,
     voidedAt: (r.voided_at as string | null) ?? null,
-    byName: r.source_id ? (auditBy.get(r.source_id as string) ?? null) : null,
+    byName: r.source_id ? (auditBy.by.get(r.source_id as string) ?? null) : null,
   }));
   const reversed: ReversedEntry[] = links.map((link) => ({
     originalEntryId: link.orig.id,
     originalNumber: link.orig.entry_number,
     originalDate: link.orig.entry_date ?? "",
     description: link.orig.description ?? "",
-    amountMinor: amounts.get(link.orig.id) ?? 0,
+    amountMinor: reversedAmounts.get(link.orig.id) ?? 0,
     reversalEntryId: link.rev.id,
     reversalNumber: link.rev.entry_number,
     reason: link.reason,
     reversedAt: link.createdAt,
     byName: link.createdBy ? (names.get(link.createdBy) ?? null) : null,
   }));
-  return voidedEntries(voided, reversed, range, timeZone);
+  return voidedEntries(voided, reversed, range, timeZone, auditBy.incomplete);
 }

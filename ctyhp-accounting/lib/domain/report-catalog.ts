@@ -225,7 +225,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
   {
     id: "expenses-by-vendor",
     title: "Expenses by Vendor",
-    description: "A period's spending by vendor, largest first, adding up to cost of sales and expenses on the Profit and Loss.",
+    description: "A period's spending by vendor, largest first, adding up to cost of sales, expenses and other expenses on the Profit and Loss.",
     href: "/reports/expenses-by-vendor",
     group: "payables",
   },

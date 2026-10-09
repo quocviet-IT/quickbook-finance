@@ -120,7 +120,9 @@ export function openDocuments(
         ? Math.round((source.totalMinor * row.balanceMinor) / source.balanceMinor)
         : null;
     lines.push({
-      key: `${row.partyId}:${row.docNumber ?? row.docDate}`,
+      key: row.docNumber
+        ? `${row.docType}:${row.docNumber}`
+        : `${row.partyId}:${row.docDate}:${lines.length}`,
       partyId: row.partyId,
       partyName: row.partyName,
       docNumber: row.docNumber,

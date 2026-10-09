@@ -82,7 +82,11 @@ async function controlBalance(sb: SupabaseClient, side: Side, today: string): Pr
   return side === "receivable" ? net : -net;
 }
 
-/** What each open invoice (or bill) was for in the first place, by its number. */
+/**
+ * What each open invoice (or bill) was for in the first place, by its number.
+ * Invoice and bill numbers are unique in their tables (migrations 0005, 0011),
+ * so keying by number is exact.
+ */
 async function documentAmounts(
   sb: SupabaseClient,
   side: Side,

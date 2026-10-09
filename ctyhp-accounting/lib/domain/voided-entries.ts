@@ -60,6 +60,8 @@ export interface VoidedEntriesReport {
   lines: VoidedEntriesLine[];
   voided: number;
   reversed: number;
+  /** True when the audit read behind "By" was cut short, so an older void may show no name. */
+  byIncomplete: boolean;
 }
 
 export function voidedEntries(
@@ -67,6 +69,7 @@ export function voidedEntries(
   reversed: readonly ReversedEntry[],
   range: { from: string; to: string },
   timeZone: string,
+  byIncomplete = false,
 ): VoidedEntriesReport {
   const inRange = (day: string) => day >= range.from && day <= range.to;
   // A void the books did not time is dated by its entry, the only date it has.
@@ -111,6 +114,7 @@ export function voidedEntries(
     lines,
     voided: lines.filter((line) => line.action === "Voided").length,
     reversed: lines.filter((line) => line.action === "Reversed").length,
+    byIncomplete,
   };
 }
 

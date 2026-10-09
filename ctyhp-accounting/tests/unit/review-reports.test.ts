@@ -111,6 +111,12 @@ describe("voidedEntries", () => {
     expect([report.voided, report.reversed]).toEqual([1, 1]);
   });
 
+  it("carries the flag that the By names were cut short, off unless told", () => {
+    const range = { from: "2026-09-01", to: "2026-09-30" };
+    expect(voidedEntries([voided({})], [], range, "UTC").byIncomplete).toBe(false);
+    expect(voidedEntries([voided({})], [], range, "UTC", true).byIncomplete).toBe(true);
+  });
+
   it("dates by the void, in the company's time zone, not by the entry", () => {
     // 01:30 UTC on Oct 1 is still Sept 30 in New York.
     const late = voided({ voidedAt: "2026-10-01T01:30:00Z" });

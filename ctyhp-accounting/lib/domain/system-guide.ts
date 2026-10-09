@@ -251,7 +251,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/reports/unpaid-bills",
         note:
           "Vendor Balances nets each vendor's credits and is held to the payables account. Expenses by Vendor " +
-          "adds up a period's spending by vendor, to the Profit and Loss's cost of sales and expenses.",
+          "adds up a period's spending by vendor, to the Profit and Loss's cost of sales, expenses and other expenses.",
       },
     ],
   },

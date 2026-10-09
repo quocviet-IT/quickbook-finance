@@ -114,7 +114,7 @@ export default function PartyActivityReport({
             </tbody>
           </table>
           <ProofLine
-            against={sales ? "Income on the Profit and Loss" : "cost of sales and expenses on the Profit and Loss"}
+            against={sales ? "Income on the Profit and Loss" : "cost of sales, expenses and other expenses on the Profit and Loss"}
             tie={proof}
             money={money}
             whenOut="Run the Profit and Loss for the same dates; the two read the same posted entries, so a gap is a fault in this report. Please report it."

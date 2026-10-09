@@ -15,7 +15,7 @@ export default async function ExpensesByVendorPage() {
       <PageHeader
         meta={<ReportEntityBadge companyName={ctx.companyName} isSample={ctx.isSample} />}
         title="Expenses by Vendor Summary"
-        description="The period's spending by vendor, largest first, adding up to cost of sales and expenses on the Profit and Loss."
+        description="The period's spending by vendor, largest first, adding up to cost of sales, expenses and other expenses on the Profit and Loss."
       />
       <PartyActivityReport kind="expenses" companyName={ctx.companyName} currencyCode={ctx.currencyCode} decimals={ctx.decimals} presets={ctx.presets} load={expensesByVendorAction} />
     </div>

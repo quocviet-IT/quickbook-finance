@@ -137,6 +137,9 @@ export default function VoidedEntriesClient({
               entry, and reversing an entry posts a second one that undoes it. To record the transaction again, post it as a
               new entry. An entry voided before the books kept the time of a void is dated by the entry itself.
               {canReadAudit ? null : " Who voided a document is kept in the audit log, which your role cannot read."}
+              {report.byIncomplete
+                ? " More than 1,000 voids were recorded in this period: By names who voided the newest 1,000, and an older void shows no name. Narrow the dates to see them all."
+                : null}
             </ReportFoot>
           </>
         )}

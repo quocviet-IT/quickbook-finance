@@ -90,6 +90,18 @@ describe("openDocuments", () => {
     expect(missing.lines[0].amountMinor).toBeNull();
   });
 
+  it("gives two unnumbered invoices for one customer on one date different keys", () => {
+    const twin = openDocuments(
+      [row({ docNumber: null, balanceMinor: 1_000 }), row({ docNumber: null, balanceMinor: 2_000 })],
+      "2026-10-08",
+      "invoice",
+      new Map(),
+    );
+    expect(twin.lines).toHaveLength(2);
+    expect(twin.lines[0].key).not.toBe(twin.lines[1].key);
+    expect(new Set(report.lines.map((l) => l.key)).size).toBe(report.lines.length);
+  });
+
   it("reads bills the same way for Unpaid Bills", () => {
     const bills = openDocuments(
       [row({ docType: "bill", docNumber: "B-1", balanceMinor: 4_000 }), row({ docType: "vendor_credit", docNumber: "VC-1", balanceMinor: -1_000 })],
