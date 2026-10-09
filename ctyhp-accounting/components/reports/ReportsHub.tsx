@@ -10,6 +10,7 @@ import {
   FileDoneOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  HistoryOutlined,
   InboxOutlined,
   LineChartOutlined,
   PercentageOutlined,
@@ -19,12 +20,14 @@ import {
   ShopOutlined,
   StarFilled,
   StarOutlined,
+  StopOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Input, Select, Tabs, Typography } from "antd";
 import {
   REPORT_CATALOG,
   REPORT_GROUPS,
+  canOpenReport,
   type ReportDefinition,
   type ReportGroupId,
 } from "@/lib/domain/report-catalog";
@@ -54,11 +57,21 @@ const REPORT_ICONS: Record<string, ReactNode> = {
   "saved-reports": <InboxOutlined />,
   "inventory-valuation": <ShopOutlined />,
   "sales-tax": <PercentageOutlined />,
+  "open-invoices": <FileTextOutlined />,
+  "customer-balances": <TeamOutlined />,
+  "sales-by-customer": <BarChartOutlined />,
+  "unpaid-bills": <FileTextOutlined />,
+  "vendor-balances": <ShopOutlined />,
+  "expenses-by-vendor": <BarChartOutlined />,
+  "reconciliation-report": <BankOutlined />,
+  "change-log": <HistoryOutlined />,
+  "month-end-close-log": <ClockCircleOutlined />,
+  "voided-entries": <StopOutlined />,
 };
 
-function reportsFromIds(ids: string[]) {
+function reportsFromIds(catalog: readonly ReportDefinition[], ids: string[]) {
   return ids
-    .map((id) => REPORT_CATALOG.find((report) => report.id === id))
+    .map((id) => catalog.find((report) => report.id === id))
     .filter((report): report is ReportDefinition => Boolean(report));
 }
 
@@ -114,7 +127,12 @@ function ReportCard({
 const ALL_REPORTS = "all" as const;
 type HubTab = ReportGroupId | typeof ALL_REPORTS;
 
-export default function ReportsHub() {
+/**
+ * The Report Center. `permissionKeys` is the reader's (null when it could not
+ * be read); a report that needs a permission the reader lacks is not offered.
+ */
+export default function ReportsHub({ permissionKeys }: { permissionKeys: readonly string[] | null }) {
+  const catalog = useMemo(() => REPORT_CATALOG.filter((report) => canOpenReport(report, permissionKeys)), [permissionKeys]);
   const [activeGroup, setActiveGroup] = useState<HubTab>(ALL_REPORTS);
   const [query, setQuery] = useState("");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -131,27 +149,27 @@ export default function ReportsHub() {
   const visibleReports = useMemo(() => {
     if (!normalizedQuery) {
       return activeGroup === ALL_REPORTS
-        ? REPORT_CATALOG
-        : REPORT_CATALOG.filter((report) => report.group === activeGroup);
+        ? catalog
+        : catalog.filter((report) => report.group === activeGroup);
     }
 
-    return REPORT_CATALOG.filter((report) => {
+    return catalog.filter((report) => {
       const group = REPORT_GROUPS.find((item) => item.id === report.group);
       return [report.title, report.description, group?.label]
         .filter(Boolean)
         .some((value) => value!.toLocaleLowerCase().includes(normalizedQuery));
     });
-  }, [activeGroup, normalizedQuery]);
+  }, [activeGroup, normalizedQuery, catalog]);
 
-  const favoriteReports = reportsFromIds(favoriteIds);
-  const recentReports = reportsFromIds(recentIds).filter(
+  const favoriteReports = reportsFromIds(catalog, favoriteIds);
+  const recentReports = reportsFromIds(catalog, recentIds).filter(
     (report) => !favoriteIds.includes(report.id),
   );
   const currentGroup =
     activeGroup === ALL_REPORTS
       ? {
           id: ALL_REPORTS,
-          label: `All reports (${REPORT_CATALOG.length})`,
+          label: `All reports (${catalog.length})`,
           description: "Every report in One Book, whatever workflow it belongs to.",
         }
       : REPORT_GROUPS.find((group) => group.id === activeGroup)!;
@@ -241,7 +259,7 @@ export default function ReportsHub() {
               activeKey={activeGroup}
               onChange={(key) => setActiveGroup(key as HubTab)}
               items={[
-                { key: ALL_REPORTS, label: `All reports (${REPORT_CATALOG.length})` },
+                { key: ALL_REPORTS, label: `All reports (${catalog.length})` },
                 ...REPORT_GROUPS.map((group) => ({ key: group.id, label: group.label })),
               ]}
             />
@@ -253,7 +271,7 @@ export default function ReportsHub() {
                 value={activeGroup}
                 onChange={(value) => setActiveGroup(value)}
                 options={[
-                  { value: ALL_REPORTS, label: `All reports (${REPORT_CATALOG.length})` },
+                  { value: ALL_REPORTS, label: `All reports (${catalog.length})` },
                   ...REPORT_GROUPS.map((group) => ({ value: group.id, label: group.label })),
                 ]}
               />

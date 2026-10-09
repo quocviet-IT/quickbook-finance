@@ -41,6 +41,54 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.94",
+    date: "2026-10-09",
+    headline: "Ten more reports from the client's mockup, and Beancount in the sidebar.",
+    changes: [
+      {
+        kind: "added",
+        title: "Open Invoices, Customer Balances and Sales by Customer",
+        detail:
+          "In the Report Center under Receivables. Open Invoices lists every invoice still open on a date, with how long it is past due; Customer Balances nets each customer's credits. Both end with the A/R Aging total and say whether it agrees with the receivables account. Sales by Customer adds up a period's income by customer; income that no invoice, credit memo or customer payment stands behind is on a line of its own, so the total is Income on the Profit and Loss.",
+        route: "/reports/open-invoices",
+      },
+      {
+        kind: "added",
+        title: "Unpaid Bills, Vendor Balances and Expenses by Vendor",
+        detail:
+          "In the Report Center under Payables, the same three for what is owed: Unpaid Bills, Vendor Balances held to the payables account, and Expenses by Vendor, which adds up to cost of sales, expenses and other expenses on the Profit and Loss.",
+        route: "/reports/unpaid-bills",
+      },
+      {
+        kind: "added",
+        title: "Reconciliation Report",
+        detail:
+          "Every bank reconciliation that was signed off, and whether it still agrees with the books. A reconciliation stops agreeing when an entry it ticked is voided; the report says by how much, and which entries.",
+        route: "/reports/reconciliations",
+      },
+      {
+        kind: "added",
+        title: "Change Log and Month-End Close Log",
+        detail:
+          "The Change Log lists what changed in the books, when and by whom, for anybody whose role may read the audit log. The Month-End Close Log lists every close and reopen of a fiscal year's months, with the reason given at the time.",
+        route: "/reports/change-log",
+      },
+      {
+        kind: "added",
+        title: "Voided and Reversed Entries",
+        detail:
+          "Every entry voided or reversed in a period, dated by when it happened, or by its entry date where the time of the void was never recorded. OneBook never deletes a posted entry, so there is nothing to put back: to record the transaction again, post it as a new entry.",
+        route: "/reports/voided-entries",
+      },
+      {
+        kind: "changed",
+        title: "Beancount is in the sidebar",
+        detail: "Beancount moved from the Report Center to the sidebar, last under Accounting. Old links still open it.",
+        route: "/accounting/beancount",
+      },
+    ],
+  },
+  {
     version: "1.93",
     date: "2026-10-08",
     headline: "An invoice's or payment's details open in one request instead of several.",

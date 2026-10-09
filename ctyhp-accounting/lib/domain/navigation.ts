@@ -93,6 +93,9 @@ export const NAV: NavItem[] = [
       { key: "/journal", label: "Journal Entries" },
       { key: "/recurring", label: "Recurring Transactions" },
       { key: "/opening-balances", label: "Opening Balances" },
+      // The client's mockup keeps Beancount here, last under Accounting: the whole
+      // ledger as one plain-text file is a view of the books, not a report.
+      { key: "/accounting/beancount", label: "Beancount" },
     ],
   },
   { key: "/reports", label: "Reports" },

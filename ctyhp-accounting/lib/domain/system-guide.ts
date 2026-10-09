@@ -155,6 +155,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/reports/ar-aging",
         note: "This report ties to the Accounts Receivable control account by design.",
       },
+      {
+        action: "List the open invoices, and what each customer owes",
+        control: "Open Invoices",
+        route: "/reports/open-invoices",
+        note:
+          "Customer Balances nets each customer's credits; both end with the A/R Aging total and say whether it " +
+          "agrees with the receivables account. Sales by Customer adds up a period's income by customer.",
+      },
     ],
   },
   {
@@ -236,6 +244,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "AP aging",
         route: "/reports/ap-aging",
         note: "Ties to the Accounts Payable control account.",
+      },
+      {
+        action: "List the unpaid bills, and what is owed to each vendor",
+        control: "Unpaid Bills",
+        route: "/reports/unpaid-bills",
+        note:
+          "Vendor Balances nets each vendor's credits and is held to the payables account. Expenses by Vendor " +
+          "adds up a period's spending by vendor, to the Profit and Loss's cost of sales, expenses and other expenses.",
       },
     ],
   },
@@ -442,6 +458,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Reopen",
         note: "Needs permission and a reason, and the reopen is audited.",
       },
+      {
+        action: "Check that signed-off reconciliations still agree",
+        control: "Reconciliation Report",
+        route: "/reports/reconciliations",
+        note:
+          "A reconciliation stops agreeing when an entry it ticked is voided. The report says which ones, by how " +
+          "much, and opens each.",
+      },
     ],
   },
   {
@@ -470,6 +494,20 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Reopening needs a reason and is audited. The accounting-correct route is " +
           "usually a reversal in the open period rather than a reopen.",
+      },
+      {
+        action: "See every close and reopen of the year",
+        control: "Month-End Close Log",
+        route: "/reports/close-log",
+        note: "When, by whom, and the reason given at the time, month by month.",
+      },
+      {
+        action: "Take the whole ledger as one plain-text file",
+        control: "Beancount",
+        route: "/accounting/beancount",
+        note:
+          "Last under Accounting in the sidebar. The file is for bean-check and Fava, with a balance line per " +
+          "reconciled statement.",
       },
     ],
   },
@@ -549,6 +587,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Audit history",
         route: "/settings/audit",
         note: "Every protected write records the actor, the action and the before and after values.",
+      },
+      {
+        action: "Review what changed, and what was voided or reversed",
+        control: "Change Log",
+        route: "/reports/change-log",
+        note:
+          "The Change Log reads the audit log and needs the same permission. Voided and Reversed Entries lists " +
+          "every entry voided or reversed in a period; nothing in OneBook is deleted.",
       },
     ],
   },
