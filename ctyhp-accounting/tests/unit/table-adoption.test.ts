@@ -55,7 +55,6 @@ const RAW_TABLE = new Set<string>([
   "app/(app)/purchase-orders/[id]/PurchaseOrderDetailClient.tsx",
   "app/(app)/purchase-orders/[id]/ReceiveModal.tsx",
   "app/(app)/reports/1099/Report1099Client.tsx",
-  "app/(app)/reports/cash-flow-forecast/CashFlowForecastClient.tsx",
   "app/(app)/reports/gl-posting/GlPostingClient.tsx",
   "app/(app)/reports/inventory-review/InventoryReviewClient.tsx",
   "app/(app)/reports/journal/JournalReportClient.tsx",

@@ -99,8 +99,8 @@ export const REPORT_CATALOG: ReportDefinition[] = [
   },
   {
     id: "cash-flow-forecast",
-    title: "Cash Flow Forecast",
-    description: "Project receipts and payments over the next 13 weeks from open invoices and bills.",
+    title: "13 Week Cash Forecast",
+    description: "Receipts and payments expected over the next thirteen weeks.",
     href: "/reports/cash-flow-forecast",
     group: "business-overview",
   },
@@ -260,6 +260,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "accounting",
   },
   {
+    id: "financial-ratios",
+    title: "Financial Ratios",
+    description: "Liquidity, leverage and margin, worked out from the statements.",
+    href: "/reports/financial-ratios",
+    group: "analysis",
+  },
+  {
     id: "what-if-analysis",
     title: "What-If Analysis",
     description:
@@ -330,6 +337,20 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     title: "Inventory Valuation",
     description: "Analyze jewelry quantities, unit costs, and inventory value.",
     href: "/reports/inventory-valuation",
+    group: "inventory-tax",
+  },
+  {
+    id: "purchases-inventory",
+    title: "Purchases and Inventory",
+    description: "What was bought over the period and what is still in stock.",
+    href: "/reports/purchases-inventory",
+    group: "inventory-tax",
+  },
+  {
+    id: "sales-tax-liability",
+    title: "Sales Tax Liability",
+    description: "Sales tax charged and paid, period by period.",
+    href: "/reports/sales-tax-liability",
     group: "inventory-tax",
   },
   {

@@ -1,28 +1,28 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import PageHeader from "@/components/PageHeader";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
-import CashForecastReport from "@/components/reports/CashForecastReport";
 import { reportPageContext } from "@/lib/services/report-context";
-import { cashForecastAction } from "./actions";
+import FinancialRatiosClient from "./FinancialRatiosClient";
+import { financialRatiosAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function CashFlowForecastPage() {
+export default async function FinancialRatiosPage() {
   const sb = await createSupabaseServerClient();
   const ctx = await reportPageContext(sb);
   return (
     <div>
       <PageHeader
         meta={<ReportEntityBadge companyName={ctx.companyName} isSample={ctx.isSample} />}
-        title="13 Week Cash Forecast"
-        description="Receipts and payments expected over the next thirteen weeks."
+        title="Financial Ratios"
+        description="Liquidity, leverage and margin, worked out from the statements."
       />
-      <CashForecastReport
+      <FinancialRatiosClient
         companyName={ctx.companyName}
         currencyCode={ctx.currencyCode}
         decimals={ctx.decimals}
-        today={ctx.today}
-        load={cashForecastAction}
+        presets={ctx.presets}
+        load={financialRatiosAction}
       />
     </div>
   );

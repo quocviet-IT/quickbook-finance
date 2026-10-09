@@ -30,7 +30,7 @@ describe("the Report Center after wave 1", () => {
 
   it("no longer carries Beancount, which lives in the sidebar now", () => {
     expect(REPORT_CATALOG.some((r) => r.href.includes("beancount"))).toBe(false);
-    expect(REPORT_CATALOG).toHaveLength(36);
+    expect(REPORT_CATALOG).toHaveLength(39);
   });
 
   it("asks for audit.read before offering the Change Log, and for nothing else before the rest", () => {
