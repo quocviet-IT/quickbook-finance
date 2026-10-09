@@ -44,7 +44,7 @@
   - Editing a budget needs `budget.manage`.
 - **Proof lines.** Where a report states what its total ties to, it says so under the total. When the two sides disagree, it shows a warning with the difference rather than hiding it.
 - **Tables.**
-  - Every list goes through `DataTable` or `ReportTable`. Never import antd's `Table` in a screen, and never rename it to slip past `tests/unit/table-adoption.test.ts`.
+  - Every list that can grow goes through `DataTable` or `ReportTable`. Never import antd's `Table` in a screen, and never rename it to slip past `tests/unit/table-adoption.test.ts`. A fixed-size statement table (the fifteen ratios, the thirteen weeks) may be a plain `<table className={styles.rpt}>`, as the existing statements are (user decision, 09/10).
   - Total rows use `ReportTable`'s `summary` with `SummaryRow` / `SummaryCell`.
   - Every report table passes `reportPagination(printing, …)`, so Print prints every row.
 - **JSX and Server Components.**
