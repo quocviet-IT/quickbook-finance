@@ -32,7 +32,7 @@ describe("payment void UI contract", () => {
   it("keeps the detail view and the description edit in their own components", () => {
     expect(read("PaymentsClient.tsx")).toContain("<PaymentDetailDrawer");
     expect(read("PaymentsClient.tsx")).toContain("<EditPaymentDetailsModal");
-    expect(read("PaymentDetailDrawer.tsx")).toContain("getPaymentDetailAction");
+    expect(read("PaymentDetailDrawer.tsx")).toContain("getPaymentDrawerAction");
     expect(read("PaymentDetailDrawer.tsx")).toContain("DocumentAuditTrail");
     expect(read("EditPaymentDetailsModal.tsx")).toContain("updatePaymentDetailsAction");
     expect(read("ReceivePaymentModal.tsx")).toContain("correctPaymentAction");

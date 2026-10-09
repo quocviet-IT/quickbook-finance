@@ -85,26 +85,44 @@ export async function fileFeedbackReportAction(
   }
 }
 
-export async function listFeedbackReportsAction(): Promise<
-  ActionResult<FeedbackReportView[]>
-> {
+/** One part of a combined read: its own answer or its own error, never the others'. */
+async function settled<T>(read: () => Promise<T>): Promise<ActionResult<T>> {
   try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listFeedbackReports(sb) };
+    return { ok: true, data: await read() };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }
 }
 
-export async function listFeedbackImprovementsAction(): Promise<
-  ActionResult<FeedbackImprovementView[]>
-> {
+export interface FeedbackTriage {
+  reports: ActionResult<FeedbackReportView[]>;
+  attachments: ActionResult<FeedbackAttachmentView[]>;
+  improvements: ActionResult<FeedbackImprovementView[]>;
+}
+
+/**
+ * Reads only: the whole triage queue, in one request.
+ *
+ * These were three Server Actions in a Promise.all, and Next dispatches Server
+ * Actions one at a time per client ("Sequential dispatch" in its Server Actions
+ * guide), so opening the queue — and refreshing it after every status change —
+ * was three trips in a row. Here the reads run side by side on one client, each
+ * keeping its own error. RLS still decides what each read returns.
+ */
+export async function getFeedbackTriageAction(): Promise<FeedbackTriage> {
+  let sb: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listFeedbackImprovements(sb) };
+    sb = await createSupabaseServerClient();
   } catch (err) {
-    return { ok: false, error: msg(err) };
+    const failed = { ok: false, error: msg(err) };
+    return { reports: failed, attachments: failed, improvements: failed };
   }
+  const [reports, attachments, improvements] = await Promise.all([
+    settled(() => listFeedbackReports(sb)),
+    settled(() => listFeedbackAttachments(sb)),
+    settled(() => listFeedbackImprovements(sb)),
+  ]);
+  return { reports, attachments, improvements };
 }
 
 export async function setFeedbackStatusAction(
@@ -157,17 +175,6 @@ export async function recordFeedbackAttachmentsAction(
     );
     revalidatePath("/settings/feedback");
     return { ok: true, data: stored };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
-}
-
-export async function listFeedbackAttachmentsAction(): Promise<
-  ActionResult<FeedbackAttachmentView[]>
-> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await listFeedbackAttachments(sb) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

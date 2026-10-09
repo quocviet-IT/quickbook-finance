@@ -123,41 +123,61 @@ export async function deletePaymentAction(
   }
 }
 
-/** What a receipt settled and how it posted. Read-only, so the session is the gate. */
-export async function getPaymentDetailAction(payment: {
-  id: string;
-  journal_entry_id: string | null;
-}): Promise<ActionResult<PaymentDetail>> {
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await getPaymentDetail(sb, payment) };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
+export interface PaymentDrawer {
+  /** What the receipt settled and how it posted. Read-only, so the session is the gate. */
+  detail: ActionResult<PaymentDetail>;
+  /** The receipt's change history; null when it was not asked for. */
+  audit: ActionResult<AuditEntryRow[]> | null;
 }
 
-/** The change history of one receipt, for whoever may read the audit log. */
-export async function getPaymentAuditAction(
-  paymentId: string,
-): Promise<ActionResult<AuditEntryRow[]>> {
+/**
+ * Reads only: what the payment drawer shows, in one request.
+ *
+ * These were two Server Actions in a Promise.all, and Next dispatches Server
+ * Actions one at a time per client ("Sequential dispatch" in its Server Actions
+ * guide), so opening a payment was two trips in a row. Here both reads run side
+ * by side on one client. The history is read only for whoever holds
+ * `audit.read`, checked here on the server; `withAudit` only spares asking.
+ */
+export async function getPaymentDrawerAction(
+  payment: { id: string; journal_entry_id: string | null },
+  withAudit: boolean,
+): Promise<PaymentDrawer> {
+  let sb: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   try {
-    const sb = await createSupabaseServerClient();
-    if (!(await hasPermission(sb, "audit.read"))) {
-      return { ok: false, error: "You do not have permission to perform this action" };
-    }
-    const entries = await searchAudit(sb, {
-      table_name: "acc_payment",
-      record_id: paymentId,
-      actor_id: null,
-      action: null,
-      from: null,
-      to: null,
-      limit: 200,
-    });
-    return { ok: true, data: entries };
+    sb = await createSupabaseServerClient();
   } catch (err) {
-    return { ok: false, error: msg(err) };
+    const failed = { ok: false, error: msg(err) };
+    return { detail: failed, audit: withAudit ? failed : null };
   }
+  const readDetail = async (): Promise<ActionResult<PaymentDetail>> => {
+    try {
+      return { ok: true, data: await getPaymentDetail(sb, payment) };
+    } catch (err) {
+      return { ok: false, error: msg(err) };
+    }
+  };
+  const readAudit = async (): Promise<ActionResult<AuditEntryRow[]>> => {
+    try {
+      if (!(await hasPermission(sb, "audit.read"))) {
+        return { ok: false, error: "You do not have permission to perform this action" };
+      }
+      const entries = await searchAudit(sb, {
+        table_name: "acc_payment",
+        record_id: payment.id,
+        actor_id: null,
+        action: null,
+        from: null,
+        to: null,
+        limit: 200,
+      });
+      return { ok: true, data: entries };
+    } catch (err) {
+      return { ok: false, error: msg(err) };
+    }
+  };
+  const [detail, audit] = await Promise.all([readDetail(), withAudit ? readAudit() : Promise.resolve(null)]);
+  return { detail, audit };
 }
 
 /**

@@ -86,7 +86,9 @@ describe("the banking category column", () => {
     const filters = read("BankTransactionsFilters.tsx");
     expect(filters).toContain("All accounts posted to");
     expect(filters).toContain("Not categorised yet");
-    expect(read("BankingClient.tsx")).toContain("getBankPostingsAction");
+    // Fetched beside the lines, in the one request the screen loads them with.
+    expect(read("BankingClient.tsx")).toContain("getBankingViewAction");
+    expect(read("actions.ts")).toMatch(/getBankingViewAction[\s\S]*?listBankTransactionPostings\(sb, bankAccountId\)/);
   });
 
   it("never touches the feed's own category through this column", () => {

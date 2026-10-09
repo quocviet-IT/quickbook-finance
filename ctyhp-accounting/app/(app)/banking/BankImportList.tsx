@@ -35,6 +35,9 @@ export default function BankImportList({
 }: BankImportListProps) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<BankStatementImportRow[]>([]);
+  // Until the first answer the register is loading, not empty: it reads after
+  // the bank lines in Next's one-at-a-time queue of Server Actions.
+  const [loaded, setLoaded] = useState(false);
   const [undoing, setUndoing] = useState<BankStatementImportRow | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,6 +45,7 @@ export default function BankImportList({
   const refresh = useCallback(() => {
     void getStatementImportsAction(bankAccountId).then((result) => {
       if (result.ok && result.data) setRows(result.data);
+      setLoaded(true);
     });
   }, [bankAccountId]);
 
@@ -70,7 +74,8 @@ export default function BankImportList({
         rowKey="id"
         pagination={false}
         dataSource={rows}
-        locale={{ emptyText: "No statement has been imported into this company yet." }}
+        loading={!loaded}
+        locale={{ emptyText: loaded ? "No statement has been imported into this company yet." : "" }}
         columns={[
           {
             title: "File",
