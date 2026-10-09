@@ -4,6 +4,7 @@ import {
   buildSalesTaxLiability,
   classifyEntries,
   fiscalYearLabel,
+  overpaidNote,
   readsAsSalesTax,
   resolveTaxAccounts,
   salesTaxLiabilitySheet,
@@ -193,6 +194,18 @@ describe("finding the tax accounts", () => {
     expect(readsAsSalesTax("Taxes Payable")).toBe(true);
     expect(readsAsSalesTax("Sales Tax Payable")).toBe(true);
     expect(readsAsSalesTax("State sales tax")).toBe(true);
+  });
+
+  it("words an overpayment as a credit with the agency", () => {
+    expect(overpaidNote("$12.50")).toBe("Paid over more than was collected: a credit of $12.50 with the tax agency.");
+  });
+
+  it("tests the other taxes on whole words, not inside longer words", () => {
+    expect(readsAsSalesTax("Private Events Sales Tax Payable")).toBe(true);
+    expect(readsAsSalesTax("Reservation Deposits Tax Payable")).toBe(true);
+    expect(readsAsSalesTax("VAT Payable")).toBe(false);
+    expect(readsAsSalesTax("Employer Payroll Taxes Payable")).toBe(false);
+    expect(readsAsSalesTax("Income Tax Payable")).toBe(false);
   });
 
   it("uses the accounts sales codes post to, and ignores other directions", () => {

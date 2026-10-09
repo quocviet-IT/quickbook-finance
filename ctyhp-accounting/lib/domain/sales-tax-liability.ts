@@ -40,12 +40,12 @@ export interface TaxCodeLink {
 const LIABILITY_TYPES: ReadonlySet<string> = new Set(["current_liability", "long_term_liability"]);
 
 /** Taxes that are not sales tax: a name carrying one of these words never reads as sales tax. */
-const OTHER_TAX = /payroll|income|withholding|employ|federal|property|corporate|franchise|excise|vat/;
+const OTHER_TAX = /\b(payroll|income|withholding|employ\w*|federal|property|corporate|franchise|excise|vat)\b/i;
 
-/** Whether a name, letters only, reads as sales tax: "salestax" or "tax…payable", and not another kind of tax. */
+/** Whether a name reads as sales tax: "salestax" or "tax…payable" in its letters, and no other kind of tax as a whole word. */
 export function readsAsSalesTax(name: string): boolean {
   const letters = name.toLowerCase().replace(/[^a-z]/g, "");
-  return (/salestax/.test(letters) || /tax.*payable/.test(letters)) && !OTHER_TAX.test(letters);
+  return (/salestax/.test(letters) || /tax.*payable/.test(letters)) && !OTHER_TAX.test(name);
 }
 
 export type TaxAccountBasis = "codes" | "names" | "none";
@@ -328,6 +328,11 @@ export const SALES_TAX_FOOTNOTE =
 
 export function owedAtLabel(report: Pick<SalesTaxLiabilityReport, "to">): string {
   return `Owed at ${shortDate(report.to)}`;
+}
+
+/** What the line under the table says when more was paid over than was collected. */
+export function overpaidNote(amountText: string): string {
+  return `Paid over more than was collected: a credit of ${amountText} with the tax agency.`;
 }
 
 export function paymentButtonLabel(amountText: string): string {

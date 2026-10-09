@@ -295,17 +295,23 @@ export const RATIOS: readonly RatioDefinition[] = [
 /** Show a ratio the way its format says; a blank is a dash. */
 export function formatRatio(format: RatioFormat, value: number | null, money: (minor: number) => string): string {
   if (value === null || !Number.isFinite(value)) return "—";
+  // A value that rounds to zero at the shown precision prints as plain zero, never "-0.0%".
+  const at = (v: number, places: number) => {
+    const scale = 10 ** places;
+    const rounded = Math.round(v * scale) / scale;
+    return rounded === 0 ? 0 : v;
+  };
   switch (format) {
     case "ratio":
-      return value.toFixed(2);
+      return at(value, 2).toFixed(2);
     case "money":
-      return money(Math.round(value));
+      return money(Math.round(value) || 0);
     case "percent":
-      return `${(value * 100).toFixed(1)}%`;
+      return `${at(value * 100, 1).toFixed(1)}%`;
     case "months":
-      return `${value.toFixed(1)} months`;
+      return `${at(value, 1).toFixed(1)} months`;
     case "days":
-      return `${Math.round(value).toLocaleString("en-US")} days`;
+      return `${(Math.round(value) || 0).toLocaleString("en-US")} days`;
   }
 }
 

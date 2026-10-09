@@ -31,7 +31,9 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   other_expense: "Other Expense",
 };
 
-const zeros = (): number[] => new Array<number>(GRID_MONTHS).fill(0);
+const LOAD_PROBLEM = "The budget could not be read. Close this and try again.";
+
+const zeros =(): number[] => new Array<number>(GRID_MONTHS).fill(0);
 const byCode = (a: GridAccount, b: GridAccount) => a.accountCode.localeCompare(b.accountCode);
 
 /**
@@ -69,33 +71,47 @@ export default function BudgetEditorDrawer({
 
   useEffect(() => {
     if (!open) return;
+    // The cleanup below ends this open: an answer that arrives after the drawer
+    // closed, reopened or changed year is ignored.
     let active = true;
-    // Opening the grid intentionally synchronizes it with the database.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
+    // Opening the grid intentionally resets it and synchronizes it with the database.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setData(null);
+    setValues({});
+    setBaseline({});
+    setRowIds([]);
+    setUplift(0);
     setProblem(null);
-    void getBudgetGridAction(fiscalYear).then((result) => {
-      if (!active) return;
-      setLoading(false);
-      if (!result.ok || !result.data) {
-        message.error(result.error ?? "Failed to load budget");
-        return;
+    setLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    void (async () => {
+      try {
+        const result = await getBudgetGridAction(fiscalYear);
+        if (!active) return;
+        if (!result.ok || !result.data) {
+          setProblem(LOAD_PROBLEM);
+          return;
+        }
+        const loaded = result.data;
+        setData(loaded);
+        setBaseline(Object.fromEntries(Object.entries(loaded.budget).map(([id, row]) => [id, [...row]])));
+        setValues(Object.fromEntries(Object.entries(loaded.budget).map(([id, row]) => [id, [...row]])));
+        setRowIds(
+          loaded.accounts
+            .filter((account) => loaded.budget[account.accountId])
+            .sort(byCode)
+            .map((account) => account.accountId),
+        );
+      } catch {
+        if (active) setProblem(LOAD_PROBLEM);
+      } finally {
+        if (active) setLoading(false);
       }
-      const loaded = result.data;
-      setData(loaded);
-      setBaseline(Object.fromEntries(Object.entries(loaded.budget).map(([id, row]) => [id, [...row]])));
-      setValues(Object.fromEntries(Object.entries(loaded.budget).map(([id, row]) => [id, [...row]])));
-      setRowIds(
-        loaded.accounts
-          .filter((account) => loaded.budget[account.accountId])
-          .sort(byCode)
-          .map((account) => account.accountId),
-      );
-    });
+    })();
     return () => {
       active = false;
     };
-  }, [open, fiscalYear, message]);
+  }, [open, fiscalYear]);
 
   const accountById = useMemo(() => new Map((data?.accounts ?? []).map((a) => [a.accountId, a])), [data]);
   const rows = useMemo(
@@ -186,6 +202,22 @@ export default function BudgetEditorDrawer({
     if (written.length > 0) onSaved({ complete: !outcome.failed });
   };
 
+  /** Every way out of the drawer comes through here: unsaved typing is never thrown away unasked. */
+  const requestClose = () => {
+    if (saving) return;
+    if (dirty.length === 0) {
+      onClose();
+      return;
+    }
+    modal.confirm({
+      title: "Discard the changes you have not saved?",
+      okText: "Discard",
+      okButtonProps: { danger: true },
+      cancelText: "Keep editing",
+      onOk: onClose,
+    });
+  };
+
   const inputProps = {
     controls: false,
     min: 0,
@@ -197,13 +229,18 @@ export default function BudgetEditorDrawer({
     <Drawer
       title={`FY ${fiscalYear} budget`}
       open={open}
-      onClose={onClose}
+      onClose={requestClose}
+      maskClosable={!saving}
+      keyboard={!saving}
+      closable={!saving}
       width="min(1500px, 96vw)"
       destroyOnHidden
       extra={
         <Space>
-          <Button onClick={onClose}>Close</Button>
-          <Button type="primary" loading={saving} disabled={loading || dirty.length === 0} onClick={() => void save()}>
+          <Button disabled={saving} onClick={requestClose}>
+            Close
+          </Button>
+          <Button type="primary" loading={saving} disabled={loading || !data || dirty.length === 0} onClick={() => void save()}>
             {dirty.length === 0 ? "Save" : `Save ${dirty.length} ${dirty.length === 1 ? "month" : "months"}`}
           </Button>
         </Space>

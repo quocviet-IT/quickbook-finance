@@ -202,6 +202,14 @@ describe("formatRatio", () => {
     expect(formatRatio("days", 41.6, money)).toBe("42 days");
     expect(formatRatio("ratio", null, money)).toBe("—");
   });
+
+  it("never prints a negative zero", () => {
+    expect(formatRatio("ratio", -0.0004, money)).toBe("0.00");
+    expect(formatRatio("percent", -0.0004, money)).toBe("0.0%");
+    expect(formatRatio("months", -0.0004, money)).toBe("0.0 months");
+    expect(formatRatio("days", -0.0004, money)).toBe("0 days");
+    expect(formatRatio("money", -0.0004, money)).toBe("$0.00");
+  });
 });
 
 describe("ratioArrow", () => {

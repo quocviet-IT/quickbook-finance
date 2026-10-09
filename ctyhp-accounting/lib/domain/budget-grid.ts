@@ -11,6 +11,7 @@
 import { roundHalfAwayFromZero } from "@/lib/domain/money";
 import { buildProfitAndLoss, type BudgetAccountAmount, type LedgerBalance } from "@/lib/domain/reports";
 import type { AccountType } from "@/lib/domain/accounts";
+import { fiscalMonths, type FiscalMonth } from "@/lib/domain/fiscal";
 
 /* -------------------------------------------------------- % of Budget */
 
@@ -21,6 +22,27 @@ export const hasBudget = (budgetMinor: number): boolean => budgetMinor !== 0;
 export function percentOfBudget(actualMinor: number, budgetMinor: number): number | null {
   if (!hasBudget(budgetMinor)) return null;
   return Math.round((actualMinor / budgetMinor) * 1000) / 10;
+}
+
+/* --------------------------------------------------- The range asked for */
+
+export const BUDGET_RANGE_PROBLEM = "Choose months inside the fiscal year.";
+
+/**
+ * Whether a Budget vs Actual range sits inside the fiscal year: it starts on
+ * the first day of one of the year's months, ends on the first or last day of
+ * one of them, and does not end before it starts. At most twelve months.
+ */
+export function budgetRangeIsValid(fiscalYear: number, fiscalStartMonth: number, from: string, to: string): boolean {
+  let months: FiscalMonth[];
+  try {
+    months = fiscalMonths(fiscalYear, fiscalStartMonth);
+  } catch {
+    return false;
+  }
+  const starts = new Set(months.map((m) => m.start));
+  const edges = new Set(months.flatMap((m) => [m.start, m.end]));
+  return starts.has(from) && edges.has(to) && from <= to;
 }
 
 /* ------------------------------------------------------ Month by month */

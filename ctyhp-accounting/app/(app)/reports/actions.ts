@@ -12,6 +12,7 @@ import {
 } from "@/lib/services/budgets";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { dayBefore } from "@/lib/domain/fiscal";
+import { BUDGET_RANGE_PROBLEM, budgetRangeIsValid } from "@/lib/domain/budget-grid";
 import {
   buildStatementOfEquity,
   type LedgerBalance,
@@ -58,8 +59,14 @@ export async function getBudgetVsActualAction(
     cashFlowRangeSchema.parse({ from, to });
     if (!from.endsWith("-01")) return { ok: false, error: "A budget report starts on the first day of a month" };
     if (from > to) return { ok: false, error: "Report end date must not be before its start date" };
+    const parsed = budgetMonthSaveSchema.pick({ fiscal_year: true }).safeParse({ fiscal_year: fiscalYear });
+    if (!parsed.success) return { ok: false, error: BUDGET_RANGE_PROBLEM };
     const sb = await createSupabaseServerClient();
-    return { ok: true, data: await getBudgetVsActual(sb, fiscalYear, from, to) };
+    const settings = await getCurrentCompanySettings(sb);
+    if (!budgetRangeIsValid(parsed.data.fiscal_year, settings?.fiscal_year_start_month ?? 1, from, to)) {
+      return { ok: false, error: BUDGET_RANGE_PROBLEM };
+    }
+    return { ok: true, data: await getBudgetVsActual(sb, parsed.data.fiscal_year, from, to) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to load Budget vs Actual" };
   }

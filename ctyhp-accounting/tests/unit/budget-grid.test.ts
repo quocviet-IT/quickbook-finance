@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  budgetRangeIsValid,
   buildMonthByMonth,
   budgetResultOf,
   dirtyMonths,
@@ -37,6 +38,28 @@ describe("% of Budget", () => {
     expect(percentOfBudget(0, 0)).toBeNull();
     expect(hasBudget(0)).toBe(false);
     expect(hasBudget(1)).toBe(true);
+  });
+});
+
+describe("the range asked for", () => {
+  it("accepts months inside a calendar fiscal year", () => {
+    expect(budgetRangeIsValid(2026, 1, "2026-01-01", "2026-12-31")).toBe(true);
+    expect(budgetRangeIsValid(2026, 1, "2026-03-01", "2026-03-31")).toBe(true);
+    expect(budgetRangeIsValid(2026, 1, "2026-03-01", "2026-03-01")).toBe(true);
+  });
+
+  it("follows a fiscal year that starts mid-calendar", () => {
+    expect(budgetRangeIsValid(2026, 7, "2026-07-01", "2027-06-30")).toBe(true);
+    expect(budgetRangeIsValid(2026, 7, "2026-01-01", "2026-06-30")).toBe(false);
+  });
+
+  it("refuses a range outside the year, backwards, off a month start, or a bad year", () => {
+    expect(budgetRangeIsValid(2026, 1, "2025-12-01", "2026-03-31")).toBe(false);
+    expect(budgetRangeIsValid(2026, 1, "2026-01-01", "2027-01-31")).toBe(false);
+    expect(budgetRangeIsValid(2026, 1, "2026-05-01", "2026-04-30")).toBe(false);
+    expect(budgetRangeIsValid(2026, 1, "2026-03-15", "2026-03-31")).toBe(false);
+    expect(budgetRangeIsValid(2026, 1, "2026-03-01", "2026-03-15")).toBe(false);
+    expect(budgetRangeIsValid(1999, 1, "1999-01-01", "1999-12-31")).toBe(false);
   });
 });
 

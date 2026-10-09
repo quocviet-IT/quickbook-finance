@@ -23,6 +23,7 @@ import {
   SALES_TAX_FOOTNOTE_TITLE,
   buildSalesTaxLiability,
   formatRate,
+  overpaidNote,
   owedAtLabel,
   paymentButtonLabel,
   salesTaxLiabilitySheet,
@@ -212,7 +213,7 @@ export default function SalesTaxLiabilityClient({
                       </Button>
                     ) : null
                   ) : (
-                    <span className={styles.muted}>{NOTHING_OUTSTANDING}</span>
+                    <span className={styles.muted}>{owed < 0 ? overpaidNote(money(-owed)) : NOTHING_OUTSTANDING}</span>
                   )}
                 </div>
               ) : null}
