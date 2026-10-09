@@ -219,10 +219,10 @@ export default function BudgetEditorDrawer({
 
       <div className={styles.tools}>
         <Button disabled={loading || !data} onClick={() => startFrom("lastYear")}>
-          Start from last year's actuals
+          Start from last year’s actuals
         </Button>
         <Button disabled={loading || !data} onClick={() => startFrom("thisYear")}>
-          Start from this year's actuals
+          Start from this year’s actuals
         </Button>
         <label className={styles.uplift}>
           Uplift
