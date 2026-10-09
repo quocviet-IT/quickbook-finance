@@ -251,3 +251,34 @@ Where the data disagrees with this spec, the spec gets an amendment section, as 
 
 - **Changelog.** One release, numbered at merge time in merge order. It names the five in the words the screen uses. It says plainly that the forecast now starts from cash on hand, so its running figure will differ from before.
 - **Guide.** One step for each new report group. The budget flow's steps change to describe the full-year grid.
+
+## Amendments from the data probe (09/10)
+
+Before any code was written, the rules above were run read-only against all six companies' ledgers. These points changed.
+
+1. **Opening entries are recognised three ways, not one.**
+   - OneBook's own Opening Balances screen marks its entry `source_type = 'opening_balance'`. Imported books instead post their opening entry as `manual`:
+     - two of them describe it "Opening balances…";
+     - one, imported from Wave, describes it differently.
+   - So an entry counts as stock **brought in**, not bought, when any one of these holds:
+     - it is marked `opening_balance`;
+     - its description begins "Opening balance";
+     - it has a line on an `equity` account. A purchase never touches equity.
+   - With this rule, no book shows its opening stock as a purchase.
+2. **The year table adds up left to right.**
+   - Opening stock + Bought + Count adjustment − Cost of sales = Closing stock.
+   - Count adjustment is the inventory side of count and adjustment entries, positive when it adds stock. Cost of sales leaves those entries out.
+   - The arithmetic is the mockup's (its cost of sales includes the adjustment). The columns now read as a sum.
+   - The identity held, off by 0.00, in every year of every company. One imported book has count adjustments in two years.
+3. **"Purchases" in the stat row counts entries, not posting lines.** In a perpetual book a sale touches both cost of sales and inventory and nets to zero, so only entries whose purchase lines do not net to zero are counted.
+4. **Count and adjustment entries** are those with `source_type = 'inventory_adjustment'`, or with a line on an account named for an inventory adjustment or write-down. Every book has such accounts, typed `cost_of_goods_sold`.
+5. **Inventory accounts.** The item-or-role rule finds the inventory accounts in every company: "1200 Inventory" in all of them, plus a second account in one imported book. The name fallback stays, but no current book needs it.
+6. **Sales tax.**
+   - Every company has sales tax codes, all posting to one Sales Tax Payable account, so the name fallback stays unused.
+   - The closing-owed proof holds by construction, because every line on the tax accounts is classified.
+   - To give the proof teeth, the report warns when another liability account reads as sales tax but no tax rate posts to it.
+7. **Recurring templates.**
+   - Only the demo company has any, and they are behind: their next run date has passed.
+   - As in the mockup, occurrences before today are not counted.
+   - A note under the table says how many templates are behind, so a missing payment is not silent.
+8. **Ratios.** No probe was needed. The workings come from the same builders as the Balance Sheet and the Profit and Loss, and the live test asserts that they match.
