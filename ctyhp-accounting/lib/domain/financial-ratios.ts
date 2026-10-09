@@ -183,7 +183,7 @@ export const RATIOS: readonly RatioDefinition[] = [
     id: "months-of-cash",
     group: "pay-bills",
     name: "Months of cash",
-    meaning: "How long cash on hand covers the period's spending.",
+    meaning: "How long cash on hand covers the period’s spending.",
     format: "months",
     better: "higher",
     compute: (w) => {
