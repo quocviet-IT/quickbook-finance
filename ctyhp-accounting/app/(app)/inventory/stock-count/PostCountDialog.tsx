@@ -79,7 +79,7 @@ export default function PostCountDialog({
     onClose();
   }
 
-  const accountOptions = (list:{ id: string; code: string; name: string }[]) =>
+  const accountOptions = (list: { id: string; code: string; name: string }[]) =>
     list.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }));
 
   if (outcome) {
