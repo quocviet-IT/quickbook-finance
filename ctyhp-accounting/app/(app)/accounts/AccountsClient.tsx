@@ -248,15 +248,13 @@ export default function AccountsClient({
     window.history.replaceState(null, "", chartViewHref(next));
   }
 
-  async function changeAsOf(date: dayjs.Dayjs | null) {
-    if (!date) return;
-    const next = date.format("YYYY-MM-DD");
-    if (next === (requestedAsOf ?? asOf)) return;
+  /** Reads the balances at a date. The one read path: a date change and a re-read after an edit share its stale-response guard. */
+  async function rereadBalances(next: string) {
     const run = ++latestRun.current;
     setRequestedAsOf(next);
     try {
       const result = await chartBalancesAction(next);
-      // A later date was picked while this one was being read: its answer wins.
+      // A later read was started while this one was running: its answer wins.
       if (run !== latestRun.current) return;
       if (result.ok && result.data) setBalances(result.data);
       else message.error(result.error ?? "The balances could not be read for that date");
@@ -265,6 +263,13 @@ export default function AccountsClient({
     } finally {
       if (run === latestRun.current) setRequestedAsOf(null);
     }
+  }
+
+  async function changeAsOf(date: dayjs.Dayjs | null) {
+    if (!date) return;
+    const next = date.format("YYYY-MM-DD");
+    if (next === (requestedAsOf ?? asOf)) return;
+    await rereadBalances(next);
   }
 
   /** QuickZoom on the account's figure, over the same dates the figure covers, so the list adds up to it. */
@@ -319,6 +324,8 @@ export default function AccountsClient({
     if (result.ok) {
       message.success(editing ? "Account updated" : "Account created");
       setOpen(false);
+      // A new type or contra flag changes a figure's sign and range, and the inventory set.
+      void rereadBalances(requestedAsOf ?? asOf);
     } else {
       message.error(result.error ?? "Save failed");
     }
@@ -329,8 +336,10 @@ export default function AccountsClient({
     setBusyId(row.id);
     const result = await setAccountStatusAction(row.id, next);
     setBusyId(null);
-    if (result.ok) message.success(next === "active" ? "Account activated" : "Account deactivated");
-    else message.error(result.error ?? "Failed to update status");
+    if (result.ok) {
+      message.success(next === "active" ? "Account activated" : "Account deactivated");
+      void rereadBalances(requestedAsOf ?? asOf);
+    } else message.error(result.error ?? "Failed to update status");
   }
 
   const loading = requestedAsOf !== null;
@@ -371,7 +380,7 @@ export default function AccountsClient({
             type="button"
             className={styles.nameLink}
             onClick={() => openAccount(account)}
-            disabled={balancesView && balancesUnavailable}
+            disabled={balancesUnavailable}
             aria-label={openAccountLabel(account)}
             title={account.name}
           >

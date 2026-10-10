@@ -56,7 +56,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Click a balance to see the entries behind it",
         detail:
-          "Click an account’s name, or its balance, and the same panel opens as on the financial statements: every posted line over the dates that balance covers, the account on the other side, a running balance, and a check that the lines add up to the figure you clicked. Click a line to see the whole transaction: its document, both sides of the entry, and Open in Journal. A zero balance has nothing behind it, so it does not open.",
+          "Click an account’s name, or its balance, and the same panel opens as on the financial statements: every posted line over the dates that balance covers, the account on the other side, a running balance, and a check that the lines add up to the figure you clicked. Click a line to see the whole transaction: its document, both sides of the entry, and Open in Journal. A zero balance is not a link; the account’s name still opens the list, which is empty when nothing was posted in those dates.",
         route: "/accounts",
       },
       {
