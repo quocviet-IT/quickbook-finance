@@ -41,6 +41,46 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.97",
+    date: "2026-10-10",
+    headline: "Chart of Accounts shows every account’s balance, and a balance opens the entries behind it.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Chart of Accounts is one list, with a balance on every account",
+        detail:
+          "The ten separate tables are now one list in fourteen groups, in statement order: Bank and cash, Receivables, Inventory, Other current assets, Long-term assets, Credit cards, Payables, Other current liabilities, Long-term liabilities, Equity, Income, Cost of sales, Expenses and Other expenses. A group’s heading stays at the top of the screen while you scroll through it, with its number of accounts on the right. Each account shows a coloured dot for assets, liabilities, equity, income or expenses, its code and name, its currency and its balance at the As of date. Balance sheet accounts show what they hold on that date. Income and expense accounts show the year to date, from the start of the fiscal year, and their groups say so. A balance the wrong way round for its account is in parentheses, in red. An inactive account appears only while it still holds a balance, marked Inactive.",
+        route: "/accounts",
+      },
+      {
+        kind: "added",
+        title: "Click a balance to see the entries behind it",
+        detail:
+          "Click an account’s name, or its balance, and the same panel opens as on the financial statements: every posted line over the dates that balance covers, the account on the other side, a running balance, and a check that the lines add up to the figure you clicked. Click a line to see the whole transaction: its document, both sides of the entry, and Open in Journal. A zero balance has nothing behind it, so it does not open.",
+        route: "/accounts",
+      },
+      {
+        kind: "added",
+        title: "Type pills, search and the As of date",
+        detail:
+          "All, Assets, Liabilities, Equity, Income and Expenses narrow the list, each with the number of accounts it holds; the numbers follow the search. Income takes in other income, and Expenses takes in cost of sales and other expenses. The search finds a code or a name and keeps a sub-account’s parent in view. As of starts at today in the company’s time zone; change it and every balance is read again for that date, and the line under the title says how many accounts carry a balance on it.",
+        route: "/accounts",
+      },
+      {
+        kind: "changed",
+        title: "Setup holds the type, cash flow and status columns",
+        detail:
+          "Switch from Balances to Setup at the top right for the same list with Type, Cash flow and Status, the cash flow role filter, and the edit and deactivate buttons. The address remembers the view, so a reload or a shared link opens the same one. Classify and New account stay where they were.",
+        route: "/accounts?view=setup",
+      },
+      {
+        kind: "fixed",
+        title: "The entries panel counts one line as “1 line”",
+        detail: "Under the entries behind a figure, a single entry used to read “1 lines”.",
+      },
+    ],
+  },
+  {
     version: "1.96",
     date: "2026-10-10",
     headline: "Stock Count: count what is on the shelves and correct the books to it in one entry.",
