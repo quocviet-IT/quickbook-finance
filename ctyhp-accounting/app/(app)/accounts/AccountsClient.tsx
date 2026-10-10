@@ -1,24 +1,29 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   App,
   Button,
+  DatePicker,
   Form,
   Input,
   Modal,
+  Segmented,
   Select,
   Space,
+  Spin,
   Switch,
   Tag,
   type TableColumnsType,
 } from "antd";
-import { CheckOutlined, EditOutlined, PlusOutlined, StopOutlined } from "@ant-design/icons";
+import { CheckOutlined, EditOutlined, PlusOutlined, SearchOutlined, StopOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
+import PageHeader from "@/components/PageHeader";
+import ZoomSheet from "@/components/reports/ZoomSheet";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
-import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
-import ClassifyAccountsButton from "./ClassifyAccountsButton";
 import IconActionButton from "@/components/ui/IconActionButton";
+import { COLUMN } from "@/lib/design/table-metrics";
 import {
   ACCOUNT_TYPES,
   ACCOUNT_TYPE_LABEL,
@@ -27,10 +32,42 @@ import {
   type AccountType,
 } from "@/lib/domain/accounts";
 import { detailLabel, detailTypeOptions } from "@/lib/domain/account-detail";
-import { accountSections, parentChoices, withAncestors, type AccountTreeRow } from "@/lib/domain/account-sections";
+import { parentChoices } from "@/lib/domain/account-sections";
 import { CASH_FLOW_ROLES, defaultCashFlowRole, type CashFlowRole } from "@/lib/domain/cashflow";
+import {
+  CHART_FILTERS,
+  chartClassOf,
+  chartLede,
+  chartRange,
+  chartZoomSpec,
+  groupRangeLabel,
+  statementOf,
+  type ChartClass,
+} from "@/lib/domain/chart-groups";
+import {
+  chartFigureSpoken,
+  chartFigureText,
+  chartListing,
+  chartViewHref,
+  fiscalStartMonthOf,
+  isRetired,
+  openAccountLabel,
+  type ChartFilter,
+  type ChartListRow,
+  type ChartView,
+} from "@/lib/domain/chart-list";
+import { shortDate } from "@/lib/domain/report-presets";
+import type { ZoomSpec } from "@/lib/domain/statement";
+import { formatMoney } from "@/lib/format";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
-import { createAccountAction, updateAccountAction, setAccountStatusAction } from "./actions";
+import type { ChartBalances } from "@/lib/services/chart-balances";
+import ClassifyAccountsButton from "./ClassifyAccountsButton";
+import {
+  chartBalancesAction,
+  createAccountAction,
+  updateAccountAction,
+  setAccountStatusAction,
+} from "./actions";
 import styles from "./accounts.module.css";
 
 const STATUS_LABELS: Record<AccountStatus, { text: string; color: string }> = {
@@ -56,7 +93,39 @@ const CASH_FLOW_ROLE_LABELS: Record<CashFlowRole, string> = {
   unclassified: "Unclassified",
 };
 
-type Row = AccountTreeRow<AccountRow>;
+const CLASS_LABEL: Record<ChartClass, string> = {
+  asset: "Asset",
+  liability: "Liability",
+  equity: "Equity",
+  income: "Income",
+  expense: "Expense",
+};
+
+/**
+ * Column widths. The Account column carries none and takes what is left, never
+ * less than ACCOUNT_FLOOR; tests/unit/accounts-screen adds each view's fixed
+ * widths up against the 984px box at a 1280px window.
+ */
+export const CODE_WIDTH = COLUMN.CODE;
+export const CURRENCY_WIDTH = 84;
+/** Room for `($1,234,567.89)`: a seven-figure balance the wrong way round. */
+export const BALANCE_WIDTH = 140;
+export const TYPE_WIDTH = 150;
+export const ACTIONS_WIDTH = COLUMN.ACTION * 2;
+export const ACCOUNT_FLOOR = COLUMN.TEXT_MIN;
+/** Balances: Code, Currency, Balance. */
+export const BALANCES_FIXED_WIDTHS = [CODE_WIDTH, CURRENCY_WIDTH, BALANCE_WIDTH] as const;
+/** Setup, for someone who can write: Code, Currency, Type, Cash flow, Status, Actions. */
+export const SETUP_FIXED_WIDTHS = [CODE_WIDTH, CURRENCY_WIDTH, TYPE_WIDTH, COLUMN.STATUS, COLUMN.STATUS, ACTIONS_WIDTH] as const;
+
+/**
+ * The app's top bar: Ant Design's Layout header, 64px high and pinned at the
+ * top of the page, which is the scrolling container. The filter bar pins under
+ * it at the same 64px (app/globals.css), and a group's heading under both.
+ */
+const APP_HEADER_HEIGHT = 64;
+
+type ListRow = ChartListRow<AccountRow>;
 
 interface FormValues {
   account_code: string;
@@ -74,21 +143,34 @@ interface FormValues {
 }
 
 /**
- * The chart of accounts, read by section — bank accounts, receivables and
- * inventory, non-current assets, liabilities, equity, income, cost of goods
- * sold, expenses — each a tree of sub-accounts under their parent in number
- * order (lib/domain/account-sections.ts).
+ * The chart of accounts as one grouped list, in the fourteen groups of
+ * lib/domain/chart-groups.ts, each a tree of sub-accounts in code order.
+ *
+ * Balances, the default view, shows every account's figure at the As of date:
+ * balance sheet accounts from the start of the books, profit and loss accounts
+ * from the start of the fiscal year. The name or the figure opens QuickZoom on
+ * the entries behind it. Setup shows the same list with type, cash flow and
+ * status, and is where accounts are edited and deactivated.
  */
 export default function AccountsClient({
   accounts,
   currencies,
   taxCodes,
   canWrite,
+  initialView,
+  initialBalances,
+  baseCurrency,
+  baseDecimals,
 }: {
   accounts: AccountRow[];
   currencies: CurrencyRow[];
   taxCodes: TaxCodeRow[];
   canWrite: boolean;
+  initialView: ChartView;
+  /** Read on the server at the company's today. */
+  initialBalances: ChartBalances;
+  baseCurrency: string;
+  baseDecimals: number;
 }) {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
@@ -96,26 +178,41 @@ export default function AccountsClient({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AccountRow | null>(null);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<AccountType | "all">("all");
-  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowRole | "all">("all");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const filtering = search.trim() !== "" || typeFilter !== "all" || cashFlowFilter !== "all";
 
-  const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return accounts.filter(
-      (a) =>
-        (typeFilter === "all" || a.account_type === typeFilter) &&
-        (cashFlowFilter === "all" || a.cash_flow_role === cashFlowFilter) &&
-        (!q || a.account_code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)),
-    );
-  }, [accounts, search, typeFilter, cashFlowFilter]);
+  const [view, setView] = useState<ChartView>(initialView);
+  // A link or the back button can change the view under a mounted page; follow it.
+  const [viewFromServer, setViewFromServer] = useState<ChartView>(initialView);
+  if (viewFromServer !== initialView) {
+    setViewFromServer(initialView);
+    setView(initialView);
+  }
 
-  // A match reads in its section under its parent, so the parents above it come along.
-  const sections = useMemo(
-    () => accountSections(filtering ? withAncestors(accounts, matches) : accounts),
-    [accounts, matches, filtering],
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<ChartFilter>("all");
+  const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowRole | "all">("all");
+
+  const [balances, setBalances] = useState<ChartBalances>(initialBalances);
+  /** The date asked for while its figures are on their way; null when the figures shown are for the date shown. */
+  const [requestedAsOf, setRequestedAsOf] = useState<string | null>(null);
+  const latestRun = useRef(0);
+  const [zoom, setZoom] = useState<ZoomSpec | null>(null);
+
+  const money = useCallback((minor: number) => formatMoney(minor, baseCurrency, baseDecimals), [baseCurrency, baseDecimals]);
+  const inventoryAccountIds = useMemo(() => new Set(balances.inventoryAccountIds), [balances.inventoryAccountIds]);
+
+  const listing = useMemo(
+    () =>
+      chartListing(accounts, {
+        figures: balances.figures,
+        inventoryAccountIds,
+        view,
+        search,
+        filter,
+        // How a reader finds every unclassified account: the one question the cash flow column is asked.
+        keep: view === "setup" && cashFlowFilter !== "all" ? (a) => a.cash_flow_role === cashFlowFilter : undefined,
+      }),
+    [accounts, balances.figures, inventoryAccountIds, view, search, filter, cashFlowFilter],
   );
 
   const labelById = useMemo(
@@ -123,7 +220,55 @@ export default function AccountsClient({
     [accounts],
   );
 
+  // A group's heading pins under the filter bar, which is pinned itself and
+  // whose height follows what it holds. Measure it rather than guess.
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    const bar = root?.querySelector<HTMLElement>(".accounting-filter-bar");
+    if (!root || !bar) return;
+    const place = () => root.style.setProperty("--coa-pin-top", `${APP_HEADER_HEIGHT + bar.offsetHeight}px`);
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
+
   const detailOptions = watchedType ? detailTypeOptions(watchedType) : [];
+
+  function changeView(next: ChartView) {
+    setView(next);
+    // In the address, so a reload or a link opens the same view. Written with
+    // history.replaceState as lib/client/use-table-url-state.ts does: the rows
+    // are already here, and router.replace would re-read every balance.
+    window.history.replaceState(window.history.state, "", chartViewHref(next));
+  }
+
+  async function changeAsOf(date: dayjs.Dayjs | null) {
+    if (!date) return;
+    const next = date.format("YYYY-MM-DD");
+    if (next === (requestedAsOf ?? balances.asOf)) return;
+    const run = ++latestRun.current;
+    setRequestedAsOf(next);
+    try {
+      const result = await chartBalancesAction(next);
+      // A later date was picked while this one was being read: its answer wins.
+      if (run !== latestRun.current) return;
+      if (result.ok && result.data) setBalances(result.data);
+      else message.error(result.error ?? "The balances could not be read for that date");
+    } catch {
+      if (run === latestRun.current) message.error("The balances could not be read for that date. Check the connection and try again.");
+    } finally {
+      if (run === latestRun.current) setRequestedAsOf(null);
+    }
+  }
+
+  /** QuickZoom on the account's figure, over the same dates the figure covers, so the list adds up to it. */
+  function openAccount(account: AccountRow) {
+    const figure = balances.figures[account.id] ?? 0;
+    const range = chartRange(statementOf(account.account_type), balances.asOf, fiscalStartMonthOf(balances.fiscalYearStart));
+    setZoom(chartZoomSpec(account, range, figure));
+  }
 
   function openCreate() {
     setEditing(null);
@@ -182,92 +327,217 @@ export default function AccountsClient({
     else message.error(result.error ?? "Failed to update status");
   }
 
-  const columns: TableColumnsType<Row> = [
+  const loading = requestedAsOf !== null;
+  const balancesView = view === "balances";
+
+  const groupHeading = (row: Extract<ListRow, { kind: "group" }>) => (
+    <div className={styles.groupHead}>
+      <span className={styles.groupTitle}>{row.title}</span>
+      {balancesView && row.statement === "profit_and_loss" ? (
+        <span className={styles.groupRange}>{groupRangeLabel(balances.fiscalYearStart)}</span>
+      ) : null}
+      <span className={styles.groupCount}>
+        {row.count}
+        <span className="accounting-sr-only">{row.count === 1 ? " account" : " accounts"}</span>
+      </span>
+    </div>
+  );
+
+  const nameCell = (account: AccountRow, depth: number) => {
+    const under = [
+      detailLabel(account.account_type, account.detail_type),
+      CASH_FLOW_ROLE_LABELS[account.cash_flow_role],
+      accountNormalBalance(account.account_type, account.is_contra) === "debit" ? "Debit normal" : "Credit normal",
+      statementSectionOf(account.account_type) === "balance_sheet" ? "Balance Sheet" : "Profit & Loss",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <div style={{ minWidth: 0, paddingLeft: depth * 18 }}>
+        <div className={styles.nameLine}>
+          {depth > 0 ? (
+            <span className={styles.subMark} aria-hidden="true">
+              ↳
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className={styles.nameLink}
+            onClick={() => openAccount(account)}
+            aria-label={openAccountLabel(account)}
+            title={account.name}
+          >
+            {account.name}
+          </button>
+          {account.is_contra ? <Tag color="purple">Contra</Tag> : null}
+          {balancesView && isRetired(account.status) ? (
+            <Tag color={STATUS_LABELS[account.status].color}>{STATUS_LABELS[account.status].text}</Tag>
+          ) : null}
+        </div>
+        {balancesView ? null : secondaryLine(under)}
+      </div>
+    );
+  };
+
+  const balanceCell = (account: AccountRow) => {
+    const figure = balances.figures[account.id] ?? 0;
+    if (figure === 0) return <span className={styles.zero}>{money(0)}</span>;
+    return (
+      <button
+        type="button"
+        className={`${styles.figure}${figure < 0 ? ` ${styles.negative}` : ""}`}
+        onClick={() => openAccount(account)}
+        aria-label={`${openAccountLabel(account)}, balance ${chartFigureSpoken(figure, money)}`}
+        title="Open the entries behind this balance"
+      >
+        {chartFigureText(figure, money)}
+      </button>
+    );
+  };
+
+  const leading: TableColumnsType<ListRow> = [
     {
       title: "Code",
       key: "code",
-      width: COLUMN.CODE,
-      render: (_: unknown, { account }: Row) => account.account_code,
+      width: CODE_WIDTH,
+      render: (_: unknown, row: ListRow) => {
+        if (row.kind === "group") return groupHeading(row);
+        const chartClass = chartClassOf(row.account.account_type);
+        return (
+          <span className={styles.code}>
+            <span className={styles.dot} data-class={chartClass} title={CLASS_LABEL[chartClass]} aria-hidden="true" />
+            {row.account.account_code}
+          </span>
+        );
+      },
     },
+    flexColumn<ListRow>({
+      title: "Account",
+      key: "name",
+      floor: ACCOUNT_FLOOR,
+      render: (_: unknown, row: ListRow) => (row.kind === "account" ? nameCell(row.account, row.depth) : null),
+    }),
     {
-      ...flexColumn<Row>({
-        title: "Account name",
-        key: "name",
-        render: (_: unknown, { account, depth }: Row) => {
-          const under = [
-            detailLabel(account.account_type, account.detail_type),
-            CASH_FLOW_ROLE_LABELS[account.cash_flow_role],
-            accountNormalBalance(account.account_type, account.is_contra) === "debit" ? "Debit normal" : "Credit normal",
-            statementSectionOf(account.account_type) === "balance_sheet" ? "Balance Sheet" : "Profit & Loss",
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          return (
-            <div style={{ minWidth: 0, paddingLeft: depth * 20 }}>
-              <span title={account.name}>
-                {depth > 0 ? <span className={styles.subMark}>↳</span> : null}
-                {account.name}
-              </span>
-              {account.is_contra ? (
-                <Tag color="purple" style={{ marginInlineStart: 8 }}>
-                  Contra
-                </Tag>
-              ) : null}
-              {secondaryLine(under)}
-            </div>
-          );
-        },
-      }),
+      title: "Currency",
+      key: "currency",
+      width: CURRENCY_WIDTH,
+      render: (_: unknown, row: ListRow) =>
+        row.kind === "account" ? <span className={styles.currency}>{row.account.currency_code ?? baseCurrency}</span> : null,
     },
+  ];
+
+  const balanceColumns: TableColumnsType<ListRow> = [
+    {
+      title: (
+        <span className={styles.balanceHead}>
+          <span>Balance</span>
+          <span>{shortDate(balances.asOf)}</span>
+        </span>
+      ),
+      key: "balance",
+      width: BALANCE_WIDTH,
+      align: "right",
+      render: (_: unknown, row: ListRow) => (row.kind === "account" ? balanceCell(row.account) : null),
+    },
+  ];
+
+  const setupColumns: TableColumnsType<ListRow> = [
     {
       title: "Type",
       key: "type",
-      width: 150,
-      render: (_: unknown, { account }: Row) => <Tag>{ACCOUNT_TYPE_LABEL[account.account_type]}</Tag>,
+      width: TYPE_WIDTH,
+      render: (_: unknown, row: ListRow) =>
+        row.kind === "account" ? <Tag>{ACCOUNT_TYPE_LABEL[row.account.account_type]}</Tag> : null,
     },
     {
       title: "Cash flow",
       key: "cashFlow",
       width: COLUMN.STATUS,
-      render: (_: unknown, { account }: Row) =>
-        account.cash_flow_role === "unclassified" ? <Tag color="orange">Unclassified</Tag> : <Tag color="blue">Set</Tag>,
+      render: (_: unknown, row: ListRow) =>
+        row.kind !== "account" ? null : row.account.cash_flow_role === "unclassified" ? (
+          <Tag color="orange">Unclassified</Tag>
+        ) : (
+          <Tag color="blue">Set</Tag>
+        ),
     },
     {
       title: "Status",
       key: "status",
       width: COLUMN.STATUS,
-      render: (_: unknown, { account }: Row) => (
-        <Tag color={STATUS_LABELS[account.status].color}>{STATUS_LABELS[account.status].text}</Tag>
-      ),
+      render: (_: unknown, row: ListRow) =>
+        row.kind === "account" ? (
+          <Tag color={STATUS_LABELS[row.account.status].color}>{STATUS_LABELS[row.account.status].text}</Tag>
+        ) : null,
     },
     ...(canWrite
       ? [
           {
             title: "Actions",
             key: "actions",
-            width: COLUMN.ACTION * 2,
+            width: ACTIONS_WIDTH,
             align: "right" as const,
-            render: (_: unknown, { account }: Row) => (
-              <Space size={4}>
-                <IconActionButton label="Edit account" icon={<EditOutlined />} onClick={() => openEdit(account)} />
-                <IconActionButton
-                  label={account.status === "active" ? "Deactivate account" : "Activate account"}
-                  icon={account.status === "active" ? <StopOutlined /> : <CheckOutlined />}
-                  loading={busyId === account.id}
-                  onClick={() => toggleStatus(account)}
-                  disabled={account.status !== "active" && account.status !== "inactive"}
-                />
-              </Space>
-            ),
-          } as TableColumnsType<Row>[number],
+            render: (_: unknown, row: ListRow) =>
+              row.kind !== "account" ? null : (
+                <Space size={4}>
+                  <IconActionButton label="Edit account" icon={<EditOutlined />} onClick={() => openEdit(row.account)} />
+                  <IconActionButton
+                    label={row.account.status === "active" ? "Deactivate account" : "Activate account"}
+                    icon={row.account.status === "active" ? <StopOutlined /> : <CheckOutlined />}
+                    loading={busyId === row.account.id}
+                    onClick={() => toggleStatus(row.account)}
+                    disabled={row.account.status !== "active" && row.account.status !== "inactive"}
+                  />
+                </Space>
+              ),
+          } as TableColumnsType<ListRow>[number],
         ]
       : []),
   ];
 
+  const shown = [...leading, ...(balancesView ? balanceColumns : setupColumns)];
+  // A group's heading is one cell across the whole row.
+  const columns: TableColumnsType<ListRow> = shown.map((column, i) => ({
+    ...column,
+    onCell: (row: ListRow) => (row.kind === "group" ? { colSpan: i === 0 ? shown.length : 0 } : {}),
+  }));
+
+  const narrowed = search.trim() !== "" || filter !== "all" || (view === "setup" && cashFlowFilter !== "all");
+
   return (
-    <div>
+    <div ref={rootRef} className={styles.root}>
+      <PageHeader
+        title="Chart of Accounts"
+        description={chartLede(listing.total, listing.withBalance, balances.asOf)}
+        actions={
+          <Segmented<ChartView>
+            aria-label="View"
+            value={view}
+            onChange={changeView}
+            options={[
+              { value: "balances", label: "Balances" },
+              { value: "setup", label: "Setup" },
+            ]}
+          />
+        }
+      />
+
+      <div className={styles.pills} role="group" aria-label="Account type">
+        {CHART_FILTERS.map((pill) => (
+          <button
+            key={pill.key}
+            type="button"
+            className={styles.pill}
+            aria-pressed={filter === pill.key}
+            onClick={() => setFilter(pill.key)}
+          >
+            {pill.label}{" "}
+            <span className={styles.pillCount}>({listing.counts[pill.key]})</span>
+          </button>
+        ))}
+      </div>
+
       <FilterBar
-        resultCount={matches.length}
+        resultCount={listing.matched}
         actions={
           <Space wrap>
             <ClassifyAccountsButton canWrite={canWrite} />
@@ -279,70 +549,68 @@ export default function AccountsClient({
           </Space>
         }
       >
-        <Input.Search
+        <Input
+          aria-label="Search accounts"
           placeholder="Search by code or name"
           allowClear
-          style={{ width: 260 }}
+          prefix={<SearchOutlined aria-hidden="true" />}
+          className={styles.search}
+          value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Select<AccountType | "all">
-          aria-label="Account type"
-          value={typeFilter}
-          onChange={setTypeFilter}
-          style={{ width: 180 }}
-          popupMatchSelectWidth={false}
-          options={[
-            { value: "all", label: "All types" },
-            ...ACCOUNT_TYPES.map((t) => ({ value: t, label: ACCOUNT_TYPE_LABEL[t] })),
-          ]}
-        />
-        {/* How a reader finds every unclassified account — the one question the cash flow column is asked. */}
-        <Select<CashFlowRole | "all">
-          aria-label="Cash flow role"
-          value={cashFlowFilter}
-          onChange={setCashFlowFilter}
-          style={{ width: 200 }}
-          popupMatchSelectWidth={false}
-          options={[
-            { value: "all", label: "All cash flow roles" },
-            ...CASH_FLOW_ROLES.map((role) => ({ value: role, label: CASH_FLOW_ROLE_LABELS[role] })),
-          ]}
-        />
+        {balancesView ? (
+          <>
+            <label className={styles.field}>
+              As of
+              <DatePicker
+                aria-label="As of"
+                value={dayjs(requestedAsOf ?? balances.asOf)}
+                allowClear={false}
+                onChange={(d) => void changeAsOf(d)}
+              />
+            </label>
+            <span className={styles.updating} aria-live="polite">
+              {loading ? (
+                <>
+                  <Spin size="small" />
+                  Updating balances…
+                </>
+              ) : null}
+            </span>
+          </>
+        ) : (
+          <Select<CashFlowRole | "all">
+            aria-label="Cash flow role"
+            value={cashFlowFilter}
+            onChange={setCashFlowFilter}
+            style={{ width: 200 }}
+            popupMatchSelectWidth={false}
+            options={[
+              { value: "all", label: "All cash flow roles" },
+              ...CASH_FLOW_ROLES.map((role) => ({ value: role, label: CASH_FLOW_ROLE_LABELS[role] })),
+            ]}
+          />
+        )}
       </FilterBar>
 
-      {sections.length === 0 ? (
-        <DataTable<Row>
-          rowKey={(row) => row.account.id}
+      <div className={`${styles.list}${loading ? ` ${styles.busy}` : ""}`} aria-busy={loading}>
+        <DataTable<ListRow>
+          rowKey={(row) => row.key}
           columns={columns}
-          dataSource={[]}
+          dataSource={listing.rows}
+          // One continuous list: a page break would split a group from its heading.
           pagination={false}
-          emptyTitle={filtering ? "No matching accounts" : "No accounts yet"}
+          rowClassName={(row) => (row.kind === "group" ? styles.groupRow : styles.accountRow)}
+          emptyTitle={narrowed ? "No accounts match that search" : "No accounts yet"}
           emptyDescription={
-            filtering
-              ? "Try a different account code, name, type or cash flow role."
+            narrowed
+              ? "Try a different code or name, or another account type."
               : "Create an account to start building the chart of accounts."
           }
         />
-      ) : (
-        sections.map((section) => (
-          <section key={section.key} className={styles.section} aria-labelledby={`coa-${section.key}`}>
-            <div className={styles.sectionHead}>
-              <h2 id={`coa-${section.key}`} className={styles.sectionTitle}>
-                {section.title}
-              </h2>
-              <span className={styles.sectionCount}>
-                {section.rows.length} {section.rows.length === 1 ? "account" : "accounts"}
-              </span>
-            </div>
-            <DataTable<Row>
-              rowKey={(row) => row.account.id}
-              columns={columns}
-              dataSource={section.rows}
-              pagination={false}
-            />
-          </section>
-        ))
-      )}
+      </div>
+
+      <ZoomSheet spec={zoom} onClose={() => setZoom(null)} money={money} />
 
       <Modal
         title={editing ? "Edit account" : "New account"}

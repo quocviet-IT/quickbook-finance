@@ -1,34 +1,340 @@
-/* The chart of accounts, one block per section (lib/domain/account-sections.ts). */
-.section {
-  margin-top: 22px;
+/*
+ * The Chart of Accounts (AccountsClient.tsx), drawn the way the client's
+ * prototype draws it: type pills, one bordered list, small upper-case group
+ * headings that pin while the page scrolls, and figures that open QuickZoom.
+ * Every colour is a token, so the dark theme follows.
+ */
+
+.root {
+  /* Where a group's heading pins: under the top bar and the filter bar. The
+     client measures the filter bar and writes the real figure here. */
+  --coa-pin-top: 120px;
 }
 
-.section:first-of-type {
-  margin-top: 10px;
+/* ---------- type pills ---------- */
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
 }
 
-.sectionHead {
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 13px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 999px;
+  background: var(--ob-surface-card);
+  color: var(--ob-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.pill:hover {
+  color: var(--ob-text-heading);
+  border-color: var(--ob-border-muted);
+}
+
+.pill:focus-visible {
+  outline: 2px solid var(--ob-intent-primary);
+  outline-offset: 2px;
+}
+
+/* The pressed pill is filled with ink: dark on a light page, light on a dark one. */
+.pill[aria-pressed="true"] {
+  color: var(--ob-surface-card);
+  background: var(--ob-text-heading);
+  border-color: var(--ob-text-heading);
+  font-weight: 600;
+}
+
+.pillCount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- filter bar ---------- */
+
+/* Under .root: Ant Design's affix wrapper sets its own width at the same weight as one class. */
+.root .search {
+  width: 280px;
+  max-width: 100%;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.updating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ob-text-secondary);
+  font-size: 12px;
+}
+
+/* ---------- the list ---------- */
+
+/*
+ * Ant Design writes its table rules under `.ant-table-wrapper
+ * .ant-table.ant-table-small`. Naming the same chain under `.list` outranks
+ * them without !important, and keeps every override on this page.
+ */
+.list :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-thead) > tr > th {
+  padding: 9px 12px;
+  color: var(--ob-text-secondary);
+  background: var(--ob-surface-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* No dividers between the head cells. Ant Design's own rule chains four :not()s,
+   which no reasonable selector here outranks. */
+.list :global(.ant-table-wrapper .ant-table-thead) > tr > th::before {
+  display: none !important;
+}
+
+.list :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody) > tr > td {
+  padding: 7px 12px;
+  border-bottom-color: var(--ob-border-default);
+  font-size: 13px;
+}
+
+.list :global(.ant-table-wrapper .ant-table-tbody) > tr.accountRow:hover > td,
+.list :global(.ant-table-wrapper .ant-table-tbody) > tr.accountRow > td:global(.ant-table-cell-row-hover) {
+  background: var(--ob-surface-muted);
+}
+
+/* A group's heading: one cell across the row, on its own ground, under a firmer rule. */
+.list :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody) > tr.groupRow > td {
+  padding: 7px 12px;
+  background: var(--ob-surface-subtle);
+  border-top: 1px solid var(--ob-border-muted);
+  border-bottom: 1px solid var(--ob-border-default);
+}
+
+.list :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody) > tr.groupRow:first-child > td {
+  border-top: 0;
+}
+
+/*
+ * Pinned headings, where the list fits its box.
+ *
+ * Sticky needs every box between the heading and the page to leave scrolling
+ * alone. The shared table frame clips with `overflow: hidden`, and a table held
+ * to its box scrolls sideways inside `.ant-table-content`; both make a box that
+ * a sticky cell sticks to instead of the page. `clip` cuts the same corners
+ * without making one. Below the 984px box (a 1280 window, less the sidebar and
+ * margins) the columns stop fitting and the frame has to scroll, so the
+ * headings scroll with it there.
+ */
+@container app-workspace (min-width: 1032px) {
+  .list :global(.accounting-data-table) {
+    overflow: clip;
+  }
+
+  .list :global(.accounting-table--fit .ant-table-content) {
+    overflow: visible;
+  }
+
+  .list :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody) > tr.groupRow > td {
+    position: sticky;
+    top: var(--coa-pin-top);
+    z-index: 3;
+  }
+}
+
+.groupHead {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin: 0 0 8px;
+  min-width: 0;
 }
 
-.sectionTitle {
-  margin: 0;
-  font-size: 12px;
+.groupTitle {
+  color: var(--ob-text-strong);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ob-text-heading);
+  white-space: nowrap;
 }
 
-.sectionCount {
+.groupRange {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ob-text-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupCount {
+  margin-left: auto;
+  color: var(--ob-text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- account rows ---------- */
+
+.code {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ob-text-strong);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
   font-size: 12px;
-  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The class dot. The chart series already give each class its hue — income and
+ * expense their own, payables the liabilities, net the equity, inventory the
+ * assets — so the dot reads the same as the charts do.
+ */
+.dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--ob-series-other);
+}
+
+.dot[data-class="asset"] {
+  background: var(--ob-series-inventory);
+}
+
+.dot[data-class="liability"] {
+  background: var(--ob-series-payable);
+}
+
+.dot[data-class="equity"] {
+  background: var(--ob-series-net);
+}
+
+.dot[data-class="income"] {
+  background: var(--ob-series-income);
+}
+
+.dot[data-class="expense"] {
+  background: var(--ob-series-expense);
+}
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nameLine :global(.ant-tag) {
+  flex: 0 0 auto;
+  margin-inline: 0;
 }
 
 .subMark {
-  color: var(--ob-text-secondary);
-  margin-right: 4px;
+  flex: 0 0 auto;
+  color: var(--ob-text-faint);
+}
+
+/* The name and the figure are buttons that read as text until pointed at. */
+.nameLink,
+.figure {
+  padding: 1px 3px;
+  margin: -1px -3px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2.5px;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+.nameLink {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ob-text-body);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameLink:hover,
+.figure:hover {
+  color: var(--ob-intent-primary);
+  text-decoration-color: currentColor;
+}
+
+.nameLink:focus-visible,
+.figure:focus-visible {
+  outline: 2px solid var(--ob-intent-primary);
+  outline-offset: 1px;
+}
+
+.currency {
+  color: var(--ob-text-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+
+.balanceHead {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.figure {
+  color: var(--ob-text-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.figure:hover {
+  background: var(--ob-accent-wash);
+}
+
+/* The wrong way round for its account: in parentheses, in the negative colour. */
+.figure.negative,
+.figure.negative:hover {
+  color: var(--ob-money-negative);
+}
+
+/* Nothing to open. */
+.zero {
+  color: var(--ob-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The figures shown are for the old date while the new ones are read. */
+.busy .figure,
+.busy .zero {
+  opacity: 0.45;
+  transition: opacity 160ms ease;
 }
