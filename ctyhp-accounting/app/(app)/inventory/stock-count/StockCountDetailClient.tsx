@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DeleteOutlined, PlusOutlined, PrinterOutlined } from "@ant-design/icons";
 import { Alert, App, Button, DatePicker, Input, InputNumber, Space } from "antd";
 import dayjs from "dayjs";
@@ -45,8 +46,8 @@ import {
 import { dateInTimeZone } from "@/lib/domain/stamp";
 import { formatMoney } from "@/lib/format";
 import type { PostingContext } from "@/lib/services/stock-count";
-import { bookValueAction, saveStockCountAction } from "./actions";
-import PostCountDialog from "./PostCountDialog";
+import { bookValueAction, saveStockCountAction, type PostStockCountOutcome } from "./actions";
+import PostCountDialog, { PostOutcomeDialog } from "./PostCountDialog";
 import styles from "./stock-count.module.css";
 
 /**
@@ -101,15 +102,39 @@ const withKey = (l: StockCountLineInput): EditorLine => ({ ...l, key: `l${keySee
 const blankLine = (): StockCountLineInput => ({ name: "", sku: null, quantity: 0, unitCostMinor: 0, sellsForMinor: null });
 
 export default function StockCountDetailClient(props: DetailProps) {
+  const router = useRouter();
+  const [outcome, setOutcome] = useState<PostStockCountOutcome | null>(null);
   const locked = props.count.status !== "draft";
-  return locked ? <LockedCount {...props} /> : <DraftCount {...props} />;
+
+  function closeOutcome() {
+    setOutcome(null);
+    // Posting already turned the page read-only behind this dialog; reading it again also
+    // catches the approval or journal entry link. It waits until the dialog is closed.
+    router.refresh();
+  }
+
+  return (
+    <>
+      {locked ? <LockedCount {...props} /> : <DraftCount {...props} onPosted={setOutcome} />}
+      {outcome ? <PostOutcomeDialog outcome={outcome} onClose={closeOutcome} /> : null}
+    </>
+  );
 }
 
 // ---------------------------------------------------------------------------
 // A draft: edit, paste, save, adjust
 // ---------------------------------------------------------------------------
 
-function DraftCount({ count, lines, liveBookMinor, posting, currencyCode, decimals, canWrite }: DetailProps) {
+function DraftCount({
+  count,
+  lines,
+  liveBookMinor,
+  posting,
+  currencyCode,
+  decimals,
+  canWrite,
+  onPosted,
+}: DetailProps & { onPosted: (outcome: PostStockCountOutcome) => void }) {
   const { message, modal } = App.useApp();
   const [asOf, setAsOf] = useState(count.asOf);
   const [memo, setMemo] = useState(count.memo ?? "");
@@ -472,6 +497,10 @@ function DraftCount({ count, lines, liveBookMinor, posting, currencyCode, decima
           posting={posting}
           money={money}
           onBooksChanged={() => void readBook(asOf)}
+          onPosted={(outcome) => {
+            setDialogOpen(false);
+            onPosted(outcome);
+          }}
         />
       ) : null}
     </div>
