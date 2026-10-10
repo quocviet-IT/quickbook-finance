@@ -151,8 +151,9 @@ async function behaviour() {
     return;
   }
 
-  // Owner prep: a clean slate for the checks, rolled back with everything else.
-  await client.query(`delete from acc_stock_count where status in ('draft', 'pending_approval')`);
+  // Owner prep: every count goes (lines cascade), so the first one made here really is the first;
+  // rolled back with everything else.
+  await client.query(`delete from acc_stock_count`);
   await client.query(`update acc_item set is_active = false where is_inventory`);
   await client.query(`update acc_approval_policy set enabled = false where action_key = 'inventory_adjustment'`);
   const { inventory_account_id: inv, offset_account_id: off } = await one(`select * from acc_stock_count_default_accounts()`);
