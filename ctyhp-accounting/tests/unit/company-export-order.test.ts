@@ -90,3 +90,14 @@ describe("reading a table for the export", () => {
     }
   });
 });
+
+describe("the Stock Count tables in the export list", () => {
+  it("come after everything they reference, header before lines", () => {
+    const at = (t: string) => EXPORT_TABLES.indexOf(t);
+    expect(at("acc_stock_count")).toBeGreaterThan(-1);
+    expect(at("acc_stock_count")).toBeGreaterThan(at("acc_account"));
+    expect(at("acc_stock_count")).toBeGreaterThan(at("acc_journal_entry"));
+    expect(at("acc_stock_count")).toBeGreaterThan(at("acc_approval_request"));
+    expect(at("acc_stock_count_line")).toBeGreaterThan(at("acc_stock_count"));
+  });
+});

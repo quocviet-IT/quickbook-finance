@@ -56,6 +56,9 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_po_variance_exception",
   "acc_purchasing_config",
   "acc_inventory_txn",
+  // Stock Count (0139): a count references accounts, a journal entry and an approval request.
+  "acc_stock_count",
+  "acc_stock_count_line",
   "acc_fixed_asset",
   "acc_asset_depreciation_schedule",
   "acc_bank_account",

@@ -181,7 +181,7 @@ export function buildPurchasesInventory(input: PurchasesInventoryInput): Purchas
       ...l,
       kind: kinds.get(l.accountId) ?? "other",
       opening: isOpeningEntry({ id: l.entryId, sourceType: l.sourceType, description: l.description }, input.equityEntryIds),
-      count: l.sourceType === "inventory_adjustment" || adjustmentEntries.has(l.entryId),
+      count: l.sourceType === "inventory_adjustment" || l.sourceType === "stock_count" || adjustmentEntries.has(l.entryId),
     };
   });
 

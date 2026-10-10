@@ -6,6 +6,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
+import { sourceHref as documentHref } from "@/lib/domain/entry-detail";
 import {
   filterGeneralLedgerRows,
   parseAmountFilterInput,
@@ -48,6 +49,9 @@ interface Props {
 // they render as plain (non-linked) text.
 function sourceHref(sourceType: string, sourceId: string | null): string | null {
   if (!sourceId) return null;
+  // A stock count has a page of its own, opened by id rather than filtered by ?source=.
+  const own = documentHref(sourceType, sourceId);
+  if (own) return own;
   const map: Record<string, string> = {
     invoice: "/invoices",
     payment: "/payments",

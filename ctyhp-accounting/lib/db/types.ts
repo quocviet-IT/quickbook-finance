@@ -22,7 +22,8 @@ export type JournalSource =
   | "inventory"
   | "inventory_adjustment"
   | "depreciation"
-  | "asset_disposal";
+  | "asset_disposal"
+  | "stock_count";
 export type JournalStatus = "posted" | "void";
 export type AppRole = "admin" | "accountant" | "sales" | "viewer";
 
@@ -877,6 +878,42 @@ export interface InventoryTxnRow {
   reversal_of: string | null;
   memo: string | null;
   created_at: string;
+}
+
+export type StockCountStatusValue = "draft" | "pending_approval" | "posted";
+
+/** acc_stock_count: one periodic count sheet (migration 0139). */
+export interface StockCountRow {
+  id: string;
+  count_number: string;
+  as_of: string;
+  status: StockCountStatusValue;
+  memo: string | null;
+  counted_minor: number | null;
+  book_minor: number | null;
+  difference_minor: number | null;
+  inventory_account_id: string | null;
+  offset_account_id: string | null;
+  journal_entry_id: string | null;
+  approval_request_id: string | null;
+  posted_by: string | null;
+  posted_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+/** acc_stock_count_line: one line of a count sheet. */
+export interface StockCountLineRow {
+  id: string;
+  stock_count_id: string;
+  line_order: number;
+  name: string;
+  sku: string | null;
+  quantity: number;
+  unit_cost_minor: number;
+  sells_for_minor: number | null;
 }
 
 export interface InventoryValuationRow {

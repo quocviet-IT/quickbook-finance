@@ -31,6 +31,7 @@ const AUDITED_TABLES = [
   "acc_purchasing_config",
   "acc_role_permission",
   "acc_statement_reconciliation",
+  "acc_stock_count",
   "acc_tax_code",
   "acc_vendor",
   "acc_vendor_credit",

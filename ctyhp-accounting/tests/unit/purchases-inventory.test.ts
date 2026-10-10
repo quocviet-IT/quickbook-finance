@@ -281,3 +281,27 @@ describe("the export sheet", () => {
     ]);
   });
 });
+
+describe("a stock count entry", () => {
+  // The count posts against a plain cost of sales account, whose name does not read as an
+  // adjustment. Only its source says it is a count.
+  const lines = [
+    line("o", "2026-01-01", "inv", 100_000, { sourceType: "opening_balance" }),
+    line("b", "2026-02-10", "cogs", 50_000, { sourceId: "bill1" }),
+    line("b", "2026-02-10", "ap", -50_000, { sourceId: "bill1" }),
+    line("c", "2026-12-31", "inv", 20_000, { sourceType: "stock_count", sourceId: "sc1" }),
+    line("c", "2026-12-31", "cogs", -20_000, { sourceType: "stock_count", sourceId: "sc1" }),
+  ];
+  const report = run(lines, { vendorOfSource: new Map([["bill1", { id: "v1", name: "Example Supply" }]]) });
+
+  it("is a count adjustment, not a negative purchase", () => {
+    expect(report.years[0]).toMatchObject({
+      openingMinor: 100_000,
+      boughtMinor: 50_000,
+      countAdjustmentMinor: 20_000,
+      closingMinor: 120_000,
+    });
+    expect(report.purchases).toBe(1);
+    expect(report.boughtMinor).toBe(50_000);
+  });
+});
