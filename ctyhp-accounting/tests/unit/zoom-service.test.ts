@@ -61,7 +61,7 @@ function fakeClient(c: Partial<Config>, rpcCalls: string[] = [], inSizes: number
           ? cfg.balancesFor
             ? cfg.balancesFor(args.p_from as string | null)
             : cfg.balances
-          :name === "acc_transaction_list" ? cfg.listed : new Error(name);
+          : name === "acc_transaction_list" ? cfg.listed : new Error(name);
       return { range: async (from: number, to: number) => pageOf(source, from, to) };
     },
   } as unknown as SupabaseClient;
