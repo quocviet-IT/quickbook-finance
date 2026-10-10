@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import {
@@ -18,6 +19,7 @@ import {
   planAccountClassification,
   type ClassificationOutcome,
 } from "@/lib/services/account-classification";
+import { getChartBalances, type ChartBalances } from "@/lib/services/chart-balances";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -115,6 +117,22 @@ export async function updateAccountAction(id: string, raw: unknown): Promise<Act
     await updateAccount(sb, id, parsed.data);
     revalidatePath("/accounts");
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: messageFrom(err) };
+  }
+}
+
+const asOfSchema = z.iso.date({ error: "Enter a valid date" });
+
+/** Every account’s figure at a date, for the chart. Reads only; any signed-in role may call it. */
+export async function chartBalancesAction(asOf: unknown): Promise<ActionResult<ChartBalances>> {
+  const role = await getUserRole();
+  if (!role) return { ok: false, error: "Not authorized" };
+  const parsed = asOfSchema.safeParse(asOf);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Enter a valid date" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getChartBalances(sb, parsed.data) };
   } catch (err) {
     return { ok: false, error: messageFrom(err) };
   }

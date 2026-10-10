@@ -119,19 +119,32 @@ function treeRows<T extends SectionAccount>(members: readonly T[]): AccountTreeR
   return out;
 }
 
-/** The sections that have accounts, in order, each as a tree in code order. */
-export function accountSections<T extends SectionAccount>(accounts: readonly T[]): AccountSection<T>[] {
-  const bySection = new Map<AccountSectionKey, T[]>();
+/**
+ * The groups that have accounts, in the order given, each as a tree in code
+ * order. A sub-account nests under its parent only when both are in the same
+ * group; otherwise it stands at the top of its own group.
+ */
+export function accountGroups<T extends SectionAccount, K extends string>(
+  accounts: readonly T[],
+  groups: readonly { key: K; title: string }[],
+  groupOf: (account: T) => K,
+): { key: K; title: string; rows: AccountTreeRow<T>[] }[] {
+  const byGroup = new Map<K, T[]>();
   for (const a of accounts) {
-    const key = sectionOf(a);
-    const list = bySection.get(key) ?? [];
+    const key = groupOf(a);
+    const list = byGroup.get(key) ?? [];
     list.push(a);
-    bySection.set(key, list);
+    byGroup.set(key, list);
   }
-  return ACCOUNT_SECTIONS.flatMap(({ key, title }) => {
-    const members = bySection.get(key);
+  return groups.flatMap(({ key, title }) => {
+    const members = byGroup.get(key);
     return members && members.length > 0 ? [{ key, title, rows: treeRows(members) }] : [];
   });
+}
+
+/** The sections that have accounts, in order, each as a tree in code order. */
+export function accountSections<T extends SectionAccount>(accounts: readonly T[]): AccountSection<T>[] {
+  return accountGroups(accounts, ACCOUNT_SECTIONS, sectionOf);
 }
 
 /**
