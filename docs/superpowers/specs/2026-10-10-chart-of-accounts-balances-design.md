@@ -167,3 +167,29 @@ There are no migrations.
 1.97, or the next free number when merging.
 - **Changelog:** says what changed on the screen.
 - **Guide:** the chart-of-accounts steps are updated for the two modes and the click-through.
+
+## Amendments from pre-building (10/10)
+
+The feature was built and run on a local pre-build branch first. Results:
+- **Live check, read-only on all six companies:** every account's figure equals its natural ledger balance over the right range. For every account with a balance, the QuickZoom list adds up to the figure. The drill-down part takes about five minutes.
+- **Smoke on the sample company, read-only:** 18 of 18.
+
+These points were settled along the way.
+
+1. **Where the groups live.**
+   - The fourteen groups are in a new module, `lib/domain/chart-groups.ts`.
+   - Today's ten `ACCOUNT_SECTIONS` and `sectionOf` stay, because the new-company chart templates (`chart-templates.ts` and its test) are organised by them.
+   - `account-sections.ts` gains `accountGroups(accounts, groups, groupOf)`, which builds the same code-ordered tree for any grouping. `accountSections` now sits on top of it, unchanged.
+   - Both modes of the page use the fourteen groups.
+2. **An account that fits two groups.** A current asset in the inventory account set goes to Inventory, even if its detail type marks money in transit.
+3. **Fiscal year.**
+   - With no settings row, the fiscal year starts in January.
+   - The drawer's dates come from the same fiscal year start the figures were worked out from, so a click covers the dates of the figure clicked.
+4. **Screen helpers** that are pure live in `lib/domain/chart-list.ts`: the rows, the visible accounts, the labels and the column widths.
+5. **Switching Balances and Setup** writes the address with `history.replaceState`, as `lib/client/use-table-url-state.ts` does. The rows are already in the browser, and a router navigation would read every balance again.
+6. **Class dots** use the app's existing chart colours. No new tokens were added.
+7. **Small choices:**
+   - Setup keeps today's cash flow role filter.
+   - Archived accounts are treated like inactive ones.
+   - Clicking an account's name opens its entries in both modes.
+8. **A QuickZoom fix the chart makes more visible:** its total line now says "1 line" for a single line, not "1 lines". It is noted in the changelog.
