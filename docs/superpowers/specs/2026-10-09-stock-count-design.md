@@ -222,3 +222,37 @@ The mockup embeds a real client's books. Only its structure is used here. Tests 
 - One release, numbered at merge time.
 - The changelog names Stock Count in the words the screen uses. It says that posting follows the inventory-adjustment approval policy, and that companies tracking items adjust item by item instead.
 - The Guide gains a "Count stock" flow: New count → paste or type the lines → Save draft → Adjust inventory.
+
+## Amendments from pre-building (09–10/10)
+
+The feature was built on a local pre-build branch.
+
+- **Migrations live.** With the user's approval, 0138 went live on all six companies first, so the posting checks could run. 0139 followed after the provisioning self-check passed (17/17).
+- **Verification script:** 168 of 168 checks pass. That covers structure in all six companies, plus the whole create / save / post / approve / reject / cancel suite on the sample company, inside rolled-back transactions.
+- **Read-only live test:** 3 of 3 on all six companies.
+- **Smoke on the sample company:** one count was posted for real, and a second count was left as a draft.
+
+These points were settled along the way.
+
+1. **Book value is base currency.** It sums `amount_base_minor`, signed by side, the way `acc_ledger_balances` does. The first draft summed debit minus credit in the line's own currency, which would be wrong for a foreign-currency line on an inventory account. The verification includes such a line.
+2. **Grants.**
+   - Both tables are SELECT-only for signed-in users. `insert`, `update`, `delete` and `truncate` are revoked from `authenticated` explicitly. Otherwise the database's default privileges in `public` leave RLS as the only barrier. Writes happen only through the RPCs.
+   - The stamp and audit triggers sit on the header only. A 2,000-line save does not flood the audit log.
+3. **Waiting for approval.**
+   - The post RPC cannot set the count's status when its approval guard raises, because the raise rolls the change back. After a successful submit, the app calls `acc_mark_stock_count_pending(count, request)`.
+   - That RPC refuses anything except a staff caller, a draft count, and a pending `inventory_adjustment` request whose payload names this count.
+   - An AFTER UPDATE trigger on `acc_approval_request` returns the count to draft when the request is rejected **or cancelled**. `acc_reject_request` and `acc_cancel_request` are untouched.
+4. **One open count at a time,** enforced by a partial unique index.
+5. **More refusals on posting:** an unknown count, a count already posted, and an offset account equal to the inventory account.
+6. **The paste reader.**
+   - Fields are read from the right, so a name may contain commas.
+   - Tab-separated text, which is what pasting from a spreadsheet gives, keeps grouped thousands safely.
+   - In typed comma-separated text a thousands comma cannot be told from a column break. The reader refuses the detectable cases, and the hint says so: "Pasting from a spreadsheet keeps the columns apart; in typed text leave out thousands separators."
+   - An unreadable line is reported by its number, and the box keeps only those lines so they can be corrected.
+7. **Screens.**
+   - Unsaved changes are guarded by a small hook (`lib/client/use-unsaved-guard.ts`).
+   - The lines editor pages at 50 rows so 2,000 inputs stay usable. Print never pages.
+   - The post action returns the entry number for "Posted as JE-…".
+   - The posted stamp is shown in the company's time zone.
+8. **One colour rule for the difference** (`differenceTone`), used in the stat row, the dialog and the list. A shortage is red. A surplus and zero use the normal text colour. List figures are plain text, and only the Count # is a link.
+9. **Default offset in practice.** The sample company has no "Inventory Adjustment" account, so its count posted against 5090 Inventory Write-down. Purchases and Inventory then showed the count as a count adjustment, with the year still adding up.
