@@ -4,6 +4,7 @@ import {
   entryDisplayName,
   entryHeadline,
   entryTotals,
+  sourceHref,
   sourceLabel,
   sourceTone,
 } from "@/lib/domain/entry-detail";
@@ -81,5 +82,20 @@ describe("the entry detail modules", () => {
     expect(service).not.toMatch(/\.(insert|update|upsert|delete)\(/);
     // The only RPC it may reach is the read-only transaction list, through reports.ts.
     expect(service).not.toMatch(/\.rpc\(/);
+  });
+});
+
+describe("stock count entries", () => {
+  it("reads as a stock count and opens the count's own page", () => {
+    expect(sourceLabel("stock_count")).toBe("Stock count");
+    expect(sourceTone("stock_count")).toBe("ledger");
+    expect(sourceHref("stock_count", "c0ffee00-0000-4000-8000-000000000001")).toBe(
+      "/inventory/stock-count/c0ffee00-0000-4000-8000-000000000001",
+    );
+  });
+
+  it("has no link without a source id, and no link for kinds routed elsewhere", () => {
+    expect(sourceHref("stock_count", null)).toBeNull();
+    expect(sourceHref("invoice", "abc")).toBeNull();
   });
 });

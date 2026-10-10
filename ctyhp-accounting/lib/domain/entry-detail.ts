@@ -25,12 +25,23 @@ const SOURCE_LABEL: Record<string, string> = {
   goods_receipt: "Goods receipt",
   inventory: "Inventory",
   inventory_adjustment: "Stock adjustment",
+  stock_count: "Stock count",
   depreciation: "Depreciation",
   asset_disposal: "Asset disposal",
 };
 
 export function sourceLabel(sourceType: string): string {
   return SOURCE_LABEL[sourceType] ?? sourceType.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * Where the document behind an entry opens, for the kinds whose document has a
+ * page of its own by id. Other kinds are routed by their list page.
+ */
+export function sourceHref(sourceType: string, sourceId: string | null): string | null {
+  if (!sourceId) return null;
+  if (sourceType === "stock_count") return `/inventory/stock-count/${sourceId}`;
+  return null;
 }
 
 /**

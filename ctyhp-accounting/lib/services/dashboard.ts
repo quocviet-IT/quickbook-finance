@@ -303,6 +303,7 @@ const ACTIVITY_ENTITIES: Record<string, { entity: string; href: string; category
   acc_purchase_order: { entity: "Purchase order", href: "/purchase-orders", category: "purchases" },
   acc_goods_receipt: { entity: "Goods receipt", href: "/purchase-orders", category: "inventory" },
   acc_inventory_txn: { entity: "Inventory movement", href: "/items", category: "inventory" },
+  acc_stock_count: { entity: "Stock count", href: "/inventory/stock-count", category: "inventory" },
   acc_journal_entry: { entity: "Journal entry", href: "/journal", category: "close" },
   acc_statement_reconciliation: { entity: "Bank reconciliation", href: "/banking/reconcile", category: "banking" },
   acc_approval_request: { entity: "Approval request", href: "/approvals", category: "governance" },
