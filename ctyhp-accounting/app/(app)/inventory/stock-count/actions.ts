@@ -8,6 +8,7 @@ import {
   countDifferenceMinor,
   countedTotalMinor,
   stockCountErrorMessage,
+  TRACKS_ITEMS_MESSAGE,
   validateStockCount,
 } from "@/lib/domain/stock-count";
 import { executeOrSubmitForApproval } from "@/lib/services/approval-flow";
@@ -15,6 +16,7 @@ import {
   createStockCount,
   getBookValue,
   getEntryNumber,
+  getPostingContext,
   getStockCount,
   markStockCountPending,
   postStockCount,
@@ -117,6 +119,8 @@ const postSchema = z.object({
 /**
  * Post the count as one adjusting entry, or send it for a second person's
  * approval when the inventory-adjustment policy asks for that at this size.
+ * A user without the adjust permission, or a company that tracks items, is
+ * refused before anything is submitted.
  *
  * The approval amount is the size of the difference, worked out here from the
  * saved lines and the books on the as-of date. The database recomputes the
@@ -129,6 +133,9 @@ export async function postStockCountAction(raw: unknown): Promise<ActionResult<P
   const { id, inventoryAccountId, offsetAccountId } = parsed.data;
   try {
     const sb = await createSupabaseServerClient();
+    const context = await getPostingContext(sb);
+    if (!context.canAdjust) return { ok: false, error: NO_PERMISSION };
+    if (context.tracksItems) return { ok: false, error: TRACKS_ITEMS_MESSAGE };
     const found = await getStockCount(sb, id);
     if (!found) return { ok: false, error: "Stock count not found" };
     if (found.count.status !== "draft") {

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   createStockCount: vi.fn(),
   getBookValue: vi.fn(),
   getEntryNumber: vi.fn(),
+  getPostingContext: vi.fn(),
   getStockCount: vi.fn(),
   markPending: vi.fn(),
   postStockCount: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("@/lib/services/stock-count", () => ({
   createStockCount: mocks.createStockCount,
   getBookValue: mocks.getBookValue,
   getEntryNumber: mocks.getEntryNumber,
+  getPostingContext: mocks.getPostingContext,
   getStockCount: mocks.getStockCount,
   markStockCountPending: mocks.markPending,
   postStockCount: mocks.postStockCount,
@@ -32,6 +34,8 @@ vi.mock("@/lib/services/stock-count", () => ({
 }));
 
 import { bookValueAction, createStockCountAction, postStockCountAction, saveStockCountAction } from "@/app/(app)/inventory/stock-count/actions";
+
+import { TRACKS_ITEMS_MESSAGE } from "@/lib/domain/stock-count";
 
 const sb = { name: "company client" };
 const ID = "6f1f5f6a-0000-4000-8000-000000000001";
@@ -52,6 +56,7 @@ beforeEach(() => {
   mocks.getUserRole.mockResolvedValue("accountant");
   mocks.getStockCount.mockResolvedValue(draftCount());
   mocks.getBookValue.mockResolvedValue(1_000);
+  mocks.getPostingContext.mockResolvedValue({ canAdjust: true, tracksItems: false });
 });
 
 describe("postStockCountAction", () => {
@@ -110,6 +115,22 @@ describe("postStockCountAction", () => {
     mocks.getStockCount.mockResolvedValue(null);
     expect((await postStockCountAction(post)).error).toBe("Stock count not found");
     expect(mocks.executeOrSubmit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a user without the adjust permission, and submits nothing", async () => {
+    mocks.getPostingContext.mockResolvedValue({ canAdjust: false, tracksItems: false });
+    const r = await postStockCountAction(post);
+    expect(r).toEqual({ ok: false, error: "You do not have permission to change stock counts" });
+    expect(mocks.executeOrSubmit).not.toHaveBeenCalled();
+    expect(mocks.markPending).not.toHaveBeenCalled();
+  });
+
+  it("refuses a company that tracks items, and submits nothing", async () => {
+    mocks.getPostingContext.mockResolvedValue({ canAdjust: true, tracksItems: true });
+    const r = await postStockCountAction(post);
+    expect(r).toEqual({ ok: false, error: TRACKS_ITEMS_MESSAGE });
+    expect(mocks.executeOrSubmit).not.toHaveBeenCalled();
+    expect(mocks.markPending).not.toHaveBeenCalled();
   });
 
   it("puts a closed period in plain words", async () => {

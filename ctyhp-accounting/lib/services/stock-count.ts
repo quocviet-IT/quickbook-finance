@@ -124,11 +124,10 @@ async function inventoryAccountIds(sb: SupabaseClient): Promise<string[]> {
  * That function is the very one acc_post_stock_count sums over, so the figure on
  * the screen and the figure the post freezes pick the same accounts.
  *
- * It sums `getLedgerBalances(null, asOf)` for those accounts. The database
- * adds debit_minor less credit_minor over the same posted entries; the two agree
- * for any base-currency line. They part only for a foreign-currency line on an
- * inventory account, where this uses the base amount (amount_base_minor) and the
- * post function the document-currency amount.
+ * It sums `getLedgerBalances(null, asOf)` for those accounts. Since migration
+ * 0139 the database post function sums amount_base_minor, signed by side,
+ * exactly as getLedgerBalances does, so the screen figure and the posted figure
+ * both use the base-currency amount and agree for foreign-currency lines too.
  */
 export async function getBookValue(sb: SupabaseClient, asOf: string): Promise<number> {
   const [ids, balances] = await Promise.all([inventoryAccountIds(sb), getLedgerBalances(sb, null, asOf)]);
