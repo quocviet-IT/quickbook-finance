@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.96",
+    date: "2026-10-10",
+    headline: "Stock Count: count what is on the shelves and correct the books to it in one entry.",
+    changes: [
+      {
+        kind: "added",
+        title: "Stock Count",
+        detail:
+          "In the sidebar under Inventory & Assets, and as a card in the Report Center. New count starts a count dated today and copies the previous count’s lines, so a recount begins from the last sheet. Type the lines in, or use Paste a count sheet: one line each, name, quantity and cost, and Sells for if you like. A line that cannot be read stays in the box with its line number so you can correct it and read it again. Save draft keeps the count without touching the books.",
+        route: "/inventory/stock-count",
+      },
+      {
+        kind: "added",
+        title: "Counted at cost, On the books and Difference",
+        detail:
+          "Each count shows three figures: Counted at cost, what the sheet comes to; On the books, what the inventory accounts hold on the count date; and the Difference between them. Change the As of date and On the books is read again for that day.",
+        route: "/inventory/stock-count",
+      },
+      {
+        kind: "added",
+        title: "Adjust inventory by …",
+        detail:
+          "When there is a difference, Adjust inventory by … opens a dialog with the three figures, the Inventory account and the Offset account, and the entry it will post. It writes one adjusting entry against an Inventory Adjustment or write-down cost-of-sales account, and the figures are frozen on the count; a posted count is read-only and links to its entry. Posting follows the inventory-adjustment approval policy: above the limit the count is Sent for approval and posts when a second person approves it, against the books as they stand then. Companies that track items adjust item by item instead, on Products & Services. A count that agrees with the books cannot be posted.",
+        route: "/approvals",
+      },
+      {
+        kind: "changed",
+        title: "Purchases and Inventory counts these entries as count adjustments",
+        detail:
+          "An entry posted from a Stock Count appears in the Count adjustment column of the report, not under Bought net of returns.",
+        route: "/reports/purchases-inventory",
+      },
+    ],
+  },
+  {
     version: "1.95",
     date: "2026-10-09",
     headline:

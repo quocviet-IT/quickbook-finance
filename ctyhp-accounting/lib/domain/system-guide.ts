@@ -352,6 +352,44 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: "count-stock",
+    title: "Count stock",
+    purpose: "Count what is on the shelves and correct the inventory on the books to it.",
+    route: "/inventory/stock-count",
+    steps: [
+      {
+        action: "Start a count",
+        control: "New count",
+        route: "/inventory/stock-count",
+        note:
+          "Dated today, with the previous count’s lines copied in. If a count is still open, it opens that one instead.",
+      },
+      {
+        action: "Put the counted lines in",
+        control: "Paste a count sheet",
+        note:
+          "One line each: name, quantity, cost, and Sells for if you like. Press Read it to add them; a line that cannot " +
+          "be read stays in the box with its line number. Add a line types one in by hand.",
+      },
+      {
+        action: "Keep the count",
+        control: "Save draft",
+        note:
+          "Nothing reaches the books. Counted at cost, On the books and Difference show the result; change the As of " +
+          "date and On the books is read again for it.",
+      },
+      {
+        action: "Correct the books to the count",
+        control: "Adjust inventory by …",
+        note:
+          "Needs permission to adjust inventory, and a saved count with a difference. Choose the Inventory account and " +
+          "the Offset account (a cost-of-sales account), check the entry shown, then press Post the adjustment. Above the " +
+          "inventory-adjustment approval limit it is Sent for approval and posts when a second person approves it on " +
+          "Approvals. Companies that track items adjust item by item instead.",
+      },
+    ],
+  },
+  {
     id: "banking",
     title: "Match the bank and reconcile",
     purpose:
