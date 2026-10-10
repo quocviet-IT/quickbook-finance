@@ -62,8 +62,6 @@ export default function PostCountDialog({
       const res = await postStockCountAction({ id: countId, inventoryAccountId: inventoryId, offsetAccountId: offsetId });
       if (res.ok && res.data) {
         setOutcome(res.data);
-        // The page behind reads the count again and turns read-only.
-        router.refresh();
       } else {
         setError(res.error ?? "The count could not be posted");
       }
@@ -74,12 +72,19 @@ export default function PostCountDialog({
     }
   }
 
-  const accountOptions = (list: { id: string; code: string; name: string }[]) =>
+  function closeOutcome() {
+    // The page behind reads the count again and turns read-only.
+    // That swaps this dialog out, so it waits until the dialog is closed.
+    router.refresh();
+    onClose();
+  }
+
+  const accountOptions = (list:{ id: string; code: string; name: string }[]) =>
     list.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }));
 
   if (outcome) {
     return (
-      <Modal title="Stock count" open={open} onCancel={onClose} footer={<Button type="primary" onClick={onClose}>Close</Button>}>
+      <Modal title="Stock count" open={open} onCancel={closeOutcome} footer={<Button type="primary" onClick={closeOutcome}>Close</Button>}>
         <div className={styles.outcome}>
           {outcome.kind === "posted" ? (
             <Alert

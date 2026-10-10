@@ -33,6 +33,7 @@ import {
   parseCountSheet,
   pasteProblemText,
   pasteSummary,
+  settleSavedRows,
   signedAmountText,
   stockCountSheet,
   stockCountStatusLabel,
@@ -181,6 +182,7 @@ function DraftCount({ count, lines, liveBookMinor, posting, currencyCode, decima
   }
 
   async function save() {
+    const sentRows = rows;
     const draft = {
       asOf,
       memo: memo.trim() === "" ? null : memo.trim(),
@@ -201,7 +203,7 @@ function DraftCount({ count, lines, liveBookMinor, posting, currencyCode, decima
       const res = await saveStockCountAction({ id: count.id, ...draft });
       if (res.ok) {
         setSaved({ asOf: draft.asOf, memo: draft.memo, lines: draft.lines });
-        setRows((all) => all.map((r, i) => ({ ...r, name: draft.lines[i].name, sku: draft.lines[i].sku })));
+        setRows((all) => settleSavedRows(all, sentRows, draft.lines));
         message.success("Draft saved");
       } else {
         setSaveError(res.error ?? "The draft could not be saved");

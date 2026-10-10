@@ -5,6 +5,7 @@ import {
   isDirty,
   lineValueMinor,
   parseCountSheet,
+  settleSavedRows,
   stockCountErrorMessage,
   stockCountSheet,
   stockCountStatusLabel,
@@ -315,5 +316,34 @@ describe("stockCountErrorMessage", () => {
       "You do not have permission to change stock counts",
     );
     expect(stockCountErrorMessage("Line 3: a name is required")).toBe("Line 3: a name is required");
+  });
+});
+
+describe("settleSavedRows", () => {
+  const row = (key: string, name: string, sku: string | null = null) => ({ key, name, sku });
+  const trimmed = (rows: { name: string; sku: string | null }[]) =>
+    rows.map((r) => ({ name: r.name.trim(), sku: r.sku?.trim() ? r.sku.trim() : null }));
+
+  it("gives rows unchanged since the save their trimmed values", () => {
+    const sent = [row("a", "  Bolt ", " B-1 "), row("b", "Nut ", "  ")];
+    expect(settleSavedRows(sent, sent, trimmed(sent))).toEqual([row("a", "Bolt", "B-1"), row("b", "Nut", null)]);
+  });
+
+  it("keeps a row added during the save as it is, without throwing", () => {
+    const sent = [row("a", " Bolt ")];
+    const current = [...sent, row("c", " New ")];
+    expect(settleSavedRows(current, sent, trimmed(sent))).toEqual([row("a", "Bolt"), row("c", " New ")]);
+  });
+
+  it("does not shift values onto other rows when a row was deleted during the save", () => {
+    const sent = [row("a", " Bolt "), row("b", " Nut "), row("c", " Screw ")];
+    const current = [sent[1], sent[2]];
+    expect(settleSavedRows(current, sent, trimmed(sent))).toEqual([row("b", "Nut"), row("c", "Screw")]);
+  });
+
+  it("keeps what the user typed into a row during the save", () => {
+    const sent = [row("a", " Bolt "), row("b", " Nut ")];
+    const current = [row("a", " Bolt and washer"), sent[1]];
+    expect(settleSavedRows(current, sent, trimmed(sent))).toEqual([row("a", " Bolt and washer"), row("b", "Nut")]);
   });
 });

@@ -461,6 +461,24 @@ export function appendCountLines<T extends StockCountLineInput>(current: readonl
   return [...current, ...added];
 }
 
+/** After a save, rows still exactly as they were sent take the trimmed name and SKU; every other row is left as the user has it. */
+export function settleSavedRows<T extends { key: string; name: string; sku: string | null }>(
+  current: readonly T[],
+  sent: readonly T[],
+  saved: readonly { name: string; sku: string | null }[],
+): T[] {
+  const settled = new Map<string, { sent: T; saved: { name: string; sku: string | null } }>();
+  sent.forEach((row, i) => {
+    const values = saved[i];
+    if (values) settled.set(row.key, { sent: row, saved: values });
+  });
+  return current.map((row) => {
+    const hit = settled.get(row.key);
+    if (!hit || row.name !== hit.sent.name || row.sku !== hit.sent.sku) return row;
+    return { ...row, name: hit.saved.name, sku: hit.saved.sku };
+  });
+}
+
 export interface AdjustButtonInput {
   /** Holds inventory.adjust in this company. */
   canAdjust: boolean;
