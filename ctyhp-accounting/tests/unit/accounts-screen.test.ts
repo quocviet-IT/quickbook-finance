@@ -11,6 +11,7 @@ import {
   accountsInView,
   chartFigureSpoken,
   chartFigureText,
+  chartLedeWithoutBalances,
   chartListing,
   chartViewHref,
   chartViewOf,
@@ -139,6 +140,14 @@ describe("the view in the address", () => {
     expect(chartViewHref("setup")).toBe("/accounts?view=setup");
     expect(chartViewHref("balances")).toBe("/accounts");
     expect(chartViewOf(new URL(chartViewHref("setup"), "https://example.test").searchParams.get("view"))).toBe("setup");
+  });
+});
+
+describe("the lede without balances", () => {
+  it("counts the accounts and says nothing about their figures", () => {
+    expect(chartLedeWithoutBalances(45)).toBe("45 accounts.");
+    expect(chartLedeWithoutBalances(1)).toBe("1 account.");
+    expect(chartLedeWithoutBalances(0)).toBe("0 accounts.");
   });
 });
 

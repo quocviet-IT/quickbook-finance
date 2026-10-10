@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   App,
   Button,
   DatePicker,
@@ -17,6 +18,7 @@ import {
 } from "antd";
 import { CheckOutlined, EditOutlined, PlusOutlined, SearchOutlined, StopOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ZoomSheet from "@/components/reports/ZoomSheet";
 import DataTable from "@/components/ui/DataTable";
@@ -47,8 +49,10 @@ import {
 import {
   chartFigureSpoken,
   chartFigureText,
+  chartLedeWithoutBalances,
   chartListing,
   chartViewHref,
+  chartViewOf,
   fiscalStartMonthOf,
   isRetired,
   openAccountLabel,
@@ -157,7 +161,7 @@ export default function AccountsClient({
   currencies,
   taxCodes,
   canWrite,
-  initialView,
+  initialAsOf,
   initialBalances,
   baseCurrency,
   baseDecimals,
@@ -166,9 +170,10 @@ export default function AccountsClient({
   currencies: CurrencyRow[];
   taxCodes: TaxCodeRow[];
   canWrite: boolean;
-  initialView: ChartView;
-  /** Read on the server at the company's today. */
-  initialBalances: ChartBalances;
+  /** The company's today: the As of date until balances are read. */
+  initialAsOf: string;
+  /** Read on the server at the company's today; null when that read failed. */
+  initialBalances: ChartBalances | null;
   baseCurrency: string;
   baseDecimals: number;
 }) {
@@ -180,31 +185,28 @@ export default function AccountsClient({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [view, setView] = useState<ChartView>(initialView);
-  // A link or the back button can change the view under a mounted page; follow it.
-  const [viewFromServer, setViewFromServer] = useState<ChartView>(initialView);
-  if (viewFromServer !== initialView) {
-    setViewFromServer(initialView);
-    setView(initialView);
-  }
+  // The address is the one source of truth, so a link, the back button and the
+  // switch itself all agree on the view.
+  const view = chartViewOf(useSearchParams().get("view"));
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ChartFilter>("all");
   const [cashFlowFilter, setCashFlowFilter] = useState<CashFlowRole | "all">("all");
 
-  const [balances, setBalances] = useState<ChartBalances>(initialBalances);
+  const [balances, setBalances] = useState<ChartBalances | null>(initialBalances);
+  const asOf = balances?.asOf ?? initialAsOf;
   /** The date asked for while its figures are on their way; null when the figures shown are for the date shown. */
   const [requestedAsOf, setRequestedAsOf] = useState<string | null>(null);
   const latestRun = useRef(0);
   const [zoom, setZoom] = useState<ZoomSpec | null>(null);
 
   const money = useCallback((minor: number) => formatMoney(minor, baseCurrency, baseDecimals), [baseCurrency, baseDecimals]);
-  const inventoryAccountIds = useMemo(() => new Set(balances.inventoryAccountIds), [balances.inventoryAccountIds]);
+  const inventoryAccountIds = useMemo(() => new Set(balances?.inventoryAccountIds ?? []), [balances?.inventoryAccountIds]);
 
   const listing = useMemo(
     () =>
       chartListing(accounts, {
-        figures: balances.figures,
+        figures: balances?.figures ?? {},
         inventoryAccountIds,
         view,
         search,
@@ -212,7 +214,7 @@ export default function AccountsClient({
         // How a reader finds every unclassified account: the one question the cash flow column is asked.
         keep: view === "setup" && cashFlowFilter !== "all" ? (a) => a.cash_flow_role === cashFlowFilter : undefined,
       }),
-    [accounts, balances.figures, inventoryAccountIds, view, search, filter, cashFlowFilter],
+    [accounts, balances?.figures, inventoryAccountIds, view, search, filter, cashFlowFilter],
   );
 
   const labelById = useMemo(
@@ -237,17 +239,19 @@ export default function AccountsClient({
   const detailOptions = watchedType ? detailTypeOptions(watchedType) : [];
 
   function changeView(next: ChartView) {
-    setView(next);
     // In the address, so a reload or a link opens the same view. Written with
-    // history.replaceState as lib/client/use-table-url-state.ts does: the rows
-    // are already here, and router.replace would re-read every balance.
-    window.history.replaceState(window.history.state, "", chartViewHref(next));
+    // history.replaceState, as lib/client/use-table-url-state.ts does: the rows
+    // are already here, and router.replace would re-read every balance. Unlike
+    // there, null is passed and not window.history.state: Next.js then updates
+    // useSearchParams, which is where the view is read, and that is wanted here
+    // (use-table-url-state wants no re-render). No server request is made.
+    window.history.replaceState(null, "", chartViewHref(next));
   }
 
   async function changeAsOf(date: dayjs.Dayjs | null) {
     if (!date) return;
     const next = date.format("YYYY-MM-DD");
-    if (next === (requestedAsOf ?? balances.asOf)) return;
+    if (next === (requestedAsOf ?? asOf)) return;
     const run = ++latestRun.current;
     setRequestedAsOf(next);
     try {
@@ -265,6 +269,8 @@ export default function AccountsClient({
 
   /** QuickZoom on the account's figure, over the same dates the figure covers, so the list adds up to it. */
   function openAccount(account: AccountRow) {
+    // No figure to open while the balances are unavailable.
+    if (!balances) return;
     const figure = balances.figures[account.id] ?? 0;
     const range = chartRange(statementOf(account.account_type), balances.asOf, fiscalStartMonthOf(balances.fiscalYearStart));
     setZoom(chartZoomSpec(account, range, figure));
@@ -329,11 +335,12 @@ export default function AccountsClient({
 
   const loading = requestedAsOf !== null;
   const balancesView = view === "balances";
+  const balancesUnavailable = balances === null;
 
   const groupHeading = (row: Extract<ListRow, { kind: "group" }>) => (
     <div className={styles.groupHead}>
       <span className={styles.groupTitle}>{row.title}</span>
-      {balancesView && row.statement === "profit_and_loss" ? (
+      {balancesView && balances && row.statement === "profit_and_loss" ? (
         <span className={styles.groupRange}>{groupRangeLabel(balances.fiscalYearStart)}</span>
       ) : null}
       <span className={styles.groupCount}>
@@ -364,6 +371,7 @@ export default function AccountsClient({
             type="button"
             className={styles.nameLink}
             onClick={() => openAccount(account)}
+            disabled={balancesView && balancesUnavailable}
             aria-label={openAccountLabel(account)}
             title={account.name}
           >
@@ -380,6 +388,7 @@ export default function AccountsClient({
   };
 
   const balanceCell = (account: AccountRow) => {
+    if (!balances) return <span className={styles.zero}>—</span>;
     const figure = balances.figures[account.id] ?? 0;
     if (figure === 0) return <span className={styles.zero}>{money(0)}</span>;
     return (
@@ -431,7 +440,7 @@ export default function AccountsClient({
       title: (
         <span className={styles.balanceHead}>
           <span>Balance</span>
-          <span>{shortDate(balances.asOf)}</span>
+          <span>{shortDate(asOf)}</span>
         </span>
       ),
       key: "balance",
@@ -507,7 +516,7 @@ export default function AccountsClient({
     <div ref={rootRef} className={styles.root}>
       <PageHeader
         title="Chart of Accounts"
-        description={chartLede(listing.total, listing.withBalance, balances.asOf)}
+        description={balances ? chartLede(listing.total, listing.withBalance, balances.asOf) : chartLedeWithoutBalances(listing.total)}
         actions={
           <Segmented<ChartView>
             aria-label="View"
@@ -564,7 +573,7 @@ export default function AccountsClient({
               As of
               <DatePicker
                 aria-label="As of"
-                value={dayjs(requestedAsOf ?? balances.asOf)}
+                value={dayjs(requestedAsOf ?? asOf)}
                 allowClear={false}
                 onChange={(d) => void changeAsOf(d)}
               />
@@ -592,6 +601,14 @@ export default function AccountsClient({
           />
         )}
       </FilterBar>
+
+      {balancesView && balancesUnavailable ? (
+        <Alert
+          type="warning"
+          showIcon
+          title="Balances could not be read. Change the As of date or reload the page to try again."
+        />
+      ) : null}
 
       <div className={`${styles.list}${loading ? ` ${styles.busy}` : ""}`} aria-busy={loading}>
         <DataTable<ListRow>

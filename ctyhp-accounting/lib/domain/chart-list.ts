@@ -26,6 +26,11 @@ export function chartViewOf(param: string | string[] | null | undefined): ChartV
   return value === "setup" ? "setup" : "balances";
 }
 
+/** The lede while the balances cannot be read: how many accounts, and nothing about their figures. */
+export function chartLedeWithoutBalances(total: number): string {
+  return `${total} ${total === 1 ? "account" : "accounts"}.`;
+}
+
 /** The address of a view. Balances is the default, so it carries no parameter. */
 export function chartViewHref(view: ChartView): string {
   return view === "setup" ? "/accounts?view=setup" : "/accounts";

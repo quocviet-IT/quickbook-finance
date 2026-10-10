@@ -290,6 +290,16 @@
   text-decoration-color: currentColor;
 }
 
+/* Balances unavailable: there is nothing to open, so the name reads as plain text. */
+.nameLink:disabled {
+  cursor: default;
+}
+
+.nameLink:disabled:hover {
+  color: var(--ob-text-body);
+  text-decoration-color: transparent;
+}
+
 .nameLink:focus-visible,
 .figure:focus-visible {
   outline: 2px solid var(--ob-intent-primary);
