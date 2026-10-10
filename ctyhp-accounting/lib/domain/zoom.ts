@@ -97,10 +97,11 @@ export function buildZoom(input: BuildZoomInput): ZoomResult {
   const sorted = [...input.lines].sort(
     (a, b) => a.entryDate.localeCompare(b.entryDate) || a.entryNumber.localeCompare(b.entryNumber) || a.lineId.localeCompare(b.lineId),
   );
-  const opening = single && spec.from !== null && input.openingRaw !== null ? input.openingRaw * sign : null;
+  const opening = single && spec.from !== null && input.openingRaw !== null ? input.openingRaw * sign + 0 : null;
   let balance = opening ?? 0;
   const rows = sorted.map((l): ZoomRow => {
-    const amount = (l.debitBase - l.creditBase) * sign;
+    // `+ 0` turns -0 into 0, so a zero never reads as "-$0.00".
+    const amount = (l.debitBase - l.creditBase) * sign + 0;
     balance += amount;
     return {
       key: l.lineId,
@@ -114,7 +115,7 @@ export function buildZoom(input: BuildZoomInput): ZoomResult {
       balance: single ? balance : null,
     };
   });
-  const total = rows.reduce((sum, r) => sum + r.amount, 0);
+  const total = rows.reduce((sum, r) => sum + r.amount, 0) + 0;
   return { spec, single, opening, rows, total, matches: total === spec.figure };
 }
 

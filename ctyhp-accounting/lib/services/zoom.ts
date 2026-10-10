@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountType } from "@/lib/domain/accounts";
 import { entryDisplayName } from "@/lib/domain/entry-detail";
+import { fiscalYearStartFor, statementOf } from "@/lib/domain/chart-groups";
 import { dayBefore } from "@/lib/domain/fiscal";
 import type { ZoomSpec } from "@/lib/domain/statement";
 import { buildZoom, type ZoomAccount, type ZoomResult } from "@/lib/domain/zoom";
+import { getCurrentCompanySettings } from "@/lib/services/company";
 import { readAllPages, type PageResult } from "@/lib/services/paging";
 import { getLedgerBalances, getTransactionList } from "@/lib/services/reports";
 
@@ -61,12 +63,27 @@ async function readLines(sb: SupabaseClient, spec: ZoomSpec): Promise<LineRow[]>
   return rows;
 }
 
+/**
+ * The account's balances the day before `from`. A balance sheet account carries
+ * everything since the start of the books. A profit and loss account is closed
+ * out each fiscal year, so it carries only the fiscal year's activity before
+ * `from`, and nothing at all when `from` is the year's first day.
+ */
+async function readBefore(sb: SupabaseClient, chart: ChartRow[], accountId: string, from: string) {
+  const account = chart.find((a) => a.id === accountId);
+  if (!account || statementOf(account.account_type) !== "profit_and_loss") return getLedgerBalances(sb, null, dayBefore(from));
+  const settings = await getCurrentCompanySettings(sb);
+  const fyStart = fiscalYearStartFor(from, settings?.fiscal_year_start_month ?? 1);
+  return from <= fyStart ? [] : getLedgerBalances(sb, fyStart, dayBefore(from));
+}
+
 export async function getZoom(sb: SupabaseClient, spec: ZoomSpec): Promise<ZoomResult> {
   const single = spec.accountIds.length === 1;
+  const chartRead = readChart(sb);
   const [chart, lines, before] = await Promise.all([
-    readChart(sb),
+    chartRead,
     readLines(sb, spec),
-    single && spec.from ? getLedgerBalances(sb, null, dayBefore(spec.from)) : Promise.resolve(null),
+    single && spec.from ? chartRead.then((rows) => readBefore(sb, rows, spec.accountIds[0], spec.from as string)) : Promise.resolve(null),
   ]);
   // Names and the other side of each entry, read only over the dates the lines span.
   const earliest = lines

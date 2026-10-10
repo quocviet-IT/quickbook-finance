@@ -575,6 +575,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note: "Total debits must equal total credits. They always do, or the post was rejected.",
       },
       {
+        action: "Read every account’s balance at the month end, and open any that looks wrong",
+        control: "Chart of Accounts",
+        route: "/accounts",
+        note:
+          "Balances, the default view, shows each account at the As of date: set it to the last day of the month. " +
+          "Balance sheet accounts show what they hold on that date; income and expense accounts show the year to date. " +
+          "A figure in parentheses is the wrong way round for its account. Click a name or a balance to list the entries " +
+          "behind it with a running balance, then click an entry to see both sides. Setup, beside Balances, is where an " +
+          "account is edited or deactivated.",
+      },
+      {
         action: "Close the period",
         control: "Close period",
         route: "/settings/periods",
@@ -818,7 +829,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "it. Put the code in the file: either \"1000\" on its own, or \"1000 - Cash on Hand\" " +
           "with the spaced hyphen; \"1000 Cash on Hand\" without the hyphen is not a form the " +
           "chart recognises. Or, when the file is somebody else's export and cannot be edited, " +
-          "set the account you do not use to Inactive under Chart of accounts — one live account " +
+          "set the account you do not use to Inactive in Chart of Accounts, under Setup — one live account " +
           "of that name is no longer a question.",
       },
       {

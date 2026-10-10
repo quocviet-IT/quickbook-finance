@@ -145,7 +145,9 @@ export default function ZoomSheet({
             emptyDescription="Nothing was posted to these accounts in these dates."
           />
           <div className={styles.zoomTotal}>
-            <span>{result.rows.length.toLocaleString("en-US")} lines</span>
+            <span>
+              {result.rows.length.toLocaleString("en-US")} {result.rows.length === 1 ? "line" : "lines"}
+            </span>
             <strong>Total {money(result.total)}</strong>
           </div>
         </>

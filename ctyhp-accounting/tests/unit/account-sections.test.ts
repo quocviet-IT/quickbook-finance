@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AccountType } from "@/lib/domain/accounts";
 import {
   ACCOUNT_SECTIONS,
+  accountGroups,
   accountSections,
   compareCodes,
   parentChoices,
@@ -134,6 +135,43 @@ describe("the parents an account may have", () => {
 
   it("are every other account until a type is chosen", () => {
     expect(parentChoices(chart, undefined, "ap").map((a) => a.id)).toEqual(["inv", "jewel"]);
+  });
+});
+
+describe("accountGroups", () => {
+  const groups = [
+    { key: "big", title: "Big" },
+    { key: "small", title: "Small" },
+    { key: "none", title: "Empty" },
+  ] as const;
+  const byCode = (a: SectionAccount) => (Number(a.account_code) >= 2000 ? "small" : "big");
+
+  it("groups by any function, in the order given, dropping empty groups", () => {
+    const out = accountGroups(
+      [acc("b", "2100", "expense"), acc("a", "1000", "bank"), acc("c", "1500", "bank")],
+      groups,
+      (a) => byCode(a) as "big" | "small" | "none",
+    );
+    expect(out.map((g) => g.key)).toEqual(["big", "small"]);
+    expect(out[0].rows.map((r) => r.account.id)).toEqual(["a", "c"]);
+    expect(out[1].rows.map((r) => r.account.id)).toEqual(["b"]);
+  });
+
+  it("nests a sub-account only under a parent in the same group", () => {
+    const out = accountGroups(
+      [
+        acc("p", "1000", "bank"),
+        acc("same", "1010", "bank", "p"),
+        acc("other", "2010", "bank", "p"),
+      ],
+      groups,
+      (a) => byCode(a) as "big" | "small" | "none",
+    );
+    expect(out[0].rows.map((r) => [r.account.id, r.depth])).toEqual([
+      ["p", 0],
+      ["same", 1],
+    ]);
+    expect(out[1].rows.map((r) => [r.account.id, r.depth])).toEqual([["other", 0]]);
   });
 });
 
