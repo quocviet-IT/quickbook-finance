@@ -347,6 +347,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     group: "inventory-tax",
   },
   {
+    id: "stock-count",
+    title: "Stock Count",
+    description: "What stock is on hand and what it is carried at.",
+    href: "/inventory/stock-count",
+    group: "inventory-tax",
+  },
+  {
     id: "sales-tax-liability",
     title: "Sales Tax Liability",
     description: "Sales tax charged and paid, period by period.",

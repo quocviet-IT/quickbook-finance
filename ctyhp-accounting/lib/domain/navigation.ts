@@ -81,6 +81,7 @@ export const NAV: NavItem[] = [
     label: "Inventory & Assets",
     children: [
       { key: "/inventory", label: "Overview" },
+      { key: "/inventory/stock-count", label: "Stock Count" },
       { key: "/fixed-assets", label: "Fixed Assets" },
     ],
   },

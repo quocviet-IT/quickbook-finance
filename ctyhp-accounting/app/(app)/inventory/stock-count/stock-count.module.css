@@ -1,0 +1,196 @@
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+}
+
+.memo {
+  flex: 1 1 280px;
+  min-width: 200px;
+}
+
+.adjust {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 16px 0;
+}
+
+.reason {
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+}
+
+.notice {
+  margin-bottom: 12px;
+}
+
+.problems {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+/* One row of the editable table: the name and SKU share a cell. */
+.nameCell {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nameCell > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sku {
+  flex: 0 0 96px;
+  width: 96px;
+}
+
+.sku,
+.nameCell input {
+  font-size: 12px;
+}
+
+/* A compact amount: right-aligned, no spinner, the cell's whole width. */
+.amount {
+  width: 100%;
+}
+
+.amount :global(.ant-input-number-input) {
+  text-align: right;
+  padding-inline: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.value {
+  display: block;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.paste {
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: var(--ob-surface-subtle);
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+}
+
+.pasteTitle {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.hint {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--ob-text-secondary);
+  line-height: 1.55;
+}
+
+.pasteActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--ob-surface-subtle);
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+}
+
+.figure {
+  display: grid;
+  gap: 2px;
+}
+
+.figureLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ob-text-secondary);
+}
+
+.figureValue {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-heading);
+}
+
+.shortage {
+  color: var(--ob-money-negative);
+}
+
+.selects {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.selectLabel {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.preview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview th {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ob-text-secondary);
+  text-align: left;
+  padding: 0 8px 6px 0;
+  border-bottom: 1px solid var(--ob-border-muted);
+}
+
+.preview td {
+  padding: 6px 8px 6px 0;
+  border-bottom: 1px solid var(--ob-border-muted);
+  color: var(--ob-text-body);
+}
+
+.preview .num {
+  text-align: right;
+  padding-right: 0;
+}
+
+.outcome {
+  display: grid;
+  gap: 8px;
+}
+
+.lockedBar {
+  margin-bottom: 16px;
+}

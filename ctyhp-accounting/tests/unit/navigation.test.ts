@@ -131,6 +131,7 @@ describe("NAV tree", () => {
     ]);
     expect(isNavGroup(inventory!) ? inventory.children.map((item) => item.key) : []).toEqual([
       "/inventory",
+      "/inventory/stock-count",
       "/fixed-assets",
     ]);
   });
@@ -201,6 +202,12 @@ describe("findActivePage", () => {
 
   it("prefers the longest matching route", () => {
     expect(findActivePage("/banking/reconcile/abc")?.key).toBe("/banking/reconcile");
+  });
+
+  it("opens Stock Count under Inventory & Assets, not under the Inventory overview", () => {
+    expect(findActivePage("/inventory/stock-count")?.key).toBe("/inventory/stock-count");
+    expect(findActivePage("/inventory/stock-count/abc")?.key).toBe("/inventory/stock-count");
+    expect(findActivePage("/inventory")?.key).toBe("/inventory");
   });
 
   it("matches every detailed report to the Report Center entry", () => {

@@ -56,6 +56,7 @@ const REPORT_ICONS: Record<string, ReactNode> = {
   "journal-report": <FileTextOutlined />,
   "saved-reports": <InboxOutlined />,
   "inventory-valuation": <ShopOutlined />,
+  "stock-count": <InboxOutlined />,
   "sales-tax": <PercentageOutlined />,
   "open-invoices": <FileTextOutlined />,
   "customer-balances": <TeamOutlined />,
