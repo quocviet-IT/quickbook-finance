@@ -5,6 +5,8 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite, getUserRole } from "@/lib/auth";
 import {
   AGREES_MESSAGE,
+  BOOKS_CHANGED_MESSAGE,
+  CHOOSE_ACCOUNTS_MESSAGE,
   countDifferenceMinor,
   countedTotalMinor,
   stockCountErrorMessage,
@@ -114,6 +116,8 @@ const postSchema = z.object({
   id: z.uuid(),
   inventoryAccountId: z.uuid("Choose the inventory account"),
   offsetAccountId: z.uuid("Choose the offset account"),
+  /** The difference the user confirmed on screen; the post is refused if the books no longer give it. */
+  expectedDifferenceMinor: z.number().int(),
 });
 
 /**
@@ -130,12 +134,19 @@ export async function postStockCountAction(raw: unknown): Promise<ActionResult<P
   if (!canWrite(await getUserRole())) return { ok: false, error: NO_PERMISSION };
   const parsed = postSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  const { id, inventoryAccountId, offsetAccountId } = parsed.data;
+  const { id, inventoryAccountId, offsetAccountId, expectedDifferenceMinor } = parsed.data;
   try {
     const sb = await createSupabaseServerClient();
     const context = await getPostingContext(sb);
     if (!context.canAdjust) return { ok: false, error: NO_PERMISSION };
     if (context.tracksItems) return { ok: false, error: TRACKS_ITEMS_MESSAGE };
+    if (
+      inventoryAccountId === offsetAccountId ||
+      !context.inventoryAccounts.some((a) => a.id === inventoryAccountId) ||
+      !context.offsetAccounts.some((a) => a.id === offsetAccountId)
+    ) {
+      return { ok: false, error: CHOOSE_ACCOUNTS_MESSAGE };
+    }
     const found = await getStockCount(sb, id);
     if (!found) return { ok: false, error: "Stock count not found" };
     if (found.count.status !== "draft") {
@@ -147,6 +158,7 @@ export async function postStockCountAction(raw: unknown): Promise<ActionResult<P
     );
     const difference = countDifferenceMinor(counted, await getBookValue(sb, found.count.as_of));
     if (difference === 0) return { ok: false, error: AGREES_MESSAGE };
+    if (difference !== expectedDifferenceMinor) return { ok: false, error: BOOKS_CHANGED_MESSAGE };
 
     const outcome = await executeOrSubmitForApproval({
       sb,

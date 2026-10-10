@@ -35,13 +35,18 @@ vi.mock("@/lib/services/stock-count", () => ({
 
 import { bookValueAction, createStockCountAction, postStockCountAction, saveStockCountAction } from "@/app/(app)/inventory/stock-count/actions";
 
-import { TRACKS_ITEMS_MESSAGE } from "@/lib/domain/stock-count";
+import { BOOKS_CHANGED_MESSAGE, CHOOSE_ACCOUNTS_MESSAGE, TRACKS_ITEMS_MESSAGE } from "@/lib/domain/stock-count";
 
 const sb = { name: "company client" };
 const ID = "6f1f5f6a-0000-4000-8000-000000000001";
 const INV = "6f1f5f6a-0000-4000-8000-000000000002";
 const ADJ = "6f1f5f6a-0000-4000-8000-000000000003";
-const post = { id: ID, inventoryAccountId: INV, offsetAccountId: ADJ };
+// Counted 2,500 at cost against 1,000 on the books: the figure the user confirmed.
+const post = { id: ID, inventoryAccountId: INV, offsetAccountId: ADJ, expectedDifferenceMinor: 1_500 };
+const accounts = {
+  inventoryAccounts: [{ id: INV, code: "1300", name: "Inventory" }],
+  offsetAccounts: [{ id: ADJ, code: "5000", name: "Cost of Goods Sold" }],
+};
 
 function draftCount(lines = [{ quantity: 10, unit_cost_minor: 250 }]) {
   return {
@@ -56,7 +61,7 @@ beforeEach(() => {
   mocks.getUserRole.mockResolvedValue("accountant");
   mocks.getStockCount.mockResolvedValue(draftCount());
   mocks.getBookValue.mockResolvedValue(1_000);
-  mocks.getPostingContext.mockResolvedValue({ canAdjust: true, tracksItems: false });
+  mocks.getPostingContext.mockResolvedValue({ canAdjust: true, tracksItems: false, ...accounts });
 });
 
 describe("postStockCountAction", () => {
@@ -73,15 +78,43 @@ describe("postStockCountAction", () => {
       amountMinor: 1_500, // counted 2,500 less the books 1,000
       payload: { stock_count_id: ID, inventory_account_id: INV, offset_account_id: ADJ },
     });
-    expect(mocks.postStockCount).toHaveBeenCalledWith(sb, post);
+    expect(mocks.postStockCount).toHaveBeenCalledWith(sb, { id: ID, inventoryAccountId: INV, offsetAccountId: ADJ });
     expect(mocks.markPending).not.toHaveBeenCalled();
   });
 
   it("uses the size of a shortfall, not its sign", async () => {
     mocks.getBookValue.mockResolvedValue(10_000);
     mocks.executeOrSubmit.mockResolvedValue({ status: "executed", result: "je1" });
-    await postStockCountAction(post);
+    await postStockCountAction({ ...post, expectedDifferenceMinor: -7_500 });
     expect(mocks.executeOrSubmit.mock.calls[0][0].amountMinor).toBe(7_500);
+  });
+
+  it("refuses when the books moved since the figure was confirmed, and submits nothing", async () => {
+    mocks.getBookValue.mockResolvedValue(1_200); // the user saw a difference of 1,500; it is now 1,300
+    const r = await postStockCountAction(post);
+    expect(r).toEqual({ ok: false, error: BOOKS_CHANGED_MESSAGE });
+    expect(mocks.executeOrSubmit).not.toHaveBeenCalled();
+    expect(mocks.markPending).not.toHaveBeenCalled();
+    expect(mocks.postStockCount).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an unknown inventory account", { inventoryAccountId: "6f1f5f6a-0000-4000-8000-000000000009" }],
+    ["an unknown offset account", { offsetAccountId: "6f1f5f6a-0000-4000-8000-000000000009" }],
+    ["the same account twice", { offsetAccountId: INV }],
+  ])("refuses %s, and submits nothing", async (_name, change) => {
+    if (_name === "the same account twice") {
+      mocks.getPostingContext.mockResolvedValue({
+        canAdjust: true,
+        tracksItems: false,
+        inventoryAccounts: accounts.inventoryAccounts,
+        offsetAccounts: [...accounts.offsetAccounts, ...accounts.inventoryAccounts],
+      });
+    }
+    const r = await postStockCountAction({ ...post, ...change });
+    expect(r).toEqual({ ok: false, error: CHOOSE_ACCOUNTS_MESSAGE });
+    expect(mocks.executeOrSubmit).not.toHaveBeenCalled();
+    expect(mocks.markPending).not.toHaveBeenCalled();
   });
 
   it("marks the count pending when the policy sends it for approval", async () => {

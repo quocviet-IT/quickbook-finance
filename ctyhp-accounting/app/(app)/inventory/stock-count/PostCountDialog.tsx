@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Modal, Select } from "antd";
-import { differenceTone, entryPreview, signedAmountText } from "@/lib/domain/stock-count";
+import { BOOKS_CHANGED_MESSAGE, differenceTone, entryPreview, signedAmountText } from "@/lib/domain/stock-count";
 import type { PostingContext } from "@/lib/services/stock-count";
 import { postStockCountAction, type PostStockCountOutcome } from "./actions";
 import styles from "./stock-count.module.css";
@@ -25,9 +25,12 @@ export default function PostCountDialog({
   differenceMinor,
   posting,
   money,
+  onBooksChanged,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Asked for when the books moved since the figures were read; the parent reads them again. */
+  onBooksChanged: () => void;
   countId: string;
   asOf: string;
   countedMinor: number;
@@ -59,10 +62,17 @@ export default function PostCountDialog({
     setBusy(true);
     setError(null);
     try {
-      const res = await postStockCountAction({ id: countId, inventoryAccountId: inventoryId, offsetAccountId: offsetId });
+      const res = await postStockCountAction({
+        id: countId,
+        inventoryAccountId: inventoryId,
+        offsetAccountId: offsetId,
+        expectedDifferenceMinor: differenceMinor,
+      });
       if (res.ok && res.data) {
         setOutcome(res.data);
       } else {
+        // The books moved: show the message and have the page re-read them, so the figures above catch up.
+        if (res.error === BOOKS_CHANGED_MESSAGE) onBooksChanged();
         setError(res.error ?? "The count could not be posted");
       }
     } catch {

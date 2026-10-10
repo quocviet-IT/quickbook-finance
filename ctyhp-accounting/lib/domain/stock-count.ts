@@ -415,6 +415,9 @@ export const CLOSED_PERIOD_MESSAGE =
 export const TRACKS_ITEMS_MESSAGE =
   "This company keeps stock item by item. Adjust items on the Products & Services page instead.";
 export const AGREES_MESSAGE = "The count agrees with the books.";
+export const BOOKS_CHANGED_MESSAGE =
+  "The books changed while this was open. The figures above are now up to date; check them, then post again.";
+export const CHOOSE_ACCOUNTS_MESSAGE = "Choose an inventory account and a different cost of sales account from the lists";
 
 /**
  * Turn what the database raised into a sentence for the screen. Messages that

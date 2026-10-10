@@ -155,6 +155,10 @@ function DraftCount({ count, lines, liveBookMinor, posting, currencyCode, decima
     if (!date) return;
     const next = date.format("YYYY-MM-DD");
     setAsOf(next);
+    await readBook(next);
+  }
+
+  async function readBook(next: string) {
     const run = ++latestBook.current;
     setBookBusy(true);
     try {
@@ -467,6 +471,7 @@ function DraftCount({ count, lines, liveBookMinor, posting, currencyCode, decima
           differenceMinor={difference}
           posting={posting}
           money={money}
+          onBooksChanged={() => void readBook(asOf)}
         />
       ) : null}
     </div>
