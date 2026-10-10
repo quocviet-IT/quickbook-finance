@@ -80,6 +80,34 @@ describe("buildZoom", () => {
     expect(z.matches).toBe(true);
   });
 
+  it("never shows a zero as negative: not the opening, a row, a balance or the total", () => {
+    const z = buildZoom({
+      ...args,
+      spec: spec({ figure: 0 }),
+      openingRaw: 0,
+      lines: [line({ lineId: "a", debitBase: 100, creditBase: 100 })],
+    });
+    expect(Object.is(z.opening, 0)).toBe(true);
+    expect(Object.is(z.rows[0].amount, 0)).toBe(true);
+    expect(Object.is(z.rows[0].balance, 0)).toBe(true);
+    expect(Object.is(z.total, 0)).toBe(true);
+    expect(z.matches).toBe(true);
+  });
+
+  it("ends a profit and loss account's balance at the figure when it opens at zero", () => {
+    const z = buildZoom({
+      ...args,
+      spec: spec({ from: "2026-01-01", to: "2026-12-31", figure: 1_300 }),
+      openingRaw: 0,
+      lines: [
+        line({ lineId: "a", entryDate: "2026-02-01", creditBase: 1_000 }),
+        line({ lineId: "b", entryId: "e2", entryNumber: "JE-000002", entryDate: "2026-03-01", creditBase: 300 }),
+      ],
+    });
+    expect(z.opening).toBe(0);
+    expect(z.rows.at(-1)?.balance).toBe(1_300);
+  });
+
   it("names the other side of one account's entry, or calls it a split", () => {
     const z = buildZoom({
       ...args,

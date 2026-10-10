@@ -94,7 +94,9 @@ describe("Chart of Accounts balances on every company's books", () => {
         const range = chartRange(statementSectionOf(a.account_type), c.today, c.fiscalStartMonth);
         const zoom = await getZoom(c.sb, chartZoomSpec(a, range, figure));
         checked += 1;
-        if (!zoom.matches) disagree += 1;
+        // The last running balance is the figure clicked, not only the rows' sum.
+        const last = zoom.rows.at(-1);
+        if (!zoom.matches || (last && last.balance !== figure)) disagree += 1;
       }
       console.log(`${c.name}: ${checked} drill-downs, ${disagree === 0 ? "all add up" : `${disagree} DO NOT add up`}`);
       expect(disagree, c.name).toBe(0);

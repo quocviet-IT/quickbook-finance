@@ -78,6 +78,13 @@ export const RELEASES: Release[] = [
         title: "The entries panel counts one line as “1 line”",
         detail: "Under the entries behind a figure, a single entry used to read “1 lines”.",
       },
+      {
+        kind: "fixed",
+        title: "The entries behind an income or expense figure start the year at zero",
+        detail:
+          "Opening the entries behind an income, cost of sales or expense figure used to start the running balance with everything the account had taken in earlier years. It now starts at zero at the beginning of the fiscal year, or at the year to date before a later start date, so the last balance is the figure you clicked. A zero opening no longer reads −$0.00.",
+        route: "/reports",
+      },
     ],
   },
   {
