@@ -1,38 +1,59 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { reconcileHref } from "@/lib/domain/statement-alerts";
+import { chosenBankId } from "@/lib/domain/reconcile-alerts-screen";
 import { createReconciliationAction, listReconciliationsAction } from "./actions";
+import StatementAlertsPanel from "./StatementAlertsPanel";
 import type { StatementReconciliationRow } from "@/lib/db/types";
 
 interface Bank {
   id: string;
   label: string;
+  /** The ledger account's name, which the statement alerts call the account by. */
+  name: string;
 }
 interface Props {
   canWrite: boolean;
   banks: Bank[];
+  baseCurrency: string;
   baseDecimals: number;
 }
 
-export default function ReconcileListClient({ canWrite, banks, baseDecimals }: Props) {
+export default function ReconcileListClient({ canWrite, banks, baseCurrency, baseDecimals }: Props) {
   const { message } = App.useApp();
   const router = useRouter();
-  const [bankId, setBankId] = useState<string | undefined>(banks[0]?.id);
+  // The chosen account lives in the address (?account=<bank id>), so the
+  // Exceptions report and the Balance Sheet can link straight to it. An id
+  // that is not one of these accounts falls back to the first.
+  const bankId = chosenBankId(banks, useSearchParams().get("account"));
+  const bank = banks.find((b) => b.id === bankId);
   const [rows, setRows] = useState<StatementReconciliationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
+  // Only the latest read may draw: switch accounts quickly and a slower,
+  // earlier answer would otherwise list another account's reconciliations.
+  const latestLoad = useRef(0);
 
   const load = async (id: string | undefined) => {
     if (!id) return;
+    const ticket = ++latestLoad.current;
     setLoading(true);
     const r = await listReconciliationsAction(id);
+    if (latestLoad.current !== ticket) return;
     setLoading(false);
     if (r.ok && r.data) setRows(r.data);
     else message.error(r.error ?? "Failed to load");
+  };
+
+  const choose = (id: string) => {
+    // history.replaceState, as Chart of Accounts does: Next.js carries it into
+    // useSearchParams, where the account is read, without a server request.
+    window.history.replaceState(null, "", reconcileHref(id));
   };
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -64,8 +85,9 @@ export default function ReconcileListClient({ canWrite, banks, baseDecimals }: P
       <Space wrap>
         <Select
           style={{ width: 320 }}
+          aria-label="Bank account"
           value={bankId}
-          onChange={setBankId}
+          onChange={choose}
           options={banks.map((b) => ({ value: b.id, label: b.label }))}
         />
         {canWrite && (
@@ -79,6 +101,16 @@ export default function ReconcileListClient({ canWrite, banks, baseDecimals }: P
           </Button>
         )}
       </Space>
+      {bank ? (
+        <StatementAlertsPanel
+          bankAccountId={bank.id}
+          accountName={bank.name}
+          canWrite={canWrite}
+          baseCurrency={baseCurrency}
+          baseDecimals={baseDecimals}
+          onRemoved={() => void load(bank.id)}
+        />
+      ) : null}
       <Table<StatementReconciliationRow>
         rowKey="id"
         loading={loading}

@@ -1,0 +1,229 @@
+/*
+ * The statement-alert cards on the Reconcile start screen: the prototype's
+ * amber .gh-card (p45), in OneBook's tokens so the dark theme follows.
+ *
+ * The padding, the accent and the icon's column are measured in
+ * alert-columns.ts, which is how the tables inside are proved to fit. Change
+ * one here and change it there.
+ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--ob-feedback-cautionBorder);
+  border-left: 4px solid var(--ob-intent-warning);
+  border-radius: 10px;
+  background: var(--ob-feedback-cautionBg);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--ob-feedback-cautionBorder);
+  background: var(--ob-surface-card);
+  color: var(--ob-intent-warning);
+  font-size: 16px;
+}
+
+/* Everything beside the icon. min-width: 0 lets a table inside shrink to its box. */
+.main {
+  min-width: 0;
+}
+
+.title {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.body {
+  margin: 6px 0 0;
+  max-width: 82ch;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ob-text-body);
+}
+
+.body strong {
+  font-weight: 650;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 14px;
+}
+
+/* The removal keeps to the right of the row, and wraps under it on a narrow screen. */
+.removal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Named under .removal so it outranks Ant Design's own `.ant-input { width: 100% }`. */
+.removal .reason {
+  flex: 0 1 320px;
+  width: 320px;
+  max-width: 100%;
+}
+
+.problem {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--ob-intent-danger);
+  text-align: right;
+}
+
+.refusal {
+  margin-top: 12px;
+}
+
+.workings {
+  margin-top: 14px;
+}
+
+.listHeading {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ob-text-strong);
+}
+
+.footnote {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ob-text-secondary);
+}
+
+.blockers {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--ob-feedback-cautionBorder);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.blockersHeading {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.blockers ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ob-text-body);
+}
+
+.blockerReason {
+  color: var(--ob-text-secondary);
+}
+
+/* A link that opens an entry beside the card rather than leaving the screen. */
+.entryLink {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ob-intent-primary);
+  cursor: pointer;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.entryLink:hover {
+  text-decoration: underline;
+}
+
+.entryLink:focus-visible {
+  outline: 2px solid var(--ob-accent-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+}
+
+.negative {
+  color: var(--ob-money-negative);
+  font-variant-numeric: tabular-nums;
+}
+
+.coded {
+  font-size: 12.5px;
+  color: var(--ob-text-strong);
+}
+
+.quiet {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ob-text-secondary);
+}
+
+.retry {
+  appearance: none;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ob-intent-primary);
+  cursor: pointer;
+}
+
+.retry:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .removal {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .problem {
+    text-align: left;
+  }
+
+  /* WORKINGS_MIN_WIDTH and OUTSTANDING_MIN_WIDTH in alert-columns.ts. */
+  .workings :global(.ant-table-content) > table {
+    min-width: 728px;
+  }
+
+  .outstanding :global(.ant-table-content) > table {
+    min-width: 636px;
+  }
+}
