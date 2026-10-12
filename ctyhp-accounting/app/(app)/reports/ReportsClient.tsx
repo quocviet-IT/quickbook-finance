@@ -301,6 +301,8 @@ export default function ReportsClient({
       // The Balance Sheet and the Trial Balance: columns are dates.
       const plan = pointColumns(compare, to, from, fiscalStartMonth);
       if (!plan.ok) return refuse(plan.message);
+      // The note belongs to the date it was read for: drop the old one before this run reads anything.
+      if (type === "balance") setBankNote(null);
       const balances = await Promise.all(plan.columns.map((c) => read(null, c.to)));
       if (type === "trial") {
         show(trialBalanceStatement({ columns: plan.columns, tbs: balances.map(buildTrialBalance), accounts: index }), null, null, { from, to });

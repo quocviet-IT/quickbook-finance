@@ -500,8 +500,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Click it, give a reason, and click Confirm — remove all N. The whole group goes or none of it. An entry " +
           "posted by hand or loaded from another program is reversed on its own date; an entry coded from Bank " +
-          "Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, and every entry " +
-          "carries the reason. Some entries cannot go from here, and the card lists them with what to do instead: " +
+          "Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, and the reason is " +
+          "recorded on each reversing entry and in the audit log. Some entries cannot go from here, and the card " +
+          "lists them with what to do instead: " +
           "one ticked on a completed reconciliation (reopen it first), one dated in a closed period (reopen the " +
           "period), one already reversed, or one that belongs to a document such as an invoice, bill or payment " +
           "(void the document). Needs the Post manual journals permission.",

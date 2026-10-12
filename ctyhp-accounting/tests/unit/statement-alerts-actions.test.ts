@@ -85,6 +85,12 @@ describe("statementAlertsAction", () => {
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
 
+  it("refuses a malformed account id without calling the service", async () => {
+    await expect(statementAlertsAction("not-an-id")).resolves.toEqual({ ok: false, error: "Choose a bank account" });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.getStatementAlerts).not.toHaveBeenCalled();
+  });
+
   it("does not ask for blockers when nothing is flagged", async () => {
     mocks.getStatementAlerts.mockResolvedValue({ ghosts: [], negative: null });
     const result = await statementAlertsAction(bank);

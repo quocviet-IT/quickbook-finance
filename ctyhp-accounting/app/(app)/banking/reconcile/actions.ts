@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import {
@@ -133,6 +134,7 @@ export interface StatementAlertsView {
 export async function statementAlertsAction(bankAccountId: string): Promise<ActionResult<StatementAlertsView>> {
   const role = await getUserRole();
   if (!role) return { ok: false, error: "Not authorized" };
+  if (!z.uuid().safeParse(bankAccountId).success) return { ok: false, error: "Choose a bank account" };
   try {
     const sb = await createSupabaseServerClient();
     const found = await getStatementAlerts(sb, bankAccountId);

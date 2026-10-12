@@ -57,7 +57,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Remove these entries, all or none",
         detail:
-          "Remove these N entries turns into Confirm — remove all N and asks for a reason. Each entry goes the OneBook way: one posted by hand or loaded from another program is reversed on its own date, and one coded from Bank Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, every entry carries the reason, and either the whole group goes or none of it. An entry ticked on a completed reconciliation, dated in a closed period, already reversed, or belonging to a document such as an invoice, bill or payment cannot be removed here: the card lists each one with what to do instead, such as voiding the document. Needs the Post manual journals permission.",
+          "Remove these N entries turns into Confirm — remove all N and asks for a reason. Each entry goes the OneBook way: one posted by hand or loaded from another program is reversed on its own date, and one coded from Bank Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, the reason is recorded on each reversing entry and in the audit log, and either the whole group goes or none of it. An entry ticked on a completed reconciliation, dated in a closed period, already reversed, or belonging to a document such as an invoice, bill or payment cannot be removed here: the card lists each one with what to do instead, such as voiding the document. Needs the Post manual journals permission.",
         route: "/banking/reconcile",
       },
       {
