@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "1.99",
+    date: "2026-10-12",
+    headline: "Every page arrives at a fraction of its former size: the styling it carried now comes from one file the browser keeps.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Pages load lighter",
+        detail:
+          "Each page used to carry 330 to 440 KB of styling for its buttons, tables, menus and forms, built again on the server for every request and sent inside the page. That styling now comes from one file the browser downloads once and keeps, so Invoices arrives at 265 KB instead of 649 KB, and Chart of Accounts at 163 KB instead of 580 KB. The first visit after this release downloads that file once. Screens look the same in light and dark.",
+      },
+      {
+        kind: "fixed",
+        title: "Two small spacing corrections",
+        detail:
+          "On Bank rules, the labels above Funding pairs post to and Pair within are the smaller caption size they were drawn with. On the Accounting overview, the notice about rules that cannot run yet no longer touches the message above it.",
+        route: "/banking/rules",
+      },
+    ],
+  },
+  {
     version: "1.97",
     date: "2026-10-10",
     headline: "Chart of Accounts shows every account’s balance, and a balance opens the entries behind it.",
