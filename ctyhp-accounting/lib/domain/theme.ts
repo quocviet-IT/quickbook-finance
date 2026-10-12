@@ -26,6 +26,15 @@ export type ResolvedTheme = "light" | "dark";
 export const THEME_STORAGE_KEY = "onebook.theme";
 export const THEME_ATTRIBUTE = "data-theme";
 
+/**
+ * What the machine preferred when this browser last loaded a page: "dark" or
+ * "light". Not a preference of the reader's — see systemThemeCookie.
+ */
+export const SYSTEM_THEME_COOKIE = "onebook.system-theme";
+
+/** Every theme cookie lives a year and is sent on every path of the app. */
+const COOKIE_ATTRIBUTES = "path=/; max-age=31536000; SameSite=Lax";
+
 /** What `mode` means right now, given what the machine says it prefers. */
 export function resolveTheme(mode: ThemeMode, systemPrefersDark: boolean): ResolvedTheme {
   if (mode === "system") return systemPrefersDark ? "dark" : "light";
@@ -59,12 +68,18 @@ export function parseThemeMode(stored: string | null | undefined): ThemeMode {
  * definition each. Written as a second copy inside layout.tsx they could
  * drift, and the symptom would be a theme that applies on first paint and
  * then changes on hydration — the flash, arriving slightly later.
+ *
+ * It also records what the machine prefers, for the server: see
+ * systemThemeCookie. That comes first, because it needs no storage — Safari's
+ * private mode, which throws below, still gets it.
  */
 export function noFlashScript(): string {
   return (
     "try{" +
+    "var s=matchMedia('(prefers-color-scheme: dark)').matches;" +
+    `document.cookie=${JSON.stringify(`${SYSTEM_THEME_COOKIE}=`)}+(s?'dark':'light')+${JSON.stringify(`; ${COOKIE_ATTRIBUTES}`)};` +
     `var m=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});` +
-    "var d=m==='dark'||((m==null||m==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);" +
+    "var d=m==='dark'||((m==null||m==='system')&&s);" +
     `document.documentElement.setAttribute(${JSON.stringify(THEME_ATTRIBUTE)},d?'dark':'light');` +
     "}catch(e){}"
   );
@@ -83,5 +98,34 @@ export function noFlashScript(): string {
  * the preference with no rule for which one wins.
  */
 export function themeCookie(mode: ThemeMode): string {
-  return `${THEME_STORAGE_KEY}=${mode}; path=/; max-age=31536000; SameSite=Lax`;
+  return `${THEME_STORAGE_KEY}=${mode}; ${COOKIE_ATTRIBUTES}`;
+}
+
+/**
+ * What the machine prefers, as a cookie, so the server can render a "system"
+ * reader in the theme they will actually see.
+ *
+ * The preference cookie above says "system" and nothing more, and the server
+ * cannot see the machine. It used to render every system reader light and let
+ * the client turn dark once React ran. Whatever hydrated after that turn was
+ * matched against the dark render while its HTML said light, and React does
+ * not patch attributes on hydration: the reports' Accountant/Management switch,
+ * streamed in its own Suspense boundary, stayed light on a dark page on every
+ * load. Every other Ant Design component sat light until the turn, too.
+ *
+ * A separate cookie, not a value of the first: that one is the reader's
+ * choice and must survive the machine changing its mind. The no-flash script
+ * writes this one on every load and the provider when the machine switches,
+ * so it is wrong at most for the first page a browser ever loads.
+ */
+export function systemThemeCookie(prefersDark: boolean): string {
+  return `${SYSTEM_THEME_COOKIE}=${prefersDark ? "dark" : "light"}; ${COOKIE_ATTRIBUTES}`;
+}
+
+/**
+ * The cookie above, read back. Missing or unrecognised means light: what the
+ * server assumed before there was a cookie, and a wrong guess it recovers from.
+ */
+export function parseSystemPrefersDark(value: string | null | undefined): boolean {
+  return value === "dark";
 }

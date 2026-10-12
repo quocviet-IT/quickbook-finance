@@ -6,6 +6,7 @@ import {
   THEME_STORAGE_KEY,
   parseThemeMode,
   resolveTheme,
+  systemThemeCookie,
   themeCookie,
   type ResolvedTheme,
   type ThemeMode,
@@ -25,16 +26,22 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  * Holds the theme, writes it onto `<html>`, and keeps following the machine
  * for as long as the reader has not overruled it.
  *
- * Server-rendered as "light" and corrected on mount, which is the only shape
- * available: the server cannot know what this browser stores or what its
- * operating system prefers, and rendering a guess would be a hydration
- * mismatch. The gap is invisible because the inline script in layout.tsx has
- * already set the attribute before React runs — this provider is catching up
- * with what the document already says, not deciding it for the first time.
+ * Server-rendered from two cookies, the reader's mode and what their machine
+ * last preferred, so the first render — server and client alike — is the
+ * theme the reader will see, and nothing has to change once React runs. A
+ * change after hydration is not a safe correction: markup that hydrates later,
+ * in a Suspense boundary, is matched against the changed render and React
+ * leaves its attributes as the server wrote them (see systemThemeCookie).
+ *
+ * Storage is still read on mount, for the rare browser whose cookies lag it.
+ * The inline script in layout.tsx has already set the attribute before React
+ * runs, so this provider is catching up with what the document says, not
+ * deciding it for the first time.
  */
 export function ThemeProvider({
   children,
   initialMode = "system",
+  initialSystemPrefersDark = false,
 }: {
   children: React.ReactNode;
   /**
@@ -43,9 +50,15 @@ export function ThemeProvider({
    * rendered light and corrected seconds later; see themeCookie.
    */
   initialMode?: ThemeMode;
+  /**
+   * What the machine preferred on this browser's last load, read by the
+   * server from systemThemeCookie. It is what "system" means until the media
+   * query below has been read.
+   */
+  initialSystemPrefersDark?: boolean;
 }) {
   const [mode, setModeState] = useState<ThemeMode>(initialMode);
-  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(initialSystemPrefersDark);
   // False until the first effect has read storage. Two things wait on it:
   // the attribute write below, and the storage write-back.
   const [hydrated, setHydrated] = useState(false);
@@ -77,8 +90,17 @@ export function ThemeProvider({
     }
 
     // Kept live rather than read once: somebody whose machine switches at
-    // sunset has chosen "system" precisely so the app follows it then.
-    const onChange = (event: MediaQueryListEvent) => setSystemPrefersDark(event.matches);
+    // sunset has chosen "system" precisely so the app follows it then. The
+    // cookie follows too, or the next page would be server-rendered in the
+    // theme the machine just left.
+    const onChange = (event: MediaQueryListEvent) => {
+      setSystemPrefersDark(event.matches);
+      try {
+        document.cookie = systemThemeCookie(event.matches);
+      } catch (err) {
+        console.warn("syncing the system theme cookie failed:", err);
+      }
+    };
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
     // initialMode is set once by the server for the life of the document.

@@ -3,7 +3,13 @@ import { cookies } from "next/headers";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import Providers from "./providers";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { noFlashScript, parseThemeMode, THEME_STORAGE_KEY } from "@/lib/domain/theme";
+import {
+  noFlashScript,
+  parseSystemPrefersDark,
+  parseThemeMode,
+  SYSTEM_THEME_COOKIE,
+  THEME_STORAGE_KEY,
+} from "@/lib/domain/theme";
 import "./globals.css";
 // Ant Design's component styles, prebuilt (zero-runtime mode, see providers.tsx):
 // one cached file instead of a stylesheet generated into every page. After
@@ -32,8 +38,14 @@ export default async function RootLayout({
   // and turn dark once React caught up, seconds later on a heavy page. A
   // reader with no cookie yet gets "system", and the inline script below
   // still sets the attribute correctly before anything paints.
+  //
+  // "System" is resolved from the second cookie, which the inline script
+  // writes with what the machine prefers. Without it every system reader on
+  // a dark machine was rendered light and turned dark after hydration, and a
+  // Suspense boundary that hydrated after the turn kept its light classes.
   const jar = await cookies();
   const initialMode = parseThemeMode(jar.get(THEME_STORAGE_KEY)?.value);
+  const initialSystemPrefersDark = parseSystemPrefersDark(jar.get(SYSTEM_THEME_COOKIE)?.value);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -56,7 +68,7 @@ export default async function RootLayout({
         <AntdRegistry>
           {/* Outside Providers, which reads the resolved theme from it to
               choose Ant Design's algorithm. */}
-          <ThemeProvider initialMode={initialMode}>
+          <ThemeProvider initialMode={initialMode} initialSystemPrefersDark={initialSystemPrefersDark}>
             <Providers>{children}</Providers>
           </ThemeProvider>
         </AntdRegistry>
