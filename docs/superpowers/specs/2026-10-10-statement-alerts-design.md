@@ -230,3 +230,62 @@ When a bank account in the report reads below zero at the report's end date, the
 - **Changelog:** says what the user sees.
 - **Guide:** gains steps in the reconciliation flow.
 - **Migration:** goes live only with the user's approval.
+
+## Amendments from pre-building (10–12/10)
+
+The release was built and run on a local pre-build branch first. Results:
+- **Migration 0140 is live** on all six companies (applied 12/10 with the user's approval). It adds two functions and changes no data. The verification script passed 80 of 80 against the live functions, in rolled-back transactions: 45 behaviour checks on the sample company and 7 structure checks on each of the others. The company provisioning self-check passed 17 of 17.
+- **Live check, read-only on all six companies:** both detectors agree with the ledger on every bank account. No company has a balance posted as payments. Only the sample company has an account below zero (1010).
+- **The screen on each company, read-only:** the five real companies show no card. The sample company shows the 1010 card.
+- **Smoke on the sample company, in two rounds:**
+  - A balance series was posted on 1085, flagged, opened and removed through the screen.
+  - The same payee was then posted again, to check that a second import is still caught.
+  - Afterwards the example lines around the series were reversed, and 1085 is back at its starting balance.
+  - The reversals stay as sample data.
+
+These points were settled along the way.
+
+1. **The two database functions.**
+   - `acc_balance_entry_blockers(entry_ids)` lists each entry that cannot be removed, with its number and one reason: the first that applies, in this order:
+     1. unknown;
+     2. not posted;
+     3. already reversed;
+     4. itself a reversal;
+     5. ticked in a completed reconciliation;
+     6. in a closed period;
+     7. owned by a document;
+     8. the bank cases.
+   - The card shows these before anyone clicks. `acc_remove_balance_entries(bank_account_id, entry_ids, reason)` refuses the whole request with the same list.
+   - **Three more bank refusals,** so the function never guesses:
+     - a bank entry that recodes another;
+     - a bank entry with no bank line attached;
+     - a bank entry answering for more than one bank line (a transfer).
+   - **Bank entries are voided and their line deleted directly,** for every bank line and not only lines from an import batch. This mirrors Uncategorise followed by Delete line. Delete line itself is not called, because it asks for a ten-character reason and refuses batch lines.
+   - **A tick in a reconciliation still in progress is released** for each removed entry. A tick in a completed reconciliation is a refusal.
+   - **Entries not on the chosen account** are refused before the blockers run.
+2. **Entries that were reversed are left out of both checks, together with their reversals.**
+   - OneBook removes by reversing, where the mockup deleted, so a removed group stays in the ledger as pairs that cancel. Counted, they caused two problems:
+     - they read as payments no statement has shown;
+     - they diluted the next group of the same name. A series removed once and imported again agreed on 5 lines of 10, under the 60% share, and went unflagged.
+   - A pair is left out only when both halves are on the account. They cancel there, so today's balance is unchanged.
+   - Found in the smoke and fixed before the plan (`withoutReversedPairs`). The second smoke round flags the re-import 5 of 5.
+3. **What is counted.**
+   - "N entries", and the removal, count distinct entries. "{agree} of the {of}" counts lines.
+   - Removal takes only the agreeing lines' entries, not the payee's other lines.
+   - The card's total is the signed sum of the agreeing lines, as in the mockup.
+4. **The removal action** needs write access and the Post manual journals permission. Without the permission it answers "Removing entries needs the Post manual journals permission." The reason is required, trimmed, and at most 300 characters.
+5. **Account names.** The cards, Exceptions and the Balance Sheet name the ledger account, for example "Sample Checking 1.85". The account picker keeps showing the bank's name and masked number, as it does today.
+6. **The Reconcile start screen.**
+   - The alerts are read after the page has drawn, so a long ledger never holds the page up. Nothing shows while they are read.
+   - A failed read shows one quiet line: "Checks could not be run." with Try again.
+   - The below-zero card comes first, then a card per flagged group, the mockup's order.
+   - An entry link opens the entry's side sheet, as Exceptions does, so the workings and a half-typed reason stay where they are. The sheet's footer opens the entry in Journal.
+   - When nothing is outstanding (1010 on the sample company), the below-zero card shows no list heading and no table.
+   - On a phone the card tables keep their declared widths and floors and scroll inside the card, so Name and Coded to stay readable. Found in the smoke and fixed before the plan.
+7. **Balance Sheet note for several accounts:**
+   - It reads "{A} and {B} are below zero." followed by "{n} entries on those accounts look like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them."
+   - It adds one "Open Reconcile for {account}" link per account.
+   - It is read after the figures. If that read fails, the note is left out.
+8. **Exceptions sheet rows.**
+   - Balance group: type "N entries", name the payee, amount the total.
+   - Below zero: date of the lowest day, type "Last reconciled {date|never}", name "Lowest {amount} · N payments not yet on a statement", amount now.
