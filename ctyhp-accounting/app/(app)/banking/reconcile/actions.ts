@@ -1,8 +1,17 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
-import { reconciliationCreateSchema, reconciliationAdjustmentSchema, reconciliationReopenSchema } from "@/lib/domain/schemas";
+import {
+  balanceGroupRemoveSchema, reconciliationCreateSchema, reconciliationAdjustmentSchema, reconciliationReopenSchema,
+} from "@/lib/domain/schemas";
+import { GHOST_GONE, payeeKeyOf, type GhostGroup, type NegativeWatch } from "@/lib/domain/statement-alerts";
+import { hasPermission } from "@/lib/services/access";
+import {
+  getBalanceEntryBlockers, getStatementAlerts, removeBalanceEntries,
+  type BalanceEntryBlocker, type RemovedBalanceEntries,
+} from "@/lib/services/statement-alerts";
 import {
   createReconciliation, setCleared, recordAdjustment, completeReconciliation, reopenReconciliation,
   listReconciliations, getReconciliationLines, getReconciliationDetail, getDiscrepancies,
@@ -104,5 +113,68 @@ export async function reconciliationDetailAction(id: string): Promise<ActionResu
 }
 export async function discrepanciesAction(bankAccountId: string): Promise<ActionResult<DiscrepancyRow[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getDiscrepancies(sb, bankAccountId) }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+/** A flagged group with the entries that stand in the way of removing it (none, when it can go). */
+export type GhostGroupView = GhostGroup & { blockers: BalanceEntryBlocker[] };
+
+export interface StatementAlertsView {
+  ghosts: GhostGroupView[];
+  negative: NegativeWatch | null;
+}
+
+/**
+ * Both statement alerts for one bank account, for any signed-in role.
+ *
+ * Who may remove is the database's call, so the blockers (which only staff may
+ * ask for) are read for people who can write, and left empty for a viewer, who
+ * is not offered the button anyway.
+ */
+export async function statementAlertsAction(bankAccountId: string): Promise<ActionResult<StatementAlertsView>> {
+  const role = await getUserRole();
+  if (!role) return { ok: false, error: "Not authorized" };
+  if (!z.uuid().safeParse(bankAccountId).success) return { ok: false, error: "Choose a bank account" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const found = await getStatementAlerts(sb, bankAccountId);
+    const ghosts: GhostGroupView[] = [];
+    for (const group of found.ghosts) {
+      const blockers = canWrite(role) ? await getBalanceEntryBlockers(sb, group.entryIds) : [];
+      ghosts.push({ ...group, blockers });
+    }
+    return { ok: true, data: { ghosts, negative: found.negative } };
+  }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+/**
+ * Remove one flagged group: every entry in it, or none.
+ *
+ * The screen sends the account and the payee, not a list of entries. The group
+ * is found again here, from the books as they are now, so a stale card cannot
+ * remove entries that have since changed. The database function refuses the
+ * whole request if any entry cannot go, and says which; that message is passed
+ * on as it is.
+ */
+export async function removeBalanceGroupAction(raw: unknown): Promise<ActionResult<RemovedBalanceEntries>> {
+  const denied = await guard(); if (denied) return { ok: false, error: denied };
+  const parsed = balanceGroupRemoveSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    if (!(await hasPermission(sb, "journal.post"))) {
+      return { ok: false, error: "Removing entries needs the Post manual journals permission." };
+    }
+    const { bankAccountId, payee, reason } = parsed.data;
+    const found = await getStatementAlerts(sb, bankAccountId);
+    const group = found.ghosts.find((g) => payeeKeyOf(g.payee) === payeeKeyOf(payee));
+    if (!group) return { ok: false, error: GHOST_GONE };
+    const result = await removeBalanceEntries(sb, bankAccountId, group.entryIds, reason);
+    for (const path of ["/banking/reconcile", "/banking", "/journal", "/reports", "/reports/exceptions", "/dashboard"]) {
+      revalidatePath(path);
+    }
+    return { ok: true, data: result };
+  }
   catch (e) { return { ok: false, error: msg(e) }; }
 }

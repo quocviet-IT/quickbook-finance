@@ -17,7 +17,12 @@ export default async function ReconcilePage() {
       <PageHeader title="Bank Reconciliation" description="Reconcile a bank account to its statement ending balance." />
       <ReconcileListClient
         canWrite={canWrite(role)}
-        banks={banks.map((b) => ({ id: b.id, label: `${b.bank_name} · ${b.account_number_masked ?? ""}`.trim() }))}
+        banks={banks.map((b) => ({
+          id: b.id,
+          label: `${b.bank_name} · ${b.account_number_masked ?? ""}`.trim(),
+          name: b.account_name || b.bank_name,
+        }))}
+        baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
       />
     </div>

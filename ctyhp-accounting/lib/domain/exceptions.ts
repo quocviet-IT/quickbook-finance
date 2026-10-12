@@ -1,5 +1,5 @@
 /**
- * The eight checks a reviewer runs by hand.
+ * The ten checks a reviewer runs by hand.
  *
  * From the client's prototype: "None of these is proof of an error. Each is a
  * question worth answering." Nothing here accuses; each check raises a
@@ -19,13 +19,22 @@ import { fromMinor } from "@/lib/domain/money";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import { rangeText } from "@/lib/domain/report-presets";
 import type { LedgerBalance } from "@/lib/domain/reports";
+import {
+  belowZeroRows,
+  belowZeroSheetText,
+  statementBalanceRows,
+  statementBalanceSheetText,
+  type BankAccountAlerts,
+  type BelowZeroRow,
+  type StatementBalanceRow,
+} from "@/lib/domain/statement-alerts";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
 
 /** Re-exported so a caller needs one import to build the input, not three. */
 export type { LedgerBalance, TransactionListRow };
 
 /**
- * The eight, named once.
+ * The ten, named once.
  *
  * The screen draws its section headings from here and the service names a
  * failed read from here, so a check cannot be called two different things in
@@ -40,6 +49,8 @@ export const CHECK_LABEL = {
   unreconciled: "Bank accounts not agreed to a statement",
   futureDated: "Entries dated in the future",
   holding: "Still sitting in a holding account",
+  statementBalance: "Entries that look like a statement balance",
+  belowZero: "Bank accounts below zero since their last statement",
 } as const;
 
 export type CheckKey = keyof typeof CHECK_LABEL;
@@ -445,6 +456,11 @@ export interface ExceptionReportInput {
   entriesAfterToday: readonly TransactionListRow[];
   paymentReferences: readonly ExceptionPaymentRef[];
   /**
+   * Each bank account's two statement alerts, found by the detectors in
+   * `statement-alerts.ts`. Left out, the two statement checks find nothing.
+   */
+  statementAlerts?: readonly BankAccountAlerts[];
+  /**
    * Checks whose data could not be read. They are reported as unavailable
    * rather than as "nothing found", because a check that could not run and a
    * check that found nothing are opposite answers.
@@ -455,7 +471,7 @@ export interface ExceptionReportInput {
 export interface ExceptionReport {
   entriesExamined: number;
   questionsRaised: number;
-  checksRun: 8;
+  checksRun: 10;
   unavailable: CheckKey[];
   duplicates: DuplicateGroup[];
   checkNumberClashes: CheckNumberClash[];
@@ -465,6 +481,8 @@ export interface ExceptionReport {
   unreconciled: UnreconciledRow[];
   futureDated: TransactionListRow[];
   holding: HoldingRow[];
+  statementBalance: StatementBalanceRow[];
+  belowZero: BelowZeroRow[];
 }
 
 /**
@@ -490,7 +508,7 @@ function referencesByEntry(
   return out;
 }
 
-/** Run all eight. Nothing here reads a clock, a database or a file. */
+/** Run all ten. Nothing here reads a clock, a database or a file. */
 export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
   const balanceByAccountId = new Map<string, number>(
     input.accounts.map((a) => [a.accountId, signedBalance(a)]),
@@ -507,6 +525,8 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const unreconciled = unreconciledBankAccounts(input.bankAccounts, balanceByAccountId, input.to);
   const futureDated = futureDatedEntries(input.entriesAfterToday, input.today);
   const holding = holdingAccounts(input.accounts);
+  const statementBalance = statementBalanceRows(input.statementAlerts ?? []);
+  const belowZero = belowZeroRows(input.statementAlerts ?? []);
 
   return {
     entriesExamined: input.entriesInRange.length,
@@ -518,8 +538,10 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
       incomeNoCost.length +
       unreconciled.length +
       futureDated.length +
-      holding.length,
-    checksRun: 8,
+      holding.length +
+      statementBalance.length +
+      belowZero.length,
+    checksRun: 10,
     unavailable: [...input.unavailable],
     duplicates,
     checkNumberClashes,
@@ -529,6 +551,8 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     unreconciled,
     futureDated,
     holding,
+    statementBalance,
+    belowZero,
   };
 }
 
@@ -642,6 +666,26 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       name: "",
       account: `${h.accountCode} ${h.name}`,
       amount: money(h.balanceMinor),
+    })),
+  );
+  add(
+    "statementBalance",
+    report.statementBalance.map((r) => ({
+      check: CHECK_LABEL.statementBalance,
+      date: "",
+      ...statementBalanceSheetText(r),
+      account: r.accountName,
+      amount: money(r.totalMinor),
+    })),
+  );
+  add(
+    "belowZero",
+    report.belowZero.map((r) => ({
+      check: CHECK_LABEL.belowZero,
+      date: r.worstDate ?? "",
+      ...belowZeroSheetText(r, (minor) => money(minor).toFixed(meta.decimals)),
+      account: r.accountName,
+      amount: money(r.nowMinor),
     })),
   );
 

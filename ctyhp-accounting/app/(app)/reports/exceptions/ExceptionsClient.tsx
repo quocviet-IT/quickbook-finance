@@ -37,6 +37,7 @@ import {
   type UnreconciledRow,
   type WrongWayRow,
 } from "@/lib/domain/exceptions";
+import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/lib/domain/statement-alerts";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -62,7 +63,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 /**
  * The Exception Report, laid out as the client's prototype lays it out
  * (`reportExceptions` in Accounting-System-v3.html): a period picker, the
- * report on paper under its heading, three figures, then the eight checks —
+ * report on paper under its heading, three figures, then the ten checks —
  * each with its question, why it matters, and what it found. Every section is
  * drawn, including the ones with nothing in them, because a reviewer has to see
  * that a check ran. Clicking a line opens the entry behind it in a side sheet.
@@ -453,6 +454,87 @@ export default function ExceptionsClient({
             ]}
           />
         </ReportSection>
+
+        <ReportSection
+          title={CHECK_LABEL.statementBalance}
+          note={plural(r.statementBalance.length, "group", "groups")}
+          state={state("statementBalance", r.statementBalance.length)}
+          why="When a statement’s Balance column is read as amounts, a run of entries for one payee lands exactly on what the account comes to on each date. A payment does not track the balance of the account it is paid from. Open Reconcile to see the workings and remove them."
+        >
+          <DataTable<StatementBalanceRow>
+            rowKey={(row) => `${row.bankAccountId}:${row.payee}`}
+            pagination={false}
+            dataSource={r.statementBalance}
+            columns={[
+              flexColumn<StatementBalanceRow>({ title: "Bank account", key: "account", render: (_, row) => row.accountName }),
+              flexColumn<StatementBalanceRow>({
+                title: "Payee",
+                key: "payee",
+                render: (_, row) => <span title={row.payee}>{row.payee}</span>,
+              }),
+              { title: "Entries", key: "entries", width: COLUMN.QTY, align: "right", render: (_, row) => row.entryCount },
+              { title: "Total", key: "total", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.totalMinor) },
+              {
+                title: "",
+                key: "open",
+                width: 130,
+                render: (_, row) => <Link href={reconcileHref(row.bankAccountId)}>Open Reconcile</Link>,
+              },
+            ]}
+          />
+        </ReportSection>
+
+        <ReportSection
+          title={CHECK_LABEL.belowZero}
+          note={plural(r.belowZero.length, "account", "accounts")}
+          state={state("belowZero", r.belowZero.length)}
+          why="Once a statement is agreed, the balance was right on that day. What drags the account under afterwards is far more often an entry that is not a payment than a real overdraft, which the bank would have printed."
+        >
+          <DataTable<BelowZeroRow>
+            rowKey="bankAccountId"
+            pagination={false}
+            dataSource={r.belowZero}
+            columns={[
+              flexColumn<BelowZeroRow>({ title: "Bank account", key: "account", render: (_, row) => row.accountName }),
+              {
+                title: "Reads now",
+                key: "now",
+                width: COLUMN.MONEY_WIDE,
+                align: "right",
+                render: (_, row) => <span className={row.nowMinor < 0 ? styles.negative : undefined}>{money(row.nowMinor)}</span>,
+              },
+              {
+                title: "Lowest",
+                key: "worst",
+                width: 190,
+                align: "right",
+                render: (_, row) =>
+                  row.worstMinor === null || row.worstDate === null ? (
+                    "—"
+                  ) : (
+                    <span>
+                      <span className={styles.negative}>{money(row.worstMinor)}</span>{" "}
+                      <span className={styles.muted}>{shortDate(row.worstDate)}</span>
+                    </span>
+                  ),
+              },
+              {
+                title: "Last statement",
+                key: "last",
+                width: 140,
+                render: (_, row) =>
+                  row.lastStatementDate ? shortDate(row.lastStatementDate) : <Tag color="orange">never</Tag>,
+              },
+              { title: "Not on a statement", key: "outstanding", width: 150, align: "right", render: (_, row) => row.outstandingCount },
+              {
+                title: "",
+                key: "open",
+                width: 130,
+                render: (_, row) => <Link href={reconcileHref(row.bankAccountId)}>Open Reconcile</Link>,
+              },
+            ]}
+          />
+        </ReportSection>
       </>
     );
   };
@@ -469,7 +551,7 @@ export default function ExceptionsClient({
               { label: "Questions raised", value: report.questionsRaised, danger: report.questionsRaised > 0 },
               {
                 label: "Checks run",
-                value: report.unavailable.length > 0 ? `${8 - report.unavailable.length} of 8` : 8,
+                value: report.unavailable.length > 0 ? `${10 - report.unavailable.length} of 10` : 10,
               },
             ]}
           />
@@ -478,7 +560,7 @@ export default function ExceptionsClient({
               type="warning"
               showIcon
               style={{ marginBottom: 20 }}
-              title={`${report.unavailable.length} of 8 checks could not be run`}
+              title={`${report.unavailable.length} of 10 checks could not be run`}
               description={`${report.unavailable.map((c) => CHECK_LABEL[c]).join("; ")}. The rest of the report is complete. A check that could not run is not saying the books are clear — run the report again.`}
             />
           ) : null}
@@ -495,7 +577,7 @@ export default function ExceptionsClient({
           {loading ? (
             <Space orientation="vertical" size={12}>
               <Spin size="large" />
-              <span className={styles.muted}>Running eight checks over the books…</span>
+              <span className={styles.muted}>Running ten checks over the books…</span>
             </Space>
           ) : (
             <span className={styles.muted}>The report has not been run.</span>
