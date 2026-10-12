@@ -47,7 +47,8 @@
     "test:e2e:document-scan": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.e2e.config.ts tests/e2e/document-scan.e2e.ts",
     "test:scanner-gateway": "node ../services/document-scanner/test/contract.test.mjs",
     "verify:entitlement": "node --env-file=.env.local scripts/verify-entitlement.mjs",
-    "verify:stock-count": "node --env-file=.env.local scripts/verify-stock-count.mjs"
+    "verify:stock-count": "node --env-file=.env.local scripts/verify-stock-count.mjs",
+    "verify:balance-entries": "node --env-file=.env.local scripts/verify-balance-entries.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
