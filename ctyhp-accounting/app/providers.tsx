@@ -50,6 +50,19 @@ export default function Providers({ children }: { children: React.ReactNode }) {
          * overwriting each other and insertion order stops mattering.
          */
         cssVar: { key: theme === "dark" ? "ob-dark" : "ob-light" },
+        /*
+         * Component styles come from antd/dist/antd.css (imported in
+         * app/layout.tsx), not from a stylesheet generated at run time.
+         *
+         * That generation was 330–440 KB of CSS rebuilt for every request and
+         * inlined into each page's HTML — 60–85% of it, never cached — and run
+         * again in the browser on every navigation. Zero-runtime mode keeps
+         * only the CSS variables: the theme's tokens and each component's token
+         * block, which are what carry this app's colours, so light, dark and
+         * the per-theme keys above work as before. antd reads this flag once
+         * per mount, so it must never change at run time.
+         */
+        zeroRuntime: true,
         token: { ...token, borderRadius: 8, fontFamily: SANS, fontSize: 14, wireframe: false },
         components: {
           ...components,

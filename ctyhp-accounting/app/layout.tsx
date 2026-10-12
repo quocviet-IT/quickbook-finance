@@ -5,6 +5,16 @@ import Providers from "./providers";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { noFlashScript, parseThemeMode, THEME_STORAGE_KEY } from "@/lib/domain/theme";
 import "./globals.css";
+// Ant Design's component styles, prebuilt (zero-runtime mode, see providers.tsx):
+// one cached file instead of a stylesheet generated into every page. After
+// globals.css, where the generated stylesheet used to land: it was emitted
+// into <head> behind the app's own CSS, so on a tie of specificity Ant Design
+// won, and every screen was approved looking that way. Importing it first
+// flips those ties to the app on every page — the menu grows to 44px rows,
+// badges and buttons change colour and shadow — a redesign nobody asked for.
+// A page's own CSS module still loads after this file and wins its ties, as
+// its author wrote it to.
+import "antd/dist/antd.css";
 
 export const metadata: Metadata = {
   title: "One Book",
