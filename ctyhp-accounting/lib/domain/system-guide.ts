@@ -483,6 +483,43 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "record its side there.",
       },
       {
+        action: "Check an account for a statement's balance posted as payments",
+        control: "Show me the workings",
+        route: "/banking/reconcile",
+        note:
+          "Choose the account at the top of Reconcile. When a run of entries for one payee lands exactly on what " +
+          "the account itself comes to on each date, an amber card says they look like the statement's balance, " +
+          "not payments: a statement's Balance column read as amounts, because a real payment does not track the " +
+          "balance of the account it is paid from. Show me the workings lists each entry beside what the account " +
+          "came to that day with the group taken out, and the difference; click a date to see the entry.",
+      },
+      {
+        action: "Remove a balance posted as payments",
+        control: "Remove these N entries",
+        route: "/banking/reconcile",
+        note:
+          "Click it, give a reason, and click Confirm — remove all N. The whole group goes or none of it. An entry " +
+          "posted by hand or loaded from another program is reversed on its own date; an entry coded from Bank " +
+          "Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, and every entry " +
+          "carries the reason. Some entries cannot go from here, and the card lists them with what to do instead: " +
+          "one ticked on a completed reconciliation (reopen it first), one dated in a closed period (reopen the " +
+          "period), one already reversed, or one that belongs to a document such as an invoice, bill or payment " +
+          "(void the document). Needs the Post manual journals permission.",
+      },
+      {
+        action: "See what drags an account below zero",
+        control: "Payments not yet on a statement",
+        route: "/banking/reconcile",
+        note:
+          "When the chosen account reads below zero today, or has dropped below zero since the last statement you " +
+          "agreed, an amber card gives the figure that statement closed at, the lowest point since and the balance " +
+          "today. A bank would have charged for an overdraft and printed it, so what drags the account under is " +
+          "usually an entry that is not a payment — a balance posted as one, or the same thing entered twice. The " +
+          "card lists the largest payments not yet on a statement; reconcile the next statement and whatever the " +
+          "bank has never seen is left standing on its own. An account nobody has reconciled is flagged only while " +
+          "it is below zero now.",
+      },
+      {
         action: "Reconcile to a statement balance",
         control: "New reconciliation",
         route: "/banking/reconcile",

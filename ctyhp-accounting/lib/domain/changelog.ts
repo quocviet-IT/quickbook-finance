@@ -41,6 +41,56 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.00",
+    date: "2026-10-12",
+    headline:
+      "Reconcile spots a statement’s balance posted as payments and a bank account below zero, and removes such a run safely in one step.",
+    changes: [
+      {
+        kind: "added",
+        title: "Reconcile warns when a statement’s balance was posted as payments",
+        detail:
+          "Above the reconciliations, an amber card appears for the chosen account when a run of entries for one payee lands exactly on what the account itself comes to on each date — a statement’s Balance column read as amounts. Real payments do not track the balance of the account they are paid from. The card names the payee, says how many of its entries agree and what they move together, and Show me the workings lists each one beside what the account came to that day with the group taken out, and the difference. Click a date to see its entry.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Remove these entries, all or none",
+        detail:
+          "Remove these N entries turns into Confirm — remove all N and asks for a reason. Each entry goes the OneBook way: one posted by hand or loaded from another program is reversed on its own date, and one coded from Bank Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, every entry carries the reason, and either the whole group goes or none of it. An entry ticked on a completed reconciliation, dated in a closed period, already reversed, or belonging to a document such as an invoice, bill or payment cannot be removed here: the card lists each one with what to do instead, such as voiding the document. Needs the Post manual journals permission.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Reconcile warns when a bank account reads below zero",
+        detail:
+          "A second amber card appears when the chosen account reads below zero today, or has dropped below zero since the last statement you agreed. It gives the figure that statement closed at, the lowest point since and the balance today, then the largest payments not yet on a statement, each opening its entry. An account nobody has reconciled is flagged only while it is below zero now.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "Reconcile keeps the chosen account in the address",
+        detail:
+          "Choosing an account adds it to the address, so a reload, a bookmark or a link from the Exception Report or the Balance Sheet opens the same account.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Two new checks in the Exception Report",
+        detail:
+          "Entries that look like a statement balance, and Bank accounts below zero since their last statement, across every bank and cash account. Each row opens Reconcile on that account. The report now runs ten checks.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "The Balance Sheet notes a bank account below zero",
+        detail:
+          "When a bank account reads below zero on the report’s date, an amber note under the Balance Sheet says so and links to Reconcile for that account. When some of its entries look like the account’s own balance posted as payments, the note says how many.",
+        route: "/reports?report=balance",
+      },
+    ],
+  },
+  {
     version: "1.99",
     date: "2026-10-12",
     headline: "Every page arrives at a fraction of its former size: the styling it carried now comes from one file the browser keeps.",
