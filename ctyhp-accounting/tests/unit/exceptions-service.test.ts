@@ -5,7 +5,7 @@ import { getExceptionReport } from "@/lib/services/exceptions";
 /**
  * The `unavailable` mechanism, which is where this branch's worst bugs lived.
  *
- * `getExceptionReport` reads eight checks' worth of data behind `readOr`,
+ * `getExceptionReport` reads ten checks' worth of data behind `readOr`,
  * which is supposed to tag exactly the checks a failed read affects — no
  * more, no fewer — and let the rest of the report through untouched. Each
  * test here fails exactly one read and inspects what got tagged, because a
@@ -34,6 +34,7 @@ interface ReaderConfig {
   vendorPayments: Source;
   undepositedLines: Source;
   monthlyBalances: Source;
+  reconciliationLines: Source;
 }
 
 function defaultConfig(): ReaderConfig {
@@ -49,6 +50,7 @@ function defaultConfig(): ReaderConfig {
     vendorPayments: [],
     undepositedLines: [],
     monthlyBalances: [],
+    reconciliationLines: [],
   };
 }
 
@@ -77,6 +79,8 @@ interface Chain {
   order: (column: string, options?: unknown) => Chain;
   limit: (count: number) => Promise<{ data: Row[] | null; error: { message: string } | null }>;
   range: (from: number, to: number) => Promise<{ data: Row[] | null; error: { message: string } | null }>;
+  /** A read that never asks for a range, as `listBankAccounts` does: `await` gets everything. */
+  then: (resolve: (value: { data: Row[] | null; error: { message: string } | null }) => unknown) => unknown;
 }
 
 function chainFor(source: Source): Chain {
@@ -89,6 +93,7 @@ function chainFor(source: Source): Chain {
     order: () => builder,
     limit: async () => resultOf(source),
     range: async (from: number, to: number) => pageOf(source, from, to),
+    then: (resolve) => resolve(resultOf(source)),
   };
   return builder;
 }
@@ -113,6 +118,10 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
           return chainFor(c.vendorPayments);
         case "acc_journal_line":
           return chainFor(c.undepositedLines);
+        case "acc_reconciliation_line":
+          return chainFor(c.reconciliationLines);
+        case "acc_journal_reversal_link":
+          return chainFor([]);
         default:
           throw new Error(`fakeClient: unhandled table "${table}"`);
       }
@@ -212,6 +221,74 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     const sb = fakeClient();
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
     expect(report.unavailable).toEqual([]);
-    expect(report.checksRun).toBe(8);
+    expect(report.checksRun).toBe(10);
+  });
+
+  it("tags both statement checks, and only them, when the bank-account lines cannot be read", async () => {
+    // The statement checks share one read of every bank account's lines, so
+    // neither can claim "nothing found" when it fails, and no other check is
+    // taken down with it.
+    const sb = fakeClient({
+      bankAccounts: [BANK],
+      undepositedLines: new Error("acc_journal_line unreachable"),
+      ledgerBalances: [
+        {
+          account_id: "h1",
+          account_code: "9000",
+          name: "Uncategorized Expense",
+          account_type: "expense",
+          debit_base: 250_000,
+          credit_base: 0,
+        },
+      ],
+    });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual(["statementBalance", "belowZero"]);
+    expect(report.holding).toHaveLength(1);
+    expect(report.statementBalance).toEqual([]);
+    expect(report.belowZero).toEqual([]);
+  });
+
+  it("finds a bank account below zero from its own lines", async () => {
+    const sb = fakeClient({
+      bankAccounts: [BANK],
+      undepositedLines: [
+        journalLine("l1", "e1", "2026-01-01", 1_000, 0),
+        journalLine("l2", "e2", "2026-01-03", 0, 5_000),
+      ],
+    });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual([]);
+    expect(report.belowZero).toEqual([
+      {
+        bankAccountId: "bank-1",
+        accountName: "Operating Checking",
+        nowMinor: -4_000,
+        worstMinor: null,
+        worstDate: null,
+        lastStatementDate: null,
+        outstandingCount: 1,
+      },
+    ]);
+    expect(report.statementBalance).toEqual([]);
+    expect(report.questionsRaised).toBeGreaterThanOrEqual(1);
   });
 });
+
+const BANK = {
+  id: "bank-1",
+  account_id: "gl-1",
+  bank_name: "First Test Bank",
+  created_at: "2026-01-01T00:00:00Z",
+  acc_account: { name: "Operating Checking" },
+};
+
+function journalLine(id: string, entryId: string, date: string, debit: number, credit: number): Row {
+  return {
+    id,
+    debit_minor: debit,
+    credit_minor: credit,
+    amount_base_minor: debit || credit,
+    acc_journal_entry: { id: entryId, entry_number: `JE-${id}`, entry_date: date, source_type: "manual" },
+  };
+}

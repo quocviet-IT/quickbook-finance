@@ -17,6 +17,8 @@ import type { LedgerBalance } from "@/lib/domain/reports";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
 import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts, type BankAccountWithGl } from "@/lib/services/banking";
+import { getAllStatementAlerts } from "@/lib/services/statement-alerts";
+import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
 import {
   getLedgerBalances,
   getMonthlyLedgerBalances,
@@ -352,7 +354,7 @@ export async function getExceptionReport(
     )
     .map((a) => a.accountId);
 
-  const [refs, details, byMonth] = await Promise.all([
+  const [refs, details, byMonth, statementAlerts] = await Promise.all([
     readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
     readOr(unavailable, [], new Map<string, UndepositedDetail>(), () =>
       undepositedDetails(sb, holdingIds, to),
@@ -361,6 +363,11 @@ export async function getExceptionReport(
       earliest === null
         ? Promise.resolve(new Map<string, LedgerBalance[]>())
         : getMonthlyLedgerBalances(sb, to, monthSpan(earliest, to)),
+    ),
+    // Both statement checks stand on the same read of every bank account's
+    // lines, so when it fails neither can say "nothing found".
+    readOr(unavailable, ["statementBalance", "belowZero"], [] as BankAccountAlerts[], () =>
+      getAllStatementAlerts(sb),
     ),
   ]);
 
@@ -393,6 +400,7 @@ export async function getExceptionReport(
     entriesInRange,
     entriesAfterToday,
     paymentReferences: refs,
+    statementAlerts,
     unavailable,
   });
 }

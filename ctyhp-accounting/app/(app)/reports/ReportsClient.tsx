@@ -43,7 +43,8 @@ import {
   type ZoomSpec,
 } from "@/lib/domain/statement";
 import { fiscalYearStartOf, pointColumns, rangeColumns, type CompareMode } from "@/lib/domain/statement-columns";
-import { getBudgetVsActualAction, getLedgerBalancesAction, getStatementOfEquityAction } from "./actions";
+import type { BalanceSheetNote } from "@/lib/domain/statement-alerts";
+import { balanceSheetNoteAction, getBudgetVsActualAction, getLedgerBalancesAction, getStatementOfEquityAction } from "./actions";
 
 interface ReportsClientProps {
   initialReportType: InternalReportId;
@@ -190,6 +191,8 @@ export default function ReportsClient({
   // Budget vs Actual: each month of the range against its budget (empty for a single month).
   const [monthly, setMonthly] = useState<MonthResult[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  // The Balance Sheet's note about a bank account below zero on its end date.
+  const [bankNote, setBankNote] = useState<BalanceSheetNote | null>(null);
   const [ran, setRan] = useState(initialRange);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState<ZoomSpec | null>(null);
@@ -224,6 +227,7 @@ export default function ReportsClient({
       setChart(null);
       setStats(null);
       setMonthly([]);
+      setBankNote(null);
     };
 
     setLoading(true);
@@ -309,6 +313,15 @@ export default function ReportsClient({
         await Promise.all(starts.map(async (start) => [start, netIncomeOf(await read(null, dayBefore(start)))] as const)),
       );
       const sheets = balances.map(buildBalanceSheet);
+      // A help beside the statement, not part of it: read apart from the figures, and left out if it fails.
+      void balanceSheetNoteAction(to).then(
+        (result) => {
+          if (current()) setBankNote(result.ok ? (result.data ?? null) : null);
+        },
+        () => {
+          if (current()) setBankNote(null);
+        },
+      );
       show(
         balanceSheetStatement({
           columns: plan.columns,
@@ -422,6 +435,25 @@ export default function ReportsClient({
           className={styles.outOfBalance}
           title={`${type === "trial" ? "Debits and credits" : "Assets, and liabilities plus equity,"} differ by ${money(Math.abs(shownStatement.outOfBalance))}.`}
           description="This should not happen while every entry balances. The General Ledger Posting report shows which document did not reach the ledger."
+        />
+      ) : null}
+      {type === "balance" && bankNote ? (
+        <Alert
+          type="warning"
+          showIcon
+          className={styles.outOfBalance}
+          title={bankNote.headline}
+          description={
+            <>
+              {bankNote.detail}{" "}
+              {bankNote.links.map((link, i) => (
+                <span key={link.bankAccountId}>
+                  {i > 0 ? " · " : null}
+                  <Link href={link.href}>{link.label}</Link>
+                </span>
+              ))}
+            </>
+          }
         />
       ) : null}
       <ReportFoot>

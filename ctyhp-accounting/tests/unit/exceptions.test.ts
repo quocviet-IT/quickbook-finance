@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { csvFromExportSheet } from "@/lib/domain/report-export";
+import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
 import {
+  CHECK_LABEL,
   buildExceptionReport,
   exceptionReportSheet,
   duplicateCheckNumbers,
@@ -479,9 +481,9 @@ const emptyInput = (over: Partial<ExceptionReportInput> = {}): ExceptionReportIn
 });
 
 describe("buildExceptionReport", () => {
-  it("runs eight checks and raises nothing on an empty book", () => {
+  it("runs ten checks and raises nothing on an empty book", () => {
     const report = buildExceptionReport(emptyInput());
-    expect(report.checksRun).toBe(8);
+    expect(report.checksRun).toBe(10);
     expect(report.questionsRaised).toBe(0);
     expect(report.entriesExamined).toBe(0);
     expect(report.unavailable).toEqual([]);
@@ -495,7 +497,7 @@ describe("buildExceptionReport", () => {
       }),
     );
     expect(report.unavailable).toEqual(["incomeNoCost"]);
-    // The other seven still ran.
+    // The other nine still ran.
     expect(report.holding).toHaveLength(1);
   });
 
@@ -549,13 +551,78 @@ describe("buildExceptionReport", () => {
   });
 });
 
+describe("the two statement checks", () => {
+  const alerts: BankAccountAlerts[] = [
+    {
+      bankAccountId: "b1",
+      accountName: "Business Checking",
+      ghosts: [
+        { payee: "Payroll", rows: [], agree: 4, of: 4, offsetMinor: 0, runs: 1, totalMinor: -90_000, entryIds: ["a", "b", "c", "d"] },
+      ],
+      negative: {
+        nowMinor: -2_500,
+        last: { date: "2026-03-31", endingMinor: 40_000 },
+        worst: { date: "2026-05-04", balanceMinor: -7_500 },
+        outstanding: [],
+        outstandingCount: 6,
+      },
+    },
+    { bankAccountId: "b2", accountName: "Savings", ghosts: [], negative: null },
+  ];
+  const meta = { companyName: "Riverbend Trading LLC", currencyCode: "USD", decimals: 2, from: "2026-01-01", to: "2026-09-26" };
+
+  it("names both checks", () => {
+    expect(CHECK_LABEL.statementBalance).toBe("Entries that look like a statement balance");
+    expect(CHECK_LABEL.belowZero).toBe("Bank accounts below zero since their last statement");
+  });
+
+  it("raises one question per flagged group and per flagged account", () => {
+    const report = buildExceptionReport(emptyInput({ statementAlerts: alerts }));
+    expect(report.statementBalance).toHaveLength(1);
+    expect(report.statementBalance[0]).toMatchObject({ bankAccountId: "b1", payee: "Payroll", entryCount: 4, totalMinor: -90_000 });
+    expect(report.belowZero).toHaveLength(1);
+    expect(report.belowZero[0]).toMatchObject({ bankAccountId: "b1", nowMinor: -2_500, worstMinor: -7_500, outstandingCount: 6 });
+    expect(report.questionsRaised).toBe(2);
+  });
+
+  it("finds nothing when no alerts were supplied", () => {
+    const report = buildExceptionReport(emptyInput());
+    expect(report.statementBalance).toEqual([]);
+    expect(report.belowZero).toEqual([]);
+  });
+
+  it("says Could not run for a statement check whose data could not be read, and Nothing found when it ran", () => {
+    const report = buildExceptionReport(emptyInput({ unavailable: ["belowZero"] }));
+    const byCheck = new Map(exceptionReportSheet(report, meta).rows.map((r) => [r.check, r.name]));
+    expect(byCheck.get(CHECK_LABEL.belowZero)).toBe("Could not run");
+    expect(byCheck.get(CHECK_LABEL.statementBalance)).toBe("Nothing found");
+  });
+
+  it("writes their rows into the sheet", () => {
+    const sheet = exceptionReportSheet(buildExceptionReport(emptyInput({ statementAlerts: alerts })), meta);
+    expect(sheet.rows.filter((r) => r.check === CHECK_LABEL.statementBalance)).toEqual([
+      { check: CHECK_LABEL.statementBalance, date: "", type: "4 entries", name: "Payroll", account: "Business Checking", amount: -900 },
+    ]);
+    expect(sheet.rows.filter((r) => r.check === CHECK_LABEL.belowZero)).toEqual([
+      {
+        check: CHECK_LABEL.belowZero,
+        date: "2026-05-04",
+        type: "Last reconciled 2026-03-31",
+        name: "Lowest -75.00 · 6 payments not yet on a statement",
+        account: "Business Checking",
+        amount: -25,
+      },
+    ]);
+  });
+});
+
 describe("exceptionReportSheet", () => {
   const meta = { companyName: "Riverbend Trading LLC", currencyCode: "USD", decimals: 2, from: "2026-01-01", to: "2026-09-26" };
 
   it("keeps every check, saying which found nothing and which could not run", () => {
     const report = buildExceptionReport(emptyInput({ unavailable: ["incomeNoCost"] }));
     const sheet = exceptionReportSheet(report, meta);
-    expect(sheet.rows).toHaveLength(8);
+    expect(sheet.rows).toHaveLength(10);
     const byCheck = new Map(sheet.rows.map((r) => [r.check, r.name]));
     expect(byCheck.get("A year with income and no costs")).toBe("Could not run");
     expect(byCheck.get("Entries dated in the future")).toBe("Nothing found");
