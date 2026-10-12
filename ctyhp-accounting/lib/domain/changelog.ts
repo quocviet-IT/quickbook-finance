@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.01",
+    date: "2026-10-12",
+    headline: "Dark mode is dark from the first moment for anyone whose theme follows their computer.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The Accountant / Management switch on reports is dark in dark mode",
+        detail:
+          "With the theme set to Match my system on a computer in dark mode, the switch at the top of every report stayed light on a dark page. It now follows the theme like everything around it.",
+        route: "/reports/general-ledger",
+      },
+      {
+        kind: "fixed",
+        title: "No light flash while a page loads in dark mode",
+        detail:
+          "With Match my system on a computer in dark mode, a page used to arrive with a white background and light tables and buttons, and turn dark a moment later. It now arrives dark. The first page a browser opens after this release can still turn once; every page after it arrives dark. Choosing Dark or Light yourself worked before and is unchanged.",
+      },
+    ],
+  },
+  {
     version: "2.00",
     date: "2026-10-12",
     headline:

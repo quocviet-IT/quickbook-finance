@@ -1,11 +1,16 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  SYSTEM_THEME_COOKIE,
   THEME_ATTRIBUTE,
   THEME_MODES,
   THEME_STORAGE_KEY,
   noFlashScript,
+  parseSystemPrefersDark,
   parseThemeMode,
   resolveTheme,
+  systemThemeCookie,
   themeCookie,
 } from "@/lib/domain/theme";
 
@@ -137,5 +142,106 @@ describe("themeCookie", () => {
       const value = themeCookie(mode).split(";")[0].split("=")[1];
       expect(parseThemeMode(value)).toBe(mode);
     }
+  });
+});
+
+/**
+ * "System" is the default mode, and the server cannot see the machine. It used
+ * to render every system reader light and let the client turn dark after
+ * hydration. Whatever hydrated after that turn — the report toolbar's
+ * Accountant/Management switch, streamed in its own Suspense boundary — was
+ * matched against the dark client render while its HTML said light, and React
+ * does not patch attributes on hydration: the switch stayed light on a dark
+ * page, every load, for every system reader on a dark machine.
+ *
+ * So the browser tells the server what the machine prefers, in a cookie the
+ * no-flash script writes on every load, and the first server render is
+ * already the theme the reader will see.
+ */
+describe("the machine's preference, for the server", () => {
+  /** Runs the no-flash script against fakes and returns what it wrote. */
+  function run(stored: string | null, prefersDark: boolean) {
+    const attributes: Record<string, string> = {};
+    const document = {
+      cookie: "",
+      documentElement: { setAttribute: (k: string, v: string) => (attributes[k] = v) },
+    };
+    new Function("document", "localStorage", "matchMedia", noFlashScript())(
+      document,
+      { getItem: () => stored },
+      () => ({ matches: prefersDark }),
+    );
+    return { attribute: attributes[THEME_ATTRIBUTE], cookie: document.cookie };
+  }
+
+  it("is written by the no-flash script on every load", () => {
+    expect(run(null, true).cookie).toBe(systemThemeCookie(true));
+    expect(run("system", false).cookie).toBe(systemThemeCookie(false));
+  });
+
+  it("records the machine even when the reader has chosen, so switching to System later renders right", () => {
+    expect(run("light", true)).toEqual({ attribute: "light", cookie: systemThemeCookie(true) });
+    expect(run("dark", false)).toEqual({ attribute: "dark", cookie: systemThemeCookie(false) });
+  });
+
+  it("still records the machine when storage refuses to be read", () => {
+    // Safari in private mode throws on localStorage. The attribute cannot be
+    // decided without it, but the machine's preference does not need it.
+    const document = { cookie: "", documentElement: { setAttribute: () => undefined } };
+    new Function("document", "localStorage", "matchMedia", noFlashScript())(
+      document,
+      {
+        getItem: () => {
+          throw new Error("SecurityError");
+        },
+      },
+      () => ({ matches: true }),
+    );
+    expect(document.cookie).toBe(systemThemeCookie(true));
+  });
+
+  it("round-trips through the parser the layout uses", () => {
+    for (const prefersDark of [true, false]) {
+      const [name, value] = systemThemeCookie(prefersDark).split(";")[0].split("=");
+      expect(name).toBe(SYSTEM_THEME_COOKIE);
+      expect(parseSystemPrefersDark(value)).toBe(prefersDark);
+    }
+  });
+
+  it("reads a missing or unrecognised cookie as light, what the server assumed before it had one", () => {
+    expect(parseSystemPrefersDark(undefined)).toBe(false);
+    expect(parseSystemPrefersDark("")).toBe(false);
+    expect(parseSystemPrefersDark("DARK")).toBe(false);
+  });
+
+  it("is a separate cookie from the reader's choice, with the same lifetime and scope", () => {
+    // One cookie for both would lose the choice the moment the machine changed.
+    expect(SYSTEM_THEME_COOKIE).not.toBe(THEME_STORAGE_KEY);
+    const cookie = systemThemeCookie(true);
+    expect(cookie).toContain("path=/");
+    expect(cookie).toContain("max-age=31536000");
+    expect(cookie.toLowerCase()).toContain("samesite=lax");
+  });
+});
+
+describe("the server renders a system reader in the machine's theme", () => {
+  const source = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
+
+  it("the root layout hands the machine's preference to the theme provider", () => {
+    const layout = source("app/layout.tsx");
+    expect(layout).toMatch(/parseSystemPrefersDark\(jar\.get\(SYSTEM_THEME_COOKIE\)\?\.value\)/);
+    expect(layout).toMatch(/initialSystemPrefersDark=\{initialSystemPrefersDark\}/);
+  });
+
+  it("the provider's first render, server and client, starts from it", () => {
+    // Starting from false again would put the light-then-dark turn back for
+    // every system reader on a dark machine.
+    expect(source("components/theme/ThemeProvider.tsx")).toMatch(
+      /useState\(initialSystemPrefersDark\)/,
+    );
+  });
+
+  it("the provider keeps the cookie current when the machine changes theme mid-session", () => {
+    expect(source("components/theme/ThemeProvider.tsx")).toMatch(/systemThemeCookie\(event\.matches\)/);
   });
 });
