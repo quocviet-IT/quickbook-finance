@@ -521,6 +521,14 @@ export const reconciliationReopenSchema = z.object({
 });
 export type ReconciliationReopenInput = z.infer<typeof reconciliationReopenSchema>;
 
+/** Removing a flagged group of entries (statement alerts): the account and the payee, never a list of entries. */
+export const balanceGroupRemoveSchema = z.object({
+  bankAccountId: z.uuid("Choose a bank account"),
+  payee: z.string().trim().min(1, "The payee is required").max(300),
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+export type BalanceGroupRemoveInput = z.infer<typeof balanceGroupRemoveSchema>;
+
 /** An ISO day that exists: 2026-02-31 is refused here, not by the database. */
 const statementDay = z
   .string()
