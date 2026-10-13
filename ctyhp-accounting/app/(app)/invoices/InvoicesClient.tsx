@@ -11,7 +11,6 @@ import {
   DatePicker,
   Form,
   Input,
-  InputNumber,
   Dropdown,
   Modal,
   Select,
@@ -23,7 +22,6 @@ import {
   type TableColumnsType,
 } from "antd";
 import {
-  DeleteOutlined,
   MoreOutlined,
   PaperClipOutlined,
   PlusOutlined,
@@ -47,12 +45,16 @@ import type {
   InvoiceLineRow,
   ItemRow,
 } from "@/lib/db/types";
-import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
+import type { InvoiceEstimateLink, InvoiceWithCustomer } from "@/lib/services/invoicing";
 import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
-import { itemToInvoiceLineDefaults } from "@/lib/domain/items";
-import EmptyCatalogHint from "@/components/EmptyCatalogHint";
+import SalesLineItems from "@/components/SalesLineItems";
+import {
+  estimateMessages,
+  invoiceFormFromEstimate,
+  type EstimateInvoicePrefill,
+} from "@/lib/domain/estimates";
 import { documentAttribution } from "@/lib/domain/audit";
 import {
   checkInvoiceAgainstCredit,
@@ -104,6 +106,8 @@ const AttachmentDrawer = dynamic(() => import("@/components/documents/Attachment
 
 export default function InvoicesClient({
   initialCreateOpen,
+  estimatePrefill,
+  estimateNotice,
   initialQueue,
   invoices,
   customers,
@@ -128,6 +132,10 @@ export default function InvoicesClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  /** From "Turn into an invoice" (`?estimate=`): the customer and lines the form opens with. */
+  estimatePrefill: EstimateInvoicePrefill | null;
+  /** Shown instead of opening the form when that estimate cannot be turned into an invoice now. */
+  estimateNotice: string | null;
   initialQueue: { asOf: string; focusId: string | null } | null;
   invoices: InvoiceWithCustomer[];
   customers: CustomerRow[];
@@ -171,6 +179,13 @@ export default function InvoicesClient({
   } | null>(null);
   const [overrideForm] = Form.useForm();
 
+  // Turning an estimate into an invoice. Both are read once: after the draft
+  // is made, the refreshed page finds the estimate converted, which is not
+  // news to the person who just converted it.
+  const [fromEstimate, setFromEstimate] = useState(estimatePrefill);
+  const [estimateNoticeShown, setEstimateNoticeShown] = useState(estimateNotice);
+  const [createError, setCreateError] = useState<string | null>(null);
+
   // Inline customer creation
   const [custOpen, setCustOpen] = useState(false);
   const [custForm] = Form.useForm();
@@ -184,6 +199,7 @@ export default function InvoicesClient({
   const [auditLoading, setAuditLoading] = useState(false);
   const [viewSettlements, setViewSettlements] = useState<SettlementEvent[]>([]);
   const [settlementsLoading, setSettlementsLoading] = useState(false);
+  const [viewEstimate, setViewEstimate] = useState<InvoiceEstimateLink | null>(null);
 
   const directory = useMemo(
     () => new Map(actors.map((a) => [a.id, a.email || a.full_name])),
@@ -290,10 +306,29 @@ export default function InvoicesClient({
   });
 
   function openCreate() {
+    setFromEstimate(null);
+    setCreateError(null);
     form.resetFields();
     form.setFieldsValue({ currency_code: baseCurrency, lines: [{ quantity: 1 }] });
     setOpen(true);
   }
+
+  /**
+   * Opened from an estimate: its customer and lines, and the due date set from
+   * the customer's terms as picking the customer would set it. Not the rest of
+   * what picking a customer does: the estimate's lines keep their own tax
+   * codes, so an untaxed line is not taxed on the way (invoiceFormFromEstimate).
+   */
+  const estimateFormValues = useMemo(() => {
+    if (!fromEstimate) return null;
+    const customer = localCustomers.find((c) => c.id === fromEstimate.values.customer_id);
+    const { dueInDays, ...values } = invoiceFormFromEstimate(fromEstimate, {
+      currencyCode: baseCurrency,
+      customerTermsDays: customer?.credit_terms_days,
+      defaultTermsDays,
+    });
+    return { ...values, due_date: dayjs().add(dueInDays, "day") };
+  }, [fromEstimate, localCustomers, baseCurrency, defaultTermsDays]);
 
   /**
    * Most states tax a sale where it is delivered, so picking a customer fills
@@ -359,6 +394,7 @@ export default function InvoicesClient({
       item_id: l.item_id || null,
     }));
     setSaving(true);
+    setCreateError(null);
     const res = await createInvoiceAction({
       customer_id: v.customer_id,
       currency_code: v.currency_code,
@@ -366,8 +402,24 @@ export default function InvoicesClient({
       due_date: v.due_date ? v.due_date.format("YYYY-MM-DD") : null,
       memo: v.memo ?? null,
       lines,
+      // Makes the draft and links it to the estimate in one transaction.
+      ...(fromEstimate ? { estimateId: fromEstimate.estimateId } : {}),
     });
     setSaving(false);
+    if (fromEstimate) {
+      if (!res.ok) {
+        // The database's words, in the form: the estimate was converted or
+        // declined meanwhile, or the customer no longer matches.
+        setCreateError(res.error ?? "Failed to create invoice");
+        return;
+      }
+      message.success(estimateMessages.invoiceCreated(fromEstimate.estimateNumber));
+      setFromEstimate(null);
+      setOpen(false);
+      // Off the estimate's link, so a reload does not try to convert it again.
+      router.replace("/invoices");
+      return;
+    }
     if (res.ok) {
       message.success("Draft invoice created");
       setOpen(false);
@@ -449,18 +501,21 @@ export default function InvoicesClient({
     setViewLines([]);
     setViewAudit([]);
     setViewSettlements([]);
+    setViewEstimate(null);
     setLinesOpen(true);
     setSettlementsLoading(true);
     if (canReadAudit) setAuditLoading(true);
     // One request: Next runs Server Actions one at a time, so these three
     // reads sent as separate actions were three trips in a row.
-    const { lines: res, settlements: settled, audit: trail } = await getInvoiceDetailAction(inv.id, canReadAudit);
+    const { lines: res, settlements: settled, audit: trail, estimate: madeFrom } = await getInvoiceDetailAction(inv.id, canReadAudit);
     setSettlementsLoading(false);
     setAuditLoading(false);
     if (res.ok && res.data) setViewLines(res.data);
     else message.error(res.error ?? "Failed to load lines");
     if (settled.ok && settled.data) setViewSettlements(settled.data);
     else message.error(settled.error ?? "Failed to load the payment history");
+    if (madeFrom.ok) setViewEstimate(madeFrom.data ?? null);
+    else message.error(madeFrom.error ?? "Failed to load the estimate it was made from");
     if (!trail) return;
     if (trail.ok && trail.data) setViewAudit(trail.data);
     else message.error(trail.error ?? "Failed to load the change history");
@@ -664,6 +719,22 @@ export default function InvoicesClient({
 
   return (
     <div>
+      {estimateNoticeShown ? (
+        <Alert
+          type="warning"
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+          title={estimateNoticeShown}
+          onClose={() => setEstimateNoticeShown(null)}
+          action={
+            <Button size="small" onClick={() => router.push("/estimates")}>
+              Open Estimates
+            </Button>
+          }
+        />
+      ) : null}
+
       {sequenceWarning ? (
         <Alert
           type="error"
@@ -768,13 +839,21 @@ export default function InvoicesClient({
         width={860}
         destroyOnHidden
       >
+        {fromEstimate ? (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            title={estimateMessages.fromEstimate(fromEstimate.estimateNumber)}
+          />
+        ) : null}
         {/* Defaults live here too, so opening straight from the New menu matches
             what the New invoice button sets up. */}
         <Form
           form={form}
           layout="vertical"
           requiredMark={false}
-          initialValues={{ currency_code: baseCurrency, lines: [{ quantity: 1 }] }}
+          initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [{ quantity: 1 }] }}
         >
           <Space align="end" wrap>
             <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>
@@ -784,10 +863,14 @@ export default function InvoicesClient({
                 placeholder="Select a customer"
                 options={localCustomers.map((c) => ({ value: c.id, label: c.name }))}
                 onChange={applyCustomerDefaults}
+                // The database takes only the estimate's own customer.
+                disabled={Boolean(fromEstimate)}
               />
             </Form.Item>
             <Form.Item label=" ">
-              <Button onClick={() => setCustOpen(true)}>+ New customer</Button>
+              <Button onClick={() => setCustOpen(true)} disabled={Boolean(fromEstimate)}>
+                + New customer
+              </Button>
             </Form.Item>
             <Form.Item name="currency_code" label="Currency" rules={[{ required: true }]} style={{ width: 150 }}>
               <Select disabled options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
@@ -856,80 +939,15 @@ export default function InvoicesClient({
             />
           ) : null}
 
-          <Typography.Text strong>Line items</Typography.Text>
-          <Form.List name="lines">
-            {(fields, { add, remove }) => (
-              <div style={{ marginTop: 8 }}>
-                {fields.map((field) => (
-                  <Space key={field.key} align="baseline" style={{ display: "flex", marginBottom: 8 }} wrap>
-                    <Form.Item name={[field.name, "item_id"]} style={{ marginBottom: 0, width: 190 }}>
-                      <Select
-                        allowClear
-                        showSearch
-                        placeholder="Item (optional)"
-                        optionFilterProp="label"
-                        notFoundContent={items.length === 0 ? "No products or services yet" : undefined}
-                        options={items.map((i) => ({ value: i.id, label: i.name }))}
-                        onChange={(itemId) => {
-                          const it = items.find((i) => i.id === itemId);
-                          if (!it) return;
-                          const d = itemToInvoiceLineDefaults(it);
-                          const dec = decimalsOf(form.getFieldValue("currency_code") ?? baseCurrency);
-                          form.setFields([
-                            { name: ["lines", field.name, "description"], value: d.description },
-                            { name: ["lines", field.name, "unit_price"], value: d.unit_price_minor / 10 ** dec },
-                            { name: ["lines", field.name, "income_account_id"], value: d.income_account_id ?? undefined },
-                            { name: ["lines", field.name, "tax_code_id"], value: d.tax_code_id ?? undefined },
-                          ]);
-                        }}
-                      />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "description"]} style={{ marginBottom: 0, width: 200 }}>
-                      <Input placeholder="Description" />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "quantity"]} style={{ marginBottom: 0 }} rules={[{ required: true, message: "Quantity" }]}>
-                      <InputNumber placeholder="Quantity" min={0} style={{ width: 90 }} />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "unit_price"]} style={{ marginBottom: 0 }} rules={[{ required: true, message: "Price" }]}>
-                      <InputNumber placeholder="Unit price" min={0} step={0.01} style={{ width: 130 }} prefix="$" />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "income_account_id"]} style={{ marginBottom: 0, width: 200 }} rules={[{ required: true, message: "Account" }]}>
-                      <Select
-                        placeholder="Income account"
-                        options={incomeAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))}
-                      />
-                    </Form.Item>
-                    <Form.Item name={[field.name, "tax_code_id"]} style={{ marginBottom: 0, width: 190 }}>
-                      <Select
-                        allowClear
-                        showSearch
-                        placeholder="Tax"
-                        optionFilterProp="label"
-                        options={taxOptions}
-                      />
-                    </Form.Item>
-                    <IconActionButton
-                      label="Remove invoice line"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => remove(field.name)}
-                    />
-                  </Space>
-                ))}
-                <Button type="dashed" onClick={() => add({ quantity: 1 })} icon={<PlusOutlined />} block>
-                  Add line
-                </Button>
-              </div>
-            )}
-          </Form.List>
-
-          {items.length === 0 ? (
-            <div style={{ marginTop: 8 }}>
-              <EmptyCatalogHint canManage={canManageItems}>
-                No products or services yet, so every line must be typed in full. Save the price once in
-              </EmptyCatalogHint>
-            </div>
-          ) : null}
+          {/* Shared with the estimate form, so an estimate's lines and an invoice's are the same editor. */}
+          <SalesLineItems
+            items={items}
+            incomeAccounts={incomeAccounts}
+            taxOptions={taxOptions}
+            decimals={decimalsOf(currency)}
+            canManageItems={canManageItems}
+            removeLabel="Remove invoice line"
+          />
 
           <Form.Item name="memo" label="Memo" style={{ marginTop: 12 }}>
             <Input.TextArea rows={2} />
@@ -942,6 +960,8 @@ export default function InvoicesClient({
               Total: {formatMoney(previewTotals.totalMinor, currency, decimalsOf(currency))}
             </Typography.Text>
           </div>
+
+          {createError ? <Alert style={{ marginTop: 12 }} type="error" showIcon title={createError} /> : null}
         </Form>
       </Modal>
 
@@ -973,6 +993,12 @@ export default function InvoicesClient({
         footer={null}
         width={820}
       >
+        {viewEstimate ? (
+          <Typography.Paragraph>
+            <Link href="/estimates">{estimateMessages.fromEstimate(viewEstimate.estimate_number)}</Link>
+          </Typography.Paragraph>
+        ) : null}
+
         {viewInvoice ? (
           <DocumentAuditTrail
             record={viewInvoice}

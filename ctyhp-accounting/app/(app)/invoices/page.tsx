@@ -11,10 +11,41 @@ import { getCurrentCompanySettings } from "@/lib/services/company";
 import { auditSequence, describeSequenceIntegrity } from "@/lib/domain/sequence";
 import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
+import { getEstimateInvoicePrefill } from "@/lib/services/estimates";
+import { estimateIdSchema } from "@/lib/domain/schemas";
+import type { EstimateInvoicePrefill } from "@/lib/domain/estimates";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
 
 export const dynamic = "force-dynamic";
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/**
+ * `?estimate=<id>`, from "Turn into an invoice": the New invoice form's
+ * values, or the words to show instead of opening it (already turned into an
+ * invoice, declined, not found). Writers only, since it exists to create an
+ * invoice; anyone else gets the plain page. Never throws: a failed read must
+ * not take the invoice list down with it.
+ */
+async function estimateLink(
+  sb: SupabaseServerClient,
+  raw: string | undefined,
+): Promise<{ prefill: EstimateInvoicePrefill | null; notice: string | null }> {
+  if (!raw) return { prefill: null, notice: null };
+  if (!canWrite(await getUserRole())) return { prefill: null, notice: null };
+  const id = estimateIdSchema.safeParse(raw);
+  if (!id.success) return { prefill: null, notice: "Estimate not found" };
+  try {
+    const prefill = await getEstimateInvoicePrefill(sb, id.data);
+    if (!prefill) return { prefill: null, notice: "Estimate not found" };
+    if (prefill.blocked) return { prefill: null, notice: prefill.blocked };
+    return { prefill, notice: null };
+  } catch (err) {
+    const reason = err instanceof Error && err.message ? `: ${err.message}` : ".";
+    return { prefill: null, notice: `The estimate could not be read${reason}` };
+  }
+}
 
 export default async function InvoicesPage({
   searchParams,
@@ -24,10 +55,10 @@ export default async function InvoicesPage({
     queue?: string;
     asOf?: string;
     focus?: string;
+    estimate?: string;
   }>;
 }) {
   const params = await searchParams;
-  const initialCreateOpen = params.new === "1";
   const initialQueue =
     params.queue === "overdue" && /^\d{4}-\d{2}-\d{2}$/.test(params.asOf ?? "")
       ? { asOf: params.asOf!, focusId: params.focus ?? null }
@@ -54,6 +85,7 @@ export default async function InvoicesPage({
     canOverrideCredit,
     companySettings,
     canManageItems,
+    fromEstimate,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -75,7 +107,12 @@ export default async function InvoicesPage({
     hasPermission(sb, "credit.override"),
     getCurrentCompanySettings(sb),
     hasPermission(sb, "items.manage"),
+    estimateLink(sb, params.estimate),
   ]);
+
+  // An estimate that cannot be turned into an invoice now says so instead of
+  // opening a form the database would refuse.
+  const initialCreateOpen = params.new === "1" && fromEstimate.notice === null;
 
   // A number the sequence issued that no invoice holds is the sign of a removed
   // sale, so the warning belongs where invoices are worked on — not only in the
@@ -107,7 +144,14 @@ export default async function InvoicesPage({
     <div>
       <PageHeader title="Invoices" description="Create invoices, issue them to the ledger, and track balances due." />
       <InvoicesClient
+        // A fresh screen per estimate link: the prefill and its notice are read
+        // once, when the screen mounts. Keyed on the address rather than on the
+        // answer, so the refresh after the draft is made (which now finds the
+        // estimate converted) does not remount it to say so.
+        key={params.estimate ?? "invoices"}
         initialCreateOpen={initialCreateOpen}
+        estimatePrefill={fromEstimate.prefill}
+        estimateNotice={fromEstimate.notice}
         initialQueue={initialQueue}
         invoices={invoices}
         customers={customers}

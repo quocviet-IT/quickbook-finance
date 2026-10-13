@@ -1,8 +1,15 @@
 "use client";
 
 import type { jsPDF } from "jspdf";
-import type { InvoiceDocument } from "@/lib/domain/invoice-document";
+import type { InvoiceDocument, PrintedDocument } from "@/lib/domain/invoice-document";
 import { invoiceDocumentFileName } from "@/lib/domain/invoice-document";
+import type { EstimateDocument } from "@/lib/domain/estimate-document";
+
+/**
+ * What this renderer draws: an invoice, or an estimate, which adds a closing
+ * line under its note (lib/domain/estimate-document).
+ */
+export type RenderableDocument = PrintedDocument & { footer?: string | null };
 
 const INK: [number, number, number] = [15, 23, 42];
 const MUTED: [number, number, number] = [100, 116, 139];
@@ -29,11 +36,12 @@ async function pdfLibrary() {
 }
 
 /**
- * Draws the document model produced by lib/domain/invoice-document. Every
- * string here already came from that module — this file decides placement,
+ * Draws the document model produced by lib/domain/invoice-document, or the
+ * estimate's from lib/domain/estimate-document, which shares its layout. Every
+ * string here already came from those modules — this file decides placement,
  * never content.
  */
-export async function renderInvoicePdf(doc: InvoiceDocument): Promise<jsPDF> {
+export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> {
   const { jsPDF, autoTable } = await pdfLibrary();
   const pdf = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -106,21 +114,39 @@ export async function renderInvoicePdf(doc: InvoiceDocument): Promise<jsPDF> {
 
   // @ts-expect-error jspdf-autotable augments the document at runtime.
   let totalsY = (pdf.lastAutoTable?.finalY ?? billY) + 22;
-  for (const total of doc.totals) {
-    const emphasise = total.label === "Balance due";
+  doc.totals.forEach((total, index) => {
+    // The last row is the figure the reader acts on: Balance due on an
+    // invoice, which the model always puts last, and Total on an estimate,
+    // which owes nothing.
+    const emphasise = index === doc.totals.length - 1;
     pdf.setFont("helvetica", emphasise ? "bold" : "normal");
     pdf.setFontSize(emphasise ? 11 : 9);
     pdf.setTextColor(...(emphasise ? INK : MUTED));
     pdf.text(total.label, rightEdge - 140, totalsY, { align: "right" });
     pdf.text(total.amount, rightEdge, totalsY, { align: "right" });
     totalsY += emphasise ? 18 : 14;
-  }
+  });
 
+  let footY = totalsY + 10;
   if (doc.memo) {
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9);
     pdf.setTextColor(...MUTED);
-    pdf.text(pdf.splitTextToSize(doc.memo, pageWidth - MARGIN * 2), MARGIN, totalsY + 10);
+    const memoLines: string[] = pdf.splitTextToSize(doc.memo, pageWidth - MARGIN * 2);
+    pdf.text(memoLines, MARGIN, footY);
+    footY += memoLines.length * pdf.getLineHeight() + 8;
+  }
+
+  if (doc.footer) {
+    // Starts a page of its own rather than running into the page number.
+    if (footY > pdf.internal.pageSize.getHeight() - 48) {
+      pdf.addPage();
+      footY = 64;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.setTextColor(...INK);
+    pdf.text(pdf.splitTextToSize(doc.footer, pageWidth - MARGIN * 2), MARGIN, footY);
   }
 
   if (doc.watermark) {
@@ -158,6 +184,12 @@ export async function downloadInvoicePdf(
 ): Promise<void> {
   const pdf = await renderInvoicePdf(doc);
   pdf.save(invoiceDocumentFileName(invoiceNumber, issueDate));
+}
+
+/** Saves an estimate under the name its model gives it: `Estimate EST-000001 <customer>.pdf`. */
+export async function downloadEstimatePdf(doc: EstimateDocument): Promise<void> {
+  const pdf = await renderInvoicePdf(doc);
+  pdf.save(doc.fileName);
 }
 
 /** Opens the browser print dialog on the rendered document. */
