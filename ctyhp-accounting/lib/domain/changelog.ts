@@ -57,7 +57,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Open, Expired, Declined and Converted",
         detail:
-          "An estimate starts Open, and reads Expired from the day after its Valid until date, in the company’s time zone. An expired estimate can still be edited, or turned into an invoice after a question. Mark declined when the customer says no, and Reopen if they change their mind. Once an invoice is made from it, it reads Converted and is locked: it can be viewed and printed, but not edited, declined or deleted. An estimate that has never had an invoice made from it can be deleted; one that has is marked declined instead.",
+          "An estimate starts Open, and reads Expired from the day after its Valid until date, in the company’s time zone. An expired estimate can still be edited, or turned into an invoice after a question. Mark declined when the customer says no, and Reopen if they change their mind. Once an invoice is made from it, it reads Converted and is locked: it can be viewed and printed, but not edited, declined or deleted. An estimate that has never had an invoice made from it can be deleted; one whose invoice was later voided cannot, and is marked declined instead. A declined estimate is reopened before it can be turned into an invoice.",
         route: "/estimates",
       },
       {

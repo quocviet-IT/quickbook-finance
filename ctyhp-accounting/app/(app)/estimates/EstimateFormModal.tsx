@@ -328,7 +328,7 @@ function EstimateFormBody({
               }),
             ]}
           >
-            <DatePicker onChange={() => setExpiryFollowsDate(false)} />
+            <DatePicker allowClear={false} onChange={() => setExpiryFollowsDate(false)} />
           </Form.Item>
         </Space>
 

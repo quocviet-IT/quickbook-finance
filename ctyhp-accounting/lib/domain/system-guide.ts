@@ -203,8 +203,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         action: "Record a no",
         control: "Mark declined",
         note:
-          "Reopen brings it back if the customer changes their mind. An estimate past its Valid until date " +
-          "reads Expired on its own; it can still be edited, or turned into an invoice after a question.",
+          "Reopen brings it back if the customer changes their mind; a declined estimate is reopened before it " +
+          "can be turned into an invoice. An estimate past its Valid until date reads Expired on its own; it " +
+          "can still be edited, or turned into an invoice after a question.",
       },
       {
         action: "Turn a yes into an invoice",

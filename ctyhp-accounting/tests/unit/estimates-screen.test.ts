@@ -118,6 +118,11 @@ describe("the Estimates screen's sources", () => {
     expect(form).toContain('label="Note printed at the foot"');
   });
 
+  it("keeps Valid until from being cleared, so a blank date cannot reset it to 30 days", () => {
+    const form = readFileSync(join(ESTIMATES_DIR, "EstimateFormModal.tsx"), "utf8");
+    expect(form).toContain("<DatePicker allowClear={false} onChange={() => setExpiryFollowsDate(false)} />");
+  });
+
   it("asks before a delete and before turning an expired estimate into an invoice, in the shared words", () => {
     const client = readFileSync(join(ESTIMATES_DIR, "EstimatesClient.tsx"), "utf8");
     expect(client).toContain("estimateMessages.deleteConfirm(row.estimate_number)");
