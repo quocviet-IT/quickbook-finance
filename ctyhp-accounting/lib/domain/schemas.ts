@@ -132,6 +132,43 @@ export const invoiceCreateSchema = z.object({
 });
 export type InvoiceCreateInput = z.infer<typeof invoiceCreateSchema>;
 
+/**
+ * The New invoice form's input, which may carry the estimate the form was
+ * opened from. The invoice fields are validated exactly as above; with an
+ * estimate, the draft is made and linked by acc_create_invoice_from_estimate.
+ */
+export const invoiceCreateWithEstimateSchema = invoiceCreateSchema.extend({
+  estimateId: z.uuid("The estimate this invoice is made from was not found").optional().nullable(),
+});
+
+// --- Estimates ---
+/** An estimate line is an invoice line, so turning an estimate into an invoice loses nothing. */
+export const estimateLineInputSchema = invoiceLineInputSchema;
+export type EstimateLineInput = z.infer<typeof estimateLineInputSchema>;
+
+/** An estimate's id, for every action that names one. */
+export const estimateIdSchema = z.uuid("Estimate not found");
+
+/**
+ * Create or edit an estimate. The number is the database's, assigned on the
+ * first save. A missing "Valid until" means the estimate date plus 30 days,
+ * which the database fills in. Amounts are worked out by the database.
+ */
+export const estimateSaveSchema = z
+  .object({
+    customer_id: z.uuid("Select a customer"),
+    currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
+    estimate_date: z.iso.date("Choose the estimate date."),
+    expiry_date: z.iso.date("Enter a valid Valid until date.").optional().nullable(),
+    memo: z.string().trim().max(500).optional().nullable(),
+    lines: z.array(estimateLineInputSchema).min(1, "Add at least one line item"),
+  })
+  .refine((value) => !value.expiry_date || value.expiry_date >= value.estimate_date, {
+    message: "Valid until cannot be before the estimate date.",
+    path: ["expiry_date"],
+  });
+export type EstimateSaveInput = z.infer<typeof estimateSaveSchema>;
+
 // --- Payments ---
 export const paymentAllocationSchema = z.object({
   invoice_id: z.uuid(),

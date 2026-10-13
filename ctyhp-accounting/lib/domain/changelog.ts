@@ -41,6 +41,42 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.02",
+    date: "2026-10-13",
+    headline:
+      "Estimates: promise a customer a price, print it, and turn it into an invoice when they accept.",
+    changes: [
+      {
+        kind: "added",
+        title: "Estimates, under Sales",
+        detail:
+          "Sales › Estimates lists every estimate with its number, date, customer, Valid until, total, state, and the invoice made from it. The pills narrow the list to Open, Expired, Declined or Converted, each with its count, and the search finds a number or a customer. New estimate, here or under New › Estimate, opens the form: choose a customer or add one, then the estimate date and Valid until, which starts 30 days later. The lines work exactly as on an invoice — item, description, quantity, unit price, income account and tax code — and choosing an item fills in its price and tax. Subtotal, Sales tax and Total add up as you type, and Note printed at the foot is optional. Save gives a new estimate its number, from EST-000001. An estimate is not in the books: nothing posts for it.",
+        route: "/estimates",
+      },
+      {
+        kind: "added",
+        title: "Open, Expired, Declined and Converted",
+        detail:
+          "An estimate starts Open, and reads Expired from the day after its Valid until date, in the company’s time zone. An expired estimate can still be edited, or turned into an invoice after a question. Mark declined when the customer says no, and Reopen if they change their mind. Once an invoice is made from it, it reads Converted and is locked: it can be viewed and printed, but not edited, declined or deleted. An estimate that has never had an invoice made from it can be deleted; one whose invoice was later voided cannot, and is marked declined instead. A declined estimate is reopened before it can be turned into an invoice.",
+        route: "/estimates",
+      },
+      {
+        kind: "added",
+        title: "Turn an estimate into an invoice",
+        detail:
+          "Turn into an invoice, on the list or in the form, opens New invoice on the Invoices screen with the estimate’s customer and lines filled in, under From estimate EST-000001. The due date follows the customer’s terms as usual, and each line keeps the tax code the estimate gave it. Change anything you need, then Save draft: the draft is linked to the estimate, which becomes Converted. Check the draft over, then issue it as usual — only the invoice posts. Cancel changes nothing. If that invoice is voided later, the estimate reads Open again. An invoice made from an estimate says so in its detail, with a link to Estimates.",
+        route: "/invoices",
+      },
+      {
+        kind: "added",
+        title: "Estimates print as PDF",
+        detail:
+          "Download PDF prints an estimate on the invoice’s layout: Estimate EST-000001 with its estimate date and Valid until, the lines, then Subtotal, Sales tax and Total. Nothing is owed on an estimate, so there is no Paid or Balance due. Your note follows, then always “This is a quotation, not an invoice. Nothing is owed on it.” The file is named Estimate, the number and the customer’s name.",
+        route: "/estimates",
+      },
+    ],
+  },
+  {
     version: "2.01",
     date: "2026-10-12",
     headline: "Dark mode is dark from the first moment for anyone whose theme follows their computer.",

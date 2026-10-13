@@ -48,6 +48,7 @@ export const NAV: NavItem[] = [
       // stock it happens to also describe.
       { key: "/items", label: "Products & Services" },
       { key: "/invoices", label: "Invoices" },
+      { key: "/estimates", label: "Estimates" },
       { key: "/payments", label: "Payments" },
       { key: "/credit-memos", label: "Credit Memos" },
       { key: "/sales-tax", label: "Sales Tax" },
@@ -357,6 +358,7 @@ export interface NewMenuItem {
  */
 export const NEW_MENU: NewMenuItem[] = [
   { key: "invoice", label: "Invoice", href: "/invoices?new=1" },
+  { key: "estimate", label: "Estimate", href: "/estimates?new=1" },
   { key: "payment", label: "Payment received", href: "/payments?new=1" },
   { key: "bill", label: "Bill", href: "/bills?new=1" },
   { key: "expense", label: "Expense", href: "/expenses?new=1" },

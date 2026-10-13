@@ -294,6 +294,7 @@ export async function getDashboardMetrics(
 
 const ACTIVITY_ENTITIES: Record<string, { entity: string; href: string; category: DashboardActivityCategory }> = {
   acc_invoice: { entity: "Invoice", href: "/invoices", category: "sales" },
+  acc_estimate: { entity: "Estimate", href: "/estimates", category: "sales" },
   acc_payment: { entity: "Customer payment", href: "/payments", category: "sales" },
   acc_credit_memo: { entity: "Credit memo", href: "/credit-memos", category: "sales" },
   acc_bill: { entity: "Bill", href: "/bills", category: "purchases" },
@@ -331,6 +332,7 @@ const REFERENCE_KEYS = [
   "expense_number",
   "po_number",
   "receipt_number",
+  "estimate_number",
   "entry_number",
   "label",
 ] as const;

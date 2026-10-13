@@ -125,6 +125,7 @@ describe("NAV tree", () => {
       "/customers",
       "/items",
       "/invoices",
+      "/estimates",
       "/payments",
       "/credit-memos",
       "/sales-tax",
@@ -373,6 +374,7 @@ describe("NEW_MENU", () => {
   it("covers the documents entered daily", () => {
     expect(NEW_MENU.map((i) => i.key)).toEqual([
       "invoice",
+      "estimate",
       "payment",
       "bill",
       "expense",

@@ -48,7 +48,8 @@
     "test:scanner-gateway": "node ../services/document-scanner/test/contract.test.mjs",
     "verify:entitlement": "node --env-file=.env.local scripts/verify-entitlement.mjs",
     "verify:stock-count": "node --env-file=.env.local scripts/verify-stock-count.mjs",
-    "verify:balance-entries": "node --env-file=.env.local scripts/verify-balance-entries.mjs"
+    "verify:balance-entries": "node --env-file=.env.local scripts/verify-balance-entries.mjs",
+    "verify:estimates": "node --env-file=.env.local scripts/verify-estimates.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

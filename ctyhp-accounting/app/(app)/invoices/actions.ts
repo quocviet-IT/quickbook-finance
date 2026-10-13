@@ -7,15 +7,18 @@ import {
   issueInvoice,
   voidInvoice,
   createCustomer,
+  getInvoiceEstimate,
   getInvoiceLines,
   getInvoiceDocumentSource,
   InvoicingError,
+  type InvoiceEstimateLink,
 } from "@/lib/services/invoicing";
+import { createInvoiceFromEstimate } from "@/lib/services/estimates";
 import { searchAudit } from "@/lib/services/access";
 import { listInvoiceSettlements } from "@/lib/services/settlements";
 import type { SettlementEvent } from "@/lib/domain/settlement";
 import type { AuditEntryRow, InvoiceLineRow } from "@/lib/db/types";
-import { invoiceCreateSchema, customerCreateSchema } from "@/lib/domain/schemas";
+import { invoiceCreateWithEstimateSchema, customerCreateSchema } from "@/lib/domain/schemas";
 import {
   buildInvoiceDocument,
   type InvoiceDocument,
@@ -52,14 +55,29 @@ export async function createCustomerAction(raw: unknown): Promise<ActionResult<{
   }
 }
 
+/**
+ * Create a draft invoice. When the New invoice form was opened from an
+ * estimate, the input carries `estimateId`, and the draft is made and linked
+ * to that estimate in one transaction (acc_create_invoice_from_estimate),
+ * which makes the estimate Converted. The invoice fields are validated the
+ * same way either way.
+ */
 export async function createInvoiceAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
-  const parsed = invoiceCreateSchema.safeParse(raw);
+  const parsed = invoiceCreateWithEstimateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  const { estimateId, ...input } = parsed.data;
   try {
     const sb = await createSupabaseServerClient();
-    const inv = await createDraftInvoice(sb, parsed.data);
+    if (estimateId) {
+      const id = await createInvoiceFromEstimate(sb, estimateId, input);
+      revalidatePath("/invoices");
+      revalidatePath("/estimates");
+      revalidatePath("/dashboard");
+      return { ok: true, data: { id } };
+    }
+    const inv = await createDraftInvoice(sb, input);
     revalidatePath("/invoices");
     return { ok: true, data: { id: inv.id } };
   } catch (err) {
@@ -82,6 +100,8 @@ export interface InvoiceDetail {
   settlements: ActionResult<SettlementEvent[]>;
   /** The change history, newest first; null when it was not asked for. */
   audit: ActionResult<AuditEntryRow[]> | null;
+  /** The estimate it was made from ("From estimate EST-000001"); data null when none. */
+  estimate: ActionResult<InvoiceEstimateLink | null>;
 }
 
 /**
@@ -91,7 +111,8 @@ export interface InvoiceDetail {
  * then the change history — and Next dispatches Server Actions one at a time
  * per client ("Sequential dispatch" in its Server Actions guide), so opening an
  * invoice was three trips in a row. Here the reads run side by side on one
- * client, each keeping its own error.
+ * client, each keeping its own error. The estimate the invoice was made from
+ * is one more read alongside them.
  *
  * `withAudit` is the page's answer to whether the viewer holds `audit.read`.
  * It decides only whether the history is asked for: `acc_audit_search` refuses
@@ -103,9 +124,9 @@ export async function getInvoiceDetailAction(id: string, withAudit: boolean): Pr
     sb = await createSupabaseServerClient();
   } catch (err) {
     const failed = { ok: false, error: msg(err) };
-    return { lines: failed, settlements: failed, audit: withAudit ? failed : null };
+    return { lines: failed, settlements: failed, audit: withAudit ? failed : null, estimate: failed };
   }
-  const [lines, settlements, audit] = await Promise.all([
+  const [lines, settlements, audit, estimate] = await Promise.all([
     settled(() => getInvoiceLines(sb, id)),
     settled(() => listInvoiceSettlements(sb, id)),
     withAudit
@@ -121,8 +142,9 @@ export async function getInvoiceDetailAction(id: string, withAudit: boolean): Pr
           }),
         )
       : Promise.resolve(null),
+    settled(() => getInvoiceEstimate(sb, id)),
   ]);
-  return { lines, settlements, audit };
+  return { lines, settlements, audit, estimate };
 }
 
 /**

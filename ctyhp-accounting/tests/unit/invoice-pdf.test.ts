@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildInvoiceDocument } from "@/lib/domain/invoice-document";
+import { buildEstimateDocument, ESTIMATE_CLOSING_LINE } from "@/lib/domain/estimate-document";
 import { renderInvoicePdf } from "@/lib/client/invoice-pdf";
 
 const source = {
@@ -96,6 +97,98 @@ describe("renderInvoicePdf", () => {
     await expect(renderInvoicePdf(doc)).resolves.toBeDefined();
     const pdf = await renderInvoicePdf(doc);
     expect(() => pdf.output("arraybuffer")).not.toThrow();
+  });
+});
+
+/** The page content as text: jsPDF writes its streams uncompressed unless asked otherwise. */
+function pdfText(bytes: Uint8Array): string {
+  return new TextDecoder("latin1").decode(bytes);
+}
+
+const estimateSource = {
+  estimate: {
+    estimate_number: "EST-000004",
+    estimate_date: "2026-10-01",
+    expiry_date: "2026-10-31",
+    currency_code: "USD",
+    subtotal_minor: 60_000,
+    tax_minor: 3_750,
+    total_minor: 63_750,
+    memo: "Prices hold for thirty days.",
+  },
+  lines: [
+    {
+      line_order: 1,
+      description: "Sample ring resizing",
+      quantity: 2,
+      unit_price_minor: 30_000,
+      line_subtotal_minor: 60_000,
+      line_tax_minor: 3_750,
+      line_total_minor: 63_750,
+    },
+  ],
+  customer: source.customer,
+  company: source.company,
+};
+
+describe("renderInvoicePdf, drawing an estimate", () => {
+  it("produces a real PDF file", async () => {
+    const pdf = await renderInvoicePdf(buildEstimateDocument(estimateSource));
+    const bytes = new Uint8Array(pdf.output("arraybuffer") as ArrayBuffer);
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+  });
+
+  it("draws the closing line after the note", async () => {
+    const pdf = await renderInvoicePdf(buildEstimateDocument(estimateSource));
+    const text = pdfText(new Uint8Array(pdf.output("arraybuffer") as ArrayBuffer));
+    const note = text.indexOf("(Prices hold for thirty days.)");
+    const closing = text.indexOf(`(${ESTIMATE_CLOSING_LINE})`);
+    expect(note).toBeGreaterThan(-1);
+    expect(closing).toBeGreaterThan(note);
+  });
+
+  it("draws the closing line when there is no note", async () => {
+    const pdf = await renderInvoicePdf(
+      buildEstimateDocument({ ...estimateSource, estimate: { ...estimateSource.estimate, memo: null } }),
+    );
+    expect(pdfText(new Uint8Array(pdf.output("arraybuffer") as ArrayBuffer))).toContain(`(${ESTIMATE_CLOSING_LINE})`);
+  });
+
+  it("emphasises Total, the estimate's last row, as it emphasises an invoice's Balance due", async () => {
+    const pdf = await renderInvoicePdf(buildEstimateDocument(estimateSource));
+    const text = pdfText(new Uint8Array(pdf.output("arraybuffer") as ArrayBuffer));
+    // The emphasised row is set in 11pt; every other totals row in 9pt.
+    const total = text.indexOf("(Total)");
+    const subtotal = text.indexOf("(Subtotal)");
+    expect(text.lastIndexOf(" 11 Tf", total)).toBeGreaterThan(text.lastIndexOf(" 9 Tf", total));
+    expect(text.lastIndexOf(" 9 Tf", subtotal)).toBeGreaterThan(text.lastIndexOf(" 11 Tf", subtotal));
+  });
+});
+
+describe("invoices print as before", () => {
+  it("still emphasise Balance due, which the model always puts last", () => {
+    // The renderer now emphasises the last totals row instead of the row
+    // labelled Balance due. For an invoice they are the same row, paid or not.
+    const unpaid = buildInvoiceDocument(source);
+    const partlyPaid = buildInvoiceDocument({
+      ...source,
+      invoice: { ...source.invoice, status: "partial", balance_due_minor: 100_000 },
+    });
+    expect(unpaid.totals.at(-1)?.label).toBe("Balance due");
+    expect(partlyPaid.totals.map((t) => t.label)).toEqual([
+      "Subtotal",
+      "Sales tax",
+      "Total",
+      "Paid to date",
+      "Balance due",
+    ]);
+  });
+
+  it("set Balance due in 11pt and draw no closing line", async () => {
+    const text = pdfText(await pdfBytes());
+    const balance = text.indexOf("(Balance due)");
+    expect(text.lastIndexOf(" 11 Tf", balance)).toBeGreaterThan(text.lastIndexOf(" 9 Tf", balance));
+    expect(text).not.toContain("quotation");
   });
 });
 
