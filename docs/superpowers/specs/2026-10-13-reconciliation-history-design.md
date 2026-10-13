@@ -272,3 +272,63 @@ It also checks the structure on all six companies.
 - AI suggestions.
 - Bringing history forward after an account already has completed reconciliations.
 - Posting an adjustment for an opening that does not match.
+
+## Amendments from pre-building (13/10)
+
+The release was built and run on a local pre-build branch first.
+
+**Results**
+- **Migration 0142 is live** on all six companies, applied on 13/10 with the user's approval.
+  - The rolled-back verification script passed 207 of 207 against the live functions: 97 behaviour and structure checks on the sample company, and 22 structure checks on each of the others.
+  - The company provisioning self-check passed 17 of 17.
+  - A read-only count found bank accounts never reconciled in two companies, with about 1,800 and 2,800 posted lines that no reconciliation holds.
+- **First smoke on the sample company, against the live database:** 138 of 140.
+  - Every flow worked at 1280 in light and dark.
+  - The two failures were tables cut off on a phone; both are fixed (item 12).
+- **Second smoke, after the fixes:** 23 of 24, with no console errors.
+  - One check was blocked by the existing Bank Transactions matcher (see "Found along the way").
+  - One display flicker after bringing the history forward was fixed (item 13).
+
+**Settled along the way**
+
+1. **Where the workspace finds the statement's period.**
+   - A reconciliation does not store its statement's period start, so the workspace reads `period_start` from the kept statement file.
+   - The day brought forward through is the day before that.
+   - A session without a kept file, or whose file names no start or opening, gets no button; the Reconcile history page does it instead.
+   - The kept file is readable with `documents.read`, which every role has by default.
+2. **Pairing is worked out in the application, not stored.** So the refusal to set aside a paired line ("This line is paired with the books, so it is a transaction.") lives in the service, not in the database function.
+3. **Discarding a session that holds an adjustment.**
+   - Nothing in the app voids a reconciliation adjustment, so the refusal says so plainly: "This reconciliation posted an adjustment ({entry}), so it cannot be discarded."
+   - A completed reconciliation that an administrator reopens is in progress again, so it can then be discarded.
+4. **"Today"** for bringing history forward is the company's day, also for From statement files.
+5. **Extra lines.** A missing line is held back as Extra under either of two rules:
+   - the opening plus the paired lines already equals the closing, which makes every missing line extra;
+   - the statement does not prove itself, and exactly one missing line is the amount it is out by.
+
+   The second rule catches a misread line that stands beside a real line the books lack, such as a fee. The fee stays in Add all.
+6. **Held-back lines.**
+   - Extra lines and likely duplicates are listed under "Held back from Add all:", each with its note and Add anyway.
+   - "Add all N" posts only the lines not held back.
+   - Each posting is still all of what was asked or none.
+   - Duplicates are looked up only for the lines Add all would add.
+7. **A match with 0 entries offers no button.** An empty brought-forward reconciliation would close the account to bringing its real history forward later.
+8. **Bringing forward from a reconciliation also ties the kept statement file to the brought-forward reconciliation**, as From statement files does.
+   - Its note is the existing brought-forward note.
+   - On the history page the note is "Brought forward, proved by the statement balance of {amount} on {date}".
+   - The confirmation reads "{N entries} up to {date} will be marked reconciled. Nothing is posted to the books."
+9. **A line set aside stays in Bank Transactions**, unmatched. The message says so: "Set aside as not a transaction. Its line stays in Bank Transactions — exclude it there if it is not real."
+10. **Discard returns to Reconcile on the same bank account.**
+11. **The history page** prints its dates as "Sep 30, 2026". The chosen account is marked with the light accent wash, and its date picker refuses a day after today.
+12. **On a phone,** the workspace's statement lines, ledger lines and Add missing tables, and the history table, scroll inside their own box; the page itself never scrolls sideways. The widths are kept beside the columns and pinned by tests.
+13. **Write buttons stay busy until the screen catches up.**
+    - This covers bringing forward, discarding, Add anyway, Not a transaction / Restore, Complete, Record adjustment and Reopen.
+    - After bringing the history forward, the figures are read again before the dialog closes, so the screen changes once.
+14. **The PDF reader.**
+    - Inside a check-image area, a "Checks…" or "Fees…" caption, or the images' own Date / Check No. / Amount table, no longer reopens reading.
+    - An invented fixture shows the old reader taking a thumbnail row as a payment.
+
+**Found along the way, for later releases**
+- **Statement lines are not exported.** `acc_reconciliation_statement_line` has been missing from the company export, backup and restore since 0132, so a restored company loses its kept statement lines.
+- **The Bank Transactions matcher scores ties the same.** It scores a book line 0 days away and one 2 days away alike. Between two identical bank lines it can suggest the later one, which then blocks Add anyway with "approve or reject that first". This belongs to the 2.04 matching work.
+- **Info and success alerts in light mode** have a heavy grey-green fill across the app (theme, not this release).
+- **`scripts/verify-reconcile-from-statement.mjs` writes in every company** inside its rolled-back transaction. Its mismatch message now follows 0142.
