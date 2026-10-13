@@ -216,3 +216,56 @@ Creating, editing, declining, reopening, deleting and turning into an invoice ne
 - No partial conversion, no deposit, no progress invoicing (the mockup has none).
 - No estimates report.
 - No global search entry for estimates.
+
+## Amendments from pre-building (12–13/10)
+
+The release was built and run on a local pre-build branch first.
+
+**Results**
+- **Migration 0141 is live** on all six companies, applied on 13/10 with the user's approval.
+  - The rolled-back verification script passed 224 of 224 against the live functions: 99 behaviour and structure checks on the sample company, and 25 structure checks on each of the others.
+  - The company provisioning self-check passed 17 of 17.
+- **Smoke on the sample company, against the live database:** 59 of 60.
+  - Covered: create, PDF, decline, reopen, turn into an invoice with a changed quantity, a second conversion refused, the invoice's "From estimate", void then Open, the delete rules, and the expired confirmation.
+  - The one failure is the existing behaviour of every screen opened by `?new=1`: choosing New › Estimate while already on `/estimates` does not open the form.
+  - The estimates it created stay on PC-Test as sample data.
+- **Release number:** main took 2.01 for a theme fix first, so this release is 2.02.
+
+**Settled along the way**
+
+1. **Writing.** Both tables are read-only to `authenticated` (read as invoices are read), and every write goes through the four functions. A direct insert, update or delete by staff is refused; the verification script checks this.
+2. **Status for the Number Sequence report.**
+   - `acc_estimate.status` is a plain column reading `open` or `declined`, kept equal to `declined_at` by a check constraint. Converted stays derived.
+   - It is not a generated column, because restoring a backup inserts every column and Postgres refuses a value for a generated one.
+3. **Stamps and the audit trail.** There are `updated_by` and the actor-stamp trigger, as every document table since 0064 has. An audit trigger on the header puts estimates in recent activity and the change log.
+4. **Delete.**
+   - A deleted estimate's number is written to the gap notes, as deleting a payment does, so the Number Sequence report explains the gap.
+   - The refusal reads "… Mark it declined instead." when every invoice made from it is void, and "… so it cannot be deleted" while one is live.
+5. **Validation.**
+   - The estimate date is required: there is no database default, because the database date is UTC.
+   - Income accounts must be income-type, posting and active, the invoice form's own rule, enforced in the database.
+   - Refusals name the line, or the estimate number.
+6. **Amounts.**
+   - Line subtotals and tax round exactly as invoices do: a test pins the text in both functions.
+   - Quantities are rounded to the 4 places stored, so the invoice made from an estimate totals the same.
+   - The conversion calls `acc_create_draft_invoice`, then sets `estimate_id`; it copies none of its logic.
+7. **The form.**
+   - The line editor is shared with the invoice form (`components/SalesLineItems.tsx`), so the two cannot drift.
+   - Picking a customer fills the customer's state tax into untaxed lines, as on an invoice.
+   - "Turn into an invoice" in a changed form saves first.
+   - There are no column sorters; the list is ordered by date then number, newest first.
+8. **Turning into an invoice.**
+   - The customer is locked on the prefilled form, because the database refuses another.
+   - The customer's default tax is NOT reapplied, so a line left untaxed stays untaxed.
+   - The estimate's note is not carried into the invoice memo.
+   - A stale link to an estimate already converted or declined shows its message in an alert above the Invoices list, instead of a form.
+9. **PDF.**
+   - The Sales tax row is left out when the tax is zero, by the same helper the invoice uses.
+   - The file name drops characters file systems refuse.
+   - The renderer is shared with invoices: it takes an optional footer, and invoices print exactly as before.
+10. **Reads and guards.** List, detail and PDF reads are open to every role. The prefill read and every write need write access.
+11. **Known, not changed here** (each is the existing behaviour elsewhere):
+    - the `?new=1` same-page case above;
+    - a draft invoice's issue date is the database's date when left blank, and its due date follows the browser's date, as on the New invoice form;
+    - voiding an invoice refreshes only `/invoices`;
+    - on a phone, list tables let their elastic columns collapse, so the Customer column disappears. That is app-wide, and is best fixed once in `DataTable`.
