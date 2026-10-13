@@ -175,6 +175,71 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: "quote-a-price",
+    title: "Give a customer an estimate and turn it into an invoice",
+    purpose:
+      "Promise a customer a price before the sale, then make the invoice from it when they accept. " +
+      "Nothing reaches the books until that invoice is issued.",
+    route: "/estimates",
+    steps: [
+      {
+        action: "Write the estimate",
+        control: "New estimate",
+        route: "/estimates",
+        note:
+          "Choose the customer, the estimate date and Valid until, which starts 30 days later. The lines " +
+          "work as on an invoice: an item fills in its price, income account and tax code. Save gives it " +
+          "its number, EST-000001 onwards. It posts nothing.",
+      },
+      {
+        action: "Give the customer a copy",
+        control: "Download PDF",
+        note:
+          "Printed on the invoice's layout with Valid until in place of the due date, and Subtotal, Sales " +
+          "tax and Total with no Balance due. It always ends: This is a quotation, not an invoice. Nothing " +
+          "is owed on it.",
+      },
+      {
+        action: "Record a no",
+        control: "Mark declined",
+        note:
+          "Reopen brings it back if the customer changes their mind. An estimate past its Valid until date " +
+          "reads Expired on its own; it can still be edited, or turned into an invoice after a question.",
+      },
+      {
+        action: "Turn a yes into an invoice",
+        control: "Turn into an invoice",
+        note:
+          "Opens New invoice on the Invoices screen with the customer and lines filled in, marked From " +
+          "estimate. Change anything you need first; Cancel changes nothing.",
+      },
+      {
+        action: "Create the draft",
+        control: "Save draft",
+        route: "/invoices",
+        note:
+          "The draft is linked to the estimate, which reads Converted and is locked from then on. The draft " +
+          "itself affects nothing yet: check it over before issuing it.",
+      },
+      {
+        action: "Issue the invoice",
+        control: "Issue",
+        route: "/invoices",
+        note:
+          "Posts it like any other invoice. The estimate never posts; only the invoice made from it does.",
+      },
+      {
+        action: "If the sale falls through after all",
+        control: "Void invoice",
+        route: "/invoices",
+        note:
+          "Voiding the invoice made from an estimate opens the estimate again: it reads Open, so it can be " +
+          "turned into a new invoice or marked declined. An estimate that has had an invoice made from it " +
+          "cannot be deleted.",
+      },
+    ],
+  },
+  {
     id: "correct-a-sale",
     title: "Correct or cancel a sale",
     purpose: "Undo or reduce something already issued, without editing history.",
