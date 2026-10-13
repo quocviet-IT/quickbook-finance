@@ -219,6 +219,50 @@ export interface InvoiceLineRow {
   line_total_minor: number;
 }
 
+/**
+ * A price promised to a customer (migration 0141). Not in the books: nothing
+ * posts until an invoice made from it is issued. Only Declined is stored;
+ * Converted and Expired are worked out when read (lib/domain/estimates.ts).
+ */
+export interface EstimateRow {
+  id: string;
+  estimate_number: string;
+  customer_id: string;
+  /** YYYY-MM-DD. */
+  estimate_date: string;
+  /** YYYY-MM-DD; "Valid until". Never before the estimate date. */
+  expiry_date: string;
+  currency_code: "USD";
+  /** Printed at the foot. */
+  memo: string | null;
+  subtotal_minor: number;
+  tax_minor: number;
+  total_minor: number;
+  declined_at: string | null;
+  /** Always agrees with declined_at; kept for the Number Sequence report. */
+  status: "open" | "declined";
+  created_by: string | null;
+  created_at: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+/** The same shape as an invoice line, so turning an estimate into an invoice loses nothing. */
+export interface EstimateLineRow {
+  id: string;
+  estimate_id: string;
+  line_order: number;
+  item_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  income_account_id: string;
+  tax_code_id: string | null;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+}
+
 export interface PaymentRow {
   id: string;
   payment_number: string | null;

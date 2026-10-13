@@ -15,6 +15,7 @@ vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getInvoiceLines: vi.fn(),
+  getInvoiceEstimate: vi.fn(),
   listInvoiceSettlements: vi.fn(),
   searchAudit: vi.fn(),
   listFeedbackReports: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("@/lib/services/settlements", () => ({ listInvoiceSettlements: mocks.lis
 vi.mock("@/lib/services/invoicing", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/services/invoicing")>()),
   getInvoiceLines: mocks.getInvoiceLines,
+  getInvoiceEstimate: mocks.getInvoiceEstimate,
 }));
 vi.mock("@/lib/services/feedback", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/services/feedback")>()),
@@ -52,13 +54,15 @@ describe("getInvoiceDetailAction reads what the invoice drawer shows, in one req
     mocks.getInvoiceLines.mockResolvedValue([{ id: "line-1" }]);
     mocks.listInvoiceSettlements.mockResolvedValue([{ kind: "payment" }]);
     mocks.searchAudit.mockResolvedValue([{ id: "audit-1" }]);
+    mocks.getInvoiceEstimate.mockResolvedValue({ id: "est-1", estimate_number: "EST-000001" });
   });
 
-  it("reads lines, settlements and the change history on one client", async () => {
+  it("reads lines, settlements, the change history and the estimate it came from on one client", async () => {
     const detail = await getInvoiceDetailAction("inv-1", true);
     expect(mocks.createClient).toHaveBeenCalledTimes(1);
     expect(mocks.getInvoiceLines).toHaveBeenCalledWith(sb, "inv-1");
     expect(mocks.listInvoiceSettlements).toHaveBeenCalledWith(sb, "inv-1");
+    expect(mocks.getInvoiceEstimate).toHaveBeenCalledWith(sb, "inv-1");
     expect(mocks.searchAudit).toHaveBeenCalledWith(
       sb,
       expect.objectContaining({ table_name: "acc_invoice", record_id: "inv-1", limit: 200 }),
@@ -67,7 +71,17 @@ describe("getInvoiceDetailAction reads what the invoice drawer shows, in one req
       lines: { ok: true, data: [{ id: "line-1" }] },
       settlements: { ok: true, data: [{ kind: "payment" }] },
       audit: { ok: true, data: [{ id: "audit-1" }] },
+      estimate: { ok: true, data: { id: "est-1", estimate_number: "EST-000001" } },
     });
+  });
+
+  it("reads no estimate for an invoice not made from one, and keeps that read's failure to itself", async () => {
+    mocks.getInvoiceEstimate.mockResolvedValueOnce(null);
+    expect((await getInvoiceDetailAction("inv-1", false)).estimate).toEqual({ ok: true, data: null });
+    mocks.getInvoiceEstimate.mockRejectedValueOnce(new Error("estimate unavailable"));
+    const detail = await getInvoiceDetailAction("inv-1", false);
+    expect(detail.estimate).toEqual({ ok: false, error: "estimate unavailable" });
+    expect(detail.lines).toEqual({ ok: true, data: [{ id: "line-1" }] });
   });
 
   it("does not ask for the change history when the viewer may not read it", async () => {
@@ -87,7 +101,7 @@ describe("getInvoiceDetailAction reads what the invoice drawer shows, in one req
     mocks.createClient.mockRejectedValue(new Error("This account does not belong to any company."));
     const detail = await getInvoiceDetailAction("inv-1", true);
     const failed = { ok: false, error: "This account does not belong to any company." };
-    expect(detail).toEqual({ lines: failed, settlements: failed, audit: failed });
+    expect(detail).toEqual({ lines: failed, settlements: failed, audit: failed, estimate: failed });
     expect(mocks.getInvoiceLines).not.toHaveBeenCalled();
   });
 });

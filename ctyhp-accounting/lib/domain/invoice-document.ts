@@ -4,6 +4,10 @@
  * Pure. It turns stored minor units and raw rows into the exact strings the
  * renderer draws, so what gets printed is decided here — and tested here —
  * rather than inside a PDF library call.
+ *
+ * The seller block, the bill-to block, the line rows, the balance check and
+ * the totals rows are shared with the estimate (lib/domain/estimate-document),
+ * so the two documents print a company, a customer and a line the same way.
  */
 import { USD_DECIMAL_PLACES } from "@/lib/domain/currency";
 import { formatMoney } from "@/lib/format";
@@ -15,6 +19,33 @@ export interface PostalParty {
   region: string | null;
   postal_code: string | null;
   country: string | null;
+}
+
+/** The customer a document is addressed to. */
+export type DocumentCustomer = PostalParty & {
+  name: string;
+  email: string | null;
+  contact_name: string | null;
+  phone: string | null;
+};
+
+/** The company a document comes from: the current settings row. */
+export type DocumentCompany = PostalParty & {
+  legal_name: string;
+  dba_name: string | null;
+  /** Accepted so callers can pass the settings row as-is; never printed. */
+  ein_ref?: string | null;
+};
+
+/** One stored line, as an invoice or an estimate keeps it. */
+export interface DocumentSourceLine {
+  line_order: number;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
 }
 
 export interface InvoiceDocumentSource {
@@ -30,27 +61,9 @@ export interface InvoiceDocumentSource {
     status: string;
     memo: string | null;
   };
-  lines: Array<{
-    line_order: number;
-    description: string;
-    quantity: number;
-    unit_price_minor: number;
-    line_subtotal_minor: number;
-    line_tax_minor: number;
-    line_total_minor: number;
-  }>;
-  customer: PostalParty & {
-    name: string;
-    email: string | null;
-    contact_name: string | null;
-    phone: string | null;
-  };
-  company: PostalParty & {
-    legal_name: string;
-    dba_name: string | null;
-    /** Accepted so callers can pass the settings row as-is; never printed. */
-    ein_ref?: string | null;
-  };
+  lines: DocumentSourceLine[];
+  customer: DocumentCustomer;
+  company: DocumentCompany;
 }
 
 export interface InvoiceDocumentLine {
@@ -60,22 +73,40 @@ export interface InvoiceDocumentLine {
   amount: string;
 }
 
-export interface InvoiceDocument {
+export interface DocumentSeller {
+  displayName: string;
+  /** The legal name, shown only when it differs from the trading name. */
+  legalLine: string | null;
+  lines: string[];
+}
+
+export interface DocumentBillTo {
+  name: string;
+  lines: string[];
+}
+
+export interface DocumentTotal {
+  label: string;
+  amount: string;
+}
+
+/** What the shared renderer (lib/client/invoice-pdf) draws, whatever the document. */
+export interface PrintedDocument {
   title: string;
-  status: string;
-  /** DRAFT or VOID, drawn across the page so the copy cannot be mistaken. */
+  /** Drawn across the page so the copy cannot be mistaken; null for none. */
   watermark: string | null;
-  seller: {
-    displayName: string;
-    /** The legal name, shown only when it differs from the trading name. */
-    legalLine: string | null;
-    lines: string[];
-  };
-  billTo: { name: string; lines: string[] };
+  seller: DocumentSeller;
+  billTo: DocumentBillTo;
   meta: Array<{ label: string; value: string }>;
   lines: InvoiceDocumentLine[];
-  totals: Array<{ label: string; amount: string }>;
+  totals: DocumentTotal[];
   memo: string | null;
+}
+
+export interface InvoiceDocument extends PrintedDocument {
+  status: string;
+  /** DRAFT or VOID. */
+  watermark: string | null;
 }
 
 /** Address lines with every missing part dropped — no gaps, no stray commas. */
@@ -92,60 +123,105 @@ function quantityText(quantity: number): string {
   return Number.isInteger(quantity) ? String(quantity) : String(quantity);
 }
 
+/** The trading name first, the legal name beneath it only when they differ. */
+export function documentSeller(company: DocumentCompany): DocumentSeller {
+  return {
+    displayName: company.dba_name?.trim() || company.legal_name,
+    legalLine: company.dba_name?.trim() ? company.legal_name : null,
+    lines: formatPostalAddress(company),
+  };
+}
+
+/** The customer's address, then whichever contact details differ from their name. */
+export function documentBillTo(customer: DocumentCustomer): DocumentBillTo {
+  const addressLines = formatPostalAddress(customer);
+  const contactLines = [customer.contact_name, customer.phone, customer.email]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length > 0 && value !== customer.name);
+  return { name: customer.name, lines: [...addressLines, ...contactLines] };
+}
+
+/**
+ * The stored lines in their order, checked against the document's total.
+ *
+ * A printed document that contradicts the ledger is worse than no document,
+ * so a mismatch throws rather than printing. `noun` names the document in the
+ * message ("Invoice", "Estimate").
+ */
+export function linesMatchingTotal<L extends DocumentSourceLine>(
+  lines: readonly L[],
+  totalMinor: number,
+  noun: string,
+): L[] {
+  const ordered = [...lines].sort((a, b) => a.line_order - b.line_order);
+  const lineTotal = ordered.reduce((sum, line) => sum + line.line_total_minor, 0);
+  if (lineTotal !== totalMinor) {
+    throw new Error(
+      `${noun} line total ${lineTotal} does not match the ${noun.toLowerCase()} total ${totalMinor}`,
+    );
+  }
+  return ordered;
+}
+
+/** Description, quantity, unit price and amount, as the customer reads them. */
+export function documentLines(
+  lines: readonly DocumentSourceLine[],
+  money: (minor: number) => string,
+): InvoiceDocumentLine[] {
+  return lines.map((line) => ({
+    description: line.description.trim() || "—",
+    quantity: quantityText(line.quantity),
+    unitPrice: money(line.unit_price_minor),
+    amount: money(line.line_subtotal_minor),
+  }));
+}
+
+/** Subtotal, Sales tax (only when there is any) and Total. */
+export function documentTotals(
+  amounts: { subtotalMinor: number; taxMinor: number; totalMinor: number },
+  money: (minor: number) => string,
+): DocumentTotal[] {
+  const totals: DocumentTotal[] = [{ label: "Subtotal", amount: money(amounts.subtotalMinor) }];
+  if (amounts.taxMinor !== 0) {
+    totals.push({ label: "Sales tax", amount: money(amounts.taxMinor) });
+  }
+  totals.push({ label: "Total", amount: money(amounts.totalMinor) });
+  return totals;
+}
+
 export function buildInvoiceDocument(source: InvoiceDocumentSource): InvoiceDocument {
   const { invoice, customer, company } = source;
   const decimals = USD_DECIMAL_PLACES;
   const money = (minor: number) => formatMoney(minor, invoice.currency_code, decimals);
 
-  const lines = [...source.lines].sort((a, b) => a.line_order - b.line_order);
-
-  // A printed document that contradicts the ledger is worse than no document.
-  const lineTotal = lines.reduce((sum, line) => sum + line.line_total_minor, 0);
-  if (lineTotal !== invoice.total_minor) {
-    throw new Error(
-      `Invoice line total ${lineTotal} does not match the invoice total ${invoice.total_minor}`,
-    );
-  }
+  const lines = linesMatchingTotal(source.lines, invoice.total_minor, "Invoice");
 
   const paidMinor = invoice.total_minor - invoice.balance_due_minor;
-  const totals: Array<{ label: string; amount: string }> = [
-    { label: "Subtotal", amount: money(invoice.subtotal_minor) },
-  ];
-  if (invoice.tax_total_minor !== 0) {
-    totals.push({ label: "Sales tax", amount: money(invoice.tax_total_minor) });
-  }
-  totals.push({ label: "Total", amount: money(invoice.total_minor) });
+  const totals = documentTotals(
+    {
+      subtotalMinor: invoice.subtotal_minor,
+      taxMinor: invoice.tax_total_minor,
+      totalMinor: invoice.total_minor,
+    },
+    money,
+  );
   if (paidMinor > 0) {
     totals.push({ label: "Paid to date", amount: money(paidMinor) });
   }
   totals.push({ label: "Balance due", amount: money(invoice.balance_due_minor) });
-
-  const billToLines = formatPostalAddress(customer);
-  const contactLines = [customer.contact_name, customer.phone, customer.email]
-    .map((value) => value?.trim() ?? "")
-    .filter((value) => value.length > 0 && value !== customer.name);
 
   return {
     title: invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "Draft invoice",
     status: invoice.status,
     watermark:
       invoice.status === "draft" ? "DRAFT" : invoice.status === "void" ? "VOID" : null,
-    seller: {
-      displayName: company.dba_name?.trim() || company.legal_name,
-      legalLine: company.dba_name?.trim() ? company.legal_name : null,
-      lines: formatPostalAddress(company),
-    },
-    billTo: { name: customer.name, lines: [...billToLines, ...contactLines] },
+    seller: documentSeller(company),
+    billTo: documentBillTo(customer),
     meta: [
       { label: "Issue date", value: invoice.issue_date },
       { label: "Due date", value: invoice.due_date ?? "On receipt" },
     ],
-    lines: lines.map((line) => ({
-      description: line.description.trim() || "—",
-      quantity: quantityText(line.quantity),
-      unitPrice: money(line.unit_price_minor),
-      amount: money(line.line_subtotal_minor),
-    })),
+    lines: documentLines(lines, money),
     totals,
     memo: invoice.memo?.trim() || null,
   };

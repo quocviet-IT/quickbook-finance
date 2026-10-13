@@ -162,6 +162,30 @@ export async function createDraftInvoice(
   return invoice as unknown as InvoiceRow;
 }
 
+/** The estimate an invoice was made from (migration 0141). */
+export interface InvoiceEstimateLink {
+  id: string;
+  estimate_number: string;
+}
+
+/**
+ * The estimate this invoice was made from, or null when it was not made from
+ * one, so the invoice's detail can say "From estimate EST-000001".
+ */
+export async function getInvoiceEstimate(
+  sb: SupabaseClient,
+  invoiceId: string,
+): Promise<InvoiceEstimateLink | null> {
+  const { data, error } = await sb
+    .from("acc_invoice")
+    .select("estimate_id,acc_estimate(id,estimate_number)")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (error) throw new InvoicingError(error.message);
+  const estimate = (data as { acc_estimate?: InvoiceEstimateLink | null } | null)?.acc_estimate;
+  return estimate ? { id: estimate.id, estimate_number: estimate.estimate_number } : null;
+}
+
 /** Everything a printable invoice needs, read in one place under the caller's RLS. */
 export async function getInvoiceDocumentSource(
   sb: SupabaseClient,
