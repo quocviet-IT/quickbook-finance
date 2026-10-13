@@ -309,7 +309,17 @@ export default function InvoicesClient({
     setFromEstimate(null);
     setCreateError(null);
     form.resetFields();
-    form.setFieldsValue({ currency_code: baseCurrency, lines: [{ quantity: 1 }] });
+    // The modal destroys its fields on close but this form instance keeps its
+    // store, so a reset while closed does not reach them. Clear what an estimate,
+    // or a cancelled draft, may have left, so New invoice always starts empty.
+    form.setFieldsValue({
+      customer_id: undefined,
+      issue_date: undefined,
+      due_date: undefined,
+      memo: undefined,
+      currency_code: baseCurrency,
+      lines: [{ quantity: 1 }],
+    });
     setOpen(true);
   }
 

@@ -273,4 +273,16 @@ describe("the Invoices screen opened from an estimate", () => {
   it("names the estimate in the invoice's detail, linking to Estimates", () => {
     expect(client).toContain('<Link href="/estimates">{estimateMessages.fromEstimate(viewEstimate.estimate_number)}</Link>');
   });
+
+  it("clears the estimate's fields when New invoice opens, so a cancelled draft cannot leak into it", () => {
+    const start = client.indexOf("function openCreate()");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = client.indexOf("setOpen(true);", start);
+    const body = client.slice(start, end);
+    const setter = body.slice(body.indexOf("form.setFieldsValue({"));
+    expect(setter).toContain("customer_id: undefined,");
+    expect(setter).toContain("issue_date: undefined,");
+    expect(setter).toContain("due_date: undefined,");
+    expect(setter).toContain("memo: undefined,");
+  });
 });
