@@ -31,6 +31,10 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_item",
   "acc_tax_code",
   "acc_1099_box",
+  // Estimates (0141): a customer, items, income accounts and tax codes; the
+  // invoice made from one points back at it, so they come before acc_invoice.
+  "acc_estimate",
+  "acc_estimate_line",
   "acc_invoice",
   "acc_invoice_line",
   "acc_payment",
