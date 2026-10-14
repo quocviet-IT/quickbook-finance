@@ -7,6 +7,7 @@ import {
   monthRefusal,
   monthSentence,
   monthsFromCsv,
+  runStatementPayload,
   simulateRun,
   statementsFromPdf,
   type OpenBookLine,
@@ -36,6 +37,9 @@ const statement = (to: string, opening: number | null, closing: number | null, l
   outByMinor: null,
   ...extra,
 });
+/** A statement that adds up (2.04): one line takes it from its opening to its closing. */
+const proved = (to: string, opening: number, closing: number, extra: Partial<RunStatement> = {}): RunStatement =>
+  statement(to, opening, closing, closing === opening ? [] : [csvLine(to, closing - opening, null)], extra);
 const noContext: RunContext = { lastCompleted: null, completedDates: [], inProgress: null, today: "2026-12-31" };
 const book = (id: string, date: string, amount: number, reference: string | null = null): OpenBookLine => ({
   id,
@@ -125,12 +129,12 @@ describe("checkRun", () => {
   it("orders the statements and says which a run reconciles", () => {
     const result = checkRun(
       [
-        statement("2026-09-30", 1300, 1400),
-        statement("2026-07-31", 1000, 1100),
-        statement("2026-08-31", 1100, 1300),
-        statement("2026-08-31", 1100, 1300, [], { key: "copy", fileName: "copy.pdf" }),
-        statement("2026-06-30", 900, 1000),
-        statement("2026-05-31", 800, 900),
+        proved("2026-09-30", 1300, 1400),
+        proved("2026-07-31", 1000, 1100),
+        proved("2026-08-31", 1100, 1300),
+        proved("2026-08-31", 1100, 1300, { key: "copy", fileName: "copy.pdf" }),
+        proved("2026-06-30", 900, 1000),
+        proved("2026-05-31", 800, 900),
         statement("2026-10-31", null, null, [], { to: null, problem: RUN_MESSAGES.noDate }),
       ],
       { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null, today: "2026-12-31" },
@@ -151,7 +155,7 @@ describe("checkRun", () => {
 
   it("stops a run with a gap, with a first statement that does not open where the last reconciliation closed, and with one in progress", () => {
     const result = checkRun(
-      [statement("2026-07-31", 1000, 1100), statement("2026-08-31", 1200, 1300)],
+      [proved("2026-07-31", 1000, 1100), proved("2026-08-31", 1200, 1300)],
       { lastCompleted: { date: "2026-06-30", endingMinor: 900 }, completedDates: ["2026-06-30"], inProgress: { id: "r", date: "2026-07-31" }, today: "2026-12-31" },
       money,
     );
@@ -168,14 +172,18 @@ describe("checkRun", () => {
     ]);
   });
 
-  it("notes a statement that does not prove itself", () => {
-    const [only] = checkRun([statement("2026-07-31", 1000, 1100, [csvLine("2026-07-05", 100, null)], { outByMinor: -2000 })], noContext, money).statements;
-    expect(only.note).toBe("1 line — does not prove itself, out by $20.00");
+  it("notes a statement that does not add up, and stops the run at it (2.04)", () => {
+    const result = checkRun([statement("2026-07-31", 1000, 3100, [csvLine("2026-07-05", 100, null)])], noContext, money);
+    expect(result.statements[0].note).toBe("1 line — does not add up, out by $20.00");
+    expect(result.statements[0].proof?.differenceMinor).toBe(-2000);
+    expect(result.stops).toEqual([
+      "The statement closing Jul 31, 2026 does not add up. Out by $20.00 — import this statement on its own to correct it.",
+    ]);
   });
 
   it("marks a month that runs past the company's today as not over yet", () => {
     const result = checkRun(
-      [statement("2026-07-31", 1000, 1100), statement("2026-08-31", 1100, 1300)],
+      [proved("2026-07-31", 1000, 1100), proved("2026-08-31", 1100, 1300)],
       { lastCompleted: null, completedDates: [], inProgress: null, today: "2026-08-15" },
       money,
     );
@@ -194,6 +202,106 @@ describe("checkRun", () => {
     expect(over.stops).toContain("These statements hold 10,001 lines, and a run can hold at most 10,000. Choose fewer months.");
     const exact = checkRun([statement("2026-07-31", 1000, 1100, lines(10000))], noContext, money);
     expect(exact.stops.filter((s) => s.includes("a run can hold at most"))).toEqual([]);
+  });
+});
+
+describe("checkRun: each statement proved (2.04)", () => {
+  const context: RunContext = { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null, today: "2026-12-31" };
+
+  it("keeps each statement's proof, and a statement that adds up says only its lines", () => {
+    const result = checkRun([proved("2026-07-31", 1000, 1100)], context, money);
+    expect(result.statements[0].note).toBe("1 line");
+    expect(result.statements[0].proof).toMatchObject({ proves: true, openingBasis: "printed", closingBasis: "printed", differenceMinor: 0 });
+    expect(result.usable[0]).toMatchObject({ openingMinor: 1000, closingMinor: 1100, openingBasis: "printed", closingBasis: "printed" });
+    expect(result.stops).toEqual([]);
+  });
+
+  it("stops only at the first statement that does not add up", () => {
+    const result = checkRun(
+      [
+        proved("2026-07-31", 1000, 1100),
+        statement("2026-08-31", 1100, 1250, [csvLine("2026-08-05", 100, null)]),
+        statement("2026-09-30", 1250, 1300, [csvLine("2026-09-05", 100, null)]),
+      ],
+      context,
+      money,
+    );
+    expect(result.statements.map((c) => c.note)).toEqual([
+      "1 line",
+      "1 line — does not add up, out by $0.50",
+      "1 line — does not add up, out by $0.50",
+    ]);
+    expect(result.stops).toEqual([
+      "The statement closing Aug 31, 2026 does not add up. Out by $0.50 — import this statement on its own to correct it.",
+    ]);
+  });
+
+  it("opens a statement that prints no opening at the last reconciliation's closing, when it starts the day after", () => {
+    const result = checkRun([statement("2026-07-31", null, 1100, [csvLine("2026-07-05", 100, null)])], context, money);
+    expect(result.statements[0].proof).toMatchObject({ proves: true, openingBasis: "prior", prior: { status: "auto", date: "2026-06-30" } });
+    expect(result.usable[0]).toMatchObject({ openingMinor: 1000, openingBasis: "prior" });
+    expect(result.stops).toEqual([]);
+  });
+
+  it("opens a later statement at the closing of the one before it in the run", () => {
+    const result = checkRun(
+      [proved("2026-07-31", 1000, 1100), statement("2026-08-31", null, 1150, [csvLine("2026-08-05", 50, null)])],
+      context,
+      money,
+    );
+    expect(result.usable.map((s) => [s.openingMinor, s.openingBasis])).toEqual([
+      [1000, "printed"],
+      [1100, "prior"],
+    ]);
+    expect(result.stops).toEqual([]);
+  });
+
+  it("stops at a statement that prints no opening and does not start the day after the one before", () => {
+    const result = checkRun(
+      [statement("2026-07-31", null, 1100, [csvLine("2026-07-05", 100, null)], { from: "2026-07-02" })],
+      context,
+      money,
+    );
+    expect(result.statements[0].note).toBe("1 line — no opening balance");
+    expect(result.statements[0].proof?.prior.status).toBe("refused");
+    expect(result.stops).toEqual([
+      "The statement closing Jul 31, 2026 prints no opening balance — import this statement on its own to correct it.",
+    ]);
+  });
+
+  it("proves a CSV month by its running balances, and says where its balances jump", () => {
+    const [july] = monthsFromCsv("bank.csv", [csvLine("2026-07-03", 500, 1500), csvLine("2026-07-20", -200, 1300)]);
+    expect([july.openingBasis, july.closingBasis]).toEqual(["running", "running"]);
+    const result = checkRun([july], noContext, money);
+    expect(result.statements[0].proof).toMatchObject({ proves: true, openingMinor: 1000, closingMinor: 1300, openingBasis: "running" });
+    expect(result.stops).toEqual([]);
+  });
+
+  it("names a PDF's bases: printed, or its running balance", () => {
+    const printed: PdfStatement = {
+      accountNumber: null, from: "2026-07-01", to: "2026-07-31", openingMinor: 1000, closingMinor: 1500, openingBasis: "printed", closingBasis: "running",
+      lines: [{ date: "2026-07-05", description: "DEPOSIT", checkNumber: null, amountMinor: 500, balanceMinor: 1500, raw: "07/05 DEPOSIT 5.00" }],
+      skipped: 0,
+    };
+    const [read] = statementsFromPdf("july.pdf", [printed], null);
+    expect([read.openingBasis, read.closingBasis]).toEqual(["printed", "running"]);
+    const [old] = statementsFromPdf("july.pdf", [{ ...printed, openingBasis: undefined, closingBasis: undefined }], null);
+    expect([old.openingBasis, old.closingBasis]).toEqual(["printed", "printed"]);
+  });
+});
+
+describe("runStatementPayload", () => {
+  it("sends a month's figures and bases, nothing set aside and no override", () => {
+    expect(runStatementPayload({ ...proved("2026-07-31", 1000, 1100), openingBasis: "prior" })).toEqual({
+      opening_minor: 1000,
+      closing_minor: 1100,
+      opening_basis: "prior",
+      closing_basis: "printed",
+      set_aside: 0,
+      override: null,
+    });
+    expect(runStatementPayload({ ...proved("2026-07-31", 1000, 1100), source: "CSV" })).toMatchObject({ opening_basis: "running", closing_basis: "running" });
+    expect(runStatementPayload(statement("2026-07-31", null, 1100))).toMatchObject({ opening_minor: null, opening_basis: null });
   });
 });
 

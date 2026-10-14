@@ -561,3 +561,42 @@ export const PDF_SCENARIOS: PdfScenario[] = [
     ],
   },
 ];
+
+/**
+ * Payroll on one day (2.04, OB-1): two people paid the same, and three paid the
+ * same, in one table — five payments, none a restatement of another. Kept out
+ * of PDF_SCENARIOS, which the prototype parity run reads. Invented: "Example
+ * Bank", an account ending 3333, invented amounts.
+ */
+export const PAYROLL_REPEATS: PdfScenario = {
+  name: "payrollRepeats",
+  pages: [
+    [
+      [760, [40, "Example Bank"]],
+      [748, [40, "Account number: 0000-3333"]],
+      [736, [40, "Statement period Mar 1 - Mar 31, 2026"]],
+      [720, [40, "Beginning balance"], [500, "20,000.00"]],
+      [708, [40, "Ending balance"], [500, "17,452.70"]],
+      [690, [40, "Transaction history"]],
+      [678, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+      [666, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "655.20"], [500, "19,344.80"]],
+      [654, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "655.20"], [500, "18,689.60"]],
+      [642, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "412.30"], [500, "18,277.30"]],
+      [630, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "412.30"], [500, "17,865.00"]],
+      [618, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "412.30"], [500, "17,452.70"]],
+      [606, [40, "Total"], [330, "2,547.30"]],
+    ],
+  ],
+  expected: [
+    {
+      account: "00003333", from: "2026-03-01", to: "2026-03-31", opening: 2000000, closing: 1745270, skipped: 0,
+      lines: [
+        ["2026-03-31",-65520,"EXAMPLE PAYROLL SERVICE",null,1934480],
+        ["2026-03-31",-65520,"EXAMPLE PAYROLL SERVICE",null,1868960],
+        ["2026-03-31",-41230,"EXAMPLE PAYROLL SERVICE",null,1827730],
+        ["2026-03-31",-41230,"EXAMPLE PAYROLL SERVICE",null,1786500],
+        ["2026-03-31",-41230,"EXAMPLE PAYROLL SERVICE",null,1745270],
+      ],
+    },
+  ],
+};

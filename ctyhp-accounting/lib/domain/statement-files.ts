@@ -31,6 +31,17 @@ export interface StatementFileResult {
   skipped: number;
   /** The account number the file names, when it names one (OFX). */
   accountId: string | null;
+  /**
+   * OFX: the ledger balance the bank prints (LEDGERBAL's BALAMT) and the day it
+   * is as of (DTASOF, as a date). Null when the file has none, or more than one
+   * — a file of several statements cannot say which is which.
+   */
+  ledger?: { minor: number; asOf: string | null } | null;
+  /** OFX: the first and last day the transaction list covers (BANKTRANLIST's DTSTART and DTEND), as dates. */
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  /** QIF: the amount of its "Opening Balance" record, which is the opening and not a line; null when it has none. */
+  openingMinor?: number | null;
 }
 
 /** A name and a memo, the memo kept only when it says something the name does not. */
@@ -82,8 +93,37 @@ export function parseOfx(text: string, decimals = 2): StatementFileResult {
     });
   }
   const account = text.match(/<(?:BANKACCTFROM|CCACCTFROM)>[\s\S]*?<ACCTID>([^<\r\n]*)/i);
-  return { rows, skipped, accountId: account ? decode(account[1]) || null : null };
+  return { rows, skipped, accountId: account ? decode(account[1]) || null : null, ...ofxBalances(text, decimals) };
 }
+
+/**
+ * What an OFX file says about its own period and balance. Dates only: a bank
+ * writes 20260930120000.000[-5:EST] or 20261001, and the day is what counts —
+ * a timestamp compared with a timestamp would put a balance struck at noon
+ * after a list that ends at midnight. Read only when the file holds exactly one
+ * statement, so a figure is never taken from the wrong one. AVAILBAL is not the
+ * ledger balance and is never read.
+ */
+function ofxBalances(text: string, decimals: number): Pick<StatementFileResult, "ledger" | "periodStart" | "periodEnd"> {
+  const ledgers = text.match(/<LEDGERBAL>[\s\S]*?<\/LEDGERBAL>/gi) ?? [];
+  let ledger: StatementFileResult["ledger"] = null;
+  if (ledgers.length === 1) {
+    const amount = parseStatementAmount(tag(ledgers[0], "BALAMT") ?? "", decimals);
+    if (amount !== null) ledger = { minor: amount, asOf: ofxDate(tag(ledgers[0], "DTASOF")) };
+  }
+  let periodStart: string | null = null;
+  let periodEnd: string | null = null;
+  if ((text.match(/<BANKTRANLIST>/gi) ?? []).length === 1) {
+    // The list's own dates come before its first transaction.
+    const head = text.match(/<BANKTRANLIST>([\s\S]*?)(?:<STMTTRN>|<\/BANKTRANLIST>|$)/i)?.[1] ?? "";
+    periodStart = ofxDate(tag(head, "DTSTART"));
+    periodEnd = ofxDate(tag(head, "DTEND"));
+  }
+  return { ledger, periodStart, periodEnd };
+}
+
+/** An "Opening Balance" record: the account's opening, written by Quicken as if it were a payment. */
+const isOpeningBalance = (payee: string | null) => (payee ?? "").trim().toLowerCase() === "opening balance";
 
 const QIF_SECTIONS = new Set(["bank", "cash", "ccard"]);
 
@@ -107,6 +147,7 @@ export function parseQif(text: string, options: { decimals?: number; dateOrder?:
   let skipped = 0;
   let section: string | null = null;
   let fields: string[] = [];
+  const openings: number[] = [];
 
   const flush = () => {
     if (fields.length === 0) return;
@@ -127,6 +168,12 @@ export function parseQif(text: string, options: { decimals?: number; dateOrder?:
     const amount = parseStatementAmount(field("T") ?? field("U") ?? "", decimals);
     if (!date || amount === null) {
       skipped += 1;
+      return;
+    }
+    // The opening, not a line (2.04). Imported as a line, it would be money
+    // that never moved.
+    if (isOpeningBalance(field("P"))) {
+      openings.push(amount);
       return;
     }
     rows.push({
@@ -157,7 +204,9 @@ export function parseQif(text: string, options: { decimals?: number; dateOrder?:
     fields.push(line);
   }
   flush();
-  return { rows, skipped, accountId: null };
+  // Two such records (a file of several accounts) cannot say which opens this
+  // statement, so neither is taken: the person types the opening instead.
+  return { rows, skipped, accountId: null, openingMinor: openings.length === 1 ? openings[0] : null };
 }
 
 /** Does the file name a different account from the one chosen? Only when both give at least four digits. */

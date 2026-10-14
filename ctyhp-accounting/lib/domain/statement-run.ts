@@ -25,6 +25,15 @@ import {
   type Standing,
 } from "./reconcile-statement";
 import type { StatementLine } from "./statement-import";
+import {
+  pdfFigures,
+  proveStatement,
+  type ClosingBasis,
+  type OpeningBasis,
+  type PriorClosing,
+  type StatementProof,
+  type StatementProofPayload,
+} from "./statement-proof";
 
 export type RunSource = "PDF" | "CSV";
 
@@ -45,6 +54,13 @@ export interface RunStatement {
   problem: string | null;
   /** A PDF's own proof: closing less (opening + lines); null when it prints no balances or is a CSV month. */
   outByMinor: number | null;
+  /**
+   * Where the opening and closing came from (2.04). Set by the readers, and by
+   * checkRun on the statements a run reconciles; absent means printed for a PDF
+   * and the running balance for a CSV.
+   */
+  openingBasis?: OpeningBasis | null;
+  closingBasis?: ClosingBasis | null;
 }
 
 export const RUN_MESSAGES = {
@@ -121,6 +137,8 @@ export function monthsFromCsv(fileName: string, lines: readonly StatementLine[])
       lines: monthLines,
       problem,
       outByMinor: null,
+      openingBasis: openingMinor === null ? null : "running",
+      closingBasis: closingMinor === null ? null : "running",
     };
   });
 }
@@ -158,8 +176,59 @@ export function statementsFromPdf(
       lines: toStatementLines(s),
       problem,
       outByMinor: differenceMinor === null || differenceMinor === 0 ? null : differenceMinor,
+      openingBasis: s.openingMinor === null ? null : (s.openingBasis ?? "printed"),
+      closingBasis: s.closingMinor === null ? null : (s.closingBasis ?? "printed"),
     };
   });
+}
+
+/**
+ * A statement of a run proved as Import statement proves one: a CSV month by
+ * its running balances, a PDF by the balances it prints. `prior` is the closing
+ * the statement would follow — the account's last completed reconciliation for
+ * the first, the statement before it for the rest, since by the time a month is
+ * signed the one before it is that reconciliation. A run has no Not a
+ * transaction, no typed balance and no override: a statement that needs one is
+ * imported on its own.
+ */
+export function runStatementProof(
+  statement: RunStatement,
+  prior: PriorClosing | null,
+  money: (minor: number) => string,
+): StatementProof {
+  if (statement.source === "CSV") return proveStatement({ kind: "csv", lines: statement.lines, prior }, money);
+  const figures = pdfFigures({
+    openingMinor: statement.openingMinor,
+    closingMinor: statement.closingMinor,
+    from: statement.from,
+    to: statement.to,
+  });
+  return proveStatement(
+    {
+      kind: "pdf",
+      lines: statement.lines,
+      figures: {
+        ...figures,
+        openingBasis: figures.openingBasis && (statement.openingBasis ?? figures.openingBasis),
+        closingBasis: figures.closingBasis && (statement.closingBasis ?? figures.closingBasis),
+      },
+      prior,
+    },
+    money,
+  );
+}
+
+/** The proof a month of a run sends with its lines (reconcileRunMonthAction): its figures, nothing set aside, no override. */
+export function runStatementPayload(statement: RunStatement): StatementProofPayload {
+  const usual = statement.source === "CSV" ? "running" : "printed";
+  return {
+    opening_minor: statement.openingMinor,
+    closing_minor: statement.closingMinor,
+    opening_basis: statement.openingMinor === null ? null : (statement.openingBasis ?? usual),
+    closing_basis: statement.closingMinor === null ? null : (statement.closingBasis ?? usual),
+    set_aside: 0,
+    override: null,
+  };
 }
 
 export interface RunContext {
@@ -179,6 +248,8 @@ export interface CheckedStatement {
   state: RunState;
   /** What the statements table says about it. */
   note: string;
+  /** The statement's proof (2.04), for a statement the run would reconcile; null for any other. */
+  proof: StatementProof | null;
 }
 
 export interface RunCheck {
@@ -192,11 +263,39 @@ export interface RunCheck {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+/** "Out by $6.44 — import this statement on its own to correct it.": why a run stops at a statement that does not add up. */
+export function outByStop(differenceMinor: number, money: (minor: number) => string): string {
+  return `Out by ${money(Math.abs(differenceMinor))} — import this statement on its own to correct it.`;
+}
+
+/** What the statements table says about a statement the run would reconcile, by its proof. */
+function provedNote(lineCount: number, proof: StatementProof, money: (minor: number) => string): string {
+  const lines = plural(lineCount, "line");
+  if (proof.proves) return lines;
+  if (proof.differenceMinor !== null) return `${lines} — does not add up, out by ${money(Math.abs(proof.differenceMinor))}`;
+  if (proof.missing === "closing") return `${lines} — no closing balance`;
+  if (proof.missing === "both") return `${lines} — no opening or closing balance`;
+  return `${lines} — no opening balance`;
+}
+
+/** Why the run stops at its first statement that does not add up. */
+function unprovedStop(statement: RunStatement, proof: StatementProof, money: (minor: number) => string): string {
+  const which = `The statement closing ${shortDate(statement.to as string, true)}`;
+  if (proof.differenceMinor !== null) return `${which} does not add up. ${outByStop(proof.differenceMinor, money)}`;
+  const what = proof.missing === "closing" ? "closing balance" : proof.missing === "both" ? "opening or closing balance" : "opening balance";
+  return `${which} prints no ${what} — import this statement on its own to correct it.`;
+}
+
 /**
  * Which statements a run can reconcile, and what stops it: a gap between two
  * statements (p44b.html: the run is disabled), a first statement that does not
  * open where the last reconciliation closed, or a reconciliation in progress.
  * It also sorts out a month not over yet.
+ *
+ * Each statement the run would reconcile is proved (2.04), and its proof kept
+ * with it; the statements it returns carry the proof's opening and closing and
+ * their bases, which is what each month sends. The first that does not add up
+ * stops the run there.
  */
 export function checkRun(
   statements: readonly RunStatement[],
@@ -207,18 +306,37 @@ export function checkRun(
   const completed = new Set(context.completedDates);
   const kept = new Set<string>();
   const checked: CheckedStatement[] = ordered.map((statement) => {
-    if (statement.problem || !statement.to) return { statement, state: "unreadable", note: statement.problem ?? RUN_MESSAGES.noDate };
-    if (statement.to > context.today) return { statement, state: "notOver", note: "Not over yet" };
-    if (completed.has(statement.to)) return { statement, state: "already", note: "Already signed off" };
-    if (context.lastCompleted && statement.to < context.lastCompleted.date) {
-      return { statement, state: "before", note: "Before the last reconciliation" };
-    }
-    if (kept.has(statement.to)) return { statement, state: "duplicate", note: "Same month as another file" };
+    const as = (state: RunState, note: string): CheckedStatement => ({ statement, state, note, proof: null });
+    if (statement.problem || !statement.to) return as("unreadable", statement.problem ?? RUN_MESSAGES.noDate);
+    if (statement.to > context.today) return as("notOver", "Not over yet");
+    if (completed.has(statement.to)) return as("already", "Already signed off");
+    if (context.lastCompleted && statement.to < context.lastCompleted.date) return as("before", "Before the last reconciliation");
+    if (kept.has(statement.to)) return as("duplicate", "Same month as another file");
     kept.add(statement.to);
-    const lines = plural(statement.lines.length, "line");
-    const note = statement.outByMinor === null ? lines : `${lines} — does not prove itself, out by ${money(Math.abs(statement.outByMinor))}`;
-    return { statement, state: "usable", note };
+    return as("usable", plural(statement.lines.length, "line"));
   });
+
+  // Proved oldest first: each statement follows the closing of the one before
+  // it, the first the account's last completed reconciliation.
+  let prior: PriorClosing | null = context.lastCompleted
+    ? { date: context.lastCompleted.date, endingMinor: context.lastCompleted.endingMinor }
+    : null;
+  let unproved: CheckedStatement | null = null;
+  for (const c of checked) {
+    if (c.state !== "usable") continue;
+    const proof = runStatementProof(c.statement, prior, money);
+    c.proof = proof;
+    c.statement = {
+      ...c.statement,
+      openingMinor: proof.openingMinor,
+      closingMinor: proof.closingMinor,
+      openingBasis: proof.openingBasis,
+      closingBasis: proof.closingBasis,
+    };
+    c.note = provedNote(c.statement.lines.length, proof, money);
+    if (!proof.proves && !unproved) unproved = c;
+    if (proof.closingMinor !== null) prior = { date: c.statement.to as string, endingMinor: proof.closingMinor };
+  }
   const usable = checked.filter((c) => c.state === "usable").map((c) => c.statement);
 
   const stops: string[] = [];
@@ -251,6 +369,7 @@ export function checkRun(
         "would sign off items nobody has seen a statement for.",
     );
   }
+  if (unproved?.proof) stops.push(unprovedStop(unproved.statement, unproved.proof, money));
   return { statements: checked, usable, stops };
 }
 

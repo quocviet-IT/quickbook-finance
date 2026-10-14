@@ -52,6 +52,14 @@ export interface PdfStatement {
   to: string | null;
   openingMinor: number | null;
   closingMinor: number | null;
+  /**
+   * Where the opening came from (2.04): printed on the statement, or worked out
+   * from its first running balance when no total is printed. Null when there is
+   * no opening; absent means printed.
+   */
+  openingBasis?: "printed" | "running" | null;
+  /** Where the closing came from: printed, or the last running balance. Null when there is none; absent means printed. */
+  closingBasis?: "printed" | "running" | null;
   lines: PdfStatementLine[];
   /** Dated rows whose date does not exist. */
   skipped: number;
@@ -548,14 +556,31 @@ function readStatementRows(rows: readonly PdfRow[]) {
   const kept = lines.filter((l) => !dropped.has(l.section));
 
   // With no printed total at either end, the bank's own running balance stands in. Never the books.
-  if (closing === null && sawBal) closing = [...kept].reverse().find((l) => l.balanceMinor !== null)?.balanceMinor ?? null;
+  let openingBasis: "printed" | "running" | null = opening === null ? null : "printed";
+  let closingBasis: "printed" | "running" | null = closing === null ? null : "printed";
+  if (closing === null && sawBal) {
+    closing = [...kept].reverse().find((l) => l.balanceMinor !== null)?.balanceMinor ?? null;
+    if (closing !== null) closingBasis = "running";
+  }
   if (opening === null && sawBal) {
     const firstWithBalance = kept.find((l) => l.balanceMinor !== null);
-    if (firstWithBalance) opening = (firstWithBalance.balanceMinor as number) - firstWithBalance.amountMinor;
+    if (firstWithBalance) {
+      opening = (firstWithBalance.balanceMinor as number) - firstWithBalance.amountMinor;
+      openingBasis = "running";
+    }
   }
   let to = per.to;
   if (!to && kept.length) to = kept.map((l) => l.date).sort()[kept.length - 1];
-  return { from: per.from, to, opening: opening as number | null, closing: closing as number | null, lines: kept, skipped };
+  return {
+    from: per.from,
+    to,
+    opening: opening as number | null,
+    closing: closing as number | null,
+    openingBasis,
+    closingBasis,
+    lines: kept,
+    skipped,
+  };
 }
 
 /** A combined statement is cut at each "Account number:" line; the same account named twice is one account. */
@@ -600,6 +625,8 @@ export function readPdfStatements(glyphs: readonly PdfGlyph[]): PdfStatement[] {
       to: to || null,
       openingMinor: s.opening,
       closingMinor: s.closing,
+      openingBasis: s.openingBasis,
+      closingBasis: s.closingBasis,
       lines: s.lines.map((l) => ({
         date: l.date,
         description: l.description,

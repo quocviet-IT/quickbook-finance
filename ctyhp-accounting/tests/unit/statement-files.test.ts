@@ -78,7 +78,59 @@ describe("parseOfx", () => {
     expect(result.rows[0]).toMatchObject({ txn_date: "2026-09-20", amount_minor: 125000, description: "CUSTOMER DEPOSIT", reference: "R-9", external_id: "X-77" });
   });
   it("finds nothing in a file with no transactions", () => {
-    expect(parseOfx("<OFX></OFX>")).toEqual({ rows: [], skipped: 0, accountId: null });
+    expect(parseOfx("<OFX></OFX>")).toEqual({ rows: [], skipped: 0, accountId: null, ledger: null, periodStart: null, periodEnd: null });
+  });
+});
+
+describe("parseOfx: the period and the ledger balance (2.04)", () => {
+  const sgml = (tail: string) => `OFXHEADER:100
+DATA:OFXSGML
+<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS>
+<BANKACCTFROM><BANKID>000000000<ACCTID>99004821<ACCTTYPE>CHECKING</BANKACCTFROM>
+<BANKTRANLIST>
+<DTSTART>20260901000000.000[-5:EST]
+<DTEND>20260930235959.000[-5:EST]
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260915
+<TRNAMT>-50.00
+<FITID>F-1
+<NAME>EXAMPLE FEE
+</STMTTRN>
+</BANKTRANLIST>
+${tail}
+</STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>`;
+
+  it("reads DTSTART and DTEND as days, and LEDGERBAL with the day it is as of", () => {
+    const result = parseOfx(sgml("<LEDGERBAL><BALAMT>1234.56<DTASOF>20260930120000.000[-5:EST]</LEDGERBAL>"));
+    expect(result.periodStart).toBe("2026-09-01");
+    expect(result.periodEnd).toBe("2026-09-30");
+    expect(result.ledger).toEqual({ minor: 123456, asOf: "2026-09-30" });
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("reads XML and a negative balance, and never AVAILBAL", () => {
+    const xml =
+      "<OFX><CREDITCARDMSGSRSV1><CCSTMTTRNRS><CCSTMTRS><CCACCTFROM><ACCTID>4111000011112222</ACCTID></CCACCTFROM>" +
+      "<BANKTRANLIST><DTSTART>20260801</DTSTART><DTEND>20260831</DTEND>" +
+      "<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260810</DTPOSTED><TRNAMT>-75.00</TRNAMT><FITID>C-1</FITID><NAME>EXAMPLE CARD</NAME></STMTTRN>" +
+      "</BANKTRANLIST><LEDGERBAL><BALAMT>-1075.00</BALAMT><DTASOF>20260831</DTASOF></LEDGERBAL>" +
+      "<AVAILBAL><BALAMT>3925.00</BALAMT><DTASOF>20260831</DTASOF></AVAILBAL></CCSTMTRS></CCSTMTTRNRS></CREDITCARDMSGSRSV1></OFX>";
+    const result = parseOfx(xml);
+    expect(result).toMatchObject({ periodStart: "2026-08-01", periodEnd: "2026-08-31", ledger: { minor: -107500, asOf: "2026-08-31" } });
+  });
+
+  it("reads no balance from a file of two statements, nor a period", () => {
+    const one = sgml("<LEDGERBAL><BALAMT>10.00<DTASOF>20260930</LEDGERBAL>");
+    const two = `${one}\n${one}`;
+    const result = parseOfx(two);
+    expect([result.ledger, result.periodStart, result.periodEnd]).toEqual([null, null, null]);
+    expect(result.rows).toHaveLength(2);
+  });
+
+  it("leaves the ledger balance out when it cannot be read, and its date when there is none", () => {
+    expect(parseOfx(sgml("<LEDGERBAL><BALAMT>n/a<DTASOF>20260930</LEDGERBAL>")).ledger).toBeNull();
+    expect(parseOfx(sgml("<LEDGERBAL><BALAMT>10.00</LEDGERBAL>")).ledger).toEqual({ minor: 1000, asOf: null });
   });
 });
 
@@ -122,6 +174,25 @@ describe("parseQif", () => {
   });
   it("skips and counts unreadable records and sections that are not bank, cash or card", () => {
     expect(parseQif(QIF).skipped).toBe(2);
+  });
+
+  it("has no opening when it carries no Opening Balance record", () => {
+    expect(parseQif(QIF).openingMinor).toBeNull();
+  });
+
+  it("reads an Opening Balance record as the opening, not as a line (2.04)", () => {
+    const withOpening = ["!Type:Bank", "D9/1'26", "T2,500.00", "POpening Balance", "L[Example Checking]", "^", "D9/30'26", "T-15.00", "PMONTHLY SERVICE FEE", "^"].join("\n");
+    const result = parseQif(withOpening);
+    expect(result.openingMinor).toBe(250000);
+    expect(result.rows.map((r) => [r.txn_date, r.amount_minor, r.description])).toEqual([["2026-09-30", -1500, "MONTHLY SERVICE FEE"]]);
+    expect(result.skipped).toBe(0);
+  });
+
+  it("takes neither of two Opening Balance records, and imports neither as a line", () => {
+    const two = ["!Type:Bank", "D9/1'26", "T100.00", "POPENING BALANCE", "^", "D9/1'26", "T200.00", "P Opening Balance ", "^", "D9/2'26", "T-5.00", "PFEE", "^"].join("\n");
+    const result = parseQif(two);
+    expect(result.openingMinor).toBeNull();
+    expect(result.rows).toHaveLength(1);
   });
 });
 
