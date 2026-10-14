@@ -41,6 +41,70 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.04",
+    date: "2026-10-14",
+    headline:
+      "A statement must add up before it is imported, and repeated lines are counted, kept and said.",
+    changes: [
+      {
+        kind: "changed",
+        title: "A statement must add up before it is imported",
+        detail:
+          "Import statement now proves every statement — PDF, CSV, OFX, QFX, QBO or QIF — against the balances it prints: its opening balance plus its lines must come to its closing balance, to the cent. When it does, the dialog says so, with where the opening came from — “Opening $1,000.00 (printed) + 42 lines −$250.00 = $750.00, the closing balance the statement prints ✓” — and Import 42 lines is one click, as before. When it does not, it says how much it is out by and what the lines come to, then names what to look at: for a CSV with a balance column, the line its balance jumps after; when exactly one line is the amount it is out by, that line. The button is disabled and the dialog reads “Import is blocked until the statement adds up.” The same rule holds when a statement is imported into a reconciliation and when one is attached to it, and OneBook checks it again when the lines arrive.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Fix a misread line, or type a missing balance, in the dialog",
+        detail:
+          "Every line in the dialog has a Not a transaction tick: a ticked line is struck through, left out of the count and not imported, so a line the PDF reader took for a payment no longer stops the statement adding up. When the file prints no balance, OneBook takes one only when it is sure: the opening from the last completed reconciliation’s closing when the statement starts the day after it, and the closing from a CSV’s balance column or an OFX ledger balance. Otherwise type the figure printed on the statement into Opening balance printed on the statement or Closing balance printed on the statement. When the last reconciliation’s closing may be the opening but the statement’s first day is not known, Use $X (the closing of the reconciliation to [date]) takes it. A balance is never taken from the books, which would agree with the books whatever the bank said.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "An administrator can import anyway, with a reason that is kept",
+        detail:
+          "When a statement does not add up, an administrator sees Import anyway…, which asks for a reason and will not go on without one. The reason and the amount the statement was out by are kept with the import and in the audit log. Everyone else reads “An administrator can import it anyway, with a reason.” A statement missing its opening or closing balance cannot be imported anyway: type the balance instead. A statement that does not add up is never attached to a reconciliation, by anyone: “Attaching is blocked until the statement adds up.”",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "OFX and QIF balances are read",
+        detail:
+          "An OFX, QFX or QBO file’s ledger balance closes the statement when it is as of the file’s last day; one as of a later day is not used, and the closing is typed instead. The file’s first and last days are read too, so the last reconciliation’s closing is taken as the opening when the file starts the day after it. A QIF’s Opening Balance record is now the statement’s opening, no longer imported as a line.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Repeated identical lines are counted, kept, and said",
+        detail:
+          "Two identical lines on one statement — two payroll payments of the same amount on the same day — are two payments, and both are kept, as before. The dialog now says so for each set: “3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.” Importing the same file again imports none of them. After the import, the message says how many lines were imported, how many were already here from this statement, how many were skipped as already in Bank Transactions from another source, and how many repeated lines were kept, each only when it is not zero.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Lines already in Bank Transactions from another source are skipped",
+        detail:
+          "A line of the file that is not yet in Bank Transactions, on a day and for an amount that a line already there from another source has — one made from the books, from a bank feed, or from another file — is listed under “Already in Bank Transactions from another source (the books, a bank feed or another file)” and skipped, so it does not arrive twice. Tick one to import it as well. Two such lines in the file and one already there mark one. A skipped line still counts toward the statement adding up.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Two lines with the same bank id are both kept",
+        detail:
+          "An OFX, QFX or QBO file that gave two of its lines the same transaction id kept only one of them. Both are now imported, counted as repeated lines, and importing the file again imports neither.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "A run of statement files stops at a statement that does not add up",
+        detail:
+          "Reconcile › From statement files proves each statement as it reads it, and shows the proof under what was read. A statement that does not add up stops the run there: “Out by $6.44 — import this statement on its own to correct it.” Import it on its own, where a misread line can be ticked Not a transaction, then run the rest.",
+        route: "/banking/reconcile/from-files",
+      },
+    ],
+  },
+  {
     version: "2.03",
     date: "2026-10-14",
     headline:

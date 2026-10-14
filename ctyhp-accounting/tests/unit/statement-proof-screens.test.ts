@@ -13,6 +13,7 @@ import {
   IMPORT_PREVIEW_WIDTH,
 } from "@/app/(app)/banking/import-preview-columns";
 import { COLUMN, fitsBox } from "@/lib/design/table-metrics";
+import { RELEASES } from "@/lib/domain/changelog";
 import type { StatementLine } from "@/lib/domain/statement-import";
 import {
   NOT_A_TRANSACTION,
@@ -27,6 +28,7 @@ import {
 import { PROOF_REFUSAL, PROOF_TEXT, type StatementFigures } from "@/lib/domain/statement-proof";
 import { OTHER_SOURCE_WARNING, type StatementLinesCheck } from "@/lib/domain/statement-repeats";
 import { checkRun, type RunStatement } from "@/lib/domain/statement-run";
+import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 
 /**
  * The screens of 2.04, "Statement proof and repeated lines": the statement
@@ -427,5 +429,52 @@ describe("a run of statement files", () => {
     expect(fromFiles).toContain("{check.stops.map((stop) => (");
     expect(fromFiles).toContain("disabled={check.stops.length > 0 || reading > 0 || busy}");
     expect(fromFiles).toContain("if (!preview || previewing || check.stops.length > 0) return;");
+  });
+});
+
+// --- Release notes and the Guide -------------------------------------------------------
+
+describe("2.04 in the release notes and the Guide", () => {
+  const release = RELEASES[0];
+  const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
+
+  it("is the newest release, dated the day it was built", () => {
+    expect(release.version).toBe("2.04");
+    expect(release.date).toBe("2026-10-14");
+  });
+
+  it("says what the person sees, in the screen's words", () => {
+    for (const words of [
+      "Import is blocked until the statement adds up.",
+      "Not a transaction",
+      "Opening balance printed on the statement",
+      "Closing balance printed on the statement",
+      "Import anyway…",
+      "An administrator can import it anyway, with a reason.",
+      "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
+      OTHER_SOURCE_WARNING,
+      "Two lines with the same bank id are both kept",
+      "import this statement on its own to correct it.",
+    ]) {
+      expect(said, words).toContain(words);
+    }
+    expect(release.changes.map((c) => c.route)).toContain("/banking/reconcile/from-files");
+  });
+
+  it("gives the Guide the import, what to do when it is blocked, and the override", () => {
+    const steps = GUIDE_FLOWS.flatMap((flow) => flow.steps);
+    const step = (control: string, action: string) => {
+      const found = steps.find((s) => s.control === control && s.action === action);
+      expect(found, `${control}: ${action}`).toBeDefined();
+      return found?.note ?? "";
+    };
+    expect(step("Import statement", "Check that the statement adds up")).toContain(
+      "Import is blocked until the statement adds up",
+    );
+    expect(step("Not a transaction", "Make a statement add up")).toContain("Closing balance printed on the statement");
+    expect(step("Import anyway…", "Import a statement that does not add up")).toContain("kept with the import and in the audit log");
+    expect(step("From statement files", "Reconcile from the statement files, one month or a year")).toContain(
+      "A statement that does not add up stops the run there",
+    );
   });
 });
