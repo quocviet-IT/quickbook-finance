@@ -94,7 +94,36 @@ describe("a reconciliation's kept statement", () => {
       statementFile: null,
     });
     expect(statement.lines[5]).toEqual({
-      lineNo: 5, txnDate: "2026-09-01", description: "Line 5", reference: null, amountMinor: 105, balanceMinor: null,
+      lineNo: 5, txnDate: "2026-09-01", description: "Line 5", reference: null, amountMinor: 105, balanceMinor: null, setAside: false,
+    });
+  });
+
+  it("reads which lines are set aside, and the kept file's period", async () => {
+    const { sb } = fakeClient(
+      {
+        acc_statement_reconciliation: [
+          {
+            ...session,
+            statement_file_id: "file-1",
+            statement_file: { id: "file-1", file_name: "september.pdf", uploaded_at: "2026-10-02T10:00:00Z", sha256: "ab", period_start: "2026-09-01", period_end: "2026-09-30" },
+          },
+        ],
+        acc_reconciliation_statement_line: [
+          { line_no: 0, txn_date: "2026-09-05", description: "FEE", reference: null, amount_minor: -500, balance_minor: null, set_aside: false },
+          { line_no: 1, txn_date: "2026-09-08", description: "4101 4102", reference: "4101", amount_minor: -36000, balance_minor: null, set_aside: true },
+        ],
+      },
+      {},
+    );
+    const statement = await getReconciliationStatement(sb, "rec-1");
+    expect(statement.lines.map((l) => l.setAside)).toEqual([false, true]);
+    expect(statement.statementFile).toEqual({
+      id: "file-1",
+      fileName: "september.pdf",
+      keptAt: "2026-10-02T10:00:00Z",
+      sha256: "ab",
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
     });
   });
 
@@ -171,6 +200,21 @@ describe("pairAndTick", () => {
     expect(ticking).toHaveLength(1);
     expect(ticking[0].args).toEqual({ p_reconciliation_id: "rec-1", p_journal_line_ids: ["b"], p_cleared: true });
     expect(outcome).toEqual({ lines: 3, paired: 2, ticked: 1, missing: 1, after: 0, flipped: false });
+  });
+
+  it("never ticks the book line a set-aside statement line would pair with", async () => {
+    const { sb, calls } = fakeClient(
+      {
+        acc_statement_reconciliation: [session],
+        acc_reconciliation_statement_line: [{ ...statementLines[1], set_aside: true }],
+      },
+      {
+        acc_reconciliation_lines: [bookLine("b", "2026-09-12", -12000, false, "1201")],
+        acc_set_cleared_many: (args) => (args.p_journal_line_ids as string[]).length,
+      },
+    );
+    expect(await pairAndTick(sb, "rec-1")).toEqual({ lines: 1, paired: 0, ticked: 0, missing: 0, after: 0, flipped: false });
+    expect(calls.some((c) => c.fn === "acc_set_cleared_many")).toBe(false);
   });
 
   it("makes no call when every pair is ticked already", async () => {

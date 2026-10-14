@@ -287,20 +287,31 @@ const shownSchema = z
   .array(z.object({ lineNo: z.number().int().nonnegative(), accountId: z.uuid() }))
   .min(1, "There is nothing to add")
   .max(ADD_MISSING_LIMIT, `At most ${ADD_MISSING_LIMIT} lines can be added at a time`);
+const anywaySchema = z
+  .array(z.number().int().nonnegative())
+  .max(ADD_MISSING_LIMIT, `At most ${ADD_MISSING_LIMIT} lines can be added at a time`);
 
 /**
- * Adds the statement lines the books do not have — every one or none — as the
- * person was shown them, then pairs and ticks. The reconciliation is not
- * completed: Complete stays the person's click.
+ * Adds the statement lines the books do not have — every one asked for, or
+ * none — as the person was shown them, then pairs and ticks. "Add all N" sends
+ * the plan's items; "Add anyway" sends one held-back line, with its line
+ * number in `anyway`. The reconciliation is not completed: Complete stays the
+ * person's click.
  */
-export async function addMissingLinesAction(reconciliationId: string, shown: unknown): Promise<ActionResult<AddedLines>> {
+export async function addMissingLinesAction(
+  reconciliationId: string,
+  shown: unknown,
+  anyway: unknown = [],
+): Promise<ActionResult<AddedLines>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
   const parsed = shownSchema.safeParse(shown);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  const held = anywaySchema.safeParse(anyway);
+  if (!held.success) return { ok: false, error: held.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    const added = await addMissingLines(sb, reconciliationId, parsed.data);
+    const added = await addMissingLines(sb, reconciliationId, parsed.data, held.data);
     revalidatePath(`/banking/reconcile/${reconciliationId}`);
     revalidatePath("/banking");
     revalidatePath("/reports");

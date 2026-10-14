@@ -19,6 +19,8 @@ export interface ReconLineView {
 export interface ReconStatementLine {
   lineNo: number; txnDate: string; description: string; reference: string | null;
   amountMinor: number; balanceMinor: number | null;
+  /** Set aside as not a transaction (2.03): left out of the pairing, of Add missing lines and of the difference's parts. */
+  setAside: boolean;
 }
 
 /** A reconciliation's account and date, and the statement it is reconciled against. */
@@ -38,6 +40,9 @@ export interface KeptStatementFileRef {
   fileName: string;
   keptAt: string;
   sha256: string;
+  /** The statement's period as kept with the file; null when it names none. */
+  periodStart: string | null;
+  periodEnd: string | null;
 }
 
 /** The statement a reconciliation is reconciled against, with its lines. */
@@ -230,7 +235,7 @@ const optionalMinor = (v: unknown) => (v === null || v === undefined ? null : Nu
 /** A reconciliation's account, date and statement, or null when no reconciliation has this id. */
 export async function findReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader | null> {
   const { data, error } = await sb.from("acc_statement_reconciliation")
-    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward,statement_file_id,statement_file:acc_saved_report(id,file_name,uploaded_at,sha256)")
+    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward,statement_file_id,statement_file:acc_saved_report(id,file_name,uploaded_at,sha256,period_start,period_end)")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new BankRecError(error.message);
@@ -258,6 +263,8 @@ function keptFileRef(value: unknown): KeptStatementFileRef | null {
     fileName: row.file_name as string,
     keptAt: row.uploaded_at as string,
     sha256: row.sha256 as string,
+    periodStart: (row.period_start as string) ?? null,
+    periodEnd: (row.period_end as string) ?? null,
   };
 }
 
@@ -275,7 +282,7 @@ export async function getReconciliationStatement(sb: SupabaseClient, id: string)
     readAllPages<Record<string, unknown>>(
       (from, to) =>
         sb.from("acc_reconciliation_statement_line")
-          .select("line_no,txn_date,description,reference,amount_minor,balance_minor")
+          .select("line_no,txn_date,description,reference,amount_minor,balance_minor,set_aside")
           .eq("reconciliation_id", id)
           .order("line_no")
           .range(from, to),
@@ -287,6 +294,7 @@ export async function getReconciliationStatement(sb: SupabaseClient, id: string)
     lines: lines.map((l) => ({
       lineNo: Number(l.line_no), txnDate: l.txn_date as string, description: (l.description as string) ?? "",
       reference: (l.reference as string) ?? null, amountMinor: Number(l.amount_minor), balanceMinor: optionalMinor(l.balance_minor),
+      setAside: Boolean(l.set_aside),
     })),
   };
 }
