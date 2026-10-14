@@ -633,8 +633,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Choose PDF statements, or a CSV export with a running balance column, which is cut into months. " +
           "Each closing balance comes from the file, and each statement is proved as it is read, its proof shown " +
-          "under what was read. A statement that does not add up stops the run there — import it on its own to " +
-          "correct it — as does a month missing from the run, or a reconciliation already in progress. Preview pairs the months with the books oldest first — by date and amount, by check " +
+          "under what was read. A statement that does not add up stops the run there: the statements before it " +
+          "still run, and it and those after it wait — import it on its own to correct it. A month missing from " +
+          "the run, or a reconciliation already in progress, stops the whole run. Preview pairs the months with the books oldest first — by date and amount, by check " +
           "number, or by amount within 5 days — up to the first that does not agree, and writes nothing. Sign off " +
           "signs the months that agree; the first that does not is started, with its pairs ticked, for you to " +
           "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +

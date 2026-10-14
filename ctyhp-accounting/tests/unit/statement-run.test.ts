@@ -172,13 +172,21 @@ describe("checkRun", () => {
     ]);
   });
 
-  it("notes a statement that does not add up, and stops the run at it (2.04)", () => {
-    const result = checkRun([statement("2026-07-31", 1000, 3100, [csvLine("2026-07-05", 100, null)])], noContext, money);
-    expect(result.statements[0].note).toBe("1 line — does not add up, out by $20.00");
-    expect(result.statements[0].proof?.differenceMinor).toBe(-2000);
-    expect(result.stops).toEqual([
-      "The statement closing Jul 31, 2026 does not add up. Out by $20.00 — import this statement on its own to correct it.",
+  it("runs nothing when its first statement does not add up: that one says what it is out by, the later ones wait behind it (2.04)", () => {
+    const result = checkRun(
+      [statement("2026-07-31", 1000, 3100, [csvLine("2026-07-05", 100, null)]), proved("2026-08-31", 3100, 3200)],
+      noContext,
+      money,
+    );
+    expect(result.statements.map((c) => [c.statement.to, c.state, c.note])).toEqual([
+      ["2026-07-31", "doesNotAddUp", "Out by $20.00 — import this statement on its own to correct it."],
+      ["2026-08-31", "waiting", "Waiting behind the statement closing Jul 31, 2026"],
     ]);
+    expect(result.statements[0].proof?.differenceMinor).toBe(-2000);
+    // The one waiting is proved all the same, so the table can show its proof.
+    expect(result.statements[1].proof?.proves).toBe(true);
+    expect(result.usable).toEqual([]);
+    expect(result.stops).toEqual(["Nothing here can be reconciled yet."]);
   });
 
   it("marks a month that runs past the company's today as not over yet", () => {
@@ -198,9 +206,9 @@ describe("checkRun", () => {
 
   it("stops a run of more than 10,000 statement lines, and not one of exactly 10,000", () => {
     const lines = (n: number) => Array.from({ length: n }, (_, i) => csvLine("2026-07-05", 1, null, `L${i}`));
-    const over = checkRun([statement("2026-07-31", 1000, 1100, lines(10001))], noContext, money);
+    const over = checkRun([statement("2026-07-31", 1000, 1000 + 10001, lines(10001))], noContext, money);
     expect(over.stops).toContain("These statements hold 10,001 lines, and a run can hold at most 10,000. Choose fewer months.");
-    const exact = checkRun([statement("2026-07-31", 1000, 1100, lines(10000))], noContext, money);
+    const exact = checkRun([statement("2026-07-31", 1000, 1000 + 10000, lines(10000))], noContext, money);
     expect(exact.stops.filter((s) => s.includes("a run can hold at most"))).toEqual([]);
   });
 });
@@ -216,23 +224,44 @@ describe("checkRun: each statement proved (2.04)", () => {
     expect(result.stops).toEqual([]);
   });
 
-  it("stops only at the first statement that does not add up", () => {
+  it("runs the statements before the first that does not add up and stops there: it says what it is out by, every later one waits behind it", () => {
     const result = checkRun(
       [
         proved("2026-07-31", 1000, 1100),
         statement("2026-08-31", 1100, 1250, [csvLine("2026-08-05", 100, null)]),
         statement("2026-09-30", 1250, 1300, [csvLine("2026-09-05", 100, null)]),
+        proved("2026-10-31", 1300, 1400),
       ],
       context,
       money,
     );
-    expect(result.statements.map((c) => c.note)).toEqual([
-      "1 line",
-      "1 line — does not add up, out by $0.50",
-      "1 line — does not add up, out by $0.50",
+    expect(result.statements.map((c) => [c.state, c.note])).toEqual([
+      ["usable", "1 line"],
+      ["doesNotAddUp", "Out by $0.50 — import this statement on its own to correct it."],
+      ["waiting", "Waiting behind the statement closing Aug 31, 2026"],
+      ["waiting", "Waiting behind the statement closing Aug 31, 2026"],
     ]);
-    expect(result.stops).toEqual([
-      "The statement closing Aug 31, 2026 does not add up. Out by $0.50 — import this statement on its own to correct it.",
+    // Every one keeps its proof, so the table shows it, the ones waiting included.
+    expect(result.statements.map((c) => c.proof?.proves)).toEqual([true, false, false, true]);
+    // The month before it previews and signs: nothing stops the run.
+    expect(result.usable.map((s) => s.to)).toEqual(["2026-07-31"]);
+    expect(result.stops).toEqual([]);
+  });
+
+  it("checks for a gap only among the statements that run: one behind the stop holds nothing back, one before it stops the whole run", () => {
+    const outBy = statement("2026-08-31", 1100, 1250, [csvLine("2026-08-05", 100, null)]);
+    const behind = checkRun([proved("2026-07-31", 1000, 1100), outBy, proved("2026-09-30", 9000, 9100)], context, money);
+    expect(behind.statements.map((c) => c.state)).toEqual(["usable", "doesNotAddUp", "waiting"]);
+    expect(behind.stops).toEqual([]);
+
+    const before = checkRun(
+      [proved("2026-06-30", 900, 1000), proved("2026-07-31", 1050, 1100), outBy],
+      { ...context, lastCompleted: { date: "2026-05-31", endingMinor: 900 }, completedDates: ["2026-05-31"] },
+      money,
+    );
+    expect(before.usable.map((s) => s.to)).toEqual(["2026-06-30", "2026-07-31"]);
+    expect(before.stops).toEqual([
+      "There is a gap in the run. The statement closing Jul 31, 2026 does not open at the one before it, so a month is missing from what you have chosen. Reconciling across a gap would sign off items nobody has seen a statement for.",
     ]);
   });
 
@@ -262,11 +291,11 @@ describe("checkRun: each statement proved (2.04)", () => {
       context,
       money,
     );
-    expect(result.statements[0].note).toBe("1 line — no opening balance");
+    expect(result.statements[0].state).toBe("doesNotAddUp");
+    expect(result.statements[0].note).toBe("No opening balance — import this statement on its own to correct it.");
     expect(result.statements[0].proof?.prior.status).toBe("refused");
-    expect(result.stops).toEqual([
-      "The statement closing Jul 31, 2026 prints no opening balance — import this statement on its own to correct it.",
-    ]);
+    expect(result.usable).toEqual([]);
+    expect(result.stops).toEqual(["Nothing here can be reconciled yet."]);
   });
 
   it("proves a CSV month by its running balances, and says where its balances jump", () => {

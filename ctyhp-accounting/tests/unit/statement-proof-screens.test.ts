@@ -406,29 +406,50 @@ describe("a run of statement files", () => {
     outByMinor: null,
   });
 
-  it("shows each statement's proof under what was read", () => {
+  it("shows each statement's proof under what was read, and the one it stops at in red", () => {
     expect(fromFiles).toContain("{c.proof.sentences.summary}");
     expect(fromFiles).toContain("{c.proof.sentences.detail}");
-    expect(fromFiles).toContain('color={c.proof && !c.proof.proves ? "red" : STATE_COLOR[c.state]}');
+    expect(fromFiles).toContain("<Tag color={STATE_COLOR[c.state]}");
+    expect(fromFiles).toContain('doesNotAddUp: "red",');
+    expect(fromFiles).toContain("waiting: undefined,");
   });
 
-  it("stops at the first statement that does not add up, with the stop message, and previews nothing", () => {
+  const context = { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null, today: "2026-12-31" };
+
+  it("stops at the first statement that does not add up: the months before it preview and sign, it says the stop, the later ones wait", () => {
     const result = checkRun(
       [month("2026-07-31", 1000, 1100, 100), month("2026-08-31", 1100, 1250, 100), month("2026-09-30", 1250, 1300, 50)],
-      { lastCompleted: { date: "2026-06-30", endingMinor: 1000 }, completedDates: ["2026-06-30"], inProgress: null, today: "2026-12-31" },
+      context,
       money,
     );
     expect(result.statements.map((c) => c.proof?.proves)).toEqual([true, false, true]);
     expect(result.statements[1].proof?.sentences.summary).toBe(
       "Out by $0.50. The opening $11.00 and the 1 line come to $12.00; the statement closes at $12.50.",
     );
-    expect(result.stops).toEqual([
-      "The statement closing Aug 31, 2026 does not add up. Out by $0.50 — import this statement on its own to correct it.",
+    expect(result.statements.map((c) => [c.state, c.note])).toEqual([
+      ["usable", "1 line"],
+      ["doesNotAddUp", "Out by $0.50 — import this statement on its own to correct it."],
+      ["waiting", "Waiting behind the statement closing Aug 31, 2026"],
     ]);
-    // The screen draws every stop, and a stop keeps Preview and Sign off from going.
+    // Nothing stops the whole run: Preview goes, with the month before the stop only.
+    expect(result.stops).toEqual([]);
+    expect(result.usable.map((s) => s.to)).toEqual(["2026-07-31"]);
+    expect(fromFiles).toContain("const run = check.usable;");
+    expect(fromFiles).toContain("Preview {check.usable.length} statement{check.usable.length === 1 ? \"\" : \"s\"}");
+    // A stop of the whole run (a gap, a reconciliation in progress) still keeps Preview and Sign off from going.
     expect(fromFiles).toContain("{check.stops.map((stop) => (");
     expect(fromFiles).toContain("disabled={check.stops.length > 0 || reading > 0 || busy}");
     expect(fromFiles).toContain("if (!preview || previewing || check.stops.length > 0) return;");
+  });
+
+  it("runs nothing when the first statement does not add up, and says why on its row", () => {
+    const result = checkRun([month("2026-07-31", 1000, 1150, 100), month("2026-08-31", 1150, 1250, 100)], context, money);
+    expect(result.statements.map((c) => [c.state, c.note])).toEqual([
+      ["doesNotAddUp", "Out by $0.50 — import this statement on its own to correct it."],
+      ["waiting", "Waiting behind the statement closing Jul 31, 2026"],
+    ]);
+    expect(result.usable).toEqual([]);
+    expect(result.stops).toEqual(["Nothing here can be reconciled yet."]);
   });
 });
 

@@ -83,6 +83,8 @@ const STATE_COLOR: Record<CheckedStatement["state"], string | undefined> = {
   already: "blue",
   before: undefined,
   duplicate: undefined,
+  doesNotAddUp: "red",
+  waiting: undefined,
 };
 
 function outcomeTag(outcome: MonthOutcome) {
@@ -378,10 +380,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
                 title: "Read",
                 // Each statement's proof (2.04) under what was read: it adds up, or
                 // what it is out by and, for a CSV, where its balance jumps. The run
-                // stops at the first that does not add up (check.stops, below).
+                // stops at the first that does not add up: the statements before it
+                // still run, it says "Out by … — import this statement on its own to
+                // correct it.", and every later one waits behind it.
                 render: (_, c) => (
                   <>
-                    <Tag color={c.proof && !c.proof.proves ? "red" : STATE_COLOR[c.state]} style={{ whiteSpace: "normal" }}>
+                    <Tag color={STATE_COLOR[c.state]} style={{ whiteSpace: "normal" }}>
                       {c.note}
                     </Tag>
                     {c.proof?.sentences.summary ? (

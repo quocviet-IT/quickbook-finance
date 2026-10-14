@@ -99,7 +99,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "A run of statement files stops at a statement that does not add up",
         detail:
-          "Reconcile › From statement files proves each statement as it reads it, and shows the proof under what was read. A statement that does not add up stops the run there: “Out by $6.44 — import this statement on its own to correct it.” Import it on its own, where a misread line can be ticked Not a transaction, then run the rest.",
+          "Reconcile › From statement files proves each statement as it reads it, and shows the proof under what was read. A statement that does not add up stops the run there: the statements before it still run and can be signed off, it reads “Out by $6.44 — import this statement on its own to correct it.”, and those after it wait behind it. Import it on its own, where a misread line can be ticked Not a transaction, then run the rest.",
         route: "/banking/reconcile/from-files",
       },
     ],

@@ -241,23 +241,40 @@ export interface RunContext {
   today: string;
 }
 
-export type RunState = "usable" | "unreadable" | "notOver" | "duplicate" | "already" | "before";
+/**
+ * Where a statement stands in the run. `doesNotAddUp` is the first statement
+ * the run would reconcile that does not add up: the run stops there (2.04).
+ * `waiting` is every later one the run would otherwise reconcile.
+ */
+export type RunState =
+  | "usable"
+  | "unreadable"
+  | "notOver"
+  | "duplicate"
+  | "already"
+  | "before"
+  | "doesNotAddUp"
+  | "waiting";
 
 export interface CheckedStatement {
   statement: RunStatement;
   state: RunState;
   /** What the statements table says about it. */
   note: string;
-  /** The statement's proof (2.04), for a statement the run would reconcile; null for any other. */
+  /**
+   * The statement's proof (2.04), for a statement the run would reconcile —
+   * usable, the one that does not add up, and those waiting behind it; null
+   * for any other.
+   */
   proof: StatementProof | null;
 }
 
 export interface RunCheck {
   /** Every statement, by statement date; those without one last. */
   statements: CheckedStatement[];
-  /** The statements a run reconciles, oldest first. */
+  /** The statements a run reconciles, oldest first: those before the first that does not add up. */
   usable: RunStatement[];
-  /** What stops a run; empty when it can go. */
+  /** What stops the whole run; empty when it can go. */
   stops: string[];
 }
 
@@ -268,22 +285,20 @@ export function outByStop(differenceMinor: number, money: (minor: number) => str
   return `Out by ${money(Math.abs(differenceMinor))} — import this statement on its own to correct it.`;
 }
 
-/** What the statements table says about a statement the run would reconcile, by its proof. */
-function provedNote(lineCount: number, proof: StatementProof, money: (minor: number) => string): string {
-  const lines = plural(lineCount, "line");
-  if (proof.proves) return lines;
-  if (proof.differenceMinor !== null) return `${lines} — does not add up, out by ${money(Math.abs(proof.differenceMinor))}`;
-  if (proof.missing === "closing") return `${lines} — no closing balance`;
-  if (proof.missing === "both") return `${lines} — no opening or closing balance`;
-  return `${lines} — no opening balance`;
+/**
+ * What the statements table says about the statement a run stops at, in the
+ * stop's own words: "Out by $0.50 — import this statement on its own to
+ * correct it.", or the balance it does not print.
+ */
+function stopNote(proof: StatementProof, money: (minor: number) => string): string {
+  if (proof.differenceMinor !== null) return outByStop(proof.differenceMinor, money);
+  const what = proof.missing === "closing" ? "closing balance" : proof.missing === "both" ? "opening or closing balance" : "opening balance";
+  return `No ${what} — import this statement on its own to correct it.`;
 }
 
-/** Why the run stops at its first statement that does not add up. */
-function unprovedStop(statement: RunStatement, proof: StatementProof, money: (minor: number) => string): string {
-  const which = `The statement closing ${shortDate(statement.to as string, true)}`;
-  if (proof.differenceMinor !== null) return `${which} does not add up. ${outByStop(proof.differenceMinor, money)}`;
-  const what = proof.missing === "closing" ? "closing balance" : proof.missing === "both" ? "opening or closing balance" : "opening balance";
-  return `${which} prints no ${what} — import this statement on its own to correct it.`;
+/** What the statements table says about a statement waiting behind the one the run stops at. */
+function waitingNote(stoppedAt: RunStatement): string {
+  return `Waiting behind the statement closing ${shortDate(stoppedAt.to as string, true)}`;
 }
 
 /**
@@ -295,7 +310,11 @@ function unprovedStop(statement: RunStatement, proof: StatementProof, money: (mi
  * Each statement the run would reconcile is proved (2.04), and its proof kept
  * with it; the statements it returns carry the proof's opening and closing and
  * their bases, which is what each month sends. The first that does not add up
- * stops the run there.
+ * stops the run there, as simulateRun stops its walk at the first month that
+ * does not agree: the statements before it still run and can be signed off; it
+ * says what it is out by, and every later one waits behind it. A gap, the
+ * first statement's opening and the run's size are checked over the statements
+ * that run.
  */
 export function checkRun(
   statements: readonly RunStatement[],
@@ -317,11 +336,12 @@ export function checkRun(
   });
 
   // Proved oldest first: each statement follows the closing of the one before
-  // it, the first the account's last completed reconciliation.
+  // it, the first the account's last completed reconciliation. The first that
+  // does not add up stops the run there; every later one waits behind it.
   let prior: PriorClosing | null = context.lastCompleted
     ? { date: context.lastCompleted.date, endingMinor: context.lastCompleted.endingMinor }
     : null;
-  let unproved: CheckedStatement | null = null;
+  let stoppedAt: RunStatement | null = null;
   for (const c of checked) {
     if (c.state !== "usable") continue;
     const proof = runStatementProof(c.statement, prior, money);
@@ -333,8 +353,14 @@ export function checkRun(
       openingBasis: proof.openingBasis,
       closingBasis: proof.closingBasis,
     };
-    c.note = provedNote(c.statement.lines.length, proof, money);
-    if (!proof.proves && !unproved) unproved = c;
+    if (stoppedAt) {
+      c.state = "waiting";
+      c.note = waitingNote(stoppedAt);
+    } else if (!proof.proves) {
+      stoppedAt = c.statement;
+      c.state = "doesNotAddUp";
+      c.note = stopNote(proof, money);
+    }
     if (proof.closingMinor !== null) prior = { date: c.statement.to as string, endingMinor: proof.closingMinor };
   }
   const usable = checked.filter((c) => c.state === "usable").map((c) => c.statement);
@@ -369,7 +395,6 @@ export function checkRun(
         "would sign off items nobody has seen a statement for.",
     );
   }
-  if (unproved?.proof) stops.push(unprovedStop(unproved.statement, unproved.proof, money));
   return { statements: checked, usable, stops };
 }
 
