@@ -41,6 +41,70 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.03",
+    date: "2026-10-13",
+    headline:
+      "Reconcile brings an account’s history forward when the books match the statement, explains the difference in parts, and holds back lines a PDF may have misread.",
+    changes: [
+      {
+        kind: "added",
+        title: "Bring the history forward from inside a reconciliation",
+        detail:
+          "On an account that has never been reconciled, a reconciliation that begins at a different figure from its statement’s opening balance now looks at the books up to the day before the statement. When they add up to exactly that opening, it says so and offers Bring the history forward. It asks first, saying how many entries will be marked reconciled, then signs them off in one brought-forward reconciliation and starts this one at the statement’s opening. Nothing is posted to the books. When the books do not match, it says what they read on that day, what the statement opens at, and how much they are out by; an account that already has a completed reconciliation is told so. The offer needs the statement file kept with the reconciliation, which names the statement’s period.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Reconcile history",
+        detail:
+          "A new page, linked from Reconcile, lists every bank account with its lines not reconciled, the first and last of their dates, when it was last reconciled and its state, with any reconciliation in progress. Choose an account never reconciled and fill in Statement balance on [date] = [amount] from one of its statements: the page reads the books on that date as you go. When they match, it shows Books on [date] read [amount] ✓ and Bring forward N entries, which asks first and posts nothing. When they do not, it says how much they are out by. A date after today cannot be chosen. An account already reconciled reads Reconciled up to [date], and a reconciliation in progress that ends on or before the date must be finished or discarded first. Viewers see the page, but not the button.",
+        route: "/banking/reconcile/history",
+      },
+      {
+        kind: "added",
+        title: "Discard a reconciliation in progress",
+        detail:
+          "Discard this reconciliation asks for a reason, removes the reconciliation and its ticks, and returns to Reconcile, so a reconciliation started on the wrong footing can be started again. The statement file and its bank lines stay, and any entries added to the books from it stay in the books. The reason is kept in the audit log. A reconciliation that posted an adjustment cannot be discarded.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "The difference, explained in parts",
+        detail:
+          "“Unexplained difference” is replaced by the difference in its parts: Opening, when the reconciliation begins at a different figure from the statement’s opening; On the statement, not in the books; Ticked here, not on the statement; and Left to explain. A part with no lines in it is left out. When exactly one line is the size of what is left, the reconciliation names it and says to check that one first.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Set a misread statement line aside as Not a transaction",
+        detail:
+          "On a reconciliation in progress, a statement line the books do not have can be marked Not a transaction — a line the PDF reader took for a payment when it was not one. It is left out of Add missing lines and out of the difference, and Restore brings it back. Its line stays in Bank Transactions, and the message says so: exclude it there if it is not real. A line paired with the books cannot be set aside.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "Add missing lines holds back extra lines and likely duplicates",
+        detail:
+          "When the statement already balances without the lines the books do not have — its opening plus the paired lines comes to its closing balance — those lines are marked Extra and held back, since they are likely not transactions. When the statement does not add up and exactly one of those lines is the amount it is out by, that line alone is marked Extra, so a real fee missing from the books beside a misread line is still offered by Add all. A line whose amount the books already hold, with the same check number or within 5 days, is held back too, naming the entry it looks like. Add all adds only the rest. Each held-back line has Add anyway, which posts that line alone: two identical lines on one day can both be real.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "fixed",
+        title: "A check image is no longer read as a payment",
+        detail:
+          "On a PDF statement whose check images carry a small caption and a table of their own, a check already read could be read a second time as a payment, described by two check numbers. The images are now skipped to their end. A PDF whose opening balance plus its lines does not come to its closing balance now says a line may be missing, or one may have been read that is not a transaction.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "The import dialog says which files are read exactly",
+        detail:
+          "Import statement now says: “A bank download (CSV, QFX or OFX) is read exactly. A PDF is read from its text, and a check image or a summary table can be misread.” It says so wherever the dialog opens, in Bank Transactions and in a reconciliation.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.02",
     date: "2026-10-13",
     headline:
