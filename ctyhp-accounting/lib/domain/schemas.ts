@@ -648,6 +648,34 @@ export const runMonthSchema = z.discriminatedUnion("kind", [
 ]);
 export type RunMonthInput = z.infer<typeof runMonthSchema>;
 
+/** Discarding a reconciliation in progress (2.03): the reason is kept in the audit log. */
+export const reconciliationDiscardSchema = z.object({
+  reason: z.string().trim().min(1, "A reason is required to discard a reconciliation").max(300),
+});
+export type ReconciliationDiscardInput = z.infer<typeof reconciliationDiscardSchema>;
+
+/** Bringing an account's history forward from Reconcile history (2.03): the statement's balance on a day. */
+export const historyBringForwardSchema = z.object({
+  bank_account_id: z.uuid("Select a bank account"),
+  through: statementDay,
+  balance_minor: z.number().int("The statement balance must be a whole minor-unit amount"),
+});
+export type HistoryBringForwardInput = z.infer<typeof historyBringForwardSchema>;
+
+/** What the books hold on an account through a day: Reconcile history's live preview (2.03). */
+export const historyPreviewSchema = z.object({
+  bank_account_id: z.uuid("Select a bank account"),
+  through: statementDay,
+});
+export type HistoryPreviewInput = z.infer<typeof historyPreviewSchema>;
+
+/** Setting a statement line aside as not a transaction, or bringing it back (2.03). */
+export const statementLineAsideSchema = z.object({
+  line_no: z.number().int("Choose a statement line").nonnegative("Choose a statement line"),
+  aside: z.boolean(),
+});
+export type StatementLineAsideInput = z.infer<typeof statementLineAsideSchema>;
+
 // --- Company settings + accounting periods ---
 export const companySettingsSchema = z.object({
   legal_name: z.string().trim().min(1, "Legal name is required").max(200),

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { reconciliationStatementSchema, runMonthSchema, runPreviewSchema } from "@/lib/domain/schemas";
+import {
+  historyBringForwardSchema,
+  historyPreviewSchema,
+  reconciliationDiscardSchema,
+  reconciliationStatementSchema,
+  runMonthSchema,
+  runPreviewSchema,
+  statementLineAsideSchema,
+} from "@/lib/domain/schemas";
 
 const line = {
   txn_date: "2026-09-05",
@@ -100,5 +108,40 @@ describe("runPreviewSchema", () => {
 
   it("refuses a statement with no closing balance", () => {
     expect(runPreviewSchema.safeParse({ ...preview, statements: [{ ...preview.statements[0], closing_minor: null }] }).success).toBe(false);
+  });
+});
+
+describe("reconciliationDiscardSchema", () => {
+  it("takes a reason, trimmed, and refuses none", () => {
+    expect(reconciliationDiscardSchema.parse({ reason: "  Started on the wrong statement " })).toEqual({ reason: "Started on the wrong statement" });
+    expect(firstIssue(reconciliationDiscardSchema.safeParse({ reason: "   " }))).toBe("A reason is required to discard a reconciliation");
+    expect(reconciliationDiscardSchema.safeParse({ reason: "x".repeat(301) }).success).toBe(false);
+  });
+});
+
+describe("historyBringForwardSchema and historyPreviewSchema", () => {
+  const bring = { bank_account_id: BANK, through: "2026-08-31", balance_minor: 512340 };
+
+  it("take an account, a real day and, to bring forward, a balance in whole cents", () => {
+    expect(historyBringForwardSchema.safeParse(bring).success).toBe(true);
+    expect(historyBringForwardSchema.safeParse({ ...bring, balance_minor: -2500 }).success).toBe(true);
+    expect(historyPreviewSchema.safeParse({ bank_account_id: BANK, through: "2026-08-31" }).success).toBe(true);
+  });
+
+  it("refuse a day that does not exist, a balance in part-cents, and no account", () => {
+    expect(firstIssue(historyBringForwardSchema.safeParse({ ...bring, through: "2026-02-30" }))).toBe("A statement date must be a real day");
+    expect(firstIssue(historyBringForwardSchema.safeParse({ ...bring, balance_minor: 1.5 }))).toBe(
+      "The statement balance must be a whole minor-unit amount",
+    );
+    expect(firstIssue(historyPreviewSchema.safeParse({ bank_account_id: "bank", through: "2026-08-31" }))).toBe("Select a bank account");
+  });
+});
+
+describe("statementLineAsideSchema", () => {
+  it("takes a line number and whether it is set aside or brought back", () => {
+    expect(statementLineAsideSchema.safeParse({ line_no: 0, aside: true }).success).toBe(true);
+    expect(statementLineAsideSchema.safeParse({ line_no: 7, aside: false }).success).toBe(true);
+    expect(firstIssue(statementLineAsideSchema.safeParse({ line_no: -1, aside: true }))).toBe("Choose a statement line");
+    expect(statementLineAsideSchema.safeParse({ line_no: 1 }).success).toBe(false);
   });
 });
