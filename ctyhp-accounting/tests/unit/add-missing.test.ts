@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADD_ANYWAY,
   ADD_BLOCKED,
   ADD_MISSING_LIMIT,
   CANNOT_ADD_NOTE,
+  EXTRA_LINE_NOTE,
+  EXTRA_LINE_TAG,
+  HELD_BACK_HEADING,
   UNCATEGORIZED_WHY,
   addedMessage,
   addedNotPairedMessage,
+  chooseLinesToAdd,
+  duplicateNote,
+  extraLineNos,
+  extraStatementLines,
+  linesToCheckForDuplicates,
   planAddMissing,
   type AddBankLine,
   type AddStatementLine,
   type AddSuggestion,
+  type DuplicateMatch,
 } from "@/lib/domain/add-missing";
 import type { Standing } from "@/lib/domain/reconcile-statement";
 import { holdingAccountIds, holdingAccountsOf, isHoldingDetail, needsCoding } from "@/lib/domain/uncategorized";
@@ -165,7 +175,7 @@ describe("planAddMissing", () => {
       suggestions: new Map(),
       holding,
     });
-    expect(plan).toEqual({ missing: 1, items: [], cannot: [], uncategorized: 0, blocked: ADD_BLOCKED.flipped });
+    expect(plan).toEqual({ missing: 1, items: [], held: [], cannot: [], uncategorized: 0, blocked: ADD_BLOCKED.flipped });
   });
 
   it("adds nothing when a line needs an Uncategorized account the chart does not have", () => {
@@ -197,7 +207,220 @@ describe("planAddMissing", () => {
   it("has nothing to say when every line is in the books", () => {
     expect(
       planAddMissing({ lines: [deposit], standings: [paired], flipped: false, transactions: [], suggestions: new Map(), holding }),
-    ).toEqual({ missing: 0, items: [], cannot: [], uncategorized: 0, blocked: null });
+    ).toEqual({ missing: 0, items: [], held: [], cannot: [], uncategorized: 0, blocked: null });
+  });
+});
+
+describe("lines held back from Add all", () => {
+  // The deposit pairs with the books; the shop and the fee do not.
+  const lines = [deposit, shop, fee];
+  const standings: Standing[] = [paired, missing, missing];
+  const transactions = [txn("t-dep", deposit, { status: "matched" }), txn("t-shop", shop), txn("t-fee", fee)];
+  const base = { lines, standings, flipped: false, transactions, suggestions: new Map([["t-fee", rule]]), holding };
+  const match = (entryId: string, entryNumber: string | null, journalLineId = `${entryId}-l`): DuplicateMatch => ({
+    journalLineId,
+    entryId,
+    entryNumber,
+    entryDate: "2026-07-27",
+  });
+
+  it("holds back every missing line when the statement already balances on the paired lines", () => {
+    // Opening $1,000.00 + the deposit $500.00 = the closing $1,500.00: the shop and the fee are extra.
+    const plan = planAddMissing({ ...base, openingMinor: 100000, closingMinor: 150000 });
+    expect(plan.items).toEqual([]);
+    expect(plan.uncategorized).toBe(0);
+    expect(plan.held.map((h) => [h.lineNo, h.reason, h.note, h.transactionId, h.accountId, h.matches])).toEqual([
+      [2, "extra", EXTRA_LINE_NOTE, "t-shop", "uncat-out", []],
+      [3, "extra", EXTRA_LINE_NOTE, "t-fee", "charges", []],
+    ]);
+    expect(EXTRA_LINE_NOTE).toBe("Extra — likely not a transaction: the statement already balances without it.");
+    // Nothing is left for Add all, so the books are asked about nothing.
+    expect(linesToCheckForDuplicates(plan)).toEqual([]);
+  });
+
+  it("holds nothing back when the statement needs the missing lines, or does not print both balances", () => {
+    const needs = planAddMissing({ ...base, openingMinor: 100000, closingMinor: 150000 - 4200 - 1500 });
+    expect([needs.items.map((i) => i.lineNo), needs.held]).toEqual([[2, 3], []]);
+    expect(linesToCheckForDuplicates(needs)).toEqual([2, 3]);
+    expect(planAddMissing({ ...base, openingMinor: null, closingMinor: 150000 }).held).toEqual([]);
+    expect(planAddMissing({ ...base, openingMinor: 100000, closingMinor: null }).held).toEqual([]);
+    expect(planAddMissing(base).held).toEqual([]);
+  });
+
+  it("holds back a line the books seem to hold already, naming the entry, and counts only the rest in Add all", () => {
+    const plan = planAddMissing({ ...base, duplicates: new Map([[2, [match("e-310", "JE-000310")]]]) });
+    expect(plan.items.map((i) => i.lineNo)).toEqual([3]);
+    expect(plan.uncategorized).toBe(0);
+    expect(plan.held).toEqual([
+      {
+        lineNo: 2,
+        txnDate: shop.txnDate,
+        description: shop.description,
+        amountMinor: shop.amountMinor,
+        transactionId: "t-shop",
+        accountId: "uncat-out",
+        accountLabel: holding.expense.label,
+        source: "uncategorized",
+        short: "",
+        why: UNCATEGORIZED_WHY,
+        reason: "duplicate",
+        note: "Looks like JE-000310 already in the books.",
+        matches: [match("e-310", "JE-000310")],
+      },
+    ]);
+  });
+
+  it("names the first entry and counts the others", () => {
+    expect(duplicateNote([match("e1", "JE-000101")])).toBe("Looks like JE-000101 already in the books.");
+    // Two lines of one entry are one entry.
+    expect(
+      duplicateNote([match("e1", "JE-000101", "a"), match("e1", "JE-000101", "b"), match("e2", "JE-000102"), match("e3", "JE-000103")]),
+    ).toBe("Looks like JE-000101 and 2 more already in the books.");
+    expect(duplicateNote([match("e9", null)])).toBe("Looks like an entry already in the books.");
+  });
+
+  it(`stops at more than ${ADD_MISSING_LIMIT} lines held back and added together`, () => {
+    const many = Array.from({ length: ADD_MISSING_LIMIT + 1 }, (_, i) => line(i, "2026-07-30", -(i + 1), `FEE ${i}`));
+    const plan = planAddMissing({
+      lines: many,
+      standings: many.map(() => missing),
+      flipped: false,
+      transactions: many.map((l, i) => txn(`t-${i}`, l)),
+      suggestions: new Map(),
+      holding,
+      duplicates: new Map([[0, [match("e1", "JE-000101")]]]),
+    });
+    expect([plan.items.length, plan.held.length, plan.blocked]).toEqual([0, 0, ADD_BLOCKED.tooMany]);
+    expect(linesToCheckForDuplicates(plan)).toEqual([]);
+  });
+
+  it("marks only the lines held back as extra in the statement lines table, never a likely duplicate", () => {
+    expect(extraLineNos(planAddMissing({ ...base, openingMinor: 100000, closingMinor: 150000 }))).toEqual(new Set([2, 3]));
+    expect(extraLineNos(planAddMissing({ ...base, duplicates: new Map([[2, [match("e-310", "JE-000310")]]]) }))).toEqual(new Set());
+    expect(extraLineNos(null)).toEqual(new Set());
+  });
+
+  it("words the box's held lines as the screen shows them", () => {
+    expect([EXTRA_LINE_TAG, HELD_BACK_HEADING, ADD_ANYWAY]).toEqual(["Extra", "Held back from Add all:", "Add anyway"]);
+  });
+});
+
+describe("extra lines: the lines a statement balances without", () => {
+  // An invented statement opening at $2,500.00. The deposit and the check pair
+  // with the books. The fee is real and the books do not have it yet; the hold
+  // was read from the PDF but is not a transaction, so the closing leaves it out.
+  const aside: Standing = { kind: "aside" };
+  const dep = line(1, "2026-09-04", 80000, "DEPOSIT 7001");
+  const check = line(2, "2026-09-11", -12500, "CHECK 8101", "8101");
+  const hold = line(3, "2026-09-17", -6400, "TEMPORARY AUTHORIZATION HOLD");
+  const svc = line(4, "2026-09-30", -1800, "MONTHLY SERVICE FEE");
+  const opening = 250000;
+  const closing = opening + dep.amountMinor + check.amountMinor + svc.amountMinor;
+  const lines = [dep, check, hold, svc];
+  const standings: Standing[] = [paired, paired, missing, missing];
+  const base = {
+    lines,
+    standings,
+    flipped: false,
+    transactions: [txn("t-dep", dep, { status: "matched" }), txn("t-check", check, { status: "matched" }), txn("t-hold", hold), txn("t-svc", svc)],
+    suggestions: new Map([["t-svc", rule]]),
+    holding,
+    openingMinor: opening,
+    closingMinor: closing,
+  };
+
+  it("holds back only the misread line when a real line is missing beside it, and leaves the fee in Add all 1", () => {
+    // Opening + every line - closing = -64.00, the hold's amount and no other line's.
+    expect(opening + 80000 - 12500 - 6400 - 1800 - closing).toBe(hold.amountMinor);
+    expect(extraStatementLines(base)).toEqual(new Set([3]));
+    const plan = planAddMissing(base);
+    expect(plan.items.map((i) => [i.lineNo, i.transactionId, i.accountId])).toEqual([[4, "t-svc", "charges"]]);
+    expect(plan.held.map((h) => [h.lineNo, h.reason, h.note, h.transactionId])).toEqual([[3, "extra", EXTRA_LINE_NOTE, "t-hold"]]);
+    // The box and the statement lines table say the same thing.
+    expect(extraLineNos(plan)).toEqual(new Set([3]));
+    // The books are asked about the fee alone.
+    expect(linesToCheckForDuplicates(plan)).toEqual([4]);
+  });
+
+  it("marks neither of two missing lines of the amount the statement is out by: exactly one is the rule", () => {
+    const twin = line(5, "2026-09-18", -6400, "TEMPORARY AUTHORIZATION HOLD");
+    const input = {
+      ...base,
+      lines: [...lines, twin],
+      standings: [...standings, missing],
+      transactions: [...base.transactions, txn("t-twin", twin)],
+      // The statement holds one hold of -64.00; two were read.
+      closingMinor: closing - 6400,
+    };
+    expect(opening + 80000 - 12500 - 6400 - 1800 - 6400 - input.closingMinor).toBe(-6400);
+    expect(extraStatementLines(input)).toEqual(new Set());
+    const plan = planAddMissing(input);
+    expect(plan.held).toEqual([]);
+    expect(plan.items.map((i) => i.lineNo)).toEqual([3, 4, 5]);
+  });
+
+  it("marks nothing when the statement proves itself", () => {
+    const proves = { ...base, closingMinor: opening + 80000 - 12500 - 6400 - 1800 };
+    expect(extraStatementLines(proves)).toEqual(new Set());
+    expect(planAddMissing(proves).held).toEqual([]);
+  });
+
+  it("still marks every missing line when the statement balances on the paired lines alone", () => {
+    const balances = { ...base, closingMinor: opening + 80000 - 12500 };
+    expect(extraStatementLines(balances)).toEqual(new Set([3, 4]));
+    expect(planAddMissing(balances).held.map((h) => [h.lineNo, h.reason])).toEqual([
+      [3, "extra"],
+      [4, "extra"],
+    ]);
+  });
+
+  it("counts a line set aside for nothing, and never marks a line dated after the statement", () => {
+    // The hold set aside: without it the statement proves itself, so the fee stays to be added.
+    expect(extraStatementLines({ ...base, standings: [paired, paired, aside, missing] })).toEqual(new Set());
+    // The hold dated after the statement is counted, but is not a line to mark; no other line is -64.00.
+    expect(extraStatementLines({ ...base, standings: [paired, paired, after, missing] })).toEqual(new Set());
+  });
+
+  it("marks nothing without both balances, or with nothing missing", () => {
+    expect(extraStatementLines({ ...base, openingMinor: null })).toEqual(new Set());
+    expect(extraStatementLines({ ...base, closingMinor: undefined })).toEqual(new Set());
+    expect(extraStatementLines({ ...base, standings: [paired, paired, paired, paired] })).toEqual(new Set());
+  });
+});
+
+describe("chooseLinesToAdd", () => {
+  const lines = [deposit, wire, shop, fee];
+  const plan = planAddMissing({
+    lines,
+    standings: [missing, missing, missing, missing],
+    flipped: false,
+    transactions: lines.map((l, i) => txn(`t-${i}`, l)),
+    suggestions: new Map([["t-3", rule]]),
+    holding,
+    duplicates: new Map([[2, [{ journalLineId: "jl", entryId: "e", entryNumber: "JE-000200", entryDate: "2026-07-28" }]]]),
+  });
+  const shown = (lineNo: number) => {
+    const item = [...plan.items, ...plan.held].find((i) => i.lineNo === lineNo)!;
+    return { lineNo, accountId: item.accountId };
+  };
+
+  it("takes the lines of Add all as they were shown, in statement order", () => {
+    expect(plan.items.map((i) => i.lineNo)).toEqual([0, 1, 3]);
+    expect(chooseLinesToAdd(plan, [shown(3), shown(0), shown(1)], [])?.map((i) => i.lineNo)).toEqual([0, 1, 3]);
+    // A line of Add all may be asked for alone: each one is checked, and nothing unseen is added.
+    expect(chooseLinesToAdd(plan, [shown(1)], [])?.map((i) => i.transactionId)).toEqual(["t-1"]);
+  });
+
+  it("takes a held-back line only when it was chosen with Add anyway", () => {
+    expect(chooseLinesToAdd(plan, [shown(2)], [])).toBeNull();
+    expect(chooseLinesToAdd(plan, [shown(2)], [2])?.map((i) => [i.lineNo, i.transactionId, i.accountId])).toEqual([[2, "t-2", "uncat-out"]]);
+    // Add anyway names only held-back lines; it never lets in a line the plan does not hold.
+    expect(chooseLinesToAdd(plan, [{ lineNo: 9, accountId: "uncat-out" }], [9])).toBeNull();
+  });
+
+  it("refuses a line posting to another account than shown, or asked for twice", () => {
+    expect(chooseLinesToAdd(plan, [{ lineNo: 3, accountId: "uncat-out" }], [])).toBeNull();
+    expect(chooseLinesToAdd(plan, [shown(0), shown(0)], [])).toBeNull();
   });
 });
 

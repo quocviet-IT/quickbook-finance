@@ -73,6 +73,140 @@ export function broughtForwardNote(from: string | null, to: string | null): stri
   return `Brought forward, proved by the opening balance on the statement for ${periodLabel(from, to)}`;
 }
 
+/** "1 entry", "1,204 entries". */
+export function entriesCount(n: number): string {
+  return n === 1 ? "1 entry" : `${n.toLocaleString("en-US")} entries`;
+}
+
+// --- Bringing the history forward from inside a reconciliation (2.03) --------
+
+/** Where a reconciliation in progress would bring its account's history forward to. */
+export interface SessionHistoryStart {
+  /** The day before the kept statement's period: the last day brought forward. */
+  through: string;
+  /** The balance the statement opens with: what the books must hold through `through`. */
+  openingMinor: number;
+}
+
+/** A reconciliation as bringing its history forward reads it. */
+export interface HistorySession {
+  status: string;
+  /** The kept statement file's period start; null when there is no file, or it names none. */
+  periodStart: string | null;
+  /** A statement file is kept with the reconciliation, but this person may not open it (saved files need documents.read). */
+  fileUnreadable?: boolean;
+  /** The balance the statement opens with; null when it prints none. */
+  openingMinor: number | null;
+  /** Where the reconciliation begins. */
+  beginningMinor: number;
+}
+
+export const SESSION_HISTORY_REFUSAL = {
+  notInProgress: "Only a reconciliation in progress can bring the history forward.",
+  unreadFile:
+    "You cannot open the statement file kept with this reconciliation, so the history cannot be brought forward from here.",
+  noStart:
+    "The statement file kept with this reconciliation names no period start or no opening balance, so the history cannot be brought forward from here.",
+  begins: "This reconciliation already begins at the balance its statement opens with.",
+} as const;
+
+/** Why a reconciliation cannot bring its account's history forward, or null when it can ask. */
+export function sessionHistoryRefusal(session: HistorySession): string | null {
+  if (session.status !== "in_progress") return SESSION_HISTORY_REFUSAL.notInProgress;
+  if (session.fileUnreadable) return SESSION_HISTORY_REFUSAL.unreadFile;
+  if (!session.periodStart || session.openingMinor === null) return SESSION_HISTORY_REFUSAL.noStart;
+  if (session.beginningMinor === session.openingMinor) return SESSION_HISTORY_REFUSAL.begins;
+  return null;
+}
+
+/**
+ * The day before the period of the statement file kept with a reconciliation in
+ * progress, and the balance that statement opens with. Null when there is
+ * nothing to offer: the session is not in progress, its statement file names no
+ * period start or no opening balance, or the session already begins at that
+ * opening (sessionHistoryRefusal says which).
+ */
+export function sessionHistoryStart(session: HistorySession): SessionHistoryStart | null {
+  if (sessionHistoryRefusal(session) || !session.periodStart || session.openingMinor === null) return null;
+  return { through: dayBefore(session.periodStart), openingMinor: session.openingMinor };
+}
+
+/** What the server reads for a reconciliation's offer to bring the history forward. */
+export interface SessionHistoryFacts extends SessionHistoryStart {
+  /** The posted lines on the account through `through`, as the books hold them. */
+  bookBalanceMinor: number;
+  /** How many posted lines through `through` bringing the history forward marks reconciled. */
+  entries: number;
+  /** The account already has a completed reconciliation: the history cannot be brought forward. */
+  reconciled: boolean;
+}
+
+export interface SessionHistoryAdvice {
+  /** Offer the button: the books agree with the statement's opening, and there is history to bring. */
+  canBringForward: boolean;
+  through: string;
+  entries: number;
+  text: string;
+}
+
+export const BRING_HISTORY_FORWARD = "Bring the history forward";
+export const ALREADY_RECONCILED = "This account already has a completed reconciliation.";
+
+/**
+ * What a reconciliation says about bringing its account's history forward: the
+ * books through the day before the statement must hold exactly the balance the
+ * statement opens with, and the account must never have been reconciled. Null
+ * when there is nothing to say (sessionHistoryStart). `money` is the screen's
+ * own formatter.
+ */
+export function sessionHistoryAdvice(
+  facts: SessionHistoryFacts | null,
+  money: (minor: number) => string,
+): SessionHistoryAdvice | null {
+  if (!facts) return null;
+  const { through, openingMinor, bookBalanceMinor, entries } = facts;
+  const date = shortDate(through, true);
+  if (facts.reconciled) return { canBringForward: false, through, entries, text: ALREADY_RECONCILED };
+  if (bookBalanceMinor !== openingMinor) {
+    return {
+      canBringForward: false,
+      through,
+      entries,
+      text:
+        `The books on ${date} read ${money(bookBalanceMinor)}; the statement opens at ${money(openingMinor)}. ` +
+        `Out by ${money(Math.abs(bookBalanceMinor - openingMinor))}.`,
+    };
+  }
+  return {
+    canBringForward: entries > 0,
+    through,
+    entries,
+    text: `Everything in the books up to ${date} adds up to ${money(openingMinor)}, the balance this statement opens with.`,
+  };
+}
+
+/** The question Bring the history forward asks before it marks anything. */
+export function bringHistoryForwardConfirmation(entries: number, through: string): string {
+  return `${entriesCount(entries)} up to ${shortDate(through, true)} will be marked reconciled. Nothing is posted to the books.`;
+}
+
+// --- Discarding a reconciliation in progress (2.03) --------------------------
+
+export const DISCARD_RECONCILIATION = "Discard this reconciliation";
+export const DISCARD_CONFIRMATION =
+  "Its ticks and the statement lines kept with it are removed, along with any line set aside as not a transaction. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.";
+/** Where the person goes once the reconciliation is discarded: Reconcile, on the same account. */
+export function discardedReturnPath(bankAccountId: string): string {
+  return `/banking/reconcile?account=${encodeURIComponent(bankAccountId)}`;
+}
+
+/** Said once a reconciliation is discarded: "Reconciliation discarded, with its 12 ticks." */
+export function discardedMessage(ticksRemoved: number): string {
+  if (ticksRemoved <= 0) return "Reconciliation discarded.";
+  const ticks = ticksRemoved === 1 ? "1 tick" : `${ticksRemoved.toLocaleString("en-US")} ticks`;
+  return `Reconciliation discarded, with its ${ticks}.`;
+}
+
 /** Said when the statement's closing balance is not the reconciliation's ending balance. */
 export function closingAdvice(closingMinor: number | null, endingMinor: number, money: (minor: number) => string): string | null {
   if (closingMinor === null || closingMinor === endingMinor) return null;
@@ -93,10 +227,57 @@ export interface StandingBookLine extends PairBookLine {
   cleared: boolean;
 }
 
+/** A statement line as the standings take it: set aside, it is not a transaction and takes no part in pairing. */
+export interface StandingStatementLine extends PairStatementLine {
+  setAside?: boolean;
+}
+
 export type Standing =
   | { kind: "paired"; how: string; bookId: string; entryNumber: string | null; ticked: boolean }
   | { kind: "missing" }
-  | { kind: "after" };
+  | { kind: "after" }
+  /** Set aside as not a transaction (a misread line): never paired, never missing, never added. */
+  | { kind: "aside" };
+
+// --- A statement line set aside as not a transaction (2.03) ------------------
+
+export const NOT_A_TRANSACTION = "Not a transaction";
+export const RESTORE_LINE = "Restore";
+export const PAIRED_LINE_REFUSAL = "This line is paired with the books, so it is a transaction.";
+/**
+ * Said once a line is set aside. Setting it aside changes the reconciliation
+ * only: the bank line it was imported as stays waiting in Bank Transactions,
+ * and the person is told so, since only they can say it is not real.
+ */
+export const SET_ASIDE_MESSAGE =
+  "Set aside as not a transaction. Its line stays in Bank Transactions — exclude it there if it is not real.";
+
+/**
+ * Why a statement line cannot be set aside, or null when it can. A line the
+ * books pair with is a transaction. Whether a line pairs is worked out here,
+ * not stored, so this is the check the database cannot make. Bringing a line
+ * back is always allowed.
+ */
+export function setAsideRefusal(standing: Standing | undefined, aside: boolean): string | null {
+  return aside && standing?.kind === "paired" ? PAIRED_LINE_REFUSAL : null;
+}
+
+/** The one action a statement line offers on a reconciliation in progress, and what it asks for. */
+export interface AsideAction {
+  label: string;
+  aside: boolean;
+}
+
+/**
+ * What a statement line offers someone who can write: a line the books do not
+ * have can be set aside as not a transaction, and a line set aside can be
+ * restored. A paired line, or one dated after the statement, offers nothing.
+ */
+export function asideActionFor(standing: Standing | undefined): AsideAction | null {
+  if (standing?.kind === "missing") return { label: NOT_A_TRANSACTION, aside: true };
+  if (standing?.kind === "aside") return { label: RESTORE_LINE, aside: false };
+  return null;
+}
 
 /**
  * How a pair was made, in the screen's words. The pairing keeps the
@@ -113,21 +294,31 @@ export interface StatementStandings {
   paired: number;
   missing: number;
   after: number;
+  /** Lines set aside as not a transaction. */
+  aside: number;
   flipped: boolean;
   /** Book lines not on the statement. */
   outstanding: string[];
 }
 
-/** How each statement line stands with the books as they are now. */
+/**
+ * How each statement line stands with the books as they are now. A line set
+ * aside is left out of the pairing altogether, so it can neither take a book
+ * line nor be counted as missing.
+ */
 export function statementStandings(
-  lines: readonly PairStatementLine[],
+  lines: readonly StandingStatementLine[],
   book: readonly StandingBookLine[],
   statementDate: string,
 ): StatementStandings {
-  const match = matchStatement(lines, book, statementDate);
+  const taking = lines
+    .filter((line) => !line.setAside)
+    .map((line) => ({ lineNo: line.lineNo, date: line.date, amountMinor: line.amountMinor, reference: line.reference }));
+  const match = matchStatement(taking, book, statementDate);
   const byLine = new Map(match.pairs.map((pair) => [pair.line.lineNo, pair]));
   const byId = new Map(book.map((entry) => [entry.id, entry]));
   const standings = lines.map((line): Standing => {
+    if (line.setAside) return { kind: "aside" };
     if (line.date > statementDate) return { kind: "after" };
     const pair = byLine.get(line.lineNo);
     if (!pair) return { kind: "missing" };
@@ -145,6 +336,7 @@ export function statementStandings(
     paired: match.pairs.length,
     missing: match.missing.length,
     after: match.ignored,
+    aside: lines.length - taking.length,
     flipped: match.flipped,
     outstanding: match.unseen.map((entry) => entry.id),
   };
@@ -154,7 +346,7 @@ export function statementStandings(
 export function reconciliationStandings(
   statement: {
     endingDate: string;
-    lines: readonly { lineNo: number; txnDate: string; amountMinor: number; reference: string | null }[];
+    lines: readonly { lineNo: number; txnDate: string; amountMinor: number; reference: string | null; setAside?: boolean }[];
   },
   book: readonly {
     journalLineId: string;
@@ -166,7 +358,13 @@ export function reconciliationStandings(
   }[],
 ): StatementStandings {
   return statementStandings(
-    statement.lines.map((l) => ({ lineNo: l.lineNo, date: l.txnDate, amountMinor: l.amountMinor, reference: l.reference })),
+    statement.lines.map((l) => ({
+      lineNo: l.lineNo,
+      date: l.txnDate,
+      amountMinor: l.amountMinor,
+      reference: l.reference,
+      setAside: l.setAside ?? false,
+    })),
     book.map((b) => ({
       id: b.journalLineId,
       date: b.entryDate,

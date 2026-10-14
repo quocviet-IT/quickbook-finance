@@ -2,27 +2,45 @@
  * Adding the statement lines the books do not have (1.82): what the
  * reconciliation's box shows, worked out from the kept statement, the books,
  * the account's bank lines and their coding suggestions; and the click that
- * posts them all through acc_add_statement_lines_to_books, then pairs and ticks.
+ * posts them through acc_add_statement_lines_to_books, then pairs and ticks.
+ *
+ * 2.03: a line the statement balances without, or one the books seem to hold
+ * already, is held back from "Add all N"; the screen offers "Add anyway" for
+ * it alone.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { planAddMissing, type AddBankLine, type AddMissingPlan, type AddSuggestion } from "@/lib/domain/add-missing";
+import {
+  chooseLinesToAdd,
+  linesToCheckForDuplicates,
+  planAddMissing,
+  type AddBankLine,
+  type AddMissingPlan,
+  type AddSuggestion,
+  type ChosenLine,
+} from "@/lib/domain/add-missing";
 import { reconciliationStandings, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { holdingAccountsOf } from "@/lib/domain/uncategorized";
 import { listAccounts } from "./accounts";
 import { listSuggestions } from "./banking";
 import { getReconciliationLines, getReconciliationStatement, listReconciliations, pairAndTick } from "./bankrec";
 import { codingSuggestions } from "./coding";
+import { statementLineDuplicates } from "./reconcile-history";
 import { bankLinesBetween } from "./statement-bank-lines";
 
 export class AddMissingError extends Error {}
 
-/** What "Add all N to the books" would add to this reconciliation, and what it cannot. */
+/**
+ * What "Add all N to the books" would add to this reconciliation, what is held
+ * back from it, and what cannot be added. The books are asked about the lines
+ * "Add all" would add, and only when there are some.
+ */
 export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: string): Promise<AddMissingPlan> {
   const [statement, book] = await Promise.all([
     getReconciliationStatement(sb, reconciliationId),
     getReconciliationLines(sb, reconciliationId),
   ]);
   const standings = reconciliationStandings(statement, book);
+  const balances = { openingMinor: statement.openingMinor, closingMinor: statement.closingMinor };
   const missingDates = statement.lines.filter((_, i) => standings.standings[i]?.kind === "missing").map((l) => l.txnDate).sort();
   if (!missingDates.length || standings.flipped) {
     return planAddMissing({
@@ -32,6 +50,7 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
       transactions: [],
       suggestions: new Map(),
       holding: { income: null, expense: null },
+      ...balances,
     });
   }
 
@@ -63,7 +82,7 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
   const suggestions = new Map<string, AddSuggestion>(
     coding.map((s) => [s.transactionId, { accountId: s.accountId, accountLabel: s.accountLabel, source: s.source, short: s.short, why: s.why }]),
   );
-  return planAddMissing({
+  const base = {
     lines: statement.lines,
     standings: standings.standings,
     flipped: false,
@@ -71,7 +90,13 @@ export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: st
     suggestions,
     holding: holdingAccountsOf(accounts),
     signedThrough,
-  });
+    ...balances,
+  };
+  const plan = planAddMissing(base);
+  const asked = linesToCheckForDuplicates(plan);
+  if (!asked.length) return plan;
+  const duplicates = await statementLineDuplicates(sb, reconciliationId, asked);
+  return duplicates.size ? planAddMissing({ ...base, duplicates }) : plan;
 }
 
 export interface AddedLines {
@@ -84,36 +109,36 @@ export interface AddedLines {
 }
 
 /** Shown to the person: a line and the account it would post to. */
-export interface ShownItem {
-  lineNo: number;
-  accountId: string;
-}
+export type ShownItem = ChosenLine;
 
-const sameItems = (a: readonly ShownItem[], b: readonly ShownItem[]) => {
-  const key = (items: readonly ShownItem[]) => items.map((i) => `${i.lineNo}:${i.accountId}`).sort().join(",");
-  return key(a) === key(b);
-};
+export const PLAN_CHANGED = "The lines to add changed since this page was drawn, so nothing was posted. Look them over again.";
 
 /**
- * Posts every line the plan adds, or none; then pairs and ticks. The plan is
- * worked out again here, and it must be the one the person was shown: a
- * suggestion or a bank line that changed since is not posted unseen.
+ * Posts the lines asked for, every one or none; then pairs and ticks. The plan
+ * is worked out again here, and each line must still be in it as the person
+ * was shown it: in "Add all N", or held back and chosen with "Add anyway" (the
+ * line numbers in `anyway`), posting to the same account. A suggestion or a
+ * bank line that changed since is not posted unseen.
  */
-export async function addMissingLines(sb: SupabaseClient, reconciliationId: string, shown: readonly ShownItem[]): Promise<AddedLines> {
+export async function addMissingLines(
+  sb: SupabaseClient,
+  reconciliationId: string,
+  shown: readonly ShownItem[],
+  anyway: readonly number[] = [],
+): Promise<AddedLines> {
   const plan = await getAddMissingPlan(sb, reconciliationId);
   if (plan.blocked) throw new AddMissingError(plan.blocked);
-  if (!plan.items.length) throw new AddMissingError("There is nothing to add");
-  if (!sameItems(plan.items, shown)) {
-    throw new AddMissingError("The lines to add changed since this page was drawn, so nothing was posted. Look them over again.");
-  }
+  if (!plan.items.length && !plan.held.length) throw new AddMissingError("There is nothing to add");
+  const chosen = chooseLinesToAdd(plan, shown, anyway);
+  if (!chosen?.length) throw new AddMissingError(PLAN_CHANGED);
   const { error } = await sb.rpc("acc_add_statement_lines_to_books", {
     p_reconciliation_id: reconciliationId,
-    p_items: plan.items.map((item) => ({ line_no: item.lineNo, bank_transaction_id: item.transactionId, account_id: item.accountId })),
+    p_items: chosen.map((item) => ({ line_no: item.lineNo, bank_transaction_id: item.transactionId, account_id: item.accountId })),
   });
   if (error) throw new AddMissingError(error.message);
   // The lines are in the books now, whatever happens next: a pairing that fails
   // is said as such, never as lines that were not added.
-  const added = { added: plan.items.length, uncategorized: plan.uncategorized };
+  const added = { added: chosen.length, uncategorized: chosen.filter((item) => item.source === "uncategorized").length };
   try {
     return { ...added, outcome: await pairAndTick(sb, reconciliationId), pairingError: null };
   } catch (e) {

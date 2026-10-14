@@ -1,13 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALREADY_RECONCILED,
+  BRING_HISTORY_FORWARD,
+  DISCARD_CONFIRMATION,
+  DISCARD_RECONCILIATION,
+  NOT_A_TRANSACTION,
+  PAIRED_LINE_REFUSAL,
+  RESTORE_LINE,
+  SESSION_HISTORY_REFUSAL,
+  SET_ASIDE_MESSAGE,
+  asideActionFor,
   bringForwardAdvice,
+  bringHistoryForwardConfirmation,
   broughtForwardNote,
   closingAdvice,
   dayBefore,
+  discardedMessage,
+  discardedReturnPath,
+  entriesCount,
   openingAdvice,
   pairedHowLabel,
   pairingMessage,
   reconciliationStandings,
+  sessionHistoryAdvice,
+  sessionHistoryRefusal,
+  sessionHistoryStart,
+  setAsideRefusal,
   statementStandings,
   type StandingBookLine,
 } from "@/lib/domain/reconcile-statement";
@@ -118,6 +136,159 @@ describe("statementStandings", () => {
       book.map((b) => ({ ...b, journalLineId: b.id, entryDate: b.date, signedMinor: b.amountMinor })),
     );
     expect(result).toEqual(statementStandings(lines, book, "2026-09-30"));
+  });
+
+  it("leaves a line set aside out of the pairing: it takes no book line and is not missing", () => {
+    // Line 0 would pair with "a" by date and amount; set aside, it is not a transaction.
+    const aside = lines.map((l) => (l.lineNo === 0 || l.lineNo === 2 ? { ...l, setAside: true } : l));
+    const result = statementStandings(aside, book, "2026-09-30");
+    expect(result.standings).toEqual([
+      { kind: "aside" },
+      { kind: "paired", how: "cheque number", bookId: "b", entryNumber: "BP-7", ticked: false },
+      { kind: "aside" },
+      { kind: "after" },
+    ]);
+    expect(result).toMatchObject({ paired: 1, missing: 0, after: 1, aside: 2, flipped: false });
+    // The book line the set-aside line would have taken is outstanding again.
+    expect(result.outstanding.sort()).toEqual(["a", "c"]);
+  });
+
+  it("carries a kept statement line's mark through to its standing", () => {
+    const result = reconciliationStandings(
+      { endingDate: "2026-09-30", lines: [{ lineNo: 0, txnDate: "2026-09-05", amountMinor: -1200, reference: null, setAside: true }] },
+      [{ journalLineId: "a", entryDate: "2026-09-05", signedMinor: -1200, reference: null, entryNumber: "JE-1", cleared: true }],
+    );
+    expect(result.standings).toEqual([{ kind: "aside" }]);
+    expect(result.outstanding).toEqual(["a"]);
+  });
+});
+
+describe("setting a statement line aside", () => {
+  it("refuses a line paired with the books, and allows any other — and bringing any line back", () => {
+    const paired = { kind: "paired", how: "date and amount", bookId: "a", entryNumber: "JE-1", ticked: true } as const;
+    expect(setAsideRefusal(paired, true)).toBe(PAIRED_LINE_REFUSAL);
+    expect(PAIRED_LINE_REFUSAL).toBe("This line is paired with the books, so it is a transaction.");
+    expect(setAsideRefusal({ kind: "missing" }, true)).toBeNull();
+    expect(setAsideRefusal({ kind: "after" }, true)).toBeNull();
+    expect(setAsideRefusal({ kind: "aside" }, true)).toBeNull();
+    expect(setAsideRefusal(paired, false)).toBeNull();
+    expect(setAsideRefusal(undefined, true)).toBeNull();
+  });
+
+  it("names the mark and the way back as the spec does", () => {
+    expect([NOT_A_TRANSACTION, RESTORE_LINE]).toEqual(["Not a transaction", "Restore"]);
+  });
+
+  it("says, once a line is set aside, that its bank line stays in Bank Transactions", () => {
+    expect(SET_ASIDE_MESSAGE).toBe(
+      "Set aside as not a transaction. Its line stays in Bank Transactions — exclude it there if it is not real.",
+    );
+  });
+
+  it("offers Not a transaction on a line the books do not have, Restore on one set aside, and nothing else", () => {
+    expect(asideActionFor({ kind: "missing" })).toEqual({ label: "Not a transaction", aside: true });
+    expect(asideActionFor({ kind: "aside" })).toEqual({ label: "Restore", aside: false });
+    const paired = { kind: "paired", how: "date and amount", bookId: "a", entryNumber: "JE-1", ticked: false } as const;
+    expect(asideActionFor(paired)).toBeNull();
+    expect(asideActionFor({ kind: "after" })).toBeNull();
+    expect(asideActionFor(undefined)).toBeNull();
+  });
+
+  it("never offers to set aside a line the server would refuse", () => {
+    const standings = [
+      { kind: "missing" },
+      { kind: "aside" },
+      { kind: "after" },
+      { kind: "paired", how: "check number", bookId: "b", entryNumber: null, ticked: true },
+    ] as const;
+    for (const standing of standings) {
+      const action = asideActionFor(standing);
+      if (action) expect(setAsideRefusal(standing, action.aside), standing.kind).toBeNull();
+    }
+  });
+});
+
+describe("bringing the history forward from inside a reconciliation", () => {
+  const session = { status: "in_progress", periodStart: "2026-09-01", openingMinor: 512340, beginningMinor: 0 };
+
+  it("brings it forward through the day before the statement's period, at the balance the statement opens with", () => {
+    expect(sessionHistoryRefusal(session)).toBeNull();
+    expect(sessionHistoryStart(session)).toEqual({ through: "2026-08-31", openingMinor: 512340 });
+  });
+
+  it("offers nothing, and says why, when the session is done, its file names no start or opening, or it begins there already", () => {
+    const cases = [
+      [{ ...session, status: "completed" }, SESSION_HISTORY_REFUSAL.notInProgress],
+      [{ ...session, periodStart: null, fileUnreadable: true }, SESSION_HISTORY_REFUSAL.unreadFile],
+      [{ ...session, periodStart: null }, SESSION_HISTORY_REFUSAL.noStart],
+      [{ ...session, openingMinor: null }, SESSION_HISTORY_REFUSAL.noStart],
+      [{ ...session, beginningMinor: 512340 }, SESSION_HISTORY_REFUSAL.begins],
+    ] as const;
+    for (const [s, why] of cases) {
+      expect(sessionHistoryRefusal(s)).toBe(why);
+      expect(sessionHistoryStart(s)).toBeNull();
+    }
+  });
+
+  const facts = { through: "2026-08-31", openingMinor: 512340, bookBalanceMinor: 512340, entries: 214, reconciled: false };
+
+  it("offers the button when the books through that day hold exactly the opening", () => {
+    expect(sessionHistoryAdvice(facts, money)).toEqual({
+      canBringForward: true,
+      through: "2026-08-31",
+      entries: 214,
+      text: "Everything in the books up to Aug 31, 2026 adds up to $5123.40, the balance this statement opens with.",
+    });
+  });
+
+  it("says by how much the books are out, in either direction", () => {
+    expect(sessionHistoryAdvice({ ...facts, bookBalanceMinor: 498765 }, money)).toMatchObject({
+      canBringForward: false,
+      text: "The books on Aug 31, 2026 read $4987.65; the statement opens at $5123.40. Out by $135.75.",
+    });
+    expect(sessionHistoryAdvice({ ...facts, bookBalanceMinor: 700000 }, money)?.text).toBe(
+      "The books on Aug 31, 2026 read $7000.00; the statement opens at $5123.40. Out by $1876.60.",
+    );
+  });
+
+  it("says the account was reconciled before, whatever the figures", () => {
+    expect(sessionHistoryAdvice({ ...facts, reconciled: true }, money)).toMatchObject({
+      canBringForward: false,
+      text: "This account already has a completed reconciliation.",
+    });
+    expect(ALREADY_RECONCILED).toBe("This account already has a completed reconciliation.");
+  });
+
+  it("says nothing when there is nothing to offer, and offers no button with nothing to bring", () => {
+    expect(sessionHistoryAdvice(null, money)).toBeNull();
+    expect(sessionHistoryAdvice({ ...facts, entries: 0 }, money)?.canBringForward).toBe(false);
+  });
+
+  it("asks before marking, counting the entries", () => {
+    expect(BRING_HISTORY_FORWARD).toBe("Bring the history forward");
+    expect(bringHistoryForwardConfirmation(214, "2026-08-31")).toBe(
+      "214 entries up to Aug 31, 2026 will be marked reconciled. Nothing is posted to the books.",
+    );
+    expect(bringHistoryForwardConfirmation(1, "2026-08-31")).toBe(
+      "1 entry up to Aug 31, 2026 will be marked reconciled. Nothing is posted to the books.",
+    );
+    expect([entriesCount(0), entriesCount(1), entriesCount(1204)]).toEqual(["0 entries", "1 entry", "1,204 entries"]);
+  });
+});
+
+describe("discarding a reconciliation", () => {
+  it("says what goes and what stays, and returns to Reconcile", () => {
+    expect(DISCARD_RECONCILIATION).toBe("Discard this reconciliation");
+    expect(DISCARD_CONFIRMATION).toBe(
+      "Its ticks and the statement lines kept with it are removed, along with any line set aside as not a transaction. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.",
+    );
+    expect(discardedReturnPath("bank-1")).toBe("/banking/reconcile?account=bank-1");
+  });
+
+  it("says it was discarded, counting the ticks that went with it", () => {
+    expect(discardedMessage(0)).toBe("Reconciliation discarded.");
+    expect(discardedMessage(1)).toBe("Reconciliation discarded, with its 1 tick.");
+    expect(discardedMessage(1204)).toBe("Reconciliation discarded, with its 1,204 ticks.");
   });
 });
 

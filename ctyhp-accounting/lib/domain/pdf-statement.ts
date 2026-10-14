@@ -6,13 +6,16 @@
  *
  * Pure: the browser turns the file into glyphs (lib/client/pdf-text.ts) and
  * this turns the glyphs into statements. It departs from the prototype in
- * four places, each marked "OneBook:" where it happens:
+ * five places, each marked "OneBook:" where it happens:
  *   1. a figure with two decimals is never a date (the prototype reads 75.00 as
  *      month 75, day 00, and loses a cheque in a grid);
  *   2. "Statement date: November 30, 2026" is read with its whole month name;
  *   3. a line dated a day that does not exist is skipped and counted;
  *   4. a date pdf.js has joined to the words after it is read as the date and
- *      the words.
+ *      the words;
+ *   5. inside the images of cheques, a "Checks" or "Fees" caption does not end
+ *      the skip, nor does a table of cheque numbers that captions the images:
+ *      only a table of activity or a transaction history does.
  */
 import type { StatementLine } from "./statement-import";
 
@@ -209,6 +212,12 @@ const SKIP_HEADING =
   /daily\s+(\w+\s+)?balances?\b|ending\s+balance\s*$|check\s+images?|balance\s+summary|interest\s+summary|account\s+summary|card\s+summary|how to (balance|reconcile)/i;
 const DEBIT_HEADING = /withdraw|debit|^checks?\b|fees?\b|charges?\b|payments? (made|out)/i;
 const CREDIT_HEADING = /deposit|credit|additions?|payments? (in|received)/i;
+/** The heading of a page of cheque images. */
+const IMAGES_HEADING = /check\s+images?/i;
+/** A caption the images of cheques print over them: it names the images, it opens no section. */
+const IMAGE_CAPTION = /^checks?\b|fees?\b/i;
+/** A row that announces a table of activity. */
+const ACTIVITY_TITLE = /^transactions?\s+(history|detail|activity)/i;
 
 interface Heading {
   dates: number;
@@ -327,7 +336,8 @@ function readStatementRows(rows: readonly PdfRow[]) {
   let secSign = 0;
   let prev: number | null = opening;
   let sawBal = false;
-  let skipping = false;
+  // What is being skipped: a summary or a grid of balances, or the images of cheques.
+  let skipping: "summary" | "images" | null = null;
   let prevRow: PdfRow | null = null;
   let prevRow2: PdfRow | null = null;
   let secNo = 0;
@@ -374,8 +384,13 @@ function readStatementRows(rows: readonly PdfRow[]) {
       prevRow2 = prevRow;
       prevRow = r;
       secNo++;
+      // OneBook: among the images of cheques, a table of cheque numbers and
+      // amounts captions the images; a table of activity (one with a debit,
+      // credit or balance column, or with no cheque column) ends them.
+      const captionsImages = h.check && h.debit === undefined && h.credit === undefined && h.balance === undefined;
+      if (skipping === "images" && !captionsImages) skipping = null;
       // A grid of balances is not activity, and a table under a heading we were told to ignore stays ignored.
-      sec = skipping || (h.balanceOnly && h.dates > 1) ? null : h;
+      sec = skipping !== null || (h.balanceOnly && h.dates > 1) ? null : h;
       continue;
     }
     const current: Heading | null = sec;
@@ -388,7 +403,7 @@ function readStatementRows(rows: readonly PdfRow[]) {
 
     if (!dated) {
       if (SKIP_HEADING.test(t)) {
-        skipping = true;
+        skipping = IMAGES_HEADING.test(t) ? "images" : "summary";
         sec = null;
         prevRow2 = prevRow;
         prevRow = r;
@@ -401,15 +416,25 @@ function readStatementRows(rows: readonly PdfRow[]) {
         continue;
       }
       if (t.length && t.length < 60 && !moneyIn(t).length) {
-        if (DEBIT_HEADING.test(t)) {
+        if (skipping === "images" && !ACTIVITY_TITLE.test(t)) {
+          // OneBook: the prototype ends the skip at any "Checks…" or "Fees…"
+          // row, and the images of cheques print exactly that over themselves,
+          // so a restated cheque was read as a second payment. Here a caption
+          // changes nothing, and any other section title only sets the sign of
+          // the table it heads: that table ends the skip when it comes.
+          if (!IMAGE_CAPTION.test(t)) {
+            if (DEBIT_HEADING.test(t)) secSign = -1;
+            else if (CREDIT_HEADING.test(t)) secSign = 1;
+          }
+        } else if (DEBIT_HEADING.test(t)) {
           secSign = -1;
-          skipping = false;
+          skipping = null;
         } else if (CREDIT_HEADING.test(t)) {
           secSign = 1;
-          skipping = false;
-        } else if (/^transactions?\s+(history|detail|activity)/i.test(t)) {
+          skipping = null;
+        } else if (ACTIVITY_TITLE.test(t)) {
           // A summary we were told to ignore ends where the next table of activity announces itself.
-          skipping = false;
+          skipping = null;
         }
       }
       prevRow2 = prevRow;

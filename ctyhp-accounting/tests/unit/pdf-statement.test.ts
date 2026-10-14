@@ -30,6 +30,29 @@ describe("readPdfStatements", () => {
   it("reads nothing out of no glyphs", () => {
     expect(readPdfStatements([])).toEqual([]);
   });
+
+  it("ends the skip of cheque images at a table of activity, signed by the title above it", () => {
+    const images = PDF_SCENARIOS.find((s) => s.name === "checkImagesAfterChecksPaid")!;
+    const [statement] = readPdfStatements(
+      glyphsOf({
+        ...images,
+        pages: [
+          [
+            ...images.pages[0],
+            [538, [40, "Deposits and other credits"]],
+            [526, [40, "Date"], [90, "Description"], [420, "Amount"]],
+            [514, [40, "06/20"], [90, "EXAMPLE LATE DEPOSIT"], [420, "40.00"]],
+          ],
+        ],
+      }),
+    );
+    expect(statement.lines.map((l) => [l.date, l.amountMinor, l.description])).toEqual([
+      ["2027-06-03", 25000, "EXAMPLE CLIENT DEPOSIT"],
+      ["2027-06-08", -36000, "CHECK 4101"],
+      ["2027-06-15", -25000, "CHECK 4102"],
+      ["2027-06-20", 4000, "EXAMPLE LATE DEPOSIT"],
+    ]);
+  });
 });
 
 describe("moneyMinor", () => {

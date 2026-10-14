@@ -522,4 +522,42 @@ export const PDF_SCENARIOS: PdfScenario[] = [
       },
     ],
   },
+  {
+    // The images of the cheques paid follow the list of them. The images carry
+    // a "Checks" caption and their own small table, whose row names two cheque
+    // numbers and one amount: it restates a cheque already read, and is not a
+    // transaction. The caption must not end the skip of the images.
+    name: "checkImagesAfterChecksPaid",
+    prototypeDiffers: "the prototype ends the skip of the check images at their \"Checks\" caption and reads the image row as a payment",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Statement period Jun 1 - Jun 30, 2027"]],
+        [730, [40, "Beginning balance"], [500, "2,000.00"]],
+        [718, [40, "Ending balance"], [500, "1,640.00"]],
+        [700, [40, "Transaction history"]],
+        [688, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+        [676, [40, "06/03"], [90, "EXAMPLE CLIENT DEPOSIT"], [410, "250.00"], [500, "2,250.00"]],
+        [664, [40, "06/08"], [90, "CHECK 4101"], [330, "360.00"], [500, "1,890.00"]],
+        [652, [40, "06/15"], [90, "CHECK 4102"], [330, "250.00"], [500, "1,640.00"]],
+        [634, [40, "Checks paid"]],
+        [622, [40, "Date"], [90, "Check No."], [160, "Amount"], [260, "Date"], [310, "Check No."], [380, "Amount"]],
+        [610, [40, "06/08"], [90, "4101"], [160, "360.00"], [260, "06/15"], [310, "4102"], [380, "250.00"]],
+        [592, [40, "Check images"]],
+        [580, [40, "Checks"]],
+        [568, [40, "Date"], [90, "Check No."], [200, "Amount"]],
+        [556, [40, "06/08"], [90, "4101"], [140, "4102"], [200, "360.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: "2027-06-01", to: "2027-06-30", opening: 200000, closing: 164000, skipped: 0,
+        lines: [
+          ["2027-06-03",25000,"EXAMPLE CLIENT DEPOSIT",null,225000],
+          ["2027-06-08",-36000,"CHECK 4101","4101",189000],
+          ["2027-06-15",-25000,"CHECK 4102","4102",164000],
+        ],
+      },
+    ],
+  },
 ];

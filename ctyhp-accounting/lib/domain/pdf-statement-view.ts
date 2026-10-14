@@ -14,6 +14,10 @@ export const PDF_MESSAGES = {
   cents: "A PDF statement can be read only into an account kept in a currency with two decimal places.",
 } as const;
 
+/** Said in the statement import dialog: which files are read exactly, and which can be misread. */
+export const STATEMENT_READING_NOTE =
+  "A bank download (CSV, QFX or OFX) is read exactly. A PDF is read from its text, and a check image or a summary table can be misread.";
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "Aug 31" or "Aug 31, 2026". */
@@ -67,7 +71,7 @@ export function summarizeStatement(s: PdfStatement, money: (minor: number) => st
     proof =
       `Out by ${money(Math.abs(differenceMinor))}: opening ${money(s.openingMinor)} ${lines} comes to ` +
       `${money(s.openingMinor + linesMinor)}, and the statement closes at ${money(s.closingMinor)}. ` +
-      "A line may not have been read — check before importing.";
+      "A line may not have been read, or one may have been read that is not a transaction — check before importing.";
   }
   return {
     moneyIn: { count: moneyIn.length, minor: moneyIn.reduce((sum, l) => sum + l.amountMinor, 0) },

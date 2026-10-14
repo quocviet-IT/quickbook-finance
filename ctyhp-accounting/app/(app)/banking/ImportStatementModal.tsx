@@ -22,7 +22,7 @@ import {
   type StatementFileResult,
 } from "@/lib/domain/statement-files";
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
-import { pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
+import { STATEMENT_READING_NOTE, pickStatement, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import { formatMoney } from "@/lib/format";
 import { rememberColumns, rememberedColumns, type CsvColumnChoice } from "@/lib/client/statement-columns";
 import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
@@ -242,6 +242,10 @@ export default function ImportStatementModal({
         </p>
         <p className="ant-upload-text">Click or drag a statement file here</p>
       </Upload.Dragger>
+      {/* Which files are read exactly and which can be misread, wherever the dialog is opened from (2.03). */}
+      <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 8 }}>
+        {STATEMENT_READING_NOTE}
+      </Typography.Text>
 
       {file.kind === "reading" ? <ReadingPdf /> : null}
 
