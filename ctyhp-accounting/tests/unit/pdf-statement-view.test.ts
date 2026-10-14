@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { PdfStatement, PdfStatementLine } from "@/lib/domain/pdf-statement";
-import { periodLabel, pickStatement, skippedNote, statementLabel, summarizeStatement } from "@/lib/domain/pdf-statement-view";
+import {
+  STATEMENT_READING_NOTE,
+  periodLabel,
+  pickStatement,
+  skippedNote,
+  statementLabel,
+  summarizeStatement,
+} from "@/lib/domain/pdf-statement-view";
 import { formatMoney } from "@/lib/format";
 
 const usd = (minor: number) => formatMoney(minor, "USD", 2);
@@ -68,12 +75,24 @@ describe("summarizeStatement", () => {
     expect(summary.proof).toBe("Opening $1,000.00 − lines $320.00 = $680.00, the closing balance on the statement.");
   });
 
-  it("says by how much a statement is out", () => {
-    const summary = summarizeStatement(statement({ closingMinor: 120000 }), usd);
-    expect(summary.proves).toBe(false);
-    expect(summary.proof).toBe(
+  it("says by how much a statement is out, whether a line is missing or one is extra", () => {
+    const short = summarizeStatement(statement({ closingMinor: 120000 }), usd);
+    expect(short.proves).toBe(false);
+    expect(short.proof).toBe(
       "Out by $20.00: opening $1,000.00 + lines $180.00 comes to $1,180.00, and the statement closes at $1,200.00. " +
-        "A line may not have been read — check before importing.",
+        "A line may not have been read, or one may have been read that is not a transaction — check before importing.",
+    );
+    // A line read that is not a transaction: the lines come to more than the statement closes at.
+    const extra = summarizeStatement(statement({ lines: [line(-25000), line(-7000), line(50000), line(-36000)] }), usd);
+    expect(extra.proof).toBe(
+      "Out by $360.00: opening $1,000.00 − lines $180.00 comes to $820.00, and the statement closes at $1,180.00. " +
+        "A line may not have been read, or one may have been read that is not a transaction — check before importing.",
+    );
+  });
+
+  it("says in the import dialog which files are read exactly and which can be misread", () => {
+    expect(STATEMENT_READING_NOTE).toBe(
+      "A bank download (CSV, QFX or OFX) is read exactly. A PDF is read from its text, and a check image or a summary table can be misread.",
     );
   });
 
