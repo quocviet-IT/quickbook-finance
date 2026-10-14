@@ -6,7 +6,6 @@ import { getUserRole, canWrite, getSessionUser } from "@/lib/auth";
 import {
   createBankAccount,
   importStatement,
-  checkStatementLines,
   listBankLinesOn,
   type StatementImportCounts,
   categoriseBankTransaction,
@@ -41,7 +40,7 @@ import type { BankTransactionRow } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { CODE_ALL_LIMIT, type CodingSuggestionView } from "@/lib/domain/coding";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
-import { loanPaymentSchema, statementImportLinesSchema, statementLinesCheckSchema } from "@/lib/domain/schemas";
+import { loanPaymentSchema, statementImportLinesSchema } from "@/lib/domain/schemas";
 import {
   PROOF_REFUSAL,
   proofRefusal,
@@ -49,7 +48,7 @@ import {
   statementProofPayloadSchema,
   type PriorClosing,
 } from "@/lib/domain/statement-proof";
-import type { BankLineOn, StatementLinesCheck } from "@/lib/domain/statement-repeats";
+import type { BankLineOn } from "@/lib/domain/statement-repeats";
 import { formatMoney } from "@/lib/format";
 import { getPriorClosing } from "@/lib/services/bankrec";
 import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
@@ -178,7 +177,12 @@ export async function priorClosingAction(bankAccountId: string): Promise<ActionR
   }
 }
 
-/** The account's bank lines from `from` to `to`, with where each came from, every page of them (2.04). Reads only. */
+/**
+ * The account's bank lines from `from` to `to`, with where each came from and
+ * their keys, every page of them (2.04). Import statement asks once per
+ * statement read, over the file's days, and works out from them in the browser
+ * which lines are already in Bank Transactions, on every tick. Reads only.
+ */
 export async function bankLinesOnAction(
   bankAccountId: string,
   from: string,
@@ -191,23 +195,6 @@ export async function bankLinesOnAction(
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: await listBankLinesOn(sb, account.data, from, to) };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
-}
-
-/**
- * What Import statement shows before importing (2.04): which lines are already
- * here from this statement, and which are already in Bank Transactions from
- * another source. Ask again when a line is marked Not a transaction or brought
- * back: the keys are counted over the lines sent. Reads only.
- */
-export async function checkStatementLinesAction(raw: unknown): Promise<ActionResult<StatementLinesCheck>> {
-  const parsed = statementLinesCheckSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  try {
-    const sb = await createSupabaseServerClient();
-    return { ok: true, data: await checkStatementLines(sb, parsed.data.bank_account_id, parsed.data.lines, parsed.data.aside) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

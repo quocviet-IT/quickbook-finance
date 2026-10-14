@@ -10,9 +10,9 @@
  * statement line can never meet.
  *
  * Pure, and free of node:crypto, so the import dialog uses it in the browser.
- * The keys themselves are worked out on the server (checkStatementLines), which
- * sends back which lines are already present and which are already here from
- * another source; everything said about them is said here.
+ * The dialog works out the lines' keys in the browser and reads the account's
+ * bank lines once per statement read (statement-line-keys.ts), then applies the
+ * rules here on every tick; everything said about them is said here.
  */
 import { shortDate } from "./pdf-statement-view";
 import { plainAmount } from "./statement-proof";
@@ -66,7 +66,7 @@ export interface OtherSourceLine {
   bankLineId: string;
 }
 
-/** What the server found for one file's lines: the facts the dialog cannot work out without the keys. */
+/** Which of one file's lines are already in Bank Transactions (checkStatementLinesFrom). */
 export interface StatementLinesCheck {
   /** Indexes of the lines whose own key is already in this account's Bank Transactions: "already here from this statement". */
   present: number[];
@@ -82,7 +82,8 @@ const dayAndAmount = (date: string, amountMinor: number) => `${date}|${amountMin
 
 /**
  * The lines whose own key is already in Bank Transactions. `hashes` is one per
- * line read, null for a line marked Not a transaction (it is not sent).
+ * line read, null for a line marked Not a transaction (it is not sent);
+ * `existing` is the account's bank lines over the file's days.
  */
 export function presentLines(hashes: readonly (string | null)[], existing: readonly BankLineOn[]): number[] {
   const held = new Set(existing.map((line) => line.rawHash));

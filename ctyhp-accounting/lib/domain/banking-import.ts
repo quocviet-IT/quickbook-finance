@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
+import { rowKeyText, statementLineKeyText } from "./statement-line-keys";
 import { repeatKey } from "./statement-repeats";
 
 /** Collision-resistant deterministic hash for immutable statement rows. */
 export function statementRowHash(
   parts: (string | number | null | undefined)[],
 ): string {
-  const canonical = parts.map((part) => String(part ?? "")).join("|");
-  return createHash("sha256").update(canonical).digest("hex");
+  return createHash("sha256").update(rowKeyText(parts)).digest("hex");
 }
 
 /**
@@ -17,17 +17,15 @@ export function statementRowHash(
  * line of one file (n ≥ 2) adds its `occurrence`: two $5.00 fees on one day are
  * two lines, and the first keeps the key it always had. Since 2.04 that holds
  * for the bank's own id too: two lines of one file carrying the same FITID are
- * two lines, not one.
+ * two lines, not one. The text hashed is statementLineKeyText's, which the
+ * import dialog hashes in the browser to the same key.
  */
 export function statementLineHash(
   bankAccountId: string,
   line: StatementLineKey,
   occurrence = 1,
 ): string {
-  const parts: (string | number | null)[] = line.external_id
-    ? [bankAccountId, "fitid", line.external_id]
-    : [bankAccountId, line.txn_date, line.amount_minor, line.description, line.reference];
-  return statementRowHash(occurrence > 1 ? [...parts, `#${occurrence}`] : parts);
+  return createHash("sha256").update(statementLineKeyText(bankAccountId, line, occurrence)).digest("hex");
 }
 
 export interface StatementLineKey {

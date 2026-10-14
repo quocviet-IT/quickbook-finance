@@ -72,9 +72,11 @@ export interface StatementDialogInput {
   prior: PriorClosing | null;
   marks: DialogMarks;
   /**
-   * What the server found for these lines with these Not a transaction ticks
-   * (checkStatementLinesAction); null while it is being asked, or when it
-   * could not be. Never asked when attaching.
+   * Which of these lines are already in Bank Transactions with these Not a
+   * transaction ticks (checkStatementLinesFrom: worked out in the browser on
+   * every tick, from what the server sent once for the statement read); null
+   * while that is being fetched, or when it could not be. Never asked when
+   * attaching.
    */
   check: StatementLinesCheck | null;
   /**
@@ -240,7 +242,7 @@ export { NOT_A_TRANSACTION } from "./reconcile-statement";
 /** Said under the other-source warning: those lines are skipped by default, and each can be ticked back. */
 export const OTHER_SOURCE_NOTE = "These lines are skipped. Tick one to import it as well.";
 
-/** Said while the server works out which lines are already in Bank Transactions. */
+/** Said until the dialog has what it needs to say which lines are already in Bank Transactions. */
 export const CHECKING_LINES = "Checking the lines against Bank Transactions…";
 
 /** Said when that could not be worked out: nothing is sent until it is. */

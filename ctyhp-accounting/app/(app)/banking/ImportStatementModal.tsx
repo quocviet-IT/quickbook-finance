@@ -31,7 +31,7 @@ import {
   type StatementKind,
   type StatementOverride,
 } from "@/lib/domain/statement-proof";
-import type { StatementLinesCheck } from "@/lib/domain/statement-repeats";
+import { checkStatementLinesFrom, statementDays, type StatementLineFacts } from "@/lib/domain/statement-line-keys";
 import {
   CHECKING_LINES,
   NO_MARKS,
@@ -48,7 +48,8 @@ import {
 import { serverFailure } from "@/lib/domain/statement-evidence";
 import { formatMoney } from "@/lib/format";
 import { rememberColumns, rememberedColumns, type CsvColumnChoice } from "@/lib/client/statement-columns";
-import { checkStatementLinesAction, priorClosingAction } from "./actions";
+import { statementLineKeyTable } from "@/lib/client/statement-line-keys";
+import { bankLinesOnAction, priorClosingAction } from "./actions";
 import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
 import StatementProofPanel from "./StatementProofPanel";
 import StatementLinesPreview from "./StatementLinesPreview";
@@ -68,11 +69,14 @@ import styles from "./import-statement.module.css";
  * says whether it does, and the import stays one click when it does. When it
  * does not, the import is blocked until a misread line is ticked Not a
  * transaction or a missing balance is typed; an administrator can import it
- * anyway, with a reason. Before anything is sent the server says which lines
- * are already in Bank Transactions, so the dialog can count repeated lines and
- * skip the lines already there from another source. What is shown and what is
- * sent are worked out by statementDialogView (lib/domain), not here; the server
- * proves the statement again, and the database a third time.
+ * anyway, with a reason. Before anything can be sent the dialog asks the
+ * server, once per statement read, for the account's bank lines over the
+ * file's days, and works out in the browser which lines are already in Bank
+ * Transactions — again on every tick, with no round trip — so it can count
+ * repeated lines and skip the lines already there from another source. What
+ * is shown and what is sent are worked out by statementDialogView
+ * (lib/domain), not here; the server proves the statement again, and the
+ * database a third time.
  *
  * The import itself is a server action of the screen that opened the dialog:
  * Banking opens Review import after it, and a reconciliation pairs the lines
@@ -146,15 +150,6 @@ const COLUMN_FIELDS: { key: keyof StatementColumnMap; label: string; required?: 
   { key: "reference", label: "Reference" },
   { key: "balance", label: "Balance" },
 ];
-
-/** A line as checkStatementLinesAction takes it: only what its key is made of. */
-const checkLine = (line: StatementLine) => ({
-  txn_date: line.txn_date,
-  description: line.description,
-  reference: line.reference,
-  amount_minor: line.amount_minor,
-  external_id: line.external_id ?? null,
-});
 
 export default function ImportStatementModal({
   open,
@@ -306,29 +301,45 @@ export default function ImportStatementModal({
   const prior = priorOf?.accountId === bankAccount.id ? priorOf.prior : null;
 
   // Which lines are already in Bank Transactions, from this statement or from
-  // another source. Asked again whenever the Not a transaction ticks change:
-  // the keys are counted over the lines sent. Nothing is imported until the
-  // answer for the lines as they are has come back.
-  const checkKey = purpose === "import" && lines.length ? `${linesKey}#${marks.aside.join(",")}` : "";
-  const [checkOf, setCheckOf] = useState<{ key: string; result: StatementLinesCheck | null; error: string | null } | null>(null);
+  // another source. The server is asked once per statement read, never on a
+  // tick: for the account's bank lines over the file's days, with their keys.
+  // The lines' own keys are worked out here, once, for every occurrence a line
+  // can be sent as. Nothing is imported until both are in. Both belong to the
+  // account: its id is part of every key.
+  const factsKey = purpose === "import" && lines.length ? `${bankAccount.id}|${linesKey}` : "";
+  const [factsOf, setFactsOf] = useState<{
+    key: string;
+    lines: readonly StatementLine[];
+    facts: StatementLineFacts | null;
+    error: string | null;
+  } | null>(null);
   useEffect(() => {
-    if (!checkKey) return;
+    const days = statementDays(lines);
+    if (!factsKey || !days) return;
     let live = true;
-    const key = checkKey;
-    checkStatementLinesAction({ bank_account_id: bankAccount.id, lines: lines.map(checkLine), aside: [...marks.aside] })
-      .then((res) => {
+    const key = factsKey;
+    Promise.all([bankLinesOnAction(bankAccount.id, days.from, days.to), statementLineKeyTable(bankAccount.id, lines)])
+      .then(([res, keys]) => {
         if (!live) return;
-        setCheckOf({ key, result: res.ok ? (res.data ?? null) : null, error: res.ok ? null : (res.error ?? serverFailure(null)) });
+        setFactsOf(
+          res.ok
+            ? { key, lines, facts: { keys, bankLines: res.data ?? [] }, error: null }
+            : { key, lines, facts: null, error: res.error ?? serverFailure(null) },
+        );
       })
       .catch((error: unknown) => {
-        if (live) setCheckOf({ key, result: null, error: serverFailure(error) });
+        if (live) setFactsOf({ key, lines, facts: null, error: serverFailure(error) });
       });
     return () => {
       live = false;
     };
-  }, [checkKey, bankAccount.id, lines, marks.aside]);
-  const check = checkOf?.key === checkKey ? checkOf.result : null;
-  const checkError = checkOf?.key === checkKey ? checkOf.error : null;
+  }, [factsKey, bankAccount.id, lines]);
+  const factsHere = factsOf?.key === factsKey && factsOf.lines === lines ? factsOf : null;
+  const facts = factsHere?.facts ?? null;
+  const checkError = factsHere?.error ?? null;
+  // Worked out again here on every Not a transaction tick, with no round trip:
+  // the keys are counted over the lines sent, as the import counts them.
+  const check = useMemo(() => (facts ? checkStatementLinesFrom(lines, marks.aside, facts) : null), [facts, lines, marks.aside]);
 
   // Worked out again only when something it rests on changes: a statement can
   // hold thousands of lines, and a render for anything else — the import

@@ -7,16 +7,9 @@ import type {
   BankTransactionRow,
 } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
-import { statementKeysAsSent, statementLineHashes, type StatementLineKey } from "@/lib/domain/banking-import";
+import { statementLineHashes } from "@/lib/domain/banking-import";
 import type { StatementProofPayload } from "@/lib/domain/statement-proof";
-import {
-  BANK_LINE_SOURCES,
-  otherSourceLines,
-  presentLines,
-  type BankLineOn,
-  type BankLineSource,
-  type StatementLinesCheck,
-} from "@/lib/domain/statement-repeats";
+import { BANK_LINE_SOURCES, type BankLineOn, type BankLineSource } from "@/lib/domain/statement-repeats";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -176,7 +169,8 @@ export async function importStatement(
  * (`acc_bank_lines_on`, 0143). Paged past PostgREST's cap: the books alone can
  * hold thousands of lines in a year, and a line not read would be a line the
  * import dialog cannot see is already there. Ordered by date, then id, so the
- * order is total.
+ * order is total. The dialog reads them once per statement read, and works out
+ * from their keys which of its lines are here (statement-line-keys.ts).
  */
 export async function listBankLinesOn(
   sb: SupabaseClient,
@@ -203,26 +197,6 @@ export async function listBankLinesOn(
       : "other",
     importBatchId: (r.import_batch_id as string | null) ?? null,
   }));
-}
-
-/**
- * What Import statement needs to know about a file's lines before it imports
- * them, and cannot work out in the browser: which lines' own keys are already
- * in Bank Transactions, and which lines are already there from another source.
- * The keys are the import's own (statementKeysAsSent); the bank lines are read
- * over the file's days.
- */
-export async function checkStatementLines(
-  sb: SupabaseClient,
-  bankAccountId: string,
-  lines: readonly StatementLineKey[],
-  aside: Iterable<number> = [],
-): Promise<StatementLinesCheck> {
-  const hashes = statementKeysAsSent(bankAccountId, lines, aside);
-  const dates = lines.filter((_, index) => hashes[index] !== null).map((line) => line.txn_date).sort();
-  if (!dates.length) return { present: [], otherSource: [] };
-  const existing = await listBankLinesOn(sb, bankAccountId, dates[0], dates[dates.length - 1]);
-  return { present: presentLines(hashes, existing), otherSource: otherSourceLines(lines, hashes, existing) };
 }
 
 export interface BankStatementImportRow {

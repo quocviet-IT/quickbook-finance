@@ -22,8 +22,11 @@ import {
   repeatKey,
   type BankLineOn,
   type BankLineSource,
+  type RepeatLine,
 } from "@/lib/domain/statement-repeats";
-import { checkStatementLines, importStatement } from "@/lib/services/banking";
+import { checkStatementLinesFrom, statementDays, type StatementLineFacts } from "@/lib/domain/statement-line-keys";
+import { statementLineKeyTable } from "@/lib/client/statement-line-keys";
+import { importStatement, listBankLinesOn } from "@/lib/services/banking";
 import { PAYROLL_REPEATS, glyphsOf } from "../fixtures/pdf-statements";
 
 /**
@@ -112,9 +115,24 @@ function fakeBank(cap = 1000) {
   return { sb, stored, imports, reads, add };
 }
 
+/**
+ * What the import dialog reads once per statement: the account's bank lines
+ * over the file's days, and the lines' keys, hashed as the browser hashes them.
+ */
+async function dialogFacts(bank: ReturnType<typeof fakeBank>, rows: readonly RepeatLine[]): Promise<StatementLineFacts> {
+  const days = statementDays(rows);
+  if (!days) throw new Error("a statement read has lines");
+  return { keys: await statementLineKeyTable(ACCOUNT, rows), bankLines: await listBankLinesOn(bank.sb, ACCOUNT, days.from, days.to) };
+}
+
+/** Which lines are already here, as the dialog works it out for the ticks given. */
+async function dialogCheck(bank: ReturnType<typeof fakeBank>, rows: readonly RepeatLine[], aside: number[] = []) {
+  return checkStatementLinesFrom(rows, aside, await dialogFacts(bank, rows));
+}
+
 /** One import as the dialog does it: check the lines, skip those already here from another source, import with the proof. */
 async function importAsTheDialogDoes(bank: ReturnType<typeof fakeBank>, rows: StatementLine[], proof: StatementProof) {
-  const check = await checkStatementLines(bank.sb, ACCOUNT, rows);
+  const check = await dialogCheck(bank, rows);
   const skip = check.otherSource.map((line) => line.index);
   const repeats = describeRepeats(rows, [], check.present, skip, money);
   const result = await importStatement(bank.sb, ACCOUNT, "payroll.file", statementImportRows(rows, [], skip), proofPayload(proof));
@@ -268,7 +286,7 @@ describe("lines already in Bank Transactions from another source", () => {
     const bank = fakeBank();
     const { rows, proof } = csvFile();
     bank.add({ txn_date: "2026-03-31", amount_minor: -41230, raw_hash: "ledger:entry-line-1", source_kind: "books", import_batch_id: null });
-    const check = await checkStatementLines(bank.sb, ACCOUNT, rows);
+    const check = await dialogCheck(bank, rows);
     expect(check.otherSource.map((l) => l.index)).toEqual([2]);
     const keysOf = (b: ReturnType<typeof fakeBank>) => (b.imports[0].p_rows as { raw_hash: string }[]).map((r) => r.raw_hash);
 
@@ -460,7 +478,7 @@ describe("importStatement", () => {
   });
 });
 
-describe("checkStatementLines", () => {
+describe("what the import dialog reads once per statement", () => {
   it("reads the account's lines over the file's days, every page, in a total order", async () => {
     const bank = fakeBank();
     for (let i = 0; i < 2300; i += 1) {
@@ -468,7 +486,7 @@ describe("checkStatementLines", () => {
     }
     // The last of them, past the first two pages, is the twin of the file's one line.
     const lines = [fileLine("2026-03-15", -3299, "EXAMPLE SUPPLIES"), fileLine("2026-03-20", -5, "EXAMPLE FEE")];
-    const check = await checkStatementLines(bank.sb, ACCOUNT, lines);
+    const check = await dialogCheck(bank, lines);
     expect(check.otherSource).toEqual([{ index: 0, source: "books", bankLineId: "line-002300" }]);
     expect(bank.reads.map((r) => r.range)).toEqual([
       [0, 999],
@@ -480,12 +498,28 @@ describe("checkStatementLines", () => {
     }
   });
 
-  it("reads over the days of the lines sent, and nothing when every line is marked Not a transaction", async () => {
+  it("reads once, over every line's days, and answers each Not a transaction tick without reading again", async () => {
     const bank = fakeBank();
+    bank.add({ txn_date: "2026-03-01", amount_minor: -100, raw_hash: "feed-1", source_kind: "feed", import_batch_id: null });
     const lines = [fileLine("2026-03-01", -100), fileLine("2026-03-31", -200)];
-    await checkStatementLines(bank.sb, ACCOUNT, lines, [0]);
-    expect(bank.reads[0].args).toMatchObject({ p_from: "2026-03-31", p_to: "2026-03-31" });
-    expect(await checkStatementLines(bank.sb, ACCOUNT, lines, [0, 1])).toEqual({ present: [], otherSource: [] });
+    const facts = await dialogFacts(bank, lines);
+    expect(bank.reads).toHaveLength(1);
+    expect(bank.reads[0].args).toMatchObject({ p_from: "2026-03-01", p_to: "2026-03-31" });
+    expect(checkStatementLinesFrom(lines, [], facts)).toEqual({ present: [], otherSource: [{ index: 0, source: "feed", bankLineId: "line-000001" }] });
+    expect(checkStatementLinesFrom(lines, [0], facts)).toEqual({ present: [], otherSource: [] });
+    expect(checkStatementLinesFrom(lines, [0, 1], facts)).toEqual({ present: [], otherSource: [] });
+    expect(bank.reads).toHaveLength(1);
+  });
+
+  it("follows a tick: the identical line after a ticked one takes its key, and is the one already here", async () => {
+    const bank = fakeBank();
+    const { rows } = csvFile();
+    // The account holds the first of the three identical lines, from an earlier statement.
+    bank.add({ txn_date: "2026-03-31", amount_minor: -41230, raw_hash: statementLineHashes(ACCOUNT, rows)[2], source_kind: "import", import_batch_id: "batch-old" });
+    const facts = await dialogFacts(bank, rows);
+    expect(checkStatementLinesFrom(rows, [], facts).present).toEqual([2]);
+    // Ticked Not a transaction, the first is not sent, and the second is sent with the key the first had.
+    expect(checkStatementLinesFrom(rows, [2], facts).present).toEqual([3]);
     expect(bank.reads).toHaveLength(1);
   });
 });

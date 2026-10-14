@@ -598,25 +598,6 @@ export const statementImportLinesSchema = z
   .min(1, "No rows to import")
   .max(20_000, "A statement can hold at most 20,000 lines");
 
-/** The lines whose keys Import statement asks about before importing (checkStatementLinesAction). */
-export const statementLinesCheckSchema = z.object({
-  bank_account_id: z.uuid("Select a bank account"),
-  lines: z
-    .array(
-      z.object({
-        txn_date: statementDay,
-        description: z.string(),
-        reference: z.string().nullable(),
-        amount_minor: z.number().int(),
-        external_id: z.string().nullable().optional(),
-      }),
-    )
-    .max(20_000, "A statement can hold at most 20,000 lines"),
-  /** Indexes into `lines` of the lines marked Not a transaction. */
-  aside: z.array(z.number().int().nonnegative()).max(20_000).default([]),
-});
-export type StatementLinesCheckInput = z.infer<typeof statementLinesCheckSchema>;
-
 /**
  * A statement file as a reconciliation takes it: its name, its lines, and its
  * proof (2.04) — the opening and closing it was proved between, which the

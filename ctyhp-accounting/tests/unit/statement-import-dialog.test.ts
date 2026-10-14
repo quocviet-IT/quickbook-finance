@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { statementLineHash } from "@/lib/domain/banking-import";
 import type { StatementLine } from "@/lib/domain/statement-import";
+import { checkStatementLinesFrom, lineKeyTexts, type StatementLineFacts } from "@/lib/domain/statement-line-keys";
 import { PROOF_REFUSAL, PROOF_TEXT, type StatementFigures } from "@/lib/domain/statement-proof";
 import type { StatementLinesCheck } from "@/lib/domain/statement-repeats";
 import {
@@ -175,6 +178,36 @@ describe("lines ticked Not a transaction", () => {
       set_aside: 1,
       override: null,
     });
+  });
+
+  it("are answered in the browser: each tick works out again, from what was read once, which lines are already here", () => {
+    const account = "acct-dialog";
+    const payroll = [line("2026-03-31", -41230, "PAYROLL"), line("2026-03-31", -41230, "PAYROLL"), line("2026-03-31", -41230, "PAYROLL")];
+    // Read once for the statement: the lines' keys, and the account's bank
+    // lines, which hold the first payroll line from an earlier statement.
+    const facts: StatementLineFacts = {
+      keys: new Map(
+        lineKeyTexts(account, payroll).map(({ key, texts }) => [key, texts.map((text) => createHash("sha256").update(text).digest("hex"))]),
+      ),
+      bankLines: [
+        { id: "bl-1", txnDate: "2026-03-31", amountMinor: -41230, rawHash: statementLineHash(account, payroll[0]), sourceKind: "import", importBatchId: "batch-old" },
+      ],
+    };
+    const figures = { openingMinor: 200000, closingMinor: 200000 - 2 * 41230 };
+    const tick = (aside: number[]) =>
+      view({ lines: payroll, figures, marks: marks({ aside }), check: checkStatementLinesFrom(payroll, aside, facts) });
+
+    expect(tick([]).repeats.map((group) => group.text)).toEqual([
+      "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
+    ]);
+    // The first ticked: the second is sent with the key the first had, so it is the one already here.
+    const ticked = tick([0]);
+    expect(checkStatementLinesFrom(payroll, [0], facts).present).toEqual([1]);
+    expect(ticked.repeats.map((group) => group.text)).toEqual([
+      "2 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 1 will be imported.",
+    ]);
+    expect(ticked.checking).toBe(false);
+    expect(ticked.okDisabled).toBe(false);
   });
 });
 

@@ -57,12 +57,7 @@ vi.mock("@/lib/services/bankrec", async (importOriginal) => ({
 vi.mock("@/lib/services/banking-surface/facts", () => ({ getBankingContext: mocks.getBankingContext }));
 vi.mock("@/lib/services/statement-bank-lines", () => ({ matchAfterCompletion: mocks.matchAfterCompletion }));
 
-import {
-  bankLinesOnAction,
-  checkStatementLinesAction,
-  importStatementAction,
-  priorClosingAction,
-} from "@/app/(app)/banking/actions";
+import { bankLinesOnAction, importStatementAction, priorClosingAction } from "@/app/(app)/banking/actions";
 import { importStatementIntoReconciliationAction, reconcileRunMonthAction } from "@/app/(app)/banking/reconcile/statement-actions";
 import { attachStatementFileAction } from "@/app/(app)/banking/statement-file-actions";
 import { PROOF_REFUSAL } from "@/lib/domain/statement-proof";
@@ -281,16 +276,6 @@ describe("the reads Import statement needs", () => {
   it("refuses dates that are not days", async () => {
     expect(await bankLinesOnAction(BANK, "03/01/2026", "2026-03-31")).toEqual({ ok: false, error: "Use a YYYY-MM-DD date" });
     expect(client.rpcs).toEqual([]);
-  });
-
-  it("says which lines are here already, and which from another source", async () => {
-    client = fakeClient({
-      bankLines: [{ id: "b1", txn_date: "2026-03-09", amount_minor: -500, raw_hash: "ledger:x", source_kind: "books", import_batch_id: null }],
-    });
-    const result = await checkStatementLinesAction({ bank_account_id: BANK, lines: PLAIN, aside: [] });
-    expect(result).toEqual({ ok: true, data: { present: [], otherSource: [{ index: 1, source: "books", bankLineId: "b1" }] } });
-    expect(client.rpcs[0].args).toEqual({ p_bank_account_id: BANK, p_from: "2026-03-05", p_to: "2026-03-09" });
-    expect((await checkStatementLinesAction({ bank_account_id: "bank", lines: [] })).ok).toBe(false);
   });
 });
 

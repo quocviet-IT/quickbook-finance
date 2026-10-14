@@ -290,13 +290,32 @@ describe("the import dialog", () => {
     expect(send).toContain("confirmStatement(lines, marks, view, override)");
   });
 
-  it("asks which lines are already here again whenever the Not a transaction ticks change, and reads the prior closing", () => {
-    expect(modal).toContain('const checkKey = purpose === "import" && lines.length ? `${linesKey}#${marks.aside.join(",")}` : "";');
-    expect(modal).toContain(
-      "checkStatementLinesAction({ bank_account_id: bankAccount.id, lines: lines.map(checkLine), aside: [...marks.aside] })",
-    );
-    expect(modal).toContain("const check = checkOf?.key === checkKey ? checkOf.result : null;");
+  it("asks the server once per statement read and never on a tick, and works out which lines are here in the browser", () => {
+    // The only server calls the dialog makes: the prior closing when it opens,
+    // and the bank lines over the file's days when a statement is read.
+    expect([...new Set(modal.match(/\b\w+Action(?=\()/g) ?? [])].sort()).toEqual(["bankLinesOnAction", "priorClosingAction"]);
+    expect(modal).not.toContain("checkStatementLinesAction");
     expect(modal).toContain("priorClosingAction(accountId)");
+    expect(modal).toContain('const factsKey = purpose === "import" && lines.length ? `${bankAccount.id}|${linesKey}` : "";');
+    expect(modal).toContain(
+      "Promise.all([bankLinesOnAction(bankAccount.id, days.from, days.to), statementLineKeyTable(bankAccount.id, lines)])",
+    );
+    // Neither effect that calls the server runs again on a tick: neither hangs on the marks.
+    for (const [call, deps] of [
+      ["bankLinesOnAction(", "factsKey, bankAccount.id, lines"],
+      ["priorClosingAction(", "open, bankAccount.id"],
+    ]) {
+      const after = modal.slice(modal.indexOf(call));
+      expect(after.match(/\n {2}\}, \[([^\]]*)\]\);/)?.[1], call).toBe(deps);
+    }
+    // A tick changes the marks, and nothing else: the check is worked out again from what was read once.
+    expect(modal).toContain(
+      "const check = useMemo(() => (facts ? checkStatementLinesFrom(lines, marks.aside, facts) : null), [facts, lines, marks.aside]);",
+    );
+    expect(modal).toContain("onAside={(index, on) => mark((current) => ({ aside: toggle(current.aside, index, on) }))}");
+    expect(body(modal, "const mark = ", "\n    });\n")).not.toMatch(/Action\(|statementLineKeyTable/);
+    // What was read belongs to the statement it was read for.
+    expect(modal).toContain("const factsHere = factsOf?.key === factsKey && factsOf.lines === lines ? factsOf : null;");
   });
 
   it("requires a reason for Import anyway…: OK starts disabled, follows the reason, and nothing is sent without one", () => {
