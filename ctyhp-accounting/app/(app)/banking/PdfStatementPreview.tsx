@@ -3,12 +3,14 @@ import type { ReactNode } from "react";
 import { Alert, Select, Space, Spin, Typography } from "antd";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import { periodLabel, skippedNote, statementLabel, summarizeStatement } from "@/lib/domain/pdf-statement-view";
+import styles from "./import-statement.module.css";
 
 /**
  * A PDF statement as read, before it is used: which statement (a PDF can hold
- * several), its period, its opening and closing balances, money in and out, and
- * whether the opening balance plus the lines comes to the closing balance.
- * Import statement and starting a reconciliation from a PDF both show it.
+ * several), its period, its opening and closing balances, and money in and out.
+ * Whether the opening balance plus the lines comes to the closing balance is
+ * the import dialog's proof panel to say (2.04), for every format alike and
+ * with the lines ticked Not a transaction left out, so it is not said twice.
  */
 export interface PdfStatementPreviewProps {
   fileName: string;
@@ -89,13 +91,12 @@ export default function PdfStatementPreview({
         <Typography.Paragraph style={{ marginBottom: 8 }}>
           <strong>{fileName}</strong> (PDF): {periodLabel(statement.from, statement.to)}
         </Typography.Paragraph>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+        <div className={styles.figures}>
           <Figure label="Opening balance" value={statement.openingMinor === null ? "—" : money(statement.openingMinor)} />
           <Figure label={`Money in · ${summary.moneyIn.count}`} value={money(summary.moneyIn.minor)} />
           <Figure label={`Money out · ${summary.moneyOut.count}`} value={money(summary.moneyOut.minor)} />
           <Figure label="Closing balance" value={statement.closingMinor === null ? "—" : money(statement.closingMinor)} />
         </div>
-        <Alert style={{ marginTop: 8 }} type={summary.proves ? "success" : "warning"} showIcon title={summary.proof} />
         {statement.skipped > 0 ? (
           <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 4 }}>
             {skippedNote(statement.skipped)}

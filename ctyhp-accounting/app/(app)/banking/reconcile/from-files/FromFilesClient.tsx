@@ -10,6 +10,7 @@ import { periodLabel, shortDate } from "@/lib/domain/pdf-statement-view";
 import {
   checkRun,
   monthSentence,
+  runStatementPayload,
   type CheckedStatement,
   type MonthOutcome,
   type RunContext,
@@ -275,8 +276,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         kind: "month",
         bank_account_id: bankAccount.id,
         file_name: statement.fileName,
-        opening_minor: statement.openingMinor,
-        closing_minor: statement.closingMinor,
+        proof: runStatementPayload(statement),
         statement_date: month.statementDate,
         lines: statement.lines,
         statement_file_id: fileIdOf.get(statement.key) ?? null,
@@ -306,8 +306,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         kind: "month",
         bank_account_id: bankAccount.id,
         file_name: statement.fileName,
-        opening_minor: statement.openingMinor,
-        closing_minor: statement.closingMinor,
+        proof: runStatementPayload(statement),
         statement_date: needsLook.statementDate,
         lines: statement.lines,
         statement_file_id: fileIdOf.get(statement.key) ?? null,
@@ -375,7 +374,29 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
                 align: "right",
                 render: (_, c) => (c.statement.closingMinor === null ? "—" : money(c.statement.closingMinor)),
               },
-              { title: "Read", render: (_, c) => <Tag color={STATE_COLOR[c.state]}>{c.note}</Tag> },
+              {
+                title: "Read",
+                // Each statement's proof (2.04) under what was read: it adds up, or
+                // what it is out by and, for a CSV, where its balance jumps. The run
+                // stops at the first that does not add up (check.stops, below).
+                render: (_, c) => (
+                  <>
+                    <Tag color={c.proof && !c.proof.proves ? "red" : STATE_COLOR[c.state]} style={{ whiteSpace: "normal" }}>
+                      {c.note}
+                    </Tag>
+                    {c.proof?.sentences.summary ? (
+                      <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 4 }}>
+                        {c.proof.sentences.summary}
+                      </Typography.Text>
+                    ) : null}
+                    {c.proof?.sentences.detail ? (
+                      <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                        {c.proof.sentences.detail}
+                      </Typography.Text>
+                    ) : null}
+                  </>
+                ),
+              },
             ]}
           />
           {check.stops.map((stop) => (

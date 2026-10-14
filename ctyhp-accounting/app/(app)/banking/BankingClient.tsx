@@ -65,6 +65,7 @@ import type {
  * File API either way.
  */
 const ImportStatementModal = dynamic(() => import("./ImportStatementModal"), { ssr: false });
+import type { ConfirmedImport } from "./ImportStatementModal";
 
 /**
  * The attachment drawer, fetched when a paperclip is clicked. It carries the
@@ -85,8 +86,7 @@ import {
 } from "@/lib/domain/transaction-filter";
 import { TOKENS } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
-import type { StatementLine } from "@/lib/domain/statement-import";
-import type { PdfStatement } from "@/lib/domain/pdf-statement";
+import { importedSummary } from "@/lib/domain/statement-repeats";
 import { keepFailureMessage, linesSpan, serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { formatMoney } from "@/lib/format";
@@ -167,6 +167,7 @@ export default function BankingClient({
   glBankAccounts,
   currencies,
   canWrite,
+  canOverride,
   plaidConfigured,
   plaidEnvironment,
   canReadDocuments,
@@ -185,6 +186,8 @@ export default function BankingClient({
   glBankAccounts: AccountRow[];
   currencies: CurrencyRow[];
   canWrite: boolean;
+  /** An administrator: offered "Import anyway…" for a statement that does not add up. The database decides again. */
+  canOverride: boolean;
   plaidConfigured: boolean;
   plaidEnvironment: string;
   canReadDocuments: boolean;
@@ -477,9 +480,11 @@ export default function BankingClient({
     window.location.reload();
   }
 
-  // Reading the file — every format, and a CSV's columns — happens in
-  // ImportStatementModal, from rules in lib/domain that are covered by tests.
-  async function confirmImport(fileName: string, rows: StatementLine[], pdf: PdfStatement | null, file: File) {
+  // Reading the file — every format, and a CSV's columns — and proving it
+  // (2.04) happen in ImportStatementModal, from rules in lib/domain that are
+  // covered by tests. `rows` is what is sent: every line but those ticked Not a
+  // transaction, those already here from another source marked skip.
+  async function confirmImport({ fileName, file, statement: pdf, lines, rows, proof, repeats }: ConfirmedImport) {
     if (!selectedId || !selected || !rows.length) return;
     setBusy("import");
     try {
@@ -490,20 +495,28 @@ export default function BankingClient({
           keepStatementFile(
             file,
             statementFileAccount(selected.bank_name || selected.account_name, selected.account_number_masked),
-            pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows),
+            pdf ? { from: pdf.from, to: pdf.to } : linesSpan(lines),
           ),
         )
         .catch((error: unknown): KeptStatementFile => ({
           ok: false,
           reason: error instanceof Error ? error.message : "the upload could not start",
         }));
-      const result = await importStatementAction(selectedId, fileName, rows, kept.ok ? kept.id : null);
+      const result = await importStatementAction(selectedId, fileName, rows, kept.ok ? kept.id : null, proof);
       if (!result.ok || !result.data) {
-        message.error(result.error ?? "Import failed");
+        // A statement that does not add up, a balance missing, an override
+        // refused: said in the server's own words.
+        message.error(result.error ?? "Import failed", 10);
         return;
       }
       message.success(
-        `Imported ${result.data.inserted} line(s); ${result.data.skipped} duplicate(s) skipped`,
+        importedSummary({
+          inserted: result.data.inserted,
+          alreadyHere: result.data.skipped,
+          otherSource: result.data.otherSource,
+          repeats,
+        }),
+        8,
       );
       if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "import"), 8);
       if (result.data.fileWarning) message.warning(result.data.fileWarning, 10);
@@ -980,7 +993,8 @@ export default function BankingClient({
             currencyCode: selected.currency_code,
           }}
           importing={busy === "import"}
-          onConfirm={(fileName, rows, pdf, file) => void confirmImport(fileName, rows, pdf, file)}
+          canOverride={canOverride}
+          onConfirm={(confirmed) => void confirmImport(confirmed)}
           onCancel={() => setImportOpen(false)}
         />
       ) : null}

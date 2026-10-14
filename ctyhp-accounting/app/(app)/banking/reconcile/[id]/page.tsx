@@ -37,6 +37,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
         reconciliationId={id}
         canWrite={canWrite(role)}
         canReopen={isAdmin(role)}
+        canOverride={isAdmin(role)}
         offsetAccounts={offsets.map((a) => ({ id: a.id, label: `${a.account_code} ${a.name}` }))}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
