@@ -402,6 +402,13 @@ describe("the workspace's bring forward and discard", () => {
     const reread = bring.indexOf("await Promise.all([load(), loadHistory()]);");
     expect(reread).toBeGreaterThan(bring.indexOf("throw new Error(r.error);"));
     expect(reread).toBeLessThan(bring.indexOf("message.success(historyBroughtForwardMessage("));
+    // A failed re-read is caught: it never turns a done bring-forward into a
+    // failure. The success shows, the dialog closes, and the problem is said apart.
+    expect(bring).toMatch(/try \{\s*await Promise\.all\(\[load\(\), loadHistory\(\)\]\);\s*\} catch \{\s*refreshed = false;\s*\}/);
+    expect(bring).toContain(
+      "The history was brought forward, but the screen could not be refreshed — reload the page.",
+    );
+    expect(bring.indexOf("if (!refreshed)")).toBeGreaterThan(bring.indexOf("message.success(historyBroughtForwardMessage("));
     expect(bring).not.toContain("setHistoryFacts(null);");
     expect(workspace).toMatch(/loading=\{bringing\}\s*onClick=\{\(\) => bringHistoryForward\(/);
   });
@@ -451,7 +458,7 @@ describe("the workspace's bring forward and discard", () => {
     expect(send).toBeGreaterThan(check);
     expect(discard.slice(check, send)).toContain("throw new Error(problem);");
     expect(DISCARD_CONFIRMATION).toBe(
-      "Its ticks are removed. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.",
+      "Its ticks and the statement lines kept with it are removed, along with any line set aside as not a transaction. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.",
     );
   });
 
@@ -569,6 +576,11 @@ describe("the Reconcile history page", () => {
     expect(client).toContain("historyPreviewAction({ bank_account_id: chosenId, through: throughIso })");
     expect(client).toContain("preview.key === previewKey");
     expect(client).toContain("historyAdvice(chosen, throughIso, balanceMinor, shownPreview, money)");
+  });
+
+  it("stops the reading state when the books cannot be read, so no spinner is left running", () => {
+    expect(client).toContain("setFailedKey(key);");
+    expect(client).toContain("failedKey !== previewKey");
   });
 
   it("offers Bring forward N entries only to a writer, on a match, after asking", () => {

@@ -280,7 +280,7 @@ describe("discarding a reconciliation", () => {
   it("says what goes and what stays, and returns to Reconcile", () => {
     expect(DISCARD_RECONCILIATION).toBe("Discard this reconciliation");
     expect(DISCARD_CONFIRMATION).toBe(
-      "Its ticks are removed. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.",
+      "Its ticks and the statement lines kept with it are removed, along with any line set aside as not a transaction. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.",
     );
     expect(discardedReturnPath("bank-1")).toBe("/banking/reconcile?account=bank-1");
   });

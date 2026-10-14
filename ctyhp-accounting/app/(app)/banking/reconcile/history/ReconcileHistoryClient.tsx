@@ -58,6 +58,8 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
   const [balance, setBalance] = useState<number | null>(null);
   // The books through a date, with the account and date they were read for.
   const [preview, setPreview] = useState<{ key: string; data: HistoryPreview } | null>(null);
+  // The account and date whose reading failed: the spinner stops for them.
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   // Bringing forward: from the click until its dialog closes.
   const [bringing, setBringing] = useState(false);
 
@@ -91,7 +93,11 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
       void historyPreviewAction({ bank_account_id: chosenId, through: throughIso }).then((res) => {
         if (!live) return;
         if (res.ok && res.data) setPreview({ key, data: res.data });
-        else message.error(res.error ?? "The books could not be read on that date");
+        else {
+          // The reading ends with the failure: no spinner is left running.
+          setFailedKey(key);
+          message.error(res.error ?? "The books could not be read on that date");
+        }
       });
     }, PREVIEW_DELAY_MS);
     return () => {
@@ -106,7 +112,9 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
     chosen && chosen.state === "never" && throughIso && balanceMinor !== null && shownPreview
       ? historyAdvice(chosen, throughIso, balanceMinor, shownPreview, money)
       : null;
-  const reading = Boolean(chosen && chosen.state === "never" && previewKey && balanceMinor !== null && !shownPreview);
+  const reading = Boolean(
+    chosen && chosen.state === "never" && previewKey && balanceMinor !== null && !shownPreview && failedKey !== previewKey,
+  );
 
   function choose(id: string) {
     if (id === chosenId) return;

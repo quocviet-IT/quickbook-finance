@@ -42,7 +42,7 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     version: "2.03",
-    date: "2026-10-13",
+    date: "2026-10-14",
     headline:
       "Reconcile brings an account’s history forward when the books match the statement, explains the difference in parts, and holds back lines a PDF may have misread.",
     changes: [
@@ -64,7 +64,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Discard a reconciliation in progress",
         detail:
-          "Discard this reconciliation asks for a reason, removes the reconciliation and its ticks, and returns to Reconcile, so a reconciliation started on the wrong footing can be started again. The statement file and its bank lines stay, and any entries added to the books from it stay in the books. The reason is kept in the audit log. A reconciliation that posted an adjustment cannot be discarded.",
+          "Discard this reconciliation asks for a reason, removes the reconciliation, its ticks and the statement lines kept with it, and returns to Reconcile, so a reconciliation started on the wrong footing can be started again. The statement file and its bank lines stay, and any entries added to the books from it stay in the books. The reason is kept in the audit log. A reconciliation that posted an adjustment cannot be discarded.",
         route: "/banking/reconcile",
       },
       {

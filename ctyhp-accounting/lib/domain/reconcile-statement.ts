@@ -194,7 +194,7 @@ export function bringHistoryForwardConfirmation(entries: number, through: string
 
 export const DISCARD_RECONCILIATION = "Discard this reconciliation";
 export const DISCARD_CONFIRMATION =
-  "Its ticks are removed. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.";
+  "Its ticks and the statement lines kept with it are removed, along with any line set aside as not a transaction. The statement file and its bank lines stay, and any entries added to the books from it stay in the books.";
 /** Where the person goes once the reconciliation is discarded: Reconcile, on the same account. */
 export function discardedReturnPath(bankAccountId: string): string {
   return `/banking/reconcile?account=${encodeURIComponent(bankAccountId)}`;

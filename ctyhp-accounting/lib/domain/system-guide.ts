@@ -641,8 +641,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Discard this reconciliation",
         route: "/banking/reconcile",
         note:
-          "For a reconciliation in progress. It asks for a reason, removes the reconciliation and its ticks, and " +
-          "returns to Reconcile. The statement file and its bank lines stay, and any entries added to the books " +
+          "For a reconciliation in progress. It asks for a reason, removes the reconciliation, its ticks and the statement lines kept " +
+          "with it, and returns to Reconcile. The statement file and its bank lines stay, and any entries added to the books " +
           "from it stay in the books. A reconciliation that posted an adjustment cannot be discarded.",
       },
       {

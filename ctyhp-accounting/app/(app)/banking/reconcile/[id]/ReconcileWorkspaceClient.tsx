@@ -343,11 +343,20 @@ export default function ReconcileWorkspaceClient({
         }
         // The figures and the offer are read again before the dialog closes, so
         // the screen changes once: no spent offer left behind, and no opening
-        // warning drawn from the figures as they were before.
-        await Promise.all([load(), loadHistory()]);
+        // warning drawn from the figures as they were before. A refresh that
+        // fails never reads as a failed bring-forward: it is said apart below.
+        let refreshed = true;
+        try {
+          await Promise.all([load(), loadHistory()]);
+        } catch {
+          refreshed = false;
+        }
         const rebased = r.data.rebasedReconciliationId ? facts.openingMinor : null;
         message.success(historyBroughtForwardMessage(r.data.lines, facts.through, rebased, money), 8);
         if (r.data.fileWarning) message.warning(r.data.fileWarning, 10);
+        if (!refreshed) {
+          message.warning("The history was brought forward, but the screen could not be refreshed — reload the page.", 10);
+        }
       },
     });
   };
