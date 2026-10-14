@@ -25,23 +25,9 @@ import {
   type RepeatLine,
   type StatementLinesCheck,
 } from "./statement-repeats";
+import { rowKeyText, statementLineKeyText } from "./statement-key-text";
 
-/** The text a row's key is a hash of: its parts, a missing one as empty, joined by "|". */
-export function rowKeyText(parts: readonly (string | number | null | undefined)[]): string {
-  return parts.map((part) => String(part ?? "")).join("|");
-}
-
-/**
- * The text a statement line's duplicate key is a hash of: the account and the
- * bank's own id (OFX FITID) when the line has one, else the account, date,
- * amount, description and reference; the n-th identical line (n ≥ 2) adds "#n".
- */
-export function statementLineKeyText(bankAccountId: string, line: RepeatLine, occurrence = 1): string {
-  const parts: (string | number | null)[] = line.external_id
-    ? [bankAccountId, "fitid", line.external_id]
-    : [bankAccountId, line.txn_date, line.amount_minor, line.description, line.reference];
-  return rowKeyText(occurrence > 1 ? [...parts, `#${occurrence}`] : parts);
-}
+export { rowKeyText, statementLineKeyText };
 
 /** The first and last day a file's lines fall on; null for a file with none. */
 export function statementDays(lines: readonly Pick<RepeatLine, "txn_date">[]): { from: string; to: string } | null {

@@ -16,6 +16,9 @@
  */
 import { shortDate } from "./pdf-statement-view";
 import { plainAmount } from "./statement-proof";
+import { repeatKey } from "./statement-key-text";
+
+export { repeatKey };
 
 /** The parts of a statement line that make two lines of one file identical. */
 export interface RepeatLine {
@@ -27,16 +30,6 @@ export interface RepeatLine {
   external_id?: string | null;
 }
 
-/**
- * What makes two lines of one file the same line twice, as statementLineHashes
- * counts them: the bank's own id when the line has one, else its date, amount,
- * description and reference.
- */
-export function repeatKey(line: RepeatLine): string {
-  return line.external_id
-    ? JSON.stringify(["fitid", line.external_id])
-    : JSON.stringify([line.txn_date, line.amount_minor, line.description, line.reference]);
-}
 
 // --- What Bank Transactions already holds -------------------------------------
 

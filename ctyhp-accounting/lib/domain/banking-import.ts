@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { rowKeyText, statementLineKeyText } from "./statement-line-keys";
-import { repeatKey } from "./statement-repeats";
+// With its .ts suffix and free of other modules, so the verification scripts
+// can load this file straight into Node.
+import { repeatKey, rowKeyText, statementLineKeyText } from "./statement-key-text.ts";
 
 /** Collision-resistant deterministic hash for immutable statement rows. */
 export function statementRowHash(
