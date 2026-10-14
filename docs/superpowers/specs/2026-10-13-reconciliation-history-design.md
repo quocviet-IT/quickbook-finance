@@ -160,7 +160,7 @@ A session with no statement file gets no button. The history page handles those.
 
 **Discard this reconciliation.**
 - In progress only, for staff.
-- The confirmation asks for a reason and says: "Its ticks are removed. The statement file and its bank lines stay, and any entries added to the books from it stay in the books."
+- The confirmation asks for a reason and says: "Its ticks and the statement lines kept with it are removed, along with any line set aside as not a transaction. The statement file and its bank lines stay, and any entries added to the books from it stay in the books."
 - Afterwards the user returns to Reconcile.
 
 **The difference, explained.** This replaces "Unexplained difference" with these parts:
@@ -323,9 +323,11 @@ The release was built and run on a local pre-build branch first.
 13. **Write buttons stay busy until the screen catches up.**
     - This covers bringing forward, discarding, Add anyway, Not a transaction / Restore, Complete, Record adjustment and Reopen.
     - After bringing the history forward, the figures are read again before the dialog closes, so the screen changes once.
+    - If that reading fails, the bring-forward still reads as done and the dialog closes; a separate warning asks for a reload.
 14. **The PDF reader.**
     - Inside a check-image area, a "Checks…" or "Fees…" caption, or the images' own Date / Check No. / Amount table, no longer reopens reading.
     - An invented fixture shows the old reader taking a thumbnail row as a payment.
+15. **The discard confirmation** was made to name the statement lines kept with the reconciliation and any line set aside as not a transaction, which the cascade deletes too.
 
 **Found along the way, for later releases**
 - **Statement lines are not exported.** `acc_reconciliation_statement_line` has been missing from the company export, backup and restore since 0132, so a restored company loses its kept statement lines.
