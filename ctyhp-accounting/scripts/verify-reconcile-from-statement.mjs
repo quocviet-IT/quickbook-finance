@@ -112,7 +112,8 @@ try {
 
       const bringForward = `select acc_bring_forward_reconciliation($1, '2026-08-31', $2, 'Brought forward, proved by the opening balance on the statement for Sep 1 – Sep 30, 2026') as id`;
       const wrong = await refused(bringForward, [bank, 80000]);
-      check("bringing forward on a different opening balance is refused", /The books hold 750\.00 on 2026-08-31, and the statement opens at 800\.00/.test(wrong ?? ""), wrong ?? "accepted");
+      // Since 0142 the refusal comes from the shared rule, acc_bring_history_forward.
+      check("bringing forward on a different opening balance is refused", /The books hold 750\.00 on Aug 31, 2026; the statement shows 800\.00\. Out by 50\.00\./.test(wrong ?? ""), wrong ?? "accepted");
       const future = await refused(`select acc_bring_forward_reconciliation($1, current_date + 1, 0, 'x')`, [bank]);
       check("bringing forward past today is refused", /past today/.test(future ?? ""), future ?? "accepted");
       const forward = (await one(bringForward, [bank, 75000])).id;
