@@ -17,6 +17,7 @@ import {
   isAllowedAttachmentType,
 } from "./feedback-attachment";
 import { MAX_RUN_LINES } from "./statement-run";
+import { statementProofPayloadSchema } from "./statement-proof";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
 export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {
@@ -575,11 +576,31 @@ const statementDay = z
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
   }, "A statement date must be a real day");
 
-/** A statement file as a reconciliation takes it: its name, the balances it prints, and its lines. */
-export const reconciliationStatementSchema = z.object({
-  file_name: z.string().trim().min(1, "The statement file has no name").max(255),
-  opening_minor: z.number().int().nullable(),
-  closing_minor: z.number().int().nullable(),
+/**
+ * A statement line as an import sends it. `skip` (2.04) marks a line already in
+ * Bank Transactions from another source: it counts in the proof and is not
+ * imported.
+ */
+export const statementImportLineSchema = z.object({
+  txn_date: statementDay,
+  description: z.string(),
+  reference: z.string().nullable(),
+  amount_minor: z.number().int(),
+  running_balance_minor: z.number().int().nullable(),
+  raw_line: z.string(),
+  external_id: z.string().nullable().optional(),
+  skip: z.boolean().optional(),
+});
+
+/** The lines of Banking › Import statement: every line read but those marked Not a transaction. */
+export const statementImportLinesSchema = z
+  .array(statementImportLineSchema)
+  .min(1, "No rows to import")
+  .max(20_000, "A statement can hold at most 20,000 lines");
+
+/** The lines whose keys Import statement asks about before importing (checkStatementLinesAction). */
+export const statementLinesCheckSchema = z.object({
+  bank_account_id: z.uuid("Select a bank account"),
   lines: z
     .array(
       z.object({
@@ -587,13 +608,27 @@ export const reconciliationStatementSchema = z.object({
         description: z.string(),
         reference: z.string().nullable(),
         amount_minor: z.number().int(),
-        running_balance_minor: z.number().int().nullable(),
-        raw_line: z.string(),
         external_id: z.string().nullable().optional(),
       }),
     )
+    .max(20_000, "A statement can hold at most 20,000 lines"),
+  /** Indexes into `lines` of the lines marked Not a transaction. */
+  aside: z.array(z.number().int().nonnegative()).max(20_000).default([]),
+});
+export type StatementLinesCheckInput = z.infer<typeof statementLinesCheckSchema>;
+
+/**
+ * A statement file as a reconciliation takes it: its name, its lines, and its
+ * proof (2.04) — the opening and closing it was proved between, which the
+ * reconciliation keeps, and where they came from.
+ */
+export const reconciliationStatementSchema = z.object({
+  file_name: z.string().trim().min(1, "The statement file has no name").max(255),
+  lines: z
+    .array(statementImportLineSchema)
     .min(1, "The statement has no lines")
     .max(5000, "A statement can hold at most 5,000 lines"),
+  proof: statementProofPayloadSchema,
   /** The statement file, kept in Reports › Saved (1.83); null when it could not be kept. */
   statement_file_id: z.uuid().nullable().default(null),
 });
@@ -627,7 +662,8 @@ export type RunPreviewInput = z.infer<typeof runPreviewSchema>;
 /**
  * One step of a run, signed on the server: bringing the account's earlier lines
  * forward, or one month started from its statement — completed when `sign` is
- * set and it reaches zero, left in progress otherwise.
+ * set and it reaches zero, left in progress otherwise. A month's closing is its
+ * proof's: a month whose statement prints none is refused with the proof.
  */
 export const runMonthSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -642,7 +678,6 @@ export const runMonthSchema = z.discriminatedUnion("kind", [
     kind: z.literal("month"),
     bank_account_id: z.uuid("Select a bank account"),
     statement_date: statementDay,
-    closing_minor: z.number().int("The statement prints no closing balance"),
     sign: z.boolean(),
   }),
 ]);

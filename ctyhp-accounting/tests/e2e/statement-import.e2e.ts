@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCsv } from "@/lib/csv";
 import { parseStatementRows } from "@/lib/domain/statement-import";
+import { proofPayload, proveStatement } from "@/lib/domain/statement-proof";
 import { importStatement, listBankTransactions } from "@/lib/services/banking";
 import {
   closeE2eSession,
@@ -45,7 +46,13 @@ describe("bank statement import over HTTPS", () => {
       expect(parsed.rows.map((row) => row.amount_minor)).toEqual([280651, -320000]);
       expect(parsed.rows[1].reference).toBe("10428");
 
-      const first = await importStatement(sb, bankAccountId, `${marker}.csv`, parsed.rows);
+      // The file proves itself by its own balances (2.04): the database checks
+      // the proof the import sends.
+      const proof = proveStatement({ kind: "csv", lines: parsed.rows }, (minor) => `$${(minor / 100).toFixed(2)}`);
+      expect(proof.proves).toBe(true);
+      const payload = proofPayload(proof);
+
+      const first = await importStatement(sb, bankAccountId, `${marker}.csv`, parsed.rows, payload);
       expect(first.inserted, "both lines must land").toBe(2);
       expect(first.skipped).toBe(0);
 
@@ -58,7 +65,7 @@ describe("bank statement import over HTTPS", () => {
 
       // The same file again: a bank statement gets re-uploaded all the time, and
       // a second copy of a transaction would put the reconciliation out.
-      const second = await importStatement(sb, bankAccountId, `${marker}.csv`, parsed.rows);
+      const second = await importStatement(sb, bankAccountId, `${marker}.csv`, parsed.rows, payload);
       expect(second.inserted, "a re-upload must add nothing").toBe(0);
       expect(second.skipped).toBe(2);
     } finally {

@@ -1,10 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite, getSessionUser } from "@/lib/auth";
 import {
   createBankAccount,
   importStatement,
+  checkStatementLines,
+  listBankLinesOn,
+  type StatementImportCounts,
   categoriseBankTransaction,
   uncategoriseBankTransaction,
   listBankTransactionPostings,
@@ -37,7 +41,17 @@ import type { BankTransactionRow } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { CODE_ALL_LIMIT, type CodingSuggestionView } from "@/lib/domain/coding";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
-import { loanPaymentSchema } from "@/lib/domain/schemas";
+import { loanPaymentSchema, statementImportLinesSchema, statementLinesCheckSchema } from "@/lib/domain/schemas";
+import {
+  PROOF_REFUSAL,
+  proofRefusal,
+  proveStatementPayload,
+  statementProofPayloadSchema,
+  type PriorClosing,
+} from "@/lib/domain/statement-proof";
+import type { BankLineOn, StatementLinesCheck } from "@/lib/domain/statement-repeats";
+import { formatMoney } from "@/lib/format";
+import { getPriorClosing } from "@/lib/services/bankrec";
 import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
 import { loanSuggestions, postLoanPayment } from "@/lib/services/loan-payments";
 import { tieKeptStatementFile } from "@/lib/services/statement-files";
@@ -65,6 +79,8 @@ function msg(err: unknown): string {
   if (err instanceof BankingError || err instanceof Error) return err.message;
   return "An unexpected error occurred";
 }
+/** Bank accounts are kept in USD only (createBankAccountAction), so a statement's money is said in dollars. */
+const usd = (minor: number) => formatMoney(minor, USD_CURRENCY_CODE, 2);
 
 export async function createBankAccountAction(input: {
   account_id: string;
@@ -90,18 +106,41 @@ export async function createBankAccountAction(input: {
   }
 }
 
+export interface StatementImportResult extends StatementImportCounts {
+  /** Said when the kept file could not be tied to the import; null when it was, or none was kept. */
+  fileWarning: string | null;
+}
+
+/**
+ * Banking › Import statement (2.04: proved). `rows` is every line of the
+ * statement but those marked Not a transaction, in file order, those already in
+ * Bank Transactions from another source marked `skip`. `proof` is the
+ * statement's opening and closing, where each came from, how many lines were
+ * marked Not a transaction, and an administrator's override when the person
+ * chose "Import anyway…" (StatementProofPayload). The proof is worked out here
+ * again from what was sent — the same rule the dialog runs — and a statement
+ * that does not add up, with no override, is refused before the database is
+ * asked. Whether the person may override is the database's to say.
+ */
 export async function importStatementAction(
   bankAccountId: string,
   filename: string,
   rows: ImportRow[],
   statementFileId: string | null = null,
-): Promise<ActionResult<{ inserted: number; skipped: number; batchId: string | null; fileWarning: string | null }>> {
+  proof: unknown = null,
+): Promise<ActionResult<StatementImportResult>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
-  if (!rows.length) return { ok: false, error: "No rows to import" };
+  const lines = statementImportLinesSchema.safeParse(rows);
+  if (!lines.success) return { ok: false, error: lines.error.issues[0]?.message ?? "Invalid data" };
+  if (proof === null || proof === undefined) return { ok: false, error: PROOF_REFUSAL.noProof };
+  const payload = statementProofPayloadSchema.safeParse(proof);
+  if (!payload.success) return { ok: false, error: payload.error.issues[0]?.message ?? "Invalid data" };
+  const refusal = proofRefusal(proveStatementPayload(lines.data, payload.data, usd), payload.data.override);
+  if (refusal) return { ok: false, error: refusal };
   try {
     const sb = await createSupabaseServerClient();
-    const res = await importStatement(sb, bankAccountId, filename, rows);
+    const res = await importStatement(sb, bankAccountId, filename, lines.data, payload.data);
     // The file the lines were read from, kept already (1.83). Linking it costs
     // nothing the import did if it fails: the file stays in Reports › Saved,
     // and the screen says so.
@@ -116,6 +155,59 @@ export async function importStatementAction(
     }
     revalidatePath("/banking");
     return { ok: true, data: { ...res, fileWarning } };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+const accountIdSchema = z.uuid("Select a bank account");
+const daySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date");
+
+/**
+ * The prior statement's closing for Import statement's proof (2.04): the
+ * account's last completed reconciliation, or null when it has none. Reads only.
+ */
+export async function priorClosingAction(bankAccountId: string): Promise<ActionResult<PriorClosing | null>> {
+  const account = accountIdSchema.safeParse(bankAccountId);
+  if (!account.success) return { ok: false, error: account.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getPriorClosing(sb, account.data) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** The account's bank lines from `from` to `to`, with where each came from, every page of them (2.04). Reads only. */
+export async function bankLinesOnAction(
+  bankAccountId: string,
+  from: string,
+  to: string,
+): Promise<ActionResult<BankLineOn[]>> {
+  const account = accountIdSchema.safeParse(bankAccountId);
+  const days = z.tuple([daySchema, daySchema]).safeParse([from, to]);
+  if (!account.success) return { ok: false, error: account.error.issues[0]?.message ?? "Invalid data" };
+  if (!days.success) return { ok: false, error: days.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await listBankLinesOn(sb, account.data, from, to) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * What Import statement shows before importing (2.04): which lines are already
+ * here from this statement, and which are already in Bank Transactions from
+ * another source. Ask again when a line is marked Not a transaction or brought
+ * back: the keys are counted over the lines sent. Reads only.
+ */
+export async function checkStatementLinesAction(raw: unknown): Promise<ActionResult<StatementLinesCheck>> {
+  const parsed = statementLinesCheckSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await checkStatementLines(sb, parsed.data.bank_account_id, parsed.data.lines, parsed.data.aside) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

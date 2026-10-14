@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attachMismatch,
   keepFailureMessage,
   unlinkedFileMessage,
   linesSpan,
@@ -256,15 +257,55 @@ describe("statementFileKeepSchema", () => {
 });
 
 describe("statementFileAttachSchema", () => {
+  const base = {
+    reconciliation_id: "aaaabbbb-cccc-4ddd-8eee-ffff00001111",
+    file_id: "bbbbcccc-dddd-4eee-8fff-000011112222",
+    to: "2026-05-31",
+    closing_minor: 616001,
+    lines: [{ txn_date: "2026-05-04", amount_minor: -1200 }],
+    proof: { opening_minor: 617201, closing_minor: 616001, opening_basis: "printed", closing_basis: "printed" },
+  };
+
   it("accepts what was read and refuses a line without a whole amount", () => {
-    const base = {
-      reconciliation_id: "aaaabbbb-cccc-4ddd-8eee-ffff00001111",
-      file_id: "bbbbcccc-dddd-4eee-8fff-000011112222",
-      to: "2026-05-31",
-      closing_minor: 616001,
-      lines: [{ txn_date: "2026-05-04", amount_minor: -1200 }],
-    };
     expect(statementFileAttachSchema.safeParse(base).success).toBe(true);
     expect(statementFileAttachSchema.safeParse({ ...base, lines: [{ txn_date: "2026-05-04", amount_minor: 1.5 }] }).success).toBe(false);
+  });
+
+  it("needs the statement's proof, and takes the lines marked Not a transaction (2.04)", () => {
+    expect(statementFileAttachSchema.safeParse({ ...base, proof: undefined }).success).toBe(false);
+    expect(statementFileAttachSchema.parse(base).aside).toEqual([]);
+    expect(statementFileAttachSchema.parse({ ...base, aside: [0] }).aside).toEqual([0]);
+    expect(statementFileAttachSchema.safeParse({ ...base, aside: [-1] }).success).toBe(false);
+  });
+});
+
+describe("attachMismatch (2.04)", () => {
+  const target = {
+    endingDate: "2026-05-31",
+    endingMinor: 616001,
+    keptLines: [
+      { txn_date: "2026-05-04", amount_minor: -1200 },
+      { txn_date: "2026-05-15", amount_minor: 50000 },
+    ],
+  };
+  const misread = { txn_date: "2026-05-09", amount_minor: -36000 };
+  const read = { to: "2026-05-31", closingMinor: 616001, lines: [target.keptLines[0], misread, target.keptLines[1]] };
+
+  it("compares the lines the file counts: a line marked Not a transaction is left out", () => {
+    expect(attachMismatch(read, [1], target, money)).toBeNull();
+    expect(attachMismatch(read, [], target, money)).toBe(
+      "This reconciliation kept 2 lines from May 4, 2026 to May 31, 2026; this file has 3 lines in those days.",
+    );
+  });
+
+  it("leaves out a kept line the reconciliation set aside, so a statement kept whole still matches", () => {
+    const keptWhole = { ...target, keptLines: [target.keptLines[0], { ...misread, setAside: true }, target.keptLines[1]] };
+    expect(attachMismatch(read, [1], keptWhole, money)).toBeNull();
+  });
+
+  it("is statementFileMismatch when nothing is marked or set aside", () => {
+    const plain = { to: "2026-05-31", closingMinor: 616001, lines: target.keptLines };
+    expect(attachMismatch(plain, [], target, money)).toBe(statementFileMismatch(plain, target, money));
+    expect(attachMismatch({ ...plain, closingMinor: 1 }, [], target, money)).toBe(statementFileMismatch({ ...plain, closingMinor: 1 }, target, money));
   });
 });

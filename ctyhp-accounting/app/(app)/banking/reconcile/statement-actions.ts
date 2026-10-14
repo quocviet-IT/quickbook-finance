@@ -27,6 +27,7 @@ import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
+import { PROOF_REFUSAL, proofRefusal, proveStatementPayload, sentWithoutProof } from "@/lib/domain/statement-proof";
 import { tieKeptStatementFile } from "@/lib/services/statement-files";
 import { matchAfterCompletion } from "@/lib/services/statement-bank-lines";
 import type { BankLineMatchCounts } from "@/lib/domain/statement-bank-lines";
@@ -44,35 +45,52 @@ export interface StatementImportSummary {
   /** New lines in Bank Transactions; a line already there is a duplicate. */
   inserted: number;
   duplicates: number;
+  /** Lines skipped as already in Bank Transactions from another source (2.04). */
+  otherSource: number;
   outcome: PairingOutcome;
   /** Said when the kept file could not be tied to the import; null when it was, or none was kept. */
   fileWarning: string | null;
 }
 
+const usd = (minor: number) => formatMoney(minor, USD_CURRENCY_CODE, 2);
+
+/**
+ * The statement as the reconciliation keeps it: its lines — every one but
+ * those marked Not a transaction, those skipped as already here included, for
+ * they are on the statement — and the opening and closing it was proved
+ * between (2.04), which the reconciliation's opening and closing advice uses.
+ */
 function statementFile(input: ReconciliationStatementInput): StatementFileInput {
   return {
     fileName: input.file_name,
-    openingMinor: input.opening_minor,
-    closingMinor: input.closing_minor,
+    openingMinor: input.proof.opening_minor,
+    closingMinor: input.proof.closing_minor,
     lines: input.lines,
     statementFileId: input.statement_file_id,
   };
 }
 
+/** Why the statement is refused before anything is written (2.04), or null: the dialog's rule, run again on what was sent. */
+function statementRefusal(input: ReconciliationStatementInput): string | null {
+  return proofRefusal(proveStatementPayload(input.lines, input.proof, usd), input.proof.override);
+}
+
 /**
  * The statement's lines go into Bank Transactions as Import statement puts
- * them there — the same path and the same duplicate rule — and its matches are
- * looked for, so Review import can code what the books do not have. A failure
- * finding matches costs the proposals, not the import.
+ * them there — the same path, the same duplicate rule and the same proof — and
+ * its matches are looked for, so Review import can code what the books do not
+ * have. A failure finding matches costs the proposals, not the import.
  */
 async function importIntoBankTransactions(
   sb: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   bankAccountId: string,
-  file: StatementFileInput,
+  input: ReconciliationStatementInput,
 ) {
-  const imported = await importStatement(sb, bankAccountId, file.fileName, file.lines);
+  const imported = await importStatement(sb, bankAccountId, input.file_name, input.lines, input.proof);
   const fileWarning =
-    imported.batchId && file.statementFileId ? await tieKeptStatementFile(sb, "import", imported.batchId, file.statementFileId) : null;
+    imported.batchId && input.statement_file_id
+      ? await tieKeptStatementFile(sb, "import", imported.batchId, input.statement_file_id)
+      : null;
   if (imported.inserted > 0) {
     await generateSuggestions(sb, bankAccountId).catch((err) =>
       console.warn("finding ledger matches after import failed:", err instanceof Error ? err.message : err),
@@ -85,7 +103,10 @@ async function importIntoBankTransactions(
  * The statement a reconciliation in progress is reconciled against: kept with
  * it (replacing any kept before, its file with it), imported into Bank
  * Transactions, and paired with the books — every pair is ticked. Nothing is
- * posted.
+ * posted. The payload is a ReconciliationStatementInput: the lines (those
+ * marked Not a transaction left out, those already here from another source
+ * marked `skip`) and the proof; a statement that does not add up, with no
+ * override, is refused before anything is kept.
  */
 export async function importStatementIntoReconciliationAction(
   reconciliationId: string,
@@ -93,8 +114,11 @@ export async function importStatementIntoReconciliationAction(
 ): Promise<ActionResult<StatementImportSummary>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
+  if (sentWithoutProof(raw)) return { ok: false, error: PROOF_REFUSAL.noProof };
   const parsed = reconciliationStatementSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  const refusal = statementRefusal(parsed.data);
+  if (refusal) return { ok: false, error: refusal };
   let kept = false;
   try {
     const sb = await createSupabaseServerClient();
@@ -103,11 +127,20 @@ export async function importStatementIntoReconciliationAction(
     await setReconciliationStatement(sb, reconciliationId, file);
     kept = true;
     const { bankAccountId } = await getReconciliationHeader(sb, reconciliationId);
-    const imported = await importIntoBankTransactions(sb, bankAccountId, file);
+    const imported = await importIntoBankTransactions(sb, bankAccountId, parsed.data);
     const outcome = await pairAndTick(sb, reconciliationId);
     revalidatePath(`/banking/reconcile/${reconciliationId}`);
     revalidatePath("/banking");
-    return { ok: true, data: { inserted: imported.inserted, duplicates: imported.skipped, outcome, fileWarning: imported.fileWarning } };
+    return {
+      ok: true,
+      data: {
+        inserted: imported.inserted,
+        duplicates: imported.skipped,
+        otherSource: imported.otherSource,
+        outcome,
+        fileWarning: imported.fileWarning,
+      },
+    };
   } catch (e) {
     if (!kept) return { ok: false, error: msg(e) };
     revalidatePath(`/banking/reconcile/${reconciliationId}`);
@@ -203,9 +236,16 @@ export interface RunMonthResult {
 export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResult<RunMonthResult>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
+  if ((raw as { kind?: unknown } | null)?.kind === "month" && sentWithoutProof(raw)) return { ok: false, error: PROOF_REFUSAL.noProof };
   const parsed = runMonthSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   const input = parsed.data;
+  // A month whose statement does not add up is refused before anything is
+  // written; the run stops there, and the statement is imported on its own.
+  if (input.kind === "month") {
+    const refusal = statementRefusal(input);
+    if (refusal) return { ok: false, error: refusal };
+  }
   let startedId: string | null = null;
   try {
     const sb = await createSupabaseServerClient();
@@ -233,9 +273,10 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
     );
     if (refusal) return { ok: false, error: refusal };
     const file = statementFile(input);
-    const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, input.closing_minor, file);
+    // The proof has a closing: a statement without one was refused above.
+    const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, input.proof.closing_minor as number, file);
     startedId = id;
-    const { fileWarning } = await importIntoBankTransactions(sb, input.bank_account_id, file);
+    const { fileWarning } = await importIntoBankTransactions(sb, input.bank_account_id, input);
     await pairAndTick(sb, id);
     const { differenceMinor } = await getReconciliationDetail(sb, id);
     const signed = input.sign && differenceMinor === 0;

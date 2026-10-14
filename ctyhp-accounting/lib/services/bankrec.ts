@@ -5,6 +5,7 @@ import type { ReconciliationCreateInput, ReconciliationAdjustmentInput, Reconcil
 import type { StatementLine } from "@/lib/domain/statement-import";
 import { reconciliationStandings, type BroughtForwardPreview, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import type { OpenBookLine } from "@/lib/domain/statement-run";
+import type { PriorClosing } from "@/lib/domain/statement-proof";
 
 export class BankRecError extends Error {}
 
@@ -100,6 +101,25 @@ export async function completeReconciliation(sb: SupabaseClient, id: string): Pr
 export async function reopenReconciliation(sb: SupabaseClient, id: string, input: ReconciliationReopenInput): Promise<void> {
   const { error } = await sb.rpc("acc_reopen_reconciliation", { p_reconciliation_id: id, p_reason: input.reason });
   if (error) throw new BankRecError(error.message);
+}
+
+/**
+ * The prior statement's closing (2.04): the account's last completed
+ * reconciliation — its statement ending date and ending balance — or null when
+ * it has none. One row: the newest by statement date.
+ */
+export async function getPriorClosing(sb: SupabaseClient, bankAccountId: string): Promise<PriorClosing | null> {
+  const { data, error } = await sb.from("acc_statement_reconciliation")
+    .select("statement_ending_date,statement_ending_balance_minor")
+    .eq("bank_account_id", bankAccountId)
+    .eq("status", "completed")
+    .order("statement_ending_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new BankRecError(error.message);
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return { date: r.statement_ending_date as string, endingMinor: Number(r.statement_ending_balance_minor) };
 }
 
 export async function listReconciliations(sb: SupabaseClient, bankAccountId: string): Promise<StatementReconciliationRow[]> {

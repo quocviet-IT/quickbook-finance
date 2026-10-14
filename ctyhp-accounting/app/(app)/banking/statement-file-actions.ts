@@ -13,11 +13,12 @@ import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { SAVED_REPORT_BUCKET } from "@/lib/domain/saved-reports";
 import {
   STATEMENT_FILE_MIME_TYPES,
+  attachMismatch,
   statementFileAttachSchema,
   statementFileKeepSchema,
-  statementFileMismatch,
   type StatementFileMime,
 } from "@/lib/domain/statement-evidence";
+import { PROOF_REFUSAL, PROOF_TEXT, proofRefusal, proveStatementPayload, sentWithoutProof } from "@/lib/domain/statement-proof";
 import { formatMoney } from "@/lib/format";
 import { getReconciliationDetail, getReconciliationStatement } from "@/lib/services/bankrec";
 import { createSavedReportUploadTicket } from "@/lib/services/saved-reports";
@@ -99,14 +100,23 @@ export async function keepStatementFileAction(raw: unknown): Promise<ActionResul
 /**
  * Attach the statement: the file chosen is attached only when what was read
  * from it is this reconciliation's statement — checked here against the
- * reconciliation's own figures and kept lines, as the browser checked it.
+ * reconciliation's own figures and kept lines, as the browser checked it — and,
+ * since 2.04, only when it adds up: its opening plus the lines that count is its
+ * closing. Nothing is imported, so there is nothing to import anyway: a file
+ * that does not add up is never attached, override or not.
  */
 export async function attachStatementFileAction(raw: unknown): Promise<ActionResult> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
+  if (sentWithoutProof(raw)) return { ok: false, error: PROOF_REFUSAL.noProof };
   const parsed = statementFileAttachSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   const input = parsed.data;
+  const money = (minor: number) => formatMoney(minor, USD_CURRENCY_CODE, 2);
+  const aside = new Set(input.aside);
+  const counted = input.lines.filter((_, index) => !aside.has(index));
+  const refusal = proofRefusal(proveStatementPayload(counted, input.proof, money), null, PROOF_TEXT.attachBlocked);
+  if (refusal) return { ok: false, error: refusal };
   try {
     const sb = await createSupabaseServerClient();
     const [statement, detail] = await Promise.all([
@@ -114,14 +124,15 @@ export async function attachStatementFileAction(raw: unknown): Promise<ActionRes
       getReconciliationDetail(sb, input.reconciliation_id),
     ]);
     if (statement.statementFileId) return { ok: false, error: "This reconciliation already has its statement file" };
-    const mismatch = statementFileMismatch(
+    const mismatch = attachMismatch(
       { to: input.to, closingMinor: input.closing_minor, lines: input.lines },
+      input.aside,
       {
         endingDate: statement.endingDate,
         endingMinor: detail.statementEndingMinor,
-        keptLines: statement.lines.map((l) => ({ txn_date: l.txnDate, amount_minor: l.amountMinor })),
+        keptLines: statement.lines.map((l) => ({ txn_date: l.txnDate, amount_minor: l.amountMinor, setAside: l.setAside })),
       },
-      (minor) => formatMoney(minor, USD_CURRENCY_CODE, 2),
+      money,
     );
     if (mismatch) return { ok: false, error: mismatch };
     await linkReconciliationStatementFile(sb, input.reconciliation_id, input.file_id);
