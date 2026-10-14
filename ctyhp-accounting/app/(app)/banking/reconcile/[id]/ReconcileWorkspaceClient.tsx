@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   App,
   Alert,
@@ -21,11 +22,24 @@ import { fromMinor } from "@/lib/domain/money";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import type { StatementLine } from "@/lib/domain/statement-import";
 import {
+  BRING_HISTORY_FORWARD,
+  DISCARD_CONFIRMATION,
+  DISCARD_RECONCILIATION,
+  SET_ASIDE_MESSAGE,
+  asideActionFor,
+  bringHistoryForwardConfirmation,
   closingAdvice,
+  discardedMessage,
+  discardedReturnPath,
   openingAdvice,
   pairingMessage,
   reconciliationStandings,
+  sessionHistoryAdvice,
+  type SessionHistoryFacts,
 } from "@/lib/domain/reconcile-statement";
+import { explainDifference } from "@/lib/domain/reconcile-difference";
+import { historyBroughtForwardMessage } from "@/lib/domain/reconcile-history";
+import { REASON_MAX, reasonProblem } from "@/lib/domain/reconcile-alerts-screen";
 import { formatMoney } from "@/lib/format";
 import { shortDate } from "@/lib/domain/pdf-statement-view";
 import { keepFailureMessage, linesSpan, serverFailure, statementFileMismatch } from "@/lib/domain/statement-evidence";
@@ -48,9 +62,24 @@ import {
   reconciliationStatementAction,
   setStatementEndingAction,
 } from "../statement-actions";
-import { addedMessage, addedNotPairedMessage, type AddMissingPlan } from "@/lib/domain/add-missing";
+import {
+  bringHistoryForwardFromSessionAction,
+  discardReconciliationAction,
+  sessionHistoryAdviceAction,
+  setStatementLineAsideAction,
+} from "../history-actions";
+import {
+  addedMessage,
+  addedNotPairedMessage,
+  extraLineNos,
+  type AddMissingPlan,
+  type HeldLine,
+} from "@/lib/domain/add-missing";
 import { bankLinesToCheck, completedMessage } from "@/lib/domain/statement-bank-lines";
 import AddMissingBox from "./AddMissingBox";
+import DifferenceAlert from "./DifferenceAlert";
+import { STATEMENT_LINE_WIDTH as SW } from "./statement-line-columns";
+import styles from "./workspace.module.css";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import StandingTag from "../StandingTag";
@@ -94,6 +123,7 @@ export default function ReconcileWorkspaceClient({
   fileAccount,
 }: Props) {
   const { message, modal } = App.useApp();
+  const router = useRouter();
   const [lines, setLines] = useState<ReconLineView[]>([]);
   const [detail, setDetail] = useState<ReconDetail | null>(null);
   const [statement, setStatement] = useState<ReconStatement | null>(null);
@@ -113,6 +143,20 @@ export default function ReconcileWorkspaceClient({
   const [adding, setAdding] = useState(false);
   // Asks for the plan again when an add was refused because it changed.
   const [planAsked, setPlanAsked] = useState(0);
+  // The held-back line being added with Add anyway, and the statement line being set aside or restored.
+  const [addingLine, setAddingLine] = useState<number | null>(null);
+  const [asideLine, setAsideLine] = useState<number | null>(null);
+  // What an offer to bring the account's history forward rests on (2.03); null when there is none.
+  const [historyFacts, setHistoryFacts] = useState<SessionHistoryFacts | null>(null);
+  // A button that writes is busy from its click until the screen has caught
+  // up, so a second click cannot send it twice: bringing the history forward,
+  // discarding and reopening while their dialog is open or their request runs,
+  // Complete and Record adjustment until the figures are read again.
+  const [bringing, setBringing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,10 +174,20 @@ export default function ReconcileWorkspaceClient({
     else message.error(s.error ?? "Failed");
   }, [reconciliationId, message]);
 
+  // Read apart from the figures, so ticking a line does not wait on it: only a
+  // statement imported or attached, the history brought forward, or a reopen
+  // changes what it says.
+  const loadHistory = useCallback(async () => {
+    const h = await sessionHistoryAdviceAction(reconciliationId);
+    if (h.ok) setHistoryFacts(h.data ?? null);
+    else message.error(h.error ?? "Failed");
+  }, [reconciliationId, message]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+    void loadHistory();
+  }, [load, loadHistory]);
 
   // How each statement line stands with the books as they are now. Derived,
   // never stored: the same pairing Match again ticks by.
@@ -151,6 +205,10 @@ export default function ReconcileWorkspaceClient({
   const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
   const completed = detail?.status === "completed";
   const working = canWrite && !completed;
+  // Once the figures say so: discarding, setting a line aside and bringing the
+  // history forward are for a reconciliation in progress, and for a writer.
+  const inProgress = detail?.status === "in_progress";
+  const writing = canWrite && inProgress;
 
   // What "Add all" would add is worked out on the server, and only when the
   // lines the books do not have change — ticking a line does not change them.
@@ -182,15 +240,11 @@ export default function ReconcileWorkspaceClient({
   // its way, the box waits rather than offering the last one.
   const shownPlan =
     missingKey && working && addPlan && addPlan.key === missingKey && addPlan.plan.missing > 0 ? addPlan.plan : null;
+  // The lines the plan holds back as extra are marked in the statement lines table too.
+  const extraLines = useMemo(() => extraLineNos(shownPlan), [shownPlan]);
 
-  async function addAll() {
-    if (!shownPlan) return;
-    setAdding(true);
-    const res = await addMissingLinesAction(
-      reconciliationId,
-      shownPlan.items.map((item) => ({ lineNo: item.lineNo, accountId: item.accountId })),
-    );
-    setAdding(false);
+  /** What adding lines said, and the screen brought up to date; a refusal asks for the plan again. */
+  function afterAdding(res: Awaited<ReturnType<typeof addMissingLinesAction>>) {
     if (!res.ok || !res.data) {
       message.error(res.error ?? "The lines could not be added");
       setAddPlan(null);
@@ -203,9 +257,152 @@ export default function ReconcileWorkspaceClient({
     setAddPlan(null);
     void load();
   }
+
+  async function addAll() {
+    if (!shownPlan) return;
+    setAdding(true);
+    try {
+      afterAdding(
+        await addMissingLinesAction(
+          reconciliationId,
+          shownPlan.items.map((item) => ({ lineNo: item.lineNo, accountId: item.accountId })),
+        ),
+      );
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  /** One held-back line alone, posted without the duplicate check: the person has looked at it. */
+  async function addAnyway(line: HeldLine) {
+    setAddingLine(line.lineNo);
+    try {
+      afterAdding(
+        await addMissingLinesAction(reconciliationId, [{ lineNo: line.lineNo, accountId: line.accountId }], [line.lineNo]),
+      );
+    } finally {
+      setAddingLine(null);
+    }
+  }
+
+  /**
+   * Sets a statement line aside as not a transaction, or restores it. A refusal
+   * is said as the server words it. Setting aside says the bank line stays in
+   * Bank Transactions. The line's button stays busy until the lines are read
+   * again, so it never offers the action it has just taken.
+   */
+  async function setAside(lineNo: number, aside: boolean) {
+    setAsideLine(lineNo);
+    try {
+      const res = await setStatementLineAsideAction(reconciliationId, { line_no: lineNo, aside });
+      if (!res.ok) {
+        message.error(res.error ?? "The statement line could not be changed");
+        return;
+      }
+      if (aside) message.success(SET_ASIDE_MESSAGE, 8);
+      await load();
+    } finally {
+      setAsideLine(null);
+    }
+  }
+
   const statementClosing = statement?.closingMinor ?? null;
   const closing = detail ? closingAdvice(statementClosing, detail.statementEndingMinor, money) : null;
   const opening = statement && detail ? openingAdvice(statement.openingMinor, detail.beginningMinor, money) : null;
+  // Bringing the history forward, while in progress (2.03). When it speaks, it
+  // says what the opening advice says, and more usefully, so that one is hidden.
+  const historyAdvice = inProgress ? sessionHistoryAdvice(historyFacts, money) : null;
+  // The difference in its parts; null when there is none.
+  const explained =
+    detail && !completed
+      ? explainDifference(
+          {
+            detail,
+            statement: statement ? { openingMinor: statement.openingMinor, lines: statement.lines } : null,
+            standings: standings?.standings ?? null,
+            book: lines,
+          },
+          money,
+        )
+      : null;
+
+  const bringHistoryForward = (facts: SessionHistoryFacts, entries: number) => {
+    if (bringing) return;
+    setBringing(true);
+    modal.confirm({
+      title: `${BRING_HISTORY_FORWARD}?`,
+      content: bringHistoryForwardConfirmation(entries, facts.through),
+      okText: BRING_HISTORY_FORWARD,
+      cancelText: "Cancel",
+      afterClose: () => setBringing(false),
+      onOk: async () => {
+        const r = await bringHistoryForwardFromSessionAction(reconciliationId);
+        if (!r.ok || !r.data) {
+          message.error(r.error ?? "The history could not be brought forward");
+          throw new Error(r.error);
+        }
+        // The figures and the offer are read again before the dialog closes, so
+        // the screen changes once: no spent offer left behind, and no opening
+        // warning drawn from the figures as they were before.
+        await Promise.all([load(), loadHistory()]);
+        const rebased = r.data.rebasedReconciliationId ? facts.openingMinor : null;
+        message.success(historyBroughtForwardMessage(r.data.lines, facts.through, rebased, money), 8);
+        if (r.data.fileWarning) message.warning(r.data.fileWarning, 10);
+      },
+    });
+  };
+
+  /**
+   * Discards this reconciliation in progress, with a reason, and returns to
+   * Reconcile. The dialog's button stays disabled until a reason is typed, and
+   * the same rule is checked again before anything is sent.
+   */
+  const discard = () => {
+    if (discarding) return;
+    let reason = "";
+    // Once discarded the screen is on its way back to Reconcile: the button stays busy.
+    let discarded = false;
+    setDiscarding(true);
+    const dialog = modal.confirm({
+      title: `${DISCARD_RECONCILIATION}?`,
+      content: (
+        <Space orientation="vertical" size="small" style={{ width: "100%" }}>
+          <Typography.Text>{DISCARD_CONFIRMATION}</Typography.Text>
+          <Input.TextArea
+            aria-label="Reason"
+            placeholder="Reason (required)"
+            maxLength={REASON_MAX}
+            autoSize={{ minRows: 2, maxRows: 4 }}
+            onChange={(e) => {
+              reason = e.target.value;
+              dialog.update({ okButtonProps: { danger: true, disabled: reasonProblem(reason) !== null } });
+            }}
+          />
+        </Space>
+      ),
+      okText: "Discard",
+      okButtonProps: { danger: true, disabled: true },
+      cancelText: "Cancel",
+      afterClose: () => {
+        if (!discarded) setDiscarding(false);
+      },
+      onOk: async () => {
+        const problem = reasonProblem(reason);
+        if (problem) {
+          message.error(problem);
+          throw new Error(problem);
+        }
+        const r = await discardReconciliationAction(reconciliationId, { reason: reason.trim() });
+        if (!r.ok || !r.data) {
+          message.error(r.error ?? "The reconciliation could not be discarded");
+          throw new Error(r.error);
+        }
+        discarded = true;
+        message.success(discardedMessage(r.data.ticksRemoved));
+        router.push(discardedReturnPath(bankAccount.id));
+      },
+    });
+  };
 
   const toggle = async (line: ReconLineView, cleared: boolean) => {
     const r = await setClearedAction(reconciliationId, line.journalLineId, cleared);
@@ -214,31 +411,45 @@ export default function ReconcileWorkspaceClient({
   };
 
   const submitAdjust = async () => {
+    if (adjusting) return;
     const v = await form.validateFields();
-    const r = await recordAdjustmentAction(reconciliationId, { offset_account_id: v.offset_account_id, reason: v.reason });
-    if (r.ok) {
-      message.success("Adjustment recorded");
-      setAdjOpen(false);
-      form.resetFields();
-      void load();
-    } else {
-      message.error(r.error ?? "Failed");
+    setAdjusting(true);
+    try {
+      const r = await recordAdjustmentAction(reconciliationId, { offset_account_id: v.offset_account_id, reason: v.reason });
+      if (r.ok) {
+        message.success("Adjustment recorded");
+        setAdjOpen(false);
+        form.resetFields();
+        await load();
+      } else {
+        message.error(r.error ?? "Failed");
+      }
+    } finally {
+      setAdjusting(false);
     }
   };
 
   const complete = async () => {
-    const r = await completeReconciliationAction(reconciliationId);
-    if (r.ok) {
-      const said = completedMessage(r.data?.matched ?? null, r.data?.matchError ?? null);
-      if (r.data?.matchError || (r.data?.matched && bankLinesToCheck(r.data.matched) > 0)) message.warning(said, 10);
-      else message.success(said, 8);
-      void load();
-    } else {
-      message.error(r.error ?? "Failed");
+    if (completing) return;
+    setCompleting(true);
+    try {
+      const r = await completeReconciliationAction(reconciliationId);
+      if (r.ok) {
+        const said = completedMessage(r.data?.matched ?? null, r.data?.matchError ?? null);
+        if (r.data?.matchError || (r.data?.matched && bankLinesToCheck(r.data.matched) > 0)) message.warning(said, 10);
+        else message.success(said, 8);
+        await load();
+      } else {
+        message.error(r.error ?? "Failed");
+      }
+    } finally {
+      setCompleting(false);
     }
   };
 
   const reopen = () => {
+    if (reopening) return;
+    setReopening(true);
     let reason = "";
     modal.confirm({
       title: "Reopen reconciliation?",
@@ -250,6 +461,7 @@ export default function ReconcileWorkspaceClient({
           }}
         />
       ),
+      afterClose: () => setReopening(false),
       onOk: async () => {
         const r = await reopenReconciliationAction(reconciliationId, { reason });
         if (r.ok) {
@@ -258,7 +470,11 @@ export default function ReconcileWorkspaceClient({
               ? "Reconciliation reopen submitted for approval"
               : "Reopened",
           );
-          if (!r.data?.submittedForApproval) void load();
+          // The dialog stays until the figures say the reconciliation is open again, and Reopen has gone.
+          if (!r.data?.submittedForApproval) {
+            void loadHistory();
+            await load();
+          }
         } else {
           message.error(r.error ?? "Failed");
           throw new Error(r.error);
@@ -304,6 +520,7 @@ export default function ReconcileWorkspaceClient({
       if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "reconciliation"), 10);
       if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
       void load();
+      void loadHistory();
     } catch (error) {
       message.error(`Failed to import the statement: ${serverFailure(error)}`, 10);
     } finally {
@@ -364,6 +581,7 @@ export default function ReconcileWorkspaceClient({
       setAttachOpen(false);
       message.success("The statement file is attached to this reconciliation.");
       void load();
+      void loadHistory();
     } catch (error) {
       message.error(`Failed to attach the statement: ${serverFailure(error)}`, 10);
     } finally {
@@ -409,16 +627,32 @@ export default function ReconcileWorkspaceClient({
       )}
       <p><Link href={`/banking/reconcile/${reconciliationId}/report`}>View report</Link></p>
       {statement?.broughtForward && statement.note ? <Alert type="info" showIcon title={statement.note} /> : null}
-      {detail && !completed && (
+      {historyAdvice && historyFacts ? (
         <Alert
-          type={detail.differenceMinor === 0 ? "success" : "warning"}
-          message={
-            detail.differenceMinor === 0
-              ? "Difference is zero — ready to complete."
-              : `Unexplained difference: ${fmt(detail.differenceMinor)} ${baseCurrency}.`
+          type={historyAdvice.canBringForward ? "info" : "warning"}
+          showIcon
+          title={historyAdvice.text}
+          description={
+            historyAdvice.canBringForward && writing ? (
+              <Button
+                type="primary"
+                size="small"
+                loading={bringing}
+                onClick={() => bringHistoryForward(historyFacts, historyAdvice.entries)}
+              >
+                {BRING_HISTORY_FORWARD}
+              </Button>
+            ) : undefined
           }
         />
-      )}
+      ) : null}
+      {detail && !completed ? (
+        detail.differenceMinor === 0 ? (
+          <Alert type="success" message="Difference is zero — ready to complete." />
+        ) : explained ? (
+          <DifferenceAlert explained={explained} money={money} />
+        ) : null
+      ) : null}
       {closing && !completed && statementClosing !== null ? (
         <Alert
           type="warning"
@@ -433,7 +667,7 @@ export default function ReconcileWorkspaceClient({
           }
         />
       ) : null}
-      {opening && !completed ? <Alert type="warning" showIcon title={opening} /> : null}
+      {opening && !completed && !historyAdvice ? <Alert type="warning" showIcon title={opening} /> : null}
       {working && (
         <Space wrap>
           <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
@@ -444,16 +678,26 @@ export default function ReconcileWorkspaceClient({
               Match again
             </Button>
           ) : null}
-          <Button type="primary" disabled={!detail || detail.differenceMinor !== 0} onClick={complete}>
+          <Button
+            type="primary"
+            loading={completing}
+            disabled={!detail || detail.differenceMinor !== 0}
+            onClick={() => void complete()}
+          >
             Complete
           </Button>
-          <Button disabled={!detail || detail.differenceMinor === 0} onClick={() => setAdjOpen(true)}>
+          <Button disabled={!detail || detail.differenceMinor === 0 || adjusting} onClick={() => setAdjOpen(true)}>
             Record adjustment
           </Button>
+          {writing ? (
+            <Button danger loading={discarding} onClick={discard}>
+              {DISCARD_RECONCILIATION}
+            </Button>
+          ) : null}
         </Space>
       )}
       {completed && canReopen && (
-        <Button danger onClick={reopen}>
+        <Button danger loading={reopening} onClick={reopen}>
           Reopen
         </Button>
       )}
@@ -483,7 +727,15 @@ export default function ReconcileWorkspaceClient({
         </Space>
       ) : null}
       {shownPlan ? (
-        <AddMissingBox plan={shownPlan} bankAccountId={bankAccount.id} money={money} adding={adding} onAdd={() => void addAll()} />
+        <AddMissingBox
+          plan={shownPlan}
+          bankAccountId={bankAccount.id}
+          money={money}
+          adding={adding}
+          onAdd={() => void addAll()}
+          onAddAnyway={(line) => void addAnyway(line)}
+          addingLine={addingLine}
+        />
       ) : null}
       <div>
         <Space size="small" style={{ marginBottom: 8 }} wrap>
@@ -497,6 +749,7 @@ export default function ReconcileWorkspaceClient({
             <Space size={4} wrap>
               <Tag color="green">{standings.paired} paired</Tag>
               {standings.missing > 0 ? <Tag color="orange">{standings.missing} not in the books</Tag> : null}
+              {standings.aside > 0 ? <Tag>{standings.aside} set aside</Tag> : null}
               {standings.after > 0 ? <Tag>{standings.after} after the statement date</Tag> : null}
             </Space>
           ) : null}
@@ -507,6 +760,7 @@ export default function ReconcileWorkspaceClient({
           </Typography.Paragraph>
         ) : null}
         <Table<ReconStatementLine>
+          className={writing ? `${styles.statementLines} ${styles.withAction}` : styles.statementLines}
           rowKey="lineNo"
           size="small"
           pagination={
@@ -521,36 +775,62 @@ export default function ReconcileWorkspaceClient({
           dataSource={statement?.lines ?? []}
           locale={{ emptyText: "No statement kept with this reconciliation" }}
           columns={[
-            { title: "Date", dataIndex: "txnDate", width: 110 },
+            { title: "Date", dataIndex: "txnDate", width: SW.date },
             { title: "Description", dataIndex: "description" },
             {
               title: "Reference",
               dataIndex: "reference",
-              width: 130,
+              width: SW.reference,
               render: (value: string | null) => value ?? "—",
             },
             {
               title: "Amount",
               dataIndex: "amountMinor",
-              width: 130,
+              width: SW.amount,
               align: "right",
               render: (value: number) => fmt(value),
             },
             {
               title: "With the books",
               key: "standing",
-              width: 280,
+              width: SW.standing,
               render: (_: unknown, line) => {
                 const standing = standingOf.get(line.lineNo);
-                return standing ? <StandingTag standing={standing} /> : null;
+                return standing ? <StandingTag standing={standing} extra={extraLines.has(line.lineNo)} /> : null;
               },
             },
+            // A misread line is set aside as not a transaction, and brought back with Restore (2.03).
+            ...(writing
+              ? [
+                  {
+                    title: "",
+                    key: "aside",
+                    width: SW.aside,
+                    align: "right" as const,
+                    render: (_: unknown, line: ReconStatementLine) => {
+                      const action = asideActionFor(standingOf.get(line.lineNo));
+                      return action ? (
+                        <Button
+                          type="link"
+                          size="small"
+                          loading={asideLine === line.lineNo}
+                          disabled={asideLine !== null && asideLine !== line.lineNo}
+                          onClick={() => void setAside(line.lineNo, action.aside)}
+                        >
+                          {action.label}
+                        </Button>
+                      ) : null;
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       </div>
 
       <Typography.Text strong>Ledger lines in this reconciliation</Typography.Text>
       <Table
+        className={styles.ledgerLines}
         rowKey="journalLineId"
         loading={loading}
         dataSource={lines}
@@ -580,7 +860,13 @@ export default function ReconcileWorkspaceClient({
           },
         ]}
       />
-      <Modal open={adjOpen} title="Record adjustment" onCancel={() => setAdjOpen(false)} onOk={submitAdjust}>
+      <Modal
+        open={adjOpen}
+        title="Record adjustment"
+        confirmLoading={adjusting}
+        onCancel={() => setAdjOpen(false)}
+        onOk={submitAdjust}
+      >
         <p>
           An adjusting entry for the outstanding difference{" "}
           {detail ? `(${fmt(detail.differenceMinor)} ${baseCurrency})` : ""} will post to the selected account.

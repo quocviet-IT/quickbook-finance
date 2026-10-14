@@ -1,0 +1,30 @@
+/*
+ * The Reconcile history table.
+ *
+ * The chosen account is one row of many, so the default selected-row fill —
+ * a heavy grey-green in the light theme — painted it like a warning. A light
+ * wash marks it instead, as Review import marks a ticked line
+ * (review-import.module.css), and keeps the text readable in both themes.
+ *
+ * `.history.history` and `td.ant-table-cell` outrank Ant Design's own rule,
+ * which is injected after this stylesheet and would otherwise win a tie.
+ */
+.history.history :global(.ant-table-tbody > tr.ant-table-row-selected > td.ant-table-cell) {
+  background: var(--ob-accent-wash);
+}
+
+.history.history :global(.ant-table-tbody > tr.ant-table-row-selected:hover > td.ant-table-cell) {
+  background: var(--ob-surface-subtle);
+}
+
+/*
+ * On a phone the table keeps its measured widths and Account its floor, and
+ * scrolls inside its own box (DataTable's content box already scrolls). The
+ * figure is HISTORY_MIN_WIDTH in history-columns.ts; change one and change the
+ * other. At 1280 this does not apply.
+ */
+@media (max-width: 640px) {
+  .history :global(.ant-table-content) > table {
+    min-width: 950px;
+  }
+}

@@ -1,0 +1,42 @@
+/*
+ * The reconciliation workspace's tables on a phone. Layout only — no colour.
+ *
+ * Below 640px the statement lines, the ledger lines and the Add missing box's
+ * "Would post to" table are each held to their measured widths plus their
+ * floors, and scroll inside their own box while the page does not — the
+ * precedent of the statement-alert cards (statement-alerts.module.css). The
+ * widths are in statement-line-columns.ts; change one and change the other.
+ *
+ * The statement and ledger lines are Ant Design's own Table, whose content box
+ * scrolls sideways only when `scroll.x` is set, so it is told to here. The
+ * Add missing table is a DataTable, whose content box already scrolls
+ * (`.accounting-table--fit .ant-table-content` in globals.css).
+ *
+ * At 1280 none of this applies, and every table is drawn as it was.
+ */
+
+@media (max-width: 640px) {
+  .statementLines :global(.ant-table-content),
+  .ledgerLines :global(.ant-table-content) {
+    overflow-x: auto;
+  }
+
+  /* STATEMENT_LINES_READ_MIN_WIDTH, then STATEMENT_LINES_MIN_WIDTH with the line's action. */
+  .statementLines :global(.ant-table-content) > table {
+    min-width: 828px;
+  }
+
+  .statementLines.withAction :global(.ant-table-content) > table {
+    min-width: 976px;
+  }
+
+  /* LEDGER_LINES_MIN_WIDTH. */
+  .ledgerLines :global(.ant-table-content) > table {
+    min-width: 1016px;
+  }
+
+  /* ADD_MISSING_MIN_WIDTH. */
+  .addMissing :global(.ant-table-content) > table {
+    min-width: 750px;
+  }
+}

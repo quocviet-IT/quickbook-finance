@@ -6,6 +6,7 @@ import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
 import { chosenBankId } from "@/lib/domain/reconcile-alerts-screen";
+import { RECONCILE_HISTORY, RECONCILE_HISTORY_PATH } from "@/lib/domain/reconcile-history";
 import { createReconciliationAction, listReconciliationsAction } from "./actions";
 import StatementAlertsPanel from "./StatementAlertsPanel";
 import type { StatementReconciliationRow } from "@/lib/db/types";
@@ -100,6 +101,8 @@ export default function ReconcileListClient({ canWrite, banks, baseCurrency, bas
             From statement files
           </Button>
         )}
+        {/* Every account's lines not yet reconciled, and bringing an account's history forward (2.03). */}
+        <Link href={RECONCILE_HISTORY_PATH}>{RECONCILE_HISTORY}</Link>
       </Space>
       {bank ? (
         <StatementAlertsPanel

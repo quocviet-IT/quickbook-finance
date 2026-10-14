@@ -1,0 +1,48 @@
+/*
+ * The difference, explained (2.03): each part's name on the left, its amount
+ * on the right, and the opening's sentence under its name. Layout only — the
+ * colours are the Alert's and Typography's, so the dark theme follows.
+ *
+ * The modifiers are written `.parts .x` so they outrank `.parts dt` and
+ * `.parts dd`; a bare `.x` would lose to them and change nothing.
+ */
+
+.parts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  row-gap: 2px;
+  margin: 0;
+  max-width: 560px;
+}
+
+.parts dt {
+  min-width: 0;
+  font-weight: 400;
+}
+
+.parts dd {
+  margin: 0;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The opening's sentence spans both columns, under its name, and wraps. */
+.parts .note {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+  text-align: left;
+  white-space: normal;
+}
+
+/* Left to explain closes the list, set apart by a little room. */
+.parts .left {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.hint {
+  display: block;
+  margin-top: 8px;
+}

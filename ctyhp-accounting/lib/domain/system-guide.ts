@@ -477,8 +477,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "OneBook reads the period, the opening and closing balances and every line, and shows whether " +
           "the opening balance plus the lines comes to the closing balance. If it does not, a line may not " +
-          "have been read: check the statement, then Import anyway or use the bank's CSV. A scanned PDF has " +
-          "no text to read.",
+          "have been read, or one may have been read that is not a transaction: check the statement, then " +
+          "Import anyway or use the bank's CSV. A bank download (CSV, QFX or OFX) is read exactly; a PDF is " +
+          "read from its text, and a check image or a summary table can be misread. A scanned PDF has no " +
+          "text to read.",
       },
       {
         action: "Take back a bank-feed sync",
@@ -591,7 +593,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "New reconciliation",
         route: "/banking/reconcile",
         note:
-          "Completing a session requires either zero unexplained difference or an " +
+          "The difference is explained in its parts, and Complete needs a difference of zero or a recorded " +
           "adjustment somebody signs for. Complete then matches, in Bank Transactions, each bank line to the " +
           "book line its statement line paired with; a bank line already matched to another entry, ignored, or " +
           "of the opposite sign is left as it was, and the message says how many to check there.",
@@ -611,14 +613,77 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Transactions, as Complete does.",
       },
       {
+        action: "Bring an account's history forward from its first reconciliation",
+        control: "Bring the history forward",
+        route: "/banking/reconcile",
+        note:
+          "On an account never reconciled, a reconciliation that begins at a different figure from its statement's " +
+          "opening checks the books up to the day before the statement. When they add up to exactly that opening, " +
+          "the button appears; it asks first, saying how many entries will be marked reconciled, then signs them " +
+          "off in one brought-forward reconciliation and starts this one at the statement's opening. Nothing is " +
+          "posted. Otherwise it says how much the books are out by. It needs the statement file kept with the " +
+          "reconciliation.",
+      },
+      {
+        action: "See every account's lines not yet reconciled, and bring an account's history forward",
+        control: "Reconcile history",
+        route: "/banking/reconcile/history",
+        note:
+          "Linked from Reconcile. Each bank account shows its lines not reconciled, their first and last dates, " +
+          "when it was last reconciled and its state. Choose an account never reconciled and fill in Statement " +
+          "balance on [date] = [amount] from one of its statements; the books on that date are read as you go. " +
+          "When they match, Bring forward N entries signs them off and posts nothing; when they do not, the page " +
+          "says how much they are out by. A reconciliation in progress that ends on or before the date must be " +
+          "finished or discarded first.",
+      },
+      {
+        action: "Start a reconciliation again",
+        control: "Discard this reconciliation",
+        route: "/banking/reconcile",
+        note:
+          "For a reconciliation in progress. It asks for a reason, removes the reconciliation and its ticks, and " +
+          "returns to Reconcile. The statement file and its bank lines stay, and any entries added to the books " +
+          "from it stay in the books. A reconciliation that posted an adjustment cannot be discarded.",
+      },
+      {
+        action: "Read the difference",
+        control: "Left to explain",
+        route: "/banking/reconcile",
+        note:
+          "The difference is shown in its parts: Opening, when the reconciliation begins at a different figure " +
+          "from the statement's opening; On the statement, not in the books; Ticked here, not on the statement; " +
+          "and Left to explain. When exactly one line is the size of what is left, it is named: check that one " +
+          "first.",
+      },
+      {
+        action: "Set aside a statement line that is not a transaction",
+        control: "Not a transaction",
+        route: "/banking/reconcile",
+        note:
+          "Beside a statement line the books do not have — a line the PDF was misread into. It leaves the line out " +
+          "of Add missing lines and out of the difference; its line stays in Bank Transactions, to exclude there " +
+          "if it is not real. Restore brings it back. A line paired with the books cannot be set aside.",
+      },
+      {
         action: "Add what the statement has and the books do not",
         control: "Add all to the books",
         route: "/banking/reconcile",
         note:
           "The box above the statement lines shows each line the books do not have and the account it would " +
           "post to — by card, related company, rule or history, or else Uncategorized Income or Expense. Add all " +
-          "posts every one, dated as the bank has it, or none, then pairs and ticks them; Complete stays yours. " +
-          "Or code them one by one in Bank Transactions and click Match again; no tick is ever removed.",
+          "posts every one it lists, dated as the bank has it, or none, then pairs and ticks them; Complete stays " +
+          "yours. Or code them one by one in Bank Transactions and click Match again; no tick is ever removed.",
+      },
+      {
+        action: "Add a line held back from Add all",
+        control: "Add anyway",
+        route: "/banking/reconcile",
+        note:
+          "Two kinds of line are held back and listed apart, each with why. When the statement already balances " +
+          "without the lines the books do not have, they are marked Extra: likely not transactions. When it does " +
+          "not add up and exactly one of them is the amount it is out by, that one alone is Extra. A line whose " +
+          "amount the books already hold, with the same check number or within 5 days, names the entry it looks " +
+          "like. Add anyway posts that one line alone, because two identical lines on one day can both be real.",
       },
       {
         action: "Recode a line from Uncategorized",
