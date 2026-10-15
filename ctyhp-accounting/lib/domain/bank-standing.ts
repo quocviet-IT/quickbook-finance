@@ -157,3 +157,51 @@ export function reconcileCardText(accountName: string, s: BankStanding, money: M
 export function withBelowZero(text: string, belowZeroDate: string): string {
   return `${text} · below zero at ${shortDate(belowZeroDate)}`;
 }
+
+/* ------------------------------------------------------------ balance sheet */
+
+/** One line of the Balance Sheet's "Bank accounts" panel. */
+export interface BalanceSheetBank {
+  bankAccountId: string;
+  accountName: string;
+  standing: BankStanding;
+  /** Found below zero at the report date. */
+  belowZero: boolean;
+  /** Entries in the account's flagged groups; 0 when it is not below zero. */
+  ghostEntries: number;
+}
+
+/** What the panel says about entries that look like the account's own balance posted as payments. */
+export function ghostEntriesSentence(n: number): string {
+  return `${n === 1 ? "1 entry looks" : `${n} entries look`} like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them.`;
+}
+
+/**
+ * One item per bank account that has a standing row, ordered by account name.
+ * An account the standing read does not return has nothing to say and is left out.
+ */
+export function balanceSheetBanks(
+  banks: readonly { id: string; name: string }[],
+  standings: readonly BankStanding[],
+  belowZero: readonly { bankAccountId: string; ghostEntries: number }[],
+): BalanceSheetBank[] {
+  const byId = new Map(standings.map((s) => [s.bankAccountId, s]));
+  const low = new Map(belowZero.map((b) => [b.bankAccountId, b.ghostEntries]));
+  const out: BalanceSheetBank[] = [];
+  for (const bank of banks) {
+    const standing = byId.get(bank.id);
+    if (!standing) continue;
+    out.push({
+      bankAccountId: bank.id,
+      accountName: bank.name,
+      standing,
+      belowZero: low.has(bank.id),
+      ghostEntries: low.get(bank.id) ?? 0,
+    });
+  }
+  return out.sort(
+    (a, b) =>
+      a.accountName.localeCompare(b.accountName, "en", { sensitivity: "base" }) ||
+      a.bankAccountId.localeCompare(b.bankAccountId),
+  );
+}

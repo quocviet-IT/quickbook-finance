@@ -43,8 +43,9 @@ import {
   type ZoomSpec,
 } from "@/lib/domain/statement";
 import { fiscalYearStartOf, pointColumns, rangeColumns, type CompareMode } from "@/lib/domain/statement-columns";
-import type { BalanceSheetNote } from "@/lib/domain/statement-alerts";
-import { balanceSheetNoteAction, getBudgetVsActualAction, getLedgerBalancesAction, getStatementOfEquityAction } from "./actions";
+import type { BalanceSheetBank } from "@/lib/domain/bank-standing";
+import BalanceSheetBanksPanel from "./BalanceSheetBanksPanel";
+import { balanceSheetBanksAction, getBudgetVsActualAction, getLedgerBalancesAction, getStatementOfEquityAction } from "./actions";
 
 interface ReportsClientProps {
   initialReportType: InternalReportId;
@@ -191,8 +192,8 @@ export default function ReportsClient({
   // Budget vs Actual: each month of the range against its budget (empty for a single month).
   const [monthly, setMonthly] = useState<MonthResult[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  // The Balance Sheet's note about a bank account below zero on its end date.
-  const [bankNote, setBankNote] = useState<BalanceSheetNote | null>(null);
+  // The Balance Sheet's bank accounts panel, with the end date it was read for.
+  const [bankPanel, setBankPanel] = useState<{ asOf: string; banks: BalanceSheetBank[] } | null>(null);
   const [ran, setRan] = useState(initialRange);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState<ZoomSpec | null>(null);
@@ -227,7 +228,7 @@ export default function ReportsClient({
       setChart(null);
       setStats(null);
       setMonthly([]);
-      setBankNote(null);
+      setBankPanel(null);
     };
 
     setLoading(true);
@@ -301,8 +302,8 @@ export default function ReportsClient({
       // The Balance Sheet and the Trial Balance: columns are dates.
       const plan = pointColumns(compare, to, from, fiscalStartMonth);
       if (!plan.ok) return refuse(plan.message);
-      // The note belongs to the date it was read for: drop the old one before this run reads anything.
-      if (type === "balance") setBankNote(null);
+      // The panel belongs to the date it was read for: drop the old one before this run reads anything.
+      if (type === "balance") setBankPanel(null);
       const balances = await Promise.all(plan.columns.map((c) => read(null, c.to)));
       if (type === "trial") {
         show(trialBalanceStatement({ columns: plan.columns, tbs: balances.map(buildTrialBalance), accounts: index }), null, null, { from, to });
@@ -316,12 +317,12 @@ export default function ReportsClient({
       );
       const sheets = balances.map(buildBalanceSheet);
       // A help beside the statement, not part of it: read apart from the figures, and left out if it fails.
-      void balanceSheetNoteAction(to).then(
+      void balanceSheetBanksAction(to).then(
         (result) => {
-          if (current()) setBankNote(result.ok ? (result.data ?? null) : null);
+          if (current()) setBankPanel(result.ok && result.data ? { asOf: to, banks: result.data } : null);
         },
         () => {
-          if (current()) setBankNote(null);
+          if (current()) setBankPanel(null);
         },
       );
       show(
@@ -439,25 +440,6 @@ export default function ReportsClient({
           description="This should not happen while every entry balances. The General Ledger Posting report shows which document did not reach the ledger."
         />
       ) : null}
-      {type === "balance" && bankNote ? (
-        <Alert
-          type="warning"
-          showIcon
-          className={styles.outOfBalance}
-          title={bankNote.headline}
-          description={
-            <>
-              {bankNote.detail}{" "}
-              {bankNote.links.map((link, i) => (
-                <span key={link.bankAccountId}>
-                  {i > 0 ? " · " : null}
-                  <Link href={link.href}>{link.label}</Link>
-                </span>
-              ))}
-            </>
-          }
-        />
-      ) : null}
       <ReportFoot>
         <strong>Every figure is a QuickZoom.</strong> Click any amount to open the entries behind it, then click a line to
         open the full double entry.
@@ -547,6 +529,10 @@ export default function ReportsClient({
           ) : (
             paper
           )}
+          {type === "balance" && bankPanel && !notice && shownStatement && !shownStatement.empty ? (
+            // Outside the printed paper and the export: a help beside the statement, not part of it.
+            <BalanceSheetBanksPanel banks={bankPanel.banks} asOf={bankPanel.asOf} money={money} />
+          ) : null}
         </div>
       </Spin>
 

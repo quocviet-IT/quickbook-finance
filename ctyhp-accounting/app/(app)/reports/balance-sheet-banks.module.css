@@ -1,0 +1,76 @@
+/*
+ * The Balance Sheet's "Bank accounts" panel. A short list under the statement,
+ * outside the printed paper. Every colour is a theme token, so it reads in
+ * light and dark.
+ */
+.panel {
+  margin-top: 16px;
+  background: var(--ob-surface-card);
+  border: 1px solid var(--ob-border-default);
+  border-radius: 10px;
+  padding: 16px 20px 8px;
+  min-width: 0;
+}
+
+.heading {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ob-border-default);
+  min-width: 0;
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.name {
+  flex: 0 0 200px;
+  max-width: 100%;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.lines {
+  flex: 1 1 320px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.line {
+  margin: 0;
+}
+
+.line + .line {
+  margin-top: 4px;
+}
+
+.note {
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .panel {
+    padding: 14px 14px 6px;
+  }
+
+  .name {
+    flex-basis: 100%;
+  }
+}

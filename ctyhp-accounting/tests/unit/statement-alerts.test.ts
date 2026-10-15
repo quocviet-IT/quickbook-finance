@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   GHOST_GONE,
-  balanceSheetNote,
   belowZeroRows,
   belowZeroSheetText,
   ghostCard,
@@ -501,53 +500,7 @@ describe("the copy", () => {
   });
 });
 
-describe("balanceSheetNote", () => {
-  it("says nothing when no bank account is below zero", () => {
-    expect(balanceSheetNote([])).toBeNull();
-  });
-
-  it("names one account and points to Reconcile", () => {
-    const note = balanceSheetNote([{ bankAccountId: "b 1", accountName: "Operating Checking", ghostEntries: 0 }]);
-    expect(note?.headline).toBe("Operating Checking is below zero.");
-    expect(note?.detail).toBe("Reconcile shows what has gone in since the last statement you agreed.");
-    expect(note?.links).toEqual([
-      { bankAccountId: "b 1", accountName: "Operating Checking", href: "/banking/reconcile?account=b%201", label: "Open Reconcile" },
-    ]);
-  });
-
-  it("uses the balance sentence when the account has flagged entries", () => {
-    const note = balanceSheetNote([{ bankAccountId: "b1", accountName: "Operating Checking", ghostEntries: 31 }]);
-    expect(note?.detail).toBe(
-      "31 entries on it look like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them.",
-    );
-  });
-
-  it("joins several accounts and adds their flagged entries together", () => {
-    const note = balanceSheetNote([
-      { bankAccountId: "b1", accountName: "Checking", ghostEntries: 4 },
-      { bankAccountId: "b2", accountName: "Savings", ghostEntries: 0 },
-      { bankAccountId: "b3", accountName: "Petty Cash", ghostEntries: 3 },
-    ]);
-    expect(note?.headline).toBe("Checking, Savings and Petty Cash are below zero.");
-    expect(note?.detail).toBe(
-      "7 entries on those accounts look like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them.",
-    );
-    expect(note?.links.map((l) => l.label)).toEqual([
-      "Open Reconcile for Checking",
-      "Open Reconcile for Savings",
-      "Open Reconcile for Petty Cash",
-    ]);
-    expect(balanceSheetNote([
-      { bankAccountId: "b1", accountName: "Checking", ghostEntries: 1 },
-    ])?.detail).toContain("1 entry on it looks like");
-    expect(
-      balanceSheetNote([
-        { bankAccountId: "b1", accountName: "Checking", ghostEntries: 0 },
-        { bankAccountId: "b2", accountName: "Savings", ghostEntries: 0 },
-      ])?.headline,
-    ).toBe("Checking and Savings are below zero.");
-  });
-
+describe("reconcileHref", () => {
   it("builds the Reconcile address from the bank account", () => {
     expect(reconcileHref("abc")).toBe("/banking/reconcile?account=abc");
   });
