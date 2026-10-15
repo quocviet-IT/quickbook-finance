@@ -46,6 +46,9 @@ describe("historyClosingCell", () => {
     expect(historyClosingCell(never, money)).toBeNull();
     expect(historyClosingCell(null, money)).toBeNull();
   });
+  it("reads a dash, never $0.00, when a reconciliation has no closing recorded", () => {
+    expect(historyClosingCell({ ...reconciled, lastClosingMinor: null }, money)).toEqual({ amount: "—", broughtForward: false });
+  });
 });
 
 describe("historySinceCell", () => {

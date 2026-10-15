@@ -41,6 +41,8 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
   // The account whose reconciliations were last read: the empty state waits for it.
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [standing, setStanding] = useState<BankStanding | null>(null);
+  // The account whose standing read has settled, found or not: the empty state waits for it too.
+  const [standingFor, setStandingFor] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   // Only the latest read may draw: switch accounts quickly and a slower,
@@ -55,10 +57,15 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
     const standingTicket = ++latestStanding.current;
     setLoading(true);
     // The card is read beside the list and fails quietly: without it the table still works.
-    void bankStandingAction(id).then((s) => {
+    const settle = (found: BankStanding | null) => {
       if (latestStanding.current !== standingTicket) return;
-      setStanding(s.ok ? (s.data ?? null) : null);
-    });
+      setStanding(found);
+      setStandingFor(id);
+    };
+    void bankStandingAction(id).then(
+      (s) => settle(s.ok ? (s.data ?? null) : null),
+      () => settle(null),
+    );
     const r = await listReconciliationsAction(id);
     if (latestLoad.current !== ticket) return;
     setLoading(false);
@@ -81,9 +88,11 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
 
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
 
-  // Finished reading and none found: the card is the empty state. While a read
-  // runs the table keeps its loading state, so the empty state never flashes.
-  const isEmpty = Boolean(bank) && !loading && loadedFor === bankId && rows.length === 0;
+  // Finished reading and none found: the card is the empty state. While either
+  // read runs the table keeps its loading state, so neither "No data" nor a
+  // sentence without its counts flashes before the full empty state.
+  const standingSettled = standingFor === bankId;
+  const isEmpty = Boolean(bank) && !loading && loadedFor === bankId && rows.length === 0 && standingSettled;
 
   const submit = async () => {
     const v = await form.validateFields();
@@ -152,7 +161,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
       {isEmpty ? null : (
         <Table<StatementReconciliationRow>
           rowKey="id"
-          loading={loading}
+          loading={loading || (rows.length === 0 && !standingSettled)}
           dataSource={rows}
           columns={[
             { title: "Ending date", dataIndex: "statement_ending_date" },

@@ -58,13 +58,17 @@ export function withStandings(
   return accounts.map((account) => ({ ...account, standing: byId.get(account.bankAccountId) ?? null }));
 }
 
-/** The closing under Last reconciled; null when never reconciled or the standing was not read. */
+/**
+ * The closing under Last reconciled; null when never reconciled or the standing
+ * was not read. A reconciliation with no closing recorded reads "—", never $0.00.
+ */
 export function historyClosingCell(
   standing: BankStanding | null | undefined,
   money: (minor: number) => string,
 ): { amount: string; broughtForward: boolean } | null {
   if (!standing || standing.lastCompletedDate === null) return null;
-  return { amount: money(standing.lastClosingMinor ?? 0), broughtForward: standing.lastBroughtForward };
+  const amount = standing.lastClosingMinor === null ? "—" : money(standing.lastClosingMinor);
+  return { amount, broughtForward: standing.lastBroughtForward };
 }
 
 /**
