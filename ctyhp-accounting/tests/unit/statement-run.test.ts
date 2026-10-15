@@ -94,6 +94,38 @@ describe("monthsFromCsv", () => {
     const [july] = monthsFromCsv("zero.csv", [csvLine("2026-07-03", 500, 1500), csvLine("2026-07-04", 0, 1500)]);
     expect(july.lines).toHaveLength(1);
   });
+
+  it("opens a month at its first balance less every line up to it, and closes it at its last balance plus every line after it", () => {
+    const [july] = monthsFromCsv("edges.csv", [
+      csvLine("2026-07-02", 30000, null),
+      csvLine("2026-07-02", -2000, 128000),
+      csvLine("2026-07-15", -12000, 116000),
+      csvLine("2026-07-31", 500, null),
+    ]);
+    // 1,280.00 less +300.00 and −20.00; 1,160.00 plus +5.00.
+    expect([july.openingMinor, july.closingMinor, july.problem]).toEqual([100000, 116500, null]);
+    expect((july.openingMinor as number) + july.lines.reduce((sum, l) => sum + l.amount_minor, 0)).toBe(july.closingMinor);
+  });
+
+  it("agrees with the run's proof on a month whose first rows carry no balance, and leaves no gap before it", () => {
+    const months = monthsFromCsv("bank.csv", [
+      csvLine("2026-07-03", 50000, 150000),
+      csvLine("2026-07-20", -2500, 147500),
+      csvLine("2026-08-03", 3000, null),
+      csvLine("2026-08-03", -1500, 149000),
+      csvLine("2026-08-25", -9000, 140000),
+    ]);
+    expect(months.map((m) => [m.openingMinor, m.closingMinor, m.problem])).toEqual([
+      [100000, 147500, null],
+      [147500, 140000, null],
+    ]);
+    const result = checkRun(months, noContext, money);
+    expect(result.statements.map((c) => [c.state, c.proof?.proves, c.proof?.openingMinor, c.proof?.closingMinor])).toEqual([
+      ["usable", true, 100000, 147500],
+      ["usable", true, 147500, 140000],
+    ]);
+    expect(result.stops).toEqual([]);
+  });
 });
 
 describe("statementsFromPdf", () => {

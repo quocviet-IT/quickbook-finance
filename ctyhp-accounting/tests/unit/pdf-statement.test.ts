@@ -39,6 +39,14 @@ describe("readPdfStatements", () => {
     expect(statementProof(statement)).toEqual({ linesMinor: 17500, differenceMinor: 0 });
   });
 
+  it("closes at the last running balance plus every line after it, when the last rows carry no balance", () => {
+    const [statement] = readPdfStatements(glyphsOf(PDF_SCENARIOS.find((s) => s.name === "noBalanceOnLastRows")!));
+    // 1,210.00 printed beside the second line, plus +0.85 and −12.00 below it.
+    expect([statement.openingMinor, statement.openingBasis]).toEqual([100000, "running"]);
+    expect([statement.closingMinor, statement.closingBasis]).toEqual([119885, "running"]);
+    expect(statementProof(statement)).toEqual({ linesMinor: 19885, differenceMinor: 0 });
+  });
+
   it("ends the skip of cheque images at a table of activity, signed by the title above it", () => {
     const images = PDF_SCENARIOS.find((s) => s.name === "checkImagesAfterChecksPaid")!;
     const [statement] = readPdfStatements(

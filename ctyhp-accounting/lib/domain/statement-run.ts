@@ -8,12 +8,14 @@
  * the books' open lines without writing anything. Signing is the server's, one
  * month at a time (statement-actions.ts).
  *
- * OneBook departs from the prototype in two places, each marked "OneBook:":
+ * OneBook departs from the prototype in three places, each marked "OneBook:":
  *   1. a CSV listed newest first is read oldest first before it is cut into
  *      months, so a month never opens or closes on the wrong line of its first
  *      or last day;
  *   2. a month that agrees only on its balance stops the run for a person, where
- *      the prototype ticks every line and signs it.
+ *      the prototype ticks every line and signs it;
+ *   3. a CSV month whose first or last rows carry no balance opens and closes
+ *      with those rows counted, not out by them.
  */
 import { shortDate } from "./pdf-statement-view";
 import { statementProof, toStatementLines, type PdfStatement } from "./pdf-statement";
@@ -83,10 +85,16 @@ export const MAX_RUN_LINES = 10_000;
 const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 /**
- * A CSV export cut into calendar months, each closing at the last running
- * balance in it and opening at its first balance less that line's amount
- * (p44.html: readStatementText). Lines of no amount are dropped, as the
- * prototype drops them. Without a running balance a month cannot prove itself.
+ * A CSV export cut into calendar months (p44.html: readStatementText), each
+ * opening at its first running balance less every line of the month up to and
+ * including that one, as the proof's own CSV rule does, and closing at its last
+ * running balance plus every line of the month after it. Lines of no amount are
+ * dropped, as the prototype drops them. Without a running balance a month
+ * cannot prove itself.
+ *
+ * OneBook: the prototype opens a month at its first balance less that one line
+ * and closes it at its last balance, so a month whose first or last rows carry
+ * no balance is out by those lines.
  */
 export function monthsFromCsv(fileName: string, lines: readonly StatementLine[]): RunStatement[] {
   const kept = lines.filter((line) => line.amount_minor !== 0);
@@ -109,11 +117,25 @@ export function monthsFromCsv(fileName: string, lines: readonly StatementLine[])
   }
   const many = months.size > 1;
   return [...months.entries()].map(([month, monthLines]) => {
-    const withBalance = monthLines.filter((line) => line.running_balance_minor !== null);
-    const last = withBalance[withBalance.length - 1];
-    const first = withBalance[0];
-    const closingMinor = last ? (last.running_balance_minor as number) : null;
-    const openingMinor = first ? (first.running_balance_minor as number) - first.amount_minor : null;
+    let openingMinor: number | null = null;
+    let upTo = 0;
+    for (const line of monthLines) {
+      upTo += line.amount_minor;
+      if (line.running_balance_minor !== null) {
+        openingMinor = line.running_balance_minor - upTo;
+        break;
+      }
+    }
+    let closingMinor: number | null = null;
+    let after = 0;
+    for (let k = monthLines.length - 1; k >= 0; k--) {
+      const line = monthLines[k];
+      if (line.running_balance_minor !== null) {
+        closingMinor = line.running_balance_minor + after;
+        break;
+      }
+      after += line.amount_minor;
+    }
     let problem: string | null = closingMinor === null ? RUN_MESSAGES.noClosing : null;
     if (!problem) {
       for (let i = 1; i < monthLines.length; i++) {

@@ -559,8 +559,19 @@ function readStatementRows(rows: readonly PdfRow[]) {
   let openingBasis: "printed" | "running" | null = opening === null ? null : "printed";
   let closingBasis: "printed" | "running" | null = closing === null ? null : "printed";
   if (closing === null && sawBal) {
-    closing = [...kept].reverse().find((l) => l.balanceMinor !== null)?.balanceMinor ?? null;
-    if (closing !== null) closingBasis = "running";
+    // The last balance printed holds nothing below it: the lines after it that
+    // carry none are added, so a statement whose last rows print no balance
+    // closes where those lines take it.
+    let after = 0;
+    for (let k = kept.length - 1; k >= 0; k--) {
+      const l = kept[k];
+      if (l.balanceMinor !== null) {
+        closing = l.balanceMinor + after;
+        closingBasis = "running";
+        break;
+      }
+      after += l.amountMinor;
+    }
   }
   if (opening === null && sawBal) {
     // The first balance printed already holds every line above it, not only

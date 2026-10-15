@@ -589,6 +589,34 @@ export const PDF_SCENARIOS: PdfScenario[] = [
       },
     ],
   },
+  {
+    // No total printed at either end, and the last rows carry no balance. The
+    // closing is the last balance plus every line after it.
+    name: "noBalanceOnLastRows",
+    prototypeDiffers: "the prototype takes the closing as the last balance printed, so the lines after it leave the statement out by their sum",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Account activity"]],
+        [730, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+        [718, [40, "09/06/2027"], [90, "EXAMPLE CLIENT DEPOSIT"], [410, "250.00"], [500, "1,250.00"]],
+        [706, [40, "09/14/2027"], [90, "EXAMPLE SUPPLIES"], [330, "40.00"], [500, "1,210.00"]],
+        [694, [40, "09/28/2027"], [90, "EXAMPLE INTEREST"], [410, "0.85"]],
+        [682, [40, "09/30/2027"], [90, "EXAMPLE MONTHLY CHARGE"], [330, "12.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: null, to: "2027-09-30", opening: 100000, closing: 119885, skipped: 0,
+        lines: [
+          ["2027-09-06",25000,"EXAMPLE CLIENT DEPOSIT",null,125000],
+          ["2027-09-14",-4000,"EXAMPLE SUPPLIES",null,121000],
+          ["2027-09-28",85,"EXAMPLE INTEREST",null,null],
+          ["2027-09-30",-1200,"EXAMPLE MONTHLY CHARGE",null,null],
+        ],
+      },
+    ],
+  },
 ];
 
 /**
