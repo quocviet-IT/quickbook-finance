@@ -5,7 +5,7 @@ import { Alert, Button, DatePicker, Select, Space, Spin, Tag, type TableColumnsT
 import dayjs from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
 import DataTable from "@/components/ui/DataTable";
-import { flexColumn } from "@/components/ui/columns";
+import { flexColumn, type FlexColumnSpec } from "@/components/ui/columns";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import {
@@ -43,6 +43,7 @@ import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/li
 import { CLEARING_WHY, CLEARING_FIFO_NOTE, LEFT_STANDING } from "@/lib/domain/clearing-accounts";
 import { ToneBadge } from "@/lib/design/tone";
 import { CLEARING_TAG_WIDTH } from "./clearing-columns";
+import clearingStyles from "./clearing-table.module.css";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -64,6 +65,16 @@ interface ClashTableRow {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * An elastic column that holds a sentence and wraps it, rather than cutting it.
+ * An elastic column cuts with an ellipsis, and on a phone every DataTable cell
+ * is kept to one line (globals.css); a style on the cell itself outranks both,
+ * so "oldest Nov 19, 2025" is never the part that goes missing.
+ */
+function sentenceColumn<T>(spec: FlexColumnSpec<T>) {
+  return { ...flexColumn<T>(spec), ellipsis: false, onCell: () => ({ style: { whiteSpace: "normal" as const } }) };
+}
 
 /**
  * The Exception Report, laid out as the client's prototype lays it out
@@ -316,6 +327,7 @@ export default function ExceptionsClient({
           state={state("clearing", r.clearing.length)}
           why={`${CLEARING_WHY} ${CLEARING_FIFO_NOTE}`}
         >
+          <div className={clearingStyles.clearingTable}>
           <DataTable<ClearingRow>
             rowKey="accountId"
             pagination={false}
@@ -327,21 +339,15 @@ export default function ExceptionsClient({
                 render: (_, row) => accountLink(row.accountId, `${row.accountCode} — ${row.name}`),
               }),
               { title: "Balance", key: "balance", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.balanceMinor) },
-              flexColumn<ClearingRow>({
+              sentenceColumn<ClearingRow>({
                 title: "Open items",
                 key: "items",
-                render: (_, row) => {
-                  const text = clearingSentences(row, ran.to, money).composition;
-                  return text ? <span title={text}>{text}</span> : "—";
-                },
+                render: (_, row) => clearingSentences(row, ran.to, money).composition ?? "—",
               }),
-              flexColumn<ClearingRow>({
+              sentenceColumn<ClearingRow>({
                 title: "Last movement",
                 key: "movement",
-                render: (_, row) => {
-                  const text = clearingSentences(row, ran.to, money).idle;
-                  return text ? <span title={text}>{text}</span> : "—";
-                },
+                render: (_, row) => clearingSentences(row, ran.to, money).idle ?? "—",
               }),
               {
                 title: "",
@@ -351,6 +357,7 @@ export default function ExceptionsClient({
               },
             ]}
           />
+          </div>
         </ReportSection>
 
         <ReportSection

@@ -9,3 +9,9 @@ export const CLEARING_TAG_WIDTH = 132;
 export const CLEARING_FIXED_WIDTHS: readonly number[] = [COLUMN.MONEY_WIDE, CLEARING_TAG_WIDTH];
 /** Three elastic columns, each at its text floor. */
 export const CLEARING_ELASTIC_FLOOR = COLUMN.TEXT_MIN * 3;
+
+/**
+ * The narrowest the table is drawn on a phone (clearing-table.module.css): it
+ * scrolls inside its own box there, and each sentence keeps its floor.
+ */
+export const CLEARING_MIN_WIDTH = CLEARING_FIXED_WIDTHS.reduce((sum, w) => sum + w, 0) + CLEARING_ELASTIC_FLOOR;

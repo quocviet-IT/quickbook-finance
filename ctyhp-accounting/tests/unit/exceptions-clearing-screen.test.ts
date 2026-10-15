@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { TABLE_BOX_AT_1280, fitsBox } from "@/lib/design/table-metrics";
-import { CLEARING_ELASTIC_FLOOR, CLEARING_FIXED_WIDTHS } from "@/app/(app)/reports/exceptions/clearing-columns";
+import { CLEARING_ELASTIC_FLOOR, CLEARING_FIXED_WIDTHS, CLEARING_MIN_WIDTH } from "@/app/(app)/reports/exceptions/clearing-columns";
 
 const screen = readFileSync("app/(app)/reports/exceptions/ExceptionsClient.tsx", "utf8");
 
@@ -30,5 +30,19 @@ describe("the clearing section of the Exceptions screen", () => {
 
   it("scrolls only downwards", () => {
     expect(screen).not.toMatch(/scroll=\{\{\s*x/);
+  });
+
+  it("wraps its two sentences rather than cutting them", () => {
+    expect(screen).toMatch(/sentenceColumn<ClearingRow>\(\{\s*title: "Open items"/);
+    expect(screen).toMatch(/sentenceColumn<ClearingRow>\(\{\s*title: "Last movement"/);
+    expect(screen).toMatch(/ellipsis: false, onCell: \(\) => \(\{ style: \{ whiteSpace: "normal"/);
+  });
+
+  it("is held to its measured widths on a phone, so a sentence never wraps a letter at a time", () => {
+    const css = readFileSync("app/(app)/reports/exceptions/clearing-table.module.css", "utf8");
+    expect(CLEARING_MIN_WIDTH).toBe(CLEARING_FIXED_WIDTHS.reduce((a, b) => a + b, 0) + CLEARING_ELASTIC_FLOOR);
+    expect(css).toMatch(/@media \(max-width: 640px\)/);
+    expect(css).toContain(`min-width: ${CLEARING_MIN_WIDTH}px;`);
+    expect(screen).toContain("<div className={clearingStyles.clearingTable}>");
   });
 });
