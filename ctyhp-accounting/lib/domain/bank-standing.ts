@@ -74,9 +74,11 @@ export interface StandingView {
   ageDays: number | null;
 }
 
-function daysFromTo(fromIso: string, toIso: string): number {
+/** Whole days from one date to another; null when either does not parse. */
+function daysFromTo(fromIso: string, toIso: string): number | null {
   const a = Date.parse(`${fromIso}T00:00:00Z`);
   const b = Date.parse(`${toIso}T00:00:00Z`);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   return Math.max(0, Math.round((b - a) / 86_400_000));
 }
 
@@ -97,8 +99,8 @@ function toneForAge(ageDays: number): StandingTone {
 export function describeStanding(s: BankStanding, asOf: string, money: Money): StandingView {
   const noLongerAgrees =
     s.voidTickedCount > 0
-      ? `No longer agrees: ${entries(s.voidTickedCount)} ticked on the ${
-          s.voidReconciliationDate ? shortDate(s.voidReconciliationDate) : "earlier"
+      ? `No longer agrees: ${entries(s.voidTickedCount)} ticked on ${
+          s.voidReconciliationDate ? `the ${shortDate(s.voidReconciliationDate)}` : "a completed"
         } reconciliation ${s.voidTickedCount === 1 ? "was" : "were"} voided (${money(s.voidTickedMinor)})`
       : null;
 
@@ -127,7 +129,8 @@ export function describeStanding(s: BankStanding, asOf: string, money: Money): S
       ? `${entries(s.sinceCount)} since, ${money(s.sinceNetMinor)} not on a statement`
       : "nothing since";
   return {
-    tone: noLongerAgrees ? "danger" : toneForAge(ageDays),
+    // A date that does not parse can never read as a healthy account.
+    tone: noLongerAgrees || ageDays === null ? "danger" : toneForAge(ageDays),
     text: `Agreed to ${shortDate(s.lastCompletedDate)} at ${closing}${forward} · ${since}`,
     noLongerAgrees,
     ageDays,

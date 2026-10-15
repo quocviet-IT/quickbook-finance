@@ -139,6 +139,17 @@ describe("no longer agrees", () => {
     expect(v.tone).toBe("danger");
   });
 
+  it("words a voided tick without its date, singular and plural", () => {
+    const one = describeStanding({ ...voided, voidTickedCount: 1, voidTickedMinor: 5_000, voidReconciliationDate: null }, "2026-07-01", money);
+    expect(one.noLongerAgrees).toBe(
+      "No longer agrees: 1 entry ticked on a completed reconciliation was voided ($50.00)",
+    );
+    const many = describeStanding({ ...voided, voidReconciliationDate: null }, "2026-07-01", money);
+    expect(many.noLongerAgrees).toBe(
+      "No longer agrees: 3 entries ticked on a completed reconciliation were voided (-$123.45)",
+    );
+  });
+
   it("is absent when nothing was voided", () => {
     expect(describeStanding(base, "2026-07-01", money).noLongerAgrees).toBeNull();
   });
@@ -272,6 +283,20 @@ describe("withBelowZero", () => {
     expect(withBelowZero("Agreed to Jun 30, 2026 at $1.00 · nothing since", "2026-03-04")).toBe(
       "Agreed to Jun 30, 2026 at $1.00 · nothing since · below zero at Mar 4, 2026",
     );
+  });
+});
+
+describe("an unreadable date", () => {
+  it("never reads a bank account's age as green when the last agreed date does not parse", () => {
+    const v = describeStanding({ ...base, lastCompletedDate: "not a date" }, "2026-07-01", money);
+    expect(v.ageDays).toBeNull();
+    expect(v.tone).toBe("danger");
+  });
+
+  it("does the same when the report date does not parse", () => {
+    const v = describeStanding(base, "", money);
+    expect(v.ageDays).toBeNull();
+    expect(v.tone).toBe("danger");
   });
 });
 
