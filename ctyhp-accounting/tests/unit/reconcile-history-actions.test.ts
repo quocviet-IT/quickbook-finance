@@ -14,7 +14,11 @@ const mocks = vi.hoisted(() => ({
   getSessionHistoryAdvice: vi.fn(),
   setStatementLineAside: vi.fn(),
   addMissingLines: vi.fn(),
+  getBankStanding: vi.fn(),
+  getBankingContext: vi.fn(),
 }));
+vi.mock("@/lib/services/bank-standing", () => ({ getBankStanding: mocks.getBankStanding }));
+vi.mock("@/lib/services/banking-surface/facts", () => ({ getBankingContext: mocks.getBankingContext }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/auth", () => ({ getUserRole: mocks.getUserRole, canWrite: mocks.canWrite, isAdmin: vi.fn() }));
 vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClient }));
@@ -66,6 +70,8 @@ beforeEach(() => {
   mocks.bringHistoryForwardFromSession.mockResolvedValue({ ...made, fileWarning: null });
   mocks.getHistoryPreview.mockResolvedValue({ bookBalanceMinor: 512340, entries: 214 });
   mocks.getReconciliationHistory.mockResolvedValue([]);
+  mocks.getBankingContext.mockResolvedValue({ asOf: "2026-10-15" });
+  mocks.getBankStanding.mockResolvedValue([]);
   mocks.getSessionHistoryAdvice.mockResolvedValue(null);
   mocks.setStatementLineAside.mockResolvedValue(undefined);
   mocks.addMissingLines.mockResolvedValue({ added: 1, uncategorized: 1, outcome: null, pairingError: null });
@@ -101,6 +107,27 @@ describe("who may", () => {
     mocks.getUserRole.mockResolvedValue(null);
     expect(await reconciliationHistoryAction()).toEqual({ ok: false, error: "Not authorized" });
     expect(mocks.getReconciliationHistory).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("reconciliationHistoryAction standing", () => {
+  const row = { bankAccountId: BANK } as never;
+  const standing = { bankAccountId: BANK, sinceCount: 2 };
+
+  it("joins each account's standing at the company's today, in the same read", async () => {
+    mocks.getReconciliationHistory.mockResolvedValue([row]);
+    mocks.getBankStanding.mockResolvedValue([standing]);
+    const res = await reconciliationHistoryAction();
+    expect(mocks.getBankStanding).toHaveBeenCalledWith(client, "2026-10-15");
+    expect(res.data?.[0]).toMatchObject({ bankAccountId: BANK, standing });
+  });
+
+  it("leaves the standing null, and does not fail, when it cannot be read", async () => {
+    mocks.getReconciliationHistory.mockResolvedValue([row]);
+    mocks.getBankStanding.mockRejectedValue(new Error("function acc_bank_standing does not exist"));
+    const res = await reconciliationHistoryAction();
+    expect(res.ok).toBe(true);
+    expect(res.data?.[0].standing).toBeNull();
   });
 });
 
