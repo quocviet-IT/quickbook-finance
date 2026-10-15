@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Dayjs } from "dayjs";
 import { Alert, App, Button, Card, DatePicker, InputNumber, Space, Spin, Typography, type TableColumnsType } from "antd";
@@ -12,6 +12,9 @@ import {
   OPEN_IN_PROGRESS,
   STATEMENT_BALANCE_ON,
   defaultHistoryAccount,
+  historyClosingCell,
+  historyDatedCell,
+  historySinceCell,
   historyAdvice,
   historyBroughtForwardMessage,
   inProgressText,
@@ -175,9 +178,53 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
       align: "right",
       render: (n: number) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{n.toLocaleString("en-US")}</span>,
     },
-    { title: "From", dataIndex: "firstOpenDate", width: W.from, render: historyDateCell },
-    { title: "To", dataIndex: "lastOpenDate", width: W.to, render: historyDateCell },
-    { title: "Last reconciled", dataIndex: "lastReconciledDate", width: W.lastReconciled, render: historyDateCell },
+    {
+      title: "First – last",
+      key: "dated",
+      width: W.dated,
+      render: (_: unknown, row: HistoryAccount) => {
+        const lines = historyDatedCell(row.firstOpenDate, row.lastOpenDate);
+        if (!lines) return "—";
+        return (
+          <>
+            <time dateTime={row.firstOpenDate ?? row.lastOpenDate ?? undefined}>{lines[0]}</time>
+            {lines[1] ? secondaryLine(<time dateTime={row.lastOpenDate ?? undefined}>{lines[1]}</time>) : null}
+          </>
+        );
+      },
+    },
+    {
+      title: "Last reconciled",
+      key: "lastReconciled",
+      width: W.lastReconciled,
+      render: (_: unknown, row: HistoryAccount) => {
+        const closing = historyClosingCell(row.standing, money);
+        return (
+          <>
+            {historyDateCell(row.lastReconciledDate)}
+            {closing ? secondaryLine(closing.amount) : null}
+            {closing?.broughtForward ? secondaryLine("(brought forward)") : null}
+          </>
+        );
+      },
+    },
+    {
+      title: "Since",
+      key: "since",
+      width: W.since,
+      align: "right",
+      render: (_: unknown, row: HistoryAccount) => {
+        const [first, ...rest] = historySinceCell(row.standing, money);
+        return (
+          <>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{first}</span>
+            {rest.map((line) => (
+              <Fragment key={line}>{secondaryLine(line)}</Fragment>
+            ))}
+          </>
+        );
+      },
+    },
     {
       title: "State",
       key: "state",

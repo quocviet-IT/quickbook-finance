@@ -496,7 +496,7 @@ describe("the Reconcile history page", () => {
     expect(client).not.toMatch(/scroll=\{\{[^}]*\bx\s*:/);
     expect(client).not.toMatch(/pageSize:\s*\d/);
     expect(client).toContain("reconciliationHistoryAction()");
-    for (const title of ["Account", "Lines not reconciled", "From", "To", "Last reconciled", "State"]) {
+    for (const title of ["Account", "Lines not reconciled", "First – last", "Last reconciled", "Since", "State"]) {
       expect(client, title).toContain(`title: "${title}"`);
     }
   });
@@ -505,8 +505,15 @@ describe("the Reconcile history page", () => {
     expect(HISTORY_ELASTIC_FLOOR).toBe(COLUMN.TEXT_MIN);
     expect(fitsBox(sum(Object.values(HISTORY_COLUMN_WIDTH)), HISTORY_ELASTIC_FLOOR)).toBe(true);
     expect(HISTORY_COLUMN_WIDTH.choose).toBe(COLUMN.SELECTION);
-    expect(HISTORY_COLUMN_WIDTH.from).toBe(HISTORY_SHORT_DATE);
-    expect(HISTORY_COLUMN_WIDTH.to).toBe(HISTORY_SHORT_DATE);
+    // Closing and Since are money cells: the money token fits them, and the merged dates carry a 12px "– Sep 30, 2026" line.
+    expect(HISTORY_COLUMN_WIDTH.since).toBe(COLUMN.MONEY);
+    expect(HISTORY_COLUMN_WIDTH.lastReconciled).toBeGreaterThanOrEqual(COLUMN.MONEY);
+    expect(HISTORY_COLUMN_WIDTH.dated).toBeGreaterThanOrEqual(HISTORY_SHORT_DATE);
+    // 36 + 150 + 112 + 120 + 116 + 220 = 754, plus Account's 200 = 954 of the 984 box.
+    expect(Object.keys(HISTORY_COLUMN_WIDTH)).toEqual(["choose", "openLines", "dated", "lastReconciled", "since", "state"]);
+    expect(sum(Object.values(HISTORY_COLUMN_WIDTH)) + HISTORY_ELASTIC_FLOOR).toBe(954);
+    // "(brought forward)" at 12px is 94px, plus 24px of cell padding.
+    expect(HISTORY_COLUMN_WIDTH.lastReconciled).toBeGreaterThanOrEqual(94 + 24);
     // "Sep 30, 2026" is wider than the 2026-09-30 the date token measures, and fits Last reconciled too.
     expect(HISTORY_SHORT_DATE).toBeGreaterThan(COLUMN.DATE);
     expect(HISTORY_COLUMN_WIDTH.lastReconciled).toBeGreaterThanOrEqual(HISTORY_SHORT_DATE);
@@ -517,13 +524,11 @@ describe("the Reconcile history page", () => {
   });
 
   it("prints its dates as its card does, Sep 30, 2026", () => {
-    for (const [title, field, width] of [
-      ["From", "firstOpenDate", "W.from"],
-      ["To", "lastOpenDate", "W.to"],
-      ["Last reconciled", "lastReconciledDate", "W.lastReconciled"],
-    ]) {
-      expect(client, title).toContain(`{ title: "${title}", dataIndex: "${field}", width: ${width}, render: historyDateCell }`);
-    }
+    // Last reconciled keeps its date; the open dates are one two-line cell, the last under the first.
+    expect(client).toContain("historyDateCell(row.lastReconciledDate)");
+    expect(client).toContain("historyDatedCell(row.firstOpenDate, row.lastOpenDate)");
+    expect(client).toContain("historyClosingCell(row.standing, money)");
+    expect(client).toContain("historySinceCell(row.standing, money)");
     expect(client).toContain('(iso ? <time dateTime={iso}>{shortDate(iso, true)}</time> : "—")');
     expect(client).not.toContain("dateColumn");
   });

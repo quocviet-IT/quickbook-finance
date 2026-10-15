@@ -11,7 +11,14 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { formatMoney } from "@/lib/format";
-import { historyBroughtForwardNote, type HistoryAccount, type HistoryPreview } from "@/lib/domain/reconcile-history";
+import {
+  historyBroughtForwardNote,
+  withStandings,
+  type HistoryAccount,
+  type HistoryPreview,
+} from "@/lib/domain/reconcile-history";
+import { getBankStanding } from "@/lib/services/bank-standing";
+import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import type { SessionHistoryFacts } from "@/lib/domain/reconcile-statement";
 import {
   historyBringForwardSchema,
@@ -150,7 +157,13 @@ export async function reconciliationHistoryAction(): Promise<ActionResult<Histor
   if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
-    return { ok: true, data: await getReconciliationHistory(sb) };
+    const { asOf } = await getBankingContext(sb);
+    // One round trip for the client; a standing that cannot be read leaves the columns blank, not the page.
+    const [history, standings] = await Promise.all([
+      getReconciliationHistory(sb),
+      getBankStanding(sb, asOf).catch(() => null),
+    ]);
+    return { ok: true, data: withStandings(history, standings) };
   } catch (e) {
     return { ok: false, error: msg(e) };
   }

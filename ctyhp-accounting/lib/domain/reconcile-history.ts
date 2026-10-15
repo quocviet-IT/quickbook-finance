@@ -10,6 +10,7 @@
  * acc_brought_forward_preview; this merges them and writes the page's
  * sentences.
  */
+import type { BankStanding } from "./bank-standing";
 import { shortDate } from "./pdf-statement-view";
 import { entriesCount } from "./reconcile-statement";
 
@@ -44,6 +45,44 @@ export interface HistoryAccount extends ReconciliationHistoryRow {
   label: string;
   maskedNumber: string | null;
   state: HistoryState;
+  /** Where the account stands against its statements (2.05); null or absent when it could not be read. */
+  standing?: BankStanding | null;
+}
+
+/** Joins each account's standing by its id; every row is null when the standing could not be read. */
+export function withStandings(
+  accounts: readonly HistoryAccount[],
+  standings: readonly BankStanding[] | null,
+): HistoryAccount[] {
+  const byId = new Map((standings ?? []).map((s) => [s.bankAccountId, s]));
+  return accounts.map((account) => ({ ...account, standing: byId.get(account.bankAccountId) ?? null }));
+}
+
+/** The closing under Last reconciled; null when never reconciled or the standing was not read. */
+export function historyClosingCell(
+  standing: BankStanding | null | undefined,
+  money: (minor: number) => string,
+): { amount: string; broughtForward: boolean } | null {
+  if (!standing || standing.lastCompletedDate === null) return null;
+  return { amount: money(standing.lastClosingMinor ?? 0), broughtForward: standing.lastBroughtForward };
+}
+
+/**
+ * The Since cell's lines: count over net, "Nothing since" for a reconciled
+ * account with no activity, all its lines for a never-reconciled one, a dash
+ * when the standing was not read.
+ */
+export function historySinceCell(standing: BankStanding | null | undefined, money: (minor: number) => string): string[] {
+  if (!standing) return ["—"];
+  if (standing.lastCompletedDate !== null && standing.sinceCount === 0) return ["Nothing since"];
+  return [entriesCount(standing.sinceCount), money(standing.sinceNetMinor)];
+}
+
+/** The open lines' dates in one cell: the first, then "– last" under it; null when there are none. */
+export function historyDatedCell(first: string | null, last: string | null): string[] | null {
+  if (!first && !last) return null;
+  if (first && last && first !== last) return [shortDate(first, true), `– ${shortDate(last, true)}`];
+  return [shortDate((first ?? last) as string, true)];
 }
 
 const noHistory = (bankAccountId: string): ReconciliationHistoryRow => ({

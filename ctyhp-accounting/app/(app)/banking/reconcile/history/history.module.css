@@ -25,6 +25,6 @@
  */
 @media (max-width: 640px) {
   .history :global(.ant-table-content) > table {
-    min-width: 950px;
+    min-width: 954px;
   }
 }

@@ -28,10 +28,20 @@ export const HISTORY_COLUMN_WIDTH = {
   choose: COLUMN.SELECTION,
   /** A count, under a three-word heading that stays on one line. */
   openLines: 150,
-  from: HISTORY_SHORT_DATE,
-  to: HISTORY_SHORT_DATE,
-  /** A date, under a two-word heading that stays on one line. */
+  /**
+   * The open lines' first date, and "– {last date}" under it, under the one-line
+   * heading "First – last". "– Sep 30, 2026" at the secondary 12px measures
+   * 77px, "Sep 30, 2026" 79px, plus the cell's 24px of padding.
+   */
+  dated: HISTORY_SHORT_DATE,
+  /**
+   * The last reconciliation's date, its closing under it and "(brought
+   * forward)" under that (12px, 94px, plus 24px of padding, which is why this
+   * is not COLUMN.MONEY); the heading "Last reconciled" stays on one line.
+   */
   lastReconciled: 120,
+  /** What has happened since: "1,234 entries" over a net amount up to -$1,234,567.89. */
+  since: COLUMN.MONEY,
   /** "Never reconciled", and under it "In progress, ending Sep 30, 2026". */
   state: 220,
 } as const;
@@ -50,8 +60,8 @@ export const HISTORY_ELASTIC_FLOOR = COLUMN.TEXT_MIN;
 export const HISTORY_MIN_WIDTH =
   HISTORY_COLUMN_WIDTH.choose +
   HISTORY_COLUMN_WIDTH.openLines +
-  HISTORY_COLUMN_WIDTH.from +
-  HISTORY_COLUMN_WIDTH.to +
+  HISTORY_COLUMN_WIDTH.dated +
   HISTORY_COLUMN_WIDTH.lastReconciled +
+  HISTORY_COLUMN_WIDTH.since +
   HISTORY_COLUMN_WIDTH.state +
   HISTORY_ELASTIC_FLOOR;
