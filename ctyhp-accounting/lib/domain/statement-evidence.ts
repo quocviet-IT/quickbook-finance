@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { periodLabel, shortDate } from "./pdf-statement-view";
 import { SAVED_REPORT_MAX_BYTES } from "./saved-reports";
-import { statementProofPayloadSchema } from "./statement-proof";
+import { statementProofPayloadSchema } from "./statement-proof-schema";
 
 /** A bank's own download (OFX, QFX, QBO, QIF) is text, and kept as text. */
 export const STATEMENT_FILE_MIME_TYPES = ["application/pdf", "text/csv", "text/plain"] as const;

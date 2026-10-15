@@ -16,8 +16,8 @@ import {
   FEEDBACK_ATTACHMENT_MAX_FILES,
   isAllowedAttachmentType,
 } from "./feedback-attachment";
-import { MAX_RUN_LINES } from "./statement-run";
-import { statementProofPayloadSchema } from "./statement-proof";
+import { MAX_RUN_LINES } from "./statement-run-limits";
+import { statementProofPayloadSchema } from "./statement-proof-schema";
 
 export const ACCOUNT_STATUSES = ["draft", "active", "inactive", "archived"] as const;
 export const usdCurrencySchema = z.literal(USD_CURRENCY_CODE, {

@@ -19,6 +19,7 @@
  */
 import { shortDate } from "./pdf-statement-view";
 import { statementProof, toStatementLines, type PdfStatement } from "./pdf-statement";
+import { MAX_RUN_LINES } from "./statement-run-limits";
 import {
   bringForwardAdvice,
   statementStandings,
@@ -80,7 +81,7 @@ export const RUN_MESSAGES = {
  * size stays under the server's 1 MB body limit when references are short; a
  * run of long references can still exceed it, and is refused whole, writing nothing.
  */
-export const MAX_RUN_LINES = 10_000;
+export { MAX_RUN_LINES };
 
 const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
