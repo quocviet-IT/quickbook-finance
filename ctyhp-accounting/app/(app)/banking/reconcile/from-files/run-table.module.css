@@ -35,4 +35,13 @@
   .runTable :global(.ant-table-thead) > tr > th:nth-child(4) {
     width: 140px;
   }
+
+  /*
+   * Read holds sentences. On a phone every DataTable cell is kept to one line
+   * (`.accounting-data-table .ant-table-cell` in globals.css), which would run
+   * a proof across the whole table; this cell outranks that rule and wraps.
+   */
+  .runTable :global(.ant-table-tbody) > tr > td:nth-child(5) {
+    white-space: normal;
+  }
 }

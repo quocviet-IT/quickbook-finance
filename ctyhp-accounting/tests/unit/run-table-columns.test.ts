@@ -39,6 +39,11 @@ describe("the statements table on a phone", () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|\bcolor\s*:/);
   });
 
+  it("lets Read wrap on a phone, where every other DataTable cell keeps to one line", () => {
+    const media = css.slice(css.indexOf("@media"));
+    expect(media).toMatch(/\.runTable :global\(\.ant-table-tbody\) > tr > td:nth-child\(5\) \{\s*white-space: normal;\s*\}/);
+  });
+
   it("puts the table under its rule and sets no scroll.x", () => {
     const client = read("FromFilesClient.tsx");
     expect(client).toContain("<div className={styles.runTable}>");
