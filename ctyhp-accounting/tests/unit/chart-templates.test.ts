@@ -87,6 +87,20 @@ describe("chartTemplateStatements", () => {
     expect(update).not.toMatch(/account_type\s*=/i);
   });
 
+  it("starts Undeposited Funds and Transfer Clearing ticked as clearing accounts, and nothing else", () => {
+    const ticked = retail.filter((a) => a.clearing).map((a) => a.code).sort();
+    expect(ticked).toEqual(["1090", "1210"]);
+    for (const a of retail.filter((x) => x.clearing)) {
+      expect(["current_asset", "current_liability"], a.code).toContain(a.type);
+    }
+    const statements = chartTemplateStatements("retail_jewelry").filter((s) => /insert into acc_account/i.test(s.sql));
+    const flags = new Map(statements.map((s) => [s.params[0], s.params[6]]));
+    expect(flags.get("1210")).toBe(true);
+    expect(flags.get("1090")).toBe(true);
+    expect(flags.get("1100")).toBe(false);
+    expect(statements[0].sql).toMatch(/is_clearing = excluded\.is_clearing or acc_account\.is_clearing/);
+  });
+
   it("imports nothing that could write to the books, and only types from other modules", () => {
     const src = readFileSync("lib/domain/chart-templates.ts", "utf8");
     expect(src).not.toMatch(/@\/lib\/(db|services)\//);
