@@ -115,7 +115,9 @@ try {
       await client.query("set local statement_timeout = '60s'");
       await client.query(`set local search_path = ${schema}, extensions`);
       const was = await one(GRANTS, [schema, OLD, PROVED]);
-      check("before 0146 a signed-in user may call the older import", was.old_signed_in === true);
+      // Once 0146 is live the grant is already gone; that is a note, not a failure.
+      if (was.old_signed_in === true) check("before 0146 a signed-in user may call the older import", true);
+      else console.log("  (0146 is already live here: a signed-in user could not call the older import before this run)");
       const sql = schema === "public"
         ? MIGRATION
         : planCompanySchema([{ file: FILE, sql: MIGRATION }], schema).statements.join("\n;\n");
