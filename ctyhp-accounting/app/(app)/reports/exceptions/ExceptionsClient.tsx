@@ -26,19 +26,23 @@ import { csvFromExportSheet } from "@/lib/domain/report-export";
 import { PERIOD_PRESETS, presetRange, rangeText, shortDate, type PeriodPreset } from "@/lib/domain/report-presets";
 import {
   CHECK_LABEL,
+  clearingSentences,
   exceptionReportSheet,
   type CheckKey,
+  type ClearingRow,
   type ExceptionPaymentRef,
   type ExceptionReport,
   type HoldingRow,
   type IncomeNoCostRow,
   type NoLongerAgreeRow,
   type TransactionListRow,
-  type UndepositedRow,
   type UnreconciledRow,
   type WrongWayRow,
 } from "@/lib/domain/exceptions";
 import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/lib/domain/statement-alerts";
+import { CLEARING_WHY, CLEARING_FIFO_NOTE, LEFT_STANDING } from "@/lib/domain/clearing-accounts";
+import { ToneBadge } from "@/lib/design/tone";
+import { CLEARING_TAG_WIDTH } from "./clearing-columns";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -307,28 +311,43 @@ export default function ExceptionsClient({
         </ReportSection>
 
         <ReportSection
-          title={CHECK_LABEL.undeposited}
-          note={plural(r.undeposited.length, "account", "accounts")}
-          state={state("undeposited", r.undeposited.length)}
-          why="Undeposited funds should empty as takings reach the bank. A balance that keeps growing means the sales are recorded but the deposits are not — revenue is in the books, the cash is not."
+          title={CHECK_LABEL.clearing}
+          note={plural(r.clearing.length, "account", "accounts")}
+          state={state("clearing", r.clearing.length)}
+          why={`${CLEARING_WHY} ${CLEARING_FIFO_NOTE}`}
         >
-          <DataTable<UndepositedRow>
+          <DataTable<ClearingRow>
             rowKey="accountId"
             pagination={false}
-            dataSource={r.undeposited}
+            dataSource={r.clearing}
             columns={[
-              flexColumn<UndepositedRow>({
+              flexColumn<ClearingRow>({
                 title: "Account",
                 key: "account",
                 render: (_, row) => accountLink(row.accountId, `${row.accountCode} — ${row.name}`),
               }),
               { title: "Balance", key: "balance", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.balanceMinor) },
-              { title: "Entries", key: "entries", width: COLUMN.QTY, align: "right", render: (_, row) => row.entryCount ?? "—" },
+              flexColumn<ClearingRow>({
+                title: "Open items",
+                key: "items",
+                render: (_, row) => {
+                  const text = clearingSentences(row, ran.to, money).composition;
+                  return text ? <span title={text}>{text}</span> : "—";
+                },
+              }),
+              flexColumn<ClearingRow>({
+                title: "Last movement",
+                key: "movement",
+                render: (_, row) => {
+                  const text = clearingSentences(row, ran.to, money).idle;
+                  return text ? <span title={text}>{text}</span> : "—";
+                },
+              }),
               {
-                title: "Oldest",
-                key: "oldest",
-                width: 108,
-                render: (_, row) => (row.oldestEntryDate ? shortDate(row.oldestEntryDate) : "—"),
+                title: "",
+                key: "standing",
+                width: CLEARING_TAG_WIDTH,
+                render: (_, row) => (row.leftStanding ? <ToneBadge tone="warning">{LEFT_STANDING}</ToneBadge> : null),
               },
             ]}
           />

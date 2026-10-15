@@ -36,6 +36,7 @@ import {
 import { detailLabel, detailTypeOptions } from "@/lib/domain/account-detail";
 import { parentChoices } from "@/lib/domain/account-sections";
 import { CASH_FLOW_ROLES, defaultCashFlowRole, type CashFlowRole } from "@/lib/domain/cashflow";
+import { CLEARING_FORM_HELP, canBeClearing } from "@/lib/domain/clearing-account-type";
 import {
   CHART_FILTERS,
   chartClassOf,
@@ -139,6 +140,7 @@ interface FormValues {
   /** Offered for bank and current-asset types; see lib/domain/account-detail. */
   detail_type?: string | null;
   is_contra: boolean;
+  is_clearing: boolean;
   parent_account_id?: string | null;
   currency_code?: string | null;
   default_tax_code_id?: string | null;
@@ -284,7 +286,7 @@ export default function AccountsClient({
   function openCreate() {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ currency_code: "USD", is_posting_account: true, is_contra: false });
+    form.setFieldsValue({ currency_code: "USD", is_posting_account: true, is_contra: false, is_clearing: false });
     setOpen(true);
   }
 
@@ -297,6 +299,7 @@ export default function AccountsClient({
       cash_flow_role: row.cash_flow_role,
       detail_type: row.detail_type,
       is_contra: row.is_contra,
+      is_clearing: row.is_clearing,
       parent_account_id: row.parent_account_id,
       currency_code: row.currency_code,
       default_tax_code_id: row.default_tax_code_id,
@@ -308,6 +311,7 @@ export default function AccountsClient({
 
   function onTypeChange(type: AccountType) {
     form.setFieldValue("cash_flow_role", defaultCashFlowRole(type));
+    if (!canBeClearing(type)) form.setFieldValue("is_clearing", false);
     const detail = form.getFieldValue("detail_type") as string | null | undefined;
     if (!detailTypeOptions(type).some((o) => o.value === detail)) form.setFieldValue("detail_type", null);
     const parentId = form.getFieldValue("parent_account_id") as string | null | undefined;
@@ -317,7 +321,9 @@ export default function AccountsClient({
   }
 
   async function onSubmit() {
-    const values = await form.validateFields();
+    const fields = await form.validateFields();
+    // The tick is not rendered for a type that cannot clear, so validateFields leaves it out; say it outright.
+    const values = { ...fields, is_clearing: canBeClearing(fields.account_type) && fields.is_clearing === true };
     setSaving(true);
     const result = editing ? await updateAccountAction(editing.id, values) : await createAccountAction(values);
     setSaving(false);
@@ -387,6 +393,7 @@ export default function AccountsClient({
             {account.name}
           </button>
           {account.is_contra ? <Tag color="purple">Contra</Tag> : null}
+          {account.is_clearing ? <Tag>Clearing</Tag> : null}
           {balancesView && isRetired(account.status) ? (
             <Tag color={STATUS_LABELS[account.status].color}>{STATUS_LABELS[account.status].text}</Tag>
           ) : null}
@@ -711,6 +718,16 @@ export default function AccountsClient({
           >
             <Switch />
           </Form.Item>
+          {canBeClearing(watchedType) ? (
+            <Form.Item
+              name="is_clearing"
+              label="Clearing account"
+              valuePropName="checked"
+              tooltip={CLEARING_FORM_HELP}
+            >
+              <Switch />
+            </Form.Item>
+          ) : null}
           <Form.Item name="currency_code" label="Currency">
             <Select
               disabled

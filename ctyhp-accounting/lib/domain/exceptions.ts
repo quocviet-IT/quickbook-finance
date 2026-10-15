@@ -15,6 +15,17 @@
 
 import { ACCOUNT_TYPE_LABEL, naturalBalance, type AccountType } from "@/lib/domain/accounts";
 import { entryDisplayName, sourceLabel } from "@/lib/domain/entry-detail";
+import {
+  byLeftStandingThenName,
+  clearingItemNoun,
+  describeClearing,
+  LEFT_STANDING,
+  type ClearingItemNoun,
+  type ClearingStanding,
+  type ClearingView,
+  type Money,
+} from "@/lib/domain/clearing-accounts";
+import { formatMoney } from "@/lib/format";
 import { fromMinor } from "@/lib/domain/money";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { BankStanding } from "@/lib/domain/bank-standing";
@@ -44,7 +55,7 @@ export type { LedgerBalance, TransactionListRow };
 export const CHECK_LABEL = {
   duplicates: "Entries recorded more than once",
   checkNumber: "A check number used twice on one account",
-  undeposited: "Money received but not yet banked",
+  clearing: "Clearing accounts that have not emptied",
   wrongWay: "A balance pointing the wrong way",
   incomeNoCost: "A year with income and no costs",
   unreconciled: "Bank accounts not agreed to a statement",
@@ -73,6 +84,10 @@ export interface ExceptionAccount extends LedgerBalance {
    * Sales Returns, Owner's Draw.
    */
   isContra: boolean;
+  /** Ticked as a clearing account (migration 0145): money that should pass through and empty. */
+  isClearing: boolean;
+  /** The account's detail type, which decides whether its items are called receipts or entries. */
+  detailType: string | null;
 }
 
 export interface ExceptionBankAccount {
@@ -105,12 +120,6 @@ export interface ExceptionPaymentRef {
   amountMinor: number;
 }
 
-/** How long money has been sitting in a holding account, and in how many pieces. */
-export interface UndepositedDetail {
-  entryCount: number;
-  oldestEntryDate: string | null;
-}
-
 export interface YearTotals {
   year: string;
   incomeMinor: number;
@@ -136,7 +145,7 @@ function signedBalance(account: ExceptionAccount): number {
 /**
  * Largest question first.
  *
- * `wrongWayBalances`, `holdingAccounts` and `undepositedFunds` all order their
+ * `wrongWayBalances` and `holdingAccounts` order their
  * findings this way, so it is written once: a reviewer works down from the
  * figure most worth explaining. `unreconciledBankAccounts` is the one balance
  * check that does not — it sorts by account name instead.
@@ -195,54 +204,67 @@ export function holdingAccounts(accounts: readonly ExceptionAccount[]): HoldingR
   return byLargestFirst(rows);
 }
 
-export interface UndepositedRow {
+export interface ClearingRow {
   accountId: string;
   accountCode: string;
   name: string;
+  /** Debit-positive, as `wrongWayBalances` and `holdingAccounts` show balances. */
   balanceMinor: number;
-  /**
-   * `null` when the detail read could not name a figure for this account —
-   * distinct from `0`, which says the read ran and found nothing. The balance
-   * above is still known and shown either way; only the count is absent.
-   */
-  entryCount: number | null;
-  oldestEntryDate: string | null;
+  leftStanding: boolean;
+  /** What the database answered for this account; the sentences are worked out from it. */
+  standing: ClearingStanding;
+  itemNoun: ClearingItemNoun;
 }
 
-/** Exported: the service reads this too, to decide which accounts to fetch detail for. */
-export const UNDEPOSITED_NAME = /undeposited/i;
 /**
- * The seeded chart's code for it; accepted alongside the name, never instead.
- * Exported: the service reads this too, so the two layers cannot disagree about
- * which account is a holding account.
+ * The two sentences a clearing row is read by, "{amount} across {n} receipts,
+ * oldest {date}" and "No movement for {d} days, since {date}".
+ *
+ * The one place they are written: the screen and the export both call this with
+ * the same money formatter, so they cannot word a row differently.
  */
-export const UNDEPOSITED_CODE = "1210";
+export function clearingSentences(row: ClearingRow, asOf: string, money: Money): ClearingView {
+  return describeClearing(row.standing, asOf, row.itemNoun, money);
+}
 
 /**
- * Undeposited funds should empty as takings reach the bank. A balance that
- * keeps growing means the sales are recorded but the deposits are not —
- * revenue is in the books, the cash is not.
+ * A clearing account should empty. One row for each account ticked as one that
+ * still holds a balance at `asOf`, the ones left standing first.
+ *
+ * The balance is the ledger's; the standing only says how old it is. An account
+ * with a balance but no standing row is still listed, and as left standing,
+ * because a figure that cannot be dated never looks healthy.
  */
-export function undepositedFunds(
+export function clearingAccountsNotEmptied(
   accounts: readonly ExceptionAccount[],
-  details: ReadonlyMap<string, UndepositedDetail>,
-): UndepositedRow[] {
-  const rows: UndepositedRow[] = [];
+  standing: readonly ClearingStanding[],
+  asOf: string,
+): ClearingRow[] {
+  const standingById = new Map(standing.map((x) => [x.accountId, x]));
+  const rows: ClearingRow[] = [];
   for (const a of accounts) {
     const balanceMinor = signedBalance(a);
-    if (balanceMinor === 0) continue;
-    if (!UNDEPOSITED_NAME.test(a.name) && a.accountCode !== UNDEPOSITED_CODE) continue;
-    const detail = details.get(a.accountId);
+    if (!a.isClearing || balanceMinor === 0) continue;
+    const s: ClearingStanding = standingById.get(a.accountId) ?? {
+      accountId: a.accountId,
+      balanceMinor,
+      lastMovementDate: null,
+      openCount: 0,
+      openOldestDate: null,
+      openMinor: Math.abs(balanceMinor),
+    };
+    const itemNoun = clearingItemNoun(a.detailType);
     rows.push({
       accountId: a.accountId,
       accountCode: a.accountCode,
       name: a.name,
       balanceMinor,
-      entryCount: detail?.entryCount ?? null,
-      oldestEntryDate: detail?.oldestEntryDate ?? null,
+      leftStanding: describeClearing(s, asOf, itemNoun, String).leftStanding,
+      standing: s,
+      itemNoun,
     });
   }
-  return byLargestFirst(rows);
+  return rows.sort(byLeftStandingThenName);
 }
 
 export interface UnreconciledRow {
@@ -496,7 +518,8 @@ export interface ExceptionReportInput {
   /** Supplied, never read from the clock, so the checks are deterministic. */
   today: string;
   accounts: readonly ExceptionAccount[];
-  undepositedDetails: ReadonlyMap<string, UndepositedDetail>;
+  /** The clearing accounts' standing at `to`. Left out (or empty), a ticked account with a balance reads as left standing. */
+  clearingStanding?: readonly ClearingStanding[];
   bankAccounts: readonly ExceptionBankAccount[];
   yearTotals: readonly YearTotals[];
   /** Posted entries per calendar year, for the years the income check flags. */
@@ -529,7 +552,7 @@ export interface ExceptionReport {
   unavailable: CheckKey[];
   duplicates: DuplicateGroup[];
   checkNumberClashes: CheckNumberClash[];
-  undeposited: UndepositedRow[];
+  clearing: ClearingRow[];
   wrongWay: WrongWayRow[];
   incomeNoCost: IncomeNoCostRow[];
   unreconciled: UnreconciledRow[];
@@ -574,7 +597,11 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     referencesByEntry(input.paymentReferences),
   );
   const checkNumberClashes = duplicateCheckNumbers(input.paymentReferences);
-  const undeposited = undepositedFunds(input.accounts, input.undepositedDetails);
+  // Without the standing nothing can be said about how old a balance is, and a
+  // balance listed on a guess would count as a question the check never asked.
+  const clearing = input.unavailable.includes("clearing")
+    ? []
+    : clearingAccountsNotEmptied(input.accounts, input.clearingStanding ?? [], input.to);
   const wrongWay = wrongWayBalances(input.accounts);
   const incomeNoCost = yearsWithIncomeAndNoCost(input.yearTotals, input.entryCountByYear);
   const unreconciled = unreconciledBankAccounts(input.bankAccounts, balanceByAccountId, input.to, input.bankStanding ?? []);
@@ -589,7 +616,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     questionsRaised:
       duplicates.length +
       checkNumberClashes.length +
-      undeposited.length +
+      clearing.length +
       wrongWay.length +
       incomeNoCost.length +
       unreconciled.length +
@@ -602,7 +629,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     unavailable: [...input.unavailable],
     duplicates,
     checkNumberClashes,
-    undeposited,
+    clearing,
     wrongWay,
     incomeNoCost,
     unreconciled,
@@ -636,6 +663,8 @@ type SheetRow = ReportExportSheet["rows"][number];
  */
 export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionSheetMeta): ReportExportSheet {
   const money = (minor: number) => fromMinor(minor, meta.decimals);
+  // The screen formats its sentences the same way, so the two read alike.
+  const sentenceMoney: Money = (minor) => formatMoney(minor, meta.currencyCode, meta.decimals);
   const rows: SheetRow[] = [];
   const entryRow = (check: CheckKey, e: TransactionListRow): SheetRow => ({
     check: CHECK_LABEL[check],
@@ -671,15 +700,19 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
     ),
   );
   add(
-    "undeposited",
-    report.undeposited.map((u) => ({
-      check: CHECK_LABEL.undeposited,
-      date: u.oldestEntryDate ?? "",
-      type: "Oldest entry",
-      name: u.entryCount === null ? "" : `${u.entryCount} entries`,
-      account: `${u.accountCode} ${u.name}`,
-      amount: money(u.balanceMinor),
-    })),
+    "clearing",
+    report.clearing.map((c) => {
+      const view = clearingSentences(c, meta.to, sentenceMoney);
+      return {
+        check: CHECK_LABEL.clearing,
+        date: c.standing.openOldestDate ?? "",
+        type: c.leftStanding ? LEFT_STANDING : "Clearing",
+        // Both sentences the screen shows, Open items then Last movement.
+        name: [view.composition, view.idle].filter(Boolean).join(" · "),
+        account: `${c.accountCode} ${c.name}`,
+        amount: money(c.balanceMinor),
+      };
+    }),
   );
   add(
     "wrongWay",

@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.06",
+    date: "2026-10-15",
+    headline: "A clearing account that should have emptied says what it still holds, and how long it has been left.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Money received but not yet banked is now Clearing accounts that have not emptied",
+        detail:
+          "The Exception Report checks every account marked as a clearing account, not only one named Undeposited Funds or coded 1210. Each one that still holds a balance says what is in it — “$1,750.00 across 14 receipts, oldest Nov 19, 2025” — and when it last moved — “No movement for 245 days, since Nov 28, 2025” — both counted to the report’s end date. An account with no movement for more than 60 days, or with an item more than 90 days old, is tagged Left standing and listed first. The oldest items are found first in, first out: each amount out clears the oldest amount in that is still open. Before, the check counted every line the account ever had and gave its first date, so the count and the date it shows are different from before. The export carries the same sentences.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "Mark a clearing account in the chart",
+        detail:
+          "A current asset or a current liability can be marked Clearing account on its form in the Chart of Accounts — Undeposited Funds, payroll clearing, a suspense account — and the setup list tags it Clearing. Undeposited Funds and Transfer Clearing are marked already. Any other type is refused: “Only a current asset or a current liability can be a clearing account.”",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
     version: "2.05",
     date: "2026-10-15",
     headline: "Every bank account says how far it has been agreed to a statement, and what has happened since.",

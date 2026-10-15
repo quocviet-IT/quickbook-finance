@@ -4,11 +4,12 @@ import { CHECK_LABEL } from "@/lib/domain/exceptions";
 import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 
 describe("2.05 in the release notes and the Guide", () => {
-  const release = RELEASES[0];
+  // Looked up by number: later releases sit above it.
+  const release = RELEASES.find((r) => r.version === "2.05")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
-  it("is the newest release, dated the day it was built", () => {
-    expect(release.version).toBe("2.05");
+  it("is in the release notes, dated the day it was built", () => {
+    expect(release).toBeDefined();
     expect(release.date).toBe("2026-10-15");
   });
 

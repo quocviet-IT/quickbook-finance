@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { csvFromExportSheet } from "@/lib/domain/report-export";
+import { formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
+import type { ClearingStanding } from "@/lib/domain/clearing-accounts";
 import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
 import {
   CHECK_LABEL,
@@ -11,7 +13,8 @@ import {
   duplicateEntries,
   futureDatedEntries,
   holdingAccounts,
-  undepositedFunds,
+  clearingAccountsNotEmptied,
+  clearingSentences,
   unreconciledBankAccounts,
   wrongWayBalances,
   yearTotalsFromMonthly,
@@ -22,7 +25,6 @@ import {
   type ExceptionReportInput,
   type LedgerBalance,
   type TransactionListRow,
-  type UndepositedDetail,
 } from "@/lib/domain/exceptions";
 
 const account = (over: Partial<ExceptionAccount> = {}): ExceptionAccount => ({
@@ -31,6 +33,8 @@ const account = (over: Partial<ExceptionAccount> = {}): ExceptionAccount => ({
   name: "Cash on Hand",
   accountType: "bank",
   isContra: false,
+  isClearing: false,
+  detailType: null,
   debitBase: 0,
   creditBase: 0,
   ...over,
@@ -117,64 +121,128 @@ describe("holdingAccounts", () => {
   });
 });
 
-describe("undepositedFunds", () => {
-  const details = new Map<string, UndepositedDetail>([
-    ["u1", { entryCount: 12, oldestEntryDate: "2026-01-04" }],
-  ]);
+const standing = (over: Partial<ClearingStanding> = {}): ClearingStanding => ({
+  accountId: "c1",
+  balanceMinor: 1_234_500,
+  lastMovementDate: "2025-12-29",
+  openCount: 16,
+  openOldestDate: "2025-12-02",
+  openMinor: 1_234_500,
+  ...over,
+});
 
-  it("flags a balance sitting in Undeposited Funds", () => {
-    const rows = undepositedFunds(
-      [account({ accountId: "u1", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset", debitBase: 33_400_00 })],
-      details,
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0].entryCount).toBe(12);
-    expect(rows[0].oldestEntryDate).toBe("2026-01-04");
+const clearingAccount = (over: Partial<ExceptionAccount> = {}): ExceptionAccount =>
+  account({
+    accountId: "c1",
+    accountCode: "1250",
+    name: "Card Settlements",
+    accountType: "current_asset",
+    detailType: "undeposited_funds",
+    isClearing: true,
+    debitBase: 1_234_500,
+    ...over,
   });
 
-  it("recognises the account by code when it has been renamed", () => {
-    const rows = undepositedFunds(
-      [account({ accountId: "u1", accountCode: "1210", name: "Takings not yet banked", accountType: "current_asset", debitBase: 500_00 })],
-      details,
-    );
-    expect(rows).toHaveLength(1);
+const dollars = (minor: number) => `$${(minor / 100).toFixed(2)}`;
+
+describe("clearingAccountsNotEmptied", () => {
+  it("is named once", () => {
+    expect(CHECK_LABEL.clearing).toBe("Clearing accounts that have not emptied");
+    expect(Object.keys(CHECK_LABEL)).not.toContain("undeposited");
   });
 
-  it("recognises a second one by name when it does not carry the code", () => {
-    const rows = undepositedFunds(
-      [account({ accountId: "u2", accountCode: "1211", name: "Undeposited Funds - Branch", accountType: "current_asset", debitBase: 500_00 })],
-      new Map(),
+  it("leaves receipts standing at the end of a year, read eight months later, first in order", () => {
+    const rows = clearingAccountsNotEmptied(
+      [
+        account({ accountId: "z", name: "Zeta Tills", accountType: "current_asset", isClearing: true, debitBase: 5_000, creditBase: 0 }),
+        clearingAccount(),
+      ],
+      [standing(), standing({ accountId: "z", balanceMinor: 5_000, openMinor: 5_000, openCount: 1, openOldestDate: "2026-08-20", lastMovementDate: "2026-08-25" })],
+      "2026-08-31",
     );
-    expect(rows).toHaveLength(1);
-    // Absent is not zero: no detail was supplied for this account, and that is
-    // a different answer from "the detail read ran and found no entries".
-    expect(rows[0].entryCount).toBeNull();
-    expect(rows[0].oldestEntryDate).toBeNull();
+    expect(rows.map((r) => [r.accountId, r.leftStanding])).toEqual([
+      ["c1", true],
+      ["z", false],
+    ]);
+    const view = clearingSentences(rows[0], "2026-08-31", dollars);
+    expect(view.composition).toBe("$12345.00 across 16 receipts, oldest Dec 2, 2025");
+    expect(view.idle).toBe("No movement for 245 days, since Dec 29, 2025");
+    expect(rows[0].balanceMinor).toBe(1_234_500);
   });
 
-  it("reports entryCount as null, never zero, for a balance the detail read never covered", () => {
-    const rows = undepositedFunds(
-      [account({ accountId: "u3", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset", debitBase: 750_00 })],
-      new Map(),
+  it("calls the items entries on an account that is not undeposited funds", () => {
+    const rows = clearingAccountsNotEmptied(
+      [clearingAccount({ detailType: "transfer_clearing" })],
+      [standing({ openCount: 3 })],
+      "2026-08-31",
     );
-    expect(rows).toHaveLength(1);
-    expect(rows[0].entryCount).toBeNull();
+    expect(clearingSentences(rows[0], "2026-08-31", dollars).composition).toBe(
+      "$12345.00 across 3 entries, oldest Dec 2, 2025",
+    );
   });
 
-  it("says nothing when the account has emptied, which is what should happen", () => {
-    const rows = undepositedFunds(
-      [account({ accountId: "u1", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset" })],
-      details,
+  it("lists a liability clearing account with a credit balance, signed as the checks show balances", () => {
+    const rows = clearingAccountsNotEmptied(
+      [
+        account({
+          accountId: "w1",
+          accountCode: "2250",
+          name: "Wages Payable Clearing",
+          accountType: "current_liability",
+          detailType: null,
+          isClearing: true,
+          creditBase: 80_000,
+        }),
+      ],
+      [standing({ accountId: "w1", balanceMinor: -80_000, openMinor: 80_000, openCount: 4, openOldestDate: "2026-07-01", lastMovementDate: "2026-08-28" })],
+      "2026-08-31",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].balanceMinor).toBe(-80_000);
+    expect(rows[0].leftStanding).toBe(false);
+    expect(clearingSentences(rows[0], "2026-08-31", dollars).composition).toBe("$800.00 across 4 entries, oldest Jul 1, 2026");
+  });
+
+  it("does not list an account that has emptied", () => {
+    const rows = clearingAccountsNotEmptied(
+      [clearingAccount({ debitBase: 700_00, creditBase: 700_00 })],
+      [standing({ balanceMinor: 0, openMinor: 0, openCount: 0, openOldestDate: null })],
+      "2026-08-31",
     );
     expect(rows).toEqual([]);
   });
 
-  it("reports an account matching both the name and the code only once", () => {
-    const rows = undepositedFunds(
-      [account({ accountId: "u1", accountCode: "1210", name: "Undeposited Funds", accountType: "current_asset", debitBase: 900_00 })],
-      new Map(),
+  it("does not list an account that carries a balance but is not ticked as a clearing account", () => {
+    const rows = clearingAccountsNotEmptied(
+      [clearingAccount({ isClearing: false, name: "Undeposited Funds", accountCode: "1210" })],
+      [standing()],
+      "2026-08-31",
     );
+    expect(rows).toEqual([]);
+  });
+
+  it("lists a ticked account with a balance and no standing as left standing, never as healthy", () => {
+    const rows = clearingAccountsNotEmptied([clearingAccount()], [], "2026-08-31");
     expect(rows).toHaveLength(1);
+    expect(rows[0].leftStanding).toBe(true);
+    const view = clearingSentences(rows[0], "2026-08-31", dollars);
+    expect(view.composition).toBeNull();
+    expect(view.idle).toBeNull();
+  });
+
+  it("puts accounts left standing first and then orders by name", () => {
+    const old = { lastMovementDate: "2026-01-02", openOldestDate: "2026-01-02" };
+    const fresh = { lastMovementDate: "2026-08-29", openOldestDate: "2026-08-20" };
+    const rows = clearingAccountsNotEmptied(
+      [
+        clearingAccount({ accountId: "a", name: "Alpha" }),
+        clearingAccount({ accountId: "b", name: "Bravo" }),
+        clearingAccount({ accountId: "c", name: "Charlie" }),
+      ],
+      [standing({ accountId: "a", ...fresh }), standing({ accountId: "b", ...old }), standing({ accountId: "c", ...old })],
+      "2026-08-31",
+    );
+    expect(rows.map((r) => r.name)).toEqual(["Bravo", "Charlie", "Alpha"]);
   });
 });
 
@@ -471,7 +539,6 @@ const emptyInput = (over: Partial<ExceptionReportInput> = {}): ExceptionReportIn
   to: "2026-09-30",
   today: "2026-09-26",
   accounts: [],
-  undepositedDetails: new Map(),
   bankAccounts: [],
   yearTotals: [],
   entriesInRange: [],
@@ -685,10 +752,79 @@ describe("the exceptions module", () => {
     expect(source).not.toMatch(/@\/lib\/(db|services)\//);
   });
 
-  it("does not let the service keep its own copy of which account is a holding account", () => {
+  it("does not let the service decide which account is a clearing account", () => {
     const service = readFileSync("lib/services/exceptions.ts", "utf8");
-    expect(service).not.toMatch(/const\s+UNDEPOSITED_(NAME|CODE)\s*=/);
-    expect(service).toMatch(/UNDEPOSITED_NAME/);
+    expect(service).not.toMatch(/undeposited/i);
+    expect(service).not.toMatch(/UNDEPOSITED_(NAME|CODE)/);
+    expect(readFileSync("lib/domain/exceptions.ts", "utf8")).not.toMatch(/UNDEPOSITED_(NAME|CODE)|undepositedFunds/);
+  });
+});
+
+describe("the clearing check in the report", () => {
+  const meta = { companyName: "Riverbend Trading LLC", currencyCode: "USD", decimals: 2, from: "2026-01-01", to: "2026-08-31" };
+  const input = () =>
+    emptyInput({
+      to: "2026-08-31",
+      accounts: [clearingAccount()],
+      clearingStanding: [standing()],
+    });
+
+  it("counts its rows among the questions and still runs eleven checks", () => {
+    const report = buildExceptionReport(input());
+    expect(report.clearing).toHaveLength(1);
+    expect(report.questionsRaised).toBe(1);
+    expect(report.checksRun).toBe(11);
+  });
+
+  it("carries a failed read as unavailable, not as nothing found", () => {
+    const report = buildExceptionReport(emptyInput({ unavailable: ["clearing"], accounts: [clearingAccount()] }));
+    expect(report.clearing).toEqual([]);
+    expect(report.questionsRaised).toBe(0);
+    expect(report.unavailable).toEqual(["clearing"]);
+    const rows = exceptionReportSheet(report, meta).rows.filter((r) => r.check === CHECK_LABEL.clearing);
+    expect(rows).toEqual([{ check: CHECK_LABEL.clearing, date: "", type: "", name: "Could not run", account: "", amount: null }]);
+  });
+
+  it("says Nothing found when no ticked account holds a balance", () => {
+    const rows = exceptionReportSheet(buildExceptionReport(emptyInput()), meta).rows.filter((r) => r.check === CHECK_LABEL.clearing);
+    expect(rows.map((r) => r.name)).toEqual(["Nothing found"]);
+  });
+
+  it("exports the oldest open date, Left standing, the sentence the screen shows, the account and the balance", () => {
+    const report = buildExceptionReport(input());
+    const rows = exceptionReportSheet(report, meta).rows.filter((r) => r.check === CHECK_LABEL.clearing);
+    expect(rows).toEqual([
+      {
+        check: "Clearing accounts that have not emptied",
+        date: "2025-12-02",
+        type: "Left standing",
+        name: "$12,345.00 across 16 receipts, oldest Dec 2, 2025 · No movement for 245 days, since Dec 29, 2025",
+        account: "1250 Card Settlements",
+        amount: 12_345,
+      },
+    ]);
+    // One source: the export's words are the screen's words, both of them.
+    const formatted = (minor: number) => formatMoney(minor, "USD", 2);
+    const view = clearingSentences(report.clearing[0], meta.to, formatted);
+    expect(rows[0].name).toBe(`${view.composition} · ${view.idle}`);
+  });
+
+  it("exports Clearing for an account that is not left standing, with the date blank when none is known", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        to: "2026-08-31",
+        accounts: [clearingAccount()],
+        clearingStanding: [standing({ lastMovementDate: "2026-08-29", openOldestDate: "2026-08-20" })],
+      }),
+    );
+    const row = exceptionReportSheet(report, meta).rows.find((r) => r.check === CHECK_LABEL.clearing);
+    expect(row?.type).toBe("Clearing");
+    expect(row?.date).toBe("2026-08-20");
+    const noStanding = exceptionReportSheet(
+      buildExceptionReport(emptyInput({ to: "2026-08-31", accounts: [clearingAccount()] })),
+      meta,
+    ).rows.find((r) => r.check === CHECK_LABEL.clearing);
+    expect(noStanding).toMatchObject({ date: "", type: "Left standing", name: "" });
   });
 });
 

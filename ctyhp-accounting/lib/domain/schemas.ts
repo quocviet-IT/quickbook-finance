@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { CASH_FLOW_ROLES, defaultCashFlowRole } from "./cashflow";
 import { CHART_TEMPLATE_KEYS } from "./chart-templates";
+import { CLEARING_TYPE_MESSAGE, canBeClearing } from "./clearing-account-type";
 import { passwordPolicyProblems } from "./password-policy";
 import { USD_CURRENCY_CODE } from "./currency";
 import {
@@ -42,6 +43,7 @@ const accountFieldsSchema = z.object({
   cash_flow_role: z.enum(CASH_FLOW_ROLES).optional(),
   detail_type: z.string().trim().max(80).optional().nullable(),
   is_contra: z.boolean(),
+  is_clearing: z.boolean(),
   parent_account_id: z.uuid().optional().nullable(),
   description: z.string().trim().max(500).optional().nullable(),
   default_tax_code_id: z.uuid().optional().nullable(),
@@ -52,12 +54,19 @@ const accountFieldsSchema = z.object({
 
 const accountInputSchema = accountFieldsSchema.extend({
   is_contra: z.boolean().default(false),
+  is_clearing: z.boolean().default(false),
   currency_code: usdCurrencySchema.default(USD_CURRENCY_CODE),
   is_posting_account: z.boolean().default(true),
   status: z.enum(ACCOUNT_STATUSES).default("active"),
 });
 
-export const accountCreateSchema = accountInputSchema.transform((value) => ({
+/** A clearing tick needs a type that can clear; with no type given (an update that leaves it alone) the database guard decides. */
+function clearingTypeAllowed(value: { is_clearing?: boolean; account_type?: string }): boolean {
+  return !value.is_clearing || value.account_type === undefined || canBeClearing(value.account_type);
+}
+const clearingTypeIssue = { message: CLEARING_TYPE_MESSAGE, path: ["is_clearing"] };
+
+export const accountCreateSchema = accountInputSchema.refine(clearingTypeAllowed, clearingTypeIssue).transform((value) => ({
   ...value,
   cash_flow_role: value.cash_flow_role ?? defaultCashFlowRole(value.account_type),
 }));
@@ -65,7 +74,10 @@ export const accountCreateSchema = accountInputSchema.transform((value) => ({
 export type AccountCreateInput = z.infer<typeof accountCreateSchema>;
 
 /** Update allows partial fields, changes only those given, and never changes the code via this path. */
-export const accountUpdateSchema = accountFieldsSchema.partial().omit({ account_code: true });
+export const accountUpdateSchema = accountFieldsSchema
+  .partial()
+  .omit({ account_code: true })
+  .refine(clearingTypeAllowed, clearingTypeIssue);
 export type AccountUpdateInput = z.infer<typeof accountUpdateSchema>;
 
 export const accountStatusSchema = z.enum(ACCOUNT_STATUSES);

@@ -91,4 +91,49 @@ describe("accountUpdateSchema", () => {
     expect(accountUpdateSchema.parse({ name: "Rent" })).toEqual({ name: "Rent" });
     expect(accountUpdateSchema.parse({ cash_flow_role: "operating" })).toEqual({ cash_flow_role: "operating" });
   });
+
+  it("carries the clearing tick when given, and leaves it alone when not", () => {
+    expect(accountUpdateSchema.parse({ is_clearing: true })).toEqual({ is_clearing: true });
+    expect("is_clearing" in accountUpdateSchema.parse({ name: "Rent" })).toBe(false);
+    const created = accountCreateSchema.parse({ account_code: "1291", name: "Payroll Clearing", account_type: "current_liability" });
+    expect(created.is_clearing).toBe(false);
+    expect(
+      accountCreateSchema.parse({ account_code: "1291", name: "Payroll Clearing", account_type: "current_liability", is_clearing: true }).is_clearing,
+    ).toBe(true);
+  });
+
+  describe("clearing rule", () => {
+    const WORDS = "Only a current asset or a current liability can be a clearing account.";
+    const base = { account_code: "1291", name: "Payroll Clearing" };
+
+    it("accepts the tick on a current asset and a current liability", () => {
+      for (const account_type of ["current_asset", "current_liability"] as const) {
+        expect(accountCreateSchema.parse({ ...base, account_type, is_clearing: true }).is_clearing).toBe(true);
+      }
+    });
+
+    it("refuses the tick on any other type, in words", () => {
+      for (const account_type of ["expense", "bank", "income", "equity", "fixed_asset"] as const) {
+        const r = accountCreateSchema.safeParse({ ...base, account_type, is_clearing: true });
+        expect(r.success).toBe(false);
+        if (!r.success) expect(r.error.issues[0]?.message).toBe(WORDS);
+      }
+    });
+
+    it("lets an untick through on any type, and defaults to false", () => {
+      expect(accountCreateSchema.parse({ ...base, account_type: "expense" }).is_clearing).toBe(false);
+      expect(accountCreateSchema.parse({ ...base, account_type: "bank", is_clearing: false }).is_clearing).toBe(false);
+    });
+
+    it("refuses an update that ticks while moving to a type that cannot clear", () => {
+      const r = accountUpdateSchema.safeParse({ account_type: "expense", is_clearing: true });
+      expect(r.success).toBe(false);
+      if (!r.success) expect(r.error.issues[0]?.message).toBe(WORDS);
+      expect(accountUpdateSchema.parse({ account_type: "expense", is_clearing: false })).toEqual({
+        account_type: "expense",
+        is_clearing: false,
+      });
+      expect(accountUpdateSchema.parse({ account_type: "current_asset", is_clearing: true }).is_clearing).toBe(true);
+    });
+  });
 });

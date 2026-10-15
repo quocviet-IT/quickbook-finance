@@ -90,6 +90,8 @@ export interface AccountRow {
   detail_type: string | null;
   /** Reduces another account in its section (Accumulated Depreciation, Sales Returns, Owner's Draw). */
   is_contra: boolean;
+  /** Meant to empty: money received waits here until it is banked, wages until they are paid. */
+  is_clearing: boolean;
   parent_account_id: string | null;
   description: string | null;
   default_tax_code_id: string | null;

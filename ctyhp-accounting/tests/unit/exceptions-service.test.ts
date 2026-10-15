@@ -32,10 +32,11 @@ interface ReaderConfig {
   earliestEntry: Source;
   customerPayments: Source;
   vendorPayments: Source;
-  undepositedLines: Source;
+  journalLines: Source;
   monthlyBalances: Source;
   reconciliationLines: Source;
   bankStanding: Source;
+  clearingStanding: Source;
 }
 
 function defaultConfig(): ReaderConfig {
@@ -49,10 +50,11 @@ function defaultConfig(): ReaderConfig {
     earliestEntry: [],
     customerPayments: [],
     vendorPayments: [],
-    undepositedLines: [],
+    journalLines: [],
     monthlyBalances: [],
     reconciliationLines: [],
     bankStanding: [],
+    clearingStanding: [],
   };
 }
 
@@ -119,7 +121,7 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
         case "acc_bill_payment":
           return chainFor(c.vendorPayments);
         case "acc_journal_line":
-          return chainFor(c.undepositedLines);
+          return chainFor(c.journalLines);
         case "acc_reconciliation_line":
           return chainFor(c.reconciliationLines);
         case "acc_journal_reversal_link":
@@ -145,6 +147,7 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
         return paged(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange);
       }
       if (name === "acc_monthly_ledger_balances") return paged(c.monthlyBalances);
+      if (name === "acc_clearing_standing") return { order: () => paged(c.clearingStanding) };
       if (name === "acc_bank_standing") {
         const ordered = { order: () => paged(c.bankStanding) };
         return ordered;
@@ -154,6 +157,32 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
   };
   return sb as unknown as SupabaseClient;
 }
+
+const CLEARING_ACCOUNT = { id: "u1", is_contra: false, is_clearing: true, detail_type: "undeposited_funds" };
+const CLEARING_LEDGER = {
+  account_id: "u1",
+  account_code: "1250",
+  name: "Card Settlements",
+  account_type: "current_asset",
+  debit_base: 500_000,
+  credit_base: 0,
+};
+const CLEARING_STANDING = {
+  account_id: "u1",
+  balance_minor: "500000",
+  last_movement_date: "2025-12-30",
+  open_count: 7,
+  open_oldest_date: "2025-12-05",
+  open_minor: "500000",
+};
+const HOLDING_LEDGER = {
+  account_id: "h1",
+  account_code: "9000",
+  name: "Uncategorized Expense",
+  account_type: "expense",
+  debit_base: 250_000,
+  credit_base: 0,
+};
 
 const FROM = "2026-01-01";
 const TO = "2026-09-26";
@@ -173,7 +202,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
   it("tags all four balance checks when the ledger-balances read fails", async () => {
     const sb = fakeClient({ ledgerBalances: new Error("acc_ledger_balances unreachable") });
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
-    expect(report.unavailable).toEqual(["undeposited", "wrongWay", "holding", "unreconciled"]);
+    expect(report.unavailable).toEqual(["clearing", "wrongWay", "holding", "unreconciled"]);
   });
 
   it("tags only futureDated when the future-dated read fails, and the other checks still run", async () => {
@@ -198,29 +227,39 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     expect(report.holding[0].balanceMinor).toBe(250_000);
   });
 
-  it("reports the undeposited balance with entryCount null when only its detail read fails, and does not tag it", () => {
+  it("tags only the clearing check when the standing cannot be read, and the other checks still run", async () => {
     const sb = fakeClient({
+      accounts: [CLEARING_ACCOUNT],
+      ledgerBalances: [CLEARING_LEDGER, HOLDING_LEDGER],
+      clearingStanding: new Error("acc_clearing_standing unreachable"),
+    });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual(["clearing"]);
+    expect(report.clearing).toEqual([]);
+    expect(report.holding).toHaveLength(1);
+  });
+
+  it("lists a ticked clearing account from its balance and its standing, and leaves out one that is not ticked", async () => {
+    const sb = fakeClient({
+      accounts: [CLEARING_ACCOUNT, { id: "u2", is_contra: false, is_clearing: false, detail_type: "undeposited_funds" }],
       ledgerBalances: [
-        {
-          account_id: "u1",
-          account_code: "1210",
-          name: "Undeposited Funds",
-          account_type: "current_asset",
-          debit_base: 500_000,
-          credit_base: 0,
-        },
+        CLEARING_LEDGER,
+        { ...CLEARING_LEDGER, account_id: "u2", account_code: "1211", name: "Undeposited Funds" },
       ],
-      undepositedLines: new Error("acc_journal_line unreachable"),
+      clearingStanding: [CLEARING_STANDING],
     });
-    return getExceptionReport(sb, FROM, TO, TODAY).then((report) => {
-      // The balance is known regardless of whether the detail read worked, so
-      // the check is not disabled — only the count and date it could not
-      // read are absent, and absent is not the same answer as zero.
-      expect(report.unavailable).toEqual([]);
-      expect(report.undeposited).toHaveLength(1);
-      expect(report.undeposited[0].balanceMinor).toBe(500_000);
-      expect(report.undeposited[0].entryCount).toBeNull();
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual([]);
+    expect(report.clearing).toHaveLength(1);
+    expect(report.clearing[0]).toMatchObject({
+      accountId: "u1",
+      accountCode: "1250",
+      balanceMinor: 500_000,
+      leftStanding: true,
+      itemNoun: "receipts",
     });
+    expect(report.clearing[0].standing).toMatchObject({ openCount: 7, openOldestDate: "2025-12-05" });
+    expect(report.questionsRaised).toBe(1);
   });
 
   it("names nothing as unavailable when every read succeeds", async () => {
@@ -236,7 +275,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     // taken down with it.
     const sb = fakeClient({
       bankAccounts: [BANK],
-      undepositedLines: new Error("acc_journal_line unreachable"),
+      journalLines: new Error("acc_journal_line unreachable"),
       ledgerBalances: [
         {
           account_id: "h1",
@@ -258,7 +297,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
   it("finds a bank account below zero from its own lines", async () => {
     const sb = fakeClient({
       bankAccounts: [BANK],
-      undepositedLines: [
+      journalLines: [
         journalLine("l1", "e1", "2026-01-01", 1_000, 0),
         journalLine("l2", "e2", "2026-01-03", 0, 5_000),
       ],
