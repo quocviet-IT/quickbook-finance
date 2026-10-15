@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite, getSessionUser } from "@/lib/auth";
+import { getUserRole, canWrite, getSessionUser, isAdmin } from "@/lib/auth";
 import {
   createBankAccount,
   importStatement,
@@ -43,6 +43,7 @@ import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import { loanPaymentSchema, statementImportLinesSchema } from "@/lib/domain/schemas";
 import {
   PROOF_REFUSAL,
+  needsAdministrator,
   proofRefusal,
   proveStatementPayload,
   statementProofPayloadSchema,
@@ -118,8 +119,9 @@ export interface StatementImportResult extends StatementImportCounts {
  * marked Not a transaction, and an administrator's override when the person
  * chose "Import anyway…" (StatementProofPayload). The proof is worked out here
  * again from what was sent — the same rule the dialog runs — and a statement
- * that does not add up, with no override, is refused before the database is
- * asked. Whether the person may override is the database's to say.
+ * that does not add up, with no override or with one from anyone but an
+ * administrator, is refused before the database is asked; the database asks
+ * again whether the person may override.
  */
 export async function importStatementAction(
   bankAccountId: string,
@@ -135,8 +137,12 @@ export async function importStatementAction(
   if (proof === null || proof === undefined) return { ok: false, error: PROOF_REFUSAL.noProof };
   const payload = statementProofPayloadSchema.safeParse(proof);
   if (!payload.success) return { ok: false, error: payload.error.issues[0]?.message ?? "Invalid data" };
-  const refusal = proofRefusal(proveStatementPayload(lines.data, payload.data, usd), payload.data.override);
+  const proved = proveStatementPayload(lines.data, payload.data, usd);
+  const refusal = proofRefusal(proved, payload.data.override);
   if (refusal) return { ok: false, error: refusal };
+  if (needsAdministrator(proved, payload.data.override) && !isAdmin(await getUserRole())) {
+    return { ok: false, error: PROOF_REFUSAL.notAdmin };
+  }
   try {
     const sb = await createSupabaseServerClient();
     const res = await importStatement(sb, bankAccountId, filename, lines.data, payload.data);

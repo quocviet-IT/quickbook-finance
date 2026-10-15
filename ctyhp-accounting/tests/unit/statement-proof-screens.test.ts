@@ -284,8 +284,10 @@ describe("the import dialog", () => {
     expect(modal).toContain("okButtonProps={{ disabled: view.okDisabled, loading: importing }}");
     expect(modal).toContain("onOk={confirm}");
     const confirm = body(modal, "function confirm() {");
-    expect(confirm).toContain("if (view.okDisabled) return;");
+    // A second press while the first import is still on its way sends nothing, as "Import anyway…" does.
+    expect(confirm).toContain("if (view.okDisabled || importing) return;");
     expect(confirm).toContain("send(null);");
+    expect(body(modal, "function importAnyway() {")).toContain('if (view.override !== "button" || view.checking || importing) return;');
     const send = body(modal, "function send(override: StatementOverride | null) {");
     expect(send).toContain("confirmStatement(lines, marks, view, override)");
   });

@@ -177,6 +177,8 @@ export const PROOF_REFUSAL = {
   noBalances: "The statement has no opening or closing balance; enter the ones printed on the statement.",
   /** A screen from before 2.04, still open after the update, sends no proof. */
   noProof: "The statement was sent without its opening and closing balances. Reload the page and try again.",
+  /** An override sent by someone who is not an administrator: the database's own words (0143). */
+  notAdmin: "Only an administrator can import a statement that does not add up",
 } as const;
 
 /** "Import 42 lines": the button, one click, when the statement adds up. */
@@ -574,7 +576,7 @@ export function proveStatementPayload(
  * Why a server action refuses the statement before the database is asked, or
  * null when it may go on. A missing balance is always refused; a statement
  * that does not add up is refused unless it carries an override — whether the
- * person may override is the database's to decide, never this.
+ * person may override is not this one's to say: see `needsAdministrator`.
  */
 export function proofRefusal(
   proof: StatementProof,
@@ -586,4 +588,16 @@ export function proofRefusal(
   if (proof.missing === "closing") return PROOF_REFUSAL.noClosing;
   if (proof.proves || override) return null;
   return `${proof.sentences.summary} ${blocked}`;
+}
+
+/**
+ * Whether the statement goes in only on an administrator's override: it does
+ * not add up, and an override came with it. The screen offers "Import anyway…"
+ * to an administrator alone, so anyone else sending one sent it by hand. Each
+ * action asks the person's role before it writes anything — keeping the
+ * statement or starting a reconciliation comes before the import the database
+ * would refuse — and answers PROOF_REFUSAL.notAdmin; the database asks again.
+ */
+export function needsAdministrator(proof: StatementProof, override: StatementOverride | null): boolean {
+  return !proof.proves && override !== null;
 }

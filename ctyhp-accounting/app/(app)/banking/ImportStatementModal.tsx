@@ -361,7 +361,7 @@ export default function ImportStatementModal({
   }
 
   function confirm() {
-    if (view.okDisabled) return;
+    if (view.okDisabled || importing) return;
     send(null);
   }
 

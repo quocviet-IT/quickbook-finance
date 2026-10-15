@@ -9,6 +9,7 @@ import {
   dayAfter,
   fileFigures,
   importLinesLabel,
+  needsAdministrator,
   openingBasisWords,
   pdfFigures,
   plainAmount,
@@ -472,6 +473,16 @@ describe("the server's proof", () => {
     );
     expect(proofRefusal(out, { reason: "The bank misprinted the closing" })).toBeNull();
     expect(proofRefusal(out, null, PROOF_TEXT.attachBlocked)).toMatch(/Attaching is blocked until the statement adds up\.$/);
+  });
+
+  it("needs an administrator only for an override on a statement that does not add up", () => {
+    const reason = { reason: "The bank misprinted the closing" };
+    const out = proveStatementPayload(rows, payload({ closing_minor: 10000 }), money);
+    const adds = proveStatementPayload(rows, payload(), money);
+    expect(needsAdministrator(out, reason)).toBe(true);
+    expect(needsAdministrator(out, null)).toBe(false);
+    expect(needsAdministrator(adds, reason)).toBe(false);
+    expect(PROOF_REFUSAL.notAdmin).toBe("Only an administrator can import a statement that does not add up");
   });
 
   it("refuses a missing balance, override or not", () => {

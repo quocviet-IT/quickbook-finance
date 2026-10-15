@@ -8,7 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { shortDate } from "@/lib/domain/pdf-statement-view";
 import {
@@ -27,7 +27,9 @@ import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney } from "@/lib/format";
-import { PROOF_REFUSAL, proofRefusal, proveStatementPayload, sentWithoutProof } from "@/lib/domain/statement-proof";
+import {
+  PROOF_REFUSAL, needsAdministrator, proofRefusal, proveStatementPayload, sentWithoutProof,
+} from "@/lib/domain/statement-proof";
 import { tieKeptStatementFile } from "@/lib/services/statement-files";
 import { matchAfterCompletion } from "@/lib/services/statement-bank-lines";
 import type { BankLineMatchCounts } from "@/lib/domain/statement-bank-lines";
@@ -70,9 +72,18 @@ function statementFile(input: ReconciliationStatementInput): StatementFileInput 
   };
 }
 
-/** Why the statement is refused before anything is written (2.04), or null: the dialog's rule, run again on what was sent. */
-function statementRefusal(input: ReconciliationStatementInput): string | null {
-  return proofRefusal(proveStatementPayload(input.lines, input.proof, usd), input.proof.override);
+/**
+ * Why the statement is refused before anything is written (2.04), or null: the
+ * dialog's rule, run again on what was sent, and an override taken only from
+ * an administrator. The database refuses anyone else's too, but only at the
+ * import — after the statement is kept or the reconciliation started.
+ */
+async function statementRefusal(input: ReconciliationStatementInput): Promise<string | null> {
+  const proof = proveStatementPayload(input.lines, input.proof, usd);
+  const refusal = proofRefusal(proof, input.proof.override);
+  if (refusal) return refusal;
+  if (needsAdministrator(proof, input.proof.override) && !isAdmin(await getUserRole())) return PROOF_REFUSAL.notAdmin;
+  return null;
 }
 
 /**
@@ -106,7 +117,8 @@ async function importIntoBankTransactions(
  * posted. The payload is a ReconciliationStatementInput: the lines (those
  * marked Not a transaction left out, those already here from another source
  * marked `skip`) and the proof; a statement that does not add up, with no
- * override, is refused before anything is kept.
+ * override or with one from anyone but an administrator, is refused before
+ * anything is kept.
  */
 export async function importStatementIntoReconciliationAction(
   reconciliationId: string,
@@ -117,7 +129,7 @@ export async function importStatementIntoReconciliationAction(
   if (sentWithoutProof(raw)) return { ok: false, error: PROOF_REFUSAL.noProof };
   const parsed = reconciliationStatementSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  const refusal = statementRefusal(parsed.data);
+  const refusal = await statementRefusal(parsed.data);
   if (refusal) return { ok: false, error: refusal };
   let kept = false;
   try {
@@ -241,9 +253,10 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   const input = parsed.data;
   // A month whose statement does not add up is refused before anything is
-  // written; the run stops there, and the statement is imported on its own.
+  // written — an override with it, from anyone but an administrator, too; the
+  // run stops there, and the statement is imported on its own.
   if (input.kind === "month") {
-    const refusal = statementRefusal(input);
+    const refusal = await statementRefusal(input);
     if (refusal) return { ok: false, error: refusal };
   }
   let startedId: string | null = null;

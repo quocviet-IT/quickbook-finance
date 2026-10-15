@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The four ways a statement comes in, on the server (2.04): each works the
  * proof out again from what it is sent, with the dialog's own rule, and
  * refuses a statement that does not add up before the database is asked —
- * unless an override comes with it, which it passes on for the database to
- * judge. Plus the reads the import dialog needs. Invented data throughout.
+ * unless an administrator's override comes with it, which it passes on for the
+ * database to judge again. An override from anyone else is refused before
+ * anything is written. Plus the reads the import dialog needs. Invented data
+ * throughout.
  */
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
@@ -28,7 +30,12 @@ const mocks = vi.hoisted(() => ({
   matchAfterCompletion: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
-vi.mock("@/lib/auth", () => ({ getUserRole: mocks.getUserRole, canWrite: mocks.canWrite, getSessionUser: vi.fn(), isAdmin: vi.fn() }));
+vi.mock("@/lib/auth", async () => ({
+  getUserRole: mocks.getUserRole,
+  canWrite: mocks.canWrite,
+  getSessionUser: vi.fn(),
+  isAdmin: (await import("@/lib/domain/roles")).isAdmin,
+}));
 vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClient }));
 vi.mock("@/lib/db/company", () => ({ resolveActiveCompany: vi.fn() }));
 vi.mock("@/lib/services/saved-reports", () => ({ createSavedReportUploadTicket: vi.fn() }));
@@ -142,6 +149,9 @@ const OUT = { ...PROOF, closing_minor: 99000 };
 const OUT_REFUSAL =
   "Out by $10.00. The opening $1,000.00 and the 2 lines come to $980.00; the statement closes at $990.00. " +
   "Import is blocked until the statement adds up.";
+/** The same statement that does not add up, sent with "Import anyway…"'s reason. */
+const OVERRIDDEN = { ...OUT, override: { reason: "The bank misprinted the closing" } };
+const NOT_ADMIN = "Only an administrator can import a statement that does not add up";
 
 let client: ReturnType<typeof fakeClient>;
 
@@ -213,11 +223,32 @@ describe("Banking › Import statement", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/banking");
   });
 
-  it("passes an administrator's override on, and leaves whether it is allowed to the database", async () => {
-    client = fakeClient({ importError: "Only an administrator can import a statement that does not add up" });
+  it("refuses an override from anyone but an administrator, in the database's words, before the database is asked", async () => {
+    expect(PROOF_REFUSAL.notAdmin).toBe(NOT_ADMIN);
+    expect(await importStatementAction(BANK, "march.csv", ROWS, FILE, OVERRIDDEN)).toEqual({ ok: false, error: NOT_ADMIN });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(client.rpcs).toEqual([]);
+    expect(mocks.tieKeptStatementFile).not.toHaveBeenCalled();
+  });
+
+  it("imports an administrator's override through the proved import, the reason trimmed", async () => {
+    mocks.getUserRole.mockResolvedValue("admin");
     const result = await importStatementAction(BANK, "march.csv", ROWS, null, { ...OUT, override: { reason: "  The bank misprinted the closing  " } });
-    expect(result).toEqual({ ok: false, error: "Only an administrator can import a statement that does not add up" });
-    expect(proved()[0].args.p_proof).toEqual({ ...OUT, override: { reason: "The bank misprinted the closing" } });
+    expect(result).toMatchObject({ ok: true, data: { inserted: 2, batchId: "batch-1" } });
+    expect(proved()[0].args.p_proof).toEqual(OVERRIDDEN);
+  });
+
+  it("leaves the database the last word on an administrator's override", async () => {
+    mocks.getUserRole.mockResolvedValue("admin");
+    client = fakeClient({ importError: NOT_ADMIN });
+    expect(await importStatementAction(BANK, "march.csv", ROWS, null, OVERRIDDEN)).toEqual({ ok: false, error: NOT_ADMIN });
+    expect(proved()).toHaveLength(1);
+  });
+
+  it("lets a statement that adds up through, whoever sent an override with it", async () => {
+    const result = await importStatementAction(BANK, "march.csv", ROWS, null, { ...PROOF, override: { reason: "Not needed" } });
+    expect(result.ok).toBe(true);
+    expect(proved()).toHaveLength(1);
   });
 
   it("ties the kept file to the batch, as before", async () => {
@@ -318,10 +349,20 @@ describe("importing into a reconciliation", () => {
     expect(proved()[0].args.p_proof).toEqual(typed);
   });
 
-  it("passes an override on with a statement that does not add up", async () => {
-    const override = { ...OUT, override: { reason: "The bank's own error" } };
-    expect((await importStatementIntoReconciliationAction(REC, statement(override))).ok).toBe(true);
-    expect(proved()[0].args.p_proof).toEqual(override);
+  it("refuses an override from anyone but an administrator before keeping anything", async () => {
+    expect(await importStatementIntoReconciliationAction(REC, statement(OVERRIDDEN))).toEqual({ ok: false, error: NOT_ADMIN });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.setReconciliationStatement).not.toHaveBeenCalled();
+    expect(mocks.getReconciliationHeader).not.toHaveBeenCalled();
+    expect(mocks.pairAndTick).not.toHaveBeenCalled();
+    expect(client.rpcs).toEqual([]);
+  });
+
+  it("passes an administrator's override on with a statement that does not add up", async () => {
+    mocks.getUserRole.mockResolvedValue("admin");
+    expect((await importStatementIntoReconciliationAction(REC, statement(OVERRIDDEN))).ok).toBe(true);
+    expect(mocks.setReconciliationStatement).toHaveBeenCalledTimes(1);
+    expect(proved()[0].args.p_proof).toEqual(OVERRIDDEN);
   });
 });
 
@@ -342,6 +383,24 @@ describe("a month of a statement-files run", () => {
     expect(result).toEqual({ ok: false, error: OUT_REFUSAL });
     expect(mocks.listReconciliations).not.toHaveBeenCalled();
     expect(mocks.createReconciliationFromStatement).not.toHaveBeenCalled();
+  });
+
+  it("is refused before anything is read or written when an override comes with it from anyone but an administrator", async () => {
+    expect(await reconcileRunMonthAction(month(OVERRIDDEN))).toEqual({ ok: false, error: NOT_ADMIN });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.listReconciliations).not.toHaveBeenCalled();
+    expect(mocks.createReconciliationFromStatement).not.toHaveBeenCalled();
+    expect(mocks.pairAndTick).not.toHaveBeenCalled();
+    expect(mocks.completeReconciliation).not.toHaveBeenCalled();
+    expect(client.rpcs).toEqual([]);
+  });
+
+  it("starts the month on an administrator's override, and imports with it", async () => {
+    mocks.getUserRole.mockResolvedValue("admin");
+    const result = await reconcileRunMonthAction(month(OVERRIDDEN));
+    expect(result).toMatchObject({ ok: true, data: { id: REC } });
+    expect(mocks.createReconciliationFromStatement).toHaveBeenCalledWith(client.sb, BANK, "2026-03-31", 99000, expect.anything());
+    expect(proved()[0].args.p_proof).toEqual(OVERRIDDEN);
   });
 
   it("is refused when its statement prints no closing balance", async () => {
