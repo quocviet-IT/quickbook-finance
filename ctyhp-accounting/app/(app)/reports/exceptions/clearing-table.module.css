@@ -1,0 +1,18 @@
+/*
+ * The clearing check's table, on a phone. Layout only, no colour.
+ *
+ * Its Open items and Last movement cells hold sentences that wrap rather than
+ * being cut. In a phone's box the columns would otherwise be squeezed until a
+ * sentence wraps a letter at a time, so below 640px the table is held to its
+ * measured widths and scrolls inside its own box (DataTable's content box
+ * already scrolls) while the page does not. The figure is CLEARING_MIN_WIDTH
+ * in clearing-columns.ts; change one and change the other. At 1280 none of
+ * this applies.
+ */
+
+@media (max-width: 640px) {
+  /* CLEARING_MIN_WIDTH */
+  .clearingTable :global(.ant-table-content) > table {
+    min-width: 856px;
+  }
+}

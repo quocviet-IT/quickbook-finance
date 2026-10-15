@@ -3,14 +3,11 @@ import {
   buildExceptionReport,
   yearTotalsFromMonthly,
   yearsWithIncomeAndNoCost,
-  UNDEPOSITED_CODE,
-  UNDEPOSITED_NAME,
   type CheckKey,
   type ExceptionAccount,
   type ExceptionBankAccount,
   type ExceptionPaymentRef,
   type ExceptionReport,
-  type UndepositedDetail,
 } from "@/lib/domain/exceptions";
 import type { AccountRow } from "@/lib/db/types";
 import type { LedgerBalance } from "@/lib/domain/reports";
@@ -19,6 +16,8 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts, type BankAccountWithGl } from "@/lib/services/banking";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { getBankStanding } from "@/lib/services/bank-standing";
+import type { ClearingStanding } from "@/lib/domain/clearing-accounts";
+import { getClearingStanding } from "@/lib/services/clearing-accounts";
 import { getAllStatementAlerts } from "@/lib/services/statement-alerts";
 import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
 import {
@@ -246,63 +245,6 @@ async function paymentReferences(sb: SupabaseClient): Promise<ExceptionPaymentRe
 }
 
 /**
- * How many entries have touched a holding account, and since when.
- *
- * One query across every holding account, not one per account: past a
- * thousand lines, `entryCount` used to cap and `oldestEntryDate` became the
- * minimum of whatever arbitrary subset arrived, so the screen could print an
- * "Oldest" date later than the true oldest. Paged past the cap and ordered by
- * `id` — not by the embedded entry date, which is a to-many embed PostgREST
- * does not let a caller use to order the parent — so the oldest date is
- * instead the minimum taken client side across every row, which is correct
- * once every page has been read.
- *
- * Only asked about accounts that actually carry a balance, so the common case
- * — an undeposited funds account that empties as it should — costs nothing.
- */
-async function undepositedDetails(
-  sb: SupabaseClient,
-  accountIds: readonly string[],
-  to: string,
-): Promise<Map<string, UndepositedDetail>> {
-  const details = new Map<string, UndepositedDetail>();
-  if (accountIds.length === 0) return details;
-
-  const counts = new Map<string, number>();
-  const oldest = new Map<string, string>();
-
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb
-      .from("acc_journal_line")
-      .select("account_id,journal_entry_id,acc_journal_entry!inner(entry_date,status)")
-      .in("account_id", accountIds)
-      .eq("acc_journal_entry.status", "posted")
-      .lte("acc_journal_entry.entry_date", to)
-      .order("id")
-      .range(from, from + PAGE - 1);
-    if (error) throw new ExceptionsError(error.message);
-    const rows = (data ?? []) as unknown as {
-      account_id: string;
-      acc_journal_entry: { entry_date: string };
-    }[];
-    for (const r of rows) {
-      counts.set(r.account_id, (counts.get(r.account_id) ?? 0) + 1);
-      const seen = oldest.get(r.account_id);
-      if (!seen || r.acc_journal_entry.entry_date < seen) oldest.set(r.account_id, r.acc_journal_entry.entry_date);
-    }
-    if (rows.length < PAGE) break;
-  }
-
-  for (const accountId of accountIds) {
-    details.set(accountId, {
-      entryCount: counts.get(accountId) ?? 0,
-      oldestEntryDate: oldest.get(accountId) ?? null,
-    });
-  }
-  return details;
-}
-
-/**
  * The whole report.
  *
  * `today` is passed in rather than read here, so a caller — and a test — can
@@ -316,7 +258,7 @@ export async function getExceptionReport(
 ): Promise<ExceptionReport> {
   const unavailable: CheckKey[] = [];
   /** The checks that read balances: without them there is nothing to judge. */
-  const BALANCE_CHECKS: readonly CheckKey[] = ["undeposited", "wrongWay", "holding", "unreconciled"];
+  const BALANCE_CHECKS: readonly CheckKey[] = ["clearing", "wrongWay", "holding", "unreconciled"];
 
   const [accountRows, balances, entriesInRange, entriesAfterToday, banks, lastReconciled, earliest] =
     await Promise.all([
@@ -344,23 +286,14 @@ export async function getExceptionReport(
     name: b.name,
     accountType: b.accountType,
     isContra: accountById.get(b.accountId)?.is_contra ?? false,
+    isClearing: accountById.get(b.accountId)?.is_clearing ?? false,
+    detailType: accountById.get(b.accountId)?.detail_type ?? null,
     debitBase: b.debitBase,
     creditBase: b.creditBase,
   }));
 
-  const holdingIds = accounts
-    .filter(
-      (a) =>
-        a.debitBase - a.creditBase !== 0 &&
-        (UNDEPOSITED_NAME.test(a.name) || a.accountCode === UNDEPOSITED_CODE),
-    )
-    .map((a) => a.accountId);
-
-  const [refs, details, byMonth, statementAlerts, bankStanding] = await Promise.all([
+  const [refs, byMonth, statementAlerts, bankStanding, clearingStanding] = await Promise.all([
     readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
-    readOr(unavailable, [], new Map<string, UndepositedDetail>(), () =>
-      undepositedDetails(sb, holdingIds, to),
-    ),
     readOr(unavailable, ["incomeNoCost"], new Map<string, LedgerBalance[]>(), () =>
       earliest === null
         ? Promise.resolve(new Map<string, LedgerBalance[]>())
@@ -374,10 +307,13 @@ export async function getExceptionReport(
     // Only the voided-tick check cannot run without the standing. The "not
     // agreed" rows stand on balances, so they stay and show no since figures.
     readOr(unavailable, ["noLongerAgree"], [] as BankStanding[], () => getBankStanding(sb, to)),
+    // Only the clearing check needs it: the balances above still stand, but
+    // without the standing nothing can be said about how old they are.
+    readOr(unavailable, ["clearing"], [] as ClearingStanding[], () => getClearingStanding(sb, to)),
   ]);
 
   const yearTotals = yearTotalsFromMonthly(byMonth);
-  // A detail of the income check, like the undeposited detail above: if the
+  // A detail of the income check: if the
   // count cannot be read the check still stands, with its count left unknown.
   const entryCountByYear = await readOr(unavailable, [], new Map<string, number>(), () =>
     entriesPerYear(
@@ -398,7 +334,7 @@ export async function getExceptionReport(
     to,
     today,
     accounts,
-    undepositedDetails: details,
+    clearingStanding,
     bankAccounts,
     yearTotals,
     entryCountByYear,

@@ -5,7 +5,7 @@ import { Alert, Button, DatePicker, Select, Space, Spin, Tag, type TableColumnsT
 import dayjs from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
 import DataTable from "@/components/ui/DataTable";
-import { flexColumn } from "@/components/ui/columns";
+import { flexColumn, type FlexColumnSpec } from "@/components/ui/columns";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import {
@@ -26,19 +26,24 @@ import { csvFromExportSheet } from "@/lib/domain/report-export";
 import { PERIOD_PRESETS, presetRange, rangeText, shortDate, type PeriodPreset } from "@/lib/domain/report-presets";
 import {
   CHECK_LABEL,
+  clearingSentences,
   exceptionReportSheet,
   type CheckKey,
+  type ClearingRow,
   type ExceptionPaymentRef,
   type ExceptionReport,
   type HoldingRow,
   type IncomeNoCostRow,
   type NoLongerAgreeRow,
   type TransactionListRow,
-  type UndepositedRow,
   type UnreconciledRow,
   type WrongWayRow,
 } from "@/lib/domain/exceptions";
 import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/lib/domain/statement-alerts";
+import { CLEARING_WHY, CLEARING_FIFO_NOTE, LEFT_STANDING } from "@/lib/domain/clearing-accounts";
+import { ToneBadge } from "@/lib/design/tone";
+import { CLEARING_TAG_WIDTH } from "./clearing-columns";
+import clearingStyles from "./clearing-table.module.css";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -60,6 +65,16 @@ interface ClashTableRow {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * An elastic column that holds a sentence and wraps it, rather than cutting it.
+ * An elastic column cuts with an ellipsis, and on a phone every DataTable cell
+ * is kept to one line (globals.css); a style on the cell itself outranks both,
+ * so "oldest Nov 19, 2025" is never the part that goes missing.
+ */
+function sentenceColumn<T>(spec: FlexColumnSpec<T>) {
+  return { ...flexColumn<T>(spec), ellipsis: false, onCell: () => ({ style: { whiteSpace: "normal" as const } }) };
+}
 
 /**
  * The Exception Report, laid out as the client's prototype lays it out
@@ -307,31 +322,42 @@ export default function ExceptionsClient({
         </ReportSection>
 
         <ReportSection
-          title={CHECK_LABEL.undeposited}
-          note={plural(r.undeposited.length, "account", "accounts")}
-          state={state("undeposited", r.undeposited.length)}
-          why="Undeposited funds should empty as takings reach the bank. A balance that keeps growing means the sales are recorded but the deposits are not — revenue is in the books, the cash is not."
+          title={CHECK_LABEL.clearing}
+          note={plural(r.clearing.length, "account", "accounts")}
+          state={state("clearing", r.clearing.length)}
+          why={`${CLEARING_WHY} ${CLEARING_FIFO_NOTE}`}
         >
-          <DataTable<UndepositedRow>
+          <div className={clearingStyles.clearingTable}>
+          <DataTable<ClearingRow>
             rowKey="accountId"
             pagination={false}
-            dataSource={r.undeposited}
+            dataSource={r.clearing}
             columns={[
-              flexColumn<UndepositedRow>({
+              flexColumn<ClearingRow>({
                 title: "Account",
                 key: "account",
                 render: (_, row) => accountLink(row.accountId, `${row.accountCode} — ${row.name}`),
               }),
               { title: "Balance", key: "balance", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.balanceMinor) },
-              { title: "Entries", key: "entries", width: COLUMN.QTY, align: "right", render: (_, row) => row.entryCount ?? "—" },
+              sentenceColumn<ClearingRow>({
+                title: "Open items",
+                key: "items",
+                render: (_, row) => clearingSentences(row, ran.to, money).composition ?? "—",
+              }),
+              sentenceColumn<ClearingRow>({
+                title: "Last movement",
+                key: "movement",
+                render: (_, row) => clearingSentences(row, ran.to, money).idle ?? "—",
+              }),
               {
-                title: "Oldest",
-                key: "oldest",
-                width: 108,
-                render: (_, row) => (row.oldestEntryDate ? shortDate(row.oldestEntryDate) : "—"),
+                title: "",
+                key: "standing",
+                width: CLEARING_TAG_WIDTH,
+                render: (_, row) => (row.leftStanding ? <ToneBadge tone="warning">{LEFT_STANDING}</ToneBadge> : null),
               },
             ]}
           />
+          </div>
         </ReportSection>
 
         <ReportSection

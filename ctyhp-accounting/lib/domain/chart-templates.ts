@@ -27,6 +27,8 @@ export interface TemplateAccount {
   parent?: string;
   detailType?: string;
   contra?: boolean;
+  /** Starts ticked as a clearing account: it is meant to empty (current assets and liabilities only). */
+  clearing?: boolean;
   /** Left as the migration set it when absent. */
   cashFlowRole?: CashFlowRole;
   /** Seeded by the migrations and looked up by its code: renamed at most, never retyped. */
@@ -64,8 +66,8 @@ const RETAIL_JEWELRY: readonly TemplateAccount[] = [
   bank("1030", "Bank – Savings", "bank", { detailType: "savings", cashFlowRole: "cash" }),
   bank("1040", "Bank – Money Market", "bank", { detailType: "money_market", cashFlowRole: "cash" }),
   bank("1050", "Bank – Credit Union", "bank", { detailType: "other_bank", cashFlowRole: "cash" }),
-  bank("1090", "Transfer Clearing", "current_asset", { detailType: "transfer_clearing", cashFlowRole: "cash_equivalent" }),
-  bank("1210", "Undeposited Funds", "current_asset", { system: true, detailType: "undeposited_funds", cashFlowRole: "operating_asset" }),
+  bank("1090", "Transfer Clearing", "current_asset", { detailType: "transfer_clearing", clearing: true, cashFlowRole: "cash_equivalent" }),
+  bank("1210", "Undeposited Funds", "current_asset", { system: true, detailType: "undeposited_funds", clearing: true, cashFlowRole: "operating_asset" }),
   // Current Assets – Receivables & Inventory
   recv("1100", "Accounts Receivable", "accounts_receivable", { system: true, cashFlowRole: "operating_receivable" }),
   recv("1190", "Allowance for Doubtful Accounts", "current_asset", { system: true, contra: true }),
@@ -176,13 +178,14 @@ export interface TemplateStatement {
 }
 
 const UPSERT = `
-insert into acc_account (account_code, name, account_type, currency_code, is_posting_account, detail_type, is_contra, cash_flow_role)
-values ($1, $2, $3::acc_account_type, 'USD', true, $4, $5, coalesce($6::text, 'unclassified'))
+insert into acc_account (account_code, name, account_type, currency_code, is_posting_account, detail_type, is_contra, cash_flow_role, is_clearing)
+values ($1, $2, $3::acc_account_type, 'USD', true, $4, $5, coalesce($6::text, 'unclassified'), $7)
 on conflict (account_code) do update
    set name = excluded.name,
        detail_type = coalesce(excluded.detail_type, acc_account.detail_type),
        is_contra = excluded.is_contra or acc_account.is_contra,
        cash_flow_role = coalesce($6::text, acc_account.cash_flow_role),
+       is_clearing = excluded.is_clearing or acc_account.is_clearing,
        updated_at = now()`;
 
 const SET_PARENT = `
@@ -197,7 +200,7 @@ export function chartTemplateStatements(key: ChartTemplateKey): TemplateStatemen
   return [
     ...accounts.map((a) => ({
       sql: UPSERT,
-      params: [a.code, a.name, a.type, a.detailType ?? null, a.contra ?? false, a.cashFlowRole ?? null],
+      params: [a.code, a.name, a.type, a.detailType ?? null, a.contra ?? false, a.cashFlowRole ?? null, a.clearing ?? false],
     })),
     ...accounts.filter((a) => a.parent).map((a) => ({ sql: SET_PARENT, params: [a.code, a.parent] })),
   ];

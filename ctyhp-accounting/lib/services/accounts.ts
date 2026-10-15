@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountRow, AccountStatus } from "@/lib/db/types";
+import { CLEARING_TYPE_MESSAGE } from "@/lib/domain/clearing-account-type";
 import {
   accountCreateSchema,
   accountUpdateSchema,
@@ -9,7 +10,7 @@ import {
 
 const TABLE = "acc_account";
 const COLUMNS =
-  "id,account_code,name,account_type,cash_flow_role,detail_type,is_contra,parent_account_id,description," +
+  "id,account_code,name,account_type,cash_flow_role,detail_type,is_contra,is_clearing,parent_account_id,description," +
   "default_tax_code_id,currency_code,is_posting_account,status,effective_from," +
   "effective_to,created_by,approved_by,created_at,updated_at";
 
@@ -21,6 +22,9 @@ function mapWriteError(message: string): never {
   }
   if (message.toLowerCase().includes("cycle")) {
     throw new AccountServiceError("This parent would create a circular account hierarchy");
+  }
+  if (message.includes("acc_account_clearing_type_ck")) {
+    throw new AccountServiceError(CLEARING_TYPE_MESSAGE);
   }
   if (message.includes("same type as its parent")) {
     throw new AccountServiceError("A sub-account must have the same type as its parent");

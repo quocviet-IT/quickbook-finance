@@ -800,6 +800,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "account is edited or deactivated.",
       },
       {
+        action: "Check that clearing accounts have emptied",
+        control: "Clearing accounts that have not emptied",
+        route: "/reports/exceptions",
+        note:
+          "Mark an account as a Clearing account on its form in the Chart of Accounts — Undeposited Funds and Transfer " +
+          "Clearing are marked already. The Exception Report lists each one that still holds a balance, with how many " +
+          "items, the oldest, and when it last moved, counted to the report’s end date. One with no movement for more " +
+          "than 60 days, or an item more than 90 days old, is Left standing: money not yet banked, or something counted " +
+          "twice. The oldest items are found first in, first out.",
+      },
+      {
         action: "Close the period",
         control: "Close period",
         route: "/settings/periods",

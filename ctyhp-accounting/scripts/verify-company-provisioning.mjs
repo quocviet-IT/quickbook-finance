@@ -165,7 +165,7 @@ try {
   const built = new Map(
     (
       await client.query(
-        `select a.account_code, a.account_type::text as type, a.is_contra, a.detail_type, p.account_code as parent
+        `select a.account_code, a.account_type::text as type, a.is_contra, a.is_clearing, a.detail_type, p.account_code as parent
            from co_${RETAIL}.acc_account a
            left join co_${RETAIL}.acc_account p on p.id = a.parent_account_id`,
       )
@@ -177,6 +177,10 @@ try {
   check("each has its template parent", template.every((a) => (built.get(a.code)?.parent ?? undefined) === a.parent));
   check("contra accounts are flagged", template.every((a) => Boolean(built.get(a.code)?.is_contra) === Boolean(a.contra)));
   check("Undeposited Funds sits with the bank accounts", built.get("1210")?.detail_type === "undeposited_funds");
+  check(
+    "Undeposited Funds and Transfer Clearing start ticked as clearing accounts, and nothing else does",
+    [...built.values()].every((r) => Boolean(r.is_clearing) === (r.account_code === "1210" || r.account_code === "1090")),
+  );
   check(
     "the non-current liabilities are long-term",
     ["2500", "2600", "2700", "2990"].every((c) => built.get(c)?.type === "long_term_liability"),

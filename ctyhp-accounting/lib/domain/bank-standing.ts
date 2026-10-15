@@ -75,7 +75,7 @@ export interface StandingView {
 }
 
 /** Whole days from one date to another; null when either does not parse. */
-function daysFromTo(fromIso: string, toIso: string): number | null {
+export function daysFromTo(fromIso: string, toIso: string): number | null {
   const a = Date.parse(`${fromIso}T00:00:00Z`);
   const b = Date.parse(`${toIso}T00:00:00Z`);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
