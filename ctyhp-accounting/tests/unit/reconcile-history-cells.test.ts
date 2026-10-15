@@ -61,7 +61,9 @@ describe("historySinceCell", () => {
   });
   it("gives all the lines of a never-reconciled account", () => {
     expect(historySinceCell(never, money)).toEqual(["7 entries", "-$45.00"]);
-    expect(historySinceCell({ ...never, sinceCount: 0, sinceNetMinor: 0 }, money)).toEqual(["0 entries", "$0.00"]);
+  });
+  it("says no activity for a never-reconciled account with nothing in it, as the Balance Sheet does", () => {
+    expect(historySinceCell({ ...never, sinceCount: 0, sinceNetMinor: 0, bookMinor: 0 }, money)).toEqual(["No activity"]);
   });
   it("is a dash when the standing is unread", () => {
     expect(historySinceCell(null, money)).toEqual(["—"]);

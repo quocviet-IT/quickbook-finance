@@ -789,6 +789,18 @@ describe("Reconciliations that no longer agree", () => {
     expect(names.get("Payroll Account")).toBe("");
   });
 
+  it("says Nothing since in the sheet when nothing has gone in, as Reconcile history does", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        accounts: [account({ accountId: "a1", accountCode: "1000", name: "Business Checking", debitBase: 500_00 })],
+        bankAccounts: banks,
+        bankStanding: [standing({ bankAccountId: "b1", sinceCount: 0, sinceNetMinor: 0 })],
+      }),
+    );
+    const row = exceptionReportSheet(report, meta).rows.find((r) => r.check === CHECK_LABEL.unreconciled && r.account === "Business Checking");
+    expect(row?.name).toBe("Nothing since");
+  });
+
   it("says Could not run when the standing could not be read", () => {
     const rows = exceptionReportSheet(buildExceptionReport(emptyInput({ unavailable: ["noLongerAgree"] })), meta).rows;
     expect(rows.find((r) => r.check === CHECK_LABEL.noLongerAgree)?.name).toBe("Could not run");

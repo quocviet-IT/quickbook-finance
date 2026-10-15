@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
 import { chosenBankId } from "@/lib/domain/reconcile-alerts-screen";
@@ -87,6 +88,8 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
   }, [bankId]);
 
   const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  // The card is a sentence, read beside the Balance Sheet's: money with its currency, as there.
+  const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   // Finished reading and none found: the card is the empty state. While either
   // read runs the table keeps its loading state, so neither "No data" nor a
@@ -145,7 +148,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
         />
       ) : null}
       {bank ? (
-        <StandingCard accountName={bank.name} standing={standing?.bankAccountId === bank.id ? standing : null} today={today} money={fmt} empty={isEmpty}>
+        <StandingCard accountName={bank.name} standing={standing?.bankAccountId === bank.id ? standing : null} today={today} money={money} empty={isEmpty}>
           {canWrite && (
             <Button type="primary" onClick={() => setOpen(true)} disabled={!bankId}>
               New reconciliation

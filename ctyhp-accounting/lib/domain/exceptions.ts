@@ -709,7 +709,12 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       check: CHECK_LABEL.unreconciled,
       date: u.lastReconciledDate ?? "never",
       type: "Last reconciled",
-      name: u.sinceCount === null ? "" : `${u.sinceCount === 1 ? "1 entry" : `${u.sinceCount} entries`} since`,
+      name:
+        u.sinceCount === null
+          ? ""
+          : u.sinceCount === 0
+            ? "Nothing since"
+            : `${u.sinceCount === 1 ? "1 entry" : `${u.sinceCount} entries`} since`,
       account: u.accountName,
       amount: money(u.balanceMinor),
     })),

@@ -424,6 +424,9 @@ export default function ExceptionsClient({
                 render: (_, row) =>
                   row.sinceCount === null || row.sinceNetMinor === null ? (
                     "—"
+                  ) : row.sinceCount === 0 ? (
+                    // As Reconcile history says it.
+                    "Nothing since"
                   ) : (
                     <span>
                       {plural(row.sinceCount, "entry", "entries")}

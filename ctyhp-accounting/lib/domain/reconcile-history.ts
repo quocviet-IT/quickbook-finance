@@ -79,6 +79,8 @@ export function historyClosingCell(
 export function historySinceCell(standing: BankStanding | null | undefined, money: (minor: number) => string): string[] {
   if (!standing) return ["—"];
   if (standing.lastCompletedDate !== null && standing.sinceCount === 0) return ["Nothing since"];
+  // As the Balance Sheet's panel says it: never reconciled, and nothing to reconcile.
+  if (standing.sinceCount === 0 && standing.bookMinor === 0) return ["No activity"];
   return [entriesCount(standing.sinceCount), money(standing.sinceNetMinor)];
 }
 
