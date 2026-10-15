@@ -303,9 +303,10 @@ function oldestFirst(counted: readonly Counted[]): Counted[] {
 
 /**
  * A CSV's own balances: it opens at its first balance less the lines up to and
- * including that one, and closes at the balance on its last line. Each balance
- * must be the one before it plus the lines between; the first that is not is
- * named by the line it jumps after.
+ * including that one, and closes at its last balance plus the lines after it,
+ * as a PDF whose last rows print no balance closes (pdf-statement.ts). Each
+ * balance must be the one before it plus the lines between; the first that is
+ * not is named by the line it jumps after.
  */
 function csvBalances(counted: readonly Counted[], money: (minor: number) => string) {
   const ordered = oldestFirst(counted);
@@ -321,9 +322,19 @@ function csvBalances(counted: readonly Counted[], money: (minor: number) => stri
       break;
     }
   }
-  const last = ordered[ordered.length - 1];
-  const lastBalance = last ? balanceOf(last) : null;
-  const closing: Figure<ClosingBasis> | null = lastBalance === null ? null : { minor: lastBalance, basis: "running" };
+  // The last balance holds nothing below it: the lines after it that carry none
+  // are added, so a month whose last rows print no balance closes where those
+  // lines take it, and a run of months does not stop there.
+  let closing: Figure<ClosingBasis> | null = null;
+  let trailing = 0;
+  for (let k = ordered.length - 1; k >= 0; k--) {
+    const balance = balanceOf(ordered[k]);
+    if (balance !== null) {
+      closing = { minor: balance + trailing, basis: "running" };
+      break;
+    }
+    trailing += ordered[k].line.amount_minor;
+  }
 
   let chainBreak: LinePointer | null = null;
   let balance: number | null = null;

@@ -126,6 +126,25 @@ describe("monthsFromCsv", () => {
     ]);
     expect(result.stops).toEqual([]);
   });
+
+  it("does not stop the run at a month whose last rows carry no balance", () => {
+    const months = monthsFromCsv("bank.csv", [
+      csvLine("2026-07-03", 50000, 150000),
+      csvLine("2026-07-30", -2500, null),
+      csvLine("2026-08-04", 3000, 150500),
+      csvLine("2026-08-25", -9000, 141500),
+    ]);
+    expect(months.map((m) => [m.openingMinor, m.closingMinor, m.problem])).toEqual([
+      [100000, 147500, null],
+      [147500, 141500, null],
+    ]);
+    const result = checkRun(months, noContext, money);
+    expect(result.statements.map((c) => [c.state, c.proof?.proves, c.proof?.closingMinor])).toEqual([
+      ["usable", true, 147500],
+      ["usable", true, 141500],
+    ]);
+    expect(result.stops).toEqual([]);
+  });
 });
 
 describe("statementsFromPdf", () => {

@@ -194,9 +194,16 @@ describe("a CSV", () => {
     expect(proof.sentences.detail).toBe("The balance jumps after the line of Mar 2, 2026 (10.00).");
   });
 
-  it("takes no closing from a last line that prints no balance", () => {
+  it("closes at the last balance plus the lines after it when the last line prints none, as a PDF does", () => {
     const proof = proveStatement({ kind: "csv", lines: [line("2026-03-02", 1000, "A", 11000), line("2026-03-03", -200, "B")] }, money);
-    expect(proof).toMatchObject({ openingMinor: 10000, closingMinor: null, missing: "closing", proves: false });
+    expect(proof).toMatchObject({ openingMinor: 10000, closingMinor: 10800, missing: null, proves: true });
+    const tail = [line("2026-03-02", 1000, "A", 11000), line("2026-03-03", -200, "B"), line("2026-03-04", -50, "C")];
+    expect(proveStatement({ kind: "csv", lines: tail }, money)).toMatchObject({ closingMinor: 10750, proves: true });
+  });
+
+  it("still finds no closing when no line prints a balance", () => {
+    const proof = proveStatement({ kind: "csv", lines: [line("2026-03-02", 1000, "A"), line("2026-03-03", -200, "B")] }, money);
+    expect(proof).toMatchObject({ closingMinor: null, proves: false });
   });
 
   describe("without a balance column", () => {
