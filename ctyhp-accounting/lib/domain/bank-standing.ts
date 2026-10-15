@@ -205,3 +205,24 @@ export function balanceSheetBanks(
       a.bankAccountId.localeCompare(b.bankAccountId),
   );
 }
+
+/* --------------------------------------------------------------- reconcile */
+
+/** What Reconcile's standing card draws for the chosen account. */
+export interface ReconcileCard {
+  tone: StandingTone;
+  text: string;
+  /** The extra danger line, or null. */
+  noLongerAgrees: string | null;
+}
+
+/** The card: its sentence, the tone of the last agreed statement's age, and the extra line. */
+export function reconcileCard(accountName: string, s: BankStanding, today: string, money: Money): ReconcileCard {
+  const view = describeStanding(s, today, money);
+  return { tone: view.tone, text: reconcileCardText(accountName, s, money), noLongerAgrees: view.noLongerAgrees };
+}
+
+/** The empty state's sentence; plain when the standing could not be read. */
+export function reconcileEmptyText(accountName: string, s: BankStanding | null, money: Money): string {
+  return s ? reconcileCardText(accountName, s, money) : `${accountName} has never been reconciled.`;
+}
