@@ -5,7 +5,7 @@ import { getExceptionReport } from "@/lib/services/exceptions";
 /**
  * The `unavailable` mechanism, which is where this branch's worst bugs lived.
  *
- * `getExceptionReport` reads ten checks' worth of data behind `readOr`,
+ * `getExceptionReport` reads eleven checks' worth of data behind `readOr`,
  * which is supposed to tag exactly the checks a failed read affects — no
  * more, no fewer — and let the rest of the report through untouched. Each
  * test here fails exactly one read and inspects what got tagged, because a
@@ -35,6 +35,7 @@ interface ReaderConfig {
   undepositedLines: Source;
   monthlyBalances: Source;
   reconciliationLines: Source;
+  bankStanding: Source;
 }
 
 function defaultConfig(): ReaderConfig {
@@ -51,6 +52,7 @@ function defaultConfig(): ReaderConfig {
     undepositedLines: [],
     monthlyBalances: [],
     reconciliationLines: [],
+    bankStanding: [],
   };
 }
 
@@ -143,6 +145,10 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
         return paged(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange);
       }
       if (name === "acc_monthly_ledger_balances") return paged(c.monthlyBalances);
+      if (name === "acc_bank_standing") {
+        const ordered = { order: () => paged(c.bankStanding) };
+        return ordered;
+      }
       throw new Error(`fakeClient: unhandled rpc "${name}"`);
     },
   };
@@ -221,7 +227,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     const sb = fakeClient();
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
     expect(report.unavailable).toEqual([]);
-    expect(report.checksRun).toBe(10);
+    expect(report.checksRun).toBe(11);
   });
 
   it("tags both statement checks, and only them, when the bank-account lines cannot be read", async () => {
@@ -292,3 +298,47 @@ function journalLine(id: string, entryId: string, date: string, debit: number, c
     acc_journal_entry: { id: entryId, entry_number: `JE-${id}`, entry_date: date, source_type: "manual" },
   };
 }
+
+describe("getExceptionReport: the bank standing read", () => {
+  const LEDGER = {
+    account_id: "gl-1",
+    account_code: "1000",
+    name: "Operating Checking",
+    account_type: "bank",
+    debit_base: 120_000,
+    credit_base: 0,
+  };
+  const STANDING = {
+    bank_account_id: "bank-1",
+    since_count: 3,
+    since_net_minor: -4_500,
+    void_ticked_count: 2,
+    void_ticked_minor: 9_900,
+    void_reconciliation_date: "2026-06-30",
+  };
+
+  it("fills the voided-tick rows and the since figures from one standing read", async () => {
+    const sb = fakeClient({ bankAccounts: [BANK], ledgerBalances: [LEDGER], bankStanding: [STANDING] });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual([]);
+    expect(report.noLongerAgree).toEqual([
+      { bankAccountId: "bank-1", accountName: "Operating Checking", entryCount: 2, amountMinor: 9_900, reconciliationDate: "2026-06-30" },
+    ]);
+    expect(report.unreconciled).toHaveLength(1);
+    expect(report.unreconciled[0]).toMatchObject({ sinceCount: 3, sinceNetMinor: -4_500 });
+  });
+
+  it("tags only the voided-tick check when the standing cannot be read, and keeps the not-agreed rows", async () => {
+    const sb = fakeClient({
+      bankAccounts: [BANK],
+      ledgerBalances: [LEDGER],
+      bankStanding: new Error("acc_bank_standing missing"),
+    });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual(["noLongerAgree"]);
+    expect(report.noLongerAgree).toEqual([]);
+    expect(report.unreconciled).toHaveLength(1);
+    expect(report.unreconciled[0].sinceCount).toBeNull();
+    expect(report.unreconciled[0].sinceNetMinor).toBeNull();
+  });
+});
