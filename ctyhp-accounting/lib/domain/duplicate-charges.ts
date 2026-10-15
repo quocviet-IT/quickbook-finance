@@ -174,16 +174,38 @@ export function findDuplicateCharges(
         const gaps = group.slice(1).map((l, i) => daysFromTo(group[i].date, l.date) ?? Infinity);
         const usual = group.length >= 3 ? median(gaps) : null;
 
+        const rhythm = usual !== null && usual >= RHYTHM_MIN_MEDIAN_DAYS;
+        const isCandidate = (i: number): boolean =>
+          i < gaps.length &&
+          gaps[i] <= DUPLICATE_MAX_GAP_DAYS &&
+          !(rhythm && Math.abs(gaps[i] - usual!) <= RHYTHM_TOLERANCE_DAYS);
+
         for (let i = 0; i < gaps.length; i += 1) {
-          const gap = gaps[i];
-          if (gap > DUPLICATE_MAX_GAP_DAYS) continue;
-          if (usual !== null && usual >= RHYTHM_MIN_MEDIAN_DAYS && Math.abs(gap - usual) <= RHYTHM_TOLERANCE_DAYS) continue;
+          if (!isCandidate(i)) continue;
 
           const first = group[i];
           const second = group[i + 1];
-          if (first.cleared && second.cleared) continue;
+          let gap = gaps[i];
+          let reviewSide: "earlier" | "later" = "later";
 
-          const reviewSide: "earlier" | "later" = first.cleared && !second.cleared ? "later" : second.cleared && !first.cleared ? "earlier" : "later";
+          // An extra payment between two regular ones breaks the rhythm on both
+          // sides. Its neighbours are the regular payments, so only the extra
+          // line is offered, paired with the earlier regular payment.
+          let extra = false;
+          if (rhythm && isCandidate(i + 1)) {
+            const across = daysFromTo(first.date, group[i + 2].date);
+            if (across !== null && Math.abs(across - usual!) <= RHYTHM_TOLERANCE_DAYS) {
+              extra = true;
+              i += 1; // the (B, C) pair is this same extra payment
+            }
+          }
+          if (extra) {
+            if (second.cleared) continue; // a signed-off extra is not offered
+          } else {
+            if (first.cleared && second.cleared) continue;
+            if (second.cleared && !first.cleared) reviewSide = "earlier";
+          }
+          gap = gaps[extra ? i - 1 : i];
           const review = reviewSide === "later" ? second : first;
           found.push({
             bankAccountId: account.bankAccountId,

@@ -103,6 +103,49 @@ describe("findDuplicateCharges", () => {
     expect(out[0].daysApart).toBe(1);
   });
 
+  describe("an extra payment between two regular ones", () => {
+    const months = [
+      "2025-11-01", "2025-12-01", "2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01",
+      "2026-05-01", "2026-06-01", "2026-07-01", "2026-08-01", "2026-09-01", "2026-10-01",
+    ];
+    const rent = (over: Partial<BankLine> = {}, dates = months) =>
+      dates.map((d) => line(d, -150000, "HARBOR RENT CO", over));
+
+    it("offers only the extra, paired with the earlier regular payment", () => {
+      const regular = rent();
+      const extra = line("2026-09-15", -150000, "HARBOR RENT CO");
+      const out = find([...regular, extra]);
+      expect(out).toHaveLength(1);
+      expect(out[0].reviewLineId).toBe(extra.lineId);
+      expect(out[0].reviewSide).toBe("later");
+      expect(out[0].earlier.date).toBe("2026-09-01");
+      expect(out[0].later.lineId).toBe(extra.lineId);
+      expect(out[0].daysApart).toBe(14);
+    });
+
+    it("does not offer an extra that is signed off", () => {
+      const extra = line("2026-09-15", -150000, "HARBOR RENT CO", { cleared: true });
+      expect(find([...rent(), extra])).toHaveLength(0);
+    });
+
+    it("reviews the extra when the regular payment before it is signed off", () => {
+      const regular = rent({}, months.slice(0, 10));
+      const a = line("2026-09-01", -150000, "HARBOR RENT CO", { cleared: true });
+      const c = line("2026-10-01", -150000, "HARBOR RENT CO");
+      const extra = line("2026-09-15", -150000, "HARBOR RENT CO");
+      const out = find([...regular, a, extra, c]);
+      expect(out).toHaveLength(1);
+      expect(out[0].reviewLineId).toBe(extra.lineId);
+    });
+
+    it("offers one candidate for each extra in different months", () => {
+      const e1 = line("2026-02-15", -150000, "HARBOR RENT CO");
+      const e2 = line("2026-07-15", -150000, "HARBOR RENT CO");
+      const out = find([...rent(), e1, e2]);
+      expect(out.map((c) => c.reviewLineId).sort()).toEqual([e1.lineId, e2.lineId].sort());
+    });
+  });
+
   it("leaves a weekly subscription alone and flags a double charge on one day", () => {
     const weekly = ["2026-09-01", "2026-09-08", "2026-09-15", "2026-09-22", "2026-09-29"].map((d) =>
       line(d, -499, "STREAMBOX"),
