@@ -42,6 +42,12 @@ describe("duplicatePayeeKey", () => {
     expect(duplicatePayeeKey("POS DEBIT 1234")).toBe("");
     expect(duplicatePayeeKey("")).toBe("");
   });
+  it("reads accented names as whole words, so unrelated Vietnamese payees do not share a key", () => {
+    expect(duplicatePayeeKey("Công Ty Thịnh Vượng")).toBe("cong ty");
+    expect(duplicatePayeeKey("Nguyễn Văn An")).toBe("nguyen van");
+    expect(duplicatePayeeKey("Đại Lộc Trading")).toBe("dai loc");
+    expect(duplicatePayeeKey("Nguyễn Văn An")).not.toBe(duplicatePayeeKey("Nguyên Vật Liệu"));
+  });
 });
 
 describe("descriptionShape", () => {

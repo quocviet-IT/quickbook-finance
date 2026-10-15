@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.08",
+    date: "2026-10-15",
+    headline: "A charge that looks taken twice is put in front of you to check, never removed for you.",
+    changes: [
+      {
+        kind: "added",
+        title: "Possible duplicate charges in the Banking overview",
+        detail:
+          "Two charges to the same payee, for the same amount, within 30 days of each other, now appear in the Banking overview's work list under Possible duplicates — for example “Shopmart: $39.99 twice in 15 days”, with the account and both dates. The payee is read past the card and web wording a bank adds, so “SHOPMART.COM 8004” and “POS DEBIT SHOPMART #1234” are one payee. Rent, subscriptions and other payments that come at a steady rhythm are left alone unless one breaks it, such as rent paid twice in one month. A charge whose description reads differently from the payee’s other lines is marked so and comes first. Review opens the entry; void it yourself if it is a real duplicate. Dismiss asks for a reason, and the pair is not offered again. A line already on a completed reconciliation is never the one offered for review. The last 12 months are checked.",
+        route: "/banking/overview",
+      },
+    ],
+  },
+  {
     version: "2.07",
     date: "2026-10-15",
     headline: "A CSV month no longer stops a run where its last rows print no balance, and every statement goes in through its proof.",

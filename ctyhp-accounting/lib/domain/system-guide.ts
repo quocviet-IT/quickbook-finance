@@ -741,6 +741,18 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "again, Undo recode first.",
       },
       {
+        action: "Check a charge that may have been taken twice",
+        control: "Possible duplicates",
+        route: "/banking/overview",
+        note:
+          "The Banking overview lists two charges to the same payee, for the same amount, within 30 days — over the last " +
+          "12 months — under Possible duplicates. A regular payment, such as rent or a subscription, is left alone unless one " +
+          "breaks its rhythm, and a charge whose description reads differently from the payee's others comes first. Review " +
+          "opens the entry; void it yourself if the bank took the money twice, since nothing is removed for you. Dismiss " +
+          "asks for a reason and the pair is not offered again. A line on a completed reconciliation is never the one " +
+          "offered for review.",
+      },
+      {
         action: "View the statement file",
         control: "View",
         route: "/banking/reconcile",

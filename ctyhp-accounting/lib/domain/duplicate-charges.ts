@@ -30,8 +30,16 @@ const SHAPE_CHANNEL_WORDS = CHANNEL_WORDS.filter((w) => w !== "www" && w !== "co
  * Lower-case, channel words out, digits and punctuation out, first two words.
  * Empty when nothing is left, and an empty key is never grouped.
  */
+/**
+ * Letters without their accents, so "Công Ty Hùng Phát" keys as "cong ty"
+ * rather than splitting at every accented letter ("c ng").
+ */
+function plainLetters(text: string): string {
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
+}
+
 export function duplicatePayeeKey(text: string): string {
-  const words = text
+  const words = plainLetters(text)
     .toLowerCase()
     .replace(/['’]/g, "")
     .split(/[^a-z]+/)
@@ -45,7 +53,7 @@ export function duplicatePayeeKey(text: string): string {
  * name is not part of it.
  */
 export function descriptionShape(text: string): string {
-  const lower = text.toLowerCase();
+  const lower = plainLetters(text).toLowerCase();
   const words = new Set(lower.split(/[^a-z]+/).filter(Boolean));
   const parts: string[] = SHAPE_CHANNEL_WORDS.filter((w) => words.has(w));
   if (/\.com\b/.test(lower) || words.has("www")) parts.push(".com");
