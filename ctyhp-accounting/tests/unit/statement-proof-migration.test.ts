@@ -376,7 +376,8 @@ describe("0143 leaves acc_import_bank_statement as it was", () => {
     const dir = join(process.cwd(), "supabase/migrations");
     const definers = readdirSync(dir)
       .filter((f) => f.endsWith(".sql"))
-      .filter((f) => /function acc_import_bank_statement\s*\(/i.test(strip(read(`supabase/migrations/${f}`))));
+      // A definition, not a mention: 0146 revokes it, which is no redefinition.
+      .filter((f) => /create\s+(or\s+replace\s+)?function\s+acc_import_bank_statement\s*\(/i.test(strip(read(`supabase/migrations/${f}`))));
     expect(definers).toEqual(["0058_atomic_documents_and_audit.sql"]);
     expect(original).toMatch(/on conflict \(bank_account_id, raw_hash\) do nothing/i);
     expect(original).toMatch(/return query select v_inserted, v_count - v_inserted, v_batch;/i);

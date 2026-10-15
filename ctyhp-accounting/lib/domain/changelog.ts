@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.07",
+    date: "2026-10-15",
+    headline: "A CSV month no longer stops a run where its last rows print no balance, and every statement goes in through its proof.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A CSV whose last rows print no balance closes where those lines take it",
+        detail:
+          "A CSV statement, or one month of a CSV in From statement files, whose last rows carry no running balance now closes at its last balance plus the lines after it, as a PDF already did. Before, it read as having no closing balance: Import statement asked for the closing to be typed, and a run of months stopped at that month.",
+        route: "/banking/reconcile/from-files",
+      },
+      {
+        kind: "fixed",
+        title: "Every statement goes in through its proof",
+        detail:
+          "The older import, which took a statement without checking that it adds up, can no longer be called directly. Import statement and From statement files already went through the one that proves the statement first, so nothing on the screen changes.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.06",
     date: "2026-10-15",
     headline: "A clearing account that should have emptied says what it still holds, and how long it has been left.",
