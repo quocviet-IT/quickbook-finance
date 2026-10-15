@@ -470,44 +470,9 @@ export interface BelowZeroAccount {
   ghostEntries: number;
 }
 
-export interface BalanceSheetNote {
-  /** "{A} and {B} are below zero." */
-  headline: string;
-  /** The second sentence. */
-  detail: string;
-  /** One link to Reconcile per account. */
-  links: { bankAccountId: string; accountName: string; href: string; label: string }[];
-}
-
-/** "A", "A and B", "A, B and C". */
-function nameList(names: readonly string[]): string {
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
 /** The address of the Reconcile start screen for one bank account. */
 export function reconcileHref(bankAccountId: string): string {
   return `/banking/reconcile?account=${encodeURIComponent(bankAccountId)}`;
-}
-
-/** The note under a Balance Sheet; null when no bank account is below zero. */
-export function balanceSheetNote(accounts: readonly BelowZeroAccount[]): BalanceSheetNote | null {
-  if (accounts.length === 0) return null;
-  const ghostEntries = accounts.reduce((sum, a) => sum + a.ghostEntries, 0);
-  const one = accounts.length === 1;
-  return {
-    headline: `${nameList(accounts.map((a) => a.accountName))} ${one ? "is" : "are"} below zero.`,
-    detail:
-      ghostEntries > 0
-        ? `${ghostEntries} ${ghostEntries === 1 ? "entry" : "entries"} on ${one ? "it" : "those accounts"} look${ghostEntries === 1 ? "s" : ""} like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them.`
-        : "Reconcile shows what has gone in since the last statement you agreed.",
-    links: accounts.map((a) => ({
-      bankAccountId: a.bankAccountId,
-      accountName: a.accountName,
-      href: reconcileHref(a.bankAccountId),
-      label: one ? "Open Reconcile" : `Open Reconcile for ${a.accountName}`,
-    })),
-  };
 }
 
 /* -------------------------------------------------------------- exceptions */

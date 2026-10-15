@@ -477,11 +477,12 @@ describe("a run of statement files", () => {
 // --- Release notes and the Guide -------------------------------------------------------
 
 describe("2.04 in the release notes and the Guide", () => {
-  const release = RELEASES[0];
+  // Looked up by number: later releases sit above it.
+  const release = RELEASES.find((r) => r.version === "2.04")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
-  it("is the newest release, dated the day it was built", () => {
-    expect(release.version).toBe("2.04");
+  it("is in the release notes, dated the day it was built", () => {
+    expect(release).toBeDefined();
     expect(release.date).toBe("2026-10-14");
   });
 

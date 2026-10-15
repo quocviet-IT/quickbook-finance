@@ -18,6 +18,9 @@ import {
   BankRecError, type ReconLineView, type ReconDetail, type DiscrepancyRow,
 } from "@/lib/services/bankrec";
 import type { StatementReconciliationRow } from "@/lib/db/types";
+import type { BankStanding } from "@/lib/domain/bank-standing";
+import { getBankStanding } from "@/lib/services/bank-standing";
+import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { matchAfterCompletion, type CompletionMatching } from "@/lib/services/statement-bank-lines";
 import {
   executeOrSubmitForApproval,
@@ -113,6 +116,23 @@ export async function reconciliationDetailAction(id: string): Promise<ActionResu
 }
 export async function discrepanciesAction(bankAccountId: string): Promise<ActionResult<DiscrepancyRow[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getDiscrepancies(sb, bankAccountId) }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+/**
+ * One bank account's standing against its statements at the company's today,
+ * for any signed-in role; null when the read has no row for it. Reads only.
+ */
+export async function bankStandingAction(bankAccountId: string): Promise<ActionResult<BankStanding | null>> {
+  const role = await getUserRole();
+  if (!role) return { ok: false, error: "Not authorized" };
+  if (!z.uuid().safeParse(bankAccountId).success) return { ok: false, error: "Choose a bank account" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const { asOf } = await getBankingContext(sb);
+    const standings = await getBankStanding(sb, asOf);
+    return { ok: true, data: standings.find((s) => s.bankAccountId === bankAccountId) ?? null };
+  }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 

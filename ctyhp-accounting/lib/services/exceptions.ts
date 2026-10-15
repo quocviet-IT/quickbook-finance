@@ -17,6 +17,8 @@ import type { LedgerBalance } from "@/lib/domain/reports";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
 import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts, type BankAccountWithGl } from "@/lib/services/banking";
+import type { BankStanding } from "@/lib/domain/bank-standing";
+import { getBankStanding } from "@/lib/services/bank-standing";
 import { getAllStatementAlerts } from "@/lib/services/statement-alerts";
 import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
 import {
@@ -354,7 +356,7 @@ export async function getExceptionReport(
     )
     .map((a) => a.accountId);
 
-  const [refs, details, byMonth, statementAlerts] = await Promise.all([
+  const [refs, details, byMonth, statementAlerts, bankStanding] = await Promise.all([
     readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
     readOr(unavailable, [], new Map<string, UndepositedDetail>(), () =>
       undepositedDetails(sb, holdingIds, to),
@@ -369,6 +371,9 @@ export async function getExceptionReport(
     readOr(unavailable, ["statementBalance", "belowZero"], [] as BankAccountAlerts[], () =>
       getAllStatementAlerts(sb),
     ),
+    // Only the voided-tick check cannot run without the standing. The "not
+    // agreed" rows stand on balances, so they stay and show no since figures.
+    readOr(unavailable, ["noLongerAgree"], [] as BankStanding[], () => getBankStanding(sb, to)),
   ]);
 
   const yearTotals = yearTotalsFromMonthly(byMonth);
@@ -401,6 +406,7 @@ export async function getExceptionReport(
     entriesAfterToday,
     paymentReferences: refs,
     statementAlerts,
+    bankStanding,
     unavailable,
   });
 }

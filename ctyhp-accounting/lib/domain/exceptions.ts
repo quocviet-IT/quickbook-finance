@@ -1,5 +1,5 @@
 /**
- * The ten checks a reviewer runs by hand.
+ * The eleven checks a reviewer runs by hand.
  *
  * From the client's prototype: "None of these is proof of an error. Each is a
  * question worth answering." Nothing here accuses; each check raises a
@@ -17,6 +17,7 @@ import { ACCOUNT_TYPE_LABEL, naturalBalance, type AccountType } from "@/lib/doma
 import { entryDisplayName, sourceLabel } from "@/lib/domain/entry-detail";
 import { fromMinor } from "@/lib/domain/money";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
+import type { BankStanding } from "@/lib/domain/bank-standing";
 import { rangeText } from "@/lib/domain/report-presets";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import {
@@ -34,7 +35,7 @@ import type { TransactionListRow } from "@/lib/domain/transaction-list";
 export type { LedgerBalance, TransactionListRow };
 
 /**
- * The ten, named once.
+ * The eleven, named once.
  *
  * The screen draws its section headings from here and the service names a
  * failed read from here, so a check cannot be called two different things in
@@ -51,6 +52,7 @@ export const CHECK_LABEL = {
   holding: "Still sitting in a holding account",
   statementBalance: "Entries that look like a statement balance",
   belowZero: "Bank accounts below zero since their last statement",
+  noLongerAgree: "Reconciliations that no longer agree",
 } as const;
 
 export type CheckKey = keyof typeof CHECK_LABEL;
@@ -249,6 +251,10 @@ export interface UnreconciledRow {
   accountName: string;
   balanceMinor: number;
   lastReconciledDate: string | null;
+  /** Entries on the account not yet on a completed statement; null when the standing was not read. */
+  sinceCount: number | null;
+  /** Their net effect on the balance, in minor units; null when not read. */
+  sinceNetMinor: number | null;
 }
 
 /**
@@ -261,7 +267,9 @@ export function unreconciledBankAccounts(
   banks: readonly ExceptionBankAccount[],
   balanceByAccountId: ReadonlyMap<string, number>,
   to: string,
+  standing: readonly BankStanding[] = [],
 ): UnreconciledRow[] {
+  const standingById = new Map(standing.map((x) => [x.bankAccountId, x]));
   const rows: UnreconciledRow[] = [];
   for (const b of banks) {
     const balanceMinor = balanceByAccountId.get(b.accountId) ?? 0;
@@ -273,9 +281,50 @@ export function unreconciledBankAccounts(
       accountName: b.accountName,
       balanceMinor,
       lastReconciledDate: b.lastReconciledDate,
+      sinceCount: standingById.get(b.bankAccountId)?.sinceCount ?? null,
+      sinceNetMinor: standingById.get(b.bankAccountId)?.sinceNetMinor ?? null,
     });
   }
   return rows.sort((x, y) => x.accountName.localeCompare(y.accountName));
+}
+
+export interface NoLongerAgreeRow {
+  bankAccountId: string;
+  accountName: string;
+  /** Entries ticked on a completed reconciliation and voided since. */
+  entryCount: number;
+  amountMinor: number;
+  /** The completed reconciliation they were ticked on. */
+  reconciliationDate: string | null;
+}
+
+/**
+ * Reconciliations whose ticked entries were voided afterwards.
+ *
+ * One row per bank account with at least one such entry, named from the bank
+ * accounts it is joined to; a standing row for an account that is not in the
+ * list has no name to show and is left out.
+ */
+export function reconciliationsNoLongerAgreeing(
+  banks: readonly ExceptionBankAccount[],
+  standing: readonly BankStanding[],
+): NoLongerAgreeRow[] {
+  const nameById = new Map(banks.map((b) => [b.bankAccountId, b.accountName]));
+  const rows: NoLongerAgreeRow[] = [];
+  for (const x of standing) {
+    const accountName = nameById.get(x.bankAccountId);
+    if (accountName === undefined || x.voidTickedCount <= 0) continue;
+    rows.push({
+      bankAccountId: x.bankAccountId,
+      accountName,
+      entryCount: x.voidTickedCount,
+      amountMinor: x.voidTickedMinor,
+      reconciliationDate: x.voidReconciliationDate,
+    });
+  }
+  return rows.sort(
+    (a, b) => a.accountName.localeCompare(b.accountName) || a.bankAccountId.localeCompare(b.bankAccountId),
+  );
 }
 
 const INCOME_TYPES: ReadonlySet<AccountType> = new Set<AccountType>(["income", "other_income"]);
@@ -461,6 +510,11 @@ export interface ExceptionReportInput {
    */
   statementAlerts?: readonly BankAccountAlerts[];
   /**
+   * Each bank account's standing at `to`. Left out (or empty), the "not agreed"
+   * rows carry no since figures and the voided-tick check finds nothing.
+   */
+  bankStanding?: readonly BankStanding[];
+  /**
    * Checks whose data could not be read. They are reported as unavailable
    * rather than as "nothing found", because a check that could not run and a
    * check that found nothing are opposite answers.
@@ -471,7 +525,7 @@ export interface ExceptionReportInput {
 export interface ExceptionReport {
   entriesExamined: number;
   questionsRaised: number;
-  checksRun: 10;
+  checksRun: 11;
   unavailable: CheckKey[];
   duplicates: DuplicateGroup[];
   checkNumberClashes: CheckNumberClash[];
@@ -483,6 +537,7 @@ export interface ExceptionReport {
   holding: HoldingRow[];
   statementBalance: StatementBalanceRow[];
   belowZero: BelowZeroRow[];
+  noLongerAgree: NoLongerAgreeRow[];
 }
 
 /**
@@ -508,7 +563,7 @@ function referencesByEntry(
   return out;
 }
 
-/** Run all ten. Nothing here reads a clock, a database or a file. */
+/** Run all eleven. Nothing here reads a clock, a database or a file. */
 export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
   const balanceByAccountId = new Map<string, number>(
     input.accounts.map((a) => [a.accountId, signedBalance(a)]),
@@ -522,11 +577,12 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const undeposited = undepositedFunds(input.accounts, input.undepositedDetails);
   const wrongWay = wrongWayBalances(input.accounts);
   const incomeNoCost = yearsWithIncomeAndNoCost(input.yearTotals, input.entryCountByYear);
-  const unreconciled = unreconciledBankAccounts(input.bankAccounts, balanceByAccountId, input.to);
+  const unreconciled = unreconciledBankAccounts(input.bankAccounts, balanceByAccountId, input.to, input.bankStanding ?? []);
   const futureDated = futureDatedEntries(input.entriesAfterToday, input.today);
   const holding = holdingAccounts(input.accounts);
   const statementBalance = statementBalanceRows(input.statementAlerts ?? []);
   const belowZero = belowZeroRows(input.statementAlerts ?? []);
+  const noLongerAgree = reconciliationsNoLongerAgreeing(input.bankAccounts, input.bankStanding ?? []);
 
   return {
     entriesExamined: input.entriesInRange.length,
@@ -540,8 +596,9 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
       futureDated.length +
       holding.length +
       statementBalance.length +
-      belowZero.length,
-    checksRun: 10,
+      belowZero.length +
+      noLongerAgree.length,
+    checksRun: 11,
     unavailable: [...input.unavailable],
     duplicates,
     checkNumberClashes,
@@ -553,6 +610,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     holding,
     statementBalance,
     belowZero,
+    noLongerAgree,
   };
 }
 
@@ -651,7 +709,12 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       check: CHECK_LABEL.unreconciled,
       date: u.lastReconciledDate ?? "never",
       type: "Last reconciled",
-      name: "",
+      name:
+        u.sinceCount === null
+          ? ""
+          : u.sinceCount === 0
+            ? "Nothing since"
+            : `${u.sinceCount === 1 ? "1 entry" : `${u.sinceCount} entries`} since`,
       account: u.accountName,
       amount: money(u.balanceMinor),
     })),
@@ -686,6 +749,17 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       ...belowZeroSheetText(r, (minor) => money(minor).toFixed(meta.decimals)),
       account: r.accountName,
       amount: money(r.nowMinor),
+    })),
+  );
+  add(
+    "noLongerAgree",
+    report.noLongerAgree.map((r) => ({
+      check: CHECK_LABEL.noLongerAgree,
+      date: r.reconciliationDate ?? "",
+      type: "Voided after reconciliation",
+      name: r.entryCount === 1 ? "1 entry" : `${r.entryCount} entries`,
+      account: r.accountName,
+      amount: money(r.amountMinor),
     })),
   );
 

@@ -32,6 +32,7 @@ import {
   type ExceptionReport,
   type HoldingRow,
   type IncomeNoCostRow,
+  type NoLongerAgreeRow,
   type TransactionListRow,
   type UndepositedRow,
   type UnreconciledRow,
@@ -63,7 +64,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 /**
  * The Exception Report, laid out as the client's prototype lays it out
  * (`reportExceptions` in Accounting-System-v3.html): a period picker, the
- * report on paper under its heading, three figures, then the ten checks —
+ * report on paper under its heading, three figures, then the eleven checks —
  * each with its question, why it matters, and what it found. Every section is
  * drawn, including the ones with nothing in them, because a reviewer has to see
  * that a check ran. Clicking a line opens the entry behind it in a side sheet.
@@ -415,6 +416,53 @@ export default function ExceptionsClient({
                 render: (_, row) =>
                   row.lastReconciledDate ? shortDate(row.lastReconciledDate) : <Tag color="orange">never</Tag>,
               },
+              {
+                title: "Since",
+                key: "since",
+                width: 130,
+                align: "right",
+                render: (_, row) =>
+                  row.sinceCount === null || row.sinceNetMinor === null ? (
+                    "—"
+                  ) : row.sinceCount === 0 ? (
+                    // As Reconcile history says it.
+                    "Nothing since"
+                  ) : (
+                    <span>
+                      {plural(row.sinceCount, "entry", "entries")}
+                      <br />
+                      <span className={styles.muted}>{money(row.sinceNetMinor)}</span>
+                    </span>
+                  ),
+              },
+            ]}
+          />
+        </ReportSection>
+
+        <ReportSection
+          title={CHECK_LABEL.noLongerAgree}
+          note={plural(r.noLongerAgree.length, "account", "accounts")}
+          state={state("noLongerAgree", r.noLongerAgree.length)}
+          why="Entries ticked on a completed reconciliation were voided afterwards, so the reconciliation no longer agrees with the books."
+        >
+          <DataTable<NoLongerAgreeRow>
+            rowKey="bankAccountId"
+            pagination={false}
+            dataSource={r.noLongerAgree}
+            columns={[
+              flexColumn<NoLongerAgreeRow>({
+                title: "Bank account",
+                key: "account",
+                render: (_, row) => <Link href={reconcileHref(row.bankAccountId)}>{row.accountName}</Link>,
+              }),
+              {
+                title: "Reconciliation",
+                key: "reconciliation",
+                width: 140,
+                render: (_, row) => (row.reconciliationDate ? shortDate(row.reconciliationDate) : "—"),
+              },
+              { title: "Entries voided", key: "entries", width: 130, align: "right", render: (_, row) => row.entryCount },
+              { title: "Amount", key: "amount", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.amountMinor) },
             ]}
           />
         </ReportSection>
@@ -551,7 +599,7 @@ export default function ExceptionsClient({
               { label: "Questions raised", value: report.questionsRaised, danger: report.questionsRaised > 0 },
               {
                 label: "Checks run",
-                value: report.unavailable.length > 0 ? `${10 - report.unavailable.length} of 10` : 10,
+                value: report.unavailable.length > 0 ? `${report.checksRun - report.unavailable.length} of ${report.checksRun}` : report.checksRun,
               },
             ]}
           />
@@ -560,7 +608,7 @@ export default function ExceptionsClient({
               type="warning"
               showIcon
               style={{ marginBottom: 20 }}
-              title={`${report.unavailable.length} of 10 checks could not be run`}
+              title={`${report.unavailable.length} of ${report.checksRun} checks could not be run`}
               description={`${report.unavailable.map((c) => CHECK_LABEL[c]).join("; ")}. The rest of the report is complete. A check that could not run is not saying the books are clear — run the report again.`}
             />
           ) : null}
@@ -577,7 +625,7 @@ export default function ExceptionsClient({
           {loading ? (
             <Space orientation="vertical" size={12}>
               <Spin size="large" />
-              <span className={styles.muted}>Running ten checks over the books…</span>
+              <span className={styles.muted}>Running eleven checks over the books…</span>
             </Space>
           ) : (
             <span className={styles.muted}>The report has not been run.</span>

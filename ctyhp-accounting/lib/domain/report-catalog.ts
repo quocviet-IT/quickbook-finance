@@ -148,7 +148,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "exception-report",
     title: "Exception Report",
     description:
-      "Ten checks a reviewer runs by hand: entries posted twice, a check number reused, a balance pointing the wrong way, anything still uncoded, a bank account below zero.",
+      "Eleven checks a reviewer runs by hand: entries posted twice, a check number reused, a balance pointing the wrong way, anything still uncoded, a bank account below zero.",
     href: "/reports/exceptions",
     group: "accounting",
   },

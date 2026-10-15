@@ -56,7 +56,7 @@ async function readBankAccount(sb: SupabaseClient, bankAccountId: string): Promi
   return bankFromRow(data as unknown as BankRow);
 }
 
-async function readBankAccounts(sb: SupabaseClient): Promise<AlertBankAccount[]> {
+export async function readBankAccounts(sb: SupabaseClient): Promise<AlertBankAccount[]> {
   const { data, error } = await sb.from("acc_bank_account").select(BANK_COLUMNS).order("created_at").order("id");
   if (error) throw new StatementAlertsError(`Reading the bank accounts failed: ${error.message}`);
   return ((data ?? []) as unknown as BankRow[]).map(bankFromRow);
