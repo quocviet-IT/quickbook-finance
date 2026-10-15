@@ -560,6 +560,35 @@ export const PDF_SCENARIOS: PdfScenario[] = [
       },
     ],
   },
+  {
+    // No total printed at either end, and the balance printed only on the last
+    // line of each day, so the first rows carry none. The opening is the first
+    // balance less every line up to and including the one it stands beside.
+    name: "balanceOnLastLineOfDay",
+    prototypeDiffers: "the prototype takes the opening as the first balance less that one line, so the lines above it leave the statement out by their sum",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Account activity"]],
+        [730, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+        [718, [40, "08/03/2027"], [90, "EXAMPLE CLIENT DEPOSIT"], [410, "300.00"]],
+        [706, [40, "08/03/2027"], [90, "EXAMPLE SERVICE CHARGE"], [330, "20.00"], [500, "1,280.00"]],
+        [694, [40, "08/10/2027"], [90, "EXAMPLE UTILITY"], [330, "120.00"]],
+        [682, [40, "08/10/2027"], [90, "EXAMPLE REFUND"], [410, "15.00"], [500, "1,175.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: null, to: "2027-08-10", opening: 100000, closing: 117500, skipped: 0,
+        lines: [
+          ["2027-08-03",30000,"EXAMPLE CLIENT DEPOSIT",null,null],
+          ["2027-08-03",-2000,"EXAMPLE SERVICE CHARGE",null,128000],
+          ["2027-08-10",-12000,"EXAMPLE UTILITY",null,null],
+          ["2027-08-10",1500,"EXAMPLE REFUND",null,117500],
+        ],
+      },
+    ],
+  },
 ];
 
 /**

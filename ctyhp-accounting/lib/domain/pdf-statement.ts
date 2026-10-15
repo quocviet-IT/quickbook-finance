@@ -563,10 +563,17 @@ function readStatementRows(rows: readonly PdfRow[]) {
     if (closing !== null) closingBasis = "running";
   }
   if (opening === null && sawBal) {
-    const firstWithBalance = kept.find((l) => l.balanceMinor !== null);
-    if (firstWithBalance) {
-      opening = (firstWithBalance.balanceMinor as number) - firstWithBalance.amountMinor;
-      openingBasis = "running";
+    // The first balance printed already holds every line above it, not only
+    // the one beside it: a bank that prints a balance on the last line of each
+    // day, or none on its first rows, opens at that balance less all of them.
+    let upTo = 0;
+    for (const l of kept) {
+      upTo += l.amountMinor;
+      if (l.balanceMinor !== null) {
+        opening = l.balanceMinor - upTo;
+        openingBasis = "running";
+        break;
+      }
     }
   }
   let to = per.to;
