@@ -617,6 +617,19 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "it is below zero now.",
       },
       {
+        action: "See how far each bank account has been agreed to a statement",
+        control: "Bank accounts",
+        route: "/banking/reconcile",
+        note:
+          "Reconcile shows the chosen account's line above its reconciliations, and the Balance Sheet lists every " +
+          "bank account under the sheet: the last statement agreed, its closing balance, and how many entries, and " +
+          "how much, have gone in since. Green while that statement is up to 60 days old, amber after 60 days, red " +
+          "after 180 and for an account never reconciled, counted to the report's date. An account never reconciled " +
+          "says how many entries are waiting on a statement: start with the oldest statement you have. When an entry " +
+          "ticked on a completed reconciliation is voided afterwards, the line says the reconciliation no longer " +
+          "agrees, and Exceptions lists it under Reconciliations that no longer agree.",
+      },
+      {
         action: "Reconcile to a statement balance",
         control: "New reconciliation",
         route: "/banking/reconcile",
@@ -660,7 +673,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking/reconcile/history",
         note:
           "Linked from Reconcile. Each bank account shows its lines not reconciled, their first and last dates, " +
-          "when it was last reconciled and its state. Choose an account never reconciled and fill in Statement " +
+          "when it was last reconciled with the closing balance agreed, what has gone in since, and its state. " +
+          "Choose an account never reconciled and fill in Statement " +
           "balance on [date] = [amount] from one of its statements; the books on that date are read as you go. " +
           "When they match, Bring forward N entries signs them off and posts nothing; when they do not, the page " +
           "says how much they are out by. A reconciliation in progress that ends on or before the date must be " +

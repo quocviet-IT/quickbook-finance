@@ -41,6 +41,55 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.05",
+    date: "2026-10-15",
+    headline: "Every bank account says how far it has been agreed to a statement, and what has happened since.",
+    changes: [
+      {
+        kind: "added",
+        title: "Bank accounts under the Balance Sheet",
+        detail:
+          "Under the Balance Sheet, a Bank accounts panel gives each bank account one line: “Agreed to Sep 30, 2026 at $12,000.00 · 5 entries since, $830.00 not on a statement”, “Agreed to Sep 30, 2026 at $12,000.00 · nothing since”, or “Never reconciled · 40 entries, $3,100.00 not on a statement”. It is green while the last statement agreed is up to 60 days before the sheet’s date, amber after 60 days, red after 180, and red for an account never reconciled; the age is measured to the sheet’s date, so a sheet for an earlier date reads as the account stood then. The account’s name opens Reconcile on it. The panel is not printed or exported.",
+        route: "/reports?report=balance",
+      },
+      {
+        kind: "changed",
+        title: "The below-zero note is part of the account’s line",
+        detail:
+          "The 2.00 note for a bank account below zero is now in the panel: the account’s line ends “· below zero at [date]”, and when entries look like the account’s own balance posted as payments, the line under it says how many. The printed Balance Sheet no longer carries the note.",
+        route: "/reports?report=balance",
+      },
+      {
+        kind: "added",
+        title: "Reconcile says where the chosen account stands",
+        detail:
+          "Above the reconciliations, a card gives the chosen account’s line, in the same words and colours as the Balance Sheet, or “Reconciled to Sep 30, 2026; nothing new since.” An account never reconciled no longer shows a bare “No data”: “[Account] has never been reconciled. 40 entries, $3,100.00, are waiting on a statement. Start with the oldest statement you have.”, with New reconciliation and From statement files under it.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "A reconciliation that no longer agrees is said",
+        detail:
+          "When an entry ticked on a completed reconciliation is voided afterwards, the account’s line adds, in red, “No longer agrees: 2 entries ticked on the Aug 31, 2026 reconciliation were voided ($150.00)” — on the Balance Sheet, on Reconcile, and in Exceptions’ new check, Reconciliations that no longer agree. Exceptions now runs 11 checks, and its Bank accounts not agreed to a statement rows say how many entries, and how much, have gone in since.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "changed",
+        title: "Reconcile history shows the closing and what has happened since",
+        detail:
+          "Last reconciled now gives the closing balance under the date, marked (brought forward) when it was; From and To are one column, First – last; and a new Since column gives how many entries, and how much, have gone in since the last closing.",
+        route: "/banking/reconcile/history",
+      },
+      {
+        kind: "fixed",
+        title: "Unreconciled bank activity leaves out Cash on Hand",
+        detail:
+          "The dashboard’s Unreconciled bank activity counted Cash on Hand entries, which no bank statement holds. It now counts bank accounts only, so for a company with cash on hand entries the figure is lower than before, by those entries.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "2.04",
     date: "2026-10-14",
     headline:
