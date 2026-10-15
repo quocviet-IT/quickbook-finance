@@ -239,3 +239,45 @@ Import data › Transactions / Ledger and the bank feed are not statements and a
 - Revoking the old `acc_import_bank_statement`. That comes in the release after 2.04 is live.
 - OB-3 and the rest of the review: releases 2.05–2.07.
 - The matcher improvements formerly planned as 2.04.
+
+## Amendments from pre-building (14–15/10)
+
+The release was built and run on a local pre-build branch first.
+
+**Results**
+- **Migration 0143 is live** on all six companies, applied on 14/10 with the user's approval.
+  - The rolled-back verification script passed 190 of 190 against the live functions: 85 behaviour and structure checks on the sample company, and 21 structure checks on each of the others.
+  - The company provisioning self-check passed 17 of 17.
+- **Smoke on the sample company, against the live database:** 126 checks across the situations listed in Part 3. All passed except two, both on a phone: the statement-files run table drew its cells over one another. Both are fixed (item 10), and the re-run passed 28 of 28.
+- **No console errors** were seen on any page, theme or width.
+
+**Settled along the way**
+
+1. **The OFX ledger balance** is used only when it is dated the file's end day. The spec's rule ("on or after") and its test list ("a later one that is not used") disagreed. A balance dated later can include lines the file does not hold. When it is not used, the closing field shows for typing.
+2. **Attaching a statement has no override.** Attaching imports nothing, and an override is recorded only on an import, so a file that does not add up is not attached.
+3. **The proof can only be written by the proved import.** Staff could otherwise forge or erase an administrator's override record through the API. A guard trigger on `acc_bank_import_batch` keeps the proof and override columns writable only by the proved import, as 0135 already guards that table. The old import, Undo and backup restore are unaffected.
+4. **`overridden_by` has no foreign key** to the users table, so an import never locks sign-ins.
+5. **Edge cases of the proved import:**
+   - When no line is left to import, it returns 0, 0 and no batch, and writes nothing.
+   - An override on a statement that adds up is ignored.
+   - A reason over 500 characters is refused, not cut.
+6. **A statement-files run stops at the first statement that does not add up.**
+   - The statements before it still preview and sign.
+   - That one reads "Out by … — import this statement on its own to correct it.".
+   - Later ones read "Waiting behind the statement closing {date}".
+   - A statement whose opening cannot be found reads "No opening balance — import this statement on its own to correct it.".
+7. **No round trip per tick.**
+   - The dialog reads the account's bank lines once per statement, and works the line keys out in the browser with Web Crypto.
+   - Every Not a transaction tick and typed balance is then answered locally.
+   - The server still recomputes the proof on import.
+   - Web Crypto needs https or localhost; production is https.
+8. **A balance that is missing cannot be overridden**, because the database refuses it either way. The dialog offers no "Import anyway…" until both balances are known.
+9. **The line key texts live in a module of their own** (`statement-key-text.ts`), so the verification scripts can load `banking-import.ts` in Node.
+10. **On a phone, the statement-files run table scrolls inside its box.** Its widths are kept beside the columns and pinned by a test, and its Read cell wraps. DataTable otherwise keeps every cell to one line on a phone.
+11. **The PDF preview no longer shows its own proof line.** It ignored the ticks; the proof panel does not.
+
+**Found along the way, for later releases**
+- **Direct inserts of bank lines.** Staff can still insert bank lines directly through the API (policy from 0010). This bypasses the proof outside the import path and belongs to the direct-writes hardening.
+- **The old `acc_import_bank_statement`** stays callable until the release after this one is live.
+- **A line carrying a bank id but dated outside the file's days** is not counted as already present in the preview. The database still skips it, so the import is right.
+- **A very large file can exceed the server-action body limit at import.** This is not new.
