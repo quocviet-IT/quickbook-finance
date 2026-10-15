@@ -360,51 +360,51 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         <div>
           <Typography.Text strong>Statements</Typography.Text>
           <div className={styles.runTable}>
-          <DataTable<CheckedStatement>
-            rowKey={(c) => c.statement.key}
-            size="small"
-            pagination={false}
-            dataSource={check.statements}
-            columns={[
-              { title: "File", render: (_, c) => c.statement.fileName },
-              { title: "Period", render: (_, c) => (c.statement.to ? periodLabel(c.statement.from, c.statement.to) : "—") },
-              {
-                title: "Opening",
-                align: "right",
-                render: (_, c) => (c.statement.openingMinor === null ? "—" : money(c.statement.openingMinor)),
-              },
-              {
-                title: "Closing",
-                align: "right",
-                render: (_, c) => (c.statement.closingMinor === null ? "—" : money(c.statement.closingMinor)),
-              },
-              {
-                title: "Read",
-                // Each statement's proof (2.04) under what was read: it adds up, or
-                // what it is out by and, for a CSV, where its balance jumps. The run
-                // stops at the first that does not add up: the statements before it
-                // still run, it says "Out by … — import this statement on its own to
-                // correct it.", and every later one waits behind it.
-                render: (_, c) => (
-                  <>
-                    <Tag color={STATE_COLOR[c.state]} style={{ whiteSpace: "normal" }}>
-                      {c.note}
-                    </Tag>
-                    {c.proof?.sentences.summary ? (
-                      <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 4 }}>
-                        {c.proof.sentences.summary}
-                      </Typography.Text>
-                    ) : null}
-                    {c.proof?.sentences.detail ? (
-                      <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
-                        {c.proof.sentences.detail}
-                      </Typography.Text>
-                    ) : null}
-                  </>
-                ),
-              },
-            ]}
-          />
+            <DataTable<CheckedStatement>
+              rowKey={(c) => c.statement.key}
+              size="small"
+              pagination={false}
+              dataSource={check.statements}
+              columns={[
+                { title: "File", render: (_, c) => c.statement.fileName },
+                { title: "Period", render: (_, c) => (c.statement.to ? periodLabel(c.statement.from, c.statement.to) : "—") },
+                {
+                  title: "Opening",
+                  align: "right",
+                  render: (_, c) => (c.statement.openingMinor === null ? "—" : money(c.statement.openingMinor)),
+                },
+                {
+                  title: "Closing",
+                  align: "right",
+                  render: (_, c) => (c.statement.closingMinor === null ? "—" : money(c.statement.closingMinor)),
+                },
+                {
+                  title: "Read",
+                  // Each statement's proof (2.04) under what was read: it adds up, or
+                  // what it is out by and, for a CSV, where its balance jumps. The run
+                  // stops at the first that does not add up: the statements before it
+                  // still run, it says "Out by … — import this statement on its own to
+                  // correct it.", and every later one waits behind it.
+                  render: (_, c) => (
+                    <>
+                      <Tag color={STATE_COLOR[c.state]} style={{ whiteSpace: "normal" }}>
+                        {c.note}
+                      </Tag>
+                      {c.proof?.sentences.summary ? (
+                        <Typography.Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 4 }}>
+                          {c.proof.sentences.summary}
+                        </Typography.Text>
+                      ) : null}
+                      {c.proof?.sentences.detail ? (
+                        <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                          {c.proof.sentences.detail}
+                        </Typography.Text>
+                      ) : null}
+                    </>
+                  ),
+                },
+              ]}
+            />
           </div>
           {check.stops.map((stop) => (
             <Alert key={stop} style={{ marginTop: 12 }} type="error" showIcon title={stop} />
