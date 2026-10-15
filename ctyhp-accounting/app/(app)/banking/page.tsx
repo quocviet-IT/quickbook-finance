@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listBankAccounts, listBankConnections } from "@/lib/services/banking";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { bankFeedEncryptionConfigured } from "@/lib/services/bank-token-crypto";
 import { plaidConfiguration } from "@/lib/services/plaid";
 import { hasPermission } from "@/lib/services/access";
@@ -65,6 +65,7 @@ export default async function BankingPage({
         glBankAccounts={glBankAccounts}
         currencies={currencies}
         canWrite={canWrite(role)}
+        canOverride={isAdmin(role)}
         plaidConfigured={plaid.configured && bankFeedEncryptionConfigured()}
         plaidEnvironment={plaid.environment}
         canReadDocuments={canReadDocuments}

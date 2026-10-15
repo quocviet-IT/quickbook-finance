@@ -19,8 +19,7 @@ import {
 } from "antd";
 import { PaperClipOutlined, UploadOutlined } from "@ant-design/icons";
 import { fromMinor } from "@/lib/domain/money";
-import type { PdfStatement } from "@/lib/domain/pdf-statement";
-import type { StatementLine } from "@/lib/domain/statement-import";
+import { importedSummary } from "@/lib/domain/statement-repeats";
 import {
   BRING_HISTORY_FORWARD,
   DISCARD_CONFIRMATION,
@@ -42,7 +41,7 @@ import { historyBroughtForwardMessage } from "@/lib/domain/reconcile-history";
 import { REASON_MAX, reasonProblem } from "@/lib/domain/reconcile-alerts-screen";
 import { formatMoney } from "@/lib/format";
 import { shortDate } from "@/lib/domain/pdf-statement-view";
-import { keepFailureMessage, linesSpan, serverFailure, statementFileMismatch } from "@/lib/domain/statement-evidence";
+import { attachMismatch, keepFailureMessage, linesSpan, serverFailure } from "@/lib/domain/statement-evidence";
 import { downloadSavedFile } from "@/lib/client/saved-file-download";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { attachStatementFileAction } from "../../statement-file-actions";
@@ -86,6 +85,7 @@ import StandingTag from "../StandingTag";
 
 /** The statement dialog Banking uses, fetched when somebody opens it. */
 const ImportStatementModal = dynamic(() => import("../../ImportStatementModal"), { ssr: false });
+import type { ConfirmedImport } from "../../ImportStatementModal";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -104,6 +104,8 @@ interface Props {
   reconciliationId: string;
   canWrite: boolean;
   canReopen: boolean;
+  /** An administrator: offered "Import anyway…" for a statement that does not add up. The database decides again. */
+  canOverride: boolean;
   offsetAccounts: Offset[];
   baseCurrency: string;
   baseDecimals: number;
@@ -116,6 +118,7 @@ export default function ReconcileWorkspaceClient({
   reconciliationId,
   canWrite,
   canReopen,
+  canOverride,
   offsetAccounts,
   baseCurrency,
   baseDecimals,
@@ -495,16 +498,19 @@ export default function ReconcileWorkspaceClient({
   /**
    * The statement is kept with this reconciliation, imported into Bank
    * Transactions and paired with the books — without leaving the page the
-   * statement is being worked from.
+   * statement is being worked from. It is proved first (2.04): the dialog
+   * sends the lines (those ticked Not a transaction left out, those already
+   * here from another source marked skip) and the proof, and the
+   * reconciliation keeps the opening and closing it was proved between.
    */
-  async function importStatement(fileName: string, rows: StatementLine[], pdf: PdfStatement | null, file: File) {
+  async function importStatement({ fileName, file, statement: pdf, lines: read, rows, proof, repeats }: ConfirmedImport) {
     setImporting(true);
     try {
       // Kept first, so the reconciliation takes its file with its lines (1.83);
       // a file that cannot be kept costs only the file.
       const kept: KeptStatementFile = await import("@/lib/client/keep-statement-file")
         .then(({ keepStatementFile }) =>
-          keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(rows)),
+          keepStatementFile(file, fileAccount, pdf ? { from: pdf.from, to: pdf.to } : linesSpan(read)),
         )
         .catch((error: unknown): KeptStatementFile => ({
           ok: false,
@@ -512,20 +518,24 @@ export default function ReconcileWorkspaceClient({
         }));
       const res = await importStatementIntoReconciliationAction(reconciliationId, {
         file_name: fileName,
-        opening_minor: pdf?.openingMinor ?? null,
-        closing_minor: pdf?.closingMinor ?? null,
         lines: rows,
+        proof,
         statement_file_id: kept.ok ? kept.id : null,
       });
       if (!res.ok || !res.data) {
-        message.error(res.error ?? "Failed to import the statement");
+        // A statement that does not add up, a balance missing, an override
+        // refused: said in the server's own words.
+        message.error(res.error ?? "Failed to import the statement", 10);
         return;
       }
       setImportOpen(false);
-      message.success(
-        `${res.data.inserted} new in Bank Transactions, ${res.data.duplicates} already there. ${pairingMessage(res.data.outcome)}`,
-        8,
-      );
+      const imported = importedSummary({
+        inserted: res.data.inserted,
+        alreadyHere: res.data.duplicates,
+        otherSource: res.data.otherSource,
+        repeats,
+      });
+      message.success(`${imported} ${pairingMessage(res.data.outcome)}`, 8);
       if (!kept.ok) message.warning(keepFailureMessage(kept.reason, "reconciliation"), 10);
       if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
       void load();
@@ -539,22 +549,26 @@ export default function ReconcileWorkspaceClient({
 
   /**
    * Attach the statement to a reconciliation that has no file: read here with
-   * the same readers, attached only when it is this reconciliation's statement
-   * — otherwise nothing is kept and the message says what differs.
+   * the same readers, attached only when it adds up (2.04; the dialog will not
+   * send one that does not) and is this reconciliation's statement — its lines
+   * counted as the reconciliation counts its own, those ticked Not a
+   * transaction left out — otherwise nothing is kept and the message says what
+   * differs.
    */
-  async function attachStatement(rows: StatementLine[], pdf: PdfStatement | null, file: File) {
+  async function attachStatement({ file, statement: pdf, lines: rows, aside, proof }: ConfirmedImport) {
     if (!statement || !detail) return;
     const read = {
       to: pdf?.to ?? null,
       closingMinor: pdf?.closingMinor ?? null,
       lines: rows.map((r) => ({ txn_date: r.txn_date, amount_minor: r.amount_minor })),
     };
-    const mismatch = statementFileMismatch(
+    const mismatch = attachMismatch(
       read,
+      aside,
       {
         endingDate: statement.endingDate,
         endingMinor: detail.statementEndingMinor,
-        keptLines: statement.lines.map((l) => ({ txn_date: l.txnDate, amount_minor: l.amountMinor })),
+        keptLines: statement.lines.map((l) => ({ txn_date: l.txnDate, amount_minor: l.amountMinor, setAside: l.setAside })),
       },
       money,
     );
@@ -582,6 +596,8 @@ export default function ReconcileWorkspaceClient({
         to: read.to,
         closing_minor: read.closingMinor,
         lines: read.lines,
+        aside,
+        proof,
       });
       if (!res.ok) {
         message.error(res.error ?? "Failed to attach the statement", 10);
@@ -895,7 +911,8 @@ export default function ReconcileWorkspaceClient({
           bankAccount={bankAccount}
           importing={importing}
           intro={IMPORT_INTRO}
-          onConfirm={(fileName, rows, pdf, file) => void importStatement(fileName, rows, pdf, file)}
+          canOverride={canOverride}
+          onConfirm={(confirmed) => void importStatement(confirmed)}
           onCancel={() => setImportOpen(false)}
         />
       ) : null}
@@ -904,14 +921,15 @@ export default function ReconcileWorkspaceClient({
           open={attachOpen}
           bankAccount={bankAccount}
           importing={attaching}
+          purpose="attach"
           title="Attach the statement"
           okLabel="Attach"
           intro={
             `Choose the bank's statement to ${shortDate(statement.endingDate, true)}. OneBook reads it here and attaches it ` +
-            "only if it is this reconciliation's statement: the same closing balance and, when this reconciliation kept " +
+            "only if it adds up and is this reconciliation's statement: the same closing balance and, when this reconciliation kept " +
             "the statement's lines, the same lines. Nothing in the reconciliation changes."
           }
-          onConfirm={(_fileName, rows, pdf, file) => void attachStatement(rows, pdf, file)}
+          onConfirm={(confirmed) => void attachStatement(confirmed)}
           onCancel={() => setAttachOpen(false)}
         />
       ) : null}

@@ -560,4 +560,100 @@ export const PDF_SCENARIOS: PdfScenario[] = [
       },
     ],
   },
+  {
+    // No total printed at either end, and the balance printed only on the last
+    // line of each day, so the first rows carry none. The opening is the first
+    // balance less every line up to and including the one it stands beside.
+    name: "balanceOnLastLineOfDay",
+    prototypeDiffers: "the prototype takes the opening as the first balance less that one line, so the lines above it leave the statement out by their sum",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Account activity"]],
+        [730, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+        [718, [40, "08/03/2027"], [90, "EXAMPLE CLIENT DEPOSIT"], [410, "300.00"]],
+        [706, [40, "08/03/2027"], [90, "EXAMPLE SERVICE CHARGE"], [330, "20.00"], [500, "1,280.00"]],
+        [694, [40, "08/10/2027"], [90, "EXAMPLE UTILITY"], [330, "120.00"]],
+        [682, [40, "08/10/2027"], [90, "EXAMPLE REFUND"], [410, "15.00"], [500, "1,175.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: null, to: "2027-08-10", opening: 100000, closing: 117500, skipped: 0,
+        lines: [
+          ["2027-08-03",30000,"EXAMPLE CLIENT DEPOSIT",null,null],
+          ["2027-08-03",-2000,"EXAMPLE SERVICE CHARGE",null,128000],
+          ["2027-08-10",-12000,"EXAMPLE UTILITY",null,null],
+          ["2027-08-10",1500,"EXAMPLE REFUND",null,117500],
+        ],
+      },
+    ],
+  },
+  {
+    // No total printed at either end, and the last rows carry no balance. The
+    // closing is the last balance plus every line after it.
+    name: "noBalanceOnLastRows",
+    prototypeDiffers: "the prototype takes the closing as the last balance printed, so the lines after it leave the statement out by their sum",
+    pages: [
+      [
+        [760, [40, "Example Bank"]],
+        [748, [40, "Account activity"]],
+        [730, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+        [718, [40, "09/06/2027"], [90, "EXAMPLE CLIENT DEPOSIT"], [410, "250.00"], [500, "1,250.00"]],
+        [706, [40, "09/14/2027"], [90, "EXAMPLE SUPPLIES"], [330, "40.00"], [500, "1,210.00"]],
+        [694, [40, "09/28/2027"], [90, "EXAMPLE INTEREST"], [410, "0.85"]],
+        [682, [40, "09/30/2027"], [90, "EXAMPLE MONTHLY CHARGE"], [330, "12.00"]],
+      ],
+    ],
+    expected: [
+      {
+        account: null, from: null, to: "2027-09-30", opening: 100000, closing: 119885, skipped: 0,
+        lines: [
+          ["2027-09-06",25000,"EXAMPLE CLIENT DEPOSIT",null,125000],
+          ["2027-09-14",-4000,"EXAMPLE SUPPLIES",null,121000],
+          ["2027-09-28",85,"EXAMPLE INTEREST",null,null],
+          ["2027-09-30",-1200,"EXAMPLE MONTHLY CHARGE",null,null],
+        ],
+      },
+    ],
+  },
 ];
+
+/**
+ * Payroll on one day (2.04, OB-1): two people paid the same, and three paid the
+ * same, in one table — five payments, none a restatement of another. Kept out
+ * of PDF_SCENARIOS, which the prototype parity run reads. Invented: "Example
+ * Bank", an account ending 3333, invented amounts.
+ */
+export const PAYROLL_REPEATS: PdfScenario = {
+  name: "payrollRepeats",
+  pages: [
+    [
+      [760, [40, "Example Bank"]],
+      [748, [40, "Account number: 0000-3333"]],
+      [736, [40, "Statement period Mar 1 - Mar 31, 2026"]],
+      [720, [40, "Beginning balance"], [500, "20,000.00"]],
+      [708, [40, "Ending balance"], [500, "17,452.70"]],
+      [690, [40, "Transaction history"]],
+      [678, [40, "Date"], [90, "Description"], [330, "Withdrawals"], [410, "Deposits"], [500, "Balance"]],
+      [666, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "655.20"], [500, "19,344.80"]],
+      [654, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "655.20"], [500, "18,689.60"]],
+      [642, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "412.30"], [500, "18,277.30"]],
+      [630, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "412.30"], [500, "17,865.00"]],
+      [618, [40, "03/31"], [90, "EXAMPLE PAYROLL SERVICE"], [330, "412.30"], [500, "17,452.70"]],
+      [606, [40, "Total"], [330, "2,547.30"]],
+    ],
+  ],
+  expected: [
+    {
+      account: "00003333", from: "2026-03-01", to: "2026-03-31", opening: 2000000, closing: 1745270, skipped: 0,
+      lines: [
+        ["2026-03-31",-65520,"EXAMPLE PAYROLL SERVICE",null,1934480],
+        ["2026-03-31",-65520,"EXAMPLE PAYROLL SERVICE",null,1868960],
+        ["2026-03-31",-41230,"EXAMPLE PAYROLL SERVICE",null,1827730],
+        ["2026-03-31",-41230,"EXAMPLE PAYROLL SERVICE",null,1786500],
+        ["2026-03-31",-41230,"EXAMPLE PAYROLL SERVICE",null,1745270],
+      ],
+    },
+  ],
+};

@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { periodLabel, shortDate } from "./pdf-statement-view";
 import { SAVED_REPORT_MAX_BYTES } from "./saved-reports";
+import { statementProofPayloadSchema } from "./statement-proof-schema";
 
 /** A bank's own download (OFX, QFX, QBO, QIF) is text, and kept as text. */
 export const STATEMENT_FILE_MIME_TYPES = ["application/pdf", "text/csv", "text/plain"] as const;
@@ -178,6 +179,37 @@ export function statementFileMismatch(
   );
 }
 
+/** A kept line, with whether the reconciliation set it aside as not a transaction (2.03). */
+export interface KeptEvidenceLine extends EvidenceLine {
+  setAside?: boolean;
+}
+
+/**
+ * Attach the statement since 2.04: the lines each side counts are compared —
+ * the file's lines less those marked Not a transaction in the dialog, against
+ * the reconciliation's kept lines less those it set aside. A statement imported
+ * with a misread line marked is kept without it, so the same file attached
+ * with the same line marked is the same statement. The browser and the server
+ * both decide with this.
+ */
+export function attachMismatch(
+  read: ReadStatementFile,
+  aside: Iterable<number>,
+  target: { endingDate: string; endingMinor: number; keptLines: readonly KeptEvidenceLine[] },
+  money: (minor: number) => string,
+): string | null {
+  const marked = new Set(aside);
+  return statementFileMismatch(
+    { ...read, lines: read.lines.filter((_, index) => !marked.has(index)) },
+    {
+      endingDate: target.endingDate,
+      endingMinor: target.endingMinor,
+      keptLines: target.keptLines.filter((line) => !line.setAside),
+    },
+    money,
+  );
+}
+
 // --- Validation of what the browser sends ------------------------------------
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date");
@@ -204,11 +236,20 @@ const evidenceLineSchema = z.object({
   amount_minor: z.number().int(),
 });
 
+/**
+ * Attach the statement: what was read from the file (its last day and closing
+ * when it prints them, and every line read), which lines were marked Not a
+ * transaction, and the statement's proof (2.04) — a file is attached only when
+ * it adds up.
+ */
 export const statementFileAttachSchema = z.object({
   reconciliation_id: z.string().uuid(),
   file_id: z.string().uuid(),
   to: isoDate.nullable(),
   closing_minor: z.number().int().nullable(),
   lines: z.array(evidenceLineSchema).max(10_000),
+  /** Indexes into `lines` of the lines marked Not a transaction. */
+  aside: z.array(z.number().int().nonnegative()).max(10_000).default([]),
+  proof: statementProofPayloadSchema,
 });
 export type StatementFileAttachInput = z.infer<typeof statementFileAttachSchema>;

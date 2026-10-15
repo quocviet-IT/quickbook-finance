@@ -17,7 +17,8 @@ const line = {
   running_balance_minor: null,
   raw_line: "x",
 };
-const statement = { file_name: "september.pdf", opening_minor: 75000, closing_minor: 74500, lines: [line] };
+const proof = { opening_minor: 75000, closing_minor: 74500, opening_basis: "printed", closing_basis: "printed", set_aside: 0, override: null };
+const statement = { file_name: "september.pdf", lines: [line], proof };
 const BANK = "6f1c1d4e-0a3b-4c2d-9e8f-1a2b3c4d5e6f";
 const month = { ...statement, kind: "month", bank_account_id: BANK, statement_date: "2026-09-30", sign: true };
 const bringForward = { kind: "bring_forward", bank_account_id: BANK, period_from: "2026-09-01", statement_date: "2026-09-30", opening_minor: 75000 };
@@ -61,6 +62,38 @@ describe("reconciliationStatementSchema", () => {
   it("refuses an amount that is not whole cents", () => {
     expect(reconciliationStatementSchema.safeParse({ ...statement, lines: [{ ...line, amount_minor: 1.5 }] }).success).toBe(false);
   });
+
+  it("takes a line marked skip, and keeps the mark (2.04)", () => {
+    const parsed = reconciliationStatementSchema.parse({ ...statement, lines: [line, { ...line, skip: true }] });
+    expect(parsed.lines.map((l) => l.skip)).toEqual([undefined, true]);
+    expect(reconciliationStatementSchema.safeParse({ ...statement, lines: [{ ...line, skip: "yes" }] }).success).toBe(false);
+  });
+
+  it("needs the statement's proof, and fills in what an older proof leaves out", () => {
+    expect(reconciliationStatementSchema.safeParse({ file_name: "september.pdf", lines: [line] }).success).toBe(false);
+    const parsed = reconciliationStatementSchema.parse({
+      ...statement,
+      proof: { opening_minor: 75000, closing_minor: 74500, opening_basis: "printed", closing_basis: "typed" },
+    });
+    expect(parsed.proof).toEqual({ ...proof, closing_basis: "typed" });
+  });
+
+  it("refuses a balance that does not say where it came from, or a basis of no known kind", () => {
+    expect(firstIssue(reconciliationStatementSchema.safeParse({ ...statement, proof: { ...proof, opening_basis: null } }))).toBe(
+      "Say where the opening balance came from: printed, running, prior or typed",
+    );
+    expect(firstIssue(reconciliationStatementSchema.safeParse({ ...statement, proof: { ...proof, closing_basis: null } }))).toBe(
+      "Say where the closing balance came from: printed, running, ledger or typed",
+    );
+    expect(reconciliationStatementSchema.safeParse({ ...statement, proof: { ...proof, opening_basis: "books" } }).success).toBe(false);
+    expect(reconciliationStatementSchema.safeParse({ ...statement, proof: { ...proof, closing_basis: "prior" } }).success).toBe(false);
+  });
+
+  it("takes a missing balance, which the action refuses with the proof's own words", () => {
+    expect(
+      reconciliationStatementSchema.safeParse({ ...statement, proof: { ...proof, opening_minor: null, opening_basis: null } }).success,
+    ).toBe(true);
+  });
 });
 
 describe("runMonthSchema", () => {
@@ -70,8 +103,8 @@ describe("runMonthSchema", () => {
     expect(runMonthSchema.safeParse(bringForward).success).toBe(true);
   });
 
-  it("refuses a month with no closing balance, no statement date or no lines", () => {
-    expect(runMonthSchema.safeParse({ ...month, closing_minor: null }).success).toBe(false);
+  it("refuses a month with no proof, no statement date or no lines", () => {
+    expect(runMonthSchema.safeParse({ ...month, proof: undefined }).success).toBe(false);
     expect(runMonthSchema.safeParse({ ...month, statement_date: "2026-02-31" }).success).toBe(false);
     expect(runMonthSchema.safeParse({ ...month, lines: [] }).success).toBe(false);
   });

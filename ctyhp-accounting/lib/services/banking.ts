@@ -8,6 +8,8 @@ import type {
 } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { statementLineHashes } from "@/lib/domain/banking-import";
+import type { StatementProofPayload } from "@/lib/domain/statement-proof";
+import { BANK_LINE_SOURCES, type BankLineOn, type BankLineSource } from "@/lib/domain/statement-repeats";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -98,15 +100,38 @@ export interface ImportRow {
   raw_line: string;
   /** The bank's own id (OFX FITID); the duplicate key when present. */
   external_id?: string | null;
+  /** Already in Bank Transactions from another source (2.04): counted in the proof, not imported. */
+  skip?: boolean;
 }
 
+export interface StatementImportCounts {
+  /** Lines inserted. */
+  inserted: number;
+  /** Lines not marked skip whose key was already here: "already here from this statement". */
+  skipped: number;
+  /** Lines sent marked skip: "skipped as already in Bank Transactions from another source". */
+  otherSource: number;
+  /** The import batch; null when no line was left to import. */
+  batchId: string | null;
+}
+
+/**
+ * Import a statement's lines with its proof (2.04): `acc_import_bank_statement_proved`
+ * (0143) checks opening + every line sent − closing is zero, or that an
+ * administrator gave a reason, and keeps the proof with the batch. `rows` is
+ * every line of the statement but those marked Not a transaction, in file
+ * order; their keys are counted over exactly these rows, the ones marked skip
+ * included, so ticking a skipped line back never moves another's key.
+ */
 export async function importStatement(
   sb: SupabaseClient,
   bankAccountId: string,
   filename: string,
   rows: ImportRow[],
-): Promise<{ inserted: number; skipped: number; batchId: string | null }> {
-  if (!rows.length) return { inserted: 0, skipped: 0, batchId: null };
+  proof: StatementProofPayload,
+): Promise<StatementImportCounts> {
+  const otherSource = rows.filter((r) => r.skip === true).length;
+  if (!rows.length) return { inserted: 0, skipped: 0, otherSource, batchId: null };
 
   const hashes = statementLineHashes(bankAccountId, rows);
   const payload = rows.map((r, i) => ({
@@ -118,22 +143,60 @@ export async function importStatement(
     raw_line: r.raw_line,
     raw_hash: hashes[i],
     source: "file_upload",
+    ...(r.skip === true ? { skip: true } : {}),
   }));
 
-  const { data, error } = await sb.rpc("acc_import_bank_statement", {
+  const { data, error } = await sb.rpc("acc_import_bank_statement_proved", {
     p_bank_account_id: bankAccountId,
     p_filename: filename,
     p_rows: payload,
+    p_proof: proof,
   });
   if (error) throw new BankingError(error.message);
   const result = (Array.isArray(data) ? data[0] : data) as
-    | { inserted?: number; skipped?: number; batch_id?: string }
+    | { inserted?: number; skipped?: number; batch_id?: string | null }
     | null;
   return {
     inserted: Number(result?.inserted ?? 0),
-    skipped: Number(result?.skipped ?? rows.length),
+    skipped: Number(result?.skipped ?? rows.length - otherSource),
+    otherSource,
     batchId: result?.batch_id ?? null,
   };
+}
+
+/**
+ * The account's bank lines dated `from` to `to`, with where each came from
+ * (`acc_bank_lines_on`, 0143). Paged past PostgREST's cap: the books alone can
+ * hold thousands of lines in a year, and a line not read would be a line the
+ * import dialog cannot see is already there. Ordered by date, then id, so the
+ * order is total. The dialog reads them once per statement read, and works out
+ * from their keys which of its lines are here (statement-line-keys.ts).
+ */
+export async function listBankLinesOn(
+  sb: SupabaseClient,
+  bankAccountId: string,
+  from: string,
+  to: string,
+): Promise<BankLineOn[]> {
+  const rows = await readAllPages<Record<string, unknown>>(
+    (start, end) =>
+      sb
+        .rpc("acc_bank_lines_on", { p_bank_account_id: bankAccountId, p_from: from, p_to: to })
+        .order("txn_date")
+        .order("id")
+        .range(start, end),
+    (message) => new BankingError(message),
+  );
+  return rows.map((r) => ({
+    id: r.id as string,
+    txnDate: r.txn_date as string,
+    amountMinor: Number(r.amount_minor),
+    rawHash: r.raw_hash as string,
+    sourceKind: (BANK_LINE_SOURCES as readonly string[]).includes(r.source_kind as string)
+      ? (r.source_kind as BankLineSource)
+      : "other",
+    importBatchId: (r.import_batch_id as string | null) ?? null,
+  }));
 }
 
 export interface BankStatementImportRow {

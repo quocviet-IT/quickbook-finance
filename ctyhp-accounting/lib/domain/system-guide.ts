@@ -468,19 +468,47 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking",
         note:
           "A PDF, CSV, OFX, QFX, QBO or QIF file. Each line is fingerprinted, so importing the same " +
-          "file twice adds nothing, and two identical lines in one file are both kept.",
+          "file twice adds nothing, and two identical lines in one file are both kept: the dialog says how " +
+          "many of each set are already in Bank Transactions and how many will be imported. A line already in " +
+          "Bank Transactions from another source — made from the books, from a bank feed or from another file — " +
+          "is listed apart and skipped; tick it to import it as well. The same dialog imports a statement into " +
+          "a reconciliation.",
       },
       {
-        action: "Check a PDF statement before importing it",
+        action: "Check that the statement adds up",
         control: "Import statement",
         route: "/banking",
         note:
-          "OneBook reads the period, the opening and closing balances and every line, and shows whether " +
-          "the opening balance plus the lines comes to the closing balance. If it does not, a line may not " +
-          "have been read, or one may have been read that is not a transaction: check the statement, then " +
-          "Import anyway or use the bank's CSV. A bank download (CSV, QFX or OFX) is read exactly; a PDF is " +
-          "read from its text, and a check image or a summary table can be misread. A scanned PDF has no " +
-          "text to read.",
+          "OneBook reads the opening and closing balances the statement prints — on a PDF, in a CSV's balance " +
+          "column, an OFX ledger balance as of the file's last day, a QIF's opening balance — and shows whether " +
+          "the opening plus the lines comes to the closing, to the cent, saying where the opening came from. " +
+          "When it does, Import N lines is one click. When it does not, it says how much it is out by and names " +
+          "the line a CSV's balance jumps after, or the one line it is out by; Import is blocked until the " +
+          "statement adds up. A bank download (CSV, QFX or OFX) is read exactly; a PDF is read from its text, " +
+          "and a check image or a summary table can be misread. A scanned PDF has no text to read.",
+      },
+      {
+        action: "Make a statement add up",
+        control: "Not a transaction",
+        route: "/banking",
+        note:
+          "Tick Not a transaction beside a line the file was misread into: it is struck through, left out of " +
+          "the count and not imported. When the file prints no opening or closing balance, type the one printed " +
+          "on the statement into Opening balance printed on the statement or Closing balance printed on the " +
+          "statement. When the account's last completed reconciliation closed the day before the statement " +
+          "starts, its closing is taken as the opening; when the statement's first day is not known, Use $X " +
+          "takes it. A balance is never taken from the books.",
+      },
+      {
+        action: "Import a statement that does not add up",
+        control: "Import anyway…",
+        route: "/banking",
+        note:
+          "For an administrator, when the statement is out and nothing in it can be corrected. It asks for a " +
+          "reason and will not go on without one; the reason and the amount the statement was out by are kept " +
+          "with the import and in the audit log. Everyone else reads that an administrator can import it " +
+          "anyway. A statement missing a balance cannot be imported anyway, and one that does not add up is " +
+          "never attached to a reconciliation.",
       },
       {
         action: "Take back a bank-feed sync",
@@ -604,8 +632,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking/reconcile",
         note:
           "Choose PDF statements, or a CSV export with a running balance column, which is cut into months. " +
-          "Each closing balance comes from the file; a month missing from the run, or a reconciliation already in " +
-          "progress, stops it. Preview pairs the months with the books oldest first — by date and amount, by check " +
+          "Each closing balance comes from the file, and each statement is proved as it is read, its proof shown " +
+          "under what was read. A statement that does not add up stops the run there: the statements before it " +
+          "still run, and it and those after it wait — import it on its own to correct it. A month missing from " +
+          "the run, or a reconciliation already in progress, stops the whole run. Preview pairs the months with the books oldest first — by date and amount, by check " +
           "number, or by amount within 5 days — up to the first that does not agree, and writes nothing. Sign off " +
           "signs the months that agree; the first that does not is started, with its pairs ticked, for you to " +
           "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +
@@ -712,8 +742,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking/reconcile",
         note:
           "A reconciliation with no statement file — made before 1.83, or whose file could not be kept — takes " +
-          "one here. The file is read in the browser and attached only if it is that reconciliation's statement: " +
-          "the same closing balance and, when it kept the statement's lines, the same lines. Otherwise nothing " +
+          "one here. The file is read in the browser and attached only if it adds up and is that reconciliation's " +
+          "statement: the same closing balance and, when it kept the statement's lines, the same lines, those " +
+          "ticked Not a transaction left out on both sides. Otherwise nothing " +
           "is kept and the message says what differs; the reconciliation's figures never change.",
       },
       {

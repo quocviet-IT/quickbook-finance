@@ -1,0 +1,47 @@
+/*
+ * The statements table of Reconcile > From statement files, on a phone.
+ * Layout only, no colour.
+ *
+ * Below 640px the table is held to its measured widths plus Read's floor, and
+ * scrolls inside its own box (DataTable's content box already scrolls,
+ * `.accounting-table--fit .ant-table-content` in globals.css) while the page
+ * does not. The figures are in run-table-columns.ts; change one and change the
+ * other. The table is laid out fixed, so the header cells carry the widths.
+ * At 1280 none of this applies.
+ */
+
+@media (max-width: 640px) {
+  /* RUN_TABLE_MIN_WIDTH. */
+  .runTable :global(.ant-table-content) > table {
+    min-width: 1030px;
+  }
+
+  /* RUN_TABLE_WIDTH.file */
+  .runTable :global(.ant-table-thead) > tr > th:nth-child(1) {
+    width: 200px;
+  }
+
+  /* RUN_TABLE_WIDTH.period */
+  .runTable :global(.ant-table-thead) > tr > th:nth-child(2) {
+    width: 190px;
+  }
+
+  /* RUN_TABLE_WIDTH.opening */
+  .runTable :global(.ant-table-thead) > tr > th:nth-child(3) {
+    width: 140px;
+  }
+
+  /* RUN_TABLE_WIDTH.closing */
+  .runTable :global(.ant-table-thead) > tr > th:nth-child(4) {
+    width: 140px;
+  }
+
+  /*
+   * Read holds sentences. On a phone every DataTable cell is kept to one line
+   * (`.accounting-data-table .ant-table-cell` in globals.css), which would run
+   * a proof across the whole table; this cell outranks that rule and wraps.
+   */
+  .runTable :global(.ant-table-tbody) > tr > td:nth-child(5) {
+    white-space: normal;
+  }
+}

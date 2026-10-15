@@ -8,15 +8,18 @@
  * the books' open lines without writing anything. Signing is the server's, one
  * month at a time (statement-actions.ts).
  *
- * OneBook departs from the prototype in two places, each marked "OneBook:":
+ * OneBook departs from the prototype in three places, each marked "OneBook:":
  *   1. a CSV listed newest first is read oldest first before it is cut into
  *      months, so a month never opens or closes on the wrong line of its first
  *      or last day;
  *   2. a month that agrees only on its balance stops the run for a person, where
- *      the prototype ticks every line and signs it.
+ *      the prototype ticks every line and signs it;
+ *   3. a CSV month whose first or last rows carry no balance opens and closes
+ *      with those rows counted, not out by them.
  */
 import { shortDate } from "./pdf-statement-view";
 import { statementProof, toStatementLines, type PdfStatement } from "./pdf-statement";
+import { MAX_RUN_LINES } from "./statement-run-limits";
 import {
   bringForwardAdvice,
   statementStandings,
@@ -25,6 +28,15 @@ import {
   type Standing,
 } from "./reconcile-statement";
 import type { StatementLine } from "./statement-import";
+import {
+  pdfFigures,
+  proveStatement,
+  type ClosingBasis,
+  type OpeningBasis,
+  type PriorClosing,
+  type StatementProof,
+  type StatementProofPayload,
+} from "./statement-proof";
 
 export type RunSource = "PDF" | "CSV";
 
@@ -45,6 +57,13 @@ export interface RunStatement {
   problem: string | null;
   /** A PDF's own proof: closing less (opening + lines); null when it prints no balances or is a CSV month. */
   outByMinor: number | null;
+  /**
+   * Where the opening and closing came from (2.04). Set by the readers, and by
+   * checkRun on the statements a run reconciles; absent means printed for a PDF
+   * and the running balance for a CSV.
+   */
+  openingBasis?: OpeningBasis | null;
+  closingBasis?: ClosingBasis | null;
 }
 
 export const RUN_MESSAGES = {
@@ -62,15 +81,21 @@ export const RUN_MESSAGES = {
  * size stays under the server's 1 MB body limit when references are short; a
  * run of long references can still exceed it, and is refused whole, writing nothing.
  */
-export const MAX_RUN_LINES = 10_000;
+export { MAX_RUN_LINES };
 
 const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 /**
- * A CSV export cut into calendar months, each closing at the last running
- * balance in it and opening at its first balance less that line's amount
- * (p44.html: readStatementText). Lines of no amount are dropped, as the
- * prototype drops them. Without a running balance a month cannot prove itself.
+ * A CSV export cut into calendar months (p44.html: readStatementText), each
+ * opening at its first running balance less every line of the month up to and
+ * including that one, as the proof's own CSV rule does, and closing at its last
+ * running balance plus every line of the month after it. Lines of no amount are
+ * dropped, as the prototype drops them. Without a running balance a month
+ * cannot prove itself.
+ *
+ * OneBook: the prototype opens a month at its first balance less that one line
+ * and closes it at its last balance, so a month whose first or last rows carry
+ * no balance is out by those lines.
  */
 export function monthsFromCsv(fileName: string, lines: readonly StatementLine[]): RunStatement[] {
   const kept = lines.filter((line) => line.amount_minor !== 0);
@@ -93,11 +118,25 @@ export function monthsFromCsv(fileName: string, lines: readonly StatementLine[])
   }
   const many = months.size > 1;
   return [...months.entries()].map(([month, monthLines]) => {
-    const withBalance = monthLines.filter((line) => line.running_balance_minor !== null);
-    const last = withBalance[withBalance.length - 1];
-    const first = withBalance[0];
-    const closingMinor = last ? (last.running_balance_minor as number) : null;
-    const openingMinor = first ? (first.running_balance_minor as number) - first.amount_minor : null;
+    let openingMinor: number | null = null;
+    let upTo = 0;
+    for (const line of monthLines) {
+      upTo += line.amount_minor;
+      if (line.running_balance_minor !== null) {
+        openingMinor = line.running_balance_minor - upTo;
+        break;
+      }
+    }
+    let closingMinor: number | null = null;
+    let after = 0;
+    for (let k = monthLines.length - 1; k >= 0; k--) {
+      const line = monthLines[k];
+      if (line.running_balance_minor !== null) {
+        closingMinor = line.running_balance_minor + after;
+        break;
+      }
+      after += line.amount_minor;
+    }
     let problem: string | null = closingMinor === null ? RUN_MESSAGES.noClosing : null;
     if (!problem) {
       for (let i = 1; i < monthLines.length; i++) {
@@ -121,6 +160,8 @@ export function monthsFromCsv(fileName: string, lines: readonly StatementLine[])
       lines: monthLines,
       problem,
       outByMinor: null,
+      openingBasis: openingMinor === null ? null : "running",
+      closingBasis: closingMinor === null ? null : "running",
     };
   });
 }
@@ -158,8 +199,59 @@ export function statementsFromPdf(
       lines: toStatementLines(s),
       problem,
       outByMinor: differenceMinor === null || differenceMinor === 0 ? null : differenceMinor,
+      openingBasis: s.openingMinor === null ? null : (s.openingBasis ?? "printed"),
+      closingBasis: s.closingMinor === null ? null : (s.closingBasis ?? "printed"),
     };
   });
+}
+
+/**
+ * A statement of a run proved as Import statement proves one: a CSV month by
+ * its running balances, a PDF by the balances it prints. `prior` is the closing
+ * the statement would follow — the account's last completed reconciliation for
+ * the first, the statement before it for the rest, since by the time a month is
+ * signed the one before it is that reconciliation. A run has no Not a
+ * transaction, no typed balance and no override: a statement that needs one is
+ * imported on its own.
+ */
+export function runStatementProof(
+  statement: RunStatement,
+  prior: PriorClosing | null,
+  money: (minor: number) => string,
+): StatementProof {
+  if (statement.source === "CSV") return proveStatement({ kind: "csv", lines: statement.lines, prior }, money);
+  const figures = pdfFigures({
+    openingMinor: statement.openingMinor,
+    closingMinor: statement.closingMinor,
+    from: statement.from,
+    to: statement.to,
+  });
+  return proveStatement(
+    {
+      kind: "pdf",
+      lines: statement.lines,
+      figures: {
+        ...figures,
+        openingBasis: figures.openingBasis && (statement.openingBasis ?? figures.openingBasis),
+        closingBasis: figures.closingBasis && (statement.closingBasis ?? figures.closingBasis),
+      },
+      prior,
+    },
+    money,
+  );
+}
+
+/** The proof a month of a run sends with its lines (reconcileRunMonthAction): its figures, nothing set aside, no override. */
+export function runStatementPayload(statement: RunStatement): StatementProofPayload {
+  const usual = statement.source === "CSV" ? "running" : "printed";
+  return {
+    opening_minor: statement.openingMinor,
+    closing_minor: statement.closingMinor,
+    opening_basis: statement.openingMinor === null ? null : (statement.openingBasis ?? usual),
+    closing_basis: statement.closingMinor === null ? null : (statement.closingBasis ?? usual),
+    set_aside: 0,
+    override: null,
+  };
 }
 
 export interface RunContext {
@@ -172,31 +264,80 @@ export interface RunContext {
   today: string;
 }
 
-export type RunState = "usable" | "unreadable" | "notOver" | "duplicate" | "already" | "before";
+/**
+ * Where a statement stands in the run. `doesNotAddUp` is the first statement
+ * the run would reconcile that does not add up: the run stops there (2.04).
+ * `waiting` is every later one the run would otherwise reconcile.
+ */
+export type RunState =
+  | "usable"
+  | "unreadable"
+  | "notOver"
+  | "duplicate"
+  | "already"
+  | "before"
+  | "doesNotAddUp"
+  | "waiting";
 
 export interface CheckedStatement {
   statement: RunStatement;
   state: RunState;
   /** What the statements table says about it. */
   note: string;
+  /**
+   * The statement's proof (2.04), for a statement the run would reconcile —
+   * usable, the one that does not add up, and those waiting behind it; null
+   * for any other.
+   */
+  proof: StatementProof | null;
 }
 
 export interface RunCheck {
   /** Every statement, by statement date; those without one last. */
   statements: CheckedStatement[];
-  /** The statements a run reconciles, oldest first. */
+  /** The statements a run reconciles, oldest first: those before the first that does not add up. */
   usable: RunStatement[];
-  /** What stops a run; empty when it can go. */
+  /** What stops the whole run; empty when it can go. */
   stops: string[];
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "Out by $6.44 — import this statement on its own to correct it.": why a run stops at a statement that does not add up. */
+export function outByStop(differenceMinor: number, money: (minor: number) => string): string {
+  return `Out by ${money(Math.abs(differenceMinor))} — import this statement on its own to correct it.`;
+}
+
+/**
+ * What the statements table says about the statement a run stops at, in the
+ * stop's own words: "Out by $0.50 — import this statement on its own to
+ * correct it.", or the balance it does not print.
+ */
+function stopNote(proof: StatementProof, money: (minor: number) => string): string {
+  if (proof.differenceMinor !== null) return outByStop(proof.differenceMinor, money);
+  const what = proof.missing === "closing" ? "closing balance" : proof.missing === "both" ? "opening or closing balance" : "opening balance";
+  return `No ${what} — import this statement on its own to correct it.`;
+}
+
+/** What the statements table says about a statement waiting behind the one the run stops at. */
+function waitingNote(stoppedAt: RunStatement): string {
+  return `Waiting behind the statement closing ${shortDate(stoppedAt.to as string, true)}`;
+}
 
 /**
  * Which statements a run can reconcile, and what stops it: a gap between two
  * statements (p44b.html: the run is disabled), a first statement that does not
  * open where the last reconciliation closed, or a reconciliation in progress.
  * It also sorts out a month not over yet.
+ *
+ * Each statement the run would reconcile is proved (2.04), and its proof kept
+ * with it; the statements it returns carry the proof's opening and closing and
+ * their bases, which is what each month sends. The first that does not add up
+ * stops the run there, as simulateRun stops its walk at the first month that
+ * does not agree: the statements before it still run and can be signed off; it
+ * says what it is out by, and every later one waits behind it. A gap, the
+ * first statement's opening and the run's size are checked over the statements
+ * that run.
  */
 export function checkRun(
   statements: readonly RunStatement[],
@@ -207,18 +348,44 @@ export function checkRun(
   const completed = new Set(context.completedDates);
   const kept = new Set<string>();
   const checked: CheckedStatement[] = ordered.map((statement) => {
-    if (statement.problem || !statement.to) return { statement, state: "unreadable", note: statement.problem ?? RUN_MESSAGES.noDate };
-    if (statement.to > context.today) return { statement, state: "notOver", note: "Not over yet" };
-    if (completed.has(statement.to)) return { statement, state: "already", note: "Already signed off" };
-    if (context.lastCompleted && statement.to < context.lastCompleted.date) {
-      return { statement, state: "before", note: "Before the last reconciliation" };
-    }
-    if (kept.has(statement.to)) return { statement, state: "duplicate", note: "Same month as another file" };
+    const as = (state: RunState, note: string): CheckedStatement => ({ statement, state, note, proof: null });
+    if (statement.problem || !statement.to) return as("unreadable", statement.problem ?? RUN_MESSAGES.noDate);
+    if (statement.to > context.today) return as("notOver", "Not over yet");
+    if (completed.has(statement.to)) return as("already", "Already signed off");
+    if (context.lastCompleted && statement.to < context.lastCompleted.date) return as("before", "Before the last reconciliation");
+    if (kept.has(statement.to)) return as("duplicate", "Same month as another file");
     kept.add(statement.to);
-    const lines = plural(statement.lines.length, "line");
-    const note = statement.outByMinor === null ? lines : `${lines} — does not prove itself, out by ${money(Math.abs(statement.outByMinor))}`;
-    return { statement, state: "usable", note };
+    return as("usable", plural(statement.lines.length, "line"));
   });
+
+  // Proved oldest first: each statement follows the closing of the one before
+  // it, the first the account's last completed reconciliation. The first that
+  // does not add up stops the run there; every later one waits behind it.
+  let prior: PriorClosing | null = context.lastCompleted
+    ? { date: context.lastCompleted.date, endingMinor: context.lastCompleted.endingMinor }
+    : null;
+  let stoppedAt: RunStatement | null = null;
+  for (const c of checked) {
+    if (c.state !== "usable") continue;
+    const proof = runStatementProof(c.statement, prior, money);
+    c.proof = proof;
+    c.statement = {
+      ...c.statement,
+      openingMinor: proof.openingMinor,
+      closingMinor: proof.closingMinor,
+      openingBasis: proof.openingBasis,
+      closingBasis: proof.closingBasis,
+    };
+    if (stoppedAt) {
+      c.state = "waiting";
+      c.note = waitingNote(stoppedAt);
+    } else if (!proof.proves) {
+      stoppedAt = c.statement;
+      c.state = "doesNotAddUp";
+      c.note = stopNote(proof, money);
+    }
+    if (proof.closingMinor !== null) prior = { date: c.statement.to as string, endingMinor: proof.closingMinor };
+  }
   const usable = checked.filter((c) => c.state === "usable").map((c) => c.statement);
 
   const stops: string[] = [];

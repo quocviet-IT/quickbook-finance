@@ -1,0 +1,58 @@
+/*
+ * The statement import dialog (2.04). Layout only — no colour, so the dark
+ * theme follows Ant Design's own.
+ *
+ * At 375px the dialog keeps every control in reach: the column chooser, the
+ * PDF's four figures and the two balance fields fall to fewer columns, and the
+ * lines preview keeps its measured widths plus Description's floor and scrolls
+ * inside its own box (DataTable's content box already scrolls sideways,
+ * `.accounting-table--fit .ant-table-content` in globals.css) while the dialog
+ * does not. The preview's figure is IMPORT_PREVIEW_MIN_WIDTH in
+ * import-preview-columns.ts; change one and change the other.
+ */
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.list {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+@media (max-width: 640px) {
+  .columns,
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* IMPORT_PREVIEW_MIN_WIDTH. */
+  .preview :global(.ant-table-content) > table {
+    min-width: 544px;
+  }
+}
