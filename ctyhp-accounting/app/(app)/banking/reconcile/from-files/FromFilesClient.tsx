@@ -31,6 +31,7 @@ import {
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { previewRunAction, reconcileRunMonthAction } from "../statement-actions";
 import StandingTag from "../StandingTag";
+import styles from "./run-table.module.css";
 
 /**
  * Reconciling a run of statements: choose the files, check what was read,
@@ -358,6 +359,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
       {statements.length ? (
         <div>
           <Typography.Text strong>Statements</Typography.Text>
+          <div className={styles.runTable}>
           <DataTable<CheckedStatement>
             rowKey={(c) => c.statement.key}
             size="small"
@@ -403,6 +405,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
               },
             ]}
           />
+          </div>
           {check.stops.map((stop) => (
             <Alert key={stop} style={{ marginTop: 12 }} type="error" showIcon title={stop} />
           ))}
