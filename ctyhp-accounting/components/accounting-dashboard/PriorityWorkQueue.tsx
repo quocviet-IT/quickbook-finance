@@ -27,6 +27,7 @@ export default function PriorityWorkQueue({
   canManage,
   assignees,
   today,
+  timeZone,
 }: {
   queue: SectionEnvelope<PriorityQueueItem[]>;
   /** True when the controls actually ran, so an empty queue can be believed. */
@@ -35,6 +36,7 @@ export default function PriorityWorkQueue({
   canManage: boolean;
   assignees: Assignee[];
   today: string;
+  timeZone: string;
 }) {
   return (
     <WorkQueuePanel
@@ -48,6 +50,7 @@ export default function PriorityWorkQueue({
       canManage={canManage}
       assignees={assignees}
       today={today}
+      timeZone={timeZone}
       changeAction={changeWorkItemAction}
       nouns={ACCOUNTING_NOUNS}
       blockingTag={{

@@ -50,6 +50,7 @@ export default function PurchasesSurface({
       canManage={canManage}
       assignees={assignees}
       today={context.asOf}
+      timeZone={context.timeZone}
       currencyCode={context.currencyCode}
       currencyDecimals={context.currencyDecimals}
       queueUnavailable="The purchasing work could not be loaded."

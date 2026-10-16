@@ -51,6 +51,7 @@ export default function BankingSurface({
       canManage={canManage}
       assignees={assignees}
       today={context.asOf}
+      timeZone={context.timeZone}
       currencyCode={context.currencyCode}
       currencyDecimals={context.currencyDecimals}
       queueUnavailable="The banking work could not be loaded."

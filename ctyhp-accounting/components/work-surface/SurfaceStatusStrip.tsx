@@ -21,6 +21,7 @@ export default function SurfaceStatusStrip({
   lead,
   facts,
   generatedAt,
+  timeZone,
   staleSections,
   unavailableSections,
   label = "Status",
@@ -28,6 +29,8 @@ export default function SurfaceStatusStrip({
   lead?: React.ReactNode;
   facts: readonly string[];
   generatedAt: string;
+  /** The company's zone, so the server and the browser print the same time. */
+  timeZone: string;
   staleSections: readonly string[];
   unavailableSections: readonly string[];
   label?: string;
@@ -42,7 +45,7 @@ export default function SurfaceStatusStrip({
           </span>
         ))}
         <span className={styles.stripFact}>
-          <ClockCircleOutlined aria-hidden="true" /> {timeOnly(generatedAt)}
+          <ClockCircleOutlined aria-hidden="true" /> {timeOnly(generatedAt, timeZone)}
         </span>
         {unavailableSections.length > 0 ? (
           <Tag color="warning" icon={<WarningOutlined />}>

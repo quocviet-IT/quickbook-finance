@@ -69,6 +69,7 @@ export default function WorkQueuePanel({
   canManage,
   assignees,
   today,
+  timeZone,
   changeAction,
   nouns = {},
   blockingTag,
@@ -88,6 +89,8 @@ export default function WorkQueuePanel({
   assignees: Assignee[];
   /** The company's own today, not the browser's. */
   today: string;
+  /** The company zone, so the server and the browser print the same time. */
+  timeZone: string;
   changeAction: ChangeAction;
   nouns?: SurfaceNouns;
   /** The tag on a blocking row — "blocks close", "blocks reconciliation". */
@@ -211,7 +214,7 @@ export default function WorkQueuePanel({
         </>
       )}
       {queue.data ? (
-        <FreshnessNote generatedAt={queue.generatedAt} dataState={queue.dataState} />
+        <FreshnessNote generatedAt={queue.generatedAt} dataState={queue.dataState} timeZone={timeZone} />
       ) : null}
     </Card>
   );

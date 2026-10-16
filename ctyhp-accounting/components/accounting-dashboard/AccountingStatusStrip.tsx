@@ -16,11 +16,13 @@ import { timeOnly } from "./DataStateNote";
 export default function AccountingStatusStrip({
   context,
   generatedAt,
+  timeZone,
   staleSections,
   unavailableSections,
 }: {
   context: AccountingDashboardContext;
   generatedAt: string;
+  timeZone: string;
   staleSections: string[];
   unavailableSections: string[];
 }) {
@@ -61,7 +63,7 @@ export default function AccountingStatusStrip({
         <span className={styles.stripFact}>{context.currencyCode}</span>
         <span className={styles.stripFact}>{context.timeZone}</span>
         <span className={styles.stripFact}>
-          <ClockCircleOutlined aria-hidden="true" /> {timeOnly(generatedAt)}
+          <ClockCircleOutlined aria-hidden="true" /> {timeOnly(generatedAt, timeZone)}
         </span>
         {unavailableSections.length > 0 ? (
           <Tag color="warning" icon={<WarningOutlined />}>

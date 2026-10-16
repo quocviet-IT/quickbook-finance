@@ -17,10 +17,12 @@ export default function ControlHealthPanel({
   controls,
   currencyCode,
   currencyDecimals,
+  timeZone,
 }: {
   controls: SectionEnvelope<AccountingControl[]>;
   currencyCode: string;
   currencyDecimals: number;
+  timeZone: string;
 }) {
   return (
     <ControlPanel
@@ -32,6 +34,7 @@ export default function ControlHealthPanel({
       }}
       currencyCode={currencyCode}
       currencyDecimals={currencyDecimals}
+      timeZone={timeZone}
       title="Control health"
       unavailableFallback="The accounting controls could not be evaluated."
       className="accounting-control-health"

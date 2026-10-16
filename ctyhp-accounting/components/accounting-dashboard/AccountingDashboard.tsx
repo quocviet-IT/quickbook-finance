@@ -99,6 +99,7 @@ export default function AccountingDashboard({
       <AccountingStatusStrip
         context={context}
         generatedAt={generatedAt}
+        timeZone={context.timeZone}
         staleSections={stale}
         unavailableSections={unavailable}
       />
@@ -157,7 +158,7 @@ export default function AccountingDashboard({
       </div>
 
       {mode === "close" && close ? (
-        <ClosePanel close={close} canClose={canClose} owners={owners} />
+        <ClosePanel close={close} canClose={canClose} owners={owners} timeZone={context.timeZone} />
       ) : null}
 
       <div className={styles.body}>
@@ -171,6 +172,7 @@ export default function AccountingDashboard({
             canManage={canManage}
             assignees={assignees}
             today={context.asOf}
+            timeZone={context.timeZone}
           />
         </div>
         <div className={styles.controlColumn}>
@@ -178,16 +180,18 @@ export default function AccountingDashboard({
             controls={controls}
             currencyCode={context.currencyCode}
             currencyDecimals={context.currencyDecimals}
+            timeZone={context.timeZone}
           />
         </div>
       </div>
 
-      <AccountingInsightList insights={insights} />
+      <AccountingInsightList insights={insights} timeZone={context.timeZone} />
 
       <SecondaryAnalysis
         secondary={secondary}
         currencyCode={context.currencyCode}
         currencyDecimals={context.currencyDecimals}
+        timeZone={context.timeZone}
       />
     </div>
   );
