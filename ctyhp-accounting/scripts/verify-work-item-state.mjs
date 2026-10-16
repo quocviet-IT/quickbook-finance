@@ -162,7 +162,7 @@ try {
   await scenario("work that has gone is retired, and live work is left alone", async () => {
     await set("gone:1", "acknowledged", null);
     await set("live:1", "acknowledged", null);
-    const count = await one(`select acc_retire_work_items(array['live:1']) as n`);
+    const count = await one(`select acc_retire_work_items(array['live:1'], array['gone:', 'live:']) as n`);
     check("one row was retired", Number(count.n) === 1, String(count.n));
     const gone = await one(`select lifecycle from acc_work_item_state where work_key = 'gone:1'`);
     const live = await one(`select lifecycle from acc_work_item_state where work_key = 'live:1'`);

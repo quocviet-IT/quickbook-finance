@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.10",
+    date: "2026-10-16",
+    headline: "An item that comes back to a work list can be worked on again.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "An item that came back to a work list can be worked on again",
+        detail:
+          "On the Accounting, Sales, Purchases, Inventory and Banking overview pages, an item that had left its work list and then came back — a bank line unmatched again, a bill overdue again, a check failing again — refused every action with “This item is already resolved; its exception has cleared.” It now starts afresh, with no owner or due date from before: Acknowledge, Start work, Assign to…, Set a due date… and Dismiss… all work on it again.",
+        route: "/banking/overview",
+      },
+    ],
+  },
+  {
     version: "2.09",
     date: "2026-10-16",
     headline: "What you set on a work list stays set when you open another page, and the time a page was worked out reads in the company’s time zone.",
