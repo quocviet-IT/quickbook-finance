@@ -6,7 +6,8 @@
  * lock_timeout and statement_timeout set. 0147 is applied inside it (retargeted
  * to the schema, as scripts/migrate.mjs does), so nothing is left behind.
  *
- *  - In every schema: structure (both overloads exist, the new one is a
+ *  - In every schema: structure (the two-argument overload exists, and the
+ *    one-argument one only until 0148 removes it; the new one is a
  *    security definer with a pinned search path, closed to anon and public,
  *    open to signed-in users and the service role) and one call, as the
  *    company's administrator, with empty prefixes, which must resolve nothing.
@@ -107,8 +108,12 @@ function structure(schema, facts) {
     Boolean(f) && !f.anon && !f.public && f.member && f.service,
     JSON.stringify(f && { anon: f.anon, public: f.public, member: f.member, service: f.service }));
   const s = facts.single;
-  check("the one-argument retire is still there, a security definer, closed to anon, open to signed-in users",
-    Boolean(s) && s.definer && !s.anon && s.member, JSON.stringify(s));
+  if (s) {
+    check("the one-argument retire is still there, a security definer, closed to anon, open to signed-in users",
+      s.definer && !s.anon && s.member, JSON.stringify(s));
+  } else {
+    console.log("  (the one-argument retire is gone: removed by 0148)");
+  }
 }
 
 async function adminId() {
@@ -194,10 +199,15 @@ async function behaviour() {
   await refused("an outsider is refused", `select acc_retire_work_items(array[]::text[], array['ar-draft:']::text[])`, [], "Not authorized");
   await as(admin);
 
-  console.log("  the one-argument version, unchanged");
-  const old = await one(`select acc_retire_work_items($1::text[]) as n`, [["bank-txn:none"]]);
-  check("it still resolves every active key outside its list, whatever the page (documented old behaviour)",
-    old.n >= 1 && (await lifecycle("ar-draft:verify-3")) === "resolved", String(old.n));
+  const hasSingle = Boolean((await one(`select to_regprocedure('acc_retire_work_items(text[])') as oid`)).oid);
+  if (hasSingle) {
+    console.log("  the one-argument version, unchanged");
+    const old = await one(`select acc_retire_work_items($1::text[]) as n`, [["bank-txn:none"]]);
+    check("it still resolves every active key outside its list, whatever the page (documented old behaviour)",
+      old.n >= 1 && (await lifecycle("ar-draft:verify-3")) === "resolved", String(old.n));
+  } else {
+    console.log("  (the one-argument version is gone: removed by 0148)");
+  }
   await client.query("reset role");
 }
 
