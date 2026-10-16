@@ -9,11 +9,11 @@ describe("2.08 in the release notes and the Guide", () => {
 
   it("is the newest release, dated the day it was built", () => {
     expect(release.version).toBe("2.08");
-    expect(release.date).toBe("2026-10-15");
+    expect(release.date).toBe("2026-10-16");
   });
 
   it("says what the person sees, and that nothing is removed for them", () => {
-    for (const words of ["Possible duplicates", "twice in 15 days", "Review opens the entry", "Dismiss asks for a reason", "completed reconciliation", "12 months"]) {
+    for (const words of ["Possible duplicates", "Charged twice in 15 days: POS DEBIT SHOPMART #1234", "Review opens the entry", "Dismiss asks for a reason", "completed reconciliation", "12 months"]) {
       expect(said, words).toContain(words);
     }
   });

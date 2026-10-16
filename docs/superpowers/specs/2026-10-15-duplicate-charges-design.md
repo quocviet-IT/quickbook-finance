@@ -85,7 +85,7 @@ The order is outliers first, then newest.
 | Field | Value |
 |---|---|
 | key | `dupe-charge:{earlier line id}:{later line id}`. Stable, so a dismissal holds and the item retires on its own when the pair stops being derived, for example after a void. |
-| title | `{Payee}: {amount} twice in {n} days` (`1 day`; `on the same day` when 0). |
+| title | `Charged twice in {n} days: {Payee}` (`1 day`; `on the same day` when 0). The fact comes first because the queue keeps a title to one line; the amount has its own column. |
 | reason | `{Bank account} · {date 1} and {date 2}`. An outlier adds ` · the {date} line is described differently from this payee's other {n}`. A pair with one line signed off adds ` · the {date} line is on a completed reconciliation`. |
 | severity | `high` for an outlier, `medium` otherwise. |
 | amount | The amount (magnitude). |

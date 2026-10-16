@@ -156,7 +156,9 @@ export function duplicateChargeItem(
     key: `dupe-charge:${charge.earlier.lineId}:${charge.later.lineId}`,
     sourceKind: "possible-duplicate",
     sourceId: review.lineId,
-    title: `${review.payee.trim() || "Bank charge"}: ${input.money(review.amountMinor)} twice ${within}`,
+    // What happened first: the queue keeps a title to one line, and the payee's
+    // own text can be long. The amount has its own column.
+    title: `Charged twice ${within}: ${review.payee.trim() || "a bank charge"}`,
     reason,
     severity: charge.outlier ? "high" : "medium",
     amountMinor: review.amountMinor,

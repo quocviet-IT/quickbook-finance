@@ -63,7 +63,9 @@ describe("bankingWorkQueue with duplicate charges", () => {
       actionLabel: "Review",
       blocking: false,
     });
-    expect(items[0].title).toContain("$49.95");
+    // The fact leads the title; the amount, in the surface's money, has its own column.
+    expect(items[0].title).toMatch(/^Charged twice in \d+ days?: /);
+    expect(items[0].amountMinor).toBe(4995);
   });
 
   it("shows no duplicates for a failed read, and leaves the other items alone", () => {

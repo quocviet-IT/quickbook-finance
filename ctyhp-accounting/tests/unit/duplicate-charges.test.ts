@@ -272,7 +272,7 @@ describe("duplicateChargeItem", () => {
     expect(item.key).toBe(`dupe-charge:${x.lineId}:${y.lineId}`);
     expect(item.sourceKind).toBe("possible-duplicate");
     expect(item.sourceId).toBe(y.lineId);
-    expect(item.title).toBe("SHOPMART: $25.00 twice in 15 days");
+    expect(item.title).toBe("Charged twice in 15 days: SHOPMART");
     expect(item.reason).toBe("Operating · Mar 16, 2026 and Mar 31, 2026");
     expect(item.severity).toBe("medium");
     expect(item.amountMinor).toBe(2500);
@@ -285,9 +285,9 @@ describe("duplicateChargeItem", () => {
 
   it("words singular and same-day titles", () => {
     const one = find([line("2026-03-30", -2500, "SHOPMART"), line("2026-03-31", -2500, "SHOPMART")])[0];
-    expect(duplicateChargeItem(one, input).title).toBe("SHOPMART: $25.00 twice in 1 day");
+    expect(duplicateChargeItem(one, input).title).toBe("Charged twice in 1 day: SHOPMART");
     const same = find([line("2026-03-31", -2500, "SHOPMART"), line("2026-03-31", -2500, "SHOPMART")])[0];
-    expect(duplicateChargeItem(same, input).title).toBe("SHOPMART: $25.00 twice on the same day");
+    expect(duplicateChargeItem(same, input).title).toBe("Charged twice on the same day: SHOPMART");
   });
 
   it("adds the signed-off line to the reason", () => {
