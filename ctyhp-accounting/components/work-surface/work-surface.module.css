@@ -208,6 +208,37 @@
   flex: 0 0 auto;
 }
 
+/* Phone: the fixed columns (severity, owner, amount, action) took the whole row
+   and left the title 0px wide, so a reader saw an amount and a button with no
+   words. Below 640px the title and its reason get a line of their own, first,
+   and wrap rather than being cut; the rest of the row sits under them. */
+@media (max-width: 640px) {
+  .queueRow {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .queueTitleCell {
+    flex: 1 1 100%;
+    order: -1;
+  }
+
+  .queueTitle,
+  .queueReason {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .queueOwner {
+    min-width: 0;
+  }
+
+  .queueAmount {
+    min-width: 0;
+    margin-left: auto;
+  }
+}
+
 /* Nine filters need their own line: beside the card title they truncated it. */
 .queueFilters {
   margin-bottom: 10px;
