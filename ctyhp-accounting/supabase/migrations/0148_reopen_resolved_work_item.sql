@@ -21,6 +21,13 @@
 
 set search_path = public;
 
+/**
+ * Record what a person decided about one piece of work.
+ *
+ * A null `p_expected_version` means "I believe there is no active row": it
+ * inserts a new row, or reopens a resolved one. A version is the one the caller
+ * rendered from an active row, and a row that has moved since is refused.
+ */
 create or replace function acc_set_work_item_state(
   p_key              text,
   p_lifecycle        text,
@@ -58,7 +65,10 @@ begin
     end if;
   end if;
 
-  select * into v_current from acc_work_item_state where work_key = p_key;
+  -- Locked, so a second caller waits for the first and then re-reads its
+  -- committed row: two people cannot both reopen the same item, and a stale
+  -- version cannot win.
+  select * into v_current from acc_work_item_state where work_key = p_key for update;
 
   if v_current.work_key is null then
     if p_expected_version is not null then

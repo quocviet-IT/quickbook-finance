@@ -86,6 +86,17 @@ describe("0148 reopen a resolved work item: the function", () => {
     expect(read("supabase/migrations/0118_work_item_state.sql").split(stale).length - 1).toBe(2);
   });
 
+  it("locks the row it reads, so two callers cannot both reopen it", () => {
+    expect(fn).toMatch(
+      /select \* into v_current from acc_work_item_state where work_key = p_key for update;/i,
+    );
+    expect(fn.indexOf("for update")).toBeLessThan(fn.search(/elsif v_current\.lifecycle = 'resolved'/i));
+  });
+
+  it("explains what a null version means", () => {
+    expect(raw).toMatch(/null `p_expected_version` means "I believe there is no active row"/i);
+  });
+
   it("no longer raises on a resolved row", () => {
     expect(fn).not.toMatch(/already resolved/i);
     expect(fn).not.toMatch(/its exception has cleared/i);

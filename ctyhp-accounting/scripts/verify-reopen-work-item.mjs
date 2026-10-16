@@ -88,7 +88,8 @@ select jsonb_build_object(
              'service', has_function_privilege('service_role', p.oid, 'execute'),
              'public', exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
                                 where x.grantee = 0 and x.privilege_type = 'EXECUTE'),
-             'reopens', position('reopened' in pg_get_functiondef(p.oid)) > 0) end
+             'locks', pg_get_functiondef(p.oid) ~* 'where work_key = p_key[[:space:]]+for update',
+             'reopens', pg_get_functiondef(p.oid) ~* 'elsif v_current[.]lifecycle = ''resolved'' then') end
       from (select to_regprocedure($1::text || '.${SET_SIGNATURE}') as oid) f
       left join pg_proc p on p.oid = f.oid),
   'single', to_regprocedure($1::text || '.acc_retire_work_items(text[])') is not null,
@@ -109,7 +110,8 @@ function structure(schema, facts) {
   check("…is closed to anon and public, open to signed-in users and the service role",
     Boolean(f) && !f.anon && !f.public && f.member && f.service,
     JSON.stringify(f && { anon: f.anon, public: f.public, member: f.member, service: f.service }));
-  check("…and its body reopens a resolved row", Boolean(f) && f.reopens === true);
+  check("…and its body locks the row it reads, then reopens a resolved one", Boolean(f) && f.locks === true && f.reopens === true,
+    JSON.stringify(f && { locks: f.locks, reopens: f.reopens }));
   check("the one-argument retire is gone", facts.single === false);
   const s = facts.scoped;
   check("the two-argument retire is still there, a security definer, closed to anon, open to signed-in users",
@@ -161,6 +163,9 @@ async function behaviour() {
   const a1 = await audit(k1);
   check("the audit row for the reopening is an update that says reopened", a1.reopened === 1, JSON.stringify(a1));
   check("…and the first, ordinary write does not say reopened", a1.total === 2 && a1.flagged === 1, JSON.stringify(a1));
+  await refused("a second null-version call on the now-active reopened item is refused", setSql, [k1, "dismissed", "again", null, false], STALE);
+  const r1b = await row(k1);
+  check("…and nothing changed", r1b.lifecycle === "in_progress" && r1b.version === 2 && (await audit(k1)).total === 2, JSON.stringify(r1b));
   check("the reopened item can be changed again with its new version", (await set(k1, "acknowledged", { version: 2 })).v === 3);
   check("…and that ordinary change does not say reopened", (await audit(k1)).flagged === 1);
 
