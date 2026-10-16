@@ -12,6 +12,7 @@ import {
   billDueItem,
   billsDueControl,
   DUE_SOON_DAYS,
+  PURCHASES_WORK_KEY_PREFIXES,
   QUEUE_BILL_LIMIT,
   receivedNotBilledControl,
   receivedNotBilledItem,
@@ -231,7 +232,7 @@ export interface PurchasesSections {
   context: (sb: SupabaseClient) => Promise<PurchasesContext>;
   facts: (sb: SupabaseClient, context: PurchasesContext) => Promise<PurchasesFacts>;
   workState: (sb: SupabaseClient) => Promise<Map<string, WorkItemState>>;
-  retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
+  retire: (sb: SupabaseClient, liveKeys: readonly string[], prefixes: readonly string[]) => Promise<number>;
   policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
 }
 
@@ -287,7 +288,7 @@ export async function getPurchasesSurface(
         );
 
   if (queue.data) {
-    await sections.retire(sb, queue.data.map((item) => item.key));
+    await sections.retire(sb, queue.data.map((item) => item.key), PURCHASES_WORK_KEY_PREFIXES);
   }
 
   return { context, controls, queue, policy };

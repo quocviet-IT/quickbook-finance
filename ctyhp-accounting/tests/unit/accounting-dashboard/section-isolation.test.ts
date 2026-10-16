@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ACCOUNTING_WORK_KEY_PREFIXES } from "@/lib/domain/accounting-dashboard/queue-items";
 import {
   composeAccountingDashboard,
   type AccountingDashboardSections,
@@ -174,16 +175,19 @@ describe("composeAccountingDashboard section isolation", () => {
     // The keys handed to retire are exactly the ones the queue just produced,
     // which is what stops a dismissal outliving the exception it dismissed.
     let retiredWith: readonly string[] | null = null;
+    let retiredPrefixes: readonly string[] | null = null;
     await composeAccountingDashboard(
       sb,
       sections({
-        retire: async (_sb, keys) => {
+        retire: async (_sb, keys, prefixes) => {
+          retiredPrefixes = prefixes;
           retiredWith = keys;
           return 0;
         },
       }),
     );
     expect(retiredWith).toEqual(["bill:1"]);
+    expect(retiredPrefixes).toEqual(ACCOUNTING_WORK_KEY_PREFIXES);
   });
 
   it("carries a person's decision onto the item the books produced", async () => {

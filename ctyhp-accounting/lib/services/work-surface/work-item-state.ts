@@ -98,9 +98,11 @@ export async function setWorkItemState(
 export async function retireWorkItems(
   sb: SupabaseClient,
   liveKeys: readonly string[],
+  prefixes: readonly string[],
 ): Promise<number> {
   const { data, error } = await sb.rpc("acc_retire_work_items", {
     p_live_keys: [...liveKeys],
+    p_prefixes: [...prefixes],
   });
   if (error) {
     console.error("retiring finished work items failed:", error.message);

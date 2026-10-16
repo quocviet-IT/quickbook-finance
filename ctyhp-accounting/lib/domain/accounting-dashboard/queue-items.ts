@@ -1,6 +1,9 @@
 import { calendarDayDifference, type WorkQueueItem } from "@/lib/domain/work-queue";
 import type { AccountingControl, DerivedQueueItem, QueueSeverity } from "./types";
 
+/** Every work key the Accounting overview derives starts with one of these; its retire is scoped to them. */
+export const ACCOUNTING_WORK_KEY_PREFIXES = ["control:", "period:", "recurring:"] as const;
+
 /**
  * Turning each kind of source into one queue item.
  *

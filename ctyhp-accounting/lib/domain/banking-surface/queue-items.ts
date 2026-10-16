@@ -2,6 +2,9 @@ import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
 import { shortDate } from "@/lib/domain/report-presets";
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 
+/** Every work key the Banking overview derives starts with one of these; its retire is scoped to them. */
+export const BANKING_WORK_KEY_PREFIXES = ["bank-txn:", "bank-feed:", "bank-recon:", "dupe-charge:"] as const;
+
 /**
  * The work Banking has, derived from the feed on every read.
  *

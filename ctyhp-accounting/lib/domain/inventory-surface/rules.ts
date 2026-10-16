@@ -2,6 +2,14 @@ import type { DerivedWorkItem, SurfaceControl } from "@/lib/domain/work-surface/
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
 
 /**
+ * Every work key the Inventory overview derives starts with one of these; its
+ * retire is scoped to them. The valuation variance item keeps the key "control:inventory-ties-out" (stored
+ * dismissals and assignments already use it), so it is listed whole; it also
+ * falls under Accounting's "control:" prefix, which is the one known overlap.
+ */
+export const INVENTORY_WORK_KEY_PREFIXES = ["inv-negative:", "inv-depreciation:", "control:inventory-ties-out"] as const;
+
+/**
  * What Inventory checks, and what it hands somebody to do.
  *
  * The job the design document gives this screen is *availability, negative

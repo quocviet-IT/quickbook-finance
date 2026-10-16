@@ -5,6 +5,7 @@ import type {
   SurfaceWorkItem,
 } from "@/lib/domain/work-surface/types";
 import { EMPTY_WORK_POLICY, type WorkPolicy } from "@/lib/domain/work-policy";
+import { BANKING_WORK_KEY_PREFIXES } from "@/lib/domain/banking-surface/queue-items";
 import { envelope, failed, withDecisions } from "@/lib/services/work-surface/envelope";
 import {
   listWorkItemState,
@@ -44,7 +45,7 @@ export interface BankingSections {
   facts: (sb: SupabaseClient, context: BankingContext) => Promise<Awaited<ReturnType<typeof getBankingFacts>>>;
   workState: (sb: SupabaseClient) => Promise<Map<string, import("@/lib/domain/work-surface/lifecycle").WorkItemState>>;
   duplicates: (sb: SupabaseClient, context: BankingContext) => Promise<DuplicateCharge[]>;
-  retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
+  retire: (sb: SupabaseClient, liveKeys: readonly string[], prefixes: readonly string[]) => Promise<number>;
   policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
 }
 
@@ -154,7 +155,7 @@ export async function getBankingSurface(
         if (key.startsWith(DUPLICATE_KEY_PREFIX)) liveKeys.push(key);
       }
     }
-    await sections.retire(sb, liveKeys);
+    await sections.retire(sb, liveKeys, BANKING_WORK_KEY_PREFIXES);
   }
 
   return { context, controls, queue, policy };
