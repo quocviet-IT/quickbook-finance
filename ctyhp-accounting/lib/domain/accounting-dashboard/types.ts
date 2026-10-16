@@ -34,14 +34,16 @@ export type {
 export type { Severity as QueueSeverity } from "@/lib/domain/work-surface/types";
 
 /** The checks this area runs. Which ones exist is accounting's business. */
-export type ControlKey =
-  | "trial-balance"
-  | "bank-reconciliation"
-  | "ar-to-gl"
-  | "ap-to-gl"
-  | "inventory-to-gl"
-  | "period-status"
-  | "pending-approvals";
+export const CONTROL_KEYS = [
+  "trial-balance",
+  "bank-reconciliation",
+  "ar-to-gl",
+  "ap-to-gl",
+  "inventory-to-gl",
+  "period-status",
+  "pending-approvals",
+] as const;
+export type ControlKey = (typeof CONTROL_KEYS)[number];
 
 /** The kinds of work this area produces. */
 export type QueueSourceKind =

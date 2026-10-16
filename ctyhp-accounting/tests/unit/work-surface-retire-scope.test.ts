@@ -32,7 +32,7 @@ import {
   valuationVarianceItem,
 } from "@/lib/domain/inventory-surface/rules";
 import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
-import type { AccountingControl } from "@/lib/domain/accounting-dashboard/types";
+import { CONTROL_KEYS, type AccountingControl } from "@/lib/domain/accounting-dashboard/types";
 import { EMPTY_WORK_POLICY } from "@/lib/domain/work-policy";
 import { retireWorkItems as retireWorkItemsForSurfaces } from "@/lib/services/work-surface/work-item-state";
 import { retireWorkItems as retireWorkItemsForAccounting } from "@/lib/services/accounting-dashboard/work-item-state";
@@ -109,7 +109,18 @@ describe("work key prefixes: every key a builder produces starts with its area's
     for (const key of keys) expect(startsWithOne(key, INVENTORY_WORK_KEY_PREFIXES), key).toBe(true);
   });
 
-  it("the five lists do not overlap, except the one documented case", () => {
+  it("every control key's work key belongs to Accounting and to no other area", () => {
+    const others = [BANKING_WORK_KEY_PREFIXES, SALES_WORK_KEY_PREFIXES, PURCHASES_WORK_KEY_PREFIXES, INVENTORY_WORK_KEY_PREFIXES];
+    for (const controlKey of CONTROL_KEYS) {
+      const control = { key: controlKey, status: "failing", title: "T", detail: "D", differenceMinor: 5 } as unknown as AccountingControl;
+      const [item] = controlFailureItems([control], AT);
+      expect(startsWithOne(item.key, ACCOUNTING_WORK_KEY_PREFIXES), item.key).toBe(true);
+      for (const other of others) expect(startsWithOne(item.key, other), item.key).toBe(false);
+    }
+    expect(CONTROL_KEYS).toHaveLength(7);
+  });
+
+  it("the five lists are strictly disjoint", () => {
     const areas = {
       accounting: ACCOUNTING_WORK_KEY_PREFIXES,
       banking: BANKING_WORK_KEY_PREFIXES,
@@ -124,8 +135,7 @@ describe("work key prefixes: every key a builder produces starts with its area's
         for (const p of as) for (const q of bs) if (q.startsWith(p)) overlaps.push(`${a}:${p} covers ${b}:${q}`);
       }
     }
-    // Inventory's valuation variance item keeps its stored key, "control:inventory-ties-out".
-    expect(overlaps).toEqual(["accounting:control: covers inventory:control:inventory-ties-out"]);
+    expect(overlaps).toEqual([]);
   });
 });
 
