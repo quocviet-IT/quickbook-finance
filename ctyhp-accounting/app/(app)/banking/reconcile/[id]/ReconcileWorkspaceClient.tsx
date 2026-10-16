@@ -106,6 +106,8 @@ interface Props {
   canReopen: boolean;
   /** An administrator: offered "Import anyway…" for a statement that does not add up. The database decides again. */
   canOverride: boolean;
+  /** Statements imported out of balance that completing this reconciliation settles (2.11), worded on the server. */
+  overrideNotices: string[];
   offsetAccounts: Offset[];
   baseCurrency: string;
   baseDecimals: number;
@@ -119,6 +121,7 @@ export default function ReconcileWorkspaceClient({
   canWrite,
   canReopen,
   canOverride,
+  overrideNotices,
   offsetAccounts,
   baseCurrency,
   baseDecimals,
@@ -652,6 +655,9 @@ export default function ReconcileWorkspaceClient({
       )}
       <p><Link href={`/banking/reconcile/${reconciliationId}/report`}>View report</Link></p>
       {statement?.broughtForward && statement.note ? <Alert type="info" showIcon title={statement.note} /> : null}
+      {!completed
+        ? overrideNotices.map((notice) => <Alert key={notice} type="warning" showIcon title={notice} />)
+        : null}
       {historyAdvice && historyFacts ? (
         <Alert
           type={historyAdvice.canBringForward ? "info" : "warning"}

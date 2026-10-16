@@ -120,3 +120,36 @@ export function reconciliationNotice(facts: OverrideFacts, money: Money): string
 export function reconciliationReportLine(facts: OverrideFacts, money: Money): string {
   return `Settles a statement imported out of balance: out by ${money(facts.outByMinor)}, by ${facts.name} on ${facts.date}, “${facts.reason}”.`;
 }
+
+/** Where a reconciliation in progress sits: its account, its statement end date, and the end of the one completed before it. */
+export interface ReconciliationPeriod {
+  bankAccountId: string;
+  /** This reconciliation's statement ending date. */
+  endingDate: string;
+  /** The statement ending date of the account's newest completed reconciliation before this one; null when it has none. */
+  previousEndingDate: string | null;
+}
+
+/**
+ * The open overrides a reconciliation in progress will settle: the same account,
+ * a last line on or before this statement's end and after the previous
+ * completed reconciliation's end. Oldest import first.
+ */
+export function overridesForReconciliation<T extends StatementOverride>(
+  overrides: readonly T[],
+  period: ReconciliationPeriod,
+): T[] {
+  return overrides.filter(
+    (o) =>
+      o.bankAccountId === period.bankAccountId &&
+      overrideStatus(o) === "open" &&
+      o.lastLineDate !== null &&
+      o.lastLineDate <= period.endingDate &&
+      (period.previousEndingDate === null || o.lastLineDate > period.previousEndingDate),
+  );
+}
+
+/** The overrides a completed reconciliation settled. */
+export function overridesSettledBy<T extends StatementOverride>(overrides: readonly T[], reconciliationId: string): T[] {
+  return overrides.filter((o) => o.settledByReconciliationId === reconciliationId);
+}

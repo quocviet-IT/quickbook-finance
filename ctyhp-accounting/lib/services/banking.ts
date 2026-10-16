@@ -17,6 +17,11 @@ import {
 } from "@/lib/domain/reconciliation";
 import { decryptBankToken, encryptBankToken } from "./bank-token-crypto";
 import { readAllPages } from "./paging";
+import { getCurrentCompanySettings } from "./company";
+import { listCurrencies } from "./reference";
+import { listStatementOverrides } from "./statement-overrides";
+import { importRecordDetailOf } from "@/lib/domain/statement-overrides";
+import { formatMoney } from "@/lib/format";
 import {
   exchangePlaidPublicToken as exchangePublicToken,
   getPlaidAccounts,
@@ -217,6 +222,12 @@ export interface BankStatementImportRow {
   void_reason: string | null;
   /** The file the lines were read from, kept in Reports › Saved (1.83); null before then or when it could not be kept. */
   statement_file_id: string | null;
+  /**
+   * Set when an administrator imported this statement out of balance (2.11): the
+   * sentence for the import record, worded in the company's time zone. Null for
+   * a statement that added up.
+   */
+  override_detail: string | null;
 }
 
 /** Statement imports, newest first. Null means every bank account. */
@@ -228,7 +239,21 @@ export async function listBankStatementImports(
     p_bank_account_id: bankAccountId,
   });
   if (error) throw new BankingError(error.message);
-  return (data ?? []) as unknown as BankStatementImportRow[];
+  const rows = (data ?? []) as unknown as Omit<BankStatementImportRow, "override_detail">[];
+  // Joined here, by batch id, so the list never words a sentence itself.
+  const [overrides, settings, currencies] = await Promise.all([
+    listStatementOverrides(sb),
+    getCurrentCompanySettings(sb),
+    listCurrencies(sb),
+  ]);
+  const byBatch = new Map(overrides.map((o) => [o.batchId, o]));
+  const timeZone = settings?.time_zone || "UTC";
+  const base = currencies.find((c) => c.is_base);
+  const money = (minor: number) => formatMoney(minor, base?.code ?? "USD", base?.decimal_places ?? 2);
+  return rows.map((row) => {
+    const override = byBatch.get(row.id);
+    return { ...row, override_detail: override ? importRecordDetailOf(override, timeZone, money) : null };
+  });
 }
 
 /**
