@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   descriptionShape,
   duplicatePayeeKey,
+  duplicateWindowStart,
   findDuplicateCharges,
 } from "@/lib/domain/duplicate-charges";
 import { duplicateChargeItem } from "@/lib/domain/banking-surface/queue-items";
@@ -317,5 +318,18 @@ describe("duplicateChargeItem", () => {
   it("keeps the key stable when the same pair is derived again", () => {
     const { charge } = build({}, {});
     expect(duplicateChargeItem(charge, input).key).toBe(duplicateChargeItem({ ...charge }, input).key);
+  });
+});
+
+describe("duplicateWindowStart", () => {
+  it("is the same day a year before, clamped to the month's end", () => {
+    expect(duplicateWindowStart("2026-10-15")).toBe("2025-10-15");
+    expect(duplicateWindowStart("2028-02-29")).toBe("2027-02-28");
+  });
+
+  it("is the very bound the detector applies: a pair on the start day is found, one a day before is not", () => {
+    const start = duplicateWindowStart(TODAY);
+    expect(find([line(start, -49_95, "Harbor Supplies"), line("2025-10-16", -49_95, "Harbor Supplies")])).toHaveLength(1);
+    expect(find([line("2025-10-14", -49_95, "Harbor Supplies"), line(start, -49_95, "Harbor Supplies")])).toHaveLength(0);
   });
 });

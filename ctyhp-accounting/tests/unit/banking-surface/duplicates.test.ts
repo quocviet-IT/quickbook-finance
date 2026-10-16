@@ -134,6 +134,33 @@ describe("getBankingSurface and duplicate charges", () => {
     expect(retire).toHaveBeenCalledWith(SB, []);
   });
 
+  it("skips retirement when both the state and the duplicates reads failed", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { sections: s, retire } = sections({
+      workState: async () => {
+        throw new Error("state unreadable");
+      },
+      duplicates: async () => {
+        throw new Error("lines unreadable");
+      },
+    });
+    const surface = await getBankingSurface(SB, s);
+    expect(surface.queue.dataState).toBe("fresh");
+    expect(retire).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("skipping retirement"));
+  });
+
+  it("still retires when only the state read failed", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { sections: s, retire } = sections({
+      workState: async () => {
+        throw new Error("state unreadable");
+      },
+    });
+    await getBankingSurface(SB, s);
+    expect(retire).toHaveBeenCalledWith(SB, []);
+  });
+
   it("keeps dupe-charge state out of retirement when the duplicates read failed", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const state = new Map<string, WorkItemState>([

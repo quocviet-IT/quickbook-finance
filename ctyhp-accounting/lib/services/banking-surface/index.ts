@@ -11,8 +11,8 @@ import {
   retireWorkItems,
 } from "@/lib/services/work-surface/work-item-state";
 import { getWorkPolicy } from "@/lib/services/work-policy";
-import { findDuplicateCharges, type DuplicateAccountInput, type DuplicateCharge } from "@/lib/domain/duplicate-charges";
-import { getBankAccountLines, readBankAccounts } from "@/lib/services/statement-alerts";
+import { duplicateWindowStart, findDuplicateCharges, type DuplicateCharge } from "@/lib/domain/duplicate-charges";
+import { getBankLinesSince } from "@/lib/services/statement-alerts";
 import { getBankingContext, getBankingFacts, type BankingContext } from "./facts";
 import { bankingControls, bankingWorkQueue } from "./sections";
 
@@ -52,19 +52,15 @@ export interface BankingSections {
 const DUPLICATE_KEY_PREFIX = "dupe-charge:";
 
 /**
- * Possible duplicate charges across every bank account. The accounts are read
- * one after another: the database pool is small, and each read already pages.
+ * Possible duplicate charges across every bank account. The shared reads happen
+ * once and each account's lines are bounded in the database to the detector's
+ * window; the accounts are read one after another, as the database pool is small.
  */
 export async function getDuplicateCharges(
   sb: SupabaseClient,
   context: BankingContext,
 ): Promise<DuplicateCharge[]> {
-  const accounts = await readBankAccounts(sb);
-  const inputs: DuplicateAccountInput[] = [];
-  for (const account of accounts) {
-    const { lines } = await getBankAccountLines(sb, account.id);
-    inputs.push({ bankAccountId: account.id, accountName: account.name, lines });
-  }
+  const inputs = await getBankLinesSince(sb, duplicateWindowStart(context.asOf));
   return findDuplicateCharges(inputs, context.asOf);
 }
 
@@ -96,15 +92,16 @@ export async function getBankingSurface(
   const policy = policyResult.status === "fulfilled" ? policyResult.value : EMPTY_WORK_POLICY;
 
   // A failed state read costs the owner column, never the work.
+  const stateFailed = stateResult.status === "rejected";
   const state =
-    stateResult.status === "fulfilled"
+    !stateFailed
       ? stateResult.value
       : (console.error("reading work item state failed:", stateResult.reason), new Map());
 
   // A failed duplicates read costs the duplicate rows, never the rest of the
   // queue. It must also not cost the dismissals: see the retire call below.
   const duplicatesFailed = duplicatesResult.status === "rejected";
-  if (duplicatesResult.status === "rejected") {
+  if (duplicatesFailed) {
     console.error("reading duplicate charges failed:", duplicatesResult.reason);
   }
   const duplicates = duplicatesResult.status === "fulfilled" ? duplicatesResult.value : null;
@@ -137,7 +134,13 @@ export async function getBankingSurface(
           factsResult.reason,
         );
 
-  if (queue.data) {
+  // With both reads failed there are no stored dupe-charge keys to keep alive,
+  // and retiring against a live set that lacks every duplicate would retire
+  // every duplicate dismissal. Skip it; a later load retires what has gone.
+  const skipRetire = duplicatesFailed && stateFailed;
+  if (skipRetire) console.error("skipping retirement of work item state: the state and duplicate reads both failed");
+
+  if (queue.data && !skipRetire) {
     // Retire the state of work that has gone, now the live set is known. This is
     // the one moment it can be known, and it is what stops a dismissal
     // outliving the thing it dismissed.

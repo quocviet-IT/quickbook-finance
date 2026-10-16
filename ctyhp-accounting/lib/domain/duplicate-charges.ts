@@ -97,7 +97,7 @@ export interface DuplicateAccountInput {
 }
 
 /** The first day of the window: the same day a year before `today`. */
-function windowStart(today: string): string {
+export function duplicateWindowStart(today: string): string {
   const [y, m, d] = today.split("-").map(Number);
   const last = new Date(Date.UTC(y - 1, m, 0)).getUTCDate();
   const day = Math.min(d, last);
@@ -150,7 +150,7 @@ export function findDuplicateCharges(
   accounts: readonly DuplicateAccountInput[],
   today: string,
 ): DuplicateCharge[] {
-  const start = windowStart(today);
+  const start = duplicateWindowStart(today);
   const found: DuplicateCharge[] = [];
 
   for (const account of accounts) {

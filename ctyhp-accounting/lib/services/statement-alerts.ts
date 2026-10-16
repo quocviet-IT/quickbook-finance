@@ -70,17 +70,54 @@ type LineRow = {
   acc_journal_entry: { id: string; entry_number: string; entry_date: string; source_type: string };
 };
 
-/** Every posted line on the ledger account, all dates. Ordered by the line id, which is unique. */
-function readLines(sb: SupabaseClient, accountId: string): Promise<LineRow[]> {
-  return readAll<LineRow>("the bank account's entries", (f, t) =>
-    sb
+const LINE_COLUMNS = "id,debit_minor,credit_minor,amount_base_minor,acc_journal_entry!inner(id,entry_number,entry_date,source_type)";
+
+/**
+ * Every posted line on the ledger account, all dates, or from `fromDate` on
+ * (inclusive, bounded in the database). Ordered by the line id, which is unique.
+ */
+function readLines(sb: SupabaseClient, accountId: string, fromDate?: string): Promise<LineRow[]> {
+  return readAll<LineRow>("the bank account's entries", (f, t) => {
+    let q = sb
       .from("acc_journal_line")
-      .select("id,debit_minor,credit_minor,amount_base_minor,acc_journal_entry!inner(id,entry_number,entry_date,source_type)")
+      .select(LINE_COLUMNS)
       .eq("account_id", accountId)
-      .eq("acc_journal_entry.status", "posted")
-      .order("id")
-      .range(f, t),
-  );
+      .eq("acc_journal_entry.status", "posted");
+    if (fromDate) q = q.gte("acc_journal_entry.entry_date", fromDate);
+    return q.order("id").range(f, t);
+  });
+}
+
+const PARTNER_CHUNK = 100;
+
+/**
+ * The lines on the account of the given entries dated before `before`. Used to
+ * see the other half of a reversal pair that straddles a date bound.
+ */
+async function readEarlierLinesOfEntries(
+  sb: SupabaseClient,
+  accountId: string,
+  entryIds: readonly string[],
+  before: string,
+): Promise<LineRow[]> {
+  const out: LineRow[] = [];
+  for (let i = 0; i < entryIds.length; i += PARTNER_CHUNK) {
+    const chunk = entryIds.slice(i, i + PARTNER_CHUNK);
+    out.push(
+      ...(await readAll<LineRow>("the bank account's earlier entries", (f, t) =>
+        sb
+          .from("acc_journal_line")
+          .select(LINE_COLUMNS)
+          .eq("account_id", accountId)
+          .in("journal_entry_id", chunk)
+          .eq("acc_journal_entry.status", "posted")
+          .lt("acc_journal_entry.entry_date", before)
+          .order("id")
+          .range(f, t),
+      )),
+    );
+  }
+  return out;
 }
 
 /** Debit minus credit in the base currency, read the way `acc_ledger_balances` reads it. */
@@ -230,6 +267,54 @@ export async function getBankAccountLines(
   const [labels, last, pairs] = await Promise.all([readLabels(sb), readLastStatements(sb, bank.id), readReversalPairs(sb)]);
   const { lines } = await readBankLines(sb, bank, null, labels);
   return { lines: withoutReversedPairs(lines, pairs), last: last.get(bank.id) ?? null };
+}
+
+/**
+ * Every bank account's posted lines dated `fromDate` or later, as the detectors
+ * take them: without reversed entries and their reversals.
+ *
+ * The chart labels and the reversal pairs (company-wide, never windowed) are
+ * read once, the entry names once over the dates the lines span; the accounts'
+ * lines are read one after another, bounded in the database. A reversal inside
+ * the window of an entry before it would look like a lone line, so the other
+ * half of such a pair is read too, only to let `withoutReversedPairs` drop both.
+ */
+export async function getBankLinesSince(
+  sb: SupabaseClient,
+  fromDate: string,
+): Promise<{ bankAccountId: string; accountName: string; lines: BankLine[] }[]> {
+  const banks = await readBankAccounts(sb);
+  if (banks.length === 0) return [];
+  const [labels, pairs] = await Promise.all([readLabels(sb), readReversalPairs(sb)]);
+
+  const partnerOf = new Map<string, string[]>();
+  const link = (a: string, b: string) => partnerOf.set(a, [...(partnerOf.get(a) ?? []), b]);
+  for (const p of pairs) {
+    link(p.originalEntryId, p.reversalEntryId);
+    link(p.reversalEntryId, p.originalEntryId);
+  }
+
+  const read: { bank: AlertBankAccount; rows: LineRow[]; earlier: LineRow[] }[] = [];
+  for (const bank of banks) {
+    const rows = await readLines(sb, bank.accountId, fromDate);
+    const present = new Set(rows.map((r) => r.acc_journal_entry.id));
+    const missing = new Set<string>();
+    for (const id of present) for (const other of partnerOf.get(id) ?? []) if (!present.has(other)) missing.add(other);
+    const earlier = missing.size > 0 ? await readEarlierLinesOfEntries(sb, bank.accountId, [...missing], fromDate) : [];
+    read.push({ bank, rows, earlier });
+  }
+
+  const names = await readEntryNames(
+    sb,
+    read.flatMap(({ rows }) => rows.map((r) => String(r.acc_journal_entry.entry_date).slice(0, 10))),
+  );
+  const out: { bankAccountId: string; accountName: string; lines: BankLine[] }[] = [];
+  for (const { bank, rows, earlier } of read) {
+    const cleared = await readClearedLineIds(sb, bank.id);
+    const all = withoutReversedPairs(toBankLines([...rows, ...earlier], bank.accountId, cleared, names, labels), pairs);
+    out.push({ bankAccountId: bank.id, accountName: bank.name, lines: all.filter((l) => l.date >= fromDate) });
+  }
+  return out;
 }
 
 /** Both alerts for one bank account. Throws if any read fails. */
