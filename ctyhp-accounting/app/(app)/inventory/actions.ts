@@ -8,7 +8,6 @@ import {
 import { inventoryBlockingKeys } from "@/lib/services/inventory-surface";
 import { INVENTORY_NOUNS } from "@/lib/domain/inventory-surface/rules";
 
-export type { WorkItemActionResult, WorkItemChange };
 
 /**
  * One action for every change a person makes to a piece of inventory work.
