@@ -247,7 +247,7 @@ export async function listBankStatementImports(
     listCurrencies(sb),
   ]);
   const byBatch = new Map(overrides.map((o) => [o.batchId, o]));
-  const timeZone = settings?.time_zone || "UTC";
+  const timeZone = settings?.time_zone || "America/New_York";
   const base = currencies.find((c) => c.is_base);
   const money = (minor: number) => formatMoney(minor, base?.code ?? "USD", base?.decimal_places ?? 2);
   return rows.map((row) => {

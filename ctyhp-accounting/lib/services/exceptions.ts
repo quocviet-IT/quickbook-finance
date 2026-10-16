@@ -316,7 +316,7 @@ export async function getExceptionReport(
     // The statements imported out of balance, and the company's time zone their
     // date and time are printed in: without either the check cannot say when.
     readOr(unavailable, ["statementOverride"], [] as NamedStatementOverride[], () => listStatementOverrides(sb)),
-    readOr(unavailable, ["statementOverride"], "UTC", async () => (await getCurrentCompanySettings(sb))?.time_zone || "UTC"),
+    readOr(unavailable, ["statementOverride"], "America/New_York", async () => (await getCurrentCompanySettings(sb))?.time_zone || "America/New_York"),
   ]);
 
   const yearTotals = yearTotalsFromMonthly(byMonth);

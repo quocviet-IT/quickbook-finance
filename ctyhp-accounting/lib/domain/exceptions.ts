@@ -553,6 +553,8 @@ export function openStatementOverrides(
   const names = new Map(bankAccounts.map((b) => [b.bankAccountId, b.accountName]));
   return overrides
     .filter((o) => overrideStatus(o) === "open")
+    // By the instant, not the day: two imports on one day keep the order they were made in.
+    .sort((x, y) => Date.parse(x.importedAt) - Date.parse(y.importedAt) || x.batchId.localeCompare(y.batchId))
     .map((o) => {
       const moment = overrideMoment(o.importedAt, timeZone);
       const importedDay = overrideDay(o.importedAt, timeZone);
@@ -569,8 +571,7 @@ export function openStatementOverrides(
         reason: o.reason,
         openSince: importedDay,
       };
-    })
-    .sort((x, y) => x.importedDay.localeCompare(y.importedDay) || x.batchId.localeCompare(y.batchId));
+    });
 }
 
 /**
@@ -694,7 +695,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const noLongerAgree = reconciliationsNoLongerAgreeing(input.bankAccounts, input.bankStanding ?? []);
   const statementOverride = input.unavailable.includes("statementOverride")
     ? []
-    : openStatementOverrides(input.statementOverrides ?? [], input.bankAccounts, input.timeZone ?? "UTC");
+    : openStatementOverrides(input.statementOverrides ?? [], input.bankAccounts, input.timeZone ?? "America/New_York");
 
   return {
     entriesExamined: input.entriesInRange.length,

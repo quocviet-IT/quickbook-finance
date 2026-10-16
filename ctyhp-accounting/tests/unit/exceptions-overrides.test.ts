@@ -58,6 +58,18 @@ describe("the statements imported out of balance check", () => {
     expect(report.questionsRaised).toBe(1);
   });
 
+  it("lists two made on one day in the order they were made, not by their ids", () => {
+    const report = buildExceptionReport(
+      input({
+        statementOverrides: [
+          override({ batchId: "batch-a", importedAt: "2026-09-10T20:15:00Z" }),
+          override({ batchId: "batch-z", importedAt: "2026-09-10T16:05:00Z" }),
+        ],
+      }),
+    );
+    expect(report.statementOverride.map((r) => r.batchId)).toEqual(["batch-z", "batch-a"]);
+  });
+
   it("carries account, file, moment in the company's zone, person, shortfall, reason and the day it opened", () => {
     const [row] = buildExceptionReport(input({ statementOverrides: [override()] })).statementOverride;
     expect(row).toMatchObject({
