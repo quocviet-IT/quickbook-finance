@@ -5,6 +5,7 @@ import {
   getAllStatementAlerts,
   getBalanceEntryBlockers,
   getBankAccountLines,
+  getBankLinesSince,
   getBelowZeroBankAccounts,
   getStatementAlerts,
   removeBalanceEntries,
@@ -38,15 +39,27 @@ interface Calls {
   rpc: { name: string; args: Record<string, unknown> }[];
 }
 
+interface Bounds {
+  gte?: string;
+  lt?: string;
+  entryIds?: string[];
+}
+
 function fakeClient(world: World, calls: Calls = { ranges: {}, rpc: [] }): SupabaseClient {
-  const rowsFor = (table: string, eqs: Record<string, unknown>): Row[] => {
+  const rowsFor = (table: string, eqs: Record<string, unknown>, bounds: Bounds = {}): Row[] => {
     switch (table) {
       case "acc_bank_account":
         return eqs.id === undefined ? world.banks : world.banks.filter((b) => b.id === eqs.id);
       case "acc_account":
         return world.chart;
       case "acc_journal_line":
-        return world.lines[eqs.account_id as string] ?? [];
+        return (world.lines[eqs.account_id as string] ?? []).filter((r) => {
+          const entry = r.acc_journal_entry as { id: string; entry_date: string };
+          if (bounds.gte !== undefined && !(entry.entry_date >= bounds.gte)) return false;
+          if (bounds.lt !== undefined && !(entry.entry_date < bounds.lt)) return false;
+          if (bounds.entryIds && !bounds.entryIds.includes(entry.id)) return false;
+          return true;
+        });
       case "acc_reconciliation_line":
         return (world.ticked[eqs["acc_statement_reconciliation.bank_account_id"] as string] ?? []).map((id, i) => ({
           id: `rl${i}`,
@@ -66,8 +79,21 @@ function fakeClient(world: World, calls: Calls = { ranges: {}, rpc: [] }): Supab
   return {
     from(table: string) {
       const eqs: Record<string, unknown> = {};
+      const bounds: Bounds = {};
       const builder: Record<string, unknown> = {
         select: () => builder,
+        gte: (column: string, value: string) => {
+          if (column === "acc_journal_entry.entry_date") bounds.gte = value;
+          return builder;
+        },
+        lt: (column: string, value: string) => {
+          if (column === "acc_journal_entry.entry_date") bounds.lt = value;
+          return builder;
+        },
+        in: (column: string, values: string[]) => {
+          if (column === "journal_entry_id") bounds.entryIds = values;
+          return builder;
+        },
         eq: (column: string, value: unknown) => {
           eqs[column] = value;
           return builder;
@@ -76,7 +102,7 @@ function fakeClient(world: World, calls: Calls = { ranges: {}, rpc: [] }): Supab
         range: async (from: number, to: number) => {
           (calls.ranges[table] ??= []).push([from, to]);
           if (world.fail === table) return { data: null, error: { message: `${table} unreachable` } };
-          return { data: rowsFor(table, eqs).slice(from, to + 1), error: null };
+          return { data: rowsFor(table, eqs, bounds).slice(from, to + 1), error: null };
         },
         maybeSingle: async () => {
           if (world.fail === table) return { data: null, error: { message: `${table} unreachable` } };
@@ -404,5 +430,77 @@ describe("getBelowZeroBankAccounts", () => {
     world.banks = [BANK];
     world.ledger = [ledger("gl-1", 5_000, 5_000)];
     expect(await getBelowZeroBankAccounts(fakeClient(world), "2026-02-01")).toEqual([]);
+  });
+});
+
+describe("getBankLinesSince", () => {
+  const BANK_2 = { id: "bank-2", account_id: "gl-2", bank_name: "Second Test Bank", acc_account: { name: "Savings" } };
+
+  it("bounds the lines at the database, pages past 1,000 rows and shares the other reads between accounts", async () => {
+    const world = emptyWorld();
+    world.banks = [BANK, BANK_2];
+    world.chart = [{ id: "gl-expense", account_code: "6000", name: "Wages" }];
+    const early = journalLine("2025-06-01", -700);
+    const rows: { line: Row; entry: Row }[] = [];
+    for (let i = 0; i < 1100; i += 1) rows.push(journalLine(day(i % 300), -100));
+    const other = journalLine("2026-02-01", -250);
+    world.lines["gl-1"] = [early, ...rows].map((r) => r.line);
+    world.lines["gl-2"] = [other.line];
+    world.transactions = [early, ...rows, other].map((r) => r.entry);
+    const calls: Calls = { ranges: {}, rpc: [] };
+
+    const result = await getBankLinesSince(fakeClient(world, calls), "2026-01-01");
+
+    expect(result.map((r) => [r.bankAccountId, r.accountName, r.lines.length])).toEqual([
+      ["bank-1", "Operating Checking", 1100],
+      ["bank-2", "Savings", 1],
+    ]);
+    expect(result[0].lines.every((l) => l.date >= "2026-01-01")).toBe(true);
+    // Two pages for the first account, one for the second; chart, reversals and names once.
+    expect(calls.ranges.acc_journal_line).toEqual([[0, 999], [1000, 1999], [0, 999]]);
+    expect(calls.ranges.acc_account).toHaveLength(1);
+    expect(calls.ranges.acc_journal_reversal_link).toHaveLength(1);
+    expect(calls.ranges.acc_statement_reconciliation).toBeUndefined();
+    expect(calls.ranges.acc_transaction_list).toEqual([[0, 999], [1000, 1999]]);
+  });
+
+  it("passes the date bound to the query", async () => {
+    const world = emptyWorld();
+    world.banks = [BANK];
+    const seen: [string, string][] = [];
+    const client = fakeClient(world);
+    const original = client.from.bind(client);
+    (client as unknown as { from: (t: string) => unknown }).from = (table: string) => {
+      const builder = original(table) as unknown as Record<string, (...a: unknown[]) => unknown>;
+      const gte = builder.gte;
+      builder.gte = (column: unknown, value: unknown) => {
+        seen.push([column as string, value as string]);
+        return gte(column, value);
+      };
+      return builder;
+    };
+    await getBankLinesSince(client, "2025-10-16");
+    expect(seen).toEqual([["acc_journal_entry.entry_date", "2025-10-16"]]);
+  });
+
+  it("drops a reversal inside the window with its original from before it, and keeps real charges", async () => {
+    const world = emptyWorld();
+    world.banks = [BANK];
+    const original = journalLine("2025-12-20", 5_000, { entry: "e-original" });
+    const reversal = journalLine("2026-01-10", -5_000, { entry: "e-reversal" });
+    const insideOriginal = journalLine("2026-01-12", 3_000, { entry: "e-in-original" });
+    const insideReversal = journalLine("2026-01-13", -3_000, { entry: "e-in-reversal" });
+    const charge = journalLine("2026-01-20", -1_000, { entry: "e-charge" });
+    const all = [original, reversal, insideOriginal, insideReversal, charge];
+    world.lines["gl-1"] = all.map((r) => r.line);
+    world.transactions = all.map((r) => r.entry);
+    world.reversals = [
+      { id: "r1", original_entry_id: "e-original", reversal_entry_id: "e-reversal" },
+      { id: "r2", original_entry_id: "e-in-original", reversal_entry_id: "e-in-reversal" },
+    ];
+
+    const [bank] = await getBankLinesSince(fakeClient(world), "2026-01-01");
+
+    expect(bank.lines.map((l) => l.entryId)).toEqual(["e-charge"]);
   });
 });

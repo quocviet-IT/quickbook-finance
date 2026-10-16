@@ -19,5 +19,6 @@ export const BANKING_NOUNS: SurfaceNouns = {
 export const BANKING_KIND_FILTERS: readonly KindFilter[] = [
   { id: "unmatched", label: "Unmatched", kinds: ["unmatched-bank"] },
   { id: "feeds", label: "Feeds", kinds: ["broken-feed"] },
+  { id: "duplicates", label: "Possible duplicates", kinds: ["possible-duplicate"] },
   { id: "reconciliations", label: "Reconciliations", kinds: ["open-reconciliation"] },
 ];

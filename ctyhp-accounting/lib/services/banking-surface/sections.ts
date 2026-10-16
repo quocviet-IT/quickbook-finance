@@ -7,10 +7,13 @@ import {
 } from "@/lib/domain/banking-surface/controls";
 import {
   brokenFeedItem,
+  duplicateChargeItem,
   openReconciliationItem,
   QUEUE_UNMATCHED_LIMIT,
   unmatchedBankItem,
 } from "@/lib/domain/banking-surface/queue-items";
+import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
+import { formatMoney } from "@/lib/format";
 import type { BankingContext, BankingFacts } from "./facts";
 import { daysBetween, previousMonthEnd } from "./facts";
 
@@ -84,6 +87,7 @@ export function bankingWorkQueue(
   context: BankingContext,
   ageLimitDays: number | null,
   confirmedAt: string,
+  duplicates: readonly DuplicateCharge[] | null = null,
 ): DerivedWorkItem[] {
   const names = new Map(facts.accounts.map((account) => [account.id, account.name]));
   const items: DerivedWorkItem[] = [];
@@ -136,6 +140,19 @@ export function bankingWorkQueue(
         },
         { ageDays: daysBetween(context.asOf, session.created_at), confirmedAt },
       ),
+    );
+  }
+
+  // `null` is a duplicates read that failed: the queue shows no duplicates and
+  // `getBankingSurface` keeps their stored dismissals out of retirement.
+  for (const charge of duplicates ?? []) {
+    items.push(
+      duplicateChargeItem(charge, {
+        confirmedAt,
+        money: (minor) => formatMoney(minor, context.currencyCode, context.currencyDecimals),
+        entryHref: (entryId) => `/journal?entry=${encodeURIComponent(entryId)}`,
+        ageDays: daysBetween(context.asOf, charge.later.date),
+      }),
     );
   }
 

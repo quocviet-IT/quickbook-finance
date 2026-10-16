@@ -8,7 +8,6 @@ import {
 import { bankingBlockingKeys } from "@/lib/services/banking-surface";
 import { BANKING_NOUNS } from "@/lib/domain/banking-surface/lifecycle";
 
-export type { WorkItemActionResult, WorkItemChange };
 
 /**
  * One action for every change a person makes to a piece of banking work.

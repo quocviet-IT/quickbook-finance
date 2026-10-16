@@ -1,3 +1,5 @@
+import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
+import { shortDate } from "@/lib/domain/report-presets";
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 
 /**
@@ -12,7 +14,8 @@ import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types"
 export type BankingSourceKind =
   | "unmatched-bank"
   | "broken-feed"
-  | "open-reconciliation";
+  | "open-reconciliation"
+  | "possible-duplicate";
 
 /**
  * How many unmatched lines reach the queue.
@@ -120,6 +123,48 @@ export function openReconciliationItem(
     ageDays: input.ageDays,
     href: "/banking/reconcile",
     actionLabel: "Finish",
+    confirmedAt: input.confirmedAt,
+    blocking: false,
+  };
+}
+
+/**
+ * A charge repeated to the same payee. The key names both lines, so a dismissal
+ * holds for that pair and the item retires on its own when the pair stops being
+ * derived (a void, say). Nothing here changes a record; Review opens the entry.
+ */
+export function duplicateChargeItem(
+  charge: DuplicateCharge,
+  input: {
+    confirmedAt: string;
+    money: (minor: number) => string;
+    entryHref: (entryId: string) => string;
+    ageDays: number;
+  },
+): DerivedWorkItem {
+  const review = charge.reviewSide === "later" ? charge.later : charge.earlier;
+  const other = charge.reviewSide === "later" ? charge.earlier : charge.later;
+  const within = charge.daysApart === 0 ? "on the same day" : `in ${plural(charge.daysApart, "day")}`;
+  let reason = `${charge.accountName} · ${shortDate(charge.earlier.date)} and ${shortDate(charge.later.date)}`;
+  if (charge.outlier) {
+    reason += ` · the ${shortDate(review.date)} line is described differently from this payee's other ${charge.otherPayeeLines}`;
+  }
+  if (other.cleared) {
+    reason += ` · the ${shortDate(other.date)} line is on a completed reconciliation`;
+  }
+  return {
+    key: `dupe-charge:${charge.earlier.lineId}:${charge.later.lineId}`,
+    sourceKind: "possible-duplicate",
+    sourceId: review.lineId,
+    // What happened first: the queue keeps a title to one line, and the payee's
+    // own text can be long. The amount has its own column.
+    title: `Charged twice ${within}: ${review.payee.trim() || "a bank charge"}`,
+    reason,
+    severity: charge.outlier ? "high" : "medium",
+    amountMinor: review.amountMinor,
+    ageDays: input.ageDays,
+    href: input.entryHref(review.entryId),
+    actionLabel: "Review",
     confirmedAt: input.confirmedAt,
     blocking: false,
   };

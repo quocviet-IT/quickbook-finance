@@ -8,7 +8,6 @@ import {
 import { salesBlockingKeys } from "@/lib/services/sales-surface";
 import { SALES_NOUNS } from "@/lib/domain/sales-surface/queue-items";
 
-export type { WorkItemActionResult, WorkItemChange };
 
 /**
  * One action for every change a person makes to a piece of collection work.

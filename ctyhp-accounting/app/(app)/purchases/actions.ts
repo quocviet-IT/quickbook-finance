@@ -8,7 +8,6 @@ import {
 import { purchasesBlockingKeys } from "@/lib/services/purchases-surface";
 import { PURCHASES_NOUNS } from "@/lib/domain/purchases-surface/rules";
 
-export type { WorkItemActionResult, WorkItemChange };
 
 /** One action for every change a person makes to a piece of purchasing work. */
 export async function changePurchasesWorkItemAction(

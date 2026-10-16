@@ -13,7 +13,6 @@ import {
   type WorkItemChange,
 } from "@/lib/services/work-surface/change-work-item";
 
-export type { WorkItemActionResult, WorkItemChange };
 
 /**
  * Which accounting work items are blocking, derived from the books.

@@ -151,7 +151,10 @@ export default function WorkQueuePanel({
                 </Tag>
                 <div className={styles.queueTitleCell}>
                   <span className={styles.queueTitleLine}>
-                    <span className={styles.queueTitle}>{item.title}</span>
+                    {/* `title` so a line cut to fit can still be read whole. */}
+                    <span className={styles.queueTitle} title={item.title}>
+                      {item.title}
+                    </span>
                     {item.blocking && blockingTag ? (
                       <Tag color="red" title={blockingTag.title}>
                         {blockingTag.label}
@@ -166,7 +169,9 @@ export default function WorkQueuePanel({
                       <Tag title={item.dismissReason ?? undefined}>dismissed</Tag>
                     ) : null}
                   </span>
-                  <span className={styles.queueReason}>{item.reason}</span>
+                  <span className={styles.queueReason} title={item.reason}>
+                    {item.reason}
+                  </span>
                 </div>
                 <span className={styles.queueOwner}>
                   {item.ownerName ?? <span className={styles.queueReason}>Unassigned</span>}
