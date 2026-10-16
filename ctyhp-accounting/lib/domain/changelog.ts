@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.11",
+    date: "2026-10-16",
+    headline: "A statement imported out of balance stays in sight until a reconciliation settles it.",
+    changes: [
+      {
+        kind: "added",
+        title: "A statement imported out of balance is shown where it matters",
+        detail:
+          "When an admin imports a statement that does not add up, giving a reason, Bank Transactions’ Statement imports now tags it Imported out of balance and says how much it was out by, who imported it, when, and the reason they gave. A reconciliation in progress whose period holds it says so above its lines, and completing that reconciliation settles it; the report of the reconciliation that settled it says so as well. Until then the Exception Report lists it under Statements imported out of balance, its twelfth check, with the export carrying the same facts.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "changed",
+        title: "A CSV with no balances opens at the last reconciliation’s closing",
+        detail:
+          "Import statement now opens a CSV that prints no running balance at the closing of the account’s last completed reconciliation, when every line is dated after it, as a PDF already did. Its closing is still typed, and that is what proves it. A statement whose opening is said to be that closing is checked against it as it is imported.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "The Exception Report’s today is the company’s today",
+        detail:
+          "The Exception Report read today’s date from the server’s clock, so late in the day in the Americas it took tomorrow’s date. It now reads the date in the company’s time zone.",
+        route: "/reports/exceptions",
+      },
+    ],
+  },
+  {
     version: "2.10",
     date: "2026-10-16",
     headline: "An item that comes back to a work list can be worked on again.",
