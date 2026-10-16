@@ -1,5 +1,5 @@
 /**
- * The eleven checks a reviewer runs by hand.
+ * The twelve checks a reviewer runs by hand.
  *
  * From the client's prototype: "None of these is proof of an error. Each is a
  * question worth answering." Nothing here accuses; each check raises a
@@ -41,12 +41,19 @@ import {
   type StatementBalanceRow,
 } from "@/lib/domain/statement-alerts";
 import type { TransactionListRow } from "@/lib/domain/transaction-list";
+import {
+  overrideDay,
+  overrideMoment,
+  overrideStatus,
+  type NamedStatementOverride,
+} from "@/lib/domain/statement-overrides";
+import { shortDate } from "@/lib/domain/pdf-statement-view";
 
 /** Re-exported so a caller needs one import to build the input, not three. */
 export type { LedgerBalance, TransactionListRow };
 
 /**
- * The eleven, named once.
+ * The twelve, named once.
  *
  * The screen draws its section headings from here and the service names a
  * failed read from here, so a check cannot be called two different things in
@@ -64,6 +71,7 @@ export const CHECK_LABEL = {
   statementBalance: "Entries that look like a statement balance",
   belowZero: "Bank accounts below zero since their last statement",
   noLongerAgree: "Reconciliations that no longer agree",
+  statementOverride: "Statements imported out of balance",
 } as const;
 
 export type CheckKey = keyof typeof CHECK_LABEL;
@@ -510,6 +518,72 @@ export function duplicateCheckNumbers(
     );
 }
 
+/* ------------------------------------------------ statements out of balance */
+
+/** An override still open: no completed reconciliation has reached its last line. */
+export interface StatementOverrideRow {
+  batchId: string;
+  bankAccountId: string;
+  accountName: string;
+  filename: string;
+  /** The day it was imported in the company's time zone, `2026-10-08`. */
+  importedDay: string;
+  /** That day as the screen prints it, `Oct 8, 2026`. */
+  importedDate: string;
+  /** The time of day in the company's time zone, `11:47`. */
+  importedTime: string;
+  byName: string;
+  outByMinor: number;
+  reason: string;
+  /** The day it became a question: the import's day. */
+  openSince: string;
+}
+
+/**
+ * One row for each open override, oldest first. Settled ones are the database's
+ * answer (a completed reconciliation reached the last line) and are not listed.
+ * An account missing from the bank accounts is named "Unknown account" rather
+ * than dropped: an override must not vanish.
+ */
+export function openStatementOverrides(
+  overrides: readonly NamedStatementOverride[],
+  bankAccounts: readonly ExceptionBankAccount[],
+  timeZone: string,
+): StatementOverrideRow[] {
+  const names = new Map(bankAccounts.map((b) => [b.bankAccountId, b.accountName]));
+  return overrides
+    .filter((o) => overrideStatus(o) === "open")
+    .map((o) => {
+      const moment = overrideMoment(o.importedAt, timeZone);
+      const importedDay = overrideDay(o.importedAt, timeZone);
+      return {
+        batchId: o.batchId,
+        bankAccountId: o.bankAccountId,
+        accountName: names.get(o.bankAccountId) ?? "Unknown account",
+        filename: o.filename,
+        importedDay,
+        importedDate: moment.date,
+        importedTime: moment.time,
+        byName: o.overriddenByName,
+        outByMinor: o.outByMinor,
+        reason: o.reason,
+        openSince: importedDay,
+      };
+    })
+    .sort((x, y) => x.importedDay.localeCompare(y.importedDay) || x.batchId.localeCompare(y.batchId));
+}
+
+/**
+ * The sentence a row is read by, on the screen and in the export:
+ * "bank-june.csv, imported Oct 8, 2026 at 11:47 by Dana Reyes, out by $12.00: “reason”. Open since Oct 8, 2026."
+ */
+export function statementOverrideSentence(row: StatementOverrideRow, money: Money): string {
+  return (
+    `${row.filename}, imported ${row.importedDate} at ${row.importedTime} by ${row.byName}, ` +
+    `out by ${money(row.outByMinor)}: “${row.reason}”. Open since ${shortDate(row.openSince, true)}.`
+  );
+}
+
 /* ---------------------------------------------------------------- report */
 
 export interface ExceptionReportInput {
@@ -538,6 +612,13 @@ export interface ExceptionReportInput {
    */
   bankStanding?: readonly BankStanding[];
   /**
+   * Every statement imported out of balance and not undone, open and settled,
+   * as `acc_statement_overrides()` returns them. Only the open ones are listed.
+   */
+  statementOverrides?: readonly NamedStatementOverride[];
+  /** The company's time zone, in which an override's date and time are printed. Left out, UTC. */
+  timeZone?: string;
+  /**
    * Checks whose data could not be read. They are reported as unavailable
    * rather than as "nothing found", because a check that could not run and a
    * check that found nothing are opposite answers.
@@ -548,7 +629,7 @@ export interface ExceptionReportInput {
 export interface ExceptionReport {
   entriesExamined: number;
   questionsRaised: number;
-  checksRun: 11;
+  checksRun: 12;
   unavailable: CheckKey[];
   duplicates: DuplicateGroup[];
   checkNumberClashes: CheckNumberClash[];
@@ -561,6 +642,7 @@ export interface ExceptionReport {
   statementBalance: StatementBalanceRow[];
   belowZero: BelowZeroRow[];
   noLongerAgree: NoLongerAgreeRow[];
+  statementOverride: StatementOverrideRow[];
 }
 
 /**
@@ -586,7 +668,7 @@ function referencesByEntry(
   return out;
 }
 
-/** Run all eleven. Nothing here reads a clock, a database or a file. */
+/** Run all twelve. Nothing here reads a clock, a database or a file. */
 export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
   const balanceByAccountId = new Map<string, number>(
     input.accounts.map((a) => [a.accountId, signedBalance(a)]),
@@ -610,6 +692,9 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const statementBalance = statementBalanceRows(input.statementAlerts ?? []);
   const belowZero = belowZeroRows(input.statementAlerts ?? []);
   const noLongerAgree = reconciliationsNoLongerAgreeing(input.bankAccounts, input.bankStanding ?? []);
+  const statementOverride = input.unavailable.includes("statementOverride")
+    ? []
+    : openStatementOverrides(input.statementOverrides ?? [], input.bankAccounts, input.timeZone ?? "UTC");
 
   return {
     entriesExamined: input.entriesInRange.length,
@@ -624,8 +709,9 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
       holding.length +
       statementBalance.length +
       belowZero.length +
-      noLongerAgree.length,
-    checksRun: 11,
+      noLongerAgree.length +
+      statementOverride.length,
+    checksRun: 12,
     unavailable: [...input.unavailable],
     duplicates,
     checkNumberClashes,
@@ -638,6 +724,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     statementBalance,
     belowZero,
     noLongerAgree,
+    statementOverride,
   };
 }
 
@@ -793,6 +880,18 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       name: r.entryCount === 1 ? "1 entry" : `${r.entryCount} entries`,
       account: r.accountName,
       amount: money(r.amountMinor),
+    })),
+  );
+
+  add(
+    "statementOverride",
+    report.statementOverride.map((r) => ({
+      check: CHECK_LABEL.statementOverride,
+      date: r.importedDay,
+      type: "Imported out of balance",
+      name: statementOverrideSentence(r, sentenceMoney),
+      account: r.accountName,
+      amount: money(r.outByMinor),
     })),
   );
 

@@ -551,3 +551,64 @@ describe("statementProofPayloadSchema", () => {
     expect(statementProofPayloadSchema.safeParse({ ...base, closing_basis: "books" }).success).toBe(false);
   });
 });
+
+describe("a CSV that prints no balance takes the prior closing", () => {
+  const prior = { date: "2026-08-31", endingMinor: 100000 };
+  const plain = () => [line("2026-09-02", 1000, "EXAMPLE DEPOSIT"), line("2026-09-14", -41230, "EXAMPLE SUPPLIES")];
+
+  it("automatically, when every line is after the prior end, and the typed closing proves it", () => {
+    const proof = proveStatement({ kind: "csv", lines: plain(), prior, typedClosingMinor: 59770 }, money);
+    expect(proof).toMatchObject({
+      openingMinor: 100000,
+      openingBasis: "prior",
+      closingMinor: 59770,
+      proves: true,
+      prior: { status: "auto", date: "2026-08-31", endingMinor: 100000 },
+    });
+    expect(proof.sentences.summary).toContain("from the reconciliation to Aug 31, 2026");
+  });
+
+  it("still needs a closing", () => {
+    expect(proveStatement({ kind: "csv", lines: plain(), prior }, money)).toMatchObject({
+      openingMinor: 100000,
+      closingMinor: null,
+      missing: "closing",
+      prior: { status: "auto" },
+    });
+  });
+
+  it("is refused when a line falls on the prior end date or before it", () => {
+    for (const day of ["2026-08-31", "2026-08-15"]) {
+      const lines = [line(day, 500, "EXAMPLE EARLY"), ...plain()];
+      const proof = proveStatement({ kind: "csv", lines, prior, typedClosingMinor: 60270 }, money);
+      expect(proof).toMatchObject({ openingMinor: null, missing: "opening", prior: { status: "refused" } });
+    }
+  });
+
+  it("is not applied when the CSV carries running balances", () => {
+    const lines = [line("2026-09-02", 1000, "A", 11000), line("2026-09-14", -200, "B", 10800)];
+    expect(proveStatement({ kind: "csv", lines, prior }, money)).toMatchObject({
+      openingMinor: 10000,
+      openingBasis: "running",
+      prior: { status: "none" },
+    });
+  });
+
+  it("is not applied to a CSV with no lines left to count", () => {
+    expect(proveStatement({ kind: "csv", lines: plain(), aside: [0, 1], prior }, money).prior.status).toBe("offered");
+  });
+
+  it("is not applied when the account has no completed reconciliation", () => {
+    expect(proveStatement({ kind: "csv", lines: plain(), typedOpeningMinor: 100000, typedClosingMinor: 59770 }, money)).toMatchObject({
+      openingBasis: "typed",
+      prior: { status: "none" },
+    });
+  });
+
+  it("reaches the server as a prior opening in the payload it re-proves", () => {
+    const proof = proveStatement({ kind: "csv", lines: plain(), prior, typedClosingMinor: 59770 }, money);
+    const payload = statementProofPayloadSchema.parse(proofPayload(proof));
+    expect(payload).toMatchObject({ opening_minor: 100000, opening_basis: "prior" });
+    expect(proveStatementPayload(plain(), payload, money).proves).toBe(true);
+  });
+});

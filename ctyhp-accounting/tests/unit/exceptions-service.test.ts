@@ -5,7 +5,7 @@ import { getExceptionReport } from "@/lib/services/exceptions";
 /**
  * The `unavailable` mechanism, which is where this branch's worst bugs lived.
  *
- * `getExceptionReport` reads eleven checks' worth of data behind `readOr`,
+ * `getExceptionReport` reads twelve checks' worth of data behind `readOr`,
  * which is supposed to tag exactly the checks a failed read affects — no
  * more, no fewer — and let the rest of the report through untouched. Each
  * test here fails exactly one read and inspects what got tagged, because a
@@ -37,6 +37,9 @@ interface ReaderConfig {
   reconciliationLines: Source;
   bankStanding: Source;
   clearingStanding: Source;
+  statementOverrides: Source;
+  actors: Source;
+  companySettings: Source;
 }
 
 function defaultConfig(): ReaderConfig {
@@ -55,6 +58,9 @@ function defaultConfig(): ReaderConfig {
     reconciliationLines: [],
     bankStanding: [],
     clearingStanding: [],
+    statementOverrides: [],
+    actors: [],
+    companySettings: [],
   };
 }
 
@@ -102,6 +108,20 @@ function chainFor(source: Source): Chain {
   return builder;
 }
 
+/** `getCurrentCompanySettings` reads the newest settings row with `.limit(1).maybeSingle()`. */
+function settingsChain(source: Source) {
+  const builder = {
+    select: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    maybeSingle: async () => {
+      if (source instanceof Error) return { data: null, error: { message: source.message } };
+      return { data: source[0] ?? null, error: null };
+    },
+  };
+  return builder as unknown as Chain;
+}
+
 function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
   const c: ReaderConfig = { ...defaultConfig(), ...overrides };
 
@@ -124,6 +144,8 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
           return chainFor(c.journalLines);
         case "acc_reconciliation_line":
           return chainFor(c.reconciliationLines);
+        case "acc_company_setting_version":
+          return settingsChain(c.companySettings);
         case "acc_journal_reversal_link":
           return chainFor([]);
         default:
@@ -147,6 +169,8 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
         return paged(args.p_to === "9999-12-31" ? c.txnAfterToday : c.txnInRange);
       }
       if (name === "acc_monthly_ledger_balances") return paged(c.monthlyBalances);
+      if (name === "acc_statement_overrides") return { order: () => ({ order: () => paged(c.statementOverrides) }) };
+      if (name === "acc_actor_directory") return resultOf(c.actors);
       if (name === "acc_clearing_standing") return { order: () => paged(c.clearingStanding) };
       if (name === "acc_bank_standing") {
         const ordered = { order: () => paged(c.bankStanding) };
@@ -266,7 +290,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     const sb = fakeClient();
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
     expect(report.unavailable).toEqual([]);
-    expect(report.checksRun).toBe(11);
+    expect(report.checksRun).toBe(12);
   });
 
   it("tags both statement checks, and only them, when the bank-account lines cannot be read", async () => {
@@ -379,5 +403,59 @@ describe("getExceptionReport: the bank standing read", () => {
     expect(report.unreconciled).toHaveLength(1);
     expect(report.unreconciled[0].sinceCount).toBeNull();
     expect(report.unreconciled[0].sinceNetMinor).toBeNull();
+  });
+});
+
+describe("getExceptionReport: the statements imported out of balance read", () => {
+  const OVERRIDE = (over: Row = {}): Row => ({
+    batch_id: "batch-1",
+    bank_account_id: "bank-1",
+    filename: "example-june.csv",
+    imported_at: "2026-09-10T02:30:00Z",
+    overridden_by: "user-1",
+    override_reason: "Bank confirmed the printed total is wrong",
+    out_by_minor: "1250",
+    statement_opening_minor: "100000",
+    statement_closing_minor: "150000",
+    first_line_date: "2026-09-01",
+    last_line_date: "2026-09-30",
+    settled_by_reconciliation_id: null,
+    settled_through: null,
+    ...over,
+  });
+  const ACTORS = [{ id: "user-1", email: "dana@example.test", full_name: "Dana Example" }];
+  const SETTINGS = [{ time_zone: "America/Los_Angeles" }];
+
+  it("lists an open override with its name and the company's clock, bigint strings read as numbers", async () => {
+    const sb = fakeClient({ bankAccounts: [BANK], statementOverrides: [OVERRIDE()], actors: ACTORS, companySettings: SETTINGS });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual([]);
+    expect(report.statementOverride).toEqual([
+      expect.objectContaining({
+        accountName: "Operating Checking",
+        byName: "Dana Example",
+        outByMinor: 1250,
+        importedDay: "2026-09-09",
+        importedTime: "19:30",
+      }),
+    ]);
+  });
+
+  it("leaves a settled override out", async () => {
+    const settled = OVERRIDE({ settled_by_reconciliation_id: "rec-1", settled_through: "2026-09-30" });
+    const sb = fakeClient({ bankAccounts: [BANK], statementOverrides: [settled], actors: ACTORS, companySettings: SETTINGS });
+    expect((await getExceptionReport(sb, FROM, TO, TODAY)).statementOverride).toEqual([]);
+  });
+
+  it("tags only this check when the overrides cannot be read", async () => {
+    const sb = fakeClient({ statementOverrides: new Error("permission denied") });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual(["statementOverride"]);
+  });
+
+  it("names a person the directory cannot name, rather than dropping the override", async () => {
+    const sb = fakeClient({ bankAccounts: [BANK], statementOverrides: [OVERRIDE()], actors: new Error("down"), companySettings: SETTINGS });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.statementOverride[0].byName).toBe("an unknown user");
   });
 });
