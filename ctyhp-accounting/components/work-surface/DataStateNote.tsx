@@ -26,7 +26,7 @@ export { freshnessOf };
 /**
  * The time of day, in the company's own zone. The zone is required and has no
  * default: without it the server (UTC) and the browser (the reader's zone) print
- * different text for the same instant, and React rejects the page (#418).
+ * different text for the same instant, and React rejects the page (error 418).
  */
 export function timeOnly(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", timeZone }).format(
