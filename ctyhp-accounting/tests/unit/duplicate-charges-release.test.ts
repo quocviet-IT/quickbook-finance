@@ -4,11 +4,12 @@ import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 import { duplicatePayeeKey } from "@/lib/domain/duplicate-charges";
 
 describe("2.08 in the release notes and the Guide", () => {
-  const release = RELEASES[0];
+  // Looked up by number: later releases sit above it.
+  const release = RELEASES.find((r) => r.version === "2.08")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
-  it("is the newest release, dated the day it was built", () => {
-    expect(release.version).toBe("2.08");
+  it("is in the release notes, dated the day it was built", () => {
+    expect(release).toBeDefined();
     expect(release.date).toBe("2026-10-16");
   });
 
