@@ -4,6 +4,7 @@ import {
   buildWorkQueueItems,
   type DashboardWorkQueue,
   type WorkQueueSource,
+  workQueueItemId,
 } from "@/lib/domain/work-queue";
 
 export class WorkQueueError extends Error {}
@@ -78,7 +79,7 @@ export async function getDashboardWorkQueue(
 
   const sources: WorkQueueSource[] = [
     ...((invoices.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-      id: `overdue_invoice:${String(row.id)}`,
+      id: workQueueItemId("overdue_invoice", String(row.id)),
       kind: "overdue_invoice" as const,
       title: String(row.invoice_number ?? "Invoice"),
       subtitle: relatedName(row.acc_customer, "Customer", "name"),
@@ -87,7 +88,7 @@ export async function getDashboardWorkQueue(
       href: `/invoices?queue=overdue&asOf=${asOf}&focus=${String(row.id)}`,
     })),
     ...((bills.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-      id: `due_bill:${String(row.id)}`,
+      id: workQueueItemId("due_bill", String(row.id)),
       kind: "due_bill" as const,
       title: String(row.bill_number ?? row.vendor_ref ?? "Bill"),
       subtitle: relatedName(row.acc_vendor, "Vendor", "name"),
@@ -96,7 +97,7 @@ export async function getDashboardWorkQueue(
       href: `/bills?queue=due&through=${dueThrough}&focus=${String(row.id)}`,
     })),
     ...((bankTransactions.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-      id: `unreconciled_transaction:${String(row.id)}`,
+      id: workQueueItemId("unreconciled_transaction", String(row.id)),
       kind: "unreconciled_transaction" as const,
       title: String(row.description || "Bank transaction"),
       subtitle: relatedName(row.acc_bank_account, "Bank account", "bank_name"),
@@ -107,7 +108,7 @@ export async function getDashboardWorkQueue(
         `&focus=${String(row.id)}`,
     })),
     ...((approvals.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-      id: `pending_approval:${String(row.id)}`,
+      id: workQueueItemId("pending_approval", String(row.id)),
       kind: "pending_approval" as const,
       title: String(row.title || "Approval request"),
       subtitle: String(row.action_key ?? "Controlled action").replaceAll("_", " "),

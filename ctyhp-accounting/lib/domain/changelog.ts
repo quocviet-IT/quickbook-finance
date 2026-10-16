@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.09",
+    date: "2026-10-16",
+    headline: "What you set on a work list stays set when you open another page, and the time a page was worked out reads in the company’s time zone.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A dismissal, owner or due date is kept when you open another overview page",
+        detail:
+          "Opening one of the Accounting, Sales, Purchases, Inventory and Banking overview pages cleared what had been set on the other pages’ work lists. A possible duplicate charge dismissed in the Banking overview came back once Sales had been opened, and an item’s owner, due date or in progress tag was lost the same way. Each page now clears only its own items that have gone, so a dismissal stays until you put the item back.",
+        route: "/banking/overview",
+      },
+      {
+        kind: "fixed",
+        title: "“Computed at” is in the company’s time zone",
+        detail:
+          "The time an overview page’s figures were worked out is now shown in the company’s time zone, as the “As of” date is. Before, it was printed once in the server’s time and again in the browser’s, so the two disagreed and the page was drawn a second time as it loaded.",
+        route: "/banking/overview",
+      },
+    ],
+  },
+  {
     version: "2.08",
     date: "2026-10-16",
     headline: "A charge that looks taken twice is put in front of you to check, never removed for you.",

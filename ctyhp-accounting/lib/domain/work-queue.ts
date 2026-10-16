@@ -4,6 +4,22 @@ export type WorkQueueKind =
   | "unreconciled_transaction"
   | "pending_approval";
 
+/**
+ * The prefix every dashboard queue id starts with, one per kind. The id is the
+ * work key of the item on the Accounting overview, so this one definition feeds
+ * both the ids and that overview's retire scope.
+ */
+export const WORK_QUEUE_ID_PREFIX: Record<WorkQueueKind, string> = {
+  overdue_invoice: "overdue_invoice:",
+  due_bill: "due_bill:",
+  unreconciled_transaction: "unreconciled_transaction:",
+  pending_approval: "pending_approval:",
+};
+
+export function workQueueItemId(kind: WorkQueueKind, recordId: string): string {
+  return `${WORK_QUEUE_ID_PREFIX[kind]}${recordId}`;
+}
+
 export type WorkQueuePriority = "critical" | "high" | "normal";
 
 export interface WorkQueueSource {

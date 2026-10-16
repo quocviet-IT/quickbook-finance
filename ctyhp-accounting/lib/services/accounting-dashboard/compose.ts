@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { controlFailureItems } from "@/lib/domain/accounting-dashboard/queue-items";
+import { ACCOUNTING_WORK_KEY_PREFIXES, controlFailureItems } from "@/lib/domain/accounting-dashboard/queue-items";
 import { orderQueue } from "@/lib/domain/accounting-dashboard/priority";
 import type {
   AccountingControl,
@@ -78,7 +78,7 @@ export interface AccountingDashboardSections {
   /** What people have decided about the work, keyed by the item's own key. */
   workState: (sb: SupabaseClient) => Promise<Map<string, WorkItemState>>;
   /** Marks as resolved the state of work no longer in the live set. */
-  retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
+  retire: (sb: SupabaseClient, liveKeys: readonly string[], prefixes: readonly string[]) => Promise<number>;
   policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
   /**
    * Runs after the controls, because most of what an insight has to say is
@@ -227,7 +227,7 @@ export async function composeAccountingDashboard(
   // has anything to say to the other.
   const [closeResult] = await Promise.all([
     closeSettled,
-    queue.data ? sections.retire(sb, queue.data.map((item) => item.key)) : Promise.resolve(0),
+    queue.data ? sections.retire(sb, queue.data.map((item) => item.key), ACCOUNTING_WORK_KEY_PREFIXES) : Promise.resolve(0),
   ]);
 
   const close: SectionEnvelope<CloseReadiness | null> | null =

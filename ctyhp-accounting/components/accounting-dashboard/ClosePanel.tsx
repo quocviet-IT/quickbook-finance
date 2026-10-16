@@ -48,12 +48,14 @@ export default function ClosePanel({
   close,
   canClose,
   owners,
+  timeZone,
 }: {
   close: SectionEnvelope<CloseReadiness | null>;
   /** Only an admin may close or reopen; the database enforces it either way. */
   canClose: boolean;
   /** Who holds each blocking step, by the step's work key. */
   owners: Record<string, string>;
+  timeZone: string;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -270,7 +272,7 @@ export default function ClosePanel({
         ) : null}
       </Modal>
 
-      <FreshnessNote generatedAt={close.generatedAt} dataState={close.dataState} />
+      <FreshnessNote generatedAt={close.generatedAt} dataState={close.dataState} timeZone={timeZone} />
     </Card>
   );
 }

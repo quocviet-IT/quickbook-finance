@@ -1,6 +1,9 @@
 import type { DerivedWorkItem, Severity, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
 
+/** Every work key the Purchases overview derives starts with one of these; its retire is scoped to them. */
+export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied:"] as const;
+
 /**
  * What Purchases checks, and what it hands somebody to do.
  *

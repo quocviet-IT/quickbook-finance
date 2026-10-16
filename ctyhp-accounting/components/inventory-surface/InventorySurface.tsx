@@ -53,6 +53,7 @@ export default function InventorySurface({
       canManage={canManage}
       assignees={assignees}
       today={context.asOf}
+      timeZone={context.timeZone}
       currencyCode={context.currencyCode}
       currencyDecimals={context.currencyDecimals}
       queueUnavailable="The inventory work could not be loaded."

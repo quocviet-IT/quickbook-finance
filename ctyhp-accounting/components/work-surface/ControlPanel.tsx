@@ -51,6 +51,7 @@ export default function ControlPanel({
   controls,
   currencyCode,
   currencyDecimals,
+  timeZone,
   title = "Control health",
   unavailableFallback = "These checks could not be evaluated.",
   className,
@@ -58,6 +59,8 @@ export default function ControlPanel({
   controls: SectionEnvelope<readonly SurfaceControl[]>;
   currencyCode: string;
   currencyDecimals: number;
+  /** The company zone, so the server and the browser print the same time. */
+  timeZone: string;
   title?: string;
   unavailableFallback?: string;
   className?: string;
@@ -104,7 +107,7 @@ export default function ControlPanel({
         </div>
       )}
       {controls.data ? (
-        <FreshnessNote generatedAt={controls.generatedAt} dataState={controls.dataState} />
+        <FreshnessNote generatedAt={controls.generatedAt} dataState={controls.dataState} timeZone={timeZone} />
       ) : null}
     </Card>
   );

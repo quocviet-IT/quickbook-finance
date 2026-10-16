@@ -42,6 +42,7 @@ export default function SurfaceScreen({
   canManage,
   assignees,
   today,
+  timeZone,
   currencyCode,
   currencyDecimals,
   queueUnavailable,
@@ -62,6 +63,8 @@ export default function SurfaceScreen({
   canManage: boolean;
   assignees: Assignee[];
   today: string;
+  /** The company zone, so the server and the browser print the same time. */
+  timeZone: string;
   currencyCode: string;
   currencyDecimals: number;
   queueUnavailable: string;
@@ -100,6 +103,7 @@ export default function SurfaceScreen({
         lead={lead}
         facts={facts}
         generatedAt={generatedAt}
+        timeZone={timeZone}
         staleSections={stale}
         unavailableSections={unavailable}
       />
@@ -113,6 +117,7 @@ export default function SurfaceScreen({
             canManage={canManage}
             assignees={assignees}
             today={today}
+            timeZone={timeZone}
             changeAction={changeAction}
             nouns={nouns}
             blockingTag={blockingTag}
@@ -125,6 +130,7 @@ export default function SurfaceScreen({
             controls={controls}
             currencyCode={currencyCode}
             currencyDecimals={currencyDecimals}
+            timeZone={timeZone}
             title={controlsTitle}
             unavailableFallback={controlsUnavailable}
           />

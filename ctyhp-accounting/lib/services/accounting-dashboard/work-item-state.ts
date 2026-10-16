@@ -74,24 +74,3 @@ export async function setWorkItemState(
   if (error) throw new WorkItemStateError(error.message);
   return Number(data);
 }
-
-/**
- * Mark as resolved the state of work that has gone.
- *
- * Called with the keys the queue just produced, at the one moment the live set
- * is actually known. A failure here costs the tidy-up, never the queue — so it
- * is reported and swallowed rather than thrown.
- */
-export async function retireWorkItems(
-  sb: SupabaseClient,
-  liveKeys: readonly string[],
-): Promise<number> {
-  const { data, error } = await sb.rpc("acc_retire_work_items", {
-    p_live_keys: [...liveKeys],
-  });
-  if (error) {
-    console.error("retiring finished work items failed:", error.message);
-    return 0;
-  }
-  return Number(data ?? 0);
-}

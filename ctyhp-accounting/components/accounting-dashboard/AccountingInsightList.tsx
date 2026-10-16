@@ -34,8 +34,10 @@ const SEVERITY_TAG: Record<QueueSeverity, { color: string; label: string }> = {
 
 export default function AccountingInsightList({
   insights,
+  timeZone,
 }: {
   insights: SectionEnvelope<InsightSection>;
+  timeZone: string;
 }) {
   if (insights.dataState === "unavailable" || !insights.data) {
     return (
@@ -117,7 +119,7 @@ export default function AccountingInsightList({
         />
       ) : null}
 
-      <FreshnessNote generatedAt={insights.generatedAt} dataState={insights.dataState} />
+      <FreshnessNote generatedAt={insights.generatedAt} dataState={insights.dataState} timeZone={timeZone} />
     </Card>
   );
 }

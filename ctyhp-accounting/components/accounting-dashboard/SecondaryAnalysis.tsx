@@ -20,10 +20,12 @@ export default function SecondaryAnalysis({
   secondary,
   currencyCode,
   currencyDecimals,
+  timeZone,
 }: {
   secondary: SectionEnvelope<SecondaryAnalysisData>;
   currencyCode: string;
   currencyDecimals: number;
+  timeZone: string;
 }) {
   const money = (minor: number) => formatMoney(minor, currencyCode, currencyDecimals);
 
@@ -120,7 +122,7 @@ export default function SecondaryAnalysis({
           },
         ]}
       />
-      <FreshnessNote generatedAt={secondary.generatedAt} dataState={secondary.dataState} />
+      <FreshnessNote generatedAt={secondary.generatedAt} dataState={secondary.dataState} timeZone={timeZone} />
     </Card>
   );
 }

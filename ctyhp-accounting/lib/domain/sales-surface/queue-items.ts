@@ -1,6 +1,9 @@
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
 
+/** Every work key the Sales overview derives starts with one of these; its retire is scoped to them. */
+export const SALES_WORK_KEY_PREFIXES = ["ar-overdue:", "ar-unapplied:", "ar-draft:"] as const;
+
 /**
  * The work Sales has: who to chase, what to apply, what to send out.
  *

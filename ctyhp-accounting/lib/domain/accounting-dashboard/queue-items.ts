@@ -1,5 +1,20 @@
-import { calendarDayDifference, type WorkQueueItem } from "@/lib/domain/work-queue";
-import type { AccountingControl, DerivedQueueItem, QueueSeverity } from "./types";
+import { calendarDayDifference, WORK_QUEUE_ID_PREFIX, type WorkQueueItem } from "@/lib/domain/work-queue";
+import { CONTROL_KEYS, type AccountingControl, type DerivedQueueItem, type QueueSeverity } from "./types";
+
+/**
+ * Every work key the Accounting overview derives starts with one of these; its
+ * retire is scoped to them. Controls are listed one by one (never a bare
+ * "control:") because another overview, Inventory, keeps its own item under that
+ * namespace and must not lose its state when Accounting loads.
+ */
+export const ACCOUNTING_WORK_KEY_PREFIXES: readonly string[] = [
+  ...CONTROL_KEYS.map((key) => `control:${key}`),
+  "period:",
+  "recurring:",
+  // The dashboard queue's items (invoices, bills, transactions, approvals) use
+  // their queue id as the work key.
+  ...Object.values(WORK_QUEUE_ID_PREFIX),
+];
 
 /**
  * Turning each kind of source into one queue item.

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { BANKING_WORK_KEY_PREFIXES } from "@/lib/domain/banking-surface/queue-items";
 import { getBankingSurface, type BankingSections } from "@/lib/services/banking-surface";
 import { bankingWorkQueue } from "@/lib/services/banking-surface/sections";
 import { BANKING_KIND_FILTERS } from "@/lib/domain/banking-surface/lifecycle";
@@ -126,14 +127,14 @@ describe("getBankingSurface and duplicate charges", () => {
     const { sections: s, retire } = sections({ duplicates: async () => [charge()] });
     const surface = await getBankingSurface(SB, s);
     expect(surface.queue.data?.map((item) => item.key)).toEqual(["dupe-charge:l1:l2"]);
-    expect(retire).toHaveBeenCalledWith(SB, ["dupe-charge:l1:l2"]);
+    expect(retire).toHaveBeenCalledWith(SB, ["dupe-charge:l1:l2"], BANKING_WORK_KEY_PREFIXES);
   });
 
   it("retires a dupe-charge key that is no longer derived", async () => {
     const state = new Map([["dupe-charge:old:pair", dismissed()]]);
     const { sections: s, retire } = sections({ workState: async () => state });
     await getBankingSurface(SB, s);
-    expect(retire).toHaveBeenCalledWith(SB, []);
+    expect(retire).toHaveBeenCalledWith(SB, [], BANKING_WORK_KEY_PREFIXES);
   });
 
   it("skips retirement when both the state and the duplicates reads failed", async () => {
@@ -160,7 +161,7 @@ describe("getBankingSurface and duplicate charges", () => {
       },
     });
     await getBankingSurface(SB, s);
-    expect(retire).toHaveBeenCalledWith(SB, []);
+    expect(retire).toHaveBeenCalledWith(SB, [], BANKING_WORK_KEY_PREFIXES);
   });
 
   it("keeps dupe-charge state out of retirement when the duplicates read failed", async () => {

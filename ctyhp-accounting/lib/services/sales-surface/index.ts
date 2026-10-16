@@ -14,6 +14,7 @@ import {
   unissuedInvoicesControl,
 } from "@/lib/domain/sales-surface/controls";
 import {
+  SALES_WORK_KEY_PREFIXES,
   DRAFT_STALE_AFTER_DAYS,
   overdueInvoiceItem,
   QUEUE_OVERDUE_LIMIT,
@@ -259,7 +260,7 @@ export interface SalesSections {
   context: (sb: SupabaseClient) => Promise<SalesContext>;
   facts: (sb: SupabaseClient, context: SalesContext) => Promise<SalesFacts>;
   workState: (sb: SupabaseClient) => Promise<Map<string, WorkItemState>>;
-  retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
+  retire: (sb: SupabaseClient, liveKeys: readonly string[], prefixes: readonly string[]) => Promise<number>;
   policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
 }
 
@@ -315,7 +316,7 @@ export async function getSalesSurface(
         );
 
   if (queue.data) {
-    await sections.retire(sb, queue.data.map((item) => item.key));
+    await sections.retire(sb, queue.data.map((item) => item.key), SALES_WORK_KEY_PREFIXES);
   }
 
   return { context, controls, queue, policy };

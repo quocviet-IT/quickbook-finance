@@ -49,6 +49,7 @@ export default function SalesSurface({
       canManage={canManage}
       assignees={assignees}
       today={context.asOf}
+      timeZone={context.timeZone}
       currencyCode={context.currencyCode}
       currencyDecimals={context.currencyDecimals}
       queueUnavailable="The collection work could not be loaded."

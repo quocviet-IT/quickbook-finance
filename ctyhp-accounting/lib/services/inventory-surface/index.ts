@@ -9,6 +9,7 @@ import type { WorkItemState } from "@/lib/domain/work-surface/lifecycle";
 import { orderWork } from "@/lib/domain/work-surface/priority";
 import { EMPTY_WORK_POLICY, type WorkPolicy } from "@/lib/domain/work-policy";
 import {
+  INVENTORY_WORK_KEY_PREFIXES,
   depreciationDueControl,
   depreciationDueItem,
   negativeStockControl,
@@ -195,7 +196,7 @@ export interface InventorySections {
   context: (sb: SupabaseClient) => Promise<InventoryContext>;
   facts: (sb: SupabaseClient, context: InventoryContext) => Promise<InventoryFacts>;
   workState: (sb: SupabaseClient) => Promise<Map<string, WorkItemState>>;
-  retire: (sb: SupabaseClient, liveKeys: readonly string[]) => Promise<number>;
+  retire: (sb: SupabaseClient, liveKeys: readonly string[], prefixes: readonly string[]) => Promise<number>;
   policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
 }
 
@@ -255,7 +256,7 @@ export async function getInventorySurface(
         );
 
   if (queue.data) {
-    await sections.retire(sb, queue.data.map((item) => item.key));
+    await sections.retire(sb, queue.data.map((item) => item.key), INVENTORY_WORK_KEY_PREFIXES);
   }
 
   return { context, controls, queue, policy };
