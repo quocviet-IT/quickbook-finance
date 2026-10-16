@@ -54,6 +54,13 @@ export const RELEASES: Release[] = [
       },
       {
         kind: "fixed",
+        title: "Dismiss, Assign and due dates work again in the work lists",
+        detail:
+          "On the Accounting, Sales, Purchases, Inventory and Banking overview pages, dismissing an item, assigning it or setting a due date failed with a server error. They work again.",
+        route: "/banking/overview",
+      },
+      {
+        kind: "fixed",
         title: "Work lists show what each item is on a phone",
         detail:
           "On a phone, the work lists of the overview pages left an item's title and reason no room at all: a row showed its priority, owner, amount and button with no words. The title and reason now take a line of their own above the rest, and wrap rather than being cut. On a wider screen a line still keeps to one row; hover it to read it whole.",
