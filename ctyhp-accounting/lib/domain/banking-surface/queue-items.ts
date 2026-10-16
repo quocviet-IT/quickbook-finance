@@ -2,10 +2,10 @@ import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
 import { shortDate } from "@/lib/domain/report-presets";
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 
-/** Every work key the Banking overview derives starts with one of these; its retire is scoped to them. */
 /** The prefix of a duplicate-charge key, for the service that keeps those keys alive. */
 export const DUPLICATE_KEY_PREFIX = "dupe-charge:";
 
+/** Every work key the Banking overview derives starts with one of these; its retire is scoped to them. */
 export const BANKING_WORK_KEY_PREFIXES = ["bank-txn:", "bank-feed:", "bank-recon:", DUPLICATE_KEY_PREFIX] as const;
 
 /**
