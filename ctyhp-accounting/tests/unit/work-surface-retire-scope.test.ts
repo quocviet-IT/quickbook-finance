@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ACCOUNTING_WORK_KEY_PREFIXES,
   overduePeriodItem,
+  workQueueItemToPriority,
   recurringFailureItem,
   controlFailureItems,
 } from "@/lib/domain/accounting-dashboard/queue-items";
@@ -35,7 +36,7 @@ import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
 import { CONTROL_KEYS, type AccountingControl } from "@/lib/domain/accounting-dashboard/types";
 import { EMPTY_WORK_POLICY } from "@/lib/domain/work-policy";
 import { retireWorkItems as retireWorkItemsForSurfaces } from "@/lib/services/work-surface/work-item-state";
-import { retireWorkItems as retireWorkItemsForAccounting } from "@/lib/services/accounting-dashboard/work-item-state";
+import { workQueueItemId, type WorkQueueItem, type WorkQueueKind } from "@/lib/domain/work-queue";
 import { getBankingSurface } from "@/lib/services/banking-surface";
 import { getSalesSurface } from "@/lib/services/sales-surface";
 import { getPurchasesSurface } from "@/lib/services/purchases-surface";
@@ -109,6 +110,28 @@ describe("work key prefixes: every key a builder produces starts with its area's
     for (const key of keys) expect(startsWithOne(key, INVENTORY_WORK_KEY_PREFIXES), key).toBe(true);
   });
 
+  it("every dashboard queue item key belongs to Accounting and to no other area", () => {
+    const others = [BANKING_WORK_KEY_PREFIXES, SALES_WORK_KEY_PREFIXES, PURCHASES_WORK_KEY_PREFIXES, INVENTORY_WORK_KEY_PREFIXES];
+    const kinds: WorkQueueKind[] = ["overdue_invoice", "due_bill", "unreconciled_transaction", "pending_approval"];
+    for (const kind of kinds) {
+      const item: WorkQueueItem = {
+        id: workQueueItemId(kind, "rec-1"),
+        kind,
+        title: "T",
+        subtitle: "S",
+        eventDate: "2026-08-01",
+        amountMinor: 100,
+        href: "/x",
+        priority: "high",
+        timingLabel: "late",
+      };
+      expect(item.id).toBe(`${kind}:rec-1`);
+      const { key } = workQueueItemToPriority(item, "2026-08-22", AT);
+      expect(startsWithOne(key, ACCOUNTING_WORK_KEY_PREFIXES), key).toBe(true);
+      for (const other of others) expect(startsWithOne(key, other), key).toBe(false);
+    }
+  });
+
   it("every control key's work key belongs to Accounting and to no other area", () => {
     const others = [BANKING_WORK_KEY_PREFIXES, SALES_WORK_KEY_PREFIXES, PURCHASES_WORK_KEY_PREFIXES, INVENTORY_WORK_KEY_PREFIXES];
     for (const controlKey of CONTROL_KEYS) {
@@ -140,10 +163,7 @@ describe("work key prefixes: every key a builder produces starts with its area's
 });
 
 describe("retireWorkItems sends the prefixes", () => {
-  for (const [name, fn] of [
-    ["work-surface", retireWorkItemsForSurfaces],
-    ["accounting-dashboard", retireWorkItemsForAccounting],
-  ] as const) {
+  for (const [name, fn] of [["work-surface", retireWorkItemsForSurfaces]] as const) {
     it(`${name}: calls the two-argument RPC`, async () => {
       const rpc = vi.fn(async () => ({ data: 2, error: null }));
       const n = await fn({ rpc } as unknown as SupabaseClient, ["ar-draft:1"], ["ar-draft:", "ar-overdue:"]);

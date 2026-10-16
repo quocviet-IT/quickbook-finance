@@ -7,7 +7,12 @@ import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecyc
  * "control:inventory-ties-out" (stored dismissals and assignments already use
  * it), so it is listed whole.
  */
-export const INVENTORY_WORK_KEY_PREFIXES = ["inv-negative:", "inv-depreciation:", "control:inventory-ties-out"] as const;
+export const INVENTORY_WORK_KEY_PREFIXES = [
+  "inv-negative:",
+  "inv-depreciation:",
+  // A whole key used as a prefix: the one Inventory item that is not "<kind>:<id>".
+  "control:inventory-ties-out",
+] as const;
 
 /**
  * What Inventory checks, and what it hands somebody to do.

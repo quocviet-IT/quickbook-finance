@@ -3,7 +3,10 @@ import { shortDate } from "@/lib/domain/report-presets";
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 
 /** Every work key the Banking overview derives starts with one of these; its retire is scoped to them. */
-export const BANKING_WORK_KEY_PREFIXES = ["bank-txn:", "bank-feed:", "bank-recon:", "dupe-charge:"] as const;
+/** The prefix of a duplicate-charge key, for the service that keeps those keys alive. */
+export const DUPLICATE_KEY_PREFIX = "dupe-charge:";
+
+export const BANKING_WORK_KEY_PREFIXES = ["bank-txn:", "bank-feed:", "bank-recon:", DUPLICATE_KEY_PREFIX] as const;
 
 /**
  * The work Banking has, derived from the feed on every read.
@@ -156,7 +159,7 @@ export function duplicateChargeItem(
     reason += ` · the ${shortDate(other.date)} line is on a completed reconciliation`;
   }
   return {
-    key: `dupe-charge:${charge.earlier.lineId}:${charge.later.lineId}`,
+    key: `${DUPLICATE_KEY_PREFIX}${charge.earlier.lineId}:${charge.later.lineId}`,
     sourceKind: "possible-duplicate",
     sourceId: review.lineId,
     // What happened first: the queue keeps a title to one line, and the payee's

@@ -1,4 +1,4 @@
-import { calendarDayDifference, type WorkQueueItem } from "@/lib/domain/work-queue";
+import { calendarDayDifference, WORK_QUEUE_ID_PREFIX, type WorkQueueItem } from "@/lib/domain/work-queue";
 import { CONTROL_KEYS, type AccountingControl, type DerivedQueueItem, type QueueSeverity } from "./types";
 
 /**
@@ -11,6 +11,9 @@ export const ACCOUNTING_WORK_KEY_PREFIXES: readonly string[] = [
   ...CONTROL_KEYS.map((key) => `control:${key}`),
   "period:",
   "recurring:",
+  // The dashboard queue's items (invoices, bills, transactions, approvals) use
+  // their queue id as the work key.
+  ...Object.values(WORK_QUEUE_ID_PREFIX),
 ];
 
 /**

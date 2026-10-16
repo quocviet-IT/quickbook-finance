@@ -5,7 +5,7 @@ import type {
   SurfaceWorkItem,
 } from "@/lib/domain/work-surface/types";
 import { EMPTY_WORK_POLICY, type WorkPolicy } from "@/lib/domain/work-policy";
-import { BANKING_WORK_KEY_PREFIXES } from "@/lib/domain/banking-surface/queue-items";
+import { BANKING_WORK_KEY_PREFIXES, DUPLICATE_KEY_PREFIX } from "@/lib/domain/banking-surface/queue-items";
 import { envelope, failed, withDecisions } from "@/lib/services/work-surface/envelope";
 import {
   listWorkItemState,
@@ -48,9 +48,6 @@ export interface BankingSections {
   retire: (sb: SupabaseClient, liveKeys: readonly string[], prefixes: readonly string[]) => Promise<number>;
   policy: (sb: SupabaseClient) => Promise<WorkPolicy>;
 }
-
-/** Stored work-item state for duplicate charges is keyed with this prefix. */
-const DUPLICATE_KEY_PREFIX = "dupe-charge:";
 
 /**
  * Possible duplicate charges across every bank account. The shared reads happen
