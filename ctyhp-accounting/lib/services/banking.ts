@@ -1,3 +1,4 @@
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import type {
@@ -228,6 +229,8 @@ export interface BankStatementImportRow {
    * a statement that added up.
    */
   override_detail: string | null;
+  /** True when the overrides could not be read, so a missing tag is not a clean bill of health. */
+  overrides_unavailable: boolean;
 }
 
 /** Statement imports, newest first. Null means every bank account. */
@@ -239,21 +242,32 @@ export async function listBankStatementImports(
     p_bank_account_id: bankAccountId,
   });
   if (error) throw new BankingError(error.message);
-  const rows = (data ?? []) as unknown as Omit<BankStatementImportRow, "override_detail">[];
-  // Joined here, by batch id, so the list never words a sentence itself.
-  const [overrides, settings, currencies] = await Promise.all([
-    listStatementOverrides(sb),
-    getCurrentCompanySettings(sb),
-    listCurrencies(sb),
-  ]);
-  const byBatch = new Map(overrides.map((o) => [o.batchId, o]));
-  const timeZone = settings?.time_zone || "America/New_York";
-  const base = currencies.find((c) => c.is_base);
-  const money = (minor: number) => formatMoney(minor, base?.code ?? "USD", base?.decimal_places ?? 2);
-  return rows.map((row) => {
-    const override = byBatch.get(row.id);
-    return { ...row, override_detail: override ? importRecordDetailOf(override, timeZone, money) : null };
-  });
+  const rows = (data ?? []) as unknown as Omit<BankStatementImportRow, "override_detail" | "overrides_unavailable">[];
+  // Joined here, by batch id, so the list never words a sentence itself. If any of
+  // the three reads fails the list and its Undo buttons still stand: the rows say
+  // the overrides could not be checked, and the screen says so.
+  try {
+    const [overrides, settings, currencies] = await Promise.all([
+      listStatementOverrides(sb),
+      getCurrentCompanySettings(sb),
+      listCurrencies(sb),
+    ]);
+    const byBatch = new Map(overrides.map((o) => [o.batchId, o]));
+    const timeZone = settings?.time_zone || DEFAULT_TIME_ZONE;
+    const base = currencies.find((c) => c.is_base);
+    const money = (minor: number) => formatMoney(minor, base?.code ?? "USD", base?.decimal_places ?? 2);
+    return rows.map((row) => {
+      const override = byBatch.get(row.id);
+      return {
+        ...row,
+        override_detail: override ? importRecordDetailOf(override, timeZone, money) : null,
+        overrides_unavailable: false,
+      };
+    });
+  } catch (err) {
+    console.error("Could not read the statements imported out of balance", err);
+    return rows.map((row) => ({ ...row, override_detail: null, overrides_unavailable: true }));
+  }
 }
 
 /**

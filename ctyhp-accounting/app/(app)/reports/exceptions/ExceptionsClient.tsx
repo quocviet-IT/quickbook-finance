@@ -44,6 +44,14 @@ import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/li
 import { CLEARING_WHY, CLEARING_FIFO_NOTE, LEFT_STANDING } from "@/lib/domain/clearing-accounts";
 import { ToneBadge } from "@/lib/design/tone";
 import { CLEARING_TAG_WIDTH } from "./clearing-columns";
+import {
+  OVERRIDE_ACCOUNT_FLOOR,
+  OVERRIDE_BY_FLOOR,
+  OVERRIDE_FILE_FLOOR,
+  OVERRIDE_IMPORTED_WIDTH,
+  OVERRIDE_REASON_FLOOR,
+  OVERRIDE_SINCE_WIDTH,
+} from "./override-columns";
 import clearingStyles from "./clearing-table.module.css";
 import { exceptionReportAction } from "./actions";
 
@@ -622,31 +630,32 @@ export default function ExceptionsClient({
             pagination={false}
             dataSource={r.statementOverride}
             columns={[
-              flexColumn<StatementOverrideRow>({ title: "Bank account", key: "account", render: (_, row) => row.accountName }),
+              flexColumn<StatementOverrideRow>({ title: "Bank account", key: "account", floor: OVERRIDE_ACCOUNT_FLOOR, render: (_, row) => row.accountName }),
               flexColumn<StatementOverrideRow>({
                 title: "File",
+                floor: OVERRIDE_FILE_FLOOR,
                 key: "file",
                 render: (_, row) => <span title={row.filename}>{row.filename}</span>,
               }),
               {
                 title: "Imported",
                 key: "imported",
-                width: 150,
+                width: OVERRIDE_IMPORTED_WIDTH,
                 render: (_, row) => `${row.importedDate} ${row.importedTime}`,
               },
-              flexColumn<StatementOverrideRow>({ title: "By", key: "by", render: (_, row) => row.byName }),
+              flexColumn<StatementOverrideRow>({ title: "By", key: "by", floor: OVERRIDE_BY_FLOOR, render: (_, row) => row.byName }),
               {
                 title: "Out by",
                 key: "outBy",
-                width: COLUMN.MONEY,
+                width: COLUMN.MONEY_WIDE,
                 align: "right",
                 render: (_, row) => <span className={styles.negative}>{money(row.outByMinor)}</span>,
               },
-              sentenceColumn<StatementOverrideRow>({ title: "Reason", key: "reason", render: (_, row) => row.reason }),
+              sentenceColumn<StatementOverrideRow>({ title: "Reason", key: "reason", floor: OVERRIDE_REASON_FLOOR, render: (_, row) => row.reason }),
               {
                 title: "Open since",
                 key: "since",
-                width: 120,
+                width: OVERRIDE_SINCE_WIDTH,
                 render: (_, row) => shortDate(row.openSince),
               },
             ]}

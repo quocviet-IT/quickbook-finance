@@ -1,3 +1,4 @@
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildExceptionReport,
@@ -316,7 +317,7 @@ export async function getExceptionReport(
     // The statements imported out of balance, and the company's time zone their
     // date and time are printed in: without either the check cannot say when.
     readOr(unavailable, ["statementOverride"], [] as NamedStatementOverride[], () => listStatementOverrides(sb)),
-    readOr(unavailable, ["statementOverride"], "America/New_York", async () => (await getCurrentCompanySettings(sb))?.time_zone || "America/New_York"),
+    readOr(unavailable, ["statementOverride"], DEFAULT_TIME_ZONE as string, async () => (await getCurrentCompanySettings(sb))?.time_zone || DEFAULT_TIME_ZONE),
   ]);
 
   const yearTotals = yearTotalsFromMonthly(byMonth);

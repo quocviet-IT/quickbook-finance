@@ -6,7 +6,7 @@ import { findReconciliationHeader, getReconciliationDetail, getReconciliationLin
 import { listCurrencies } from "@/lib/services/reference";
 import { fromMinor } from "@/lib/domain/money";
 import { formatMoney } from "@/lib/format";
-import { reconciliationOverrideSentences } from "@/lib/services/override-notices";
+import { readReconciliationOverrides } from "@/lib/services/override-notices";
 import { shortSha } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
 
@@ -26,13 +26,20 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
   const fmt = (m: number) => fromMinor(m, dec).toLocaleString(undefined, { minimumFractionDigits: dec });
   const cleared = lines.filter((l) => l.cleared);
   // Statements imported out of balance that this reconciliation settled (2.11).
-  const { settles } = await reconciliationOverrideSentences(sb, id, header, (m) => formatMoney(m, base?.code ?? "USD", dec));
+  // Only a completed reconciliation settles anything, so a draft reads nothing. A failed read must not take the report down.
+  const { settles, unavailable: overridesUnavailable } =
+    header.status === "completed"
+      ? await readReconciliationOverrides(sb, id, header, (m) => formatMoney(m, base?.code ?? "USD", dec))
+      : { settles: [], unavailable: false };
   return (
     <div>
       <PageHeader title="Reconciliation report" description={`Base currency ${base?.code ?? "USD"} · Status ${detail.status}`} />
       <p><Link href={`/banking/reconcile/${id}`}>← Back to session</Link></p>
       {header.broughtForward ? <p><strong>{header.note ?? "Brought forward"}</strong></p> : null}
-      {settles.map((line) => <p key={line}>{line}</p>)}
+      {settles.map((line) => <p key={line.batchId}>{line.text}</p>)}
+      {overridesUnavailable ? (
+        <p role="alert"><strong>Could not check this period for statements imported out of balance.</strong></p>
+      ) : null}
       {header.fileName ? (
         <p>
           Statement: {header.fileName}

@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
+import { Alert, App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
 import { getStatementImportsAction, undoStatementImportAction } from "./actions";
 
@@ -69,6 +69,14 @@ export default function BankImportList({
 
   return (
     <>
+      {rows.some((row) => row.overrides_unavailable) ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Could not check which of these imports were out of balance."
+        />
+      ) : null}
       <Table<BankStatementImportRow>
         size="small"
         rowKey="id"

@@ -13,6 +13,7 @@
  * Money is integer minor units, base currency, throughout.
  */
 
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import { ACCOUNT_TYPE_LABEL, naturalBalance, type AccountType } from "@/lib/domain/accounts";
 import { entryDisplayName, sourceLabel } from "@/lib/domain/entry-detail";
 import {
@@ -617,7 +618,7 @@ export interface ExceptionReportInput {
    * as `acc_statement_overrides()` returns them. Only the open ones are listed.
    */
   statementOverrides?: readonly NamedStatementOverride[];
-  /** The company's time zone, in which an override's date and time are printed. Left out, UTC. */
+  /** The company's time zone, in which an override's date and time are printed. Left out, the default time zone. */
   timeZone?: string;
   /**
    * Checks whose data could not be read. They are reported as unavailable
@@ -695,7 +696,7 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const noLongerAgree = reconciliationsNoLongerAgreeing(input.bankAccounts, input.bankStanding ?? []);
   const statementOverride = input.unavailable.includes("statementOverride")
     ? []
-    : openStatementOverrides(input.statementOverrides ?? [], input.bankAccounts, input.timeZone ?? "America/New_York");
+    : openStatementOverrides(input.statementOverrides ?? [], input.bankAccounts, input.timeZone ?? DEFAULT_TIME_ZONE);
 
   return {
     entriesExamined: input.entriesInRange.length,

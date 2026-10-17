@@ -95,7 +95,10 @@ describe("the sentences of a reconciliation", () => {
     );
     expect(out.settles).toEqual([]);
     expect(out.notices).toEqual([
-      "A statement in this period was imported out of balance: out by $12.50, by Dana Example on Sep 9, 2026, “Bank typo”. Completing this reconciliation settles it.",
+      {
+        batchId: "b1",
+        text: "A statement in this period was imported out of balance: out by $12.50, by Dana Example on Sep 9, 2026, “Bank typo”. Completing this reconciliation settles it.",
+      },
     ]);
   });
 
@@ -112,7 +115,10 @@ describe("the sentences of a reconciliation", () => {
     );
     expect(out.notices).toEqual([]);
     expect(out.settles).toEqual([
-      "Settles a statement imported out of balance: out by $12.50, by Dana Example on Sep 9, 2026, “Bank typo”.",
+      {
+        batchId: "b1",
+        text: "Settles a statement imported out of balance: out by $12.50, by Dana Example on Sep 9, 2026, “Bank typo”.",
+      },
     ]);
   });
 
