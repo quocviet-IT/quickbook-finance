@@ -98,13 +98,13 @@ describe("reading", () => {
     const { sb, calls } = fakeClient({
       acc_balance_comparison_line: [
         { account_id: "a", external_code: null, external_name: null, other_balance_minor: "12345" },
-        { account_id: null, external_code: "X1", external_name: "Outside", other_balance_minor: -500 },
+        { account_id: null, external_code: "X1", external_name: "Outside", external_group: "liability", other_balance_minor: -500 },
       ],
     });
     const lines = await listComparisonLines(sb, "2026-09-30");
     expect(lines).toEqual([
-      { accountId: "a", externalCode: null, externalName: null, otherMinor: 12345 },
-      { accountId: null, externalCode: "X1", externalName: "Outside", otherMinor: -500 },
+      { accountId: "a", externalCode: null, externalName: null, externalGroup: null, otherMinor: 12345 },
+      { accountId: null, externalCode: "X1", externalName: "Outside", externalGroup: "liability", otherMinor: -500 },
     ]);
     expect(calls[0].eq).toEqual([["as_of", "2026-09-30"]]);
     expect(calls[0].order).toEqual(["id"]);
@@ -137,7 +137,7 @@ describe("saving", () => {
       note: "  ",
       lines: [
         { accountId: "acct-1", otherMinor: 12345 },
-        { externalCode: "X9", externalName: "Outside", otherMinor: -500 },
+        { externalCode: "X9", externalName: "Outside", externalGroup: "income", otherMinor: -500 },
       ],
     });
     expect(kept).toBe(2);
@@ -147,7 +147,7 @@ describe("saving", () => {
       p_note: null,
       p_lines: [
         { account_id: "acct-1", other_balance_minor: 12345 },
-        { external_code: "X9", external_name: "Outside", other_balance_minor: -500 },
+        { external_code: "X9", external_name: "Outside", external_group: "income", other_balance_minor: -500 },
       ],
     });
   });

@@ -11,7 +11,6 @@ import {
   externalRowKey,
   formatFigureText,
   hydrateSaved,
-  inferExternalGroup,
   isRealIsoDate,
   nearestSavedDate,
   nothingTypedMessage,
@@ -184,10 +183,11 @@ describe("buildComparison", () => {
     expect(assets.totals).toEqual({ onebookMinor: 1_000_00 + 250_00 + 40_00, otherMinor: 1_150_00, differenceMinor: 100_00 });
     expect(liabilities.totals).toEqual({ onebookMinor: 2_300_00, otherMinor: 350_00, differenceMinor: -50_00 });
     expect(equity.totals).toEqual({ onebookMinor: 500_00, otherMinor: null, differenceMinor: null });
+    // Debits less credits: assets and expenses minus liabilities, equity and income, each row on its own side.
     expect(c.grand).toEqual({
-      onebookMinor: c.groups.reduce((s, g) => s + g.totals.onebookMinor, 0),
-      otherMinor: 1_150_00 + 350_00,
-      differenceMinor: 50_00,
+      onebookMinor: 1_000_00 + 250_00 + 120_00 - (40_00 + 300_00 + 2_000_00 + 500_00 + 900_00),
+      otherMinor: 900_00 + 250_00 - 350_00,
+      differenceMinor: 100_00 + 0 - -50_00,
     });
     expect(c.typedCount).toBe(3);
     expect(c.differenceCount).toBe(2);
@@ -213,6 +213,44 @@ describe("buildComparison", () => {
   });
 });
 
+describe("the whole-report total is debits less credits", () => {
+  const bal = [
+    acct("b", "1000", "Cash", "bank"),
+    acct("c", "3000", "Capital", "equity"),
+    acct("s", "4000", "Sales", "income"),
+    acct("r", "6000", "Rent", "expense"),
+  ];
+
+  it("is nil for OneBook on a balanced ledger", () => {
+    const c = buildComparison({ accounts: bal, figures: { b: 1_000_00, c: 600_00, s: 500_00, r: 100_00 }, typed: {}, externals: [] });
+    expect(c.grand.onebookMinor).toBe(0);
+    expect(c.grand.otherMinor).toBeNull();
+  });
+
+  it("is the gap, with the right sign, when the books do not balance", () => {
+    const c = buildComparison({ accounts: bal, figures: { b: 1_000_00, c: 600_00, s: 400_00, r: 100_00 }, typed: {}, externals: [] });
+    expect(c.grand.onebookMinor).toBe(100_00);
+    const credits = buildComparison({ accounts: bal, figures: { b: 900_00, c: 600_00, s: 500_00, r: 100_00 }, typed: {}, externals: [] });
+    expect(credits.grand.onebookMinor).toBe(-100_00);
+  });
+
+  it("totals the other system and the difference the same way, on typed rows only", () => {
+    const c = buildComparison({
+      accounts: bal,
+      figures: { b: 1_000_00, c: 600_00, s: 500_00, r: 100_00 },
+      typed: { "a:b": 1_000_00, "a:c": 600_00, "a:s": 450_00, "a:r": 100_00 },
+      externals: [],
+    });
+    expect(c.grand.otherMinor).toBe(1_000_00 + 100_00 - (600_00 + 450_00));
+    expect(c.grand.differenceMinor).toBe(-50_00);
+  });
+
+  it("leaves the group totals in natural sign", () => {
+    const c = buildComparison({ accounts: bal, figures: { b: 1_000_00, c: 600_00, s: 500_00, r: 100_00 }, typed: {}, externals: [] });
+    expect(c.groups.map((g) => g.totals.onebookMinor)).toEqual([1_000_00, 0, 600_00, 500_00, 100_00]);
+  });
+});
+
 describe("tableLines", () => {
   const c = buildComparison({
     accounts: ACCOUNTS,
@@ -225,7 +263,7 @@ describe("tableLines", () => {
     const lines = tableLines(c, false);
     expect(lines[0]).toMatchObject({ kind: "heading", label: "Assets" });
     expect(lines.filter((l) => l.kind === "heading")).toHaveLength(5);
-    expect(lines.at(-1)).toMatchObject({ kind: "total", label: "Total", grand: true });
+    expect(lines.at(-1)).toMatchObject({ kind: "total", label: "Debits less credits", grand: true });
     expect(lines.filter((l) => l.kind === "total" && !l.grand).map((l) => (l as { label: string }).label)).toEqual([
       "Total assets",
       "Total liabilities",
@@ -256,17 +294,16 @@ describe("saved lines", () => {
   it("round-trips typed figures and external-only rows", () => {
     const hydrated = hydrateSaved(
       [
-        { accountId: "bank", externalCode: null, externalName: null, otherMinor: 900_00 },
-        { accountId: null, externalCode: "2910", externalName: "Customer Deposits", otherMinor: 75_00 },
+        { accountId: "bank", externalCode: null, externalName: null, externalGroup: null, otherMinor: 900_00 },
+        { accountId: null, externalCode: "2910", externalName: "Customer Deposits", externalGroup: "income", otherMinor: 75_00 },
       ],
-      ACCOUNTS,
     );
     expect(hydrated.typed).toEqual({ "a:bank": 900_00, "x:2910": 75_00 });
-    expect(hydrated.externals).toEqual([{ key: "x:2910", code: "2910", name: "Customer Deposits", group: "liability" }]);
+    expect(hydrated.externals).toEqual([{ key: "x:2910", code: "2910", name: "Customer Deposits", group: "income" }]);
     const c = buildComparison({ accounts: ACCOUNTS, figures: FIGURES, ...hydrated });
     expect(draftLines(c)).toEqual([
       { accountId: "bank", otherMinor: 900_00 },
-      { externalCode: "2910", externalName: "Customer Deposits", otherMinor: 75_00 },
+      { externalCode: "2910", externalName: "Customer Deposits", externalGroup: "income", otherMinor: 75_00 },
     ]);
   });
 
@@ -275,11 +312,9 @@ describe("saved lines", () => {
     expect(draftLines(c)).toEqual([{ accountId: "bank", otherMinor: 1_00 }]);
   });
 
-  it("places an external-only account by the most similar code, and with the assets when none is", () => {
-    expect(inferExternalGroup("2999", ACCOUNTS)).toBe("liability");
-    expect(inferExternalGroup("6101", ACCOUNTS)).toBe("expense");
-    expect(inferExternalGroup("ZZ", ACCOUNTS)).toBe("asset");
-    expect(inferExternalGroup("6955", ACCOUNTS)).toBe("expense");
+  it("shows a saved external line that has no group in Assets", () => {
+    const hydrated = hydrateSaved([{ accountId: null, externalCode: "Z1", externalName: "Loose", externalGroup: null, otherMinor: 5 }]);
+    expect(hydrated.externals[0].group).toBe("asset");
   });
 });
 
@@ -361,10 +396,15 @@ describe("saving checks", () => {
 
   it("refuses a duplicate external code, ignoring case, before the database does", () => {
     const lines = [
-      { externalCode: "A-1", externalName: "One", otherMinor: 1 },
-      { externalCode: "a-1", externalName: "Two", otherMinor: 2 },
+      { externalCode: "A-1", externalName: "One", externalGroup: "asset" as const, otherMinor: 1 },
+      { externalCode: "a-1", externalName: "Two", externalGroup: "asset" as const, otherMinor: 2 },
     ];
     expect(draftProblem({ ...base, lines })).toBe("Two accounts the other system has share the code a-1");
+  });
+
+  it("refuses an account only the other system has when no valid group is chosen", () => {
+    const line = { externalCode: "A-1", externalName: "One", externalGroup: "revenue" as never, otherMinor: 1 };
+    expect(draftProblem({ ...base, lines: [line] })).toBe("Choose a group for an account only the other system has");
   });
 
   it("refuses an account twice and a figure that is not whole cents", () => {
@@ -435,7 +475,7 @@ describe("balanceComparisonSheet", () => {
     expect(rows[2]).toMatchObject({ code: "1200", other: null, difference: null });
     const old = rows.find((r) => r.code === "6950");
     expect(old).toMatchObject({ account: "Retired Fees (inactive)", other: 10, difference: 5 });
-    expect(rows.at(-1)).toMatchObject({ account: "Total" });
+    expect(rows.at(-1)).toMatchObject({ account: "Debits less credits" });
   });
 
   it("exports only the rows that differ when asked", () => {

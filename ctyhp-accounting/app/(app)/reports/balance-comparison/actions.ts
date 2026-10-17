@@ -21,7 +21,7 @@ const draftSchema = z.object({
   lines: z.array(
     z.union([
       z.object({ accountId: z.string().min(1), otherMinor: z.number().int() }),
-      z.object({ externalCode: z.string(), externalName: z.string(), otherMinor: z.number().int() }),
+      z.object({ externalCode: z.string(), externalName: z.string(), externalGroup: z.enum(["asset", "liability", "equity", "income", "expense"]), otherMinor: z.number().int() }),
     ]),
   ),
 });

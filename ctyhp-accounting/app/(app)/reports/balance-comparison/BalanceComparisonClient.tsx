@@ -204,7 +204,7 @@ export default function BalanceComparisonClient({
 
   const [initial] = useState(() => {
     const accounts = data?.accounts ?? [];
-    const hydrated = hydrateSaved(data?.lines ?? [], accounts);
+    const hydrated = hydrateSaved(data?.lines ?? []);
     const comparedWith = data?.header?.comparedWith ?? "";
     const note = data?.header?.note ?? "";
     const comparison = buildComparison({

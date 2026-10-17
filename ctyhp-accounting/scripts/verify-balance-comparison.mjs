@@ -1,5 +1,5 @@
 /**
- * Behavioural verification of migration 0155 (balance comparison) on every company.
+ * Behavioural verification of migrations 0155 and 0156 (balance comparison) on every company.
  *
  * Every schema gets ONE short transaction that is ALWAYS rolled back, with
  * lock_timeout and statement_timeout set. The migration is applied inside it
@@ -19,7 +19,8 @@ import pg from "pg";
 import { planCompanySchema } from "../lib/domain/schema-template.ts";
 
 const FILE = "0155_balance_comparison.sql";
-const SOURCES = [{ file: FILE, sql: readFileSync(new URL(`../supabase/migrations/${FILE}`, import.meta.url), "utf8") }];
+const FILES = [FILE, "0156_balance_comparison_external_group.sql"];
+const SOURCES = FILES.map((file) => ({ file, sql: readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8") }));
 const SAMPLE = "co_pc";
 const OUTSIDER = "00000000-0000-0000-0000-000000000000";
 
@@ -122,6 +123,7 @@ async function structure(schema) {
         ["external_code", "text", "YES"],
         ["external_name", "text", "YES"],
         ["other_balance_minor", "bigint", "NO"],
+        ["external_group", "text", "YES"],
       ]),
     JSON.stringify(cols));
   const indexes = await all(
@@ -134,9 +136,9 @@ async function structure(schema) {
       /UNIQUE.*\(as_of, lower\(external_code\)\).*WHERE \(account_id IS NULL\)/.test(indexes[1].indexdef),
     JSON.stringify(indexes));
   const checks = await all(
-    `select conname from pg_constraint where conrelid = to_regclass('acc_balance_comparison_line') and contype = 'c' and conname = 'acc_balance_comparison_line_who_ck'`,
+    `select conname from pg_constraint where conrelid = to_regclass('acc_balance_comparison_line') and contype = 'c' and conname in ('acc_balance_comparison_line_who_ck', 'acc_balance_comparison_line_group_ck')`,
   );
-  check("the lines carry the account-or-external check", checks.length === 1);
+  check("the lines carry the account-or-external check and the group check", checks.length === 2);
   const fk = await one(
     `select confdeltype from pg_constraint where conrelid = to_regclass('acc_balance_comparison_line') and contype = 'f' and confrelid = to_regclass('acc_balance_comparison')`,
   );
@@ -196,7 +198,7 @@ async function behaviour() {
   const n1 = await save("2001-03-31", "Sample Ledger", "  March check  ", [
     { account_id: a1, other_balance_minor: 150000 },
     { account_id: a2, other_balance_minor: -2500 },
-    { external_code: "X-100", external_name: "Only over there", other_balance_minor: 7000 },
+    { external_code: "X-100", external_name: "Only over there", external_group: "liability", other_balance_minor: 7000 },
   ]);
   check("saving returns the number of lines kept", n1 === 3, `${n1}`);
   const n2 = await save("2001-04-30", "Other Ledger", null, [{ account_id: a1, other_balance_minor: 99 }]);
@@ -222,13 +224,17 @@ async function behaviour() {
     (await one(`select count(*)::int as n from acc_audit_log where table_name = 'acc_balance_comparison' and actor_id = $1 and record_id = $2`, [admin.id, h2.id])).n === 2);
 
   // ---- an external-only line round-trips
-  await save("2001-05-31", "Sample Ledger", null, [{ external_code: " Ext-1 ", external_name: " Petty box ", other_balance_minor: 1234 }]);
+  await save("2001-05-31", "Sample Ledger", null, [{ external_code: " Ext-1 ", external_name: " Petty box ", external_group: " income ", other_balance_minor: 1234 }]);
   const ext = (await linesOn("2001-05-31"))[0];
   check("an external-only line round-trips, trimmed, with no account",
     ext.account_id === null && ext.external_code === "Ext-1" && ext.external_name === "Petty box" && Number(ext.minor) === 1234, JSON.stringify(ext));
+  check("…and keeps its group, trimmed",
+    (await one(`select external_group from acc_balance_comparison_line where as_of = '2001-05-31' and account_id is null`)).external_group === "income");
+  check("an account line stores no group",
+    (await one(`select external_group from acc_balance_comparison_line where as_of = '2001-04-30'`)).external_group === null);
   const mixed = await save("2001-05-31", "Sample Ledger", null, [
     { account_id: a1, external_code: null, external_name: null, other_balance_minor: 1 },
-    { external_code: "E-2", external_name: "Second", other_balance_minor: 2 },
+    { external_code: "E-2", external_name: "Second", external_group: "expense", other_balance_minor: 2 },
   ]);
   check("a line may carry null external fields beside its account", mixed === 2);
 
@@ -236,7 +242,7 @@ async function behaviour() {
   const blank = await save("2001-06-30", "Sample Ledger", null, [
     { account_id: a1 },
     { account_id: a2, other_balance_minor: null },
-    { external_code: "E-3", external_name: "No figure" },
+    { external_code: "E-3", external_name: "No figure", external_group: "asset" },
     { account_id: a3, other_balance_minor: 0 },
   ]);
   const kept = await linesOn("2001-06-30");
@@ -251,11 +257,19 @@ async function behaviour() {
   await refused("an unknown account is refused", SAVE, ["2001-08-31", "S", null, L({ account_id: OUTSIDER, other_balance_minor: 1 })], "active account");
   await refused("the same account twice is refused", SAVE, ["2001-08-31", "S", null, L({ account_id: a1, other_balance_minor: 1 }, { account_id: a1, other_balance_minor: 2 })], "appears twice");
   await refused("the same external code twice, in any case, is refused", SAVE,
-    ["2001-08-31", "S", null, L({ external_code: "ab", external_name: "A", other_balance_minor: 1 }, { external_code: "AB", external_name: "B", other_balance_minor: 2 })], "appears twice");
-  await refused("an external line without a name is refused", SAVE, ["2001-08-31", "S", null, L({ external_code: "E", other_balance_minor: 1 })], "needs a code and a name");
-  await refused("an external line without a code is refused", SAVE, ["2001-08-31", "S", null, L({ external_name: "E", other_balance_minor: 1 })], "needs a code and a name");
+    ["2001-08-31", "S", null, L({ external_code: "ab", external_name: "A", external_group: "asset", other_balance_minor: 1 }, { external_code: "AB", external_name: "B", external_group: "asset", other_balance_minor: 2 })], "appears twice");
+  await refused("an external line without a name is refused", SAVE, ["2001-08-31", "S", null, L({ external_code: "E", external_group: "asset", other_balance_minor: 1 })], "needs a code and a name");
+  await refused("an external line without a code is refused", SAVE, ["2001-08-31", "S", null, L({ external_name: "E", external_group: "asset", other_balance_minor: 1 })], "needs a code and a name");
   await refused("a line for an account and an external one at once is refused", SAVE,
-    ["2001-08-31", "S", null, L({ account_id: a1, external_code: "E", external_name: "E", other_balance_minor: 1 })], "not both");
+    ["2001-08-31", "S", null, L({ account_id: a1, external_code: "E", external_name: "E", external_group: "asset", other_balance_minor: 1 })], "not both");
+  await refused("an external line without a group is refused", SAVE,
+    ["2001-08-31", "S", null, L({ external_code: "E", external_name: "E", other_balance_minor: 1 })], "Choose a group");
+  await refused("an external line with an unknown group is refused", SAVE,
+    ["2001-08-31", "S", null, L({ external_code: "E", external_name: "E", external_group: "revenue", other_balance_minor: 1 })], "Choose a group");
+  await refused("an external line with a blank group is refused", SAVE,
+    ["2001-08-31", "S", null, L({ external_code: "E", external_name: "E", external_group: "  ", other_balance_minor: 1 })], "Choose a group");
+  await refused("an account line carrying a group is refused", SAVE,
+    ["2001-08-31", "S", null, L({ account_id: a1, external_group: "asset", other_balance_minor: 1 })], "takes no group");
   await refused("a fractional figure is refused", SAVE, ["2001-08-31", "S", null, L({ account_id: a1, other_balance_minor: 1.5 })], "whole number");
   await refused("a figure typed as text is refused", SAVE, ["2001-08-31", "S", null, L({ account_id: a1, other_balance_minor: "12" })], "whole number");
   await refused("a figure beyond bigint is refused", SAVE, ["2001-08-31", "S", null, '[{"account_id":"' + a1 + '","other_balance_minor":99999999999999999999}]'], "too large");
@@ -316,11 +330,11 @@ try {
       await client.query("set local lock_timeout = '3s'");
       await client.query("set local statement_timeout = '60s'");
       await client.query(`set local search_path = ${schema}, extensions`);
-      const lived = (await client.query(`select 1 from acc_schema_migrations where filename = $1`, [FILE])).rowCount > 0;
+      const lived = (await client.query(`select 1 from acc_schema_migrations where filename = any($1)`, [FILES])).rowCount === FILES.length;
       const statements = schema === "public" ? SOURCES.map((s) => s.sql) : planCompanySchema(SOURCES, schema).statements;
       for (const statement of statements) await client.query(statement);
       for (const statement of statements) await client.query(statement);
-      console.log(`  (0155 ${lived ? "is live and was applied again" : "applied inside the transaction, never committed"}; a second pass was harmless)`);
+      console.log(`  (0155 and 0156 ${lived ? "were live and were applied again" : "applied inside the transaction, never committed"}; a second pass was harmless)`);
       check("applying the migration twice is harmless", true);
 
       await structure(schema);

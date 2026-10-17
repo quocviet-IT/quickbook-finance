@@ -238,35 +238,14 @@ export interface SavedLine {
   accountId: string | null;
   externalCode: string | null;
   externalName: string | null;
+  /** The group the line was typed under; null only for an account of this ledger. */
+  externalGroup: ComparisonGroup | null;
   otherMinor: number;
-}
-
-/**
- * The group a saved external-only line is shown in. The database keeps no group
- * for it, so it goes where the account with the most similar code sits, and
- * with the assets when nothing is similar.
- */
-export function inferExternalGroup(code: string, accounts: readonly ComparisonAccount[]): ComparisonGroup {
-  const wanted = code.trim().toLowerCase();
-  let best: ComparisonGroup = "asset";
-  let bestLength = 0;
-  for (const account of accounts) {
-    if (!account.active) continue;
-    const other = account.code.toLowerCase();
-    let n = 0;
-    while (n < wanted.length && n < other.length && wanted[n] === other[n]) n += 1;
-    if (n > bestLength) {
-      bestLength = n;
-      best = comparisonGroupOf(account.type);
-    }
-  }
-  return best;
 }
 
 /** What a saved comparison puts back on the screen: typed figures by row, and the external-only rows. */
 export function hydrateSaved(
   lines: readonly SavedLine[],
-  accounts: readonly ComparisonAccount[],
 ): { typed: Record<string, number>; externals: ExternalRow[] } {
   const typed: Record<string, number> = {};
   const externals: ExternalRow[] = [];
@@ -278,7 +257,8 @@ export function hydrateSaved(
         key: externalRowKey(line.externalCode),
         code: line.externalCode,
         name: line.externalName,
-        group: inferExternalGroup(line.externalCode, accounts),
+        // A line saved without a group still shows, in Assets.
+        group: line.externalGroup ?? "asset",
       };
       externals.push(row);
       typed[row.key] = line.otherMinor;
@@ -323,7 +303,7 @@ export interface ComparisonGroupView {
 
 export interface Comparison {
   groups: ComparisonGroupView[];
-  /** The groups added together as printed; a figure for each column, like the group totals. */
+  /** Debits less credits over every row, each on its own side: nil for OneBook on a balanced ledger. */
   grand: ComparisonTotals;
   /** How many rows carry a typed figure. */
   typedCount: number;
@@ -331,18 +311,19 @@ export interface Comparison {
   differenceCount: number;
 }
 
-function totalsOf(rows: readonly ComparisonRow[]): ComparisonTotals {
+function totalsOf(rows: readonly ComparisonRow[], debitsLessCredits = false): ComparisonTotals {
   let onebook = 0;
   let other = 0;
   let difference = 0;
   let anyOther = false;
   for (const row of rows) {
-    onebook += row.onebookMinor;
+    const sign = debitsLessCredits && row.side === "credit" ? -1 : 1;
+    onebook += sign * row.onebookMinor;
     if (row.otherMinor !== null) {
-      other += row.otherMinor;
+      other += sign * row.otherMinor;
       anyOther = true;
     }
-    if (row.differenceMinor !== null) difference += row.differenceMinor;
+    if (row.differenceMinor !== null) difference += sign * row.differenceMinor;
   }
   return {
     onebookMinor: onebook,
@@ -426,7 +407,7 @@ export function buildComparison(input: BuildInput): Comparison {
   const all = groups.flatMap((g) => g.rows);
   return {
     groups,
-    grand: totalsOf(all),
+    grand: totalsOf(all, true),
     typedCount: all.filter((r) => r.otherMinor !== null).length,
     differenceCount: all.filter((r) => r.differenceMinor !== null && r.differenceMinor !== 0).length,
   };
@@ -449,6 +430,8 @@ export type TableLine =
  * each group, then the whole-report total. "Only differences" keeps just the
  * rows that differ, drops a group with none, and keeps the totals whole.
  */
+export const GRAND_TOTAL_LABEL = "Debits less credits";
+
 export function tableLines(comparison: Comparison, onlyDifferences: boolean): TableLine[] {
   const lines: TableLine[] = [];
   for (const group of comparison.groups) {
@@ -458,7 +441,7 @@ export function tableLines(comparison: Comparison, onlyDifferences: boolean): Ta
     for (const row of rows) lines.push({ kind: "row", key: row.key, row });
     lines.push({ kind: "total", key: `t:${group.key}`, label: group.totalLabel, totals: group.totals, grand: false });
   }
-  lines.push({ kind: "total", key: "t:all", label: "Total", totals: comparison.grand, grand: true });
+  lines.push({ kind: "total", key: "t:all", label: GRAND_TOTAL_LABEL, totals: comparison.grand, grand: true });
   return lines;
 }
 
@@ -527,7 +510,7 @@ export const EXTERNAL_NAME_MAX = 200;
 /** One figure to keep: an account here, or one only the other system has. */
 export type DraftLine =
   | { accountId: string; otherMinor: number }
-  | { externalCode: string; externalName: string; otherMinor: number };
+  | { externalCode: string; externalName: string; externalGroup: ComparisonGroup; otherMinor: number };
 
 export interface ComparisonDraft {
   asOf: string;
@@ -548,7 +531,12 @@ export function draftLines(comparison: Comparison): DraftLine[] {
       lines.push(
         row.accountId
           ? { accountId: row.accountId, otherMinor: row.otherMinor }
-          : { externalCode: row.code.trim(), externalName: row.name.trim(), otherMinor: row.otherMinor },
+          : {
+              externalCode: row.code.trim(),
+              externalName: row.name.trim(),
+              externalGroup: row.group,
+              otherMinor: row.otherMinor,
+            },
       );
     }
   }
@@ -574,6 +562,9 @@ export function draftProblem(draft: ComparisonDraft): string | null {
       continue;
     }
     const code = line.externalCode.trim();
+    if (!COMPARISON_GROUPS.some((g) => g.key === line.externalGroup)) {
+      return "Choose a group for an account only the other system has";
+    }
     const label = line.externalName.trim();
     if (code === "" || label === "") return "An account only the other system has needs a code and a name";
     if (code.length > EXTERNAL_CODE_MAX) return `An account code is too long (${EXTERNAL_CODE_MAX} characters at most)`;

@@ -1,12 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountType } from "@/lib/domain/accounts";
-import type { ComparisonAccount, DraftLine, SavedLine } from "@/lib/domain/balance-comparison";
+import { COMPARISON_GROUPS, type ComparisonAccount, type ComparisonGroup, type DraftLine, type SavedLine } from "@/lib/domain/balance-comparison";
 import { getChartBalances } from "./chart-balances";
 import { readAllPages } from "./paging";
 
 export class BalanceComparisonError extends Error {}
 
 const fail = (message: string) => new BalanceComparisonError(message);
+
+/** The saved group when it is one of the five; anything else reads as none, and the row shows in Assets. */
+const groupOrNull = (value: string | null): ComparisonGroup | null =>
+  COMPARISON_GROUPS.find((g) => g.key === value)?.key ?? null;
 
 export interface SavedHeader {
   asOf: string;
@@ -87,12 +91,13 @@ export async function listComparisonLines(sb: SupabaseClient, asOf: string): Pro
     account_id: string | null;
     external_code: string | null;
     external_name: string | null;
+    external_group: string | null;
     other_balance_minor: number | string;
   }>(
     (from, to) =>
       sb
         .from("acc_balance_comparison_line")
-        .select("id,account_id,external_code,external_name,other_balance_minor")
+        .select("id,account_id,external_code,external_name,external_group,other_balance_minor")
         .eq("as_of", asOf)
         .order("id")
         .range(from, to),
@@ -102,6 +107,7 @@ export async function listComparisonLines(sb: SupabaseClient, asOf: string): Pro
     accountId: r.account_id,
     externalCode: r.external_code,
     externalName: r.external_name,
+    externalGroup: groupOrNull(r.external_group),
     otherMinor: Number(r.other_balance_minor),
   }));
 }
@@ -137,6 +143,7 @@ export async function saveBalanceComparison(sb: SupabaseClient, input: SaveBalan
         : {
             external_code: line.externalCode,
             external_name: line.externalName,
+            external_group: line.externalGroup,
             other_balance_minor: line.otherMinor,
           },
     ),

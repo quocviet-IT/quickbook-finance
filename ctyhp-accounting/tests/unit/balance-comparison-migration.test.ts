@@ -76,7 +76,7 @@ describe("0155 is additive", () => {
   });
 
   it("changes no function that exists: the only definition is the new one, and no earlier migration defines it", () => {
-    for (const name of readdirSync(DIR).filter((n) => /^\d{4}_/.test(n) && n !== FILE)) {
+    for (const name of readdirSync(DIR).filter((n) => /^\d{4}_/.test(n) && n !== FILE && !n.startsWith("0156_"))) {
       expect(read(name), name).not.toMatch(/acc_save_balance_comparison|acc_balance_comparison/i);
     }
   });
