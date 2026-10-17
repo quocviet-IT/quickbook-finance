@@ -4,7 +4,6 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { findReconciliationHeader, getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
-import { fromMinor } from "@/lib/domain/money";
 import { formatMoney } from "@/lib/format";
 import { readReconciliationOverrides } from "@/lib/services/override-notices";
 import { shortSha } from "@/lib/domain/statement-evidence";
@@ -23,13 +22,13 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
   ]);
   const base = currencies.find((c) => c.is_base);
   const dec = base?.decimal_places ?? 2;
-  const fmt = (m: number) => fromMinor(m, dec).toLocaleString(undefined, { minimumFractionDigits: dec });
+  const money = (m: number) => formatMoney(m, base?.code ?? "USD", dec);
   const cleared = lines.filter((l) => l.cleared);
   // Statements imported out of balance that this reconciliation settled (2.11).
   // Only a completed reconciliation settles anything, so a draft reads nothing. A failed read must not take the report down.
   const { settles, unavailable: overridesUnavailable } =
     header.status === "completed"
-      ? await readReconciliationOverrides(sb, id, header, (m) => formatMoney(m, base?.code ?? "USD", dec))
+      ? await readReconciliationOverrides(sb, id, header, money)
       : { settles: [], unavailable: false };
   return (
     <div>
@@ -43,8 +42,8 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       {header.fileName ? (
         <p>
           Statement: {header.fileName}
-          {header.openingMinor !== null ? ` · opens at ${fmt(header.openingMinor)}` : ""}
-          {header.closingMinor !== null ? ` · closes at ${fmt(header.closingMinor)}` : ""}
+          {header.openingMinor !== null ? ` · opens at ${money(header.openingMinor)}` : ""}
+          {header.closingMinor !== null ? ` · closes at ${money(header.closingMinor)}` : ""}
         </p>
       ) : null}
       {/* The kept file, named so a printed report can be matched to it (1.83). */}
@@ -60,17 +59,17 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       )}
       <table>
         <tbody>
-          <tr><td>Beginning balance</td><td style={{ textAlign: "right" }}>{fmt(detail.beginningMinor)}</td></tr>
-          <tr><td>Cleared total</td><td style={{ textAlign: "right" }}>{fmt(detail.clearedTotalMinor)}</td></tr>
-          <tr><td>Reconciled balance</td><td style={{ textAlign: "right" }}>{fmt(detail.reconciledBalanceMinor)}</td></tr>
-          <tr><td>Statement ending</td><td style={{ textAlign: "right" }}>{fmt(detail.statementEndingMinor)}</td></tr>
-          <tr><td>Difference</td><td style={{ textAlign: "right" }}>{fmt(detail.differenceMinor)}</td></tr>
+          <tr><td>Beginning balance</td><td style={{ textAlign: "right" }}>{money(detail.beginningMinor)}</td></tr>
+          <tr><td>Cleared total</td><td style={{ textAlign: "right" }}>{money(detail.clearedTotalMinor)}</td></tr>
+          <tr><td>Reconciled balance</td><td style={{ textAlign: "right" }}>{money(detail.reconciledBalanceMinor)}</td></tr>
+          <tr><td>Statement ending</td><td style={{ textAlign: "right" }}>{money(detail.statementEndingMinor)}</td></tr>
+          <tr><td>Difference</td><td style={{ textAlign: "right" }}>{money(detail.differenceMinor)}</td></tr>
         </tbody>
       </table>
       <h3>Cleared items ({cleared.length})</h3>
       <ul>
         {cleared.map((l) => (
-          <li key={l.journalLineId}>{l.entryDate} · {l.entryNumber} · {l.sourceType} · {fmt(l.signedMinor)}</li>
+          <li key={l.journalLineId}>{l.entryDate} · {l.entryNumber} · {l.sourceType} · {money(l.signedMinor)}</li>
         ))}
       </ul>
     </div>

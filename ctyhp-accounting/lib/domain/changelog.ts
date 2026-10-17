@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.13",
+    date: "2026-10-17",
+    headline: "Tables and totals show money the same way on every screen: $1,234.56, and -$1,234.56 below zero.",
+    changes: [
+      {
+        kind: "changed",
+        title: "One way to write an amount in tables and totals",
+        detail:
+          "Amounts used to be written three ways depending on the screen: $14,610.00 on Invoices, 990.00 USD on Bills and Pay Bills, 3985.00 USD with no thousands separator on Purchase Orders, and 1,234.56 with no dollar sign on Reconcile, Journal Entries, the General Ledger, the statements and the aging reports, where a negative read -2,400.00. Tables, totals and the figures at the top of a screen now write $1,234.56, and -$1,234.56 for a negative. The figures themselves are unchanged. Chart of Accounts still puts a balance the wrong way round for its account in parentheses, in red, because there the parentheses carry a meaning. CSV exports keep plain numbers, so a spreadsheet reads them as numbers.",
+        route: "/bills",
+      },
+    ],
+  },
+  {
     version: "2.12",
     date: "2026-10-17",
     headline: "A reconciliation that has changed since it was signed off says so, and a transfer is checked on both statements.",

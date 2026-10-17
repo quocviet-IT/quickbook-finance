@@ -4,7 +4,8 @@ import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
-import { fromMinor, toMinor } from "@/lib/domain/money";
+import { toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
@@ -200,8 +201,7 @@ export default function JournalClient({
     });
   };
 
-  const fmt = (m: number) =>
-    m ? fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals }) : "";
+  const fmt = (m: number) => (m ? formatMoney(m, baseCurrency, baseDecimals) : "");
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">

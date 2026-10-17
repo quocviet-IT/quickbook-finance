@@ -18,7 +18,6 @@ import {
   Typography,
 } from "antd";
 import { PaperClipOutlined, UploadOutlined } from "@ant-design/icons";
-import { fromMinor } from "@/lib/domain/money";
 import { importedSummary } from "@/lib/domain/statement-repeats";
 import {
   BRING_HISTORY_FORWARD,
@@ -210,7 +209,6 @@ export default function ReconcileWorkspaceClient({
     [statement, standings],
   );
 
-  const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
   const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
   const completed = detail?.status === "completed";
   const working = canWrite && !completed;
@@ -647,11 +645,11 @@ export default function ReconcileWorkspaceClient({
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       {detail && (
         <Space size="large" wrap>
-          <Statistic title="Beginning" value={fmt(detail.beginningMinor)} />
-          <Statistic title="Cleared" value={fmt(detail.clearedTotalMinor)} />
-          <Statistic title="Reconciled balance" value={fmt(detail.reconciledBalanceMinor)} />
-          <Statistic title="Statement ending" value={fmt(detail.statementEndingMinor)} />
-          <Statistic title="Difference" value={fmt(detail.differenceMinor)} />
+          <Statistic title="Beginning" value={money(detail.beginningMinor)} />
+          <Statistic title="Cleared" value={money(detail.clearedTotalMinor)} />
+          <Statistic title="Reconciled balance" value={money(detail.reconciledBalanceMinor)} />
+          <Statistic title="Statement ending" value={money(detail.statementEndingMinor)} />
+          <Statistic title="Difference" value={money(detail.differenceMinor)} />
           <Tag color={completed ? "green" : "blue"}>{detail.status}</Tag>
           {statement?.broughtForward ? <Tag color="purple">Brought forward</Tag> : null}
         </Space>
@@ -825,7 +823,7 @@ export default function ReconcileWorkspaceClient({
               dataIndex: "amountMinor",
               width: SW.amount,
               align: "right",
-              render: (value: number) => fmt(value),
+              render: (value: number) => money(value),
             },
             {
               title: "With the books",
@@ -888,7 +886,7 @@ export default function ReconcileWorkspaceClient({
           { title: "Source", dataIndex: "sourceType", render: (s) => <Tag>{s}</Tag> },
           { title: "Reference", dataIndex: "reference", render: (value: string | null) => value ?? "—" },
           { title: "Memo", dataIndex: "memo" },
-          { title: "Amount", align: "right", render: (_, l) => fmt(l.signedMinor) },
+          { title: "Amount", align: "right", render: (_, l) => money(l.signedMinor) },
           {
             title: "",
             key: "outstanding",
@@ -906,7 +904,7 @@ export default function ReconcileWorkspaceClient({
       >
         <p>
           An adjusting entry for the outstanding difference{" "}
-          {detail ? `(${fmt(detail.differenceMinor)} ${baseCurrency})` : ""} will post to the selected account.
+          {detail ? `(${money(detail.differenceMinor)})` : ""} will post to the selected account.
         </p>
         <Form form={form} layout="vertical">
           <Form.Item name="offset_account_id" label="Offset account (bank charges / interest)" rules={[{ required: true }]}>

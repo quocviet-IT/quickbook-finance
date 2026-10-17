@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/lib/db/types";
 import { canDecide } from "@/lib/domain/access";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -46,8 +46,7 @@ export default function ApprovalsClient({
   const [decidedPageSize, setDecidedPageSize] = useState<number>(DECIDED_DEFAULT_PAGE_SIZE);
 
   const policyOf = (key: string) => policies.find((p) => p.action_key === key);
-  const money = (m: number) =>
-    `${fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals })} ${baseCurrency}`;
+  const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   /** The same rule the server enforces, used here only to explain the block. */
   function decision(req: ApprovalRequestRow) {

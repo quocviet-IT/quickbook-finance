@@ -17,7 +17,7 @@ import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts
 import { ReportBody } from "@/components/reports/ReportAudience";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { cashFlowAction, cashFlowDetailAction } from "./actions";
 import type { CashFlowDetail, CashFlowReport } from "@/lib/services/cashflow";
 
@@ -139,12 +139,7 @@ export default function CashFlowClient({
   const [report, setReport] = useState<CashFlowReport | null>(null);
   const [details, setDetails] = useState<Record<string, DetailState>>({});
   const [loading, setLoading] = useState(false);
-  const fmt = (amount: number) =>
-    fromMinor(amount, baseDecimals).toLocaleString(undefined, {
-      minimumFractionDigits: baseDecimals,
-      maximumFractionDigits: baseDecimals,
-    });
-  const fmtMoney = (amount: number) => `${fmt(amount)} ${baseCurrency}`;
+  const fmt = (amount: number) => formatMoney(amount, baseCurrency, baseDecimals);
 
   const run = async () => {
     if (!range) {
@@ -242,8 +237,8 @@ export default function CashFlowClient({
             }
             description={
               report.tiesOut
-                ? `${fmtMoney(report.openingMinor)} + CFO ${fmtMoney(report.operating)} + CFI ${fmtMoney(report.investing)} + CFF ${fmtMoney(report.financing)} = ${fmtMoney(report.balanceSheetCashMinor)}`
-                : `Difference ${fmtMoney(report.differenceMinor)} · ${report.unclassifiedCount} unclassified journal entr${report.unclassifiedCount === 1 ? "y" : "ies"}. Assign cash-flow roles and investigate before closing the period.`
+                ? `${fmt(report.openingMinor)} + CFO ${fmt(report.operating)} + CFI ${fmt(report.investing)} + CFF ${fmt(report.financing)} = ${fmt(report.balanceSheetCashMinor)}`
+                : `Difference ${fmt(report.differenceMinor)} · ${report.unclassifiedCount} unclassified journal entr${report.unclassifiedCount === 1 ? "y" : "ies"}. Assign cash-flow roles and investigate before closing the period.`
             }
           />
           <ReportBody
@@ -303,7 +298,7 @@ export default function CashFlowClient({
                           {
                             title: "Amount",
                             align: "right",
-                            render: (_, detail) => fmtMoney(detail.amountMinor),
+                            render: (_, detail) => fmt(detail.amountMinor),
                           },
                         ]}
                       />
@@ -347,7 +342,7 @@ export default function CashFlowClient({
               <ComparisonBars
                 title="Cash movement by activity"
                 description="Indirect operating cash flow plus investing and financing movements."
-                formatMoney={fmtMoney}
+                formatMoney={fmt}
                 data={[
                   {
                     key: "operating",

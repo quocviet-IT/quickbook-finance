@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import { formatMoney } from "@/lib/format";
 import type { CurrencyRow, ReceivedNotBilledRow } from "@/lib/db/types";
 
 export default function ReceivedNotBilledClient({
@@ -11,9 +12,8 @@ export default function ReceivedNotBilledClient({
   rows: ReceivedNotBilledRow[];
   currencies: CurrencyRow[];
 }) {
-  function fmt(minor: number, code: string): string {
-    const d = currencies.find((c) => c.code === code)?.decimal_places ?? 2;
-    return `${(minor / 10 ** d).toFixed(d)} ${code}`;
+  function decimalsOf(code: string): number {
+    return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
   }
 
   // Only total when every row is in one currency — summing across currencies
@@ -50,19 +50,19 @@ export default function ReceivedNotBilledClient({
             title: "Unit Cost",
             dataIndex: "unit_cost_minor",
             align: "right",
-            render: (v: number, r) => fmt(v, r.currency_code),
+            render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
           {
             title: "Value",
             dataIndex: "value_minor",
             align: "right",
-            render: (v: number, r) => fmt(v, r.currency_code),
+            render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
         ]}
       />
       {singleCurrency && (
         <Typography.Paragraph strong style={{ textAlign: "right", marginTop: 12 }}>
-          Total received not billed: {fmt(total, singleCurrency)}
+          Total received not billed: {formatMoney(total, singleCurrency, decimalsOf(singleCurrency))}
         </Typography.Paragraph>
       )}
       <Typography.Paragraph type="secondary">

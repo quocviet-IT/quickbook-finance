@@ -29,6 +29,7 @@ import {
 } from "@/components/charts/FinancialCharts";
 import { TOKENS } from "@/lib/design/tokens";
 import { fromMinor } from "@/lib/domain/money";
+import { formatMoney as formatCurrency } from "@/lib/format";
 import { INTERNAL_REPORT_HREFS } from "@/lib/domain/report-catalog";
 import type {
   DashboardActivity,
@@ -58,13 +59,7 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const [range, setRange] = useState<DashboardRange>(6);
   const { metrics, periodComparison, cashMovement, inventory, operatingPulse } = analytics;
-  const formatMoney = (minor: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: baseCurrency,
-      minimumFractionDigits: baseDecimals,
-      maximumFractionDigits: baseDecimals,
-    }).format(fromMinor(minor, baseDecimals));
+  const formatMoney = (minor: number) => formatCurrency(minor, baseCurrency, baseDecimals);
   const formatCompact = (minor: number) =>
     new Intl.NumberFormat("en-US", {
       notation: "compact",

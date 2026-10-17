@@ -8,6 +8,7 @@ import type { AccountRow, CurrencyRow, ItemRow, PurchaseOrderLineRow, PurchaseOr
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { poLineTotalMinor } from "@/lib/domain/purchasing";
 import { withVendor } from "@/lib/domain/vendors";
+import { formatMoney } from "@/lib/format";
 import NewVendorButton from "@/components/NewVendorButton";
 import { savePurchaseOrderAction } from "./actions";
 
@@ -258,7 +259,7 @@ function PurchaseOrderFormModalBody({
         </Form.List>
 
         <Typography.Paragraph strong style={{ marginTop: 16, textAlign: "right" }}>
-          Order total: {(totalMinor / 10 ** decimals).toFixed(decimals)} {currency}
+          Order total: {formatMoney(totalMinor, currency, decimals)}
         </Typography.Paragraph>
         <Form.Item name="memo" label="Memo">
           <Input.TextArea rows={2} />

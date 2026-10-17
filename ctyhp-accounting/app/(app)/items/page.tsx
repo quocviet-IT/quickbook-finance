@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listItems } from "@/lib/services/items";
 import { listAccounts } from "@/lib/services/accounts";
 import { salesRevenueAccounts } from "@/lib/domain/accounts";
-import { listTaxCodes } from "@/lib/services/reference";
+import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { getInventoryValuation } from "@/lib/services/inventory";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
@@ -14,14 +14,16 @@ export const dynamic = "force-dynamic";
 export default async function ItemsPage() {
   const sb = await createSupabaseServerClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [items, accounts, taxCodes, valuation, role, canManageItems] = await Promise.all([
+  const [items, accounts, taxCodes, valuation, role, canManageItems, currencies] = await Promise.all([
     listItems(sb),
     listAccounts(sb),
     listTaxCodes(sb),
     getInventoryValuation(sb, today),
     getUserRole(),
     hasPermission(sb, "items.manage"),
+    listCurrencies(sb),
   ]);
+  const base = currencies.find((c) => c.is_base);
 
   // An item's income account is what its invoice lines default to.
   const incomeAccounts = salesRevenueAccounts(accounts);
@@ -63,6 +65,8 @@ export default async function ItemsPage() {
         onHand={valuation.rows}
         canManageItems={canManageItems}
         canAdjustInventory={canWrite(role)}
+        baseCurrency={base?.code ?? "USD"}
+        baseDecimals={base?.decimal_places ?? 2}
       />
     </div>
   );

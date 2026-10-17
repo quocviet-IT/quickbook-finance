@@ -13,6 +13,7 @@ import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderWithVendor } from "@/lib/services/purchasing";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
+import { formatMoney } from "@/lib/format";
 import PurchaseOrderFormModal from "./PurchaseOrderFormModal";
 
 const STATUS_COLOR: Record<PoStatus, string> = {
@@ -82,9 +83,8 @@ export default function PurchaseOrdersClient({
     [orders, status, keyword],
   );
 
-  function fmt(minor: number, code: string): string {
-    const d = currencies.find((c) => c.code === code)?.decimal_places ?? 2;
-    return `${(minor / 10 ** d).toFixed(d)} ${code}`;
+  function decimalsOf(code: string): number {
+    return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
   }
 
   return (
@@ -134,7 +134,7 @@ export default function PurchaseOrdersClient({
             title: "Total",
             dataIndex: "total_minor",
             align: "right",
-            render: (v: number, r) => fmt(v, r.currency_code),
+            render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
           {
             title: "Status",

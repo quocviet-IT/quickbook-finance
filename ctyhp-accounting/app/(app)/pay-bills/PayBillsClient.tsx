@@ -24,6 +24,7 @@ import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
 import PayRunPanel from "@/components/payables/PayRunPanel";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import { formatMoney } from "@/lib/format";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -58,9 +59,8 @@ export default function PayBillsClient({
     [currencies, currency],
   );
 
-  function fmt(minor: number, code: string): string {
-    const d = currencies.find((c) => c.code === code)?.decimal_places ?? 2;
-    return `${(minor / 10 ** d).toFixed(d)} ${code}`;
+  function decimalsOf(code: string): number {
+    return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
   }
 
   async function onVendorChange(vendorId: string) {
@@ -164,6 +164,7 @@ export default function PayBillsClient({
     <>
       {/* What to pay, before how to pay it. */}
       <PayRunPanel
+        baseCurrency={currency}
         baseDecimals={decimals}
         onPayVendor={
           canWrite
@@ -199,8 +200,8 @@ export default function PayBillsClient({
           // The elastic column: a vendor name is text somebody typed.
           flexColumn<BillPaymentRow & { vendor_name: string }>({ title: "Vendor", dataIndex: "vendor_name" }),
           { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE },
-          { title: "Amount", dataIndex: "amount_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
-          { title: "Unapplied", dataIndex: "unapplied_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+          { title: "Amount", dataIndex: "amount_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
+          { title: "Unapplied", dataIndex: "unapplied_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
           { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "blue"}>{s}</Tag> },
           {
             title: "Actions",
@@ -296,7 +297,7 @@ export default function PayBillsClient({
             columns={[
               { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? "—" },
               { title: "Date", dataIndex: "bill_date" },
-              { title: "Balance", dataIndex: "balance_due_minor", align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+              { title: "Balance", dataIndex: "balance_due_minor", align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
               {
                 title: "Discount",
                 key: "discount",
@@ -318,7 +319,7 @@ export default function PayBillsClient({
                         }));
                       }}
                     >
-                      {fmt(available, r.currency_code)} by {r.discount_due_date}
+                      {formatMoney(available, r.currency_code, decimalsOf(r.currency_code))} by {r.discount_due_date}
                     </Checkbox>
                   );
                 },
@@ -339,7 +340,7 @@ export default function PayBillsClient({
             ]}
           />
           <Typography.Paragraph style={{ marginTop: 8 }}>
-            Allocated: {(allocTotalMinor / 10 ** decimals).toFixed(decimals)} {currency}
+            Allocated: {formatMoney(allocTotalMinor, currency, decimals)}
           </Typography.Paragraph>
         </Form>
       </Modal>

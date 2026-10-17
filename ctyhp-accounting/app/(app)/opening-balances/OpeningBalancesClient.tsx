@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import { App, Alert, Button, DatePicker, InputNumber, Select, Space, Table } from "antd";
-import { fromMinor, toMinor } from "@/lib/domain/money";
+import { toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { buildOpeningBalancePosting } from "@/lib/domain/posting";
 import { postOpeningBalancesAction } from "./actions";
 
@@ -57,7 +58,7 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
     return { d, c, equity };
   }, [rows, baseDecimals]);
 
-  const fmt = (m: number) => fromMinor(Math.abs(m), baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(Math.abs(m), baseCurrency, baseDecimals);
 
   const post = async () => {
     setPosting(true);
@@ -136,8 +137,8 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
         type={totals.equity === 0 ? "success" : "info"}
         message={
           totals.equity === 0
-            ? `Balanced. Debit = Credit = ${fmt(totals.d)} ${baseCurrency}.`
-            : `Opening Balance Equity will absorb ${fmt(totals.equity)} ${baseCurrency} on the ${totals.equity > 0 ? "credit" : "debit"} side to balance.`
+            ? `Balanced. Debit = Credit = ${fmt(totals.d)}.`
+            : `Opening Balance Equity will absorb ${fmt(totals.equity)} on the ${totals.equity > 0 ? "credit" : "debit"} side to balance.`
         }
       />
       {canWrite && (

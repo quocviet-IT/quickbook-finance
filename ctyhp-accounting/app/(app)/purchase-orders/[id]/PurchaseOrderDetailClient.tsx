@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Descriptions, Space, Table, Tag, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import { formatMoney } from "@/lib/format";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, PurchasingConfigRow, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderDetail } from "@/lib/services/purchasing";
 import { remainingQty } from "@/lib/domain/purchasing";
@@ -64,10 +65,6 @@ export default function PurchaseOrderDetailClient({
     () => currencies.find((c) => c.code === order.currency_code)?.decimal_places ?? 2,
     [currencies, order.currency_code],
   );
-
-  function fmt(minor: number): string {
-    return `${(minor / 10 ** decimals).toFixed(decimals)} ${order.currency_code}`;
-  }
 
   const canReceive = order.status === "open" || order.status === "partial";
   const receivedNotBilled = lines.some((l) => Number(l.qty_received) > Number(l.qty_billed));
@@ -200,7 +197,7 @@ export default function PurchaseOrderDetailClient({
           <Descriptions.Item label="Order date">{order.order_date}</Descriptions.Item>
           <Descriptions.Item label="Expected date">{order.expected_date ?? "—"}</Descriptions.Item>
           <Descriptions.Item label="Currency">{order.currency_code}</Descriptions.Item>
-          <Descriptions.Item label="Order total">{fmt(order.total_minor)}</Descriptions.Item>
+          <Descriptions.Item label="Order total">{formatMoney(order.total_minor, order.currency_code, decimals)}</Descriptions.Item>
           <Descriptions.Item label="Ship to">{order.ship_to ?? "—"}</Descriptions.Item>
           {order.memo && <Descriptions.Item label="Memo">{order.memo}</Descriptions.Item>}
           {order.close_reason && <Descriptions.Item label="Close reason">{order.close_reason}</Descriptions.Item>}
@@ -238,9 +235,9 @@ export default function PurchaseOrderDetailClient({
               title: "Unit Cost",
               dataIndex: "unit_cost_minor",
               align: "right",
-              render: (v: number) => fmt(v),
+              render: (v: number) => formatMoney(v, order.currency_code, decimals),
             },
-            { title: "Line Total", dataIndex: "line_total_minor", align: "right", render: (v: number) => fmt(v) },
+            { title: "Line Total", dataIndex: "line_total_minor", align: "right", render: (v: number) => formatMoney(v, order.currency_code, decimals) },
           ]}
         />
       </Card>
@@ -313,7 +310,7 @@ export default function PurchaseOrderDetailClient({
               render: (v: string | null) => <Link href="/bills">{v ?? "(draft)"}</Link>,
             },
             { title: "Date", dataIndex: "bill_date" },
-            { title: "Total", dataIndex: "total_minor", align: "right", render: (v: number) => fmt(v) },
+            { title: "Total", dataIndex: "total_minor", align: "right", render: (v: number) => formatMoney(v, order.currency_code, decimals) },
             { title: "Status", dataIndex: "status", render: (s: string) => <Tag>{s}</Tag> },
           ]}
         />

@@ -15,7 +15,7 @@ import { excludedRowsCsv } from "@/lib/domain/excluded-rows";
 import { downloadTextFile } from "@/lib/client/download";
 import type { AccountRow } from "@/lib/db/types";
 import type { AccountType } from "@/lib/domain/accounts";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import {
   fieldsFor,
   type ImportTarget,
@@ -60,6 +60,7 @@ export default function ImportClient({
   companyName,
   isSampleCompany,
   baseDecimals,
+  baseCurrency,
   bankAccounts,
   accounts,
   templateExamples,
@@ -67,6 +68,7 @@ export default function ImportClient({
   companyName: string;
   isSampleCompany: boolean;
   baseDecimals: number;
+  baseCurrency: string;
   /** Where a transaction row posts when the file does not name a bank. */
   bankAccounts: AccountRow[];
   /** The whole chart, for pointing a name in the file at an account. */
@@ -97,11 +99,8 @@ export default function ImportClient({
   // nothing to keep in step when the tab changes.
   const detection = headers.length > 0 ? detectFileShape(headers) : null;
   const money = useCallback(
-    (minor: number) =>
-      fromMinor(minor, baseDecimals).toLocaleString(undefined, {
-        minimumFractionDigits: baseDecimals,
-      }),
-    [baseDecimals],
+    (minor: number) => formatMoney(minor, baseCurrency, baseDecimals),
+    [baseCurrency, baseDecimals],
   );
 
   function reset() {
@@ -282,6 +281,7 @@ export default function ImportClient({
           companyName={companyName}
           isSampleCompany={isSampleCompany}
           baseDecimals={baseDecimals}
+          baseCurrency={baseCurrency}
           canManage
           accounts={accounts}
         />

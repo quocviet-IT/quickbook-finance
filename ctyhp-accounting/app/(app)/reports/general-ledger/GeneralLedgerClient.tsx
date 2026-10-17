@@ -5,7 +5,7 @@ import { App, Button, DatePicker, Input, Select, Space, Statistic, Tooltip, Typo
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { sourceHref as documentHref } from "@/lib/domain/entry-detail";
 import {
   filterGeneralLedgerRows,
@@ -129,7 +129,7 @@ export default function GeneralLedgerClient({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (validInitialAccount && initialTo) void run();
   }, [validInitialAccount, initialTo, run]);
-  const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   // The report itself is always in base currency (see getGeneralLedger), so
   // baseDecimals is the correct — and only — decimal count to parse an
