@@ -65,6 +65,9 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_stock_count_line",
   // Cash count (0154): a count references accounts, a journal entry and an approval request.
   "acc_cash_count",
+  // Balance comparison (0155): the lines reference their date's header.
+  "acc_balance_comparison",
+  "acc_balance_comparison_line",
   "acc_fixed_asset",
   "acc_asset_depreciation_schedule",
   "acc_bank_account",

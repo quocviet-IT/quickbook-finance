@@ -41,7 +41,7 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "2.18",
+    version: "2.19",
     date: "2026-10-17",
     headline: "Every status reads the same way, and every button is written the same way.",
     changes: [
@@ -79,6 +79,20 @@ export const RELEASES: Release[] = [
         detail:
           "System guide steps named buttons that are not on the screen. They now say Receive payment, Add user and New rate, and giving money back points to Refund in a payment's menu rather than to Credit Memos.",
         route: "/payments",
+      },
+    ],
+  },
+  {
+    version: "2.18",
+    date: "2026-10-17",
+    headline: "Another ledger’s balances, typed in beside OneBook’s and kept by date.",
+    changes: [
+      {
+        kind: "added",
+        title: "Balance Comparison",
+        detail:
+          "A new report under Reports, beside the Trial Balance. Choose a date and name the other system, such as QuickBooks, then type its balance for each account as its own balance sheet prints it: commas, a dollar sign, brackets or a minus for negatives, and CR or DR all read. Every active account is listed, at nil if it was never posted to, and an account only the other system has can be added to the group it belongs in. The difference is OneBook less the other figure, and a row that differs is marked. Save keeps what was typed under that date, so a check at one date never replaces a check at another; opening a date with nothing saved says so and links to the nearest saved one. The heading names the date and the other system on screen and in every export, and the last line, debits less credits, is nil when the books balance. Staff save; viewers read.",
+        route: "/reports/balance-comparison",
       },
     ],
   },

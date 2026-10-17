@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
 import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 
-describe("2.18 in the release notes", () => {
-  const release = RELEASES.find((r) => r.version === "2.18")!;
+describe("2.19 in the release notes", () => {
+  const release = RELEASES.find((r) => r.version === "2.19")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
     expect(RELEASES.indexOf(release)).toBeGreaterThanOrEqual(0);
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.18);
+    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.19);
     expect(release.date).toBe("2026-10-17");
   });
 

@@ -49,6 +49,7 @@
     "verify:entitlement": "node --env-file=.env.local scripts/verify-entitlement.mjs",
     "verify:stock-count": "node --env-file=.env.local scripts/verify-stock-count.mjs",
     "verify:cash-count": "node --env-file=.env.local scripts/verify-cash-count.mjs",
+    "verify:balance-comparison": "node --env-file=.env.local scripts/verify-balance-comparison.mjs",
     "verify:balance-entries": "node --env-file=.env.local scripts/verify-balance-entries.mjs",
     "verify:estimates": "node --env-file=.env.local scripts/verify-estimates.mjs",
     "verify:reconciliation-history": "node --env-file=.env.local scripts/verify-reconciliation-history.mjs",

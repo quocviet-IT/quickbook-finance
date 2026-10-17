@@ -245,6 +245,13 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     internalReport: "trial",
   },
   {
+    id: "balance-comparison",
+    title: "Balance Comparison",
+    description: "OneBook’s balance for every account beside the figures from another system, kept by date.",
+    href: "/reports/balance-comparison",
+    group: "accounting",
+  },
+  {
     id: "general-ledger",
     title: "General Ledger",
     description: "Inspect posted transactions and running balances by account.",
