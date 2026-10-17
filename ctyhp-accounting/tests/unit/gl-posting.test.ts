@@ -126,7 +126,7 @@ describe("buildPostingReport", () => {
 
   it("names each kind of problem in one sentence", () => {
     const message = describePostingExceptions(report());
-    expect(message).toContain("1 document(s) need attention");
+    expect(message).toContain("1 document needs attention");
     expect(message).toContain("no journal entry");
   });
 
@@ -211,7 +211,7 @@ describe("buildControlReconciliation", () => {
     ]);
     expect(out.allTieOut).toBe(false);
     const message = describeControlExceptions(out)!;
-    expect(message).toContain("2 control account(s) do not tie out as of 2026-08-01");
+    expect(message).toContain("2 control accounts do not tie out as of 08/01/2026");
     expect(message).toContain("Accounts Receivable is out by 162.38");
     expect(message).toContain("Undeposited Funds holds 450.00 with no subledger behind it");
   });

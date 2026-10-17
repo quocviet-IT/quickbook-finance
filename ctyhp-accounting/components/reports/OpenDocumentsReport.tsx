@@ -8,9 +8,8 @@ import ProofLine from "@/components/reports/ProofLine";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate } from "@/lib/format";
 import { ageLabel, openDocumentsSheet, type OpenDocumentLine } from "@/lib/domain/open-items";
-import { shortDate } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import type { OpenDocumentsResult } from "@/lib/services/party-reports";
 
@@ -75,10 +74,10 @@ export default function OpenDocumentsReport({
               emptyTitle={invoices ? "No open invoices" : "No unpaid bills"}
               emptyDescription={invoices ? "Every invoice dated by this day is paid." : "Every bill dated by this day is paid."}
               columns={[
-                { title: "Date", dataIndex: "docDate", width: COLUMN.DATE + 20, render: (d: string) => shortDate(d) },
+                { title: "Date", dataIndex: "docDate", width: COLUMN.DATE + 20, render: (d: string) => formatDate(d) },
                 { title: "Num", dataIndex: "docNumber", width: COLUMN.CODE, render: (n: string | null) => <span className={styles.mono}>{n ?? "—"}</span> },
                 flexColumn<OpenDocumentLine>({ title: invoices ? "Customer" : "Vendor", dataIndex: "partyName" }),
-                { title: "Due", dataIndex: "dueDate", width: COLUMN.DATE + 20, render: (d: string) => shortDate(d) },
+                { title: "Due", dataIndex: "dueDate", width: COLUMN.DATE + 20, render: (d: string) => formatDate(d) },
                 {
                   title: "Age",
                   dataIndex: "daysPastDue",

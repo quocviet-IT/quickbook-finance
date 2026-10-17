@@ -3,24 +3,17 @@ import { getSalesTaxLiability, listTaxPayments } from "@/lib/services/salestax";
 import { listTaxCodes, listCurrencies, listUsStates } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
+import { companyClock } from "@/lib/services/report-context";
 import PageHeader from "@/components/PageHeader";
 import SalesTaxClient from "./SalesTaxClient";
 
 export const dynamic = "force-dynamic";
 
-function monthStart(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-function today(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export default async function SalesTaxPage() {
   const sb = await createSupabaseServerClient();
   // Note: default range is computed on the server request; the client can change it.
-  const now = new Date();
-  const from = monthStart(now);
-  const to = today(now);
+  const to = (await companyClock(sb)).today;
+  const from = `${to.slice(0, 8)}01`;
 
   const [liability, payments, taxCodes, accounts, currencies, usStates, role] = await Promise.all([
     getSalesTaxLiability(sb, from, to),

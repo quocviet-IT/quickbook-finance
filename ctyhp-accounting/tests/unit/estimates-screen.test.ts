@@ -126,7 +126,7 @@ describe("the Estimates screen's sources", () => {
   it("asks before a delete and before turning an expired estimate into an invoice, in the shared words", () => {
     const client = readFileSync(join(ESTIMATES_DIR, "EstimatesClient.tsx"), "utf8");
     expect(client).toContain("estimateMessages.deleteConfirm(row.estimate_number)");
-    expect(client).toContain("estimateMessages.expiredConfirm(target.estimate_number, target.expiry_date)");
+    expect(client).toContain("estimateMessages.expiredConfirm(target.estimate_number, formatDate(target.expiry_date))");
     expect(client).toContain("estimateMessages.declined(n)");
     expect(client).toContain("estimateMessages.reopened(n)");
     expect(client).toContain("router.push(estimateConversionHref(target.id))");

@@ -1,5 +1,6 @@
 "use client";
 
+import { plural, pluralWord } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -226,7 +227,7 @@ export default function SystemGuideDrawer({
           </Space>
         ) : (
           <Typography.Text type="secondary">
-            {shown.length} workflow(s) mention “{query.trim()}”
+            {plural(shown.length, "workflow")} {pluralWord(shown.length, "mentions", "mention")} “{query.trim()}”
           </Typography.Text>
         )}
 

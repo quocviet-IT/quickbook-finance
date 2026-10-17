@@ -1,5 +1,6 @@
 import { calendarDayDifference, WORK_QUEUE_ID_PREFIX, type WorkQueueItem } from "@/lib/domain/work-queue";
 import { CONTROL_KEYS, type AccountingControl, type DerivedQueueItem, type QueueSeverity } from "./types";
+import { formatDate } from "@/lib/format";
 
 /**
  * Every work key the Accounting overview derives starts with one of these; its
@@ -147,7 +148,7 @@ export function recurringFailureItem(
     sourceKind: "recurring-failure",
     sourceId: run.id,
     title: `${run.templateName} did not run`,
-    reason: `The scheduled run on ${run.runDate} failed and posted nothing.`,
+    reason: `The scheduled run on ${formatDate(run.runDate)} failed and posted nothing.`,
     severity: "high",
     ageDays: Math.max(0, calendarDayDifference(asOf, run.runDate)),
     href: "/recurring",

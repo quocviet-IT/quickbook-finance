@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/format";
 import { Alert, Space } from "antd";
 import type { Dayjs } from "dayjs";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
@@ -54,7 +55,7 @@ export default function ImportConfirmContent({
           description={
             <>
               Opening balances of <b>{money(preview.openingTotalMinor)}</b> will be brought
-              across as of {asOf.format("YYYY-MM-DD")}. Opening balances can only be brought
+              across as of {formatDate(asOf.format("YYYY-MM-DD"))}. Opening balances can only be brought
               across once — a second attempt is refused rather than doubling the books.
             </>
           }

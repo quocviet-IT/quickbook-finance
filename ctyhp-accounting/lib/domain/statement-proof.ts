@@ -45,7 +45,7 @@ import {
   type StatementProofPayload,
 } from "./statement-proof-schema";
 import type { PdfStatement } from "./pdf-statement";
-import { shortDate } from "./pdf-statement-view";
+import { formatDate, plural } from "@/lib/format";
 import { statementLineName } from "./reconcile-difference";
 import type { StatementFileResult } from "./statement-files";
 import type { StatementLine } from "./statement-import";
@@ -137,7 +137,7 @@ export interface ProofSentences {
   detail: string | null;
   /** "Import is blocked until the statement adds up." whenever it does not (a balance missing included); null when it adds up. */
   blocked: string | null;
-  /** "Use $X (the closing of the reconciliation to Feb 28, 2026)" while a prior closing is on offer or taken. */
+  /** "Use $X (the closing of the reconciliation to 02/28/2026)" while a prior closing is on offer or taken. */
   usePrior: string | null;
   /** The opening's basis in words: printed / from the running balance / from the reconciliation to {date} / typed. */
   openingBasis: string | null;
@@ -191,10 +191,8 @@ export const PROOF_REFUSAL = {
 
 /** "Import 42 lines": the button, one click, when the statement adds up. */
 export function importLinesLabel(count: number): string {
-  return `Import ${count.toLocaleString("en-US")} line${count === 1 ? "" : "s"}`;
+  return `Import ${plural(count, "line")}`;
 }
-
-const lines = (n: number) => `${n.toLocaleString("en-US")} line${n === 1 ? "" : "s"}`;
 
 /** A line's amount as the statement prints it: "−412.30", "1,250.00". `money` is the screen's own formatter. */
 export function plainAmount(minor: number, money: (minor: number) => string): string {
@@ -214,23 +212,23 @@ export function openingBasisWords(basis: OpeningBasis, priorDate: string | null)
     case "running":
       return "from the running balance";
     case "prior":
-      return priorDate ? `from the reconciliation to ${shortDate(priorDate, true)}` : "from the last reconciliation";
+      return priorDate ? `from the reconciliation to ${formatDate(priorDate)}` : "from the last reconciliation";
     case "typed":
       return "typed";
   }
 }
 
-/** "Use $X (the closing of the reconciliation to Feb 28, 2026)". */
+/** "Use $X (the closing of the reconciliation to 02/28/2026)". */
 export function priorOfferLabel(prior: PriorClosing, money: (minor: number) => string): string {
-  return `Use ${money(prior.endingMinor)} (the closing of the reconciliation to ${shortDate(prior.date, true)})`;
+  return `Use ${money(prior.endingMinor)} (the closing of the reconciliation to ${formatDate(prior.date)})`;
 }
 
-/** "The balance jumps after the line of Mar 14, 2026 (−412.30)." */
+/** "The balance jumps after the line of 03/14/2026 (−412.30)." */
 export function chainBreakText(line: ProofLine, money: (minor: number) => string): string {
-  return `The balance jumps after the line of ${shortDate(line.txn_date, true)} (${plainAmount(line.amount_minor, money)}).`;
+  return `The balance jumps after the line of ${formatDate(line.txn_date)} (${plainAmount(line.amount_minor, money)}).`;
 }
 
-/** "It equals the statement line “SERVICE FEE” of Mar 14, 2026 (−12.50), which may have been misread. …" */
+/** "It equals the statement line “SERVICE FEE” of 03/14/2026 (−12.50), which may have been misread. …" */
 export function oneLineHintText(line: ProofLine, money: (minor: number) => string): string {
   const name = statementLineName({ description: line.description ?? "", txnDate: line.txn_date });
   return (
@@ -453,10 +451,10 @@ function settle(
   let summary: string | null = null;
   if (opening && closing) {
     summary = proves
-      ? `Opening ${money(opening.minor)} (${basisWords}) + ${lines(counted.length)} ${signedMoney(linesMinor, money)} = ` +
+      ? `Opening ${money(opening.minor)} (${basisWords}) + ${plural(counted.length, "line")} ${signedMoney(linesMinor, money)} = ` +
         `${money(closing.minor)}, the closing balance the statement prints ✓`
       : `Out by ${money(Math.abs(differenceMinor as number))}. The opening ${money(opening.minor)} and the ` +
-        `${lines(counted.length)} come to ${money(opening.minor + linesMinor)}; the statement closes at ${money(closing.minor)}.`;
+        `${plural(counted.length, "line")} come to ${money(opening.minor + linesMinor)}; the statement closes at ${money(closing.minor)}.`;
   }
   const onOffer = prior.status === "offered" || prior.status === "taken";
 

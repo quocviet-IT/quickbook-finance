@@ -9,6 +9,7 @@
  * to match in Bank Transactions. Pure: the service reads, this decides.
  */
 import type { Standing } from "./reconcile-statement";
+import { plural, pluralWord } from "@/lib/format";
 
 export interface StatementLineFields {
   txnDate: string;
@@ -120,9 +121,6 @@ export function addMatchCounts(a: BankLineMatchCounts, b: BankLineMatchCounts): 
   };
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-const isAre = (n: number) => (n === 1 ? "is" : "are");
-
 /**
  * What matching said, in sentences after "Reconciliation completed." or a
  * run's summary: how many bank lines are matched now, and the ones left as
@@ -132,15 +130,15 @@ export function bankLinesMatchedSentence(counts: BankLineMatchCounts): string {
   const said: string[] = [];
   if (counts.matched > 0) said.push(`${plural(counts.matched, "bank line")} matched in Bank Transactions.`);
   const left = [
-    counts.elsewhere > 0 ? `${counts.elsewhere} ${isAre(counts.elsewhere)} matched to another entry` : null,
-    counts.ignored > 0 ? `${counts.ignored} ${isAre(counts.ignored)} ignored` : null,
-    counts.differs > 0 ? `${counts.differs} ${counts.differs === 1 ? "has" : "have"} the opposite sign to the books` : null,
+    counts.elsewhere > 0 ? `${counts.elsewhere} ${pluralWord(counts.elsewhere, "is", "are")} matched to another entry` : null,
+    counts.ignored > 0 ? `${counts.ignored} ${pluralWord(counts.ignored, "is", "are")} ignored` : null,
+    counts.differs > 0 ? `${counts.differs} ${pluralWord(counts.differs, "has", "have")} the opposite sign to the books` : null,
   ].filter((part): part is string => part !== null);
   if (left.length) {
     const total = counts.elsewhere + counts.ignored + counts.differs;
     const list = left.length === 1 ? left[0] : `${left.slice(0, -1).join(", ")} and ${left[left.length - 1]}`;
     const lead = counts.matched > 0 ? list : `Of the bank lines, ${list}`;
-    said.push(`${lead} — check ${total === 1 ? "it" : "them"} in Bank Transactions.`);
+    said.push(`${lead} — check ${pluralWord(total, "it", "them")} in Bank Transactions.`);
   }
   return said.join(" ");
 }

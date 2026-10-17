@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, plural } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { App, Form, Input, InputNumber, Modal, Radio, Select, Switch, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
@@ -144,7 +145,6 @@ export default function RepaymentFormModal({
     onSaved();
   }
 
-  const s = (n: number) => (n === 1 ? "" : "s");
   return (
     <Modal
       open={open}
@@ -231,8 +231,8 @@ export default function RepaymentFormModal({
           <Typography.Text strong>
             {preview.past === 0
               ? "No past payments to this account yet"
-              : `Catches ${preview.caught} of ${preview.past} past payment${s(preview.past)} to this account`}
-            {` · ${preview.waiting} waiting line${s(preview.waiting)}`}
+              : `Catches ${preview.caught} of ${plural(preview.past, "past payment")} to this account`}
+            {` · ${plural(preview.waiting, "waiting line")}`}
           </Typography.Text>
           {preview.missed.length ? (
             <>
@@ -241,7 +241,7 @@ export default function RepaymentFormModal({
               </Typography.Text>
               {preview.missed.map((miss, i) => (
                 <Typography.Text key={`${miss.date}-${i}`} type="secondary" className={styles.missed}>
-                  {miss.date} · {miss.text}
+                  {formatDate(miss.date)} · {miss.text}
                 </Typography.Text>
               ))}
             </>

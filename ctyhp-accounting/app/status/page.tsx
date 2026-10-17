@@ -1,9 +1,11 @@
 "use client";
 
+import { formatTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, List, Space, Typography } from "antd";
 import { CheckCircleFilled, CloseCircleFilled, ReloadOutlined } from "@ant-design/icons";
 import { TOKENS } from "@/lib/design/tokens";
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { HealthPayload } from "@/lib/domain/health";
 
 const LABELS: Record<string, string> = {
@@ -198,7 +200,7 @@ export default function StatusPage() {
           </Button>
           {payload && (
             <Typography.Text type="secondary">
-              Checked {new Date(payload.checkedAt).toLocaleTimeString()}
+              Checked {formatTime(payload.checkedAt, DEFAULT_TIME_ZONE)}
             </Typography.Text>
           )}
         </Space>

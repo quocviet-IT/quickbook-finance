@@ -1,5 +1,6 @@
 import type { TablePaginationConfig } from "antd/es/table";
 import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
+import { plural } from "@/lib/format";
 
 export interface ServerPage<RecordType> {
   rows: RecordType[];
@@ -17,6 +18,20 @@ export interface DataTableCoreProps<RecordType> {
   page?: ServerPage<RecordType>;
   dataSource?: readonly RecordType[];
   pagination?: TablePaginationConfig | false;
+}
+
+/**
+ * What the pager says beside its pages: which rows are showing, of how many.
+ *
+ * The filter bar above the table already counts the results, so the pager
+ * does not count them a second time in a different noun. It said "1 records"
+ * under a bar that said "1 result".
+ */
+export function pagerTotal(total: number, range: [number, number]): string {
+  if (total === 0) return plural(0, "result");
+  const [first, last] = range.map((n) => n.toLocaleString("en-US"));
+  const of = total.toLocaleString("en-US");
+  return first === last ? `${first} of ${of}` : `${first}–${last} of ${of}`;
 }
 
 /**
@@ -49,7 +64,7 @@ export function resolveTableData<RecordType>(
 
   const shared = {
     showSizeChanger: true,
-    showTotal: (total: number) => `${total.toLocaleString("en-US")} records`,
+    showTotal: pagerTotal,
   };
 
   const pagination: TablePaginationConfig = props.page

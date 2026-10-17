@@ -3,6 +3,7 @@
  * answer to a removal means, what each screen says, and whether a sync can be
  * undone now. Pure, so the wording is tested where it is written.
  */
+import { plural, pluralWord } from "@/lib/format";
 
 /**
  * Plaid's answers that mean the connection is already gone at Plaid — removed
@@ -64,8 +65,6 @@ export interface BankFeedSyncView {
   lockedLines: number;
 }
 
-const lines = (n: number) => `${n} line${n === 1 ? "" : "s"}`;
-
 /** Whether Undo is offered on a sync, and when not, the tooltip that says why. */
 export function syncUndoState(sync: BankFeedSyncView): { canUndo: boolean; why: string | null } {
   if (sync.status === "undone") return { canUndo: false, why: sync.undoReason ? `Undone: ${sync.undoReason}` : "Undone" };
@@ -75,7 +74,7 @@ export function syncUndoState(sync: BankFeedSyncView): { canUndo: boolean; why: 
   if (sync.lockedLines > 0) {
     return {
       canUndo: false,
-      why: `${lines(sync.lockedLines)} of this sync ${sync.lockedLines === 1 ? "has" : "have"} been matched, coded or ignored — unmatch ${sync.lockedLines === 1 ? "it" : "them"} first`,
+      why: `${plural(sync.lockedLines, "line")} of this sync ${pluralWord(sync.lockedLines, "has", "have")} been matched, coded or ignored — unmatch ${pluralWord(sync.lockedLines, "it", "them")} first`,
     };
   }
   return { canUndo: true, why: null };
@@ -84,7 +83,7 @@ export function syncUndoState(sync: BankFeedSyncView): { canUndo: boolean; why: 
 /** What the Undo dialog says will happen. */
 export function undoSyncWarning(sync: BankFeedSyncView): string {
   const changed = sync.modified + sync.removed;
-  const back = changed > 0 ? ` The ${lines(changed)} it changed or removed come back as they were.` : "";
+  const back = changed > 0 ? ` The ${plural(changed, "line")} it changed or removed come back as they were.` : "";
   const nextSyncText = sync.status === "failed"
     ? "This sync did not finish, so the next sync fetches its changes again."
     : "The next sync does not bring them back; to fetch them again, disconnect the bank and connect it again.";
@@ -95,6 +94,6 @@ export function undoSyncWarning(sync: BankFeedSyncView): string {
 }
 
 export function undoneSyncMessage(result: { removed: number; restored: number }): string {
-  const restored = result.restored > 0 ? `; ${lines(result.restored)} restored` : "";
-  return `Sync undone: ${lines(result.removed)} removed${restored}.`;
+  const restored = result.restored > 0 ? `; ${plural(result.restored, "line")} restored` : "";
+  return `Sync undone: ${plural(result.removed, "line")} removed${restored}.`;
 }

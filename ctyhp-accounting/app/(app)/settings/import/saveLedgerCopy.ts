@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, plural } from "@/lib/format";
 import { calculateFileSha256 } from "@/lib/client/documents";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import type { WaveLedgerParse } from "@/lib/domain/wave-ledger";
@@ -27,11 +28,11 @@ export async function saveLedgerCopy(
     if (upload.error) throw new Error(upload.error.message);
 
     const registered = await registerSavedReportAction({
-      title: `Wave general ledger ${parse.fromDate ?? ""} to ${parse.toDate ?? ""}`.trim(),
+      title: `Wave general ledger ${parse.fromDate ? formatDate(parse.fromDate) : ""} to ${parse.toDate ? formatDate(parse.toDate) : ""}`.trim(),
       source: "wave",
       period_start: parse.fromDate,
       period_end: parse.toDate,
-      notes: `Imported into One Book: ${parse.entries.length} entries, ${parse.lineCount} lines.`,
+      notes: `Imported into One Book: ${plural(parse.entries.length, "entry", "entries")}, ${plural(parse.lineCount, "line")}.`,
       file_name: file.name,
       storage_path: ticket.data.path,
       mime_type: "text/csv",

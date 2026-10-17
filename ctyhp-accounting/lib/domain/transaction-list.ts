@@ -10,6 +10,7 @@
  */
 import { fromMinor, type Minor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { formatDateRange } from "@/lib/format";
 
 export interface TransactionListRow {
   entryId: string;
@@ -165,7 +166,7 @@ export function buildTransactionListSheet(input: {
     fileName: sanitizeExportFileName(`transaction-list-${input.from}-to-${input.to}`),
     companyName: input.companyName,
     title: "Transaction List by Date",
-    subtitle: `${input.from} to ${input.to}`,
+    subtitle: formatDateRange(input.from, input.to),
     currencyCode: input.currencyCode,
     columns: [
       { key: "date", header: "Date", kind: "text", width: 14 },

@@ -32,18 +32,18 @@ const statement = (over: Partial<PdfStatement> = {}): PdfStatement => ({
 
 describe("periodLabel", () => {
   it("names the period as a person writes it", () => {
-    expect(periodLabel("2026-01-01", "2026-01-31")).toBe("Jan 1 – Jan 31, 2026");
-    expect(periodLabel("2025-12-15", "2026-01-14")).toBe("Dec 15, 2025 – Jan 14, 2026");
-    expect(periodLabel(null, "2026-11-30")).toBe("closing Nov 30, 2026");
+    expect(periodLabel("2026-01-01", "2026-01-31")).toBe("01/01/2026 – 01/31/2026");
+    expect(periodLabel("2025-12-15", "2026-01-14")).toBe("12/15/2025 – 01/14/2026");
+    expect(periodLabel(null, "2026-11-30")).toBe("closing 11/30/2026");
     expect(periodLabel(null, null)).toBe("no period printed");
   });
 });
 
 describe("statementLabel", () => {
   it("offers each statement of a combined PDF by account, period and lines", () => {
-    expect(statementLabel(statement())).toBe("Account ending 1111 · Jan 1 – Jan 31, 2026 · 3 lines");
+    expect(statementLabel(statement())).toBe("Account ending 1111 · 01/01/2026 – 01/31/2026 · 3 lines");
     expect(statementLabel(statement({ accountNumber: null, lines: [line(100)] }))).toBe(
-      "Account not named · Jan 1 – Jan 31, 2026 · 1 line",
+      "Account not named · 01/01/2026 – 01/31/2026 · 1 line",
     );
   });
 });

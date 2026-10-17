@@ -25,6 +25,8 @@ body.print-report .report-print-area {
   --ob-surface-subtle: #f8fafc;
   --ob-surface-sider: #0f172a;
   --ob-surface-siderFocus: #121d31;
+  --ob-surface-raised: #ffffff;
+  --ob-surface-inset: #f1f5f9;
   --ob-border-default: #e2e8f0;
   --ob-border-subtle: #f1f5f9;
   --ob-border-muted: #cbd5e1;
@@ -98,6 +100,7 @@ body.print-report .report-print-area {
   --ob-feedback-positiveBg: #ecfdf5;
   --ob-feedback-positiveBgAlt: #ecfdf3;
   --ob-feedback-purpleBg: #f5f3ff;
+  --ob-feedback-purpleText: #7c3aed;
   --ob-feedback-infoBgAlt: #eff6ff;
   --ob-feedback-warningText: #a16207;
   --ob-feedback-warningBg: #fefce8;
@@ -150,6 +153,8 @@ body.print-report .report-print-area {
   --ob-surface-subtle: #1b2740;
   --ob-surface-sider: #0a101c;
   --ob-surface-siderFocus: #121d31;
+  --ob-surface-raised: #1b2740;
+  --ob-surface-inset: #0b1220;
   --ob-border-default: #2a3854;
   --ob-border-subtle: #1b2740;
   --ob-border-muted: #2a3854;
@@ -223,6 +228,7 @@ body.print-report .report-print-area {
   --ob-feedback-positiveBg: #1b2740;
   --ob-feedback-positiveBgAlt: #1b2740;
   --ob-feedback-purpleBg: #1b2740;
+  --ob-feedback-purpleText: #c4b5fd;
   --ob-feedback-infoBgAlt: #152a45;
   --ob-feedback-warningText: #fbbf24;
   --ob-feedback-warningBg: #3a2f10;
@@ -614,11 +620,43 @@ body {
   display: block;
   max-width: 164px;
   overflow: hidden;
-  color: var(--ob-chrome-scrollbar);
+  /* The header inverts with the theme; the sider's scrollbar grey did not, and
+     left the address at about 1.6:1 on the dark header. */
+  color: var(--ob-text-strong);
   font-size: 13px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * A switch such as Accountant | Management, in the page's own colours.
+ *
+ * The tokens give Ant Design the same values, but Ant Design files them under
+ * a class named for the theme, and an element whose server render was light
+ * keeps that class when it hydrates late. These read the variables that
+ * data-theme sets on <html>, which nothing leaves behind. The ring lets the
+ * well show on a dark page, where it is the page's own colour; in light it
+ * is the well's colour and does not show.
+ */
+:root .ant-segmented.ant-segmented {
+  --ant-segmented-track-bg: var(--ob-surface-inset);
+  --ant-segmented-item-color: var(--ob-text-secondary);
+  --ant-segmented-item-hover-color: var(--ob-text-heading);
+  --ant-segmented-item-selected-bg: var(--ob-surface-raised);
+  --ant-segmented-item-selected-color: var(--ob-text-heading);
+  box-shadow: inset 0 0 0 1px var(--ob-border-subtle);
+}
+
+/*
+ * Ant Design's purple tag (Contra, Brought forward, adjusting, matched by AI),
+ * in this app's purple. The preset read at 3.39:1 in dark. The extra class
+ * outweighs the preset's own rule, which antd.css declares after this file.
+ */
+.ant-tag.ant-tag-purple:not(.ant-tag-disabled):is(.ant-tag-outlined, .ant-tag-filled) {
+  color: var(--ob-feedback-purpleText);
+  background-color: var(--ob-feedback-purpleBg);
+  border-color: color-mix(in srgb, var(--ob-feedback-purpleText) 35%, transparent);
 }
 
 .app-shell__account-role {
@@ -3277,7 +3315,9 @@ body {
   background: linear-gradient(
     100deg,
     transparent 20%,
-    rgba(255, 255, 255, 0.75) 45%,
+    /* The card's own colour, so the sweep is a glint in light and in dark
+       rather than a white flash across a dark page. */
+    color-mix(in srgb, var(--ob-surface-card) 75%, transparent) 45%,
     transparent 70%
   );
   transform: translateX(-100%);

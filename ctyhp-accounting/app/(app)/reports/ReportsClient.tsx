@@ -14,11 +14,11 @@ import ReportToolbar from "@/components/reports/ReportToolbar";
 import StatementTable from "@/components/reports/StatementTable";
 import ZoomSheet from "@/components/reports/ZoomSheet";
 import { watchReportPrinting } from "@/lib/client/print-report";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate, formatDateRange } from "@/lib/format";
 import type { MonthResult } from "@/lib/domain/budget-grid";
 import { dayBefore, fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
-import { longDate, presetRange, rangeText, type PeriodPreset } from "@/lib/domain/report-presets";
+import { presetRange, type PeriodPreset } from "@/lib/domain/report-presets";
 import {
   buildBalanceSheet,
   buildProfitAndLoss,
@@ -408,7 +408,7 @@ export default function ReportsClient({
       ? { from: months[budgetFromPeriod - 1].start, to: months[budgetToPeriod - 1].end }
       : { from, to };
   const shownRange = notice ? askedRange : ran;
-  const paperRange = point ? `As of ${longDate(shownRange.to)}` : rangeText(shownRange.from, shownRange.to);
+  const paperRange = point ? `As of ${formatDate(shownRange.to)}` : formatDateRange(shownRange.from, shownRange.to);
   const sheet = useMemo(
     () =>
       shownStatement && !shownStatement.empty

@@ -27,7 +27,8 @@ import type {
   FixedAssetView,
 } from "@/lib/services/fixed-assets";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
-import { formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, formatMoney } from "@/lib/format";
 import { TOKENS } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
@@ -65,6 +66,7 @@ export default function FixedAssetReportClient({
   currencyCode: string;
   currencyDecimals: number;
 }) {
+  const { today } = useCompanyClock();
   const [view, setView] = useState<ReportView>("register");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState<FixedAssetStatus | "all">("all");
@@ -144,8 +146,8 @@ export default function FixedAssetReportClient({
     [filteredDepreciation],
   );
 
-  const subtitle = `${dateRange?.[0]?.format("MMM D, YYYY") ?? "All dates"} – ${
-    dateRange?.[1]?.format("MMM D, YYYY") ?? "present"
+  const subtitle = `${dateRange?.[0] ? formatDate(dateRange[0].format("YYYY-MM-DD")) : "All dates"} – ${
+    dateRange?.[1] ? formatDate(dateRange[1].format("YYYY-MM-DD")) : "present"
   } · ${category === "all" ? "All categories" : category}`;
 
   const exportSheet: ReportExportSheet = useMemo(
@@ -243,7 +245,7 @@ export default function FixedAssetReportClient({
         ),
       }),
     },
-    { title: "In service", dataIndex: "in_service_date", width: COLUMN.DATE },
+    { title: "In service", dataIndex: "in_service_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
     {
       title: "Status",
       dataIndex: "status",
@@ -311,7 +313,7 @@ export default function FixedAssetReportClient({
         ),
       }),
     },
-    { title: "Period end", dataIndex: "period_end", width: COLUMN.DATE },
+    { title: "Period end", dataIndex: "period_end", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
     {
       title: "Planned",
       dataIndex: "planned_amount_minor",
@@ -373,12 +375,12 @@ export default function FixedAssetReportClient({
             onChange={(value) => setDateRange(value)}
             format="MM/DD/YYYY"
             presets={[
-              { label: "Year to date", value: [dayjs().startOf("year"), dayjs()] },
+              { label: "Year to date", value: [dayjs(today).startOf("year"), dayjs(today)] },
               {
                 label: "Prior year",
                 value: [
-                  dayjs().subtract(1, "year").startOf("year"),
-                  dayjs().subtract(1, "year").endOf("year"),
+                  dayjs(today).subtract(1, "year").startOf("year"),
+                  dayjs(today).subtract(1, "year").endOf("year"),
                 ],
               },
             ]}

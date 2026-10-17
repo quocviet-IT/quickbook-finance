@@ -16,6 +16,7 @@ import {
   type ChartGroupKey,
   type ChartStatement,
 } from "./chart-groups";
+import { plural } from "@/lib/format";
 
 /** Balances is the default: every account with its figure. Setup is the same list with type, cash flow and status. */
 export type ChartView = "balances" | "setup";
@@ -28,7 +29,7 @@ export function chartViewOf(param: string | string[] | null | undefined): ChartV
 
 /** The lede while the balances cannot be read: how many accounts, and nothing about their figures. */
 export function chartLedeWithoutBalances(total: number): string {
-  return `${total} ${total === 1 ? "account" : "accounts"}.`;
+  return `${plural(total, "account")}.`;
 }
 
 /** The address of a view. Balances is the default, so it carries no parameter. */

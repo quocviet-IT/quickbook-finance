@@ -4,6 +4,8 @@ import { Alert, App, Button, Drawer, Space, Typography } from "antd";
 import type { SavedReportRow } from "@/lib/services/saved-reports";
 import StatementFileViewer from "@/components/statement-file/StatementFileViewer";
 import { downloadSavedFile } from "@/lib/client/saved-file-download";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateInTimeZone } from "@/lib/format";
 
 export interface SavedReportViewerProps {
   report: SavedReportRow | null;
@@ -19,6 +21,7 @@ export interface SavedReportViewerProps {
  */
 export default function SavedReportViewer({ report, onClose }: SavedReportViewerProps) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
 
   const download = useCallback(async () => {
     if (!report) return;
@@ -37,7 +40,7 @@ export default function SavedReportViewer({ report, onClose }: SavedReportViewer
       {report ? (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
           <Typography.Text type="secondary">
-            {report.file_name} · saved {report.uploaded_at.slice(0, 10)}
+            {report.file_name} · saved {formatDateInTimeZone(report.uploaded_at, timeZone)}
             {report.notes ? ` · ${report.notes}` : ""}
           </Typography.Text>
 

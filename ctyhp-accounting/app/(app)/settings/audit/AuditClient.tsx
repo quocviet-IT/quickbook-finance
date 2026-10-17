@@ -1,4 +1,6 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { App, Button, Checkbox, DatePicker, Input, Select, Space, Table, Tag, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
@@ -10,7 +12,6 @@ import {
   auditTrailFileName,
   diffAuditEntry,
   formatActor,
-  formatAuditTimestamp,
   formatAuditValue,
   summarizeAuditChanges,
   type AuditFieldChange,
@@ -30,18 +31,20 @@ const AUDIT_DEFAULT_PAGE_SIZE = 25;
  * A month is the unit an audit trail is reviewed in, so both the current and
  * the previous one are one click away rather than two date pickers.
  */
-function monthPresets(): { label: string; value: [Dayjs, Dayjs] }[] {
-  const thisMonth = dayjs().startOf("month");
+function monthPresets(today: string): { label: string; value: [Dayjs, Dayjs] }[] {
+  const now = dayjs(today);
+  const thisMonth = now.startOf("month");
   const lastMonth = thisMonth.subtract(1, "month");
   return [
     { label: "This month", value: [thisMonth, thisMonth.endOf("month")] },
     { label: "Last month", value: [lastMonth, lastMonth.endOf("month")] },
-    { label: "Last 90 days", value: [dayjs().subtract(90, "day"), dayjs()] },
+    { label: "Last 90 days", value: [now.subtract(90, "day"), now] },
   ];
 }
 
 export default function AuditClient({ tables, actors }: { tables: string[]; actors: ActorRow[] }) {
   const { message } = App.useApp();
+  const { timeZone, today } = useCompanyClock();
   const [rows, setRows] = useState<AuditEntryRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [ran, setRan] = useState(false);
@@ -142,7 +145,7 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
           aria-label="Filter by record id"
         />
         <DatePicker.RangePicker
-          presets={monthPresets()}
+          presets={monthPresets(today)}
           value={range}
           onChange={(v) => setRange(v as [Dayjs, Dayjs] | null)}
         />
@@ -181,7 +184,7 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
             title: "When",
             dataIndex: "created_at",
             width: 170,
-            render: (v: string) => formatAuditTimestamp(v),
+            render: (v: string) => formatDateTime(v, timeZone),
           },
           {
             title: "Actor",

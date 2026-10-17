@@ -11,6 +11,7 @@
  *
  * Money is base-currency minor units; the debit to the bank is positive.
  */
+import { plural } from "@/lib/format";
 
 /** An open leg is only raised once its entry is older than this many days. */
 export const TRANSFER_AGE_DAYS = 30;
@@ -291,7 +292,7 @@ export function destinationSentence(destinationName: string | null): string {
 /** How many places the amount was found, or null when it was found nowhere. */
 export function candidateNote(count: number): string | null {
   if (count <= 0) return null;
-  return count === 1 ? "1 candidate found" : `${count} candidates found`;
+  return `${plural(count, "candidate")} found`;
 }
 
 /** A corrected transfer in words. It only names the correcting entry; nothing is offered. */
@@ -311,7 +312,7 @@ export function transferNote(check: {
   skipped: number;
 }): string {
   const n = check.flagged.length;
-  const parts = [`${n} ${n === 1 ? "transfer" : "transfers"}`];
+  const parts = [plural(n, "transfer")];
   parts.push(`${check.notYetCheckable} could not be checked yet`);
   parts.push(`${check.corrected.length} corrected`);
   parts.push(`${check.skipped} skipped`);

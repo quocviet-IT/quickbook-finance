@@ -7,7 +7,7 @@ import { COLUMN } from "@/lib/design/table-metrics";
 
 /* ---- Reconciliations that no longer agree ---- */
 
-// "Sep 30, 2026" on one line, with room for the header.
+// "09/30/2026" on one line, with room for the header.
 export const CHANGED_STATEMENT_WIDTH = 130;
 export const CHANGED_FIXED_WIDTHS: readonly number[] = [CHANGED_STATEMENT_WIDTH];
 export const CHANGED_ACCOUNT_FLOOR = 160;
@@ -19,7 +19,7 @@ export const CHANGED_MIN_WIDTH = CHANGED_FIXED_WIDTHS.reduce((sum, w) => sum + w
 
 /* ---- Transfers cleared on one side only ---- */
 
-// "JE-000123" over "Sep 28, 2026".
+// "JE-000123" over "09/28/2026".
 export const TRANSFER_ENTRY_WIDTH = COLUMN.CODE + 30;
 export const TRANSFER_FIXED_WIDTHS: readonly number[] = [TRANSFER_ENTRY_WIDTH, COLUMN.MONEY_WIDE];
 export const TRANSFER_CLEARED_FLOOR = 180;

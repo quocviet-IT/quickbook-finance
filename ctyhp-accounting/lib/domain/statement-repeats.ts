@@ -14,7 +14,7 @@
  * bank lines once per statement read (statement-line-keys.ts), then applies the
  * rules here on every tick; everything said about them is said here.
  */
-import { shortDate } from "./pdf-statement-view";
+import { formatDate, plural, pluralWord } from "@/lib/format";
 import { plainAmount } from "./statement-proof";
 import { repeatKey } from "./statement-key-text";
 
@@ -29,7 +29,6 @@ export interface RepeatLine {
   /** The bank's own id (OFX FITID). */
   external_id?: string | null;
 }
-
 
 // --- What Bank Transactions already holds -------------------------------------
 
@@ -137,7 +136,7 @@ export interface RepeatGroup {
   otherSource: number;
   /** k: how many will be imported. */
   toImport: number;
-  /** "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported." */
+  /** "3 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 2 will be imported." */
   text: string;
 }
 
@@ -187,15 +186,15 @@ export function describeRepeats(
         otherSource,
         toImport,
         text:
-          `${indexes.length} identical lines on ${shortDate(first.txn_date, true)} ` +
+          `${indexes.length} identical lines on ${formatDate(first.txn_date)} ` +
           `(${plainAmount(first.amount_minor, money)}): ${parts.join(", ")}.`,
       };
     });
 }
 
-/** "Mar 31", "Mar 31 and Apr 30", "Mar 31, Apr 30 and May 31", or "12 days". */
+/** "03/31/2026", "03/31/2026 and 04/30/2026", "03/31/2026, 04/30/2026 and 05/31/2026", or "12 days". */
 function daysSaid(dates: readonly string[]): string {
-  const days = [...new Set(dates)].sort().map((date) => shortDate(date, false));
+  const days = [...new Set(dates)].sort().map((date) => formatDate(date));
   if (days.length > 3) return `${days.length} days`;
   if (days.length === 1) return days[0];
   return `${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}`;
@@ -216,12 +215,12 @@ export interface ImportedCounts {
 /**
  * Said after the import: "Imported 40 lines. 2 were already here from this
  * statement; 3 skipped as already in Bank Transactions from another source;
- * 3 repeated lines on Mar 31 kept." Each part after the first appears only
+ * 3 repeated lines on 03/31/2026 kept." Each part after the first appears only
  * when it is not zero.
  */
 export function importedSummary(counts: ImportedCounts): string {
   const n = counts.inserted;
-  const headline = `Imported ${n.toLocaleString("en-US")} line${n === 1 ? "" : "s"}.`;
+  const headline = `Imported ${plural(n, "line")}.`;
   const kept = counts.repeats.filter((group) => group.toImport > 0);
   // Never more repeats kept than lines imported: a line someone else imported
   // in the meantime was not imported here.
@@ -231,13 +230,13 @@ export function importedSummary(counts: ImportedCounts): string {
   );
   const parts = [
     counts.alreadyHere > 0
-      ? `${counts.alreadyHere.toLocaleString("en-US")} ${counts.alreadyHere === 1 ? "was" : "were"} already here from this statement`
+      ? `${counts.alreadyHere.toLocaleString("en-US")} ${pluralWord(counts.alreadyHere, "was", "were")} already here from this statement`
       : null,
     counts.otherSource > 0
       ? `${counts.otherSource.toLocaleString("en-US")} skipped as already in Bank Transactions from another source`
       : null,
     keptLines > 0
-      ? `${keptLines.toLocaleString("en-US")} repeated line${keptLines === 1 ? "" : "s"} on ${daysSaid(kept.map((group) => group.date))} kept`
+      ? `${plural(keptLines, "repeated line")} on ${daysSaid(kept.map((group) => group.date))} kept`
       : null,
   ].filter((part): part is string => part !== null);
   return parts.length ? `${headline} ${parts.join("; ")}.` : headline;

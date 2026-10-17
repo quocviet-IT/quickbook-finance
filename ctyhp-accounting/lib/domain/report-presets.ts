@@ -2,8 +2,8 @@
  * The period picker the client's prototype puts on every report, and the way
  * it writes a date range at the head of one.
  *
- * From `Accounting-System-v3.html` (`PRESETS`, `applyPreset`, `rangeText`,
- * `longDate`). One deliberate difference: a period that has not ended yet runs
+ * From `Accounting-System-v3.html` (`PRESETS`, `applyPreset`; the range line
+ * under a report is `formatDateRange` in lib/format.ts). One deliberate difference: a period that has not ended yet runs
  * to today, not to its last day. A report whose "To" date is still in the
  * future asks questions nobody could have answered yet — every bank account is
  * "not agreed to a statement" as of December 31 while it is still September —
@@ -104,28 +104,4 @@ export function presetRange(preset: Exclude<PeriodPreset, "custom">, ctx: Preset
         to: earlier(ctx.lastEntryDate ?? today, today),
       };
   }
-}
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-/** `2026-09-26` → `September 26, 2026`. */
-export function longDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
-}
-
-/** `2026-09-26` → `Sep 26, 2026`, for a table cell. */
-export function shortDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return `${MONTHS[m - 1].slice(0, 3)} ${d}, ${y}`;
-}
-
-/** The range line under a report's name: `January 1, 2026 – September 26, 2026`. */
-export function rangeText(from: string | null, to: string): string {
-  return from ? `${longDate(from)} – ${longDate(to)}` : `As of ${longDate(to)}`;
 }

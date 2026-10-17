@@ -14,6 +14,7 @@
  */
 
 import { GUIDE_FLOWS, type GuideFlow, type GuideStep } from "./system-guide";
+import { plural, pluralWord } from "@/lib/format";
 
 export interface ScreenContext {
   /** The route as the browser has it. */
@@ -213,7 +214,7 @@ export function describeContextForAssistant(context: AssistantContext): string {
   }
   if (dropped > 0) {
     lines.push(
-      `- ${dropped} further step(s) on this screen are not listed here. Say so if asked, ` +
+      `- ${plural(dropped, "further step")} on this screen ${pluralWord(dropped, "is", "are")} not listed here. Say so if asked, ` +
         "and point at the Guide rather than inventing them.",
     );
   }

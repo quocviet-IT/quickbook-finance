@@ -1,5 +1,7 @@
 "use client";
 
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateInTimeZone, formatDateTime } from "@/lib/format";
 import { useMemo, useState } from "react";
 import {
   App,
@@ -94,6 +96,7 @@ export default function FeedbackTriageClient({
   canTriage: boolean;
 }) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const [reports, setReports] = useState(initialReports);
   const [attachments, setAttachments] = useState(initialAttachments);
   const [improvements, setImprovements] = useState(initialImprovements);
@@ -166,8 +169,8 @@ export default function FeedbackTriageClient({
       // hover away rather than gone.
       width: COLUMN.DATE,
       render: (value: string) => (
-        <Tooltip title={new Date(value).toLocaleString("en-US")}>
-          <span>{new Date(value).toLocaleDateString("en-US")}</span>
+        <Tooltip title={formatDateTime(value, timeZone)}>
+          <span>{formatDateInTimeZone(value, timeZone)}</span>
         </Tooltip>
       ),
     },

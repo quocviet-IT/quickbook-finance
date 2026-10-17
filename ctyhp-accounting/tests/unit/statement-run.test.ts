@@ -211,9 +211,9 @@ describe("checkRun", () => {
       money,
     );
     expect(result.stops).toEqual([
-      "A reconciliation to Jul 31, 2026 is in progress on this account. Finish it before reconciling more statements.",
-      "The statement closing Jul 31, 2026 opens at $10.00, and the last reconciliation, to Jun 30, 2026, closed at $9.00: a month is missing between them, or that reconciliation closed on another figure.",
-      "There is a gap in the run. The statement closing Aug 31, 2026 does not open at the one before it, so a month is missing from what you have chosen. Reconciling across a gap would sign off items nobody has seen a statement for.",
+      "A reconciliation to 07/31/2026 is in progress on this account. Finish it before reconciling more statements.",
+      "The statement closing 07/31/2026 opens at $10.00, and the last reconciliation, to 06/30/2026, closed at $9.00: a month is missing between them, or that reconciliation closed on another figure.",
+      "There is a gap in the run. The statement closing 08/31/2026 does not open at the one before it, so a month is missing from what you have chosen. Reconciling across a gap would sign off items nobody has seen a statement for.",
     ]);
   });
 
@@ -231,7 +231,7 @@ describe("checkRun", () => {
     );
     expect(result.statements.map((c) => [c.statement.to, c.state, c.note])).toEqual([
       ["2026-07-31", "doesNotAddUp", "Out by $20.00 — import this statement on its own to correct it."],
-      ["2026-08-31", "waiting", "Waiting behind the statement closing Jul 31, 2026"],
+      ["2026-08-31", "waiting", "Waiting behind the statement closing 07/31/2026"],
     ]);
     expect(result.statements[0].proof?.differenceMinor).toBe(-2000);
     // The one waiting is proved all the same, so the table can show its proof.
@@ -289,8 +289,8 @@ describe("checkRun: each statement proved (2.04)", () => {
     expect(result.statements.map((c) => [c.state, c.note])).toEqual([
       ["usable", "1 line"],
       ["doesNotAddUp", "Out by $0.50 — import this statement on its own to correct it."],
-      ["waiting", "Waiting behind the statement closing Aug 31, 2026"],
-      ["waiting", "Waiting behind the statement closing Aug 31, 2026"],
+      ["waiting", "Waiting behind the statement closing 08/31/2026"],
+      ["waiting", "Waiting behind the statement closing 08/31/2026"],
     ]);
     // Every one keeps its proof, so the table shows it, the ones waiting included.
     expect(result.statements.map((c) => c.proof?.proves)).toEqual([true, false, false, true]);
@@ -312,7 +312,7 @@ describe("checkRun: each statement proved (2.04)", () => {
     );
     expect(before.usable.map((s) => s.to)).toEqual(["2026-06-30", "2026-07-31"]);
     expect(before.stops).toEqual([
-      "There is a gap in the run. The statement closing Jul 31, 2026 does not open at the one before it, so a month is missing from what you have chosen. Reconciling across a gap would sign off items nobody has seen a statement for.",
+      "There is a gap in the run. The statement closing 07/31/2026 does not open at the one before it, so a month is missing from what you have chosen. Reconciling across a gap would sign off items nobody has seen a statement for.",
     ]);
   });
 
@@ -387,15 +387,15 @@ describe("runStatementPayload", () => {
 
 describe("monthRefusal", () => {
   it("refuses a month not over yet", () => {
-    expect(monthRefusal("2026-10-31", "2026-10-05", null)).toBe("The month to Oct 31, 2026 is not over yet.");
+    expect(monthRefusal("2026-10-31", "2026-10-05", null)).toBe("The month to 10/31/2026 is not over yet.");
   });
 
   it("refuses a month at or before the last completed reconciliation", () => {
     expect(monthRefusal("2026-07-31", "2026-10-05", "2026-07-31")).toBe(
-      "This account is already reconciled to Jul 31, 2026, so the month to Jul 31, 2026 is not signed off again.",
+      "This account is already reconciled to 07/31/2026, so the month to 07/31/2026 is not signed off again.",
     );
     expect(monthRefusal("2026-06-30", "2026-10-05", "2026-07-31")).toBe(
-      "This account is already reconciled to Jul 31, 2026, so the month to Jun 30, 2026 is not signed off again.",
+      "This account is already reconciled to 07/31/2026, so the month to 06/30/2026 is not signed off again.",
     );
   });
 

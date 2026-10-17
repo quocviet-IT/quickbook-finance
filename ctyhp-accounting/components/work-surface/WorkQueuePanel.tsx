@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { Button, Card, Segmented, Tag } from "antd";
 import { ArrowRightOutlined, MoreOutlined } from "@ant-design/icons";
@@ -182,7 +183,7 @@ export default function WorkQueuePanel({
                     <span
                       className={item.dueDate < today ? styles.queueDueLate : styles.queueReason}
                     >
-                      due {item.dueDate}
+                      due {formatDate(item.dueDate)}
                     </span>
                   ) : null}
                 </span>

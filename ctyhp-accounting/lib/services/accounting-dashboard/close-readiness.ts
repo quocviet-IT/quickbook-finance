@@ -17,6 +17,7 @@ import { buildTrialBalance } from "@/lib/domain/reports";
 import { getControlReconciliation } from "@/lib/services/gl-posting";
 import { getLedgerBalances } from "@/lib/services/reports";
 import type { AccountingDashboardContext, AccountingPeriodRow } from "./context";
+import { formatDate } from "@/lib/format";
 
 /**
  * How ready a period is to be closed — measured at the period's own end date.
@@ -134,7 +135,7 @@ export async function getCloseReadiness(
       key: "control:unavailable",
       title: "The control accounts tie to the ledger",
       status: "unavailable",
-      passCondition: `Every subledger equals its control account at ${periodEnd}.`,
+      passCondition: `Every subledger equals its control account at ${formatDate(periodEnd)}.`,
       evidence: "The control reconciliation did not answer, so nothing here is proven.",
       blocksClose: true,
       href: "/reports/gl-posting",

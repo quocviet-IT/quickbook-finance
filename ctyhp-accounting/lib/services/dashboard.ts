@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getLedgerBalances } from "./reports";
 import { getArAging, getApAging, type AgingReport } from "./aging";
@@ -200,17 +201,8 @@ function cashFromLedger(rows: LedgerRows): number {
     .reduce((sum, row) => sum + row.debitBase - row.creditBase, 0);
 }
 
-export function todayInTimeZone(timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
-}
+/** Moved to lib/format.ts so client screens read the same day; re-exported for the server callers. */
+export { todayInTimeZone } from "@/lib/format";
 
 interface MonthRange {
   key: string;
@@ -240,7 +232,7 @@ export function trailingMonthRanges(asOf: string, count = 6): MonthRange[] {
 
 export async function getDashboardMetrics(
   sb: SupabaseClient,
-  asOf = new Date().toISOString().slice(0, 10),
+  asOf: string,
   ledger?: Pick<DashboardLedgerPromises, "asOf" | "monthToDate">,
 ): Promise<DashboardMetrics> {
   const [bal, ar, ap, unrecon, periods, mtdRows, approvals] = await Promise.all([
@@ -394,7 +386,8 @@ async function getPeriodComparison(
   const prior = performanceSnapshot(priorRows);
   return {
     currentLabel: `${asOf.slice(0, 7)} MTD`,
-    priorLabel: `${previous.label} 1-${Number(previous.to.slice(-2))}`,
+    // "09/01–09/17": the app's date style without the year, which fits a KPI card's trend line.
+    priorLabel: `${formatDate(previous.from).slice(0, 5)}–${formatDate(previous.to).slice(0, 5)}`,
     current,
     prior,
     revenueChangePercent: percentChange(current.revenueMinor, prior.revenueMinor),
@@ -486,7 +479,7 @@ async function getOperatingPulse(sb: SupabaseClient, asOf: string): Promise<Oper
 
 export async function getDashboardAnalytics(
   sb: SupabaseClient,
-  asOf = new Date().toISOString().slice(0, 10),
+  asOf: string,
 ): Promise<DashboardAnalytics> {
   const previous = comparablePreviousMonthRange(asOf);
   const ledger: DashboardLedgerPromises = {

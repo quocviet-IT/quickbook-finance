@@ -1,5 +1,6 @@
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
+import { plural, formatDate } from "@/lib/format";
 
 /** Every work key the Sales overview derives starts with one of these; its retire is scoped to them. */
 export const SALES_WORK_KEY_PREFIXES = ["ar-overdue:", "ar-unapplied:", "ar-draft:"] as const;
@@ -32,10 +33,6 @@ export const QUEUE_OVERDUE_LIMIT = 50;
 
 /** A draft older than this is worth asking about. */
 export const DRAFT_STALE_AFTER_DAYS = 7;
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
 
 /**
  * How urgent an overdue invoice is.
@@ -95,7 +92,7 @@ export function overdueInvoiceItem(
     sourceKind: "overdue-invoice",
     sourceId: invoice.docNumber,
     title: invoice.docNumber ? `Invoice ${invoice.docNumber}` : "Unnumbered invoice",
-    reason: `${invoice.customerName} · due ${invoice.dueDate} · ${plural(input.daysPastDue, "day")} past due`,
+    reason: `${invoice.customerName} · due ${formatDate(invoice.dueDate)} · ${plural(input.daysPastDue, "day")} past due`,
     severity: overdueSeverity(input.daysPastDue, invoice.balanceMinor, input.materialityMinor),
     amountMinor: Math.abs(invoice.balanceMinor),
     ageDays: input.daysPastDue,
@@ -121,7 +118,7 @@ export function unappliedReceiptItem(
     sourceKind: "unapplied-receipt",
     sourceId: payment.id,
     title: payment.number ? `Payment ${payment.number}` : "Customer payment",
-    reason: `${payment.customerName} · received ${payment.paymentDate} · not applied to any invoice`,
+    reason: `${payment.customerName} · received ${formatDate(payment.paymentDate)} · not applied to any invoice`,
     // Applying a receipt is quick and it stops a wrong chase, so it outranks
     // most debts by age alone.
     severity: input.ageDays > 30 ? "high" : "medium",
@@ -143,7 +140,7 @@ export function staleDraftItem(
     sourceKind: "stale-draft",
     sourceId: invoice.id,
     title: `Draft invoice for ${invoice.customerName}`,
-    reason: `Dated ${invoice.issueDate} · ${plural(input.ageDays, "day")} in draft · nobody has been asked to pay it`,
+    reason: `Dated ${formatDate(invoice.issueDate)} · ${plural(input.ageDays, "day")} in draft · nobody has been asked to pay it`,
     severity: input.ageDays > 30 ? "high" : "medium",
     amountMinor: Math.abs(invoice.totalMinor),
     ageDays: input.ageDays,

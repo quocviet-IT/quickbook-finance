@@ -1,4 +1,5 @@
 "use client";
+import { plural } from "@/lib/format";
 import Link from "next/link";
 import { Alert, Button, Card, Tag } from "antd";
 import type { QueueSeverity, SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
@@ -101,7 +102,7 @@ export default function AccountingInsightList({
           className={styles.insightSleeping}
           type="info"
           showIcon
-          message={`${sleeping.length} rule(s) cannot run yet`}
+          message={`${plural(sleeping.length, "rule")} cannot run yet`}
           description={
             <>
               {sleeping.map((rule) => (

@@ -72,10 +72,10 @@ describe("historySinceCell", () => {
 
 describe("historyDatedCell", () => {
   it("prints the first date, then the last under it", () => {
-    expect(historyDatedCell("2026-01-02", "2026-09-30")).toEqual(["Jan 2, 2026", "– Sep 30, 2026"]);
+    expect(historyDatedCell("2026-01-02", "2026-09-30")).toEqual(["01/02/2026", "– 09/30/2026"]);
   });
   it("prints one date when both are the same, and nothing when there are none", () => {
-    expect(historyDatedCell("2026-09-30", "2026-09-30")).toEqual(["Sep 30, 2026"]);
+    expect(historyDatedCell("2026-09-30", "2026-09-30")).toEqual(["09/30/2026"]);
     expect(historyDatedCell(null, null)).toBeNull();
   });
 });

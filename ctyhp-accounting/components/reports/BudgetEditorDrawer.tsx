@@ -17,7 +17,7 @@ import {
   type GridAccount,
 } from "@/lib/domain/budget-grid";
 import type { FiscalMonth } from "@/lib/domain/fiscal";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, plural } from "@/lib/format";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import { getBudgetGridAction, saveBudgetMonthAction } from "@/app/(app)/reports/actions";
 import type { BudgetGridData } from "@/lib/services/budgets";
@@ -241,7 +241,7 @@ export default function BudgetEditorDrawer({
             Close
           </Button>
           <Button type="primary" loading={saving} disabled={loading || !data || dirty.length === 0} onClick={() => void save()}>
-            {dirty.length === 0 ? "Save" : `Save ${dirty.length} ${dirty.length === 1 ? "month" : "months"}`}
+            {dirty.length === 0 ? "Save" : `Save ${plural(dirty.length, "month")}`}
           </Button>
         </Space>
       }

@@ -1,4 +1,6 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateInTimeZone } from "@/lib/format";
 import { Alert, App, Button, Card, Space, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import StatementFileViewer from "@/components/statement-file/StatementFileViewer";
@@ -8,6 +10,7 @@ import type { SavedReportRow } from "@/lib/services/saved-reports";
 
 export default function StatementFileClient({ file }: { file: SavedReportRow }) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
 
   async function download() {
     const problem = await downloadSavedFile(file.id);
@@ -25,7 +28,7 @@ export default function StatementFileClient({ file }: { file: SavedReportRow }) 
     >
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
         <Typography.Text type="secondary">
-          Kept {file.uploaded_at.slice(0, 10)} · SHA-256 {shortSha(file.sha256)}
+          Kept {formatDateInTimeZone(file.uploaded_at, timeZone)} · SHA-256 {shortSha(file.sha256)}
         </Typography.Text>
         {file.status === "archived" ? (
           <Alert

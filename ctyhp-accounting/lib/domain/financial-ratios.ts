@@ -10,6 +10,7 @@
 import { naturalBalance } from "./accounts";
 import { buildBalanceSheet, buildProfitAndLoss, type LedgerBalance } from "./reports";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { formatDateRange } from "@/lib/format";
 
 // --- The workings --------------------------------------------------------------
 
@@ -482,7 +483,7 @@ export function financialRatiosSheet(
     fileName: sanitizeExportFileName(`financial-ratios-${report.from}-to-${report.to}`),
     companyName: ctx.companyName,
     title: "Financial Ratios",
-    subtitle: `${report.from} to ${report.to}`,
+    subtitle: formatDateRange(report.from, report.to),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "section", header: "Group", kind: "text", width: 26 },

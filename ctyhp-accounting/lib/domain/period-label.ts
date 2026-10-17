@@ -15,6 +15,11 @@
  * fact.
  */
 
+import { formatDate } from "@/lib/format";
+
+/** A date in the app's style; an empty one stays empty rather than becoming a dash. */
+const shown = (iso: string) => (iso ? formatDate(iso) : iso);
+
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
@@ -41,7 +46,7 @@ function parts(iso: string): { y: number; m: number; d: number } | null {
 export function periodColumnLabel(from: string, to: string): string {
   const a = parts(from);
   const b = parts(to);
-  if (!a || !b) return `${from} – ${to}`;
+  if (!a || !b) return `${shown(from)} – ${shown(to)}`;
 
   const startsPeriod = a.d === 1;
   const endsPeriod = b.d === monthEnd(b.y, b.m);
@@ -58,10 +63,10 @@ export function periodColumnLabel(from: string, to: string): string {
     return `${MONTHS[a.m]} ${a.y} – ${MONTHS[b.m]} ${b.y}`;
   }
 
-  return `${from} – ${to}`;
+  return `${shown(from)} – ${shown(to)}`;
 }
 
 /** The heading for a column struck at one date, rather than covering a range. */
 export function asOfColumnLabel(asOf: string): string {
-  return asOf;
+  return shown(asOf);
 }

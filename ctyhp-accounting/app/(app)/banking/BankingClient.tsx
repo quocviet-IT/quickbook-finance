@@ -90,7 +90,8 @@ import SettleFromBankModal, { type SettleTarget } from "@/components/banking/Set
 import { importedSummary } from "@/lib/domain/statement-repeats";
 import { keepFailureMessage, linesSpan, serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, plural } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
 import { directionOf } from "@/lib/domain/coding-names";
@@ -143,12 +144,9 @@ declare global {
 
 type ReviewRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
-function formatSyncTime(value: string | null): string {
+function formatSyncTime(value: string | null, timeZone: string): string {
   if (!value) return "Not synchronized yet";
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value, timeZone);
 }
 
 interface PendingPlaidLink {
@@ -197,6 +195,7 @@ export default function BankingClient({
   scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const [selectedId, setSelectedId] = useState<string | undefined>(
     bankAccounts.some((account) => account.id === initialAccountId)
       ? initialAccountId!
@@ -457,7 +456,7 @@ export default function BankingClient({
       return;
     }
     message.success(
-      `Bank connected. Imported ${result.data.added} transaction(s) and created ${result.data.suggestions} match suggestion(s).`,
+      `Bank connected. Imported ${plural(result.data.added, "transaction")} and created ${plural(result.data.suggestions, "match suggestion")}.`,
     );
     setPendingLink(null);
     window.location.reload();
@@ -476,7 +475,7 @@ export default function BankingClient({
     }
     message.success(
       `Synchronized: ${result.data.added} new, ${result.data.modified} updated, ` +
-        `${result.data.removed} removed, ${result.data.suggestions} match suggestion(s).`,
+        `${result.data.removed} removed, ${plural(result.data.suggestions, "match suggestion")}.`,
     );
     window.location.reload();
   }
@@ -539,7 +538,7 @@ export default function BankingClient({
     const result = await generateSuggestionsAction(selectedId);
     setBusy(null);
     if (result.ok && result.data) {
-      message.success(`${result.data.count} new ledger match suggestion(s)`);
+      message.success(`${plural(result.data.count, "new ledger match suggestion")}`);
       reload();
     } else {
       message.error(result.error ?? "Failed to find ledger matches");
@@ -697,7 +696,7 @@ export default function BankingClient({
             <br />
             <Typography.Text type="secondary">
               {selectedConnection
-                ? `Last sync: ${formatSyncTime(selectedConnection.last_sync_at)}`
+                ? `Last sync: ${formatSyncTime(selectedConnection.last_sync_at, timeZone)}`
                 : "File import remains available until a bank is connected."}
             </Typography.Text>
           </div>
@@ -861,7 +860,7 @@ export default function BankingClient({
           setAttachmentTarget({
             entityType: "bank_transaction",
             entityId: row.transaction.id,
-            label: `${row.transaction.txn_date} · ${row.transaction.description}`,
+            label: `${formatDate(row.transaction.txn_date)} · ${row.transaction.description}`,
           })
         }
         selectedIds={selectedIds}

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Modal, Select } from "antd";
 import { BOOKS_CHANGED_MESSAGE, differenceTone, entryPreview, signedAmountText } from "@/lib/domain/stock-count";
+import { formatDate } from "@/lib/format";
 import type { PostingContext } from "@/lib/services/stock-count";
 import { postStockCountAction, type PostStockCountOutcome } from "./actions";
 import styles from "./stock-count.module.css";
@@ -124,7 +125,7 @@ export default function PostCountDialog({
 
   return (
     <Modal
-      title={`Adjust inventory at ${asOf}`}
+      title={`Adjust inventory at ${formatDate(asOf)}`}
       open={open}
       onCancel={busy ? undefined : onClose}
       closable={!busy}

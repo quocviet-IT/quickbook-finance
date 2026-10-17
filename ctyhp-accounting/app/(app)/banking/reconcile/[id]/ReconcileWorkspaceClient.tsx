@@ -39,8 +39,7 @@ import {
 import { explainDifference } from "@/lib/domain/reconcile-difference";
 import { historyBroughtForwardMessage } from "@/lib/domain/reconcile-history";
 import { REASON_MAX, reasonProblem } from "@/lib/domain/reconcile-alerts-screen";
-import { formatMoney } from "@/lib/format";
-import { shortDate } from "@/lib/domain/pdf-statement-view";
+import { formatDate, formatMoney, plural } from "@/lib/format";
 import { attachMismatch, keepFailureMessage, linesSpan, serverFailure } from "@/lib/domain/statement-evidence";
 import { downloadSavedFile } from "@/lib/client/saved-file-download";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
@@ -779,7 +778,7 @@ export default function ReconcileWorkspaceClient({
           <Typography.Text type="secondary">
             {!statement || statement.lines.length === 0
               ? "No statement is kept with this reconciliation yet — import it above."
-              : `${statement.lines.length} line(s) from ${statement.fileName ?? "the statement"}`}
+              : `${plural(statement.lines.length, "line")} from ${statement.fileName ?? "the statement"}`}
           </Typography.Text>
           {standings ? (
             <Space size={4} wrap>
@@ -811,7 +810,7 @@ export default function ReconcileWorkspaceClient({
           dataSource={statement?.lines ?? []}
           locale={{ emptyText: "No statement kept with this reconciliation" }}
           columns={[
-            { title: "Date", dataIndex: "txnDate", width: SW.date },
+            { title: "Date", dataIndex: "txnDate", width: SW.date, render: (value: string) => formatDate(value) },
             { title: "Description", dataIndex: "description" },
             {
               title: "Reference",
@@ -882,9 +881,9 @@ export default function ReconcileWorkspaceClient({
               />
             ),
           },
-          { title: "Date", dataIndex: "entryDate" },
+          { title: "Date", dataIndex: "entryDate", render: (value: string) => formatDate(value) },
           { title: "Entry", dataIndex: "entryNumber" },
-          { title: "Source", dataIndex: "sourceType", render: (s) => <Tag>{sourceLabel(s)}</Tag> },
+          { title: "Source", dataIndex: "sourceType", render: (source) => <Tag>{sourceLabel(source)}</Tag> },
           { title: "Reference", dataIndex: "reference", render: (value: string | null) => value ?? "—" },
           { title: "Memo", dataIndex: "memo" },
           { title: "Amount", align: "right", render: (_, l) => money(l.signedMinor) },
@@ -936,7 +935,7 @@ export default function ReconcileWorkspaceClient({
           title="Attach the statement"
           okLabel="Attach"
           intro={
-            `Choose the bank's statement to ${shortDate(statement.endingDate, true)}. OneBook reads it here and attaches it ` +
+            `Choose the bank's statement to ${formatDate(statement.endingDate)}. OneBook reads it here and attaches it ` +
             "only if it adds up and is this reconciliation's statement: the same closing balance and, when this reconciliation kept " +
             "the statement's lines, the same lines. Nothing in the reconciliation changes."
           }

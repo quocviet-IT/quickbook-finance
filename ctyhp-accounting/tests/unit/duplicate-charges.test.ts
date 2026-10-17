@@ -273,7 +273,7 @@ describe("duplicateChargeItem", () => {
     expect(item.sourceKind).toBe("possible-duplicate");
     expect(item.sourceId).toBe(y.lineId);
     expect(item.title).toBe("Charged twice in 15 days: SHOPMART");
-    expect(item.reason).toBe("Operating · Mar 16, 2026 and Mar 31, 2026");
+    expect(item.reason).toBe("Operating · 03/16/2026 and 03/31/2026");
     expect(item.severity).toBe("medium");
     expect(item.amountMinor).toBe(2500);
     expect(item.href).toBe(`/journal?entry=${y.entryId}`);
@@ -294,7 +294,7 @@ describe("duplicateChargeItem", () => {
     const { charge } = build({ cleared: true }, {});
     const item = duplicateChargeItem(charge, input);
     expect(item.reason).toBe(
-      "Operating · Mar 16, 2026 and Mar 31, 2026 · the Mar 16, 2026 line is on a completed reconciliation",
+      "Operating · 03/16/2026 and 03/31/2026 · the 03/16/2026 line is on a completed reconciliation",
     );
     expect(item.href).toBe(`/journal?entry=${charge.later.entryId}`);
   });
@@ -311,7 +311,7 @@ describe("duplicateChargeItem", () => {
     const item = duplicateChargeItem(charge, input);
     expect(item.severity).toBe("high");
     expect(item.reason).toBe(
-      "Operating · Mar 16, 2026 and Mar 31, 2026 · the Mar 31, 2026 line is described differently from this payee's other 4",
+      "Operating · 03/16/2026 and 03/31/2026 · the 03/31/2026 line is described differently from this payee's other 4",
     );
   });
 

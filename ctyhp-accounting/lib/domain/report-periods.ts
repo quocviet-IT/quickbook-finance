@@ -6,6 +6,7 @@
  * year earlier than 29 February 2024 is 28 February 2023.
  */
 import { periodColumnLabel } from "./period-label";
+import { plural, formatDate } from "@/lib/format";
 
 export const COMPARISON_BASES = [
   "prior_month",
@@ -121,7 +122,7 @@ export function trailingYearEnds(asOf: string, count: number): TrendColumn[] {
   for (let back = count - 1; back >= 0; back--) {
     const columnYear = year - back;
     const date = back === 0 ? asOf : monthEnd(columnYear, 12);
-    columns.push({ date, label: back === 0 ? `${asOf}` : String(columnYear) });
+    columns.push({ date, label: back === 0 ? formatDate(asOf) : String(columnYear) });
   }
   return columns;
 }
@@ -252,6 +253,6 @@ export function trendPeriodRangeText(labels: readonly string[]): string {
  */
 export function trendPeriodHeading(labels: readonly string[]): string {
   if (labels.length === 0) return "No periods";
-  const count = labels.length === 1 ? "1 period" : `${labels.length} periods`;
+  const count = plural(labels.length, "period");
   return `${count}, ${trendPeriodRangeText(labels)}`;
 }

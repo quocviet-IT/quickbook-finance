@@ -5,7 +5,8 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { findReconciliationHeader, getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
-import { formatMoney } from "@/lib/format";
+import { companyClock } from "@/lib/services/report-context";
+import { formatDate, formatDateInTimeZone, formatMoney } from "@/lib/format";
 import { readReconciliationOverrides } from "@/lib/services/override-notices";
 import { shortSha } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
@@ -18,8 +19,8 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
   const sb = await createSupabaseServerClient();
   const header = await findReconciliationHeader(sb, id);
   if (!header) notFound();
-  const [detail, lines, currencies] = await Promise.all([
-    getReconciliationDetail(sb, id), getReconciliationLines(sb, id), listCurrencies(sb),
+  const [detail, lines, currencies, { timeZone }] = await Promise.all([
+    getReconciliationDetail(sb, id), getReconciliationLines(sb, id), listCurrencies(sb), companyClock(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   const dec = base?.decimal_places ?? 2;
@@ -50,7 +51,7 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       {/* The kept file, named so a printed report can be matched to it (1.83). */}
       {header.statementFile ? (
         <p>
-          Statement file: {header.statementFile.fileName} · kept {header.statementFile.keptAt.slice(0, 10)} · SHA-256{" "}
+          Statement file: {header.statementFile.fileName} · kept {formatDateInTimeZone(header.statementFile.keptAt, timeZone)} · SHA-256{" "}
           {shortSha(header.statementFile.sha256)} · <Link href={`/banking/statement-files/${header.statementFile.id}`}>View</Link>
         </p>
       ) : header.statementFileId ? (
@@ -70,7 +71,7 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       <h3>Cleared items ({cleared.length})</h3>
       <ul>
         {cleared.map((l) => (
-          <li key={l.journalLineId}>{l.entryDate} · {l.entryNumber} · {sourceLabel(l.sourceType)} · {money(l.signedMinor)}</li>
+          <li key={l.journalLineId}>{formatDate(l.entryDate)} · {l.entryNumber} · {sourceLabel(l.sourceType)} · {money(l.signedMinor)}</li>
         ))}
       </ul>
     </div>

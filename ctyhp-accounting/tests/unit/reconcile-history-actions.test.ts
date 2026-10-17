@@ -178,7 +178,7 @@ describe("bringing the history forward", () => {
       BANK,
       "2026-08-31",
       512340,
-      "Brought forward, proved by the statement balance of $5,123.40 on Aug 31, 2026",
+      "Brought forward, proved by the statement balance of $5,123.40 on 08/31/2026",
     );
   });
 

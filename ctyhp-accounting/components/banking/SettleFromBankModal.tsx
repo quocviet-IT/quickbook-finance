@@ -18,7 +18,7 @@ import {
   settlementDirection,
   type RankedCandidate,
 } from "@/lib/domain/bank-settlement";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { SettlementCandidateRow } from "@/lib/services/banking";
 import {
   getSettlementCandidatesAction,
@@ -164,7 +164,7 @@ export default function SettleFromBankModal({
         <Alert
           type="info"
           showIcon
-          message={`${target.txnDate} · ${target.description} · ${fmt(target.amountMinor)}`}
+          message={`${formatDate(target.txnDate)} · ${target.description} · ${fmt(target.amountMinor)}`}
           description={
             direction === "receivable"
               ? "Money in, so this can only settle open invoices. The receipt posts to the account this line arrived on."
@@ -207,7 +207,7 @@ export default function SettleFromBankModal({
               key: "date",
               width: 110,
               render: (_v: unknown, row: RankedRow) =>
-                row.candidate.documentDate,
+                formatDate(row.candidate.documentDate),
             },
             {
               title: "Balance",

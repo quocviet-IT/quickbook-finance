@@ -10,11 +10,10 @@ import SimpleReport, { reportPagination } from "@/components/reports/SimpleRepor
 import { COLUMN } from "@/lib/design/table-metrics";
 import { cutName, describeForecastBasis, monthDay, type CashForecast, type ForecastMode, type OpenItem } from "@/lib/domain/forecast";
 import { fromMinor } from "@/lib/domain/money";
-import { longDate, shortDate } from "@/lib/domain/report-presets";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { outstandingAge } from "@/lib/domain/settlement";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate } from "@/lib/format";
 import type { CashForecastData } from "@/lib/services/forecast";
 import styles from "./cash-forecast.module.css";
 
@@ -66,7 +65,7 @@ export default function CashForecastReport({
         fileName: `13-week-cash-forecast-${forecast.today}`,
         companyName,
         title: "13 Week Cash Forecast",
-        subtitle: `From ${forecast.today} · ${mode === "due" ? "By due date" : "As they usually pay"}`,
+        subtitle: `From ${formatDate(forecast.today)} · ${mode === "due" ? "By due date" : "As they usually pay"}`,
         currencyCode,
         columns: [
           { key: "week", header: "Week", kind: "text", width: 14 },
@@ -110,7 +109,7 @@ export default function CashForecastReport({
       companyName={companyName}
       title="13 Week Cash Forecast"
       currencyCode={currencyCode}
-      period={{ kind: "none", today, caption: `The thirteen weeks from ${longDate(today)}` }}
+      period={{ kind: "none", today, caption: `The thirteen weeks from ${formatDate(today)}` }}
       load={load}
       sheet={sheet}
       runningText="Reading cash, open invoices and bills, and recurring templates…"
@@ -230,7 +229,7 @@ export default function CashForecastReport({
               guessed about sales not yet made.{" "}
               {forecast.firstBelowZero ? (
                 <>
-                  Cash goes below zero in the week beginning {longDate(forecast.firstBelowZero.start)}, at {money(forecast.firstBelowZero.minor)}.
+                  Cash goes below zero in the week beginning {formatDate(forecast.firstBelowZero.start)}, at {money(forecast.firstBelowZero.minor)}.
                 </>
               ) : (
                 <>Cash stays positive throughout.</>
@@ -255,7 +254,7 @@ export default function CashForecastReport({
                 },
                 { title: "Num", dataIndex: "documentNumber", width: COLUMN.CODE, render: (n: string | null) => <span className={paper.mono}>{n ?? "—"}</span> },
                 flexColumn<OpenItem>({ title: "Customer / vendor", dataIndex: "partyName" }),
-                { title: "Due", dataIndex: "dueDate", width: COLUMN.DATE + 20, render: (d: string) => shortDate(d) },
+                { title: "Due", dataIndex: "dueDate", width: COLUMN.DATE + 20, render: (d: string) => formatDate(d) },
                 {
                   title: "Status",
                   key: "age",

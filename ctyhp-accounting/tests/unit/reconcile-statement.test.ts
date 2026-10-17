@@ -47,7 +47,7 @@ describe("bringForwardAdvice", () => {
     expect(bringForwardAdvice({ hasReconciliations: false, bookBalanceMinor: 500000, openLines: 214 }, statement, money)).toEqual({
       canBringForward: true,
       through: "2026-08-31",
-      text: "The books hold $5000.00 on Aug 31, 2026 — the statement opens at $5000.00. The 214 earlier lines can be brought forward as reconciled.",
+      text: "The books hold $5000.00 on 08/31/2026 — the statement opens at $5000.00. The 214 earlier lines can be brought forward as reconciled.",
     });
   });
 
@@ -61,7 +61,7 @@ describe("bringForwardAdvice", () => {
     expect(bringForwardAdvice({ hasReconciliations: false, bookBalanceMinor: 490000, openLines: 3 }, statement, money)).toEqual({
       canBringForward: false,
       through: "2026-08-31",
-      text: "The books hold $4900.00 on Aug 31, 2026, and the statement opens at $5000.00: $100.00 apart. The earlier lines stay open and are reconciled with this statement.",
+      text: "The books hold $4900.00 on 08/31/2026, and the statement opens at $5000.00: $100.00 apart. The earlier lines stay open and are reconciled with this statement.",
     });
   });
 
@@ -69,7 +69,7 @@ describe("bringForwardAdvice", () => {
     expect(bringForwardAdvice({ hasReconciliations: false, bookBalanceMinor: 0, openLines: 0 }, statement, money)).toEqual({
       canBringForward: false,
       through: "2026-08-31",
-      text: "The books hold $0.00 on Aug 31, 2026, and the statement opens at $5000.00. The books have nothing before this statement: the difference is an opening balance they do not hold yet.",
+      text: "The books hold $0.00 on 08/31/2026, and the statement opens at $5000.00. The books have nothing before this statement: the difference is an opening balance they do not hold yet.",
     });
   });
 
@@ -88,7 +88,7 @@ describe("bringForwardAdvice", () => {
 describe("the sentences on a reconciliation", () => {
   it("names the statement's period in the brought-forward note", () => {
     expect(broughtForwardNote("2026-09-01", "2026-09-30")).toBe(
-      "Brought forward, proved by the opening balance on the statement for Sep 1 – Sep 30, 2026",
+      "Brought forward, proved by the opening balance on the statement for 09/01/2026 – 09/30/2026",
     );
   });
 
@@ -237,17 +237,17 @@ describe("bringing the history forward from inside a reconciliation", () => {
       canBringForward: true,
       through: "2026-08-31",
       entries: 214,
-      text: "Everything in the books up to Aug 31, 2026 adds up to $5123.40, the balance this statement opens with.",
+      text: "Everything in the books up to 08/31/2026 adds up to $5123.40, the balance this statement opens with.",
     });
   });
 
   it("says by how much the books are out, in either direction", () => {
     expect(sessionHistoryAdvice({ ...facts, bookBalanceMinor: 498765 }, money)).toMatchObject({
       canBringForward: false,
-      text: "The books on Aug 31, 2026 read $4987.65; the statement opens at $5123.40. Out by $135.75.",
+      text: "The books on 08/31/2026 read $4987.65; the statement opens at $5123.40. Out by $135.75.",
     });
     expect(sessionHistoryAdvice({ ...facts, bookBalanceMinor: 700000 }, money)?.text).toBe(
-      "The books on Aug 31, 2026 read $7000.00; the statement opens at $5123.40. Out by $1876.60.",
+      "The books on 08/31/2026 read $7000.00; the statement opens at $5123.40. Out by $1876.60.",
     );
   });
 
@@ -267,10 +267,10 @@ describe("bringing the history forward from inside a reconciliation", () => {
   it("asks before marking, counting the entries", () => {
     expect(BRING_HISTORY_FORWARD).toBe("Bring the history forward");
     expect(bringHistoryForwardConfirmation(214, "2026-08-31")).toBe(
-      "214 entries up to Aug 31, 2026 will be marked reconciled. Nothing is posted to the books.",
+      "214 entries up to 08/31/2026 will be marked reconciled. Nothing is posted to the books.",
     );
     expect(bringHistoryForwardConfirmation(1, "2026-08-31")).toBe(
-      "1 entry up to Aug 31, 2026 will be marked reconciled. Nothing is posted to the books.",
+      "1 entry up to 08/31/2026 will be marked reconciled. Nothing is posted to the books.",
     );
     expect([entriesCount(0), entriesCount(1), entriesCount(1204)]).toEqual(["0 entries", "1 entry", "1,204 entries"]);
   });

@@ -10,7 +10,7 @@ import {
   parseCountedAmount,
   varianceView,
 } from "@/lib/domain/cash-count";
-import { shortDate } from "@/lib/domain/report-presets";
+import { formatDate } from "@/lib/format";
 import {
   cashCountOptionsAction,
   cashCountPreviewAction,
@@ -235,7 +235,7 @@ function CountForm({
           <span className={styles.problem}>{bookError}</span>
         ) : book !== null ? (
           <span>
-            Book balance on {shortDate(date)}: <strong>{money(book)}</strong>
+            Book balance on {formatDate(date)}: <strong>{money(book)}</strong>
           </span>
         ) : null}
       </div>

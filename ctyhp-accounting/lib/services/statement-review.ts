@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountRow, BankTransactionRow } from "@/lib/db/types";
 import { findBankPairs, lastFourDigits, namedTransferTarget, type PairBank, type PairLine } from "@/lib/domain/bank-pairs";
@@ -243,7 +244,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
           kind: "transfer",
           counterpartId: other.id,
           label: `Transfer ${direction} ${bankLabel(other.bankAccountId)}`,
-          why: `The other side is on ${bankLabel(other.bankAccountId)}, ${other.txnDate}, for the same amount. Posting makes one transfer entry and matches both lines.`,
+          why: `The other side is on ${bankLabel(other.bankAccountId)}, ${formatDate(other.txnDate)}, for the same amount. Posting makes one transfer entry and matches both lines.`,
           also: "",
         },
         rivals: 0,
@@ -254,8 +255,8 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
         kind: "funding",
         counterpartId: other.id,
         label: `Shareholder funding · ${fundingLabel}`,
-        why: `Answered by ${other.description} of the same amount on ${other.txnDate} — the owner's money in and out, not income or a cost`,
-        also: `possible shareholder funding with ${other.description} on ${other.txnDate}`,
+        why: `Answered by ${other.description} of the same amount on ${formatDate(other.txnDate)} — the owner's money in and out, not income or a cost`,
+        also: `possible shareholder funding with ${other.description} on ${formatDate(other.txnDate)}`,
       },
       rivals: 0,
     };

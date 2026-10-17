@@ -58,7 +58,7 @@ describe("the pre-flight panel", () => {
     // Banking: the requirement "is only revealed after the user has already
     // gone through the upload and mapping steps".
     const panel = read("ImportPreflightPanel.tsx");
-    expect(panel).toContain("do not name one account");
+    expect(panel).toContain("not name one account");
     expect(panel).toContain("no record under Banking");
     expect(panel).toContain("Add under Banking");
     // The picker itself is shared with the general ledger tab, which hits the

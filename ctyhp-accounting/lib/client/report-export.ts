@@ -6,6 +6,8 @@ import {
   sanitizeExportFileName,
   type ReportExportSheet,
 } from "@/lib/domain/report-export";
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
+import { formatDate, formatDateTime } from "@/lib/format";
 
 function escapeXml(value: string): string {
   return value
@@ -181,7 +183,15 @@ export function buildReportXlsx(sheet: ReportExportSheet): Uint8Array {
   return zipSync(xlsxFiles(sheet), { level: 6 });
 }
 
-export async function exportReportToPdf(sheet: ReportExportSheet): Promise<void> {
+/** The PDF is a printed screen: its dates read MM/DD/YYYY, while the CSV and Excel keep ISO. */
+function pdfCell(text: string): string {
+  return text ? formatDate(text) : text;
+}
+
+export async function exportReportToPdf(
+  sheet: ReportExportSheet,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): Promise<void> {
   const [{ jsPDF }, autoTableModule] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
@@ -208,10 +218,8 @@ export async function exportReportToPdf(sheet: ReportExportSheet): Promise<void>
     head: [sheet.columns.map((column) => column.header)],
     body: sheet.rows.map((row) =>
       sheet.columns.map((column) =>
-        formatExportCell(
-          row[column.key] ?? null,
-          column.kind ?? "text",
-          sheet.currencyCode,
+        pdfCell(
+          formatExportCell(row[column.key] ?? null, column.kind ?? "text", sheet.currencyCode),
         ),
       ),
     ),
@@ -234,7 +242,7 @@ export async function exportReportToPdf(sheet: ReportExportSheet): Promise<void>
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text(
-        `Generated ${new Date().toLocaleString("en-US")} · Page ${page}`,
+        `Generated ${formatDateTime(new Date().toISOString(), timeZone)} · Page ${page}`,
         40,
         doc.internal.pageSize.getHeight() - 24,
       );

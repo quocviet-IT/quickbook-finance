@@ -93,6 +93,7 @@ describe("feedHealthControl", () => {
       evaluatedAt: AT,
     });
     expect(control.blocking).toBe(false);
+    expect(control.detail).toContain("1 feed needs attention");
   });
 
   it("connections that could not be read are never reported as connected", () => {
@@ -117,7 +118,7 @@ describe("statementReconciliationControl", () => {
       evaluatedAt: AT,
     });
     expect(control.status).toBe("healthy");
-    expect(control.detail).toContain("2026-07-31");
+    expect(control.detail).toContain("07/31/2026");
   });
 
   it("a session left open part-way is worth saying even when nothing is behind", () => {

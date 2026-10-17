@@ -4,7 +4,7 @@ import { Alert, Drawer, Spin, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COUNT_STATUS_LABEL, type CashCountRow } from "@/lib/domain/cash-count";
-import { shortDate } from "@/lib/domain/report-presets";
+import { formatDate } from "@/lib/format";
 import { cashCountsAction } from "./actions";
 import {
   COUNTS_DRAWER_WIDTH,
@@ -74,7 +74,7 @@ function Counts({ accountId, money }: { accountId: string; money: (minor: number
         emptyTitle="Never counted"
         emptyDescription="Record a count to date this account and post any difference."
         columns={[
-          { title: "Date", key: "date", width: COUNT_DATE_WIDTH, render: (_, row) => shortDate(row.countedOn) },
+          { title: "Date", key: "date", width: COUNT_DATE_WIDTH, render: (_, row) => formatDate(row.countedOn) },
           { title: "Counted", key: "counted", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.countedMinor) },
           { title: "Book", key: "book", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.bookMinor) },
           {

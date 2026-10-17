@@ -7,9 +7,9 @@
  * way it would have read then.
  */
 import type { Tone } from "@/lib/design/tone";
-import { shortDate } from "@/lib/domain/report-presets";
 import { groupReconciliationChanges, type ReconciliationChange } from "@/lib/domain/reconciliation-changes";
 
+import { formatDate, plural, pluralWord } from "@/lib/format";
 /** Days after the last agreed statement at which an account turns amber. */
 export const STANDING_AMBER_DAYS = 60;
 /** Days after the last agreed statement at which an account turns red. */
@@ -94,7 +94,7 @@ export function daysFromTo(fromIso: string, toIso: string): number | null {
 }
 
 function entries(n: number): string {
-  return n === 1 ? "1 entry" : `${n} entries`;
+  return plural(n, "entry", "entries");
 }
 
 function hasActivity(s: BankStanding): boolean {
@@ -111,7 +111,7 @@ function toneForAge(ageDays: number): StandingTone {
 function changedLine(count: number, latestDate: string | null): string | null {
   if (count <= 0) return null;
   if (count === 1) {
-    return `No longer agrees: the ${latestDate ? `${shortDate(latestDate)} ` : ""}reconciliation has changed since it was signed off`;
+    return `No longer agrees: the ${latestDate ? `${formatDate(latestDate)} ` : ""}reconciliation has changed since it was signed off`;
   }
   return `No longer agrees: ${count} reconciliations have changed since they were signed off`;
 }
@@ -147,8 +147,8 @@ export function describeStanding(s: BankStanding, asOf: string, money: Money): S
       ? changedLine(s.changedReconciliations, s.changedStatementDate ?? null)
       : s.voidTickedCount > 0
       ? `No longer agrees: ${entries(s.voidTickedCount)} ticked on ${
-          s.voidReconciliationDate ? `the ${shortDate(s.voidReconciliationDate)}` : "a completed"
-        } reconciliation ${s.voidTickedCount === 1 ? "was" : "were"} voided (${money(s.voidTickedMinor)})`
+          s.voidReconciliationDate ? `the ${formatDate(s.voidReconciliationDate)}` : "a completed"
+        } reconciliation ${pluralWord(s.voidTickedCount, "was", "were")} voided (${money(s.voidTickedMinor)})`
       : null;
 
   if (s.lastCompletedDate === null) {
@@ -178,7 +178,7 @@ export function describeStanding(s: BankStanding, asOf: string, money: Money): S
   return {
     // A date that does not parse can never read as a healthy account.
     tone: noLongerAgrees || ageDays === null ? "danger" : toneForAge(ageDays),
-    text: `Agreed to ${shortDate(s.lastCompletedDate)} at ${closing}${forward} · ${since}`,
+    text: `Agreed to ${formatDate(s.lastCompletedDate)} at ${closing}${forward} · ${since}`,
     noLongerAgrees,
     ageDays,
   };
@@ -190,19 +190,19 @@ export function reconcileCardText(accountName: string, s: BankStanding, money: M
     if (!hasActivity(s)) {
       return `${accountName} has never been reconciled. No entries are waiting on a statement yet.`;
     }
-    const waiting = s.sinceCount === 1 ? "is" : "are";
+    const waiting = pluralWord(s.sinceCount, "is", "are");
     return `${accountName} has never been reconciled. ${entries(s.sinceCount)}, ${money(
       s.sinceNetMinor,
     )}, ${waiting} waiting on a statement. Start with the oldest statement you have.`;
   }
-  if (s.sinceCount === 0) return `Reconciled to ${shortDate(s.lastCompletedDate)}; nothing new since.`;
+  if (s.sinceCount === 0) return `Reconciled to ${formatDate(s.lastCompletedDate)}; nothing new since.`;
   // The age only picks a tone, which the card does not use; any report date works.
   return describeStanding(s, s.lastCompletedDate, money).text;
 }
 
 /** The Balance Sheet line with the first below-zero date added. */
 export function withBelowZero(text: string, belowZeroDate: string): string {
-  return `${text} · below zero at ${shortDate(belowZeroDate)}`;
+  return `${text} · below zero at ${formatDate(belowZeroDate)}`;
 }
 
 /* ------------------------------------------------------------ balance sheet */
@@ -220,7 +220,7 @@ export interface BalanceSheetBank {
 
 /** What the panel says about entries that look like the account's own balance posted as payments. */
 export function ghostEntriesSentence(n: number): string {
-  return `${n === 1 ? "1 entry looks" : `${n} entries look`} like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them.`;
+  return `${plural(n, "entry", "entries")} ${pluralWord(n, "looks", "look")} like the account's own balance posted as payments. Reconcile shows the workings and offers to remove them.`;
 }
 
 /**

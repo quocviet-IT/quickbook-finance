@@ -1,6 +1,7 @@
 // lib/services/aging.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NO_MEMO, type RequestMemo } from "./request-memo";
+import { companyToday } from "./company";
 import { computeAging, bucketOf, type AgingItem } from "@/lib/domain/aging";
 
 export class AgingError extends Error {}
@@ -76,7 +77,7 @@ async function aging(sb: SupabaseClient, rpc: string, asOf: string, idKey: strin
   // The aging total is the CURRENT (base-currency) open position; `asOf` only
   // drives bucket assignment, so reconcile against the control account as of
   // today, not as of the (possibly past) as-of date.
-  const today = options.reconcileAsOf ?? new Date().toISOString().slice(0, 10);
+  const today = options.reconcileAsOf ?? (await companyToday(sb));
   const control = await controlBalance(sb, accountType, today, memo);
   // AR control net is debit-positive; AP control net is credit-positive (so negate).
   const controlBalanceMinor = accountType === "accounts_receivable" ? control : -control;

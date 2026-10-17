@@ -37,6 +37,7 @@ import {
   sequenceOverviewAction,
 } from "./actions";
 import { TOKENS } from "@/lib/design/tokens";
+import { formatDate, plural, pluralWord } from "@/lib/format";
 
 type View = "breaks" | "all";
 
@@ -151,8 +152,8 @@ export default function NumberSequenceClient({
           message={
             openBreaks === 0
               ? "Every issued number is accounted for"
-              : `${openBreaks} number${openBreaks === 1 ? "" : "s"} across all document types ${
-                  openBreaks === 1 ? "is" : "are"
+              : `${plural(openBreaks, "number")} across all document types ${
+                  pluralWord(openBreaks, "is", "are")
                 } unaccounted for`
           }
           description={
@@ -296,7 +297,7 @@ export default function NumberSequenceClient({
               <Tag color={STATE_COLOR[state]}>{sequenceStateLabel(state)}</Tag>
             ),
           },
-          { title: "Date", dataIndex: "documentDate", width: 130, render: (v: string | null) => v ?? "—" },
+          { title: "Date", dataIndex: "documentDate", width: 130, render: (v: string | null) => formatDate(v) },
           {
             title: "Status",
             dataIndex: "documentStatus",

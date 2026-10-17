@@ -14,14 +14,13 @@ import { printReport, watchReportPrinting } from "@/lib/client/print-report";
 import { csvFromExportSheet, tsvFromExportSheet, type ReportExportSheet } from "@/lib/domain/report-export";
 import {
   PERIOD_PRESETS,
-  longDate,
   presetRange,
-  rangeText,
   type PeriodPreset,
   type PresetContext,
 } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 
+import { formatDate, formatDateRange } from "@/lib/format";
 /** How a report is dated: as of a day, over a period, by fiscal year, or not at all. */
 export type SimpleReportPeriod =
   | { kind: "asOf"; today: string }
@@ -91,9 +90,9 @@ function initialWhen(period: SimpleReportPeriod): ReportWhen {
 function caption(period: SimpleReportPeriod, when: ReportWhen): string {
   switch (period.kind) {
     case "asOf":
-      return `As of ${longDate(when.to)}`;
+      return `As of ${formatDate(when.to)}`;
     case "range":
-      return rangeText(when.from, when.to);
+      return formatDateRange(when.from, when.to);
     case "fiscalYear":
       return `Fiscal year ${when.fiscalYear}`;
     case "none":

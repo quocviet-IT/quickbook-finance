@@ -16,7 +16,7 @@ import { COLUMN } from "@/lib/design/table-metrics";
 export const RUN_TABLE_WIDTH = {
   /** A file name, kept to a couple of lines. */
   file: 200,
-  /** "Sep 1 – Sep 30, 2026". */
+  /** "09/01/2026 – 09/30/2026". */
   period: 190,
   /** An amount with its currency symbol: wider than the bare figure COLUMN.MONEY_WIDE measures. */
   opening: COLUMN.MONEY_WIDE + 16,

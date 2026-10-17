@@ -3,7 +3,7 @@ import { Card, Collapse, Typography } from "antd";
 import ReportTable from "@/components/ui/ReportTable";
 import type { SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
 import type { SecondaryAnalysis as SecondaryAnalysisData } from "@/lib/services/accounting-dashboard";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { FreshnessNote, UnavailableNote } from "./DataStateNote";
 
 /**
@@ -100,7 +100,7 @@ export default function SecondaryAnalysis({
                 dataSource={recentEntries}
                 columns={[
                   { title: "Entry", dataIndex: "entryNumber" },
-                  { title: "Date", dataIndex: "entryDate" },
+                  { title: "Date", dataIndex: "entryDate", render: (value: string) => formatDate(value) },
                   { title: "Source", dataIndex: "sourceType" },
                   {
                     title: "Description",

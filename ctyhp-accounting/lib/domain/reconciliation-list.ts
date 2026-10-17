@@ -15,6 +15,7 @@
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { stampInTimeZone } from "./stamp";
+import { formatDate } from "@/lib/format";
 
 export interface SignedOffReconciliation {
   id: string;
@@ -89,7 +90,7 @@ export function reconciliationListSheet(
     fileName: sanitizeExportFileName(`reconciliation-report-${ctx.today}`),
     companyName: ctx.companyName,
     title: "Reconciliation Report",
-    subtitle: `Signed-off reconciliations as of ${ctx.today}`,
+    subtitle: `Signed-off reconciliations as of ${formatDate(ctx.today)}`,
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "account", header: "Bank account", kind: "text", width: 30 },

@@ -12,8 +12,8 @@ import {
   type FinancialRatiosReport,
   type RatioArrow,
 } from "@/lib/domain/financial-ratios";
-import { formatMoney } from "@/lib/format";
-import { rangeText, type PresetContext } from "@/lib/domain/report-presets";
+import { formatMoney, formatDateRange } from "@/lib/format";
+import { type PresetContext } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 
 function arrowClass(arrow: RatioArrow | null): string {
@@ -57,7 +57,7 @@ export default function FinancialRatiosClient({
       sheet={sheet}
       runningText="Working out the ratios…"
       render={(report) => {
-        const earlierText = rangeText(report.earlierFrom, report.earlierTo);
+        const earlierText = formatDateRange(report.earlierFrom, report.earlierTo);
         return (
           <>
             <div className={styles.rptScroll}>
@@ -67,7 +67,7 @@ export default function FinancialRatiosClient({
                     <th className={styles.l}>Ratio</th>
                     <th>
                       This period
-                      <div className={styles.thSub}>{rangeText(report.from, report.to)}</div>
+                      <div className={styles.thSub}>{formatDateRange(report.from, report.to)}</div>
                     </th>
                     <th>
                       A year earlier

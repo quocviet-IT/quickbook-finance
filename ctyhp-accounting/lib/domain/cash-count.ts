@@ -7,7 +7,7 @@
  * helpers.
  */
 import { daysFromTo, type Money, type StandingTone } from "@/lib/domain/bank-standing";
-import { shortDate } from "@/lib/domain/report-presets";
+import { formatDate } from "@/lib/format";
 import { parseStatementAmount } from "@/lib/domain/statement-import";
 
 /** Days after the last count at which cash on hand turns amber. */
@@ -91,14 +91,14 @@ export function describeCashStanding(s: CashStanding, asOf: string, money: Money
   const overdue = age === null || age > CASH_COUNT_AMBER_DAYS;
   return {
     tone: overdue ? "warning" : "positive",
-    text: `${s.accountName}: last counted ${shortDate(s.lastCountedOn)} (${money(s.countedMinor ?? 0)}). Count it again.`,
+    text: `${s.accountName}: last counted ${formatDate(s.lastCountedOn)} (${money(s.countedMinor ?? 0)}). Count it again.`,
     overdue,
   };
 }
 
 /** The Chart of Accounts row's small line. */
 export function lastCountedLabel(lastCountedOn: string | null): string {
-  return lastCountedOn ? `Last counted ${shortDate(lastCountedOn)}` : "Never counted";
+  return lastCountedOn ? `Last counted ${formatDate(lastCountedOn)}` : "Never counted";
 }
 
 /* ------------------------------------------------------------------ dialog */

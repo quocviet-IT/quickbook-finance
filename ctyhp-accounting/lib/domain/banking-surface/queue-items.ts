@@ -1,7 +1,7 @@
 import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
-import { shortDate } from "@/lib/domain/report-presets";
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 
+import { formatDate, plural } from "@/lib/format";
 /** The prefix of a duplicate-charge key, for the service that keeps those keys alive. */
 export const DUPLICATE_KEY_PREFIX = "dupe-charge:";
 
@@ -35,10 +35,6 @@ export type BankingSourceKind =
  * and twelve.
  */
 export const QUEUE_UNMATCHED_LIMIT = 50;
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
 
 /**
  * How urgent an unmatched line is.
@@ -81,7 +77,7 @@ export function unmatchedBankItem(
     sourceKind: "unmatched-bank",
     sourceId: line.id,
     title: line.description.trim() || "Bank line with no description",
-    reason: `${line.accountName} · ${line.txnDate} · unmatched for ${plural(input.ageDays, "day")}${late}`,
+    reason: `${line.accountName} · ${formatDate(line.txnDate)} · unmatched for ${plural(input.ageDays, "day")}${late}`,
     severity: unmatchedSeverity(input.ageDays, input.ageLimitDays),
     // Magnitude: a line is equally unmatched whichever way the money went, and
     // the queue's last tie-breaker is "how much is at stake", not "which way".
@@ -124,7 +120,7 @@ export function openReconciliationItem(
     sourceKind: "open-reconciliation",
     sourceId: session.id,
     title: `${session.accountName} — reconciliation left open`,
-    reason: `Statement ending ${session.statementEndingDate}, started ${plural(input.ageDays, "day")} ago and never finished`,
+    reason: `Statement ending ${formatDate(session.statementEndingDate)}, started ${plural(input.ageDays, "day")} ago and never finished`,
     severity: input.ageDays >= 30 ? "high" : "medium",
     ageDays: input.ageDays,
     href: "/banking/reconcile",
@@ -151,12 +147,12 @@ export function duplicateChargeItem(
   const review = charge.reviewSide === "later" ? charge.later : charge.earlier;
   const other = charge.reviewSide === "later" ? charge.earlier : charge.later;
   const within = charge.daysApart === 0 ? "on the same day" : `in ${plural(charge.daysApart, "day")}`;
-  let reason = `${charge.accountName} · ${shortDate(charge.earlier.date)} and ${shortDate(charge.later.date)}`;
+  let reason = `${charge.accountName} · ${formatDate(charge.earlier.date)} and ${formatDate(charge.later.date)}`;
   if (charge.outlier) {
-    reason += ` · the ${shortDate(review.date)} line is described differently from this payee's other ${charge.otherPayeeLines}`;
+    reason += ` · the ${formatDate(review.date)} line is described differently from this payee's other ${charge.otherPayeeLines}`;
   }
   if (other.cleared) {
-    reason += ` · the ${shortDate(other.date)} line is on a completed reconciliation`;
+    reason += ` · the ${formatDate(other.date)} line is on a completed reconciliation`;
   }
   return {
     key: `${DUPLICATE_KEY_PREFIX}${charge.earlier.lineId}:${charge.later.lineId}`,

@@ -9,6 +9,7 @@ import { ColumnHeaderCell, type ColumnHeaderCellProps } from "@/components/ui/Co
 import { useColumnDrag } from "@/components/ui/useColumnDrag";
 import { useColumnResize } from "@/components/ui/useColumnResize";
 import { COLUMN } from "@/lib/design/table-metrics";
+import { formatDate } from "@/lib/format";
 import {
   BANK_BUDGET,
   BANK_COLUMN_KEYS,
@@ -149,6 +150,7 @@ export default function BankTransactionsTable({
       key: "date",
       dataIndex: ["transaction", "txn_date"],
       width: widths.date ?? COLUMN.DATE,
+      render: (value: string) => formatDate(value),
     },
     {
       // The elastic column, and the only one that never takes a width:

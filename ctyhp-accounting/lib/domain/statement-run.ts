@@ -17,7 +17,7 @@
  *   3. a CSV month whose first or last rows carry no balance opens and closes
  *      with those rows counted, not out by them.
  */
-import { shortDate } from "./pdf-statement-view";
+import { formatDate, plural } from "@/lib/format";
 import { statementProof, toStatementLines, type PdfStatement } from "./pdf-statement";
 import { MAX_RUN_LINES } from "./statement-run-limits";
 import {
@@ -301,8 +301,6 @@ export interface RunCheck {
   stops: string[];
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
 /** "Out by $6.44 — import this statement on its own to correct it.": why a run stops at a statement that does not add up. */
 export function outByStop(differenceMinor: number, money: (minor: number) => string): string {
   return `Out by ${money(Math.abs(differenceMinor))} — import this statement on its own to correct it.`;
@@ -321,7 +319,7 @@ function stopNote(proof: StatementProof, money: (minor: number) => string): stri
 
 /** What the statements table says about a statement waiting behind the one the run stops at. */
 function waitingNote(stoppedAt: RunStatement): string {
-  return `Waiting behind the statement closing ${shortDate(stoppedAt.to as string, true)}`;
+  return `Waiting behind the statement closing ${formatDate(stoppedAt.to as string)}`;
 }
 
 /**
@@ -391,7 +389,7 @@ export function checkRun(
   const stops: string[] = [];
   if (context.inProgress) {
     stops.push(
-      `A reconciliation to ${shortDate(context.inProgress.date, true)} is in progress on this account. Finish it before reconciling more statements.`,
+      `A reconciliation to ${formatDate(context.inProgress.date)} is in progress on this account. Finish it before reconciling more statements.`,
     );
   }
   if (!usable.length) stops.push("Nothing here can be reconciled yet.");
@@ -405,15 +403,15 @@ export function checkRun(
   const first = usable[0];
   if (first && context.lastCompleted && first.openingMinor !== null && first.openingMinor !== context.lastCompleted.endingMinor) {
     stops.push(
-      `The statement closing ${shortDate(first.to as string, true)} opens at ${money(first.openingMinor)}, and the last reconciliation, ` +
-        `to ${shortDate(context.lastCompleted.date, true)}, closed at ${money(context.lastCompleted.endingMinor)}: a month is missing ` +
+      `The statement closing ${formatDate(first.to as string)} opens at ${money(first.openingMinor)}, and the last reconciliation, ` +
+        `to ${formatDate(context.lastCompleted.date)}, closed at ${money(context.lastCompleted.endingMinor)}: a month is missing ` +
         "between them, or that reconciliation closed on another figure.",
     );
   }
   const gaps = usable.filter((s, i) => i > 0 && s.openingMinor !== null && s.openingMinor !== usable[i - 1].closingMinor);
   if (gaps.length) {
     stops.push(
-      `There is a gap in the run. The statement closing ${gaps.map((s) => shortDate(s.to as string, true)).join(", ")} ` +
+      `There is a gap in the run. The statement closing ${gaps.map((s) => formatDate(s.to as string)).join(", ")} ` +
         "does not open at the one before it, so a month is missing from what you have chosen. Reconciling across a gap " +
         "would sign off items nobody has seen a statement for.",
     );
@@ -428,9 +426,9 @@ export function checkRun(
  * second click.
  */
 export function monthRefusal(statementDate: string, today: string, lastCompletedDate: string | null): string | null {
-  if (statementDate > today) return `The month to ${shortDate(statementDate, true)} is not over yet.`;
+  if (statementDate > today) return `The month to ${formatDate(statementDate)} is not over yet.`;
   if (lastCompletedDate && statementDate <= lastCompletedDate) {
-    return `This account is already reconciled to ${shortDate(lastCompletedDate, true)}, so the month to ${shortDate(statementDate, true)} is not signed off again.`;
+    return `This account is already reconciled to ${formatDate(lastCompletedDate)}, so the month to ${formatDate(statementDate)} is not signed off again.`;
   }
   return null;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { plural, pluralWord } from "@/lib/format";
 import { Alert, Button, Card, Space, Table, Tag, Typography } from "antd";
 import UnresolvedAccountsTable from "./UnresolvedAccountsTable";
 import type { AccountRow } from "@/lib/db/types";
@@ -64,7 +65,7 @@ export default function ImportPreflightPanel({
             <Alert
               type="warning"
               showIcon
-              message={`${preflight.unresolved.length} name(s) in this file do not name one account`}
+              message={`${plural(preflight.unresolved.length, "name")} in this file ${pluralWord(preflight.unresolved.length, "does", "do")} not name one account`}
               description="Point each at an account that already exists, or create it. Nothing is created on your behalf: a file names accounts and describes transactions in the same column, and only you can tell which is which."
             />
             <UnresolvedAccountsTable
@@ -82,7 +83,7 @@ export default function ImportPreflightPanel({
             <Alert
               type="warning"
               showIcon
-              message={`${preflight.unbanked.length} bank account(s) have no record under Banking`}
+              message={`${plural(preflight.unbanked.length, "bank account")} ${pluralWord(preflight.unbanked.length, "has", "have")} no record under Banking`}
               description="Each row also writes a bank line, and that line is what stops a second import of the same file posting the same money twice. Declare them here."
             />
             <Table<UnbankedRef>

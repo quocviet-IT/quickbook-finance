@@ -19,7 +19,7 @@ import {
   trendColumnLimitMessage,
   type RangeColumn,
 } from "@/lib/domain/report-periods";
-import { shortDate } from "@/lib/domain/report-presets";
+import { formatDate } from "@/lib/format";
 
 export const COMPARE_OPTIONS = [
   { key: "none", label: "No comparison" },
@@ -36,7 +36,7 @@ export type CompareMode = (typeof COMPARE_OPTIONS)[number]["key"];
 export interface StatementColumnSpec {
   key: string;
   label: string;
-  /** A second line under the heading, e.g. "As of Mar 15, 2026". */
+  /** A second line under the heading, e.g. "As of 03/15/2026". */
   sub: string;
   from: string | null;
   to: string;
@@ -89,7 +89,7 @@ function fiscalYearColumns(from: string, to: string, fiscalStartMonth: number): 
 /** A range named by its period when it is a whole one ("Q2 2026"), otherwise by its dates. */
 export function rangeLabel(from: string, to: string): string {
   const label = periodColumnLabel(from, to);
-  return /\d{4}-\d{2}-\d{2}/.test(label) ? `${shortDate(from)} – ${shortDate(to)}` : label;
+  return /\d{4}-\d{2}-\d{2}/.test(label) ? `${formatDate(from)} – ${formatDate(to)}` : label;
 }
 
 const monthName = (date: string) => `${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
@@ -104,7 +104,7 @@ function fiscalYearLimitMessage(split: readonly RangeColumn[]): string | null {
 
 /** A range column, with its dates in small text under a heading that names a period instead. */
 function rangeColumn(key: string, from: string, to: string, label = rangeLabel(from, to)): StatementColumnSpec {
-  const dates = `${shortDate(from)} – ${shortDate(to)}`;
+  const dates = `${formatDate(from)} – ${formatDate(to)}`;
   return { key, label, sub: label === dates ? "" : dates, from, to, isTotal: false };
 }
 
@@ -150,8 +150,8 @@ export function rangeColumns(mode: CompareMode, from: string, to: string, fiscal
 function pointColumn(key: string, date: string, label?: string): StatementColumnSpec {
   return {
     key,
-    label: label ?? shortDate(date),
-    sub: label ? `As of ${shortDate(date)}` : "",
+    label: label ?? formatDate(date),
+    sub: label ? `As of ${formatDate(date)}` : "",
     from: null,
     to: date,
     isTotal: false,

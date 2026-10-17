@@ -1,5 +1,7 @@
 "use client";
 
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime, plural } from "@/lib/format";
 import { useState } from "react";
 import { Alert, Button, Descriptions, Input, Space, Typography } from "antd";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
@@ -37,6 +39,7 @@ export default function RestoreClient({
   snapshot: RestoreSnapshot | null;
   loadError: string | null;
 }) {
+  const { timeZone } = useCompanyClock();
   const [name, setName] = useState("");
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<RestoreOutcome | null>(null);
@@ -71,7 +74,7 @@ export default function RestoreClient({
         size="small"
         column={1}
         items={[
-          { key: "date", label: "Snapshot date", children: snapshot.takenAt },
+          { key: "date", label: "Snapshot date", children: formatDateTime(snapshot.takenAt, timeZone) },
           {
             key: "size",
             label: "Size",
@@ -171,7 +174,7 @@ export default function RestoreClient({
               type="success"
               showIcon
               message="The books came back whole"
-              description={`Every control total of "${outcome.legalName}" matches the snapshot, measured as of ${outcome.comparedAsOf}. Open it from the company menu to work with the two sets of books side by side.`}
+              description={`Every control total of "${outcome.legalName}" matches the snapshot, measured as of ${formatDateTime(outcome.comparedAsOf, timeZone)}. Open it from the company menu to work with the two sets of books side by side.`}
             />
           ) : outcome.verdict === "mismatched" ? (
             <Alert
@@ -235,8 +238,7 @@ export default function RestoreClient({
                 <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
                   {outcome.nulledReferences.map((nulled) => (
                     <li key={`${nulled.table}.${nulled.column}`}>
-                      {nulled.rowsAffected.toLocaleString("en-US")} row
-                      {nulled.rowsAffected === 1 ? "" : "s"} in {nulled.table} came back without
+                      {plural(nulled.rowsAffected, "row")} in {nulled.table} came back without
                       their {nulled.column} link to {nulled.referencedTable}, because{" "}
                       {nulled.reason}.
                     </li>

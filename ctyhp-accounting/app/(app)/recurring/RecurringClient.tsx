@@ -57,7 +57,8 @@ import {
   FREQUENCY_LABELS,
   type RecurringTemplateCreateInput,
 } from "@/lib/domain/recurring";
-import { formatMoney, toMinorUnits } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, plural, toMinorUnits } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { withVendor } from "@/lib/domain/vendors";
 import NewVendorButton from "@/components/NewVendorButton";
 import { TOKENS } from "@/lib/design/tokens";
@@ -162,7 +163,7 @@ function scheduleLabel(template: RecurringTemplateRow): string {
   const unit = FREQUENCY_LABELS[template.frequency];
   return template.interval_count === 1
     ? `Every ${unit}`
-    : `Every ${template.interval_count} ${unit}s`;
+    : `Every ${plural(template.interval_count, unit)}`;
 }
 
 export default function RecurringClient({
@@ -198,7 +199,7 @@ export default function RecurringClient({
     form.setFieldValue("vendor_id", vendor.id);
   }
 
-  const today = dayjs().format("YYYY-MM-DD");
+  const { today, timeZone } = useCompanyClock();
   const activeCount = templates.filter((template) => template.status === "active").length;
   const dueCount = templates.filter(
     (template) => template.status === "active" && template.next_run_date <= today,
@@ -395,7 +396,7 @@ export default function RecurringClient({
       width: 110,
       render: (value: string, template) => (
         <Space direction="vertical" size={0}>
-          <Typography.Text>{dayjs(value).format("MMM D, YYYY")}</Typography.Text>
+          <Typography.Text>{formatDate(value)}</Typography.Text>
           {template.status === "active" && value <= today ? <Tag color="gold">Due</Tag> : null}
         </Space>
       ),
@@ -441,7 +442,7 @@ export default function RecurringClient({
       render: (_, template) => (
         <Space size={4}>
           <Popconfirm
-            title={`Generate the ${dayjs(template.next_run_date).format("MMM D, YYYY")} occurrence?`}
+            title={`Generate the ${formatDate(template.next_run_date)} occurrence?`}
             description={
               template.document_type === "invoice" || template.document_type === "bill"
                 ? "A draft document will be created."
@@ -477,7 +478,7 @@ export default function RecurringClient({
     {
       title: "Scheduled date",
       dataIndex: "scheduled_date",
-      render: (value: string) => dayjs(value).format("MMM D, YYYY"),
+      render: (value: string) => formatDate(value),
     },
     {
       title: "Schedule",
@@ -507,7 +508,7 @@ export default function RecurringClient({
       title: "Completed",
       dataIndex: "completed_at",
       render: (value: string | null) =>
-        value ? dayjs(value).format("MMM D, YYYY h:mm A") : "—",
+        value ? formatDateTime(value, timeZone) : "—",
     },
     {
       title: "Action",
@@ -543,7 +544,7 @@ export default function RecurringClient({
       document_type: "invoice",
       frequency: "monthly",
       interval_count: 1,
-      start_date: dayjs(),
+      start_date: dayjs(today),
       due_days: 30,
       lines: [defaultLine("invoice")],
     });
@@ -726,14 +727,13 @@ export default function RecurringClient({
             </Col>
             <Col xs={24} md={6}>
               <Form.Item name="start_date" label="First occurrence" rules={[{ required: true }]}>
-                <DatePicker format="MM/DD/YYYY" style={{ width: "100%" }} />
+                <DatePicker style={{ width: "100%" }} />
               </Form.Item>
             </Col>
             <Col xs={24} md={6}>
               <Form.Item name="end_date" label="End date">
                 <DatePicker
                   allowClear
-                  format="MM/DD/YYYY"
                   style={{ width: "100%" }}
                   disabledDate={(date) => {
                     const start = form.getFieldValue("start_date");

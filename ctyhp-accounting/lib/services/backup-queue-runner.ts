@@ -94,6 +94,7 @@ export async function runDueCompanyBackups(
   const createClient = deps.createClient ?? createSupabaseAutomationClient;
   const readLastBackup = deps.readLastBackup ?? lastBackupDate;
   const takeBackup = deps.takeBackup ?? takeCompanyBackup;
+  // A machine day, not a screen date: the nightly job ranks companies by how long since their last backup, on one clock for all of them, so UTC is right here.
   const today = deps.today ?? new Date().toISOString().slice(0, 10);
 
   const companies = await listCompanies();

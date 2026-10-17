@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { companyClock } from "@/lib/services/report-context";
 import { customerRefundSchema, writeOffSchema } from "@/lib/domain/schemas";
 import { recordCustomerRefund, voidCustomerRefund, writeOff, voidWriteOff, CreditsError } from "@/lib/services/credits";
 import {
@@ -35,7 +36,7 @@ export async function writeOffAction(raw: unknown): Promise<ActionResult<Control
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    const writeOffDate = parsed.data.write_off_date || new Date().toISOString().slice(0, 10);
+    const writeOffDate = parsed.data.write_off_date || (await companyClock(sb)).today;
     const input = { ...parsed.data, write_off_date: writeOffDate };
     const targetId = (input.invoice_id ?? input.bill_id) as string;
     const outcome = await executeOrSubmitForApproval({

@@ -2,12 +2,13 @@
 
 import type { ReactNode } from "react";
 import { Typography } from "antd";
+import { plural } from "@/lib/format";
 
 function ResultCount({ resultCount }: { resultCount?: number }) {
   if (typeof resultCount !== "number") return null;
   return (
     <Typography.Text type="secondary" className="accounting-filter-bar__count" aria-live="polite">
-      {resultCount.toLocaleString("en-US")} result{resultCount === 1 ? "" : "s"}
+      {plural(resultCount, "result")}
     </Typography.Text>
   );
 }

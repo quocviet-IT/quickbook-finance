@@ -103,7 +103,7 @@ describe("a PDF", () => {
         "Out by $360.00. The opening $1,000.00 and the 4 lines come to $820.00; the statement closes at $1,180.00.",
       );
       expect(proof.sentences.detail).toBe(
-        "It equals the statement line “CHECK IMAGE 0042” of Jan 12, 2026 (−360.00), which may have been misread. " +
+        "It equals the statement line “CHECK IMAGE 0042” of 01/12/2026 (−360.00), which may have been misread. " +
           "Mark it Not a transaction if it is not one.",
       );
       expect(proof.sentences.blocked).toBe("Import is blocked until the statement adds up.");
@@ -174,7 +174,7 @@ describe("a CSV", () => {
     expect(proof.sentences.summary).toBe(
       "Out by $50.00. The opening $10,000.00 and the 3 lines come to $10,487.70; the statement closes at $10,437.70.",
     );
-    expect(proof.sentences.detail).toBe("The balance jumps after the line of Mar 14, 2026 (−412.30).");
+    expect(proof.sentences.detail).toBe("The balance jumps after the line of 03/14/2026 (−412.30).");
   });
 
   it("finds the same jump in a file listed newest first", () => {
@@ -182,7 +182,7 @@ describe("a CSV", () => {
     const lines = csv([heading, ...rows.reverse()].join("\n"));
     const proof = proveStatement({ kind: "csv", lines }, money);
     expect(lines[proof.chainBreak!.index].txn_date).toBe("2026-03-14");
-    expect(proof.sentences.detail).toBe("The balance jumps after the line of Mar 14, 2026 (−412.30).");
+    expect(proof.sentences.detail).toBe("The balance jumps after the line of 03/14/2026 (−412.30).");
   });
 
   it("follows the balances across lines that print none", () => {
@@ -191,7 +191,7 @@ describe("a CSV", () => {
     const jumped = [line("2026-03-02", 1000, "A", 11000), line("2026-03-03", -200, "B"), line("2026-03-04", -300, "C", 10400)];
     const proof = proveStatement({ kind: "csv", lines: jumped }, money);
     expect(proof.chainBreak?.index).toBe(0);
-    expect(proof.sentences.detail).toBe("The balance jumps after the line of Mar 2, 2026 (10.00).");
+    expect(proof.sentences.detail).toBe("The balance jumps after the line of 03/02/2026 (10.00).");
   });
 
   it("closes at the last balance plus the lines after it when the last line prints none, as a PDF does", () => {
@@ -260,7 +260,7 @@ ${ledger}
       prior: { status: "auto", date: "2026-08-31", endingMinor: 100000 },
     });
     expect(proof.sentences.summary).toBe(
-      "Opening $1,000.00 (from the reconciliation to Aug 31, 2026) + 2 lines $210.00 = $1,210.00, the closing balance the statement prints ✓",
+      "Opening $1,000.00 (from the reconciliation to 08/31/2026) + 2 lines $210.00 = $1,210.00, the closing balance the statement prints ✓",
     );
     expect(proof.sentences.usePrior).toBeNull();
   });
@@ -325,7 +325,7 @@ describe("a QIF", () => {
     it("is offered with a button, not taken, when the statement's start is not known", () => {
       const proof = proveStatement({ kind: "qif", lines: read.rows, figures: fileFigures(read), prior, typedClosingMinor: 121000 }, money);
       expect(proof).toMatchObject({ openingMinor: null, missing: "opening", prior: { status: "offered" } });
-      expect(proof.sentences.usePrior).toBe("Use $1,000.00 (the closing of the reconciliation to Aug 31, 2026)");
+      expect(proof.sentences.usePrior).toBe("Use $1,000.00 (the closing of the reconciliation to 08/31/2026)");
     });
 
     it("is taken when the person presses the button", () => {
@@ -334,7 +334,7 @@ describe("a QIF", () => {
         money,
       );
       expect(proof).toMatchObject({ openingMinor: 100000, openingBasis: "prior", proves: true, prior: { status: "taken" } });
-      expect(proof.sentences.openingBasis).toBe("from the reconciliation to Aug 31, 2026");
+      expect(proof.sentences.openingBasis).toBe("from the reconciliation to 08/31/2026");
     });
 
     it("gives way to a typed opening when the button is not pressed", () => {
@@ -398,14 +398,14 @@ describe("the words", () => {
 
   it("offer the prior statement's closing on a button", () => {
     expect(priorOfferLabel({ date: "2026-02-28", endingMinor: 123450 }, money)).toBe(
-      "Use $1,234.50 (the closing of the reconciliation to Feb 28, 2026)",
+      "Use $1,234.50 (the closing of the reconciliation to 02/28/2026)",
     );
   });
 
   it("say each basis of the opening in words", () => {
     expect(openingBasisWords("printed", null)).toBe("printed");
     expect(openingBasisWords("running", null)).toBe("from the running balance");
-    expect(openingBasisWords("prior", "2026-02-28")).toBe("from the reconciliation to Feb 28, 2026");
+    expect(openingBasisWords("prior", "2026-02-28")).toBe("from the reconciliation to 02/28/2026");
     expect(openingBasisWords("typed", null)).toBe("typed");
   });
 
@@ -565,7 +565,7 @@ describe("a CSV that prints no balance takes the prior closing", () => {
       proves: true,
       prior: { status: "auto", date: "2026-08-31", endingMinor: 100000 },
     });
-    expect(proof.sentences.summary).toContain("from the reconciliation to Aug 31, 2026");
+    expect(proof.sentences.summary).toContain("from the reconciliation to 08/31/2026");
   });
 
   it("still needs a closing", () => {

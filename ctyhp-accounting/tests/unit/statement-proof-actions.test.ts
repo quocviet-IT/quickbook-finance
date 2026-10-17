@@ -489,7 +489,7 @@ describe("attaching the statement", () => {
     const result = await attachStatementFileAction(read({ ...PROOF, set_aside: 1 }, [1]));
     expect(result).toEqual({
       ok: false,
-      error: "This reconciliation kept 1 line from Mar 5, 2026 to Mar 31, 2026; this file has 2 lines in those days.",
+      error: "This reconciliation kept 1 line from 03/05/2026 to 03/31/2026; this file has 2 lines in those days.",
     });
     expect(mocks.linkReconciliationStatementFile).not.toHaveBeenCalled();
   });

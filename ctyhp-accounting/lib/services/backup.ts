@@ -7,6 +7,7 @@ import {
   readControlTotals,
   readSchemaVersion,
 } from "@/lib/services/company-export";
+import { plural } from "@/lib/format";
 
 export class BackupError extends Error {}
 
@@ -245,14 +246,14 @@ async function applyRetention(sb: SupabaseClient): Promise<void> {
       // row-delete, not just a blob removal, is what ends the pass.
       const alsoStuck =
         stuck.length > 0
-          ? ` ${stuck.length} earlier expired file(s) also could not be removed from ${BACKUP_BUCKET} and were left in place: ${stuck.join(", ")}.`
+          ? ` ${plural(stuck.length, "earlier expired file")} also could not be removed from ${BACKUP_BUCKET} and were left in place: ${stuck.join(", ")}.`
           : "";
       throw new BackupError(`${deletion.error.message}.${alsoStuck}`);
     }
   }
   if (stuck.length > 0) {
     throw new BackupError(
-      `${stuck.length} expired backup file(s) could not be removed from ${BACKUP_BUCKET} and were left in place; their acc_backup rows were kept so a later run can retry: ${stuck.join(", ")}`,
+      `${plural(stuck.length, "expired backup file")} could not be removed from ${BACKUP_BUCKET} and were left in place; their acc_backup rows were kept so a later run can retry: ${stuck.join(", ")}`,
     );
   }
 }

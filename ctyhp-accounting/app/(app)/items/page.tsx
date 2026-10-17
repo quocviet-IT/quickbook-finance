@@ -6,6 +6,7 @@ import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { getInventoryValuation } from "@/lib/services/inventory";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
+import { companyClock } from "@/lib/services/report-context";
 import PageHeader from "@/components/PageHeader";
 import ItemsClient from "./ItemsClient";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ItemsPage() {
   const sb = await createSupabaseServerClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const { today } = await companyClock(sb);
   const [items, accounts, taxCodes, valuation, role, canManageItems, currencies] = await Promise.all([
     listItems(sb),
     listAccounts(sb),

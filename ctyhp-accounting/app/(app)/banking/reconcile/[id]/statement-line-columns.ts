@@ -95,7 +95,7 @@ export const LEDGER_LINES_MIN_WIDTH =
  * ran over Amount.
  */
 export const ADD_MISSING_WIDTH = {
-  /** "Sep 30, 2026". */
+  /** "09/30/2026". */
   date: 120,
   amount: 130,
   /** The account, with "needs coding" or the rule beside it. */

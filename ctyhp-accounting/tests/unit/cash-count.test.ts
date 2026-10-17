@@ -62,7 +62,7 @@ describe("the Balance Sheet line of a cash account", () => {
       "2026-09-30",
       money,
     );
-    expect(view.text).toBe("Cash on Hand: last counted Aug 3, 2026 ($1,250.00). Count it again.");
+    expect(view.text).toBe("Cash on Hand: last counted 08/03/2026 ($1,250.00). Count it again.");
     expect(view.tone).toBe("positive");
   });
 
@@ -100,7 +100,7 @@ describe("the Balance Sheet line of a cash account", () => {
 
 describe("the Chart of Accounts line", () => {
   it("says last counted with the date, or never counted", () => {
-    expect(lastCountedLabel("2026-08-03")).toBe("Last counted Aug 3, 2026");
+    expect(lastCountedLabel("2026-08-03")).toBe("Last counted 08/03/2026");
     expect(lastCountedLabel(null)).toBe("Never counted");
   });
 });

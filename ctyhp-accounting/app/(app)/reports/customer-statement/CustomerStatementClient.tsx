@@ -4,7 +4,7 @@ import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "a
 import type { Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { customerStatementAction } from "./actions";
 import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
@@ -79,7 +79,7 @@ export default function CustomerStatementClient({ customers, baseCurrency, baseD
             emptyTitle="No statement activity"
             emptyDescription="No customer transactions were found for this date range."
             columns={[
-              { title: "Date", dataIndex: "txnDate" },
+              { title: "Date", dataIndex: "txnDate", render: (v: string) => formatDate(v) },
               { title: "Type", dataIndex: "docType" },
               { title: "Number", dataIndex: "docNumber" },
               { title: "Amount", align: "right", render: (_, r) => fmt(r.amountMinor) },

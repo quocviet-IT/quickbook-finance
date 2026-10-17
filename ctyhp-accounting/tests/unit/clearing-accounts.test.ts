@@ -51,8 +51,8 @@ describe("describeClearing", () => {
   it("flags receipts left near the end of a year, eight months on", () => {
     const v = describeClearing(standing(), "2026-07-31", "receipts", money);
     expect(v.leftStanding).toBe(true);
-    expect(v.composition).toBe("$1750.00 across 14 receipts, oldest Nov 19, 2025");
-    expect(v.idle).toBe("No movement for 245 days, since Nov 28, 2025");
+    expect(v.composition).toBe("$1750.00 across 14 receipts, oldest 11/19/2025");
+    expect(v.idle).toBe("No movement for 245 days, since 11/28/2025");
     expect(v.idleDays).toBe(245);
     expect(v.oldestDays).toBe(254);
   });
@@ -67,7 +67,7 @@ describe("describeClearing", () => {
     expect(v.idleDays).toBe(30);
     expect(v.oldestDays).toBe(39);
     expect(v.leftStanding).toBe(false);
-    expect(v.composition).toBe("$50.00 across 3 receipts, oldest Jan 21, 2026");
+    expect(v.composition).toBe("$50.00 across 3 receipts, oldest 01/21/2026");
   });
 
   it("uses strictly more than for the idle limit", () => {
@@ -122,7 +122,7 @@ describe("describeClearing", () => {
 
   it("says 1 day in the singular", () => {
     const v = describeClearing(standing({ lastMovementDate: "2026-01-04" }), "2026-01-05", "receipts", money);
-    expect(v.idle).toBe("No movement for 1 day, since Jan 4, 2026");
+    expect(v.idle).toBe("No movement for 1 day, since 01/04/2026");
   });
 
   it("never looks healthy when a date does not parse", () => {

@@ -2,7 +2,7 @@
 import { Button, Typography } from "antd";
 import { CODE_ALL_LIMIT, type CodingSuggestionView } from "@/lib/domain/coding";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, plural, pluralWord } from "@/lib/format";
 import type { BankReviewTableRow } from "./BankTransactionsTable";
 import type { CodeAllRow } from "./CodeAllModal";
 import styles from "./banking-coding.module.css";
@@ -34,8 +34,8 @@ export default function CodingSuggestionsBar({
     <div className={styles.bar} role="status">
       <div className={styles.barText}>
         <Typography.Text strong>
-          {ready.length} of {waiting.length} waiting line{waiting.length === 1 ? "" : "s"}{" "}
-          {ready.length === 1 ? "has" : "have"} a suggestion, {formatMoney(total, USD_CURRENCY_CODE, 2)} in all.
+          {ready.length} of {plural(waiting.length, "waiting line")}{" "}
+          {pluralWord(ready.length, "has", "have")} a suggestion, {formatMoney(total, USD_CURRENCY_CODE, 2)} in all.
         </Typography.Text>{" "}
         <span className={styles.hint}>
           {ready.length > CODE_ALL_LIMIT

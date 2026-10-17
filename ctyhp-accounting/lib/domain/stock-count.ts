@@ -1,5 +1,6 @@
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { plural, pluralWord, formatDate, formatDateRange } from "@/lib/format";
 
 /**
  * Stock Count: a periodic count sheet. You type or paste the stock on hand, line
@@ -183,7 +184,7 @@ function toMinorAmount(raw: string, label: string, decimals: number): { value: n
     return {
       reason: decimals === 0
         ? `${label} must be a whole number`
-        : `${label} can have at most ${decimals} decimal place${decimals === 1 ? "" : "s"}`,
+        : `${label} can have at most ${plural(decimals, "decimal place")}`,
     };
   }
   const value = Number(p.whole + fraction.padEnd(decimals, "0"));
@@ -381,7 +382,7 @@ export function stockCountSheet(input: StockCountSheetInput): ReportExportSheet 
 
   const subtitle = [
     `${input.countNumber}`,
-    `As of ${input.asOf}`,
+    formatDateRange(null, input.asOf),
     stockCountStatusLabel(input.status),
     normalisedText(input.memo),
   ]
@@ -453,10 +454,9 @@ export function pasteProblemText(problem: PasteProblem): string {
 export function pasteSummary(result: PasteResult): string {
   const added = result.lines.length;
   const skipped = result.problems.length;
-  const lines = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "line" : "lines"}`;
   if (added === 0 && skipped === 0) return "Nothing to read. Paste one line for each item.";
-  if (skipped === 0) return `Added ${lines(added)}.`;
-  return `Added ${lines(added)}. ${lines(skipped)} could not be read and ${skipped === 1 ? "was" : "were"} left out.`;
+  if (skipped === 0) return `Added ${plural(added, "line")}.`;
+  return `Added ${plural(added, "line")}. ${plural(skipped, "line")} could not be read and ${pluralWord(skipped, "was", "were")} left out.`;
 }
 
 /** The good lines of a paste go on the end of the sheet; nothing already there moves. */
@@ -523,7 +523,7 @@ export function signedAmountText(minor: number, format: (absoluteMinor: number) 
 
 /** The button's words: "Adjust inventory by +$12.00 at 2026-06-30". */
 export function adjustButtonLabel(differenceMinor: number, asOf: string, format: (absoluteMinor: number) => string): string {
-  return `Adjust inventory by ${signedAmountText(differenceMinor, format)} at ${asOf}`;
+  return `Adjust inventory by ${signedAmountText(differenceMinor, format)} at ${formatDate(asOf)}`;
 }
 
 export interface PreviewAccount {

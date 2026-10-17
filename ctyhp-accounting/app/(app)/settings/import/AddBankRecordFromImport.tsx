@@ -1,4 +1,5 @@
 "use client";
+import { plural } from "@/lib/format";
 import { useState } from "react";
 import { Alert, App, Form, Input, Modal, Select, Space, Typography } from "antd";
 import {
@@ -77,7 +78,7 @@ export default function AddBankRecordFromImport({
           <b>
             {target?.accountCode} — {target?.accountName}
           </b>{" "}
-          · {target?.rows} row(s) in this file
+          · {plural(target?.rows ?? 0, "row")} in this file
         </Typography.Text>
         <Alert
           type="info"

@@ -35,7 +35,7 @@ describe("rangeColumns (Profit and Loss)", () => {
     expect(rangeColumns("none", "2026-01-01", "2026-09-28", 1)).toMatchObject({
       ok: true,
       change: false,
-      columns: [{ label: "Jan 1, 2026 – Sep 28, 2026" }],
+      columns: [{ label: "01/01/2026 – 09/28/2026" }],
     });
   });
 
@@ -57,9 +57,9 @@ describe("rangeColumns (Profit and Loss)", () => {
 
   it("gives a column per month, clipped to the range, then a Total", () => {
     expect(columnsOf(rangeColumns("month", "2026-01-15", "2026-03-10", 1))).toEqual([
-      { label: "Jan 15, 2026 – Jan 31, 2026", from: "2026-01-15", to: "2026-01-31", isTotal: false },
+      { label: "01/15/2026 – 01/31/2026", from: "2026-01-15", to: "2026-01-31", isTotal: false },
       { label: "Feb 2026", from: "2026-02-01", to: "2026-02-28", isTotal: false },
-      { label: "Mar 1, 2026 – Mar 10, 2026", from: "2026-03-01", to: "2026-03-10", isTotal: false },
+      { label: "03/01/2026 – 03/10/2026", from: "2026-03-01", to: "2026-03-10", isTotal: false },
       { label: "Total", from: "2026-01-15", to: "2026-03-10", isTotal: true },
     ]);
   });
@@ -69,9 +69,9 @@ describe("rangeColumns (Profit and Loss)", () => {
     if (!plan.ok) throw new Error(plan.message);
     expect(plan.columns.map((c) => c.sub)).toEqual([
       "",
-      "Feb 1, 2026 – Feb 28, 2026",
+      "02/01/2026 – 02/28/2026",
       "",
-      "Jan 15, 2026 – Mar 10, 2026",
+      "01/15/2026 – 03/10/2026",
     ]);
   });
 
@@ -107,13 +107,13 @@ describe("rangeColumns (Profit and Loss)", () => {
 describe("pointColumns (Balance Sheet, Trial Balance)", () => {
   it("is one date for no comparison", () => {
     expect(columnsOf(pointColumns("none", "2026-09-28", "2026-01-01", 1))).toEqual([
-      { label: "Sep 28, 2026", from: null, to: "2026-09-28", isTotal: false },
+      { label: "09/28/2026", from: null, to: "2026-09-28", isTotal: false },
     ]);
   });
 
   it("compares with the end of the month before, leap years included", () => {
     expect(columnsOf(pointColumns("prev", "2024-03-10", "2024-01-01", 1))[1]).toEqual({
-      label: "Feb 29, 2024",
+      label: "02/29/2024",
       from: null,
       to: "2024-02-29",
       isTotal: false,
@@ -131,7 +131,7 @@ describe("pointColumns (Balance Sheet, Trial Balance)", () => {
       { label: "Feb 2026", from: null, to: "2026-02-28", isTotal: false },
       { label: "Mar 2026", from: null, to: "2026-03-15", isTotal: false },
     ]);
-    if (plan.ok) expect(plan.columns[2].sub).toBe("As of Mar 15, 2026");
+    if (plan.ok) expect(plan.columns[2].sub).toBe("As of 03/15/2026");
   });
 
   it("gives a date per quarter end and per fiscal year end", () => {
@@ -176,7 +176,7 @@ describe("helpers", () => {
 
   it("names a range by its period when it is a whole one, and by its dates when not", () => {
     expect(rangeLabel("2026-04-01", "2026-06-30")).toBe("Q2 2026");
-    expect(rangeLabel("2026-04-02", "2026-06-30")).toBe("Apr 2, 2026 – Jun 30, 2026");
+    expect(rangeLabel("2026-04-02", "2026-06-30")).toBe("04/02/2026 – 06/30/2026");
   });
 
   it("imports nothing that could write to the books", () => {

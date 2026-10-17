@@ -17,7 +17,7 @@ import {
   type TransactionListFilter,
   type TransactionListRow,
 } from "@/lib/domain/transaction-list";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { TOKENS } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
@@ -216,7 +216,7 @@ export default function TransactionListClient({
             : "Widen the dates, or post a document to see it here."
         }
         columns={[
-          { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE },
+          { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
           {
             // Two elastic columns: a party name and a description are both
             // text somebody typed, and neither has a length worth guessing.

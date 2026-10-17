@@ -1,11 +1,13 @@
 "use client";
 
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime } from "@/lib/format";
 import { useCallback, useState } from "react";
 import { Alert, Button, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Link from "next/link";
 import DataTable from "@/components/ui/DataTable";
-import { dateColumn, statusColumn, actionsColumn, flexColumn } from "@/components/ui/columns";
+import { statusColumn, actionsColumn, flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
@@ -22,6 +24,7 @@ export default function BackupsClient({
   loadError: string | null;
   canRestore: boolean;
 }) {
+  const { timeZone } = useCompanyClock();
   // A set, not a single id: downloading row A and then row B while A is
   // still in flight must not clear A's spinner when B's `finally` runs (or
   // vice versa) — each row's own request is what should own its own row's
@@ -57,7 +60,12 @@ export default function BackupsClient({
   }, []);
 
   const columns: ColumnsType<BackupRow> = [
-    dateColumn<BackupRow>({ title: "Date", dataIndex: "takenAt", width: COLUMN.DATE }),
+    {
+      title: "Date",
+      dataIndex: "takenAt",
+      width: 170,
+      render: (value: string) => <time dateTime={value}>{formatDateTime(value, timeZone)}</time>,
+    },
     statusColumn<BackupRow>({
       title: "Status",
       dataIndex: "status",

@@ -3,6 +3,7 @@
  * which statement, its figures, and whether it proves itself. Pure, so the
  * wording is tested where it is written.
  */
+import { formatDate, plural } from "@/lib/format";
 import { statementProof, type PdfStatement } from "./pdf-statement";
 
 export const PDF_MESSAGES = {
@@ -18,25 +19,17 @@ export const PDF_MESSAGES = {
 export const STATEMENT_READING_NOTE =
   "A bank download (CSV, QFX or OFX) is read exactly. A PDF is read from its text, and a check image or a summary table can be misread.";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "Aug 31" or "Aug 31, 2026". */
-export function shortDate(iso: string, withYear: boolean): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return `${MONTHS[m - 1]} ${d}${withYear ? `, ${y}` : ""}`;
-}
-
-/** "Jan 1 – Jan 31, 2026", "Dec 15, 2025 – Jan 14, 2026", "closing Nov 30, 2026" or "no period printed". */
+/** "01/01/2026 – 01/31/2026", "closing 11/30/2026" or "no period printed". */
 export function periodLabel(from: string | null, to: string | null): string {
-  if (from && to) return `${shortDate(from, from.slice(0, 4) !== to.slice(0, 4))} – ${shortDate(to, true)}`;
-  if (to) return `closing ${shortDate(to, true)}`;
+  if (from && to) return `${formatDate(from)} – ${formatDate(to)}`;
+  if (to) return `closing ${formatDate(to)}`;
   return "no period printed";
 }
 
-/** How a PDF that holds several statements offers each: "Account ending 1111 · Jan 1 – Jan 31, 2026 · 3 lines". */
+/** How a PDF that holds several statements offers each: "Account ending 1111 · 01/01/2026 – 01/31/2026 · 3 lines". */
 export function statementLabel(s: PdfStatement): string {
   const account = s.accountNumber ? `Account ending ${s.accountNumber.slice(-4)}` : "Account not named";
-  return `${account} · ${periodLabel(s.from, s.to)} · ${s.lines.length} line${s.lines.length === 1 ? "" : "s"}`;
+  return `${account} · ${periodLabel(s.from, s.to)} · ${plural(s.lines.length, "line")}`;
 }
 
 /** The statement for the bank account being imported into: the one whose last four digits match, else the first. */

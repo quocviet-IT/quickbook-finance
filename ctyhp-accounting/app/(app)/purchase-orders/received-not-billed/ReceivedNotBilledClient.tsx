@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { CurrencyRow, ReceivedNotBilledRow } from "@/lib/db/types";
 
 export default function ReceivedNotBilledClient({
@@ -38,7 +38,7 @@ export default function ReceivedNotBilledClient({
             ),
           },
           { title: "Vendor", dataIndex: "vendor_name" },
-          { title: "Order Date", dataIndex: "order_date" },
+          { title: "Order Date", dataIndex: "order_date", render: (v: string) => formatDate(v) },
           { title: "Description", dataIndex: "description", render: (v: string) => v || "—" },
           {
             title: "Quantity Outstanding",

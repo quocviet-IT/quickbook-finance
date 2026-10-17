@@ -76,7 +76,7 @@ describe("historyAdvice", () => {
   it("offers to bring the entries forward when the books read the statement's balance", () => {
     expect(historyAdvice(never, "2026-08-31", 512340, { bookBalanceMinor: 512340, entries: 214 }, money)).toEqual({
       kind: "match",
-      text: "Books on Aug 31, 2026 read $5123.40 ✓",
+      text: "Books on 08/31/2026 read $5123.40 ✓",
       action: "Bring forward 214 entries",
       entries: 214,
       outByMinor: 0,
@@ -88,7 +88,7 @@ describe("historyAdvice", () => {
   it("offers no button when the books hold nothing through the date", () => {
     expect(historyAdvice(never, "2023-12-31", 0, { bookBalanceMinor: 0, entries: 0 }, money)).toMatchObject({
       kind: "match",
-      text: "Books on Dec 31, 2023 read $0.00 ✓",
+      text: "Books on 12/31/2023 read $0.00 ✓",
       action: null,
     });
   });
@@ -122,7 +122,7 @@ describe("historyAdvice", () => {
     const done = { lastReconciledDate: "2026-07-31", inProgress: { id: "r1", endingDate: "2026-08-31" } };
     expect(historyAdvice(done, "2026-08-31", 1, { bookBalanceMinor: 2, entries: 3 }, money)).toMatchObject({
       kind: "reconciled",
-      text: "Reconciled up to Jul 31, 2026",
+      text: "Reconciled up to 07/31/2026",
       action: null,
     });
   });
@@ -130,17 +130,17 @@ describe("historyAdvice", () => {
 
 describe("the history page's sentences", () => {
   it("are the spec's, character for character", () => {
-    expect(booksReadText("2026-08-31", 512340, money)).toBe("Books on Aug 31, 2026 read $5123.40 ✓");
+    expect(booksReadText("2026-08-31", 512340, money)).toBe("Books on 08/31/2026 read $5123.40 ✓");
     expect(bringForwardEntriesLabel(1)).toBe("Bring forward 1 entry");
     expect(bringForwardEntriesLabel(1204)).toBe("Bring forward 1,204 entries");
     expect(historyOutByText(13575, money)).toBe("Out by $135.75. Find the entry that differs, or try another statement.");
-    expect(reconciledUpTo("2026-08-31")).toBe("Reconciled up to Aug 31, 2026");
+    expect(reconciledUpTo("2026-08-31")).toBe("Reconciled up to 08/31/2026");
     expect(FINISH_IN_PROGRESS_FIRST).toBe("Finish or discard the reconciliation in progress first.");
   });
 
   it("keeps the statement balance and its date as the note of a reconciliation brought forward from the history page", () => {
     expect(historyBroughtForwardNote(512340, "2026-08-31", money)).toBe(
-      "Brought forward, proved by the statement balance of $5123.40 on Aug 31, 2026",
+      "Brought forward, proved by the statement balance of $5123.40 on 08/31/2026",
     );
   });
 
@@ -148,17 +148,17 @@ describe("the history page's sentences", () => {
     expect(RECONCILE_HISTORY).toBe("Reconcile history");
     expect(RECONCILE_HISTORY_PATH).toBe("/banking/reconcile/history");
     expect(HISTORY_STATE_LABELS).toEqual({ never: "Never reconciled", reconciled: "Reconciled" });
-    expect(inProgressText("2026-09-30")).toBe("In progress, ending Sep 30, 2026");
+    expect(inProgressText("2026-09-30")).toBe("In progress, ending 09/30/2026");
     expect(OPEN_IN_PROGRESS).toBe("Open the reconciliation in progress");
     expect(STATEMENT_BALANCE_ON).toBe("Statement balance on");
   });
 
   it("says how many entries were brought forward, nothing posted, and where a session in progress now begins", () => {
     expect(historyBroughtForwardMessage(214, "2026-08-31", null, money)).toBe(
-      "Brought forward: 214 entries up to Aug 31, 2026 marked reconciled. Nothing was posted to the books.",
+      "Brought forward: 214 entries up to 08/31/2026 marked reconciled. Nothing was posted to the books.",
     );
     expect(historyBroughtForwardMessage(1, "2026-08-31", 512340, money)).toBe(
-      "Brought forward: 1 entry up to Aug 31, 2026 marked reconciled. Nothing was posted to the books. " +
+      "Brought forward: 1 entry up to 08/31/2026 marked reconciled. Nothing was posted to the books. " +
         "The reconciliation in progress now begins at $5123.40.",
     );
   });

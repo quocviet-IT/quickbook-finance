@@ -147,7 +147,7 @@ describe("the proof panel", () => {
     const misread = { ...PRINTED, closingMinor: 120000 };
     const admin = text(renderPanel(viewOf({ figures: misread, canOverride: true })));
     expect(admin).toContain("Out by $20.00. The opening $1000.00 and the 3 lines come to $1180.00; the statement closes at $1200.00.");
-    expect(admin).toContain("It equals the statement line “SERVICE FEE” of Mar 20, 2026 (−20.00), which may have been misread.");
+    expect(admin).toContain("It equals the statement line “SERVICE FEE” of 03/20/2026 (−20.00), which may have been misread.");
     expect(admin).toContain("Import is blocked until the statement adds up.");
     expect(admin).toContain("Import anyway…");
     expect(admin).not.toContain(PROOF_TEXT.adminCanOverride);
@@ -166,7 +166,7 @@ describe("the proof panel", () => {
     expect(out).toContain("Import is blocked until the statement adds up.");
     expect(out).toContain("Opening balance printed on the statement");
     expect(out).toContain("Closing balance printed on the statement");
-    expect(out).toContain("Use $1000.00 (the closing of the reconciliation to Feb 28, 2026)");
+    expect(out).toContain("Use $1000.00 (the closing of the reconciliation to 02/28/2026)");
     expect(html).toContain('aria-pressed="false"');
     // A balance missing is never imported anyway.
     expect(out).not.toContain(PROOF_TEXT.importAnyway);
@@ -217,7 +217,7 @@ describe("the lines preview", () => {
     expect(text(skipped)).toContain(OTHER_SOURCE_WARNING);
     expect(OTHER_SOURCE_WARNING).toBe("Already in Bank Transactions from another source (the books, a bank feed or another file)");
     expect(text(skipped)).toContain(OTHER_SOURCE_NOTE);
-    expect(text(skipped)).toContain("Mar 9, 2026 · RENT · -$300.00");
+    expect(text(skipped)).toContain("03/09/2026 · RENT · -$300.00");
     // Three Not a transaction ticks and the line's own, none of them ticked.
     expect(skipped.match(/type="checkbox"/g)?.length).toBe(LINES.length + 1);
     expect(skipped).not.toContain("ant-checkbox-checked");
@@ -236,7 +236,7 @@ describe("the lines preview", () => {
       check: { present: [0], otherSource: [] },
     });
     expect(text(renderPreview(view, [], payroll))).toContain(
-      "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
+      "3 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
     );
   });
 
@@ -450,13 +450,13 @@ describe("a run of statement files", () => {
     expect(result.statements.map((c) => [c.state, c.note])).toEqual([
       ["usable", "1 line"],
       ["doesNotAddUp", "Out by $0.50 — import this statement on its own to correct it."],
-      ["waiting", "Waiting behind the statement closing Aug 31, 2026"],
+      ["waiting", "Waiting behind the statement closing 08/31/2026"],
     ]);
     // Nothing stops the whole run: Preview goes, with the month before the stop only.
     expect(result.stops).toEqual([]);
     expect(result.usable.map((s) => s.to)).toEqual(["2026-07-31"]);
     expect(fromFiles).toContain("const run = check.usable;");
-    expect(fromFiles).toContain("Preview {check.usable.length} statement{check.usable.length === 1 ? \"\" : \"s\"}");
+    expect(fromFiles).toContain("Preview {plural(check.usable.length, \"statement\")}");
     // A stop of the whole run (a gap, a reconciliation in progress) still keeps Preview and Sign off from going.
     expect(fromFiles).toContain("{check.stops.map((stop) => (");
     expect(fromFiles).toContain("disabled={check.stops.length > 0 || reading > 0 || busy}");
@@ -467,7 +467,7 @@ describe("a run of statement files", () => {
     const result = checkRun([month("2026-07-31", 1000, 1150, 100), month("2026-08-31", 1150, 1250, 100)], context, money);
     expect(result.statements.map((c) => [c.state, c.note])).toEqual([
       ["doesNotAddUp", "Out by $0.50 — import this statement on its own to correct it."],
-      ["waiting", "Waiting behind the statement closing Jul 31, 2026"],
+      ["waiting", "Waiting behind the statement closing 07/31/2026"],
     ]);
     expect(result.usable).toEqual([]);
     expect(result.stops).toEqual(["Nothing here can be reconciled yet."]);

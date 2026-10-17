@@ -8,6 +8,7 @@ import {
   type AgingGridRow,
   type PartyAgingRow,
 } from "@/lib/domain/aging";
+import { formatDate } from "@/lib/format";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { exportRowsFromMinorAmounts, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { AgingReportRow } from "@/lib/services/aging";
@@ -60,7 +61,7 @@ export default function AgingByPartyTable({
     fileName: `${partyLabel.toLowerCase()}-aging-${asOf}`,
     companyName,
     title: `${partyLabel === "Vendor" ? "Accounts Payable" : "Accounts Receivable"} Aging`,
-    subtitle: `As of ${asOf}`,
+    subtitle: `As of ${formatDate(asOf)}`,
     currencyCode,
     columns: [
       { key: "label", header: "Age", kind: "text" },
@@ -102,7 +103,7 @@ export default function AgingByPartyTable({
               <Typography.Title level={4} style={{ margin: 0 }}>
                 {partyLabel === "Vendor" ? "Accounts Payable" : "Accounts Receivable"} Aging
               </Typography.Title>
-              <Typography.Text type="secondary">As of {asOf}</Typography.Text>
+              <Typography.Text type="secondary">As of {formatDate(asOf)}</Typography.Text>
             </div>
             <ReportExportButtons sheet={gridExport} disabled={grid.columns.length === 0} />
           </div>
@@ -170,7 +171,7 @@ export default function AgingByPartyTable({
                 row.oldestDueDate ? (
                   <Space size="small">
                     {name}
-                    <Tag color="red">oldest due {row.oldestDueDate}</Tag>
+                    <Tag color="red">oldest due {formatDate(row.oldestDueDate)}</Tag>
                   </Space>
                 ) : (
                   name

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
 import { App, Button, Space } from "antd";
+import { useCompanyClock } from "@/components/CompanyClock";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
 
 export default function ReportExportButtons({
@@ -13,13 +14,14 @@ export default function ReportExportButtons({
   disabled?: boolean;
 }) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const [loading, setLoading] = useState<"pdf" | "excel" | null>(null);
 
   const run = async (kind: "pdf" | "excel") => {
     setLoading(kind);
     try {
       const { exportReportToExcel, exportReportToPdf } = await import("@/lib/client/report-export");
-      if (kind === "pdf") await exportReportToPdf(sheet);
+      if (kind === "pdf") await exportReportToPdf(sheet, timeZone);
       else await exportReportToExcel(sheet);
       message.success(`${kind === "pdf" ? "PDF" : "Excel"} export created`);
     } catch (error) {

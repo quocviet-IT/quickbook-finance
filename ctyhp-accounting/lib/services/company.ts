@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CompanySettingRow } from "@/lib/db/types";
 import type { CompanySettingsInput } from "@/lib/domain/schemas";
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
+import { todayInTimeZone } from "@/lib/format";
 
 export class CompanyError extends Error {}
 
@@ -14,6 +16,12 @@ export async function getCurrentCompanySettings(sb: SupabaseClient): Promise<Com
     .select(COLS).order("effective_from", { ascending: false }).order("version", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new CompanyError(error.message);
   return (data as unknown as CompanySettingRow) ?? null;
+}
+
+/** The company's own calendar day, for a default "as of" that has no caller to ask. */
+export async function companyToday(sb: SupabaseClient): Promise<string> {
+  const settings = await getCurrentCompanySettings(sb);
+  return todayInTimeZone(settings?.time_zone || DEFAULT_TIME_ZONE);
 }
 /**
  * Keep the company register's name in step with the company's own settings.

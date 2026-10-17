@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { RELEASES } from "@/lib/domain/changelog";
 
 describe("2.16 in the release notes", () => {
-  const release = RELEASES[0];
+  const release = RELEASES.find((r) => r.version === "2.16")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
-  it("is the newest release, dated the day it was built", () => {
+  it("is dated the day it was built", () => {
     expect(release.version).toBe("2.16");
     expect(release.date).toBe("2026-10-17");
   });

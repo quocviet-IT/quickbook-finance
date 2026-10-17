@@ -1,4 +1,5 @@
 "use client";
+import { plural } from "@/lib/format";
 import { useState } from "react";
 import { App } from "antd";
 import { fieldsFor, proposeMapping, type ImportTarget } from "@/lib/domain/import-mapping";
@@ -56,8 +57,8 @@ export function useImportSource(target: ImportTarget) {
       setFileName(file.name);
       message.info(
         proposed.missingRequired.length === 0
-          ? `Read ${dataRows.length} row(s). Check the columns below.`
-          : `Read ${dataRows.length} row(s), but some required columns need choosing.`,
+          ? `Read ${plural(dataRows.length, "row")}. Check the columns below.`
+          : `Read ${plural(dataRows.length, "row")}, but some required columns need choosing.`,
       );
 
       setAiBusy(true);

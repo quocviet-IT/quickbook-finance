@@ -140,9 +140,9 @@ describe("buildInventoryReview", () => {
 
   it("leads with the write-downs, then the idle stock", () => {
     const message = describeInventoryReview(review())!;
-    expect(message).toContain("1 item(s) carried above realizable value");
+    expect(message).toContain("1 item carried above realizable value");
     expect(message).toContain("4,440.00 to write down");
-    expect(message).toContain("1 item(s) slow moving");
+    expect(message).toContain("1 item slow moving");
   });
 
   it("says nothing when every line is healthy", () => {

@@ -8,7 +8,7 @@
  *
  * Money is base-currency minor units; the debit to the bank is positive.
  */
-import { shortDate } from "@/lib/domain/report-presets";
+import { formatDate } from "@/lib/format";
 
 export type ReconciliationChangeKind = "voided" | "reversed" | "added" | "drift";
 
@@ -161,7 +161,7 @@ export function changeSentence(item: ChangeItem): string {
       ? `${entryName(item.entryNumber)} was reversed by ${item.reversalEntryNumber}.`
       : `${entryName(item.entryNumber)} was reversed.`;
   }
-  const dated = item.entryDate ? `, dated ${shortDate(item.entryDate)},` : "";
+  const dated = item.entryDate ? `, dated ${formatDate(item.entryDate)},` : "";
   return `${entryName(item.entryNumber)}${dated} was posted after the reconciliation was signed off.`;
 }
 

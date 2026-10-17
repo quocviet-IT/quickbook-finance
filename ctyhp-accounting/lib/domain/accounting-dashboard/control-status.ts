@@ -1,4 +1,5 @@
 import type { AccountingControl, ControlKey } from "./types";
+import { formatDate, plural } from "@/lib/format";
 
 /**
  * What each accounting control means, and when it has passed.
@@ -17,10 +18,6 @@ import type { AccountingControl, ControlKey } from "./types";
 /** Minor units as a plain decimal string: the detail lines read as English. */
 function money(minor: number): string {
   return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 export function trialBalanceControl(input: {
@@ -55,7 +52,7 @@ const SUBLEDGER_TITLE: Record<"ar-to-gl" | "ap-to-gl" | "inventory-to-gl", strin
 const SUBLEDGER_SUBJECT: Record<"ar-to-gl" | "ap-to-gl" | "inventory-to-gl", string> = {
   "ar-to-gl": "The open invoices",
   "ap-to-gl": "The open bills",
-  "inventory-to-gl": "The inventory on hand",
+  "inventory-to-gl": "The items on hand",
 };
 
 export function subledgerControl(
@@ -143,7 +140,7 @@ export function bankReconciliationControl(input: {
   const lastPart =
     input.lastCompletedOn === null
       ? "No completed reconciliation on record."
-      : `Last reconciled through ${input.lastCompletedOn}.`;
+      : `Last reconciled through ${formatDate(input.lastCompletedOn)}.`;
   const unmatchedPart =
     input.unmatchedCount === 0
       ? "No unmatched bank activity."

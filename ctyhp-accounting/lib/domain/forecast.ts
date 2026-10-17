@@ -13,6 +13,7 @@
 
 import { nextRecurringDate, type RecurringFrequency } from "./recurring";
 import { daysBetween } from "./settlement";
+import { plural, formatDate } from "@/lib/format";
 
 export type CashSide = "receivable" | "payable";
 
@@ -128,12 +129,12 @@ export function addDays(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "Oct 16" from an ISO date. */
+/**
+ * "10/16" from an ISO date: the app's MM/DD/YYYY without the year, for a
+ * week's column heading where thirteen full dates would not fit.
+ */
 export function monthDay(iso: string): string {
-  const [, month, day] = iso.split("-").map(Number);
-  return `${MONTHS[month - 1]} ${day}`;
+  return formatDate(iso).slice(0, 5);
 }
 
 /**
@@ -406,13 +407,13 @@ export function describeForecastBasis(forecast: CashForecast): string {
     parts.push("no settled invoice to learn a collection lag from, so receipts stay on their due dates");
   } else {
     parts.push(
-      `customers settle a median ${Math.abs(forecast.receivableLagDays)} day${Math.abs(forecast.receivableLagDays) === 1 ? "" : "s"} ` +
+      `customers settle a median ${plural(Math.abs(forecast.receivableLagDays), "day")} ` +
         `${forecast.receivableLagDays < 0 ? "early" : "late"} (${forecast.lagSampleSize.receivable} paid invoices)`,
     );
   }
   if (forecast.payableLagDays !== null) {
     parts.push(
-      `bills are paid a median ${Math.abs(forecast.payableLagDays)} day${Math.abs(forecast.payableLagDays) === 1 ? "" : "s"} ` +
+      `bills are paid a median ${plural(Math.abs(forecast.payableLagDays), "day")} ` +
         `${forecast.payableLagDays < 0 ? "early" : "late"} (${forecast.lagSampleSize.payable} paid bills)`,
     );
   }

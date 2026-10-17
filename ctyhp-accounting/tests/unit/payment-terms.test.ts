@@ -125,7 +125,7 @@ describe("rankPayable", () => {
     const row = rankPayable(bill({ dueDate: "2026-02-11" }), "2026-08-01");
     expect(row.priority).toBe("overdue");
     expect(row.daysOverdue).toBe(171);
-    expect(row.reason).toBe("171 day(s) overdue");
+    expect(row.reason).toBe("171 days overdue");
   });
 
   it("counts the day it falls due as due, not overdue", () => {
@@ -143,7 +143,7 @@ describe("rankPayable", () => {
     expect(row.daysToDiscount).toBe(4);
     expect(row.discountAvailableMinor).toBe(1_000);
     expect(row.payTodayMinor).toBe(99_000);
-    expect(row.reason).toContain("Discount of 10.00 until 2026-08-05");
+    expect(row.reason).toContain("Discount of 10.00 until 08/05/2026");
   });
 
   it("leaves a distant discount scheduled rather than shouting about it", () => {
@@ -239,7 +239,7 @@ describe("buildPayRun", () => {
 
   it("leads with the worst thing on the list", () => {
     const message = describePayRun(run())!;
-    expect(message).toContain("2 bill(s) overdue");
+    expect(message).toContain("2 bills overdue");
     expect(message).toContain("the oldest is Aurora Gemstone Supply Inc. at 171 days");
     expect(message).toContain("10.00 of early payment discount lapses");
   });

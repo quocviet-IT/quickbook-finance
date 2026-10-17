@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { getCurrentCompanySettings } from "@/lib/services/company";
+import { todayInTimeZone } from "@/lib/format";
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import { postedEntryDateSpan } from "@/lib/services/exceptions";
 import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
@@ -32,7 +34,7 @@ export default async function WorkingTrialBalancePage() {
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
         fiscalStartMonth={company?.fiscal_year_start_month ?? 1}
-        today={new Date().toISOString().slice(0, 10)}
+        today={todayInTimeZone(company?.time_zone || DEFAULT_TIME_ZONE)}
         firstEntryDate={span.first}
         lastEntryDate={span.last}
       />

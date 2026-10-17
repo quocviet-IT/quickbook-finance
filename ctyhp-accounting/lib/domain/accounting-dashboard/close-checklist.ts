@@ -20,6 +20,7 @@
  * so. The spec asks for that as a prohibition (Phase 4, work item 6); it is
  * enforced by there being nothing to store.
  */
+import { plural, pluralWord, formatDate } from "@/lib/format";
 
 export type CloseStepStatus = "complete" | "outstanding" | "not-applicable" | "unavailable";
 
@@ -107,10 +108,6 @@ function money(minor: number): string {
   return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
 }
 
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
-
 export function trialBalanceStep(input: {
   periodEnd: string;
   /** Null when the ledger could not be read at all. */
@@ -119,7 +116,7 @@ export function trialBalanceStep(input: {
   const base = {
     key: "trial-balance",
     title: "The trial balance balances",
-    passCondition: `Posted debits equal posted credits through ${input.periodEnd}.`,
+    passCondition: `Posted debits equal posted credits through ${formatDate(input.periodEnd)}.`,
     blocksClose: true,
     href: `/reports?report=trial&asOf=${input.periodEnd}`,
     workKey: "control:trial-balance",
@@ -136,8 +133,8 @@ export function trialBalanceStep(input: {
     status: input.differenceMinor === 0 ? "complete" : "outstanding",
     evidence:
       input.differenceMinor === 0
-        ? `Debits and credits agree at ${input.periodEnd}.`
-        : `Debits and credits differ by ${money(input.differenceMinor)} at ${input.periodEnd}.`,
+        ? `Debits and credits agree at ${formatDate(input.periodEnd)}.`
+        : `Debits and credits differ by ${money(input.differenceMinor)} at ${formatDate(input.periodEnd)}.`,
   };
 }
 
@@ -167,7 +164,7 @@ export function controlAccountStep(input: {
   const base = {
     key: `control:${input.controlKey}`,
     title: `${input.label} ties to the ledger`,
-    passCondition: `The ${input.label.toLowerCase()} subledger equals its control account at ${input.periodEnd}.`,
+    passCondition: `The ${input.label.toLowerCase()} subledger equals its control account at ${formatDate(input.periodEnd)}.`,
     blocksClose: true,
     href: "/reports/gl-posting",
     workKey: null,
@@ -185,7 +182,7 @@ export function controlAccountStep(input: {
     return {
       ...base,
       status: "complete",
-      evidence: `Both sides read ${money(input.controlMinor)} at ${input.periodEnd}.`,
+      evidence: `Both sides read ${money(input.controlMinor)} at ${formatDate(input.periodEnd)}.`,
     };
   }
 
@@ -207,7 +204,7 @@ export function draftDocumentsStep(input: {
   const base = {
     key: "drafts-posted",
     title: "Everything in the period is posted",
-    passCondition: `No invoice or bill dated between ${input.periodStart} and ${input.periodEnd} is still a draft.`,
+    passCondition: `No invoice or bill dated between ${formatDate(input.periodStart)} and ${formatDate(input.periodEnd)} is still a draft.`,
     // A draft has not posted, so it cannot put the ledger out and the database
     // will not refuse the close over it. It is still a reason the period's
     // figures are not final, which is why it is on the list at all.
@@ -224,7 +221,7 @@ export function draftDocumentsStep(input: {
     evidence:
       input.draftCount === 0
         ? "Every invoice and bill dated in this period has posted."
-        : `${plural(input.draftCount, "document")} dated in this period ${input.draftCount === 1 ? "is" : "are"} still a draft, so the period's figures are not final.`,
+        : `${plural(input.draftCount, "document")} dated in this period ${pluralWord(input.draftCount, "is", "are")} still a draft, so the period's figures are not final.`,
   };
 }
 
@@ -238,7 +235,7 @@ export function bankReconciledStep(input: {
   const base = {
     key: "bank-reconciled",
     title: "The bank is reconciled through the period end",
-    passCondition: `A completed reconciliation covers ${input.periodEnd} and no line before it is unmatched.`,
+    passCondition: `A completed reconciliation covers ${formatDate(input.periodEnd)} and no line before it is unmatched.`,
     blocksClose: false,
     href: "/banking/reconcile",
     workKey: "control:bank-reconciliation",
@@ -258,18 +255,18 @@ export function bankReconciledStep(input: {
     return {
       ...base,
       status: "complete",
-      evidence: `Reconciled through ${input.lastCompletedOn}, with nothing unmatched on or before ${input.periodEnd}.`,
+      evidence: `Reconciled through ${formatDate(input.lastCompletedOn)}, with nothing unmatched on or before ${formatDate(input.periodEnd)}.`,
     };
   }
   const parts = [
     reconciled
-      ? `Reconciled through ${input.lastCompletedOn}.`
+      ? `Reconciled through ${formatDate(input.lastCompletedOn)}.`
       : input.lastCompletedOn === null
         ? "No completed reconciliation on record."
-        : `The last reconciliation ends ${input.lastCompletedOn}, before the period end.`,
+        : `The last reconciliation ends ${formatDate(input.lastCompletedOn)}, before the period end.`,
     input.unmatchedCount === 0
       ? "Nothing is unmatched."
-      : `${plural(input.unmatchedCount, "bank line")} dated on or before ${input.periodEnd} ${input.unmatchedCount === 1 ? "is" : "are"} still unmatched.`,
+      : `${plural(input.unmatchedCount, "bank line")} dated on or before ${formatDate(input.periodEnd)} ${pluralWord(input.unmatchedCount, "is", "are")} still unmatched.`,
   ];
   return { ...base, status: "outstanding", evidence: parts.join(" ") };
 }
@@ -281,7 +278,7 @@ export function approvalsStep(input: {
   const base = {
     key: "approvals-decided",
     title: "Controlled actions have been decided",
-    passCondition: `Nothing requested on or before ${input.periodEnd} is still waiting for a decision.`,
+    passCondition: `Nothing requested on or before ${formatDate(input.periodEnd)} is still waiting for a decision.`,
     blocksClose: false,
     href: "/approvals",
     workKey: "control:pending-approvals",
@@ -295,7 +292,7 @@ export function approvalsStep(input: {
     evidence:
       input.pendingCount === 0
         ? "Nothing from this period is waiting for a decision."
-        : `${plural(input.pendingCount, "action")} requested on or before ${input.periodEnd} ${input.pendingCount === 1 ? "is" : "are"} still waiting.`,
+        : `${plural(input.pendingCount, "action")} requested on or before ${formatDate(input.periodEnd)} ${pluralWord(input.pendingCount, "is", "are")} still waiting.`,
   };
 }
 

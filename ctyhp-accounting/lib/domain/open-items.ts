@@ -15,6 +15,7 @@
 
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { plural, formatDateRange } from "@/lib/format";
 
 /** One row of `acc_ar_ageing` / `acc_ap_ageing`, as the reports read it. */
 export interface OpenItemRow {
@@ -85,7 +86,7 @@ export function daysPastDue(dueDate: string, asOf: string): number {
 /** "Current" when not yet due, otherwise "N days". */
 export function ageLabel(days: number): string {
   if (days <= 0) return "Current";
-  return `${days} ${days === 1 ? "day" : "days"}`;
+  return plural(days, "day");
 }
 
 const byName = (a: string, b: string) => a.localeCompare(b, "en-US", { sensitivity: "base" });
@@ -179,7 +180,7 @@ export function openDocumentsSheet(
     fileName: sanitizeExportFileName(`${invoices ? "open-invoices" : "unpaid-bills"}-as-of-${ctx.asOf}`),
     companyName: ctx.companyName,
     title: invoices ? "Open Invoices" : "Unpaid Bills",
-    subtitle: `As of ${ctx.asOf}`,
+    subtitle: formatDateRange(null, ctx.asOf),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "date", header: "Date", kind: "text", width: 12 },
@@ -218,7 +219,7 @@ export function partyBalancesSheet(
     fileName: sanitizeExportFileName(`${kind}-balances-as-of-${ctx.asOf}`),
     companyName: ctx.companyName,
     title: customers ? "Customer Balance Summary" : "Vendor Balance Summary",
-    subtitle: `As of ${ctx.asOf}`,
+    subtitle: formatDateRange(null, ctx.asOf),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "party", header: customers ? "Customer" : "Vendor", kind: "text", width: 36 },

@@ -8,11 +8,11 @@ import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { SourceTag, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { dayBefore } from "@/lib/domain/fiscal";
-import { longDate, rangeText, shortDate } from "@/lib/domain/report-presets";
 import type { ZoomSpec } from "@/lib/domain/statement";
 import type { ZoomResult, ZoomRow } from "@/lib/domain/zoom";
 import { zoomAction } from "@/app/(app)/reports/actions";
 
+import { formatDate, formatDateRange, plural } from "@/lib/format";
 /**
  * QuickZoom (the prototype's `drillDetail`): every posted line behind the
  * figure that was clicked, adding up to it. A line opens the whole entry on
@@ -61,9 +61,9 @@ export default function ZoomSheet({
   // An entry opened from an earlier figure is not this one's.
   const entryId = openEntry && openEntry.spec === spec ? openEntry.entryId : null;
 
-  const dates = spec ? (spec.from ? rangeText(spec.from, spec.to) : `All dates through ${longDate(spec.to)}`) : "";
+  const dates = spec ? (spec.from ? formatDateRange(spec.from, spec.to) : `All dates through ${formatDate(spec.to)}`) : "";
   const columns = [
-    { title: "Date", key: "date", width: 108, render: (_: unknown, r: ZoomRow) => shortDate(r.entryDate) },
+    { title: "Date", key: "date", width: 108, render: (_: unknown, r: ZoomRow) => formatDate(r.entryDate) },
     {
       title: "Type",
       key: "type",
@@ -131,7 +131,7 @@ export default function ZoomSheet({
           ) : null}
           {result.opening !== null && spec?.from ? (
             <p className={styles.muted}>
-              Balance on {shortDate(dayBefore(spec.from))}: {money(result.opening)}
+              Balance on {formatDate(dayBefore(spec.from))}: {money(result.opening)}
             </p>
           ) : null}
           {/* `rows`: paged in the browser, since a total over all dates can stand on thousands of lines. */}
@@ -146,7 +146,7 @@ export default function ZoomSheet({
           />
           <div className={styles.zoomTotal}>
             <span>
-              {result.rows.length.toLocaleString("en-US")} {result.rows.length === 1 ? "line" : "lines"}
+              {plural(result.rows.length, "line")}
             </span>
             <strong>Total {money(result.total)}</strong>
           </div>

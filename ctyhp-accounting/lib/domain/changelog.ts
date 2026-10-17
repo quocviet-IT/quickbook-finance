@@ -41,6 +41,48 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.17",
+    date: "2026-10-17",
+    headline: "One way to write a date, the company's own today, counts that agree, and dark mode finished.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Every date reads 10/16/2026",
+        detail:
+          "Lists showed 2026-10-16, statements Aug 31, 2026 and report headings October 16, 2026, sometimes on one screen. Every screen, report heading, PDF and date picker now writes a date as month/day/year. Type a date into a picker the same way. Exports to CSV and Excel keep 2026-10-16, so a spreadsheet sorts them, and a monthly column still says Oct 2026.",
+        route: "/reports",
+      },
+      {
+        kind: "changed",
+        title: "Times in 12-hour, on the company's clock",
+        detail:
+          "Change Log, Close Log, Reconciliations, Voided Entries, Audit History, Approvals, Users, Backups, bank feed syncs and a PDF's Generated line showed times such as 22:09, some in UTC and some in your computer's time zone. They now read 10:09 PM, in the time zone set in Company Settings.",
+        route: "/settings/audit",
+      },
+      {
+        kind: "fixed",
+        title: "Every report agrees on what day it is",
+        detail:
+          "Some screens took today from UTC and others from your computer, so in the evening one report could say as of the 16th while the next said the 17th. Default dates, as-of lines, overdue marks, and the date a new journal entry or write-off is posted on now all use the company's today, in its own time zone.",
+        route: "/reports",
+      },
+      {
+        kind: "fixed",
+        title: "Counts agree with what they count",
+        detail:
+          "A list of one said 1 records, and messages said bill(s), account(s) and rule(s). Every count now says 1 bill or 2 bills, and its verb agrees: 1 feed needs attention. The pager under a table now says which rows it is showing, 11–20 of 25, since the bar above it already counts the results.",
+        route: "/bills",
+      },
+      {
+        kind: "fixed",
+        title: "Dark mode: the last light patches",
+        detail:
+          "The Accountant | Management switch and the filter pills on Chart of Accounts and Estimates follow the theme. Tables, cards and inputs take the same navy as the rest of the page instead of black under a navy header. Contra and the other purple tags are readable, and so is your email address at the top right.",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
     version: "2.16",
     date: "2026-10-17",
     headline: "Cash on hand is counted, and the count is dated.",

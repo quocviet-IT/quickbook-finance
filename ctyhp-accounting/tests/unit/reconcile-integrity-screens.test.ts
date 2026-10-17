@@ -140,7 +140,7 @@ describe("Transfers cleared on one side only, through the report", () => {
     });
     const sheet = exceptionReportSheet(report, meta).rows.find((r) => r.check === CHECK_LABEL.transferOneSide);
     expect(sheet?.name).toBe(
-      "JE-900001 cleared on Example Checking (Jun 30, 2026 statement) and not on Example Savings. Likely went to Example Reserve (1 candidate found).",
+      "JE-900001 cleared on Example Checking (06/30/2026 statement) and not on Example Savings. Likely went to Example Reserve (1 candidate found).",
     );
     expect(sheet?.amount).toBe(1000);
   });
@@ -218,7 +218,7 @@ describe("the No longer agrees badge counts what the Exceptions check lists", ()
     expect(describeStanding(res, "2026-09-30", money).noLongerAgrees).toBeNull();
     const one = withReconciliationChanges([standing("b-sav")], changes, "2026-09-30")[0];
     expect(reconcileCard("Example Savings", one, "2026-09-30", money).noLongerAgrees).toBe(
-      "No longer agrees: the Jun 30, 2026 reconciliation has changed since it was signed off",
+      "No longer agrees: the 06/30/2026 reconciliation has changed since it was signed off",
     );
   });
 
@@ -226,7 +226,7 @@ describe("the No longer agrees badge counts what the Exceptions check lists", ()
     const plain = standing("b-chk", { void_ticked_count: 2, void_ticked_minor: "27500", void_reconciliation_date: "2026-06-30" });
     expect(plain.changedReconciliations).toBeUndefined();
     expect(describeStanding(plain, "2026-09-30", money).noLongerAgrees).toBe(
-      "No longer agrees: 2 entries ticked on the Jun 30, 2026 reconciliation were voided ($275.00)",
+      "No longer agrees: 2 entries ticked on the 06/30/2026 reconciliation were voided ($275.00)",
     );
   });
 

@@ -1,4 +1,5 @@
 import type { SurfaceControl } from "@/lib/domain/work-surface/types";
+import { plural, pluralWord, formatDate } from "@/lib/format";
 
 /**
  * What Banking checks about itself, and when each check has passed.
@@ -19,10 +20,6 @@ import type { SurfaceControl } from "@/lib/domain/work-surface/types";
  *   every status carries a sentence and a pass condition, so the screen never
  *   has to make a colour do the explaining.
  */
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
 
 export type BankingControlKey =
   | "unmatched-activity"
@@ -52,7 +49,7 @@ export function unmatchedActivityControl(input: {
   const base = {
     key: "unmatched-activity" as const,
     title: "Imported activity is accounted for",
-    passCondition: `Every settled line dated on or before ${input.asOf} is matched or set aside.`,
+    passCondition: `Every settled line dated on or before ${formatDate(input.asOf)} is matched or set aside.`,
     evaluatedAt: input.evaluatedAt,
     href: "/banking",
     blocking: true,
@@ -135,7 +132,7 @@ export function feedHealthControl(input: {
   return {
     ...base,
     status: "attention",
-    detail: `${plural(input.brokenCount, "feed")} need attention: ${input.brokenNames.join(", ")}. New activity may not be arriving.`,
+    detail: `${plural(input.brokenCount, "feed")} ${pluralWord(input.brokenCount, "needs", "need")} attention: ${input.brokenNames.join(", ")}. New activity may not be arriving.`,
   };
 }
 
@@ -158,7 +155,7 @@ export function statementReconciliationControl(input: {
   const base = {
     key: "statement-reconciliation" as const,
     title: "Statements are reconciled",
-    passCondition: `Every account has a completed reconciliation reaching ${input.staleBefore}.`,
+    passCondition: `Every account has a completed reconciliation reaching ${formatDate(input.staleBefore)}.`,
     evaluatedAt: input.evaluatedAt,
     href: "/banking/reconcile",
     blocking: false,
@@ -186,12 +183,12 @@ export function statementReconciliationControl(input: {
     return {
       ...base,
       status: input.inProgressCount === 0 ? "healthy" : "attention",
-      detail: `Every account is reconciled through ${input.staleBefore}.${openNote}`,
+      detail: `Every account is reconciled through ${formatDate(input.staleBefore)}.${openNote}`,
     };
   }
   return {
     ...base,
     status: "attention",
-    detail: `${plural(input.behindNames.length, "account")} not reconciled through ${input.staleBefore}: ${input.behindNames.join(", ")}.${openNote}`,
+    detail: `${plural(input.behindNames.length, "account")} not reconciled through ${formatDate(input.staleBefore)}: ${input.behindNames.join(", ")}.${openNote}`,
   };
 }

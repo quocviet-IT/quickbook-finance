@@ -1,4 +1,5 @@
 "use client";
+import { plural, pluralWord } from "@/lib/format";
 import { Alert, Select, Space, Table, Tag, Typography } from "antd";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABEL, type AccountType } from "@/lib/domain/accounts";
 import type { AccountTypeReading } from "@/lib/domain/account-type-readings";
@@ -33,8 +34,8 @@ export default function AccountTypeReview({ readings, onChange }: AccountTypeRev
         showIcon
         message={
           unreadable.length > 0
-            ? `${unreadable.length} type(s) in this file mean nothing here`
-            : `How the ${readings.length} type(s) in this file were read`
+            ? `${plural(unreadable.length, "type")} in this file ${pluralWord(unreadable.length, "means", "mean")} nothing here`
+            : `How the ${plural(readings.length, "type")} in this file ${pluralWord(readings.length, "was", "were")} read`
         }
         description={
           unreadable.length > 0

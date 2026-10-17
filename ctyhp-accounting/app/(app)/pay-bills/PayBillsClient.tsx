@@ -24,7 +24,8 @@ import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
 import PayRunPanel from "@/components/payables/PayRunPanel";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -47,6 +48,7 @@ export default function PayBillsClient({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
+  const { today } = useCompanyClock();
   const currency = currencies.find((c) => c.is_base)?.code ?? "USD";
   const [openBills, setOpenBills] = useState<BillRow[]>([]);
   /** Bills whose early payment discount is being taken, by bill id. */
@@ -79,7 +81,6 @@ export default function PayBillsClient({
   function discountOffered(bill: BillRow): number {
     const remaining = (bill.discount_amount_minor ?? 0) - (bill.discount_taken_minor ?? 0);
     if (remaining <= 0 || !bill.discount_due_date) return 0;
-    const today = new Date().toISOString().slice(0, 10);
     if (today > bill.discount_due_date) return 0;
     return Math.min(remaining, bill.balance_due_minor);
   }
@@ -199,7 +200,7 @@ export default function PayBillsClient({
           { title: "Payment Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
           // The elastic column: a vendor name is text somebody typed.
           flexColumn<BillPaymentRow & { vendor_name: string }>({ title: "Vendor", dataIndex: "vendor_name" }),
-          { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE },
+          { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
           { title: "Amount", dataIndex: "amount_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
           { title: "Unapplied", dataIndex: "unapplied_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
           { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "blue"}>{s}</Tag> },
@@ -296,7 +297,7 @@ export default function PayBillsClient({
                 style={{ marginTop: 8 }}
             columns={[
               { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? "—" },
-              { title: "Date", dataIndex: "bill_date" },
+              { title: "Date", dataIndex: "bill_date", render: (v: string) => formatDate(v) },
               { title: "Balance", dataIndex: "balance_due_minor", align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
               {
                 title: "Discount",
@@ -319,7 +320,7 @@ export default function PayBillsClient({
                         }));
                       }}
                     >
-                      {formatMoney(available, r.currency_code, decimalsOf(r.currency_code))} by {r.discount_due_date}
+                      {formatMoney(available, r.currency_code, decimalsOf(r.currency_code))} by {formatDate(r.discount_due_date)}
                     </Checkbox>
                   );
                 },

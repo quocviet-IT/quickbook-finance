@@ -39,7 +39,7 @@ describe("the four sentences", () => {
 
   it("words an entry posted after sign-off with its date", () => {
     const rows = [change({ kind: "added", entryId: "e1", entryNumber: "JE-900103", entryDate: "2026-08-28" })];
-    expect(sentences(rows)).toEqual([["JE-900103, dated Aug 28, 2026, was posted after the reconciliation was signed off."]]);
+    expect(sentences(rows)).toEqual([["JE-900103, dated 08/28/2026, was posted after the reconciliation was signed off."]]);
   });
 
   it("words a drift with how far out it is, unsigned", () => {

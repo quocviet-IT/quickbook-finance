@@ -6,7 +6,7 @@ import { App, Button, DatePicker, Input, Select, Space, Statistic, Tooltip, Typo
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { sourceHref as documentHref } from "@/lib/domain/entry-detail";
 import {
   filterGeneralLedgerRows,
@@ -277,6 +277,7 @@ export default function GeneralLedgerClient({
                 title: "Date",
                 dataIndex: "entryDate",
                 width: widths.date,
+                render: (v: string) => formatDate(v),
                 onHeaderCell: () => resizeHandleProps("date"),
               },
               {

@@ -59,29 +59,29 @@ describe("describeStanding wording", () => {
       "2026-07-15",
       money,
     );
-    expect(v.text).toBe("Agreed to Jun 30, 2026 at $12500.00 · 3 entries since, $450.50 not on a statement");
+    expect(v.text).toBe("Agreed to 06/30/2026 at $12500.00 · 3 entries since, $450.50 not on a statement");
   });
 
   it("agreed with activity since, singular", () => {
     const v = describeStanding({ ...base, sinceCount: 1, sinceNetMinor: -2_000 }, "2026-07-15", money);
-    expect(v.text).toBe("Agreed to Jun 30, 2026 at $12500.00 · 1 entry since, -$20.00 not on a statement");
+    expect(v.text).toBe("Agreed to 06/30/2026 at $12500.00 · 1 entry since, -$20.00 not on a statement");
   });
 
   it("agreed, nothing since", () => {
     const v = describeStanding(base, "2026-07-15", money);
-    expect(v.text).toBe("Agreed to Jun 30, 2026 at $12500.00 · nothing since");
+    expect(v.text).toBe("Agreed to 06/30/2026 at $12500.00 · nothing since");
   });
 
   it("brought forward closing", () => {
     const v = describeStanding({ ...base, lastBroughtForward: true }, "2026-07-15", money);
-    expect(v.text).toBe("Agreed to Jun 30, 2026 at $12500.00 (brought forward) · nothing since");
+    expect(v.text).toBe("Agreed to 06/30/2026 at $12500.00 (brought forward) · nothing since");
     const w = describeStanding(
       { ...base, lastBroughtForward: true, sinceCount: 2, sinceNetMinor: 100 },
       "2026-07-15",
       money,
     );
     expect(w.text).toBe(
-      "Agreed to Jun 30, 2026 at $12500.00 (brought forward) · 2 entries since, $1.00 not on a statement",
+      "Agreed to 06/30/2026 at $12500.00 (brought forward) · 2 entries since, $1.00 not on a statement",
     );
   });
 
@@ -122,14 +122,14 @@ describe("no longer agrees", () => {
   it("plural, date and amount", () => {
     const v = describeStanding(voided, "2026-07-01", money);
     expect(v.noLongerAgrees).toBe(
-      "No longer agrees: 3 entries ticked on the May 31, 2026 reconciliation were voided (-$123.45)",
+      "No longer agrees: 3 entries ticked on the 05/31/2026 reconciliation were voided (-$123.45)",
     );
   });
 
   it("singular", () => {
     const v = describeStanding({ ...voided, voidTickedCount: 1, voidTickedMinor: 5_000 }, "2026-07-01", money);
     expect(v.noLongerAgrees).toBe(
-      "No longer agrees: 1 entry ticked on the May 31, 2026 reconciliation was voided ($50.00)",
+      "No longer agrees: 1 entry ticked on the 05/31/2026 reconciliation was voided ($50.00)",
     );
   });
 
@@ -267,21 +267,21 @@ describe("reconcileCardText", () => {
   });
 
   it("reconciled, nothing since", () => {
-    expect(reconcileCardText("Harbor Checking", base, money)).toBe("Reconciled to Jun 30, 2026; nothing new since.");
+    expect(reconcileCardText("Harbor Checking", base, money)).toBe("Reconciled to 06/30/2026; nothing new since.");
   });
 
   it("reconciled with activity uses the account line", () => {
     const s = { ...base, sinceCount: 2, sinceNetMinor: 1_000 };
     expect(reconcileCardText("Harbor Checking", s, money)).toBe(
-      "Agreed to Jun 30, 2026 at $12500.00 · 2 entries since, $10.00 not on a statement",
+      "Agreed to 06/30/2026 at $12500.00 · 2 entries since, $10.00 not on a statement",
     );
   });
 });
 
 describe("withBelowZero", () => {
   it("appends the date", () => {
-    expect(withBelowZero("Agreed to Jun 30, 2026 at $1.00 · nothing since", "2026-03-04")).toBe(
-      "Agreed to Jun 30, 2026 at $1.00 · nothing since · below zero at Mar 4, 2026",
+    expect(withBelowZero("Agreed to 06/30/2026 at $1.00 · nothing since", "2026-03-04")).toBe(
+      "Agreed to 06/30/2026 at $1.00 · nothing since · below zero at 03/04/2026",
     );
   });
 });

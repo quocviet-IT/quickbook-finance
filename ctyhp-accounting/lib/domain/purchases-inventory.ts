@@ -1,6 +1,7 @@
 import { dayBefore, fiscalMonths, fiscalYearForDate } from "./fiscal";
 import { NO_VENDOR } from "./party-activity";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { plural, pluralWord, formatDateRange } from "@/lib/format";
 
 /**
  * Purchases and Inventory: what was bought, from whom, and whether the stock
@@ -303,7 +304,7 @@ export function yearProofText(
   const off = report.offByYears;
   if (off.length === 0) return "That holds in every year shown.";
   const detail = off.map((y) => `${money(Math.abs(y.offByMinor))} in ${y.label}`).join(", ");
-  return `${off.length === 1 ? "One year is" : `${off.length} years are`} off by ${detail}, usually stock bought or written off through neither account.`;
+  return `${off.length === 1 ? "One year is" : `${plural(off.length, "year")} ${pluralWord(off.length, "is", "are")}`} off by ${detail}, usually stock bought or written off through neither account.`;
 }
 
 export const NOTHING_BOUGHT_TITLE = "Nothing has been bought in these books yet.";
@@ -353,7 +354,7 @@ export function purchasesInventorySheet(
     fileName: sanitizeExportFileName(`purchases-and-inventory-${report.from}-to-${report.to}`),
     companyName: ctx.companyName,
     title: "Purchases and Inventory",
-    subtitle: `${report.from} to ${report.to}`,
+    subtitle: formatDateRange(report.from, report.to),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "section", header: "Table", kind: "text", width: 24 },

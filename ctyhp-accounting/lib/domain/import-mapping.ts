@@ -19,6 +19,7 @@
 
 import { parseStatementAmount } from "./statement-import";
 import { ACCOUNT_TYPES, type AccountType } from "./accounts";
+import { plural, pluralWord } from "@/lib/format";
 
 export type ImportTarget =
   | "chart_of_accounts"
@@ -709,7 +710,7 @@ export function applyMapping(
 /** One sentence describing what the file holds, before anything is imported. */
 export function describeParsedImport(parsed: ParsedImport, target: ImportTarget): string {
   const parts = [`${parsed.records.length} ${TARGET_LABEL[target].toLowerCase()} ready`];
-  if (parsed.problems.length > 0) parts.push(`${parsed.problems.length} row(s) need attention`);
-  if (parsed.blankRows > 0) parts.push(`${parsed.blankRows} blank row(s) skipped`);
+  if (parsed.problems.length > 0) parts.push(`${plural(parsed.problems.length, "row")} ${pluralWord(parsed.problems.length, "needs", "need")} attention`);
+  if (parsed.blankRows > 0) parts.push(`${plural(parsed.blankRows, "blank row")} skipped`);
   return `${parts.join(", ")}.`;
 }

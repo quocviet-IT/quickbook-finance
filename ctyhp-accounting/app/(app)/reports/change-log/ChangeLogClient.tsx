@@ -9,7 +9,7 @@ import SimpleReport, { reportPagination } from "@/components/reports/SimpleRepor
 import { changeLogSheet, CHANGE_LOG_LIMIT, type ChangeLogEntry, type ChangeLogReport } from "@/lib/domain/change-log";
 import type { PresetContext } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
-import { stampInTimeZone } from "@/lib/domain/stamp";
+import { formatDateTime, plural } from "@/lib/format";
 
 const PAGE_SIZE = 50;
 /** Room for a two-word action; a longer one, "Match from reconciliation", wraps inside its tag. */
@@ -86,7 +86,7 @@ export default function ChangeLogClient({
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
-              title={`Only the newest ${CHANGE_LOG_LIMIT.toLocaleString("en-US")} changes are shown.`}
+              title={`Only the newest ${plural(CHANGE_LOG_LIMIT, "change")} are shown.`}
               description="This period holds more. Narrow the dates to see the rest."
             />
           ) : null}
@@ -97,7 +97,7 @@ export default function ChangeLogClient({
             emptyTitle={record ? "No change to this kind of record in this period" : "Nothing changed in this period"}
             emptyDescription={record ? "Choose All records, or widen the dates." : "Widen the dates."}
             columns={[
-              { title: "When", dataIndex: "at", width: 150, render: (at: string) => stampInTimeZone(at, timeZone) },
+              { title: "When", dataIndex: "at", width: 170, render: (at: string) => formatDateTime(at, timeZone) },
               { title: "Who", dataIndex: "who", width: 220, ellipsis: true },
               {
                 title: "What",

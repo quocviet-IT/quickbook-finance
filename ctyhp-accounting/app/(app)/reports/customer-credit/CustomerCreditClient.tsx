@@ -16,7 +16,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import { downloadCsvFile } from "@/lib/client/report-export";
 import { toCsv } from "@/lib/csv";
 import { csvWithReportIdentity } from "@/lib/domain/report-export";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import { creditStateColor, sortByCreditRisk } from "@/lib/domain/credit";
 import type { CustomerCreditRow } from "@/lib/services/credit";
 import { TOKENS } from "@/lib/design/tokens";
@@ -105,7 +105,7 @@ export default function CustomerCreditClient({
         {
           companyName,
           title: "Customer Credit Exposure",
-          subtitle: `Sales window ${salesWindowDays} days`,
+          subtitle: `Sales window ${plural(salesWindowDays, "day")}`,
           currencyCode: "USD",
         },
       ),
@@ -130,8 +130,8 @@ export default function CustomerCreditClient({
         />
         <Statistic title="On credit hold" value={onHold} />
         <Statistic
-          title={`Days sales outstanding (last ${salesWindowDays} days)`}
-          value={portfolioDso === null ? "—" : `${portfolioDso} days`}
+          title={`Days sales outstanding (last ${plural(salesWindowDays, "day")})`}
+          value={portfolioDso === null ? "—" : `${portfolioDso} ${pluralWord(portfolioDso, "day")}`}
         />
       </Space>
 
@@ -139,7 +139,7 @@ export default function CustomerCreditClient({
         <Alert
           type="info"
           showIcon
-          message={`${noLimit} of ${rows.length} customers have no credit limit set`}
+          message={`${noLimit} of ${plural(rows.length, "customer")} ${pluralWord(noLimit, "has", "have")} no credit limit set`}
           description="Nothing is enforced for those accounts: an invoice of any size will issue. Set a limit on the customer record to bring them under the control."
         />
       ) : null}
@@ -258,7 +258,7 @@ export default function CustomerCreditClient({
                 <Tooltip
                   title={
                     row.oldestDueDate
-                      ? `Oldest due ${row.oldestDueDate}`
+                      ? `Oldest due ${formatDate(row.oldestDueDate)}`
                       : undefined
                   }
                 >

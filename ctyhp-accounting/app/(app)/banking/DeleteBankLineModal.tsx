@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/format";
 import { useState } from "react";
 import { App, Alert, Input, Modal, Space } from "antd";
 import { deleteBankTransactionAction } from "./actions";
@@ -82,7 +83,7 @@ export default function DeleteBankLineModal({
     >
       <Space direction="vertical" size="small" style={{ width: "100%" }}>
         <div>
-          <b>{target?.txnDate}</b> · {target?.description} · {target?.amount}
+          <b>{formatDate(target?.txnDate)}</b> · {target?.description} · {target?.amount}
         </div>
         <Alert
           type="warning"

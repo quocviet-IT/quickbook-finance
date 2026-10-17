@@ -1,5 +1,6 @@
 import type { DerivedWorkItem, Severity, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
+import { plural, formatDate } from "@/lib/format";
 
 /** Every work key the Purchases overview derives starts with one of these; its retire is scoped to them. */
 export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied:"] as const;
@@ -19,10 +20,6 @@ export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied
 
 function money(minor: number): string {
   return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 export const PURCHASES_NOUNS: SurfaceNouns = {
@@ -213,7 +210,7 @@ export function billDueItem(
   const when =
     input.daysPastDue > 0
       ? `${plural(input.daysPastDue, "day")} past due`
-      : `due ${bill.dueDate}`;
+      : `due ${formatDate(bill.dueDate)}`;
   return {
     key: `ap-bill:${bill.id}`,
     sourceKind: "bill-due",
@@ -247,7 +244,7 @@ export function receivedNotBilledItem(
     sourceKind: "received-not-billed",
     sourceId: line.lineId,
     title: line.description.trim() || "Received goods",
-    reason: `${line.vendorName} · ${line.poNumber ? `PO ${line.poNumber}` : "unnumbered order"} · ${line.qtyOutstanding} received and not billed since ${line.orderDate}`,
+    reason: `${line.vendorName} · ${line.poNumber ? `PO ${line.poNumber}` : "unnumbered order"} · ${line.qtyOutstanding} received and not billed since ${formatDate(line.orderDate)}`,
     severity: input.ageDays > 60 ? "high" : "medium",
     amountMinor: Math.abs(line.valueMinor),
     ageDays: input.ageDays,
@@ -273,7 +270,7 @@ export function unappliedPaymentItem(
     sourceKind: "unapplied-payment",
     sourceId: payment.id,
     title: payment.number ? `Payment ${payment.number}` : "Supplier payment",
-    reason: `${payment.vendorName} · paid ${payment.paymentDate} · not applied to any bill`,
+    reason: `${payment.vendorName} · paid ${formatDate(payment.paymentDate)} · not applied to any bill`,
     severity: input.ageDays > 30 ? "high" : "medium",
     amountMinor: Math.abs(payment.unappliedMinor),
     ageDays: input.ageDays,

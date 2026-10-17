@@ -1,4 +1,6 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, plural } from "@/lib/format";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Card, Input, InputNumber, Space, Table, Tag } from "antd";
@@ -19,7 +21,8 @@ export default function PeriodsClient({
   fiscalStartMonth: number;
 }) {
   const { message, modal } = App.useApp();
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const { today } = useCompanyClock();
+  const [year, setYear] = useState<number>(Number(today.slice(0, 4)));
   const [rows, setRows] = useState<AccountingPeriodRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +42,7 @@ export default function PeriodsClient({
   const generate = async () => {
     const r = await generatePeriodsAction(year);
     if (r.ok) {
-      message.success(`Generated ${r.data?.created ?? 0} period(s)`);
+      message.success(`Generated ${plural(r.data?.created ?? 0, "period")}`);
       void load(year);
     } else {
       message.error(r.error ?? "Failed");
@@ -177,8 +180,8 @@ export default function PeriodsClient({
         pagination={false}
         columns={[
           { title: "Period", dataIndex: "label" },
-          { title: "Start", dataIndex: "period_start" },
-          { title: "End", dataIndex: "period_end" },
+          { title: "Start", dataIndex: "period_start", render: (value: string) => formatDate(value) },
+          { title: "End", dataIndex: "period_end", render: (value: string) => formatDate(value) },
           {
             title: "Status",
             dataIndex: "status",

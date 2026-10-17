@@ -1,4 +1,5 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,7 +21,7 @@ import {
   startsTicked,
   type ReviewPostItem,
 } from "@/lib/domain/statement-review";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatDateInTimeZone, formatMoney, plural } from "@/lib/format";
 import type { ImportReview, ReviewLineView, ReviewOutcome } from "@/lib/services/statement-review";
 import LoanSplitModal from "../../LoanSplitModal";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "../../rules/RuleFormModal";
@@ -33,6 +34,7 @@ import styles from "./review-import.module.css";
  * waiting on Bank Transactions exactly as an import has always left it.
  */
 export default function ReviewImportClient({ review, canWrite }: { review: ImportReview; canWrite: boolean }) {
+  const { timeZone } = useCompanyClock();
   const { message } = App.useApp();
   const router = useRouter();
   const { batch, lines, accounts } = review;
@@ -160,7 +162,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   };
 
   const columns: TableColumnsType<ReviewLineView> = [
-    { title: "Date", key: "date", dataIndex: "txnDate", width: COLUMN.DATE },
+    { title: "Date", key: "date", dataIndex: "txnDate", width: COLUMN.DATE, render: (value: string) => formatDate(value) },
     {
       ...flexColumn<ReviewLineView>({
         title: "Description",
@@ -252,14 +254,12 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
     <div className={styles.review}>
       <Space direction="vertical" size={4} style={{ marginBottom: 12 }}>
         <Typography.Text strong>
-          {batch.filename} · {batch.bankLabel} · imported {batch.importedAt.slice(0, 10)}
+          {batch.filename} · {batch.bankLabel} · imported {formatDateInTimeZone(batch.importedAt, timeZone)}
         </Typography.Text>
         <Typography.Text type="secondary">
-          {batch.rowCount} row{batch.rowCount === 1 ? "" : "s"} in the file · {lines.length} line{lines.length === 1 ? "" : "s"} from this
-          import · {counts.match} already in the books · {counts.document} pay a document · {counts.transfer} transfer
-          {counts.transfer === 1 ? "" : "s"} · {cardPayments} card payment{cardPayments === 1 ? "" : "s"} · {betweenCompanies} between
-          companies · {counts.loan} loan payment
-          {counts.loan === 1 ? "" : "s"} · {counts.account - cardPayments - betweenCompanies} have an
+          {plural(batch.rowCount, "row")} in the file · {plural(lines.length, "line")} from this
+          import · {counts.match} already in the books · {counts.document} pay a document · {plural(counts.transfer, "transfer")} · {plural(cardPayments, "card payment")} · {betweenCompanies} between
+          companies · {plural(counts.loan, "loan payment")} · {counts.account - cardPayments - betweenCompanies} have an
           account · {possibleFunding} possible funding · {counts.none} need
           coding · {counts.handled} already handled
         </Typography.Text>
@@ -278,7 +278,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
                   const line = byId.get(failure.id);
                   return (
                     <div key={failure.id}>
-                      {line ? `${line.txnDate} · ${line.description} · ${money(line.amountMinor)}` : failure.id}:{" "}
+                      {line ? `${formatDate(line.txnDate)} · ${line.description} · ${money(line.amountMinor)}` : failure.id}:{" "}
                       <Typography.Text type="danger">{failure.error}</Typography.Text>
                     </div>
                   );
@@ -309,11 +309,11 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
       <Space style={{ marginTop: 12 }} wrap>
         {canWrite ? (
           <Button type="primary" disabled={!postable.length || progress !== null} loading={progress !== null} onClick={() => void post()}>
-            Post {postable.length} line{postable.length === 1 ? "" : "s"}
+            Post {plural(postable.length, "line")}
           </Button>
         ) : null}
         <Typography.Text type="secondary">
-          {Math.max(0, waiting)} line{waiting === 1 ? "" : "s"} will stay waiting on Bank Transactions
+          {plural(Math.max(0, waiting), "line")} will stay waiting on Bank Transactions
         </Typography.Text>
         <Link href="/banking">Back to Banking</Link>
       </Space>

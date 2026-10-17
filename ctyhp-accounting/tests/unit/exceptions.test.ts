@@ -166,8 +166,8 @@ describe("clearingAccountsNotEmptied", () => {
       ["z", false],
     ]);
     const view = clearingSentences(rows[0], "2026-08-31", dollars);
-    expect(view.composition).toBe("$12345.00 across 16 receipts, oldest Dec 2, 2025");
-    expect(view.idle).toBe("No movement for 245 days, since Dec 29, 2025");
+    expect(view.composition).toBe("$12345.00 across 16 receipts, oldest 12/02/2025");
+    expect(view.idle).toBe("No movement for 245 days, since 12/29/2025");
     expect(rows[0].balanceMinor).toBe(1_234_500);
   });
 
@@ -178,7 +178,7 @@ describe("clearingAccountsNotEmptied", () => {
       "2026-08-31",
     );
     expect(clearingSentences(rows[0], "2026-08-31", dollars).composition).toBe(
-      "$12345.00 across 3 entries, oldest Dec 2, 2025",
+      "$12345.00 across 3 entries, oldest 12/02/2025",
     );
   });
 
@@ -201,7 +201,7 @@ describe("clearingAccountsNotEmptied", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].balanceMinor).toBe(-80_000);
     expect(rows[0].leftStanding).toBe(false);
-    expect(clearingSentences(rows[0], "2026-08-31", dollars).composition).toBe("$800.00 across 4 entries, oldest Jul 1, 2026");
+    expect(clearingSentences(rows[0], "2026-08-31", dollars).composition).toBe("$800.00 across 4 entries, oldest 07/01/2026");
   });
 
   it("does not list an account that has emptied", () => {
@@ -711,7 +711,7 @@ describe("exceptionReportSheet", () => {
   it("titles the sheet with the report's range and basis", () => {
     const sheet = exceptionReportSheet(buildExceptionReport(emptyInput()), meta);
     expect(sheet.title).toBe("Exception Report");
-    expect(sheet.subtitle).toBe("January 1, 2026 – September 26, 2026 · Accrual basis");
+    expect(sheet.subtitle).toBe("01/01/2026 – 09/26/2026 · Accrual basis");
     expect(sheet.fileName).toBe("exception-report-2026-01-01-to-2026-09-26");
   });
 });
@@ -722,7 +722,7 @@ describe("csvFromExportSheet", () => {
       fileName: "x",
       companyName: "Cascade Precious Metals, Inc.",
       title: "Exception Report",
-      subtitle: "January 1, 2026 – September 26, 2026",
+      subtitle: "Jan 1, 2026 – Sep 26, 2026",
       currencyCode: "USD",
       columns: [
         { key: "name", header: "Name" },
@@ -737,7 +737,7 @@ describe("csvFromExportSheet", () => {
       '"Cascade Precious Metals, Inc."',
       "Exception Report",
       // The range has commas in it, so it is quoted like any other value.
-      '"January 1, 2026 – September 26, 2026"',
+      '"Jan 1, 2026 – Sep 26, 2026"',
       "Currency: USD",
       "",
       "Name,Amount",
@@ -799,7 +799,7 @@ describe("the clearing check in the report", () => {
         check: "Clearing accounts that have not emptied",
         date: "2025-12-02",
         type: "Left standing",
-        name: "$12,345.00 across 16 receipts, oldest Dec 2, 2025 · No movement for 245 days, since Dec 29, 2025",
+        name: "$12,345.00 across 16 receipts, oldest 12/02/2025 · No movement for 245 days, since 12/29/2025",
         account: "1250 Card Settlements",
         amount: 12_345,
       },
@@ -957,7 +957,7 @@ describe("Reconciliations that no longer agree", () => {
         check: CHECK_LABEL.noLongerAgree,
         date: "2026-05-31",
         type: "Changed after sign-off",
-        name: "JE-900002, dated May 30, 2026, was posted after the reconciliation was signed off.",
+        name: "JE-900002, dated 05/30/2026, was posted after the reconciliation was signed off.",
         account: "Ascent Savings",
         amount: null,
       },

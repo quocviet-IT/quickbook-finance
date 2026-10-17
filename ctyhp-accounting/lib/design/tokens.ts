@@ -65,6 +65,16 @@ export const TOKENS = {
     subtle: PALETTE.slate25,
     sider: PALETTE.slate900,
     siderFocus: PALETTE.ink850,
+    /**
+     * What floats above a card, and the chosen half of a switch: popovers,
+     * menus, the selected option of an Accountant | Management toggle. White
+     * in light, like the card; in dark one step lighter than the card, which
+     * is how a dark interface says "above". Ant Design fell back to its own
+     * neutral grey here, off the navy of every surface around it.
+     */
+    raised: PALETTE.white,
+    /** The well a switch sits in: a step below the card it is drawn on. */
+    inset: PALETTE.slate100,
   },
   border: {
     default: PALETTE.slate200,
@@ -199,6 +209,8 @@ export const TOKENS = {
     positiveBg: PALETTE.mintGreen50,
     positiveBgAlt: PALETTE.mintGreen100,
     purpleBg: PALETTE.violet50,
+    /** Written on `purpleBg`: the Contra tag. Ant Design's purple preset read at 3.39:1 in dark. */
+    purpleText: PALETTE.violet600,
     infoBgAlt: PALETTE.skyBlue50,
     warningText: PALETTE.amberText,
     warningBg: PALETTE.amber50,
@@ -291,6 +303,8 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     subtle: PALETTE.ink700,
     sider: PALETTE.ink950,
     siderFocus: PALETTE.ink850,
+    raised: PALETTE.ink700,
+    inset: PALETTE.ink900,
   },
   border: {
     default: PALETTE.ink600,
@@ -389,6 +403,7 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     positiveBg: PALETTE.ink700,
     positiveBgAlt: PALETTE.ink700,
     purpleBg: PALETTE.ink700,
+    purpleText: PALETTE.violet400,
     infoBgAlt: PALETTE.blue900,
     warningText: PALETTE.amber400,
     warningBg: PALETTE.gold900,
@@ -488,6 +503,12 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["intent.warning", "surface.card"],
   ["intent.danger", "surface.card"],
   ["intent.info", "surface.card"],
+  /** A switch: its chosen option on the raised half, the others in the well. */
+  ["text.heading", "surface.raised"],
+  ["text.secondary", "surface.inset"],
+  /** The pressed filter pill on Chart of Accounts and Estimates. */
+  ["accent.strong", "accent.hover"],
+  ["feedback.purpleText", "feedback.purpleBg"],
   /**
    * White on the solid brand fill. Not a text-on-surface pair like the rest —
    * it is text on a *block* — but it belongs here for the same reason they do:
@@ -569,6 +590,11 @@ export function antdThemeTokens(theme: ThemeName = "light") {
       colorWarning: t("intent.warning"),
       colorError: t("intent.danger"),
       colorBgLayout: t("surface.page"),
+      // Cards, tables, inputs and what floats above them. Left to Ant Design,
+      // dark drew them in its own near-black and neutral grey, so a table
+      // body sat black under a navy header on a navy page.
+      colorBgContainer: t("surface.card"),
+      colorBgElevated: t("surface.raised"),
       colorTextHeading: t("text.heading"),
     },
     components: {
@@ -588,6 +614,14 @@ export function antdThemeTokens(theme: ThemeName = "light") {
         headerBg: t("surface.muted"),
         headerColor: t("text.secondary"),
         borderColor: t("border.subtle"),
+        rowHoverBg: t("surface.subtle"),
+      },
+      Segmented: {
+        trackBg: t("surface.inset"),
+        itemColor: t("text.secondary"),
+        itemHoverColor: t("text.heading"),
+        itemSelectedBg: t("surface.raised"),
+        itemSelectedColor: t("text.heading"),
       },
     },
   };

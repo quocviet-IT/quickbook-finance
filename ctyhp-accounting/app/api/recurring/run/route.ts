@@ -16,11 +16,11 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const asOf = new Date().toISOString().slice(0, 10);
   try {
     // The occurrence budget resets for every company, so one busy schedule
-    // cannot spend the next company's allowance. The job owns those rules.
-    const job = await runRecurringAutomationJob(asOf);
+    // cannot spend the next company's allowance. The job owns those rules, and
+    // runs each company for its own today.
+    const job = await runRecurringAutomationJob();
     return Response.json({
       processedAt: new Date().toISOString(),
       ...job,

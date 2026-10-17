@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
 import { toMinor } from "@/lib/domain/money";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
 import { chosenBankId } from "@/lib/domain/reconcile-alerts-screen";
@@ -166,7 +166,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
           loading={loading || (rows.length === 0 && !standingSettled)}
           dataSource={rows}
           columns={[
-            { title: "Ending date", dataIndex: "statement_ending_date" },
+            { title: "Ending date", dataIndex: "statement_ending_date", render: (value: string) => formatDate(value) },
             { title: "Beginning", align: "right", render: (_, r) => money(r.beginning_balance_minor) },
             { title: "Statement ending", align: "right", render: (_, r) => money(r.statement_ending_balance_minor) },
             { title: "Statement", render: (_, r) => r.statement_ref ?? "—" },

@@ -26,11 +26,10 @@ import {
   type ClearingView,
   type Money,
 } from "@/lib/domain/clearing-accounts";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDateRange, formatDate, plural } from "@/lib/format";
 import { fromMinor } from "@/lib/domain/money";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { BankStanding } from "@/lib/domain/bank-standing";
-import { rangeText } from "@/lib/domain/report-presets";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import {
   belowZeroRows,
@@ -49,7 +48,6 @@ import {
   quotedReason,
   type NamedStatementOverride,
 } from "@/lib/domain/statement-overrides";
-import { shortDate } from "@/lib/domain/report-presets";
 import {
   groupReconciliationChanges,
   type ChangedReconciliation,
@@ -449,7 +447,7 @@ export function transfersClearedOnOneSide(
 /** A flagged transfer as one sentence, for the export. */
 export function transferOneSideSentence(row: TransferOneSideRow): string {
   const found = candidateNote(row.candidateCount);
-  return `${row.entryNumber} cleared on ${row.clearedAccountName} (${shortDate(row.clearedStatementDate)} statement) and not on ${row.openAccountName}. ${destinationSentence(row.destinationName)}${found ? ` (${found})` : ""}.`;
+  return `${row.entryNumber} cleared on ${row.clearedAccountName} (${formatDate(row.clearedStatementDate)} statement) and not on ${row.openAccountName}. ${destinationSentence(row.destinationName)}${found ? ` (${found})` : ""}.`;
 }
 
 const INCOME_TYPES: ReadonlySet<AccountType> = new Set<AccountType>(["income", "other_income"]);
@@ -623,7 +621,7 @@ export interface StatementOverrideRow {
   filename: string;
   /** The day it was imported in the company's time zone, `2026-10-08`. */
   importedDay: string;
-  /** That day as the screen prints it, `Oct 8, 2026`. */
+  /** That day as the screen prints it, `10/08/2026`. */
   importedDate: string;
   /** The time of day in the company's time zone, `11:47 AM`. */
   importedTime: string;
@@ -672,12 +670,12 @@ export function openStatementOverrides(
 
 /**
  * The sentence a row is read by, on the screen and in the export:
- * "bank-june.csv, imported Oct 8, 2026 at 11:47 AM by Dana Reyes, out by $12.00: “reason”. Open since Oct 8, 2026."
+ * "bank-june.csv, imported 10/08/2026 at 11:47 AM by Dana Reyes, out by $12.00: “reason”. Open since 10/08/2026."
  */
 export function statementOverrideSentence(row: StatementOverrideRow, money: Money): string {
   return (
     `${row.filename}, imported ${row.importedDate} at ${row.importedTime} by ${row.byName}, ` +
-    `out by ${money(row.outByMinor)}: ${quotedReason(row.reason)} Open since ${shortDate(row.openSince)}.`
+    `out by ${money(row.outByMinor)}: ${quotedReason(row.reason)} Open since ${formatDate(row.openSince)}.`
   );
 }
 
@@ -936,7 +934,7 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       check: CHECK_LABEL.incomeNoCost,
       date: y.year,
       type: "Income",
-      name: y.entryCount === null ? "" : `${y.entryCount} entries`,
+      name: y.entryCount === null ? "" : plural(y.entryCount, "entry", "entries"),
       account: "",
       amount: money(y.incomeMinor),
     })),
@@ -952,7 +950,7 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
           ? ""
           : u.sinceCount === 0
             ? "Nothing since"
-            : `${u.sinceCount === 1 ? "1 entry" : `${u.sinceCount} entries`} since`,
+            : `${plural(u.sinceCount, "entry", "entries")} since`,
       account: u.accountName,
       amount: money(u.balanceMinor),
     })),
@@ -1029,7 +1027,7 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
     fileName: sanitizeExportFileName(`exception-report-${meta.from}-to-${meta.to}`),
     companyName: meta.companyName,
     title: "Exception Report",
-    subtitle: `${rangeText(meta.from, meta.to)} · Accrual basis`,
+    subtitle: `${formatDateRange(meta.from, meta.to)} · Accrual basis`,
     currencyCode: meta.currencyCode,
     columns: [
       { key: "check", header: "Check", width: 34 },

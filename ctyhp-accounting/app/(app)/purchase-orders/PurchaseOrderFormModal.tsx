@@ -9,6 +9,7 @@ import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { poLineTotalMinor } from "@/lib/domain/purchasing";
 import { withVendor } from "@/lib/domain/vendors";
 import { formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import NewVendorButton from "@/components/NewVendorButton";
 import { savePurchaseOrderAction } from "./actions";
 
@@ -55,6 +56,7 @@ function PurchaseOrderFormModalBody({
   lines,
 }: Props) {
   const { message } = App.useApp();
+  const { today } = useCompanyClock();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const currency = order?.currency_code ?? currencies.find((c) => c.is_base)?.code ?? "USD";
@@ -74,7 +76,7 @@ function PurchaseOrderFormModalBody({
 
   const initialValues = useMemo(() => {
     const d = currencies.find((c) => c.code === (order?.currency_code ?? currency))?.decimal_places ?? 2;
-    if (!order) return { order_date: dayjs(), lines: [{ quantity: 1 }] as LineForm[] };
+    if (!order) return { order_date: dayjs(today), lines: [{ quantity: 1 }] as LineForm[] };
     return {
       vendor_id: order.vendor_id,
       order_date: dayjs(order.order_date),

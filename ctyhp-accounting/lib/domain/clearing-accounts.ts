@@ -1,6 +1,6 @@
 import { daysFromTo } from "@/lib/domain/bank-standing";
-import { shortDate } from "@/lib/domain/report-presets";
 
+import { formatDate, plural } from "@/lib/format";
 /** A clearing account with no movement for more than this many days is left standing. */
 export const CLEARING_IDLE_DAYS = 60;
 /** A clearing account whose oldest open item is more than this many days old is left standing. */
@@ -74,8 +74,8 @@ export interface ClearingView {
 }
 
 function noun(n: number, kind: ClearingItemNoun): string {
-  if (kind === "receipts") return n === 1 ? "1 receipt" : `${n} receipts`;
-  return n === 1 ? "1 entry" : `${n} entries`;
+  if (kind === "receipts") return plural(n, "receipt");
+  return plural(n, "entry", "entries");
 }
 
 export function describeClearing(
@@ -101,13 +101,12 @@ export function describeClearing(
   const composition =
     zero || s.openOldestDate === null
       ? null
-      : `${money(s.openMinor)} across ${noun(s.openCount, kind)}, oldest ${shortDate(s.openOldestDate)}`;
+      : `${money(s.openMinor)} across ${noun(s.openCount, kind)}, oldest ${formatDate(s.openOldestDate)}`;
 
-  const dayText = idleDays === 1 ? "1 day" : `${idleDays} days`;
   const idle =
     s.lastMovementDate === null || idleDays === null
       ? null
-      : `No movement for ${dayText}, since ${shortDate(s.lastMovementDate)}`;
+      : `No movement for ${plural(idleDays, "day")}, since ${formatDate(s.lastMovementDate)}`;
 
   return { leftStanding, idleDays, oldestDays, composition, idle };
 }

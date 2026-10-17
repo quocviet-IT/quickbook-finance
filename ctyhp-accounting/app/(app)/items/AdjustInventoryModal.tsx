@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, DatePicker, Form, Input, InputNumber, Modal, Select, Typography } from "antd";
 import dayjs from "dayjs";
+import { useCompanyClock } from "@/components/CompanyClock";
 import type { AccountRow, ItemRow } from "@/lib/db/types";
 import { adjustInventoryAction } from "./inventory-actions";
 
@@ -31,6 +32,7 @@ function AdjustInventoryModalBody({
   onClose,
 }: Props & { item: ItemRow }) {
   const { message } = App.useApp();
+  const { today } = useCompanyClock();
   const router = useRouter();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -77,7 +79,7 @@ function AdjustInventoryModalBody({
         enter; a negative quantity is costed at weighted average. Leave the quantity at zero and set a
         value change to revalue the stock without moving units.
       </Typography.Paragraph>
-      <Form form={form} layout="vertical" initialValues={{ adjust_date: dayjs(), qty_delta: 0 }}>
+      <Form form={form} layout="vertical" initialValues={{ adjust_date: dayjs(today), qty_delta: 0 }}>
         <Form.Item name="adjust_date" label="Date" rules={[{ required: true, message: "Date" }]}>
           <DatePicker />
         </Form.Item>

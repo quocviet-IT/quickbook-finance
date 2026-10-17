@@ -5,7 +5,6 @@ import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { shortDate } from "@/lib/domain/report-presets";
 import { ghostCard, type CopyFormat, type GhostRow } from "@/lib/domain/statement-alerts";
 import {
   BLOCKERS_HEADING,
@@ -23,6 +22,7 @@ import { WORKINGS_ELASTIC_FLOOR, WORKINGS_WIDTH } from "./alert-columns";
 import { AlertIcon, EntryLink, Segments } from "./alert-parts";
 import styles from "./statement-alerts.module.css";
 
+import { formatDate } from "@/lib/format";
 interface Props {
   group: GhostGroupView;
   bankAccountId: string;
@@ -96,7 +96,7 @@ export default function BalanceGroupCard({ group, bankAccountId, canWrite, fmt, 
       width: WORKINGS_WIDTH.date,
       render: (_, row) => (
         <EntryLink entryNumber={row.entryNumber} onOpen={() => onOpenEntry(row.entryId)}>
-          {shortDate(row.date)}
+          {formatDate(row.date)}
         </EntryLink>
       ),
     },
@@ -162,7 +162,7 @@ export default function BalanceGroupCard({ group, bankAccountId, canWrite, fmt, 
                   <EntryLink entryNumber={b.entryNumber} onOpen={() => onOpenEntry(b.entryId)}>
                     {b.entryNumber || "Entry"}
                   </EntryLink>
-                  {/* The reason is a predicate: "JE-0042 is dated Sep 30, 2026, in a closed period; …". */}
+                  {/* The reason is a predicate: "JE-0042 is dated 09/30/2026, in a closed period; …". */}
                   <span className={styles.blockerReason}> {b.reason}</span>
                 </li>
               ))}

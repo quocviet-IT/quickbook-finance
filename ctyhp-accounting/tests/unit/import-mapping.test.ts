@@ -223,8 +223,8 @@ describe("applyMapping", () => {
     );
     const summary = describeParsedImport(parsed, "chart_of_accounts");
     expect(summary).toContain("1 chart of accounts ready");
-    expect(summary).toContain("1 row(s) need attention");
-    expect(summary).toContain("1 blank row(s) skipped");
+    expect(summary).toContain("1 row needs attention");
+    expect(summary).toContain("1 blank row skipped");
   });
 });
 

@@ -14,6 +14,7 @@ import {
   validateStockCount,
 } from "@/lib/domain/stock-count";
 import { executeOrSubmitForApproval } from "@/lib/services/approval-flow";
+import { formatDate } from "@/lib/format";
 import {
   createStockCount,
   getBookValue,
@@ -165,7 +166,7 @@ export async function postStockCountAction(raw: unknown): Promise<ActionResult<P
       actionKey: "inventory_adjustment",
       title: `Stock count ${found.count.count_number}`,
       amountMinor: Math.abs(difference),
-      reason: `Stock count ${found.count.count_number} as of ${found.count.as_of}`,
+      reason: `Stock count ${found.count.count_number} as of ${formatDate(found.count.as_of)}`,
       payload: {
         stock_count_id: id,
         inventory_account_id: inventoryAccountId,

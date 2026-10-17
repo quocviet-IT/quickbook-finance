@@ -120,7 +120,7 @@ describe("trailingYearEnds", () => {
       "2025-12-31",
       "2026-06-30",
     ]);
-    expect(columns.map((column) => column.label)).toEqual(["2024", "2025", "2026-06-30"]);
+    expect(columns.map((column) => column.label)).toEqual(["2024", "2025", "06/30/2026"]);
   });
 });
 
@@ -139,16 +139,16 @@ describe("monthlyColumns", () => {
     // do not fully cover.
     const columns = monthlyColumns("2026-01-15", "2026-04-10");
     expect(columns).toEqual([
-      { from: "2026-01-15", to: "2026-01-31", label: "2026-01-15 – 2026-01-31" },
+      { from: "2026-01-15", to: "2026-01-31", label: "01/15/2026 – 01/31/2026" },
       { from: "2026-02-01", to: "2026-02-28", label: "Feb 2026" },
       { from: "2026-03-01", to: "2026-03-31", label: "Mar 2026" },
-      { from: "2026-04-01", to: "2026-04-10", label: "2026-04-01 – 2026-04-10" },
+      { from: "2026-04-01", to: "2026-04-10", label: "04/01/2026 – 04/10/2026" },
     ]);
   });
 
   it("gives a single column for a range inside one month", () => {
     expect(monthlyColumns("2026-06-05", "2026-06-20")).toEqual([
-      { from: "2026-06-05", to: "2026-06-20", label: "2026-06-05 – 2026-06-20" },
+      { from: "2026-06-05", to: "2026-06-20", label: "06/05/2026 – 06/20/2026" },
     ]);
   });
 

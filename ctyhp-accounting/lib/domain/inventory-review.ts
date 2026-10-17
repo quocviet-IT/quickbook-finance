@@ -10,6 +10,7 @@
  * This company is on weighted average cost, so the older lower-of-cost-or-market
  * test does not apply — it survives only for LIFO and the retail method.
  */
+import { plural, pluralWord } from "@/lib/format";
 
 export interface InventoryReviewRow {
   itemId: string;
@@ -122,7 +123,7 @@ export function reviewStock(
     verdict = "moving";
     reason =
       monthsOfCover !== null
-        ? `About ${monthsOfCover.toFixed(1)} month(s) of stock at the recent rate`
+        ? `About ${monthsOfCover.toFixed(1)} ${pluralWord(Number(monthsOfCover.toFixed(1)), "month")} of stock at the recent rate`
         : "Moving";
   }
 
@@ -202,14 +203,14 @@ export function describeInventoryReview(review: InventoryReview): string | null 
   const writeDowns = review.rows.filter((row) => row.verdict === "above_nrv");
   if (writeDowns.length > 0) {
     parts.push(
-      `${writeDowns.length} item(s) carried above realizable value — ` +
+      `${plural(writeDowns.length, "item")} carried above realizable value — ` +
         `${money(review.totals.shortfallMinor)} to write down`,
     );
   }
   const idle = review.needsAttention.filter((row) => row.verdict !== "above_nrv");
   if (idle.length > 0) {
     parts.push(
-      `${idle.length} item(s) slow moving, holding ` +
+      `${plural(idle.length, "item")} slow moving, holding ` +
         `${money(idle.reduce((sum, row) => sum + row.valueMinor, 0))}`,
     );
   }

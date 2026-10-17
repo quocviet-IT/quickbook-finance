@@ -59,7 +59,8 @@ import type {
 } from "@/lib/services/fixed-assets";
 import { calculateAssetDisposal } from "@/lib/domain/fixed-assets";
 import { parseCsv } from "@/lib/csv";
-import { formatMoney, toMinorUnits } from "@/lib/format";
+import { formatDate, formatMoney, plural, toMinorUnits } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { TOKENS } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import {
@@ -263,7 +264,8 @@ export default function FixedAssetsClient({
   const [schedule, setSchedule] = useState<AssetDepreciationScheduleRow[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [postAsset, setPostAsset] = useState<FixedAssetView | null>(null);
-  const [throughDate, setThroughDate] = useState<Dayjs>(dayjs());
+  const { today } = useCompanyClock();
+  const [throughDate, setThroughDate] = useState<Dayjs>(dayjs(today));
   const [selectedAssetIds, setSelectedAssetIds] = useState<React.Key[]>([]);
   const [batchOpen, setBatchOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -349,8 +351,8 @@ export default function FixedAssetsClient({
   function resetAssetForm() {
     form.resetFields();
     form.setFieldsValue({
-      acquisition_date: dayjs(),
-      in_service_date: dayjs(),
+      acquisition_date: dayjs(today),
+      in_service_date: dayjs(today),
       depreciation_method: "straight_line",
       salvage_value: 0,
       useful_life_months: 60,
@@ -469,7 +471,7 @@ export default function FixedAssetsClient({
       return;
     }
     message.success(
-      `Posted ${result.data.postedCount} period(s) totaling ${money(result.data.postedTotalMinor)}`,
+      `Posted ${plural(result.data.postedCount, "period")} totaling ${money(result.data.postedTotalMinor)}`,
     );
     setPostAsset(null);
     window.location.reload();
@@ -487,7 +489,7 @@ export default function FixedAssetsClient({
       return;
     }
     message.success(
-      `Posted ${result.data.periodCount} period(s) for ${result.data.assetCount} asset(s), totaling ${money(result.data.totalMinor)}`,
+      `Posted ${plural(result.data.periodCount, "period")} for ${plural(result.data.assetCount, "asset")}, totaling ${money(result.data.totalMinor)}`,
     );
     setBatchOpen(false);
     setSelectedAssetIds([]);
@@ -645,7 +647,7 @@ export default function FixedAssetsClient({
       return;
     }
     message.success(
-      `Imported ${result.data.importedCount} asset(s) and posted ${result.data.openingJournalCount} opening journal(s)`,
+      `Imported ${plural(result.data.importedCount, "asset")} and posted ${plural(result.data.openingJournalCount, "opening journal")}`,
     );
     setImportOpen(false);
     window.location.reload();
@@ -656,7 +658,7 @@ export default function FixedAssetsClient({
     setDisposalSchedule([]);
     disposalForm.resetFields();
     disposalForm.setFieldsValue({
-      disposal_date: dayjs(),
+      disposal_date: dayjs(today),
       sale_price: 0,
       disposal_cost: 0,
       proceeds_account_id: proceedsAccounts[0]?.id,
@@ -736,7 +738,7 @@ export default function FixedAssetsClient({
         ),
       }),
     },
-    { title: "In service", dataIndex: "in_service_date", width: COLUMN.DATE },
+    { title: "In service", dataIndex: "in_service_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
     {
       title: "Cost",
       dataIndex: "cost_minor",
@@ -804,7 +806,7 @@ export default function FixedAssetsClient({
               size="small"
               type="primary"
               onClick={() => {
-                setThroughDate(dayjs());
+                setThroughDate(dayjs(today));
                 setPostAsset(asset);
               }}
             >
@@ -825,8 +827,8 @@ export default function FixedAssetsClient({
 
   const scheduleColumns: TableColumnsType<AssetDepreciationScheduleRow> = [
     { title: "Period", dataIndex: "sequence_number", width: 75 },
-    { title: "From", dataIndex: "period_start", width: COLUMN.DATE },
-    { title: "Through", dataIndex: "period_end", width: COLUMN.DATE },
+    { title: "From", dataIndex: "period_start", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
+    { title: "Through", dataIndex: "period_end", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
     {
       title: "Planned",
       dataIndex: "planned_amount_minor",
@@ -933,7 +935,7 @@ export default function FixedAssetsClient({
             <Button
               icon={<CalendarOutlined />}
               onClick={() => {
-                setThroughDate(dayjs());
+                setThroughDate(dayjs(today));
                 setBatchOpen(true);
               }}
             >
@@ -1048,7 +1050,7 @@ export default function FixedAssetsClient({
                 label="Acquisition date"
                 rules={[{ required: true }]}
               >
-                <DatePicker style={{ width: "100%" }} format="MM/DD/YYYY" />
+                <DatePicker style={{ width: "100%" }} />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
@@ -1070,7 +1072,7 @@ export default function FixedAssetsClient({
                   }),
                 ]}
               >
-                <DatePicker style={{ width: "100%" }} format="MM/DD/YYYY" />
+                <DatePicker style={{ width: "100%" }} />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
@@ -1263,8 +1265,7 @@ export default function FixedAssetsClient({
         <DatePicker
           value={throughDate}
           onChange={(value) => value && setThroughDate(value)}
-          disabledDate={(date) => date.isAfter(dayjs(), "day")}
-          format="MM/DD/YYYY"
+          disabledDate={(date) => date.isAfter(dayjs(today), "day")}
           style={{ width: "100%", marginTop: 6 }}
         />
       </Modal>
@@ -1274,7 +1275,7 @@ export default function FixedAssetsClient({
         open={batchOpen}
         onOk={() => void confirmBatchPost()}
         onCancel={() => setBatchOpen(false)}
-        okText={`Post ${selectedAssetIds.length} asset(s)`}
+        okText={`Post ${plural(selectedAssetIds.length, "asset")}`}
         okButtonProps={{ loading: busy, disabled: selectedAssetIds.length === 0 }}
         destroyOnHidden
       >
@@ -1298,8 +1299,7 @@ export default function FixedAssetsClient({
         <DatePicker
           value={throughDate}
           onChange={(value) => value && setThroughDate(value)}
-          disabledDate={(date) => date.isAfter(dayjs(), "day")}
-          format="MM/DD/YYYY"
+          disabledDate={(date) => date.isAfter(dayjs(today), "day")}
           style={{ width: "100%", marginTop: 6 }}
         />
       </Modal>
@@ -1314,7 +1314,7 @@ export default function FixedAssetsClient({
           setImportErrors([]);
           setImportFileName("");
         }}
-        okText={`Import ${importRows.length} asset(s)`}
+        okText={`Import ${plural(importRows.length, "asset")}`}
         okButtonProps={{
           loading: busy,
           disabled: importRows.length === 0 || importErrors.length > 0,
@@ -1361,14 +1361,14 @@ export default function FixedAssetsClient({
             <Alert
               type="error"
               showIcon
-              message={`${importErrors.length} validation issue(s)`}
+              message={plural(importErrors.length, "validation issue")}
               description={
                 <ul style={{ margin: 0, paddingLeft: 20 }}>
                   {importErrors.slice(0, 10).map((error) => (
                     <li key={error}>{error}</li>
                   ))}
                   {importErrors.length > 10 ? (
-                    <li>{importErrors.length - 10} additional issue(s)</li>
+                    <li>{plural(importErrors.length - 10, "additional issue")}</li>
                   ) : null}
                 </ul>
               }
@@ -1382,7 +1382,7 @@ export default function FixedAssetsClient({
               columns={[
                 { title: "Asset", dataIndex: "name" },
                 { title: "Category", dataIndex: "category" },
-                { title: "In service", dataIndex: "in_service_date" },
+                { title: "In service", dataIndex: "in_service_date", render: (v: string) => formatDate(v) },
                 {
                   title: "Cost",
                   dataIndex: "cost_minor",
@@ -1446,8 +1446,7 @@ export default function FixedAssetsClient({
               >
                 <DatePicker
                   style={{ width: "100%" }}
-                  format="MM/DD/YYYY"
-                  disabledDate={(date) => date.isAfter(dayjs(), "day")}
+                  disabledDate={(date) => date.isAfter(dayjs(today), "day")}
                 />
               </Form.Item>
             </Col>

@@ -114,6 +114,14 @@ describe("approval-beyond-sla.v1", () => {
     expect(insight.ageDays).toBe(5);
   });
 
+  it("agrees the verb with the count", () => {
+    const one = { ...waiting, approvals: { pendingCount: 1, oldestAgeDays: 5 }, policy: { ...EMPTY_WORK_POLICY, approvalSlaDays: 3 } };
+    const many = { ...one, approvals: { pendingCount: 2, oldestAgeDays: 5 } };
+    const say = (facts: InsightFacts) => buildInsights(facts).find((i) => i.ruleKey === "approval-beyond-sla.v1")!.summary;
+    expect(say(one)).toContain("1 controlled action is waiting");
+    expect(say(many)).toContain("2 controlled actions are waiting");
+  });
+
   it("does not fire at exactly the SLA — the day it is due is not late", () => {
     const facts = {
       ...waiting,

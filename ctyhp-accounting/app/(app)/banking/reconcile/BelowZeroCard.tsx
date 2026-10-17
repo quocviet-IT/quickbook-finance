@@ -3,13 +3,13 @@ import { useId } from "react";
 import type { ColumnsType } from "antd/es/table";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { shortDate } from "@/lib/domain/report-presets";
 import { negativeCard, type CopyFormat, type NegativeWatch, type OutstandingPayment } from "@/lib/domain/statement-alerts";
 import { codedToText } from "@/lib/domain/reconcile-alerts-screen";
 import { OUTSTANDING_WIDTH } from "./alert-columns";
 import { AlertIcon, EntryLink, Segments } from "./alert-parts";
 import styles from "./statement-alerts.module.css";
 
+import { formatDate } from "@/lib/format";
 interface Props {
   accountName: string;
   watch: NegativeWatch;
@@ -35,7 +35,7 @@ export default function BelowZeroCard({ accountName, watch, fmt, onOpenEntry }: 
       width: OUTSTANDING_WIDTH.date,
       render: (_, row) => (
         <EntryLink entryNumber={row.entryNumber} onOpen={() => onOpenEntry(row.entryId)}>
-          {shortDate(row.date)}
+          {formatDate(row.date)}
         </EntryLink>
       ),
     },

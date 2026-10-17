@@ -82,7 +82,7 @@ describe("the difference, explained", () => {
       tickedNotOnStatement: { count: 1, amountMinor: -1200, ids: ["t1"] },
       // 1,292.00 − 1,000.00 − (−20.00) + (−12.00) = 300.00: the paired line not ticked.
       leftMinor: 30000,
-      hint: "It equals the statement line “EXAMPLE CLIENT PAYMENT” of Sep 12, 2026 ($300.00). Check that one first.",
+      hint: "It equals the statement line “EXAMPLE CLIENT PAYMENT” of 09/12/2026 ($300.00). Check that one first.",
     });
   });
 
@@ -108,7 +108,7 @@ describe("the difference, explained", () => {
       onStatement: null,
       tickedNotOnStatement: null,
       leftMinor: 45000,
-      hint: "It equals JE-0101 of Sep 3, 2026 ($450.00). Check that one first.",
+      hint: "It equals JE-0101 of 09/03/2026 ($450.00). Check that one first.",
     });
   });
 
@@ -234,11 +234,11 @@ describe("the sentences", () => {
   });
 
   it("names a line short", () => {
-    expect(statementLineName({ description: "  SERVICE FEE ", txnDate: "2026-09-05" })).toBe("the statement line “SERVICE FEE” of Sep 5, 2026");
-    expect(statementLineName({ description: "", txnDate: "2026-09-05" })).toBe("the statement line of Sep 5, 2026");
-    expect(bookLineName({ entryNumber: "JE-000123", entryDate: "2026-09-05" })).toBe("JE-000123 of Sep 5, 2026");
-    expect(bookLineName({ entryNumber: null, entryDate: "2026-09-05" })).toBe("the entry of Sep 5, 2026");
-    expect(differenceHint("JE-000123 of Sep 5, 2026", -1200, money)).toBe("It equals JE-000123 of Sep 5, 2026 (-$12.00). Check that one first.");
+    expect(statementLineName({ description: "  SERVICE FEE ", txnDate: "2026-09-05" })).toBe("the statement line “SERVICE FEE” of 09/05/2026");
+    expect(statementLineName({ description: "", txnDate: "2026-09-05" })).toBe("the statement line of 09/05/2026");
+    expect(bookLineName({ entryNumber: "JE-000123", entryDate: "2026-09-05" })).toBe("JE-000123 of 09/05/2026");
+    expect(bookLineName({ entryNumber: null, entryDate: "2026-09-05" })).toBe("the entry of 09/05/2026");
+    expect(differenceHint("JE-000123 of 09/05/2026", -1200, money)).toBe("It equals JE-000123 of 09/05/2026 (-$12.00). Check that one first.");
   });
 
   it("heads the parts with the difference, and counts each part's lines", () => {

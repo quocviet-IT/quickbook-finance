@@ -6,7 +6,7 @@ import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, 
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { toMinor } from "@/lib/domain/money";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate, plural } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
@@ -14,7 +14,6 @@ import { createJournalAction, reverseEntryAction, listJournalAction } from "./ac
 import type { JournalEntrySummary } from "@/lib/services/journal";
 import AdjustingEntryControl from "./AdjustingEntryControl";
 import type { ClosedPeriodAsk } from "@/lib/domain/adjusting-entries";
-import { shortDate } from "@/lib/domain/report-presets";
 
 interface Account {
   id: string;
@@ -42,7 +41,6 @@ interface LineForm {
   debit?: number;
   credit?: number;
 }
-
 
 /** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
 const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
@@ -226,11 +224,11 @@ export default function JournalClient({
         <Alert
           type="warning"
           showIcon
-          message={`Showing the ${entries.length.toLocaleString("en-US")} most recent of ${total.toLocaleString("en-US")} entries`}
+          message={`Showing the ${entries.length.toLocaleString("en-US")} most recent of ${plural(total, "entry", "entries")}`}
           description={
             "One read carries at most " +
-            limit.toLocaleString("en-US") +
-            " entries. Narrow the dates above to reach the rest — an entry outside this list cannot be found by scrolling, however far you page."
+            plural(limit, "entry", "entries") +
+            ". Narrow the dates above to reach the rest — an entry outside this list cannot be found by scrolling, however far you page."
           }
         />
       )}
@@ -240,8 +238,8 @@ export default function JournalClient({
           showIcon
           title={
             <span>
-              <strong>{shortDate(closedAsk.ask.entryDate)} is in a closed period.</strong> The books are closed through{" "}
-              {shortDate(closedAsk.ask.closedThrough)}. Changing that entry will alter a period somebody has already
+              <strong>{formatDate(closedAsk.ask.entryDate)} is in a closed period.</strong> The books are closed through{" "}
+              {formatDate(closedAsk.ask.closedThrough)}. Changing that entry will alter a period somebody has already
               signed off.
             </span>
           }
@@ -312,8 +310,8 @@ export default function JournalClient({
         }}
         columns={[
           { title: "Number", dataIndex: "entryNumber", width: 130 },
-          { title: "Date", dataIndex: "entryDate", width: 110 },
-          { title: "Source", dataIndex: "sourceType", width: 110, render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
+          { title: "Date", dataIndex: "entryDate", width: 110, render: (v: string) => formatDate(v) },
+          { title: "Source", dataIndex: "sourceType", width: 110, render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
           {
             title: "Description",
             dataIndex: "description",

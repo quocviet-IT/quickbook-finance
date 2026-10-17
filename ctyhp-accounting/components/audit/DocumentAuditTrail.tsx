@@ -1,4 +1,6 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { Alert, Descriptions, Space, Table, Tag, Typography } from "antd";
 import type { AuditEntryRow } from "@/lib/db/types";
@@ -6,7 +8,6 @@ import {
   diffAuditEntry,
   documentAttribution,
   formatActor,
-  formatAuditTimestamp,
   formatAuditValue,
   summarizeAuditChanges,
   type AttributionSource,
@@ -39,6 +40,7 @@ export default function DocumentAuditTrail({
 }) {
   const attribution = documentAttribution(record, directory);
   const [pageSize, setPageSize] = useState<number>(CHANGE_HISTORY_DEFAULT_PAGE_SIZE);
+  const { timeZone } = useCompanyClock();
 
   return (
     <Space direction="vertical" size="middle" style={{ display: "flex", marginBottom: 16 }}>
@@ -47,7 +49,7 @@ export default function DocumentAuditTrail({
         {
           key: "created_at",
           label: "Created",
-          children: formatAuditTimestamp(attribution.createdAt),
+          children: formatDateTime(attribution.createdAt, timeZone),
         },
         {
           key: "modified_by",
@@ -58,7 +60,7 @@ export default function DocumentAuditTrail({
           key: "modified_at",
           label: "Last modified",
           children: attribution.modifiedAt
-            ? formatAuditTimestamp(attribution.modifiedAt)
+            ? formatDateTime(attribution.modifiedAt, timeZone)
             : "Not modified since it was created",
         },
       ]} />
@@ -91,7 +93,7 @@ export default function DocumentAuditTrail({
                 title: "When",
                 dataIndex: "created_at",
                 width: 170,
-                render: (value: string) => formatAuditTimestamp(value),
+                render: (value: string) => formatDateTime(value, timeZone),
               },
               {
                 title: "Who",

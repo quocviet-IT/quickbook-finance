@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { timeOnly } from "@/components/work-surface/DataStateNote";
+import { formatTime } from "@/lib/format";
 
 /**
- * "Computed at 09:05 AM" is drawn on the server and again in the browser. If the
+ * "Computed at 9:05 AM" is drawn on the server and again in the browser. If the
  * time of day depends on the machine's own zone the two texts differ and React
  * throws #418 on every overview page. These pin the cure: the company's zone is
  * always named, and nothing in the surface components reads the machine's.
@@ -18,25 +18,25 @@ afterEach(() => {
   else process.env.TZ = originalTz;
 });
 
-describe("timeOnly", () => {
+describe("formatTime", () => {
   it("prints the company's local time", () => {
-    expect(timeOnly(INSTANT, "America/New_York")).toBe("09:05 AM");
-    expect(timeOnly(INSTANT, "UTC")).toBe("01:05 PM");
-    expect(timeOnly(INSTANT, "Asia/Ho_Chi_Minh")).toBe("08:05 PM");
+    expect(formatTime(INSTANT, "America/New_York")).toBe("9:05 AM");
+    expect(formatTime(INSTANT, "UTC")).toBe("1:05 PM");
+    expect(formatTime(INSTANT, "Asia/Ho_Chi_Minh")).toBe("8:05 PM");
   });
 
   it("prints the same text whatever zone the machine is in", () => {
     const seen = new Set<string>();
     for (const machineZone of ["UTC", "America/Los_Angeles", "Asia/Tokyo", "Pacific/Kiritimati"]) {
       process.env.TZ = machineZone;
-      seen.add(timeOnly(INSTANT, "America/New_York"));
+      seen.add(formatTime(INSTANT, "America/New_York"));
     }
-    expect([...seen]).toEqual(["09:05 AM"]);
+    expect([...seen]).toEqual(["9:05 AM"]);
   });
 
   it("follows daylight saving in the company's zone", () => {
-    expect(timeOnly("2026-01-15T13:05:00Z", "America/New_York")).toBe("08:05 AM");
-    expect(timeOnly("2026-07-15T13:05:00Z", "America/New_York")).toBe("09:05 AM");
+    expect(formatTime("2026-01-15T13:05:00Z", "America/New_York")).toBe("8:05 AM");
+    expect(formatTime("2026-07-15T13:05:00Z", "America/New_York")).toBe("9:05 AM");
   });
 });
 

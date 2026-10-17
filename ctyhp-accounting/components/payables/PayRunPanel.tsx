@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, App, Button, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
   DISCOUNT_WARNING_DAYS,
   describePayRun,
@@ -128,7 +128,7 @@ export default function PayRunPanel({
             width: 110,
             render: (value: string | null) => value ?? "—",
           },
-          { title: "Due", dataIndex: "dueDate", width: 110, render: (v: string | null) => v ?? "—" },
+          { title: "Due", dataIndex: "dueDate", width: 110, render: (v: string | null) => formatDate(v) },
           {
             title: "Why",
             dataIndex: "reason",
@@ -156,7 +156,7 @@ export default function PayRunPanel({
                 <Tooltip
                   title={`Settles the bill in full: ${money(row.balanceDueMinor)} less a ${money(
                     row.discountAvailableMinor,
-                  )} discount, if paid by ${row.discountDueDate}`}
+                  )} discount, if paid by ${formatDate(row.discountDueDate)}`}
                 >
                   <b style={{ color: TOKENS.intent.success }}>{money(row.payTodayMinor)}</b>
                 </Tooltip>

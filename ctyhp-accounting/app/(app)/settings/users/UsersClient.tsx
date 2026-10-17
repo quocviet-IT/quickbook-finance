@@ -1,4 +1,6 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Dropdown, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
@@ -45,6 +47,7 @@ export default function UsersClient({
   canCreateUsers: boolean;
 }) {
   const { message, modal } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -209,8 +212,8 @@ export default function UsersClient({
           {
             title: "Last sign-in",
             dataIndex: "last_sign_in",
-            width: 140,
-            render: (v: string | null) => (v ? v.slice(0, 16).replace("T", " ") : "never"),
+            width: 170,
+            render: (v: string | null) => (v ? formatDateTime(v, timeZone) : "never"),
           },
           {
             title: "Actions",

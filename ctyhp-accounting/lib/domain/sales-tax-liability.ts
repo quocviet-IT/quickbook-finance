@@ -1,7 +1,7 @@
 import { dayBefore, fiscalYearForDate } from "./fiscal";
 import { monthLabel } from "./purchases-inventory";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
-import { shortDate } from "./report-presets";
+import { formatDate, pluralWord, formatDateRange } from "@/lib/format";
 import { tieOut, type TieOut } from "./tie-out";
 
 /**
@@ -327,7 +327,7 @@ export const SALES_TAX_FOOTNOTE =
   "A sale is taxable when its entry carries a line to the tax account. The Exempt column is where a missing tax line would show. The rate shown is the rate actually charged.";
 
 export function owedAtLabel(report: Pick<SalesTaxLiabilityReport, "to">): string {
-  return `Owed at ${shortDate(report.to)}`;
+  return `Owed at ${formatDate(report.to)}`;
 }
 
 /** What the line under the table says when more was paid over than was collected. */
@@ -342,7 +342,7 @@ export function paymentButtonLabel(amountText: string): string {
 export function unlinkedWarning(unlinked: readonly { name: string }[]): string | null {
   if (unlinked.length === 0) return null;
   const names = unlinked.map((a) => `“${a.name}”`).join(", ");
-  return `${names} ${unlinked.length === 1 ? "reads" : "read"} as sales tax, but no tax rate posts to ${unlinked.length === 1 ? "it" : "them"}, so ${unlinked.length === 1 ? "it is" : "they are"} not in these figures.`;
+  return `${names} ${pluralWord(unlinked.length, "reads", "read")} as sales tax, but no tax rate posts to ${pluralWord(unlinked.length, "it", "them")}, so ${pluralWord(unlinked.length, "it is", "they are")} not in these figures.`;
 }
 
 export function formatRate(ratePercent: number | null): string {
@@ -386,7 +386,7 @@ export function salesTaxLiabilitySheet(
     fileName: sanitizeExportFileName(`sales-tax-liability-${report.from}-to-${report.to}`),
     companyName: ctx.companyName,
     title: "Sales Tax Liability",
-    subtitle: `${report.from} to ${report.to}`,
+    subtitle: formatDateRange(report.from, report.to),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "period", header: "Period", kind: "text", width: 24 },
