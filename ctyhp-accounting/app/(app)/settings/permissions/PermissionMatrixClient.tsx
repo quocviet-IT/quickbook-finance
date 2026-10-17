@@ -58,7 +58,7 @@ export default function PermissionMatrixClient({
         type="warning"
         showIcon
         message="Enforced and advisory permissions"
-        description="Permissions marked Enforced are checked by the server before the action runs. The rest are recorded here but the underlying operation still gates on the coarse role check (admin or accountant), so switching one off does not yet block it. Converting the remaining operations is a planned follow-up; until then treat the advisory rows as documentation, not control."
+        description="Enforced permissions are checked before the action runs. Advisory ones are listed for reference: the app does not block them yet."
       />
       <Table<Row>
         rowKey="key"
@@ -70,14 +70,16 @@ export default function PermissionMatrixClient({
             title: "Permission",
             dataIndex: "label",
             render: (v: string, r) => (
-              <Space direction="vertical" size={0}>
-                <Tooltip title={r.description}>
-                  <Typography.Text strong>{v}</Typography.Text>
-                </Tooltip>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {r.key}
-                </Typography.Text>
-              </Space>
+              <Tooltip
+                title={
+                  <>
+                    {r.description ? <div>{r.description}</div> : null}
+                    <div>{r.key}</div>
+                  </>
+                }
+              >
+                <Typography.Text strong>{v}</Typography.Text>
+              </Tooltip>
             ),
           },
           { title: "Area", dataIndex: "category" },

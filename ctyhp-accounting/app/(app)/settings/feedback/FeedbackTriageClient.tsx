@@ -227,7 +227,7 @@ export default function FeedbackTriageClient({
       ),
     },
     {
-      title: "Shot",
+      title: "Screenshot",
       width: COLUMN.ACTION + 16,
       align: "center",
       render: (_, row) =>

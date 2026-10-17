@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Alert, App, Button, Space, Spin } from "antd";
+import { Alert, App, Button, Collapse, Space, Spin } from "antd";
 import { CopyOutlined, DownloadOutlined } from "@ant-design/icons";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
@@ -193,9 +193,9 @@ export default function BeancountClient({
         <div>
           <h2 className={styles.fileName}>{fileName}</h2>
           <p className={styles.lede}>
-            Valid Beancount v3 for {companyName}. Account names and amounts are live — click one to open its ledger or
-            its entry. Each reconciled bank statement adds a balance line, so bean-check refuses the file if that
-            period changes.
+            Every posted entry for {companyName}, in Beancount format. Account names and amounts are live — click one
+            to open its ledger or its entry. Each reconciled bank statement adds the closing balance for that period,
+            so the file shows if a reconciled period has changed since.
           </p>
         </div>
         {canExport ? (
@@ -281,21 +281,32 @@ export default function BeancountClient({
         </>
       )}
 
-      <div className={styles.notes}>
-        <div className={styles.note}>
-          <strong>Documents survive the export.</strong> Invoices and bills carry an <code>#invoice</code> or{" "}
-          <code>#bill</code> tag and a <code>^link</code> to their number; the payment that settles one carries the same
-          link, so Fava groups them. Due dates travel as <code>due:</code>, check numbers as <code>num:</code>, and every
-          transaction keeps its OneBook entry number as <code>entry:</code>. Amounts stay in each entry&apos;s own
-          currency.
-        </div>
-        <div className={styles.note}>
-          <strong>For whoever opens it in Beancount.</strong> Beancount and Fava are free tools a reviewer or bookkeeper
-          may use to check these books. Installed once with <code>pip install beancount fava</code>,{" "}
-          <code>bean-check {fileName}</code> confirms every entry balances, and <code>fava {fileName}</code> opens the
-          ledger in a browser at <code>localhost:5000</code>.
-        </div>
-      </div>
+      <Collapse
+        ghost
+        items={[
+          {
+            key: "technical",
+            label: "For whoever opens this file in Beancount",
+            children: (
+              <div className={styles.notes}>
+                <div className={styles.note}>
+                  <strong>Documents survive the export.</strong> Invoices and bills carry an <code>#invoice</code> or{" "}
+                  <code>#bill</code> tag and a <code>^link</code> to their number; the payment that settles one carries
+                  the same link, so Fava groups them. Due dates travel as <code>due:</code>, check numbers as{" "}
+                  <code>num:</code>, and every transaction keeps its OneBook entry number as <code>entry:</code>.
+                  Amounts stay in each entry&apos;s own currency.
+                </div>
+                <div className={styles.note}>
+                  <strong>Opening it.</strong> Beancount and Fava are free tools a reviewer or bookkeeper may use to
+                  check these books. Installed once with <code>pip install beancount fava</code>,{" "}
+                  <code>bean-check {fileName}</code> confirms every entry balances, and <code>fava {fileName}</code>{" "}
+                  opens the ledger in a browser at <code>localhost:5000</code>.
+                </div>
+              </div>
+            ),
+          },
+        ]}
+      />
 
       <EntryDetailDrawer entryId={openEntry} onClose={() => setOpenEntry(null)} />
     </div>

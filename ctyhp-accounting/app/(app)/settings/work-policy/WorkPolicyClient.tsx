@@ -55,9 +55,9 @@ export default function WorkPolicyClient({
 
   const unset = [
     policy.materialityMinor === null ? "a materiality threshold" : null,
-    policy.approvalSlaDays === null ? "an approval SLA" : null,
-    policy.unmatchedBankAgeDays === null ? "an unmatched-bank age" : null,
-    policy.closeWindowDays === null ? "a close window" : null,
+    policy.approvalSlaDays === null ? "a time limit for approvals" : null,
+    policy.unmatchedBankAgeDays === null ? "how long a bank line may stay unmatched" : null,
+    policy.closeWindowDays === null ? "when to start closing a period" : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -66,12 +66,12 @@ export default function WorkPolicyClient({
         <Alert
           type="info"
           showIcon
-          message="Some rules are asleep"
+          message="Some dashboard alerts are off"
           description={
             <>
-              This company has not set {unset.join(", ")}. The dashboard rules that need those
-              numbers say nothing rather than judging by a value nobody chose. Leaving a field
-              empty is a legitimate answer — it just means those rules stay quiet.
+              This company has not set {unset.join(", ")}. The dashboard alerts that need those
+              numbers stay off until they are set. Leaving a field empty is a fine answer: it only
+              means those alerts stay quiet.
             </>
           }
         />

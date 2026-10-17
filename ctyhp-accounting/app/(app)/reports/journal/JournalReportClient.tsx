@@ -1,4 +1,5 @@
 "use client";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
@@ -69,7 +70,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals, initia
           placeholder="Source"
           value={source}
           onChange={setSource}
-          options={SOURCES.map((s) => ({ value: s, label: s }))}
+          options={SOURCES.map((s) => ({ value: s, label: sourceLabel(s) }))}
         />
         <DatePicker.RangePicker value={range} onChange={(v) => setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)} />
       </FilterBar>
@@ -100,7 +101,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals, initia
         columns={[
           { title: "Number", dataIndex: "entryNumber" },
           { title: "Date", dataIndex: "entryDate" },
-          { title: "Source", dataIndex: "sourceType", render: (s: string) => <Tag>{s}</Tag> },
+          { title: "Source", dataIndex: "sourceType", render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
           { title: "Description", dataIndex: "description" },
           {
             title: "Status",

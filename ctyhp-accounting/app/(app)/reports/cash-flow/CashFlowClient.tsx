@@ -1,5 +1,6 @@
 "use client";
 
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -287,7 +288,7 @@ export default function CashFlowClient({
                           {
                             title: "Source",
                             dataIndex: "sourceType",
-                            render: (value: string) => <Tag>{value.replaceAll("_", " ")}</Tag>,
+                            render: (value: string) => <Tag>{sourceLabel(value)}</Tag>,
                           },
                           {
                             title: "Account",

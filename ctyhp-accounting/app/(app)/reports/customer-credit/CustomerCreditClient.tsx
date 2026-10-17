@@ -130,7 +130,7 @@ export default function CustomerCreditClient({
         />
         <Statistic title="On credit hold" value={onHold} />
         <Statistic
-          title={`DSO (last ${salesWindowDays} days)`}
+          title={`Days sales outstanding (last ${salesWindowDays} days)`}
           value={portfolioDso === null ? "—" : `${portfolioDso} days`}
         />
       </Space>
@@ -271,7 +271,11 @@ export default function CustomerCreditClient({
               ),
           },
           {
-            title: "DSO",
+            title: (
+              <Tooltip title="Days sales outstanding: how many days, on average, customers take to pay">
+                <span>DSO</span>
+              </Tooltip>
+            ),
             key: "dso",
             width: 100,
             align: "right",

@@ -1,4 +1,5 @@
 "use client";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useEffect, useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip } from "antd";
@@ -312,7 +313,7 @@ export default function JournalClient({
         columns={[
           { title: "Number", dataIndex: "entryNumber", width: 130 },
           { title: "Date", dataIndex: "entryDate", width: 110 },
-          { title: "Source", dataIndex: "sourceType", width: 110, render: (s: string) => <Tag>{s}</Tag> },
+          { title: "Source", dataIndex: "sourceType", width: 110, render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
           {
             title: "Description",
             dataIndex: "description",

@@ -14,6 +14,7 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import {
@@ -705,7 +706,7 @@ export default function BankingClient({
               {selectedConnection.status.replaceAll("_", " ")}
             </Tag>
           ) : null}
-          {plaidEnvironment !== "production" ? <Tag color="blue">{plaidEnvironment}</Tag> : null}
+          {plaidEnvironment !== "production" ? <Tooltip title="This bank feed uses the provider's test service: its lines are sample data, not your bank's."><Tag color="blue">Test mode</Tag></Tooltip> : null}
           {selectedConnection && canWrite ? (
             <Button size="small" type="link" danger onClick={() => setDisconnecting(selectedConnection)}>
               Disconnect
@@ -713,14 +714,14 @@ export default function BankingClient({
           ) : null}
         </Space>
         {selectedConnection?.last_error ? (
-          <Alert type="warning" showIcon message="The last synchronization needs attention" description={selectedConnection.last_error} style={{ marginTop: 12 }} />
+          <Alert type="warning" showIcon message="The last bank update needs attention" description={selectedConnection.last_error} style={{ marginTop: 12 }} />
         ) : null}
         {!plaidConfigured && canWrite ? (
           <Alert
             type="info"
             showIcon
-            message="Direct bank feed is ready for configuration"
-            description="Set PLAID_CLIENT_ID, PLAID_SECRET, and BANK_FEED_ENCRYPTION_KEY in the server environment."
+            message="Direct bank feeds are not set up yet"
+            description="Ask your administrator to turn them on. Until then, bring in bank lines with Import statement."
             style={{ marginTop: 12 }}
           />
         ) : null}

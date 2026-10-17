@@ -1,4 +1,5 @@
 "use client";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, DatePicker, Segmented, Space, Statistic, Table, Tag } from "antd";
@@ -94,7 +95,7 @@ export default function GlPostingClient({
           value={view}
           onChange={(value) => setView(value as "documents" | "controls")}
           options={[
-            { label: `Documents → ledger${report ? ` (${report.summary.documents})` : ""}`, value: "documents" },
+            { label: `Documents to ledger${report ? ` (${report.summary.documents})` : ""}`, value: "documents" },
             {
               label: `Control accounts${recon ? ` (${recon.rows.length})` : ""}`,
               value: "controls",
@@ -169,7 +170,7 @@ export default function GlPostingClient({
                     { key: "verdict", header: "Posting", kind: "text" },
                   ],
                   rows: report.rows.map((row) => ({
-                    type: SOURCE_TYPE_LABEL[row.sourceType] ?? row.sourceType,
+                    type: SOURCE_TYPE_LABEL[row.sourceType] ?? sourceLabel(row.sourceType),
                     number: row.documentNumber ?? "(unnumbered)",
                     date: row.documentDate,
                     party: row.partyName,
@@ -197,7 +198,7 @@ export default function GlPostingClient({
                 title: "Type",
                 dataIndex: "sourceType",
                 width: 150,
-                render: (value: string) => SOURCE_TYPE_LABEL[value] ?? value,
+                render: (value: string) => SOURCE_TYPE_LABEL[value] ?? sourceLabel(value),
               },
               {
                 title: "Document",

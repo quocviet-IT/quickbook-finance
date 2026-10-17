@@ -1,4 +1,5 @@
 "use client";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { App, Button, DatePicker, Input, Select, Space, Statistic, Tooltip, Typography } from "antd";
@@ -308,7 +309,7 @@ export default function GeneralLedgerClient({
                         <span>{memo ?? ""}</span>
                       </Tooltip>
                       {secondaryLine(
-                        href ? <Link href={href}>{row.sourceType}</Link> : row.sourceType,
+                        href ? <Link href={href}>{sourceLabel(row.sourceType)}</Link> : sourceLabel(row.sourceType),
                       )}
                     </div>
                   );

@@ -29,7 +29,7 @@ import {
 } from "@/components/charts/FinancialCharts";
 import { TOKENS } from "@/lib/design/tokens";
 import { fromMinor } from "@/lib/domain/money";
-import { formatMoney as formatCurrency } from "@/lib/format";
+import { formatMoney as formatCurrency, timeZoneLabel } from "@/lib/format";
 import { INTERNAL_REPORT_HREFS } from "@/lib/domain/report-catalog";
 import type {
   DashboardActivity,
@@ -87,7 +87,7 @@ export default function DashboardClient({
             <Tag>As of {analytics.asOf}</Tag>
             <Tag>{accountingBasis === "cash" ? "Cash basis" : "Accrual basis"}</Tag>
             <Tag>{baseCurrency}</Tag>
-            <Tag>{timeZone}</Tag>
+            <Tag>{timeZoneLabel(timeZone)}</Tag>
           </div>
         }
       />

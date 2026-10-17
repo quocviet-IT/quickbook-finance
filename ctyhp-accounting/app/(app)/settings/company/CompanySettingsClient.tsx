@@ -13,6 +13,7 @@ import {
   Table,
   Typography,
 } from "antd";
+import { timeZoneLabel } from "@/lib/format";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
 import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
@@ -115,7 +116,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
                 </Descriptions.Item>
                 <Descriptions.Item label="Accounting basis">{current.accounting_basis}</Descriptions.Item>
                 <Descriptions.Item label="Base currency">{current.base_currency_code}</Descriptions.Item>
-                <Descriptions.Item label="Time zone">{current.time_zone}</Descriptions.Item>
+                <Descriptions.Item label="Time zone">{`${timeZoneLabel(current.time_zone)} (${current.time_zone})`}</Descriptions.Item>
                 <Descriptions.Item label="Default terms (days)">
                   {current.default_payment_terms_days}
                 </Descriptions.Item>

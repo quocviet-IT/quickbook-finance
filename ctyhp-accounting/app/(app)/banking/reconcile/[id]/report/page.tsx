@@ -1,3 +1,4 @@
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -69,7 +70,7 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       <h3>Cleared items ({cleared.length})</h3>
       <ul>
         {cleared.map((l) => (
-          <li key={l.journalLineId}>{l.entryDate} · {l.entryNumber} · {l.sourceType} · {money(l.signedMinor)}</li>
+          <li key={l.journalLineId}>{l.entryDate} · {l.entryNumber} · {sourceLabel(l.sourceType)} · {money(l.signedMinor)}</li>
         ))}
       </ul>
     </div>

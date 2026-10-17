@@ -32,7 +32,7 @@ export default async function BeancountPage() {
       <PageHeader
         meta={<ReportEntityBadge companyName={displayName} isSample={entity.active?.isSample ?? false} />}
         title="Beancount Export"
-        description="The whole ledger as one Beancount file, for whoever keeps or checks these books in Beancount or Fava."
+        description="Your books as a Beancount file: a plain-text ledger an outside accountant or auditor can open and check line by line."
       />
       <BeancountClient
         companyName={displayName}

@@ -86,7 +86,7 @@ describe("dashboard analytics", () => {
     expect(activity).toMatchObject({
       actor: "System",
       verb: "archive",
-      entity: "custom record",
+      entity: "Custom record",
       reference: null,
       href: "/settings/audit",
       category: "other",

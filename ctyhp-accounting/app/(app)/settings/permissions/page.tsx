@@ -16,7 +16,7 @@ export default async function PermissionsPage() {
     <div>
       <PageHeader
         title="Permissions"
-        description="What each role may do. Seeded to match the behavior in place before this screen existed."
+        description="What each role is allowed to do. The starting settings match how the app worked before this screen existed."
       />
       <PermissionMatrixClient
         permissions={matrix.permissions}

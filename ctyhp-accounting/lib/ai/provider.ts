@@ -83,7 +83,7 @@ export async function askProvider(input: {
   const config = readAiConfig();
   if (!config) {
     throw new AiNotConfiguredError(
-      "The assistant is not configured yet. Set AI_BASE_URL, AI_MODEL and AI_API_KEY.",
+      "The assistant is not set up yet. Ask your administrator to turn it on.",
     );
   }
 

@@ -1,3 +1,4 @@
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildProfitAndLoss } from "@/lib/domain/reports";
 import { listJournalEntries } from "@/lib/services/journal";
@@ -78,13 +79,13 @@ export async function getSecondaryAnalysis(
     sourceMix: [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
-      .map(([key, count]) => ({ key, label: humanise(key), count })),
+      .map(([key, count]) => ({ key, label: sourceLabel(key), count })),
     recentEntries: journals.slice(0, 8).map((journal) => ({
       id: journal.id,
       entryNumber: journal.entryNumber,
       entryDate: journal.entryDate,
       description: journal.description || "No description",
-      sourceType: humanise(journal.sourceType),
+      sourceType: sourceLabel(journal.sourceType),
       totalMinor: journal.lines.reduce((sum, line) => sum + Number(line.debitMinor), 0),
       status: journal.isReversal
         ? "Reversal"

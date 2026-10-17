@@ -163,7 +163,7 @@ describe("changeLogDetail", () => {
         before_json: { id: "1", status: "draft", memo: "a", customer_id: "c", updated_at: "x" },
         after_json: { id: "1", status: "issued", memo: "a", customer_id: "c2", updated_at: "y" },
       }),
-    ).toBe("status: draft → issued");
+    ).toBe("Status: draft → issued");
   });
 
   it("says what a new record holds, without a column of arrows from nothing", () => {
@@ -172,12 +172,12 @@ describe("changeLogDetail", () => {
         before_json: null,
         after_json: { id: "1", account_code: "1087", name: "Sample Feed", account_type: "bank", currency_code: "USD", created_by: "u" },
       }),
-    ).toBe("account_code: 1087; account_type: bank; currency_code: USD (+1 more)");
+    ).toBe("Account code: 1087; Account type: bank; Currency code: USD (+1 more)");
   });
 
   it("cuts a long value, and is empty when nothing a reader needs changed", () => {
     const long = "x".repeat(60);
-    expect(changeLogDetail({ before_json: { note: "" }, after_json: { note: long } })).toBe(`note: (empty) → ${"x".repeat(40)}…`);
+    expect(changeLogDetail({ before_json: { note: "" }, after_json: { note: long } })).toBe(`Note: (empty) → ${"x".repeat(40)}…`);
     expect(changeLogDetail({ before_json: { id: "1", updated_at: "a" }, after_json: { id: "1", updated_at: "b" } })).toBe("");
   });
 });
