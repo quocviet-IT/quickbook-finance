@@ -196,7 +196,7 @@ describe("saveBalanceComparisonAction", () => {
     const { sb, rpc } = fakeClient({}, { data: 1 });
     mocks.createClient.mockResolvedValue(sb);
     const result = await saveBalanceComparisonAction(draft);
-    expect(result).toEqual({ ok: true, data: { kept: 1, message: "Saved 1 figure for Sep 30, 2026." } });
+    expect(result).toEqual({ ok: true, data: { kept: 1, message: "Saved 1 figure for 09/30/2026." } });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/reports/balance-comparison");
   });

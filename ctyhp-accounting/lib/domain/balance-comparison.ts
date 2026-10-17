@@ -15,7 +15,7 @@ import type { AccountType, NormalBalance } from "./accounts";
 import { chartClassOf, type ChartClass } from "./chart-groups";
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
-import { shortDate } from "./report-presets";
+import { formatDate, plural } from "@/lib/format";
 import { parseStatementAmount } from "./statement-import";
 
 /* ------------------------------------------------------------------ groups */
@@ -142,10 +142,10 @@ export const BALANCE_BASIS_NOTE =
 /** What a comparison is called when its other system has not been named yet. */
 export const UNNAMED_OTHER_SYSTEM = "the other system";
 
-/** `Balance Comparison as of Sep 30, 2026 · OneBook and QuickBooks` */
+/** `Balance Comparison as of 09/30/2026 · OneBook and QuickBooks` */
 export function balanceComparisonHeading(asOf: string, comparedWith: string): string {
   const name = comparedWith.trim() || UNNAMED_OTHER_SYSTEM;
-  return `Balance Comparison as of ${shortDate(asOf)} · OneBook and ${name}`;
+  return `Balance Comparison as of ${formatDate(asOf)} · OneBook and ${name}`;
 }
 
 function dayNumber(iso: string): number {
@@ -187,20 +187,20 @@ export interface NothingTyped {
 
 /**
  * What a date with nothing saved says:
- * `Nothing has been typed for Sep 30, 2026. The nearest saved comparison is Aug 31, 2026.`
+ * `Nothing has been typed for 09/30/2026. The nearest saved comparison is 08/31/2026.`
  */
 export function nothingTypedMessage(asOf: string, savedDates: readonly string[]): NothingTyped {
   const nearest = nearestSavedDate(asOf, savedDates);
-  const first = `Nothing has been typed for ${shortDate(asOf)}.`;
+  const first = `Nothing has been typed for ${formatDate(asOf)}.`;
   if (!nearest) return { text: first, parts: null, nearest: null };
   const before = `${first} The nearest saved comparison is `;
-  const date = shortDate(nearest);
+  const date = formatDate(nearest);
   return { text: `${before}${date}.`, parts: { before, date, after: "." }, nearest };
 }
 
-/** `Saved 4 figures for Sep 30, 2026.` */
+/** `Saved 4 figures for 09/30/2026.` */
 export function savedMessage(count: number, asOf: string): string {
-  return `Saved ${count} ${count === 1 ? "figure" : "figures"} for ${shortDate(asOf)}.`;
+  return `Saved ${plural(count, "figure")} for ${formatDate(asOf)}.`;
 }
 
 /** What Only differences says when no row differs. */

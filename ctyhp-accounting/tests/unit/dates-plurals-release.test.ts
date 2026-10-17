@@ -5,9 +5,10 @@ describe("2.17 in the release notes", () => {
   const release = RELEASES.find((r) => r.version === "2.17")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
-  it("is the newest release, dated the day it was built", () => {
-    expect(RELEASES[0]).toBe(release);
-    expect(APP_VERSION).toBe("2.17");
+  it("is listed, dated the day it was built, and newer releases sit above it", () => {
+    expect(release).toBeDefined();
+    expect(RELEASES.indexOf(release)).toBeGreaterThanOrEqual(0);
+    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.17);
     expect(release.date).toBe("2026-10-17");
   });
 

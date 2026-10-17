@@ -393,10 +393,10 @@ describe("saved lines", () => {
 describe("the heading and the sentences", () => {
   it("states the date and the other system", () => {
     expect(balanceComparisonHeading("2026-09-30", "Sample Ledger")).toBe(
-      "Balance Comparison as of Sep 30, 2026 · OneBook and Sample Ledger",
+      "Balance Comparison as of 09/30/2026 · OneBook and Sample Ledger",
     );
     expect(balanceComparisonHeading("2026-09-30", "  ")).toBe(
-      "Balance Comparison as of Sep 30, 2026 · OneBook and the other system",
+      "Balance Comparison as of 09/30/2026 · OneBook and the other system",
     );
   });
 
@@ -414,11 +414,11 @@ describe("the heading and the sentences", () => {
 
   it("says nothing has been typed, and names the nearest saved comparison", () => {
     const m = nothingTypedMessage("2026-09-30", ["2026-08-31", "2026-02-28"]);
-    expect(m.text).toBe("Nothing has been typed for Sep 30, 2026. The nearest saved comparison is Aug 31, 2026.");
+    expect(m.text).toBe("Nothing has been typed for 09/30/2026. The nearest saved comparison is 08/31/2026.");
     expect(m.nearest).toBe("2026-08-31");
     expect(m.parts).toEqual({
-      before: "Nothing has been typed for Sep 30, 2026. The nearest saved comparison is ",
-      date: "Aug 31, 2026",
+      before: "Nothing has been typed for 09/30/2026. The nearest saved comparison is ",
+      date: "08/31/2026",
       after: ".",
     });
     expect(`${m.parts!.before}${m.parts!.date}${m.parts!.after}`).toBe(m.text);
@@ -426,16 +426,16 @@ describe("the heading and the sentences", () => {
 
   it("says only that nothing has been typed when nothing is saved anywhere", () => {
     expect(nothingTypedMessage("2026-09-30", [])).toEqual({
-      text: "Nothing has been typed for Sep 30, 2026.",
+      text: "Nothing has been typed for 09/30/2026.",
       parts: null,
       nearest: null,
     });
   });
 
   it("says how many figures were saved", () => {
-    expect(savedMessage(4, "2026-09-30")).toBe("Saved 4 figures for Sep 30, 2026.");
-    expect(savedMessage(1, "2026-09-30")).toBe("Saved 1 figure for Sep 30, 2026.");
-    expect(savedMessage(0, "2026-09-30")).toBe("Saved 0 figures for Sep 30, 2026.");
+    expect(savedMessage(4, "2026-09-30")).toBe("Saved 4 figures for 09/30/2026.");
+    expect(savedMessage(1, "2026-09-30")).toBe("Saved 1 figure for 09/30/2026.");
+    expect(savedMessage(0, "2026-09-30")).toBe("Saved 0 figures for 09/30/2026.");
   });
 
   it("writes a figure back into its box with thousands commas and a plain minus", () => {
@@ -534,7 +534,7 @@ describe("balanceComparisonSheet", () => {
     const sheet = balanceComparisonSheet(c, meta);
     expect(sheet.title).toBe("Balance Comparison");
     expect(sheet.subtitle).toBe(
-      `Balance Comparison as of Sep 30, 2026 · OneBook and Sample Ledger. ${BALANCE_BASIS_NOTE}`,
+      `Balance Comparison as of 09/30/2026 · OneBook and Sample Ledger. ${BALANCE_BASIS_NOTE}`,
     );
     expect(sheet.columns.map((col) => col.header)).toEqual(["Code", "Account", "OneBook", "Sample Ledger", "Difference"]);
     expect(sheet.fileName).toBe("balance-comparison-2026-09-30");

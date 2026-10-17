@@ -1,4 +1,4 @@
-# Balance Comparison: OneBook's balances beside another ledger's, kept by date (release 2.17)
+# Balance Comparison: OneBook's balances beside another ledger's, kept by date (release 2.18)
 
 ## Why
 
@@ -160,3 +160,10 @@ The date in that message is a link to that comparison.
 
 - Importing the other system's trial balance from a file. Typing first; import can follow.
 - Mapping accounts between the systems by name. Matching is per OneBook account, plus external-only rows.
+
+## Changes while building
+
+- Shipped as 2.18: 2.17 went to the date and plural release, so dates on this report read 09/30/2026 as everywhere else.
+- Migration 0156 keeps the group of an account only the other system has; without it, a reloaded row could land in another group.
+- The last line totals debits less credits, which is nil when the books balance.
+- Each account is read in its section's sign, so a contra account such as Accumulated Depreciation shows negative under Assets, as a balance sheet prints it.
