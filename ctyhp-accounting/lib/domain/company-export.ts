@@ -65,6 +65,9 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_stock_count_line",
   // Cash count (0154): a count references accounts, a journal entry and an approval request.
   "acc_cash_count",
+  // Balance comparison (0155): the lines reference their date's header.
+  "acc_balance_comparison",
+  "acc_balance_comparison_line",
   "acc_fixed_asset",
   "acc_asset_depreciation_schedule",
   "acc_bank_account",
@@ -107,8 +110,8 @@ export const EXPORT_TABLES: readonly string[] = [
  * can repeat rows page one already returned and drop others in their place. The
  * largest company here holds 20,740 journal lines, twenty-one pages of them.
  *
- * Most tables key on `id`, which is the default. These eight key on text and
- * have no `id` column at all; ordering them by one would not drift quietly, it
+ * Most tables key on `id`, which is the default. These nine key on text or a
+ * date and have no `id` column at all; ordering them by one would not drift quietly, it
  * would throw, because Postgres validates the column even on an empty table.
  */
 export const ORDER_COLUMNS: Record<string, string[]> = {
@@ -120,6 +123,8 @@ export const ORDER_COLUMNS: Record<string, string[]> = {
   acc_sequence: ["key"],
   acc_purchasing_config: ["singleton"],
   acc_1099_box: ["code"],
+  // keyed on its date (0155)
+  acc_balance_comparison: ["as_of"],
 };
 
 export function orderColumnsFor(table: string): string[] {
