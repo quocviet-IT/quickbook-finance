@@ -1,4 +1,5 @@
 "use client";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -883,7 +884,7 @@ export default function ReconcileWorkspaceClient({
           },
           { title: "Date", dataIndex: "entryDate" },
           { title: "Entry", dataIndex: "entryNumber" },
-          { title: "Source", dataIndex: "sourceType", render: (s) => <Tag>{s}</Tag> },
+          { title: "Source", dataIndex: "sourceType", render: (s) => <Tag>{sourceLabel(s)}</Tag> },
           { title: "Reference", dataIndex: "reference", render: (value: string | null) => value ?? "—" },
           { title: "Memo", dataIndex: "memo" },
           { title: "Amount", align: "right", render: (_, l) => money(l.signedMinor) },

@@ -9,7 +9,7 @@
  * Pure: audit entries (already described) in, report out.
  */
 
-import { diffAuditEntry, formatAuditValue, summarizeAuditChanges, type AuditEntryLike } from "./audit";
+import { auditFieldLabel, diffAuditEntry, formatAuditValue, summarizeAuditChanges, type AuditEntryLike } from "./audit";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { stampInTimeZone } from "./stamp";
 
@@ -40,7 +40,7 @@ export function changeLogDetail(entry: Pick<AuditEntryLike, "before_json" | "aft
   if (!added && !removed) return summarizeAuditChanges(changes, FIELDS_SHOWN);
   const shown = changes
     .slice(0, FIELDS_SHOWN)
-    .map((change) => `${change.field}: ${formatAuditValue(added ? change.after : change.before)}`)
+    .map((change) => `${auditFieldLabel(change.field)}: ${formatAuditValue(added ? change.after : change.before)}`)
     .join("; ");
   const rest = changes.length - FIELDS_SHOWN;
   return rest > 0 ? `${shown} (+${rest} more)` : shown;

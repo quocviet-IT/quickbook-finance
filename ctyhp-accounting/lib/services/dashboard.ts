@@ -8,6 +8,12 @@ import { getDashboardWorkQueue } from "./work-queue";
 import { buildProfitAndLoss } from "@/lib/domain/reports";
 import type { DashboardWorkQueue } from "@/lib/domain/work-queue";
 import type { AuditEntryRow } from "@/lib/db/types";
+import {
+  ACTIVITY_ENTITIES,
+  ACTIVITY_VERBS,
+  auditEntityLabel,
+  type DashboardActivityCategory,
+} from "@/lib/domain/audit-entities";
 
 export class DashboardError extends Error {}
 
@@ -105,14 +111,7 @@ export interface OperatingPulse {
   goodsReceipts: { count: number };
 }
 
-export type DashboardActivityCategory =
-  | "sales"
-  | "purchases"
-  | "inventory"
-  | "banking"
-  | "close"
-  | "governance"
-  | "other";
+export type { DashboardActivityCategory };
 
 export interface DashboardActivity {
   id: string;
@@ -292,37 +291,6 @@ export async function getDashboardMetrics(
   };
 }
 
-const ACTIVITY_ENTITIES: Record<string, { entity: string; href: string; category: DashboardActivityCategory }> = {
-  acc_invoice: { entity: "Invoice", href: "/invoices", category: "sales" },
-  acc_estimate: { entity: "Estimate", href: "/estimates", category: "sales" },
-  acc_payment: { entity: "Customer payment", href: "/payments", category: "sales" },
-  acc_credit_memo: { entity: "Credit memo", href: "/credit-memos", category: "sales" },
-  acc_bill: { entity: "Bill", href: "/bills", category: "purchases" },
-  acc_bill_payment: { entity: "Bill payment", href: "/pay-bills", category: "purchases" },
-  acc_vendor_credit: { entity: "Vendor credit", href: "/vendor-credits", category: "purchases" },
-  acc_expense: { entity: "Expense", href: "/expenses", category: "purchases" },
-  acc_purchase_order: { entity: "Purchase order", href: "/purchase-orders", category: "purchases" },
-  acc_goods_receipt: { entity: "Goods receipt", href: "/purchase-orders", category: "inventory" },
-  acc_inventory_txn: { entity: "Inventory movement", href: "/items", category: "inventory" },
-  acc_stock_count: { entity: "Stock count", href: "/inventory/stock-count", category: "inventory" },
-  acc_journal_entry: { entity: "Journal entry", href: "/journal", category: "close" },
-  acc_statement_reconciliation: { entity: "Bank reconciliation", href: "/banking/reconcile", category: "banking" },
-  acc_approval_request: { entity: "Approval request", href: "/approvals", category: "governance" },
-  acc_accounting_period: { entity: "Accounting period", href: "/settings/periods", category: "close" },
-  acc_company_setting: { entity: "Company settings", href: "/settings/company", category: "governance" },
-  acc_vendor_tax_profile: { entity: "Vendor tax profile", href: "/vendors", category: "governance" },
-  acc_budget: { entity: "Budget", href: "/reports", category: "close" },
-};
-
-const ACTIVITY_VERBS: Record<string, string> = {
-  insert: "Created",
-  update: "Updated",
-  post: "Posted",
-  void: "Voided",
-  reverse: "Reversed",
-  delete: "Deleted",
-};
-
 const REFERENCE_KEYS = [
   "invoice_number",
   "payment_number",
@@ -349,7 +317,7 @@ function referenceFromAudit(value: unknown): string | null {
 
 export function describeAuditActivity(row: AuditEntryRow): DashboardActivity {
   const meta = ACTIVITY_ENTITIES[row.table_name] ?? {
-    entity: row.table_name.replace(/^acc_/, "").replaceAll("_", " "),
+    entity: auditEntityLabel(row.table_name),
     href: "/settings/audit",
     category: "other" as const,
   };

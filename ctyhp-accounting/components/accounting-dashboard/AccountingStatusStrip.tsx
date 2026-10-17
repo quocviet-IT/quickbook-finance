@@ -1,6 +1,7 @@
 "use client";
 import { Tag, Typography } from "antd";
 import { CalendarOutlined, ClockCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { timeZoneLabel } from "@/lib/format";
 import type { AccountingDashboardContext } from "@/lib/services/accounting-dashboard";
 import styles from "./accounting-dashboard.module.css";
 import { timeOnly } from "./DataStateNote";
@@ -61,7 +62,7 @@ export default function AccountingStatusStrip({
         <span className={styles.stripFact}>As of {context.asOf}</span>
         <span className={styles.stripFact}>{context.accountingBasis}</span>
         <span className={styles.stripFact}>{context.currencyCode}</span>
-        <span className={styles.stripFact}>{context.timeZone}</span>
+        <span className={styles.stripFact}>{timeZoneLabel(context.timeZone)}</span>
         <span className={styles.stripFact}>
           <ClockCircleOutlined aria-hidden="true" /> {timeOnly(generatedAt, timeZone)}
         </span>

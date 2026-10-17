@@ -71,7 +71,7 @@ describe("evaluateBankTransactionDelete", () => {
       }),
     );
     expect(result.kind).toBe("blocked");
-    expect(result.kind === "blocked" && result.reason).toContain("posted by manual");
+    expect(result.kind === "blocked" && result.reason).toContain("(source: Journal)");
   });
 
   it("humanizes the source type in the refusal reason", () => {
@@ -83,7 +83,7 @@ describe("evaluateBankTransactionDelete", () => {
         posting: { ownEntry: false, entryNumber: null, sourceType: "ar_payment" },
       }),
     );
-    expect(result.kind === "blocked" && result.reason).toContain("posted by ar payment");
+    expect(result.kind === "blocked" && result.reason).toContain("(source: Ar payment)");
   });
 
   it("allows void-then-delete on a matched line Banking categorised itself", () => {

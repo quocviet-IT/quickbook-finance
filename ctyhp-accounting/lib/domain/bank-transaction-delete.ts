@@ -31,6 +31,8 @@
  * A dependency-free .ts file on purpose, so a test can hold this contract
  * without paying for Ant Design's runtime.
  */
+import { sourceLabel } from "./entry-detail";
+
 
 export type BankTxnDeleteStatus = "unmatched" | "matched" | "ignored";
 
@@ -69,11 +71,6 @@ export type BankTransactionDeleteEligibility =
   | { kind: "void_then_delete"; entryNumber: string | null }
   | { kind: "blocked"; reason: string };
 
-/** Enum values read better as words: "ar_payment" -> "ar payment". */
-function humanize(sourceType: string): string {
-  return sourceType.replaceAll("_", " ");
-}
-
 export function evaluateBankTransactionDelete(
   input: BankTransactionDeleteInput,
 ): BankTransactionDeleteEligibility {
@@ -111,7 +108,7 @@ export function evaluateBankTransactionDelete(
   if (!input.posting.ownEntry) {
     return {
       kind: "blocked",
-      reason: `This line's entry was posted by ${humanize(input.posting.sourceType)}, not by categorizing it here. Undo that match first, then delete the line.`,
+      reason: `This line's entry was posted elsewhere (source: ${sourceLabel(input.posting.sourceType)}), not by categorizing it here. Undo that match first, then delete the line.`,
     };
   }
   return { kind: "void_then_delete", entryNumber: input.posting.entryNumber };

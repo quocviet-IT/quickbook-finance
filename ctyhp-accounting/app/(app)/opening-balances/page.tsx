@@ -20,7 +20,7 @@ export default async function OpeningBalancesPage() {
     <div>
       <PageHeader
         title="Opening Balances"
-        description="Seed account balances as of a cutover date; the difference books to Opening Balance Equity. The batch must balance before it posts."
+        description="Enter each account's balance on the day you start keeping the books in One Book. Any difference goes to Opening Balance Equity, and debits must equal credits before you can post."
       />
       <OpeningBalancesClient
         canWrite={canWrite(role)}

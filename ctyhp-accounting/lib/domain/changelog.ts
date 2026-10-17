@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.15",
+    date: "2026-10-17",
+    headline: "Plain words where the screens used the system's own names.",
+    changes: [
+      {
+        kind: "changed",
+        title: "An entry's source reads as a word",
+        detail:
+          "Journal Entries, the Journal report and its Source filter, Reconcile, the reconciliation report, the General Ledger and the dashboard's recent entries showed an entry's source as the system stores it, such as stock_count or opening_balance. They now show the same words as the rest of the books: Stock count, Opening, Journal, Bill payment.",
+        route: "/journal",
+      },
+      {
+        kind: "changed",
+        title: "Time zones by name",
+        detail:
+          "The overview pages, the dashboard and the Accounting overview said America/New_York; they now say Eastern Time, Pacific Time and so on. Company Settings shows both, Eastern Time (America/New_York), so an administrator still sees the stored value.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Change Log and Audit History say what changed in words",
+        detail:
+          "A change used to read like due_date: (empty) → 2026-10-20; lifecycle: new → dismissed, under a record called Work item state. Field names now read as words, Due date and Status, and every audited record has a name, such as Work queue item, Bank transaction or Product or service. In Audit History the filters say Record type and Record ID, actions read Created, Updated, Deleted, Posted and Voided, and Show update stamps is now Show last-edited fields.",
+        route: "/reports/change-log",
+      },
+      {
+        kind: "changed",
+        title: "Clearer wording on settings and reports",
+        detail:
+          "Bank Transactions shows Test mode instead of sandbox for a test bank feed, and when direct bank feeds are not set up it says to ask your administrator rather than naming server settings. Permissions no longer prints each permission's internal key under its name; hover the name to see it. Work policy's Some rules are asleep is now Some dashboard alerts are off, and an approval SLA is a time limit for approvals. Opening Balances, the Feedback queue's Screenshot column, Products & Services (On the item, All uses), Customer Credit (Days sales outstanding), General Ledger Posting (Documents to ledger) and the Beancount export are reworded the same way; the Beancount page keeps its technical notes in a section you can open.",
+        route: "/settings/permissions",
+      },
+    ],
+  },
+  {
     version: "2.14",
     date: "2026-10-17",
     headline: "US spelling throughout the screens.",

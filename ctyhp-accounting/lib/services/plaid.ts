@@ -97,7 +97,7 @@ function credentials(): { clientId: string; secret: string; baseUrl: string } {
   const clientId = process.env.PLAID_CLIENT_ID?.trim() ?? "";
   const secret = process.env.PLAID_SECRET?.trim() ?? "";
   if (!clientId || !secret) {
-    throw new PlaidError("Plaid is not configured. Set PLAID_CLIENT_ID and PLAID_SECRET on the server.");
+    throw new PlaidError("Direct bank feeds are not set up yet. Ask your administrator to turn them on.");
   }
   return { clientId, secret, baseUrl: BASE_URLS[environment()] };
 }

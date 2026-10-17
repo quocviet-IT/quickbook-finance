@@ -109,7 +109,7 @@ describe("value formatting", () => {
 describe("summarizeAuditChanges", () => {
   it("reads as field: before → after", () => {
     expect(summarizeAuditChanges(diffAuditEntry(ISSUE))).toBe(
-      "invoice_number: (empty) → INV-000014; status: draft → issued",
+      "Invoice number: (empty) → INV-000014; Status: draft → issued",
     );
   });
 
@@ -120,7 +120,7 @@ describe("summarizeAuditChanges", () => {
       { field: "c", before: "1", after: "2" },
       { field: "d", before: "1", after: "2" },
     ];
-    expect(summarizeAuditChanges(many, 2)).toBe("a: 1 → 2; b: 1 → 2 (+2 more)");
+    expect(summarizeAuditChanges(many, 2)).toBe("A: 1 → 2; B: 1 → 2 (+2 more)");
   });
 
   it("says so when an entry moved no visible field", () => {

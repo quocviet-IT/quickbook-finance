@@ -200,7 +200,7 @@ export default function ItemsClient({
           onChange={setUsedFor}
           style={{ minWidth: 150 }}
           options={[
-            { value: "all", label: "Used for anything" },
+            { value: "all", label: "All uses" },
             { value: "sold", label: "Sales" },
             { value: "purchased", label: "Purchase" },
             { value: "inventory", label: "Inventory" },
@@ -271,7 +271,7 @@ export default function ItemsClient({
             align: "right",
             render: (_, r) => {
               const card = Number(r.purchase_cost_minor ?? 0);
-              const cardLine = r.is_purchased ? secondaryLine(`card ${formatMoney(card, baseCurrency, baseDecimals)}`) : null;
+              const cardLine = r.is_purchased ? secondaryLine(`On the item: ${formatMoney(card, baseCurrency, baseDecimals)}`) : null;
               if (!r.is_inventory) {
                 return (
                   <div>
@@ -285,7 +285,7 @@ export default function ItemsClient({
               return (
                 <div>
                   {differs ? (
-                    <Tooltip title="The books carry this item at the weighted average of what was actually paid, which is no longer the figure on the card.">
+                    <Tooltip title="The books carry this item at the weighted average of what was actually paid, which is no longer the cost entered on the item.">
                       <Typography.Text type="warning">{text}</Typography.Text>
                     </Tooltip>
                   ) : (

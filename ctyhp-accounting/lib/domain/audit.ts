@@ -83,12 +83,28 @@ export function formatAuditValue(value: string | null): string {
   return value === "" ? "(empty)" : value;
 }
 
-/** One scannable line for a table cell: `status: draft → issued`. */
+const AUDIT_FIELD_LABELS: Record<string, string> = {
+  lifecycle: "Status",
+  memo: "Memo",
+  amount_minor: "Amount",
+  total_minor: "Total",
+};
+
+/** A column name as words: `due_date` → `Due date`, `account_id` → `Account`. */
+export function auditFieldLabel(field: string): string {
+  const mapped = AUDIT_FIELD_LABELS[field];
+  if (mapped) return mapped;
+  const base = field.replace(/_(minor|id)$/, "") || field;
+  const words = base.replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** One scannable line for a table cell: `Status: draft → issued`. */
 export function summarizeAuditChanges(changes: readonly AuditFieldChange[], limit = 3): string {
   if (changes.length === 0) return "No field changed";
   const shown = changes
     .slice(0, limit)
-    .map((c) => `${c.field}: ${formatAuditValue(c.before)} → ${formatAuditValue(c.after)}`)
+    .map((c) => `${auditFieldLabel(c.field)}: ${formatAuditValue(c.before)} → ${formatAuditValue(c.after)}`)
     .join("; ");
   const rest = changes.length - Math.min(limit, changes.length);
   return rest > 0 ? `${shown} (+${rest} more)` : shown;

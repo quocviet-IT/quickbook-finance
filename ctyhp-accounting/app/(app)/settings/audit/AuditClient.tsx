@@ -15,6 +15,7 @@ import {
   summarizeAuditChanges,
   type AuditFieldChange,
 } from "@/lib/domain/audit";
+import { ACTIVITY_VERBS, auditEntityLabel } from "@/lib/domain/audit-entities";
 import { downloadCsvFile } from "@/lib/client/report-export";
 import { searchAuditAction } from "./actions";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -103,12 +104,12 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
         <Select
           allowClear
           showSearch
-          placeholder="Table"
+          placeholder="Record type"
           style={{ width: 220 }}
           value={table}
           onChange={setTable}
-          options={tables.map((t) => ({ value: t, label: t }))}
-          aria-label="Filter by table"
+          options={tables.map((t) => ({ value: t, label: auditEntityLabel(t) }))}
+          aria-label="Filter by record type"
         />
         <Select
           allowClear
@@ -130,11 +131,11 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
           style={{ width: 140 }}
           value={action}
           onChange={setAction}
-          options={ACTIONS.map((a) => ({ value: a, label: a }))}
+          options={ACTIONS.map((a) => ({ value: a, label: ACTIVITY_VERBS[a] ?? a }))}
           aria-label="Filter by action"
         />
         <Input
-          placeholder="Record id"
+          placeholder="Record ID"
           style={{ width: 300 }}
           value={recordId}
           onChange={(e) => setRecordId(e.target.value)}
@@ -149,7 +150,7 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
           checked={includeHousekeeping}
           onChange={(e) => setIncludeHousekeeping(e.target.checked)}
         >
-          Show update stamps
+          Show last-edited fields
         </Checkbox>
       </FilterBar>
 
@@ -188,8 +189,13 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
             width: 200,
             render: (v: string | null) => formatActor(v),
           },
-          { title: "Action", dataIndex: "action", width: 90, render: (v: string) => <Tag>{v}</Tag> },
-          { title: "Table", dataIndex: "table_name", width: 200 },
+          { title: "Action", dataIndex: "action", width: 90, render: (v: string) => <Tag>{ACTIVITY_VERBS[v] ?? v}</Tag> },
+          {
+            title: "Record type",
+            dataIndex: "table_name",
+            width: 200,
+            render: (v: string) => auditEntityLabel(v),
+          },
           {
             title: "Record",
             dataIndex: "record_id",
