@@ -96,6 +96,15 @@ async function structure(schema) {
   const triggers = await all(`select tgname from pg_trigger where tgrelid = to_regclass('acc_balance_comparison') and not tgisinternal order by tgname`);
   check("the header has its actor-stamp and audit triggers",
     triggers.map((r) => r.tgname).join(",") === "acc_balance_comparison_actor_stamp,acc_balance_comparison_atomic_audit", JSON.stringify(triggers));
+  const hcols = await all(
+    `select column_name, data_type, is_nullable from information_schema.columns
+      where table_schema = $1 and table_name = 'acc_balance_comparison' and column_name in ('id', 'as_of') order by column_name`,
+    [schema],
+  );
+  check("the header has an id and a unique, non-null date",
+    JSON.stringify(hcols.map((c) => [c.column_name, c.data_type, c.is_nullable])) === JSON.stringify([["as_of", "date", "NO"], ["id", "uuid", "NO"]]) &&
+      (await one(`select count(*)::int as n from pg_constraint where conrelid = to_regclass('acc_balance_comparison') and contype in ('p', 'u')`)).n === 2,
+    JSON.stringify(hcols));
   const lineTriggers = await all(`select tgname from pg_trigger where tgrelid = to_regclass('acc_balance_comparison_line') and not tgisinternal`);
   check("the lines carry no triggers of their own", lineTriggers.length === 0, JSON.stringify(lineTriggers));
 
@@ -209,8 +218,8 @@ async function behaviour() {
   const h2 = await head("2001-03-31");
   check("…and updates its header: new name, the note cleared, the creator kept",
     h2.compared_with === "Sample Ledger 2" && h2.note === null && h2.created_by === admin.id, JSON.stringify(h2));
-  check("…the header's audit trail holds the insert and the update",
-    (await one(`select count(*)::int as n from acc_audit_log where table_name = 'acc_balance_comparison' and actor_id = $1`, [admin.id])).n >= 3);
+  check("…the header's audit trail holds the insert and the update, each pointing at the header's id",
+    (await one(`select count(*)::int as n from acc_audit_log where table_name = 'acc_balance_comparison' and actor_id = $1 and record_id = $2`, [admin.id, h2.id])).n === 2);
 
   // ---- an external-only line round-trips
   await save("2001-05-31", "Sample Ledger", null, [{ external_code: " Ext-1 ", external_name: " Petty box ", other_balance_minor: 1234 }]);

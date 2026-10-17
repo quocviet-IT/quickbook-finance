@@ -29,7 +29,9 @@ set search_path = public;
 -- The header: one row per comparison date
 -- ----------------------------------------------------------------------------
 create table if not exists acc_balance_comparison (
-  as_of          date primary key,
+  id             uuid primary key default gen_random_uuid(),
+  -- the lines point at the date; the id is what the audit trail records
+  as_of          date not null unique,
   compared_with  text not null check (length(compared_with) between 1 and 80),
   note           text check (note is null or length(note) <= 500),
   created_by     uuid references auth.users (id),

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ACTIVITY_ENTITIES } from "@/lib/domain/audit-entities";
 import { EXPORT_TABLES, ORDER_COLUMNS, orderColumnsFor } from "@/lib/domain/company-export";
 
 const DIR = join(process.cwd(), "supabase/migrations");
@@ -87,9 +88,10 @@ describe("0155 is additive", () => {
 });
 
 describe("0155 the header table", () => {
-  it("has the spec's columns, keyed on the date", () => {
+  it("has the spec's columns: an id for the audit trail, and the date unique and not null", () => {
     expect(sql).toMatch(/create table if not exists acc_balance_comparison \(/i);
-    expect(sql).toMatch(/as_of\s+date primary key/i);
+    expect(sql).toMatch(/id\s+uuid primary key default gen_random_uuid\(\)/i);
+    expect(sql).toMatch(/as_of\s+date not null unique/i);
     expect(sql).toMatch(/compared_with\s+text not null check \(length\(compared_with\) between 1 and 80\)/i);
     expect(sql).toMatch(/note\s+text check \(note is null or length\(note\) <= 500\)/i);
     expect(sql).toMatch(/created_by\s+uuid references auth\.users \(id\)/i);
@@ -262,8 +264,19 @@ describe("0155 the company backup", () => {
     expect(at("acc_balance_comparison")).toBeGreaterThan(at("acc_account"));
   });
 
-  it("reads the header in date order, since it has no id column", () => {
-    expect(ORDER_COLUMNS.acc_balance_comparison).toEqual(["as_of"]);
+  it("reads both tables in id order, the default, with no override", () => {
+    expect(ORDER_COLUMNS.acc_balance_comparison).toBeUndefined();
+    expect(orderColumnsFor("acc_balance_comparison")).toEqual(["id"]);
     expect(orderColumnsFor("acc_balance_comparison_line")).toEqual(["id"]);
+  });
+});
+
+describe("0155 the audit trail", () => {
+  it("names both tables, so the Change Log and the activity list can point at them", () => {
+    for (const t of TABLES) {
+      expect(ACTIVITY_ENTITIES[t], t).toMatchObject({ href: "/reports/balance-comparison", category: "close" });
+    }
+    expect(ACTIVITY_ENTITIES.acc_balance_comparison.entity).toBe("Balance comparison");
+    expect(ACTIVITY_ENTITIES.acc_balance_comparison_line.entity).toBe("Balance comparison line");
   });
 });
