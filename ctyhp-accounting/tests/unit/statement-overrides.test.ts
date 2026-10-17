@@ -5,6 +5,7 @@ import {
   overrideFacts,
   overrideMoment,
   overrideStatus,
+  quotedReason,
   reconciliationNotice,
   reconciliationReportLine,
   type NamedStatementOverride,
@@ -53,19 +54,19 @@ describe("the three sentences", () => {
   const facts = overrideFacts(override(), "America/New_York");
 
   it("prints the moment in the company's time zone", () => {
-    expect(facts).toEqual({ outByMinor: 1234, name: "Dana Example", date: "Oct 8, 2026", time: "14:47", reason: "Bank confirmed its printed total is wrong" });
+    expect(facts).toEqual({ outByMinor: 1234, name: "Dana Example", date: "Oct 8, 2026", time: "2:47 PM", reason: "Bank confirmed its printed total is wrong" });
   });
 
   it("reads the import record while open", () => {
     expect(importRecordDetailOf(override(), "America/New_York", money)).toBe(
-      "Out by $12.34. Imported by Dana Example on Oct 8, 2026 at 14:47: “Bank confirmed its printed total is wrong”. Open until a reconciliation through Sep 30, 2026 is completed.",
+      "Out by $12.34. Imported by Dana Example on Oct 8, 2026 at 2:47 PM: “Bank confirmed its printed total is wrong”. Open until a reconciliation through Sep 30, 2026 is completed.",
     );
   });
 
   it("reads the import record once settled", () => {
     const settled = override({ settledByReconciliationId: "rec-1", settledThrough: "2026-10-15" });
     expect(importRecordDetailOf(settled, "America/New_York", money)).toBe(
-      "Out by $12.34. Imported by Dana Example on Oct 8, 2026 at 14:47: “Bank confirmed its printed total is wrong”. Settled by the reconciliation to Oct 15, 2026.",
+      "Out by $12.34. Imported by Dana Example on Oct 8, 2026 at 2:47 PM: “Bank confirmed its printed total is wrong”. Settled by the reconciliation to Oct 15, 2026.",
     );
   });
 
@@ -98,12 +99,12 @@ describe("the company's time zone, not the machine's", () => {
       process.env.TZ = tz;
       return overrideMoment("2026-10-08T03:30:00Z", "America/New_York");
     });
-    for (const reading of readings) expect(reading).toEqual({ date: "Oct 7, 2026", time: "23:30" });
+    for (const reading of readings) expect(reading).toEqual({ date: "Oct 7, 2026", time: "11:30 PM" });
   });
 
   it("follows the company's zone across midnight", () => {
-    expect(overrideMoment("2026-10-08T03:30:00Z", "America/New_York")).toEqual({ date: "Oct 7, 2026", time: "23:30" });
-    expect(overrideMoment("2026-10-08T03:30:00Z", "Asia/Tokyo")).toEqual({ date: "Oct 8, 2026", time: "12:30" });
+    expect(overrideMoment("2026-10-08T03:30:00Z", "America/New_York")).toEqual({ date: "Oct 7, 2026", time: "11:30 PM" });
+    expect(overrideMoment("2026-10-08T03:30:00Z", "Asia/Tokyo")).toEqual({ date: "Oct 8, 2026", time: "12:30 PM" });
   });
 });
 
@@ -125,5 +126,26 @@ describe("a row of acc_statement_overrides()", () => {
       settled_through: null,
     });
     expect(row).toMatchObject({ outByMinor: -1250, openingMinor: 100000, closingMinor: 150000, firstLineDate: null, settledThrough: null });
+  });
+});
+
+describe("how an override reads (2.11, after the screenshots)", () => {
+  it("says how far out it was, without the sign", () => {
+    const facts = overrideFacts(override({ outByMinor: -267 }), "America/New_York");
+    expect(facts.outByMinor).toBe(267);
+    expect(reconciliationNotice(facts, money)).toContain("out by $2.67,");
+  });
+
+  it("prints the time on the twelve-hour clock the rest of the app uses", () => {
+    expect(overrideMoment("2026-10-14T09:37:18Z", "America/New_York")).toEqual({ date: "Oct 14, 2026", time: "5:37 AM" });
+    expect(overrideMoment("2026-10-08T18:47:00Z", "America/New_York").time).toBe("2:47 PM");
+  });
+
+  it("does not put a second full stop after a reason that ends its own sentence", () => {
+    expect(quotedReason("Bank typo")).toBe("“Bank typo”.");
+    expect(quotedReason("The bank misprinted the closing.")).toBe("“The bank misprinted the closing.”");
+    const line = reconciliationReportLine(overrideFacts(override({ reason: "Misprinted." }), "America/New_York"), money);
+    expect(line.endsWith("“Misprinted.”")).toBe(true);
+    expect(line).not.toContain(".”.");
   });
 });

@@ -46,6 +46,7 @@ import {
   overrideDay,
   overrideMoment,
   overrideStatus,
+  quotedReason,
   type NamedStatementOverride,
 } from "@/lib/domain/statement-overrides";
 import { shortDate } from "@/lib/domain/report-presets";
@@ -531,7 +532,7 @@ export interface StatementOverrideRow {
   importedDay: string;
   /** That day as the screen prints it, `Oct 8, 2026`. */
   importedDate: string;
-  /** The time of day in the company's time zone, `11:47`. */
+  /** The time of day in the company's time zone, `11:47 AM`. */
   importedTime: string;
   byName: string;
   outByMinor: number;
@@ -568,7 +569,8 @@ export function openStatementOverrides(
         importedDate: moment.date,
         importedTime: moment.time,
         byName: o.overriddenByName,
-        outByMinor: o.outByMinor,
+        // How far out, whichever way: the sign only says which side was short.
+        outByMinor: Math.abs(o.outByMinor),
         reason: o.reason,
         openSince: importedDay,
       };
@@ -577,12 +579,12 @@ export function openStatementOverrides(
 
 /**
  * The sentence a row is read by, on the screen and in the export:
- * "bank-june.csv, imported Oct 8, 2026 at 11:47 by Dana Reyes, out by $12.00: “reason”. Open since Oct 8, 2026."
+ * "bank-june.csv, imported Oct 8, 2026 at 11:47 AM by Dana Reyes, out by $12.00: “reason”. Open since Oct 8, 2026."
  */
 export function statementOverrideSentence(row: StatementOverrideRow, money: Money): string {
   return (
     `${row.filename}, imported ${row.importedDate} at ${row.importedTime} by ${row.byName}, ` +
-    `out by ${money(row.outByMinor)}: “${row.reason}”. Open since ${shortDate(row.openSince)}.`
+    `out by ${money(row.outByMinor)}: ${quotedReason(row.reason)} Open since ${shortDate(row.openSince)}.`
   );
 }
 

@@ -128,3 +128,13 @@ describe("one default time zone", () => {
     }
   });
 });
+
+describe("the Exceptions overrides table on a phone", () => {
+  it("is held to its measured width and scrolls in its own box", async () => {
+    const { OVERRIDE_MIN_WIDTH } = await import("@/app/(app)/reports/exceptions/override-columns");
+    expect(OVERRIDE_MIN_WIDTH).toBe(OVERRIDE_FIXED_WIDTHS.reduce((a, b) => a + b, 0) + OVERRIDE_ELASTIC_FLOOR);
+    const css = read("app/(app)/reports/exceptions/overrides-table.module.css");
+    expect(css).toContain(`min-width: ${OVERRIDE_MIN_WIDTH}px;`);
+    expect(read("app/(app)/reports/exceptions/ExceptionsClient.tsx")).toContain("overridesStyles.overridesTable");
+  });
+});

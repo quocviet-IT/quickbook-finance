@@ -151,7 +151,7 @@ describe("the import history", () => {
     listStatementOverrides.mockResolvedValue([override()]);
     const rows = await listBankStatementImports(sb, null);
     expect(rows[0].override_detail).toBe(
-      "Out by $12.50. Imported by Dana Example on Sep 9, 2026 at 16:30: “Bank typo”. Open until a reconciliation through Sep 30, 2026 is completed.",
+      "Out by $12.50. Imported by Dana Example on Sep 9, 2026 at 4:30 PM: “Bank typo”. Open until a reconciliation through Sep 30, 2026 is completed.",
     );
     expect(rows[1].override_detail).toBeNull();
   });

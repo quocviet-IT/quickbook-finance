@@ -55,10 +55,24 @@ export function overrideStatus(
   return override.settledByReconciliationId !== null && override.settledThrough !== null ? "settled" : "open";
 }
 
-/** The date and time of a stored moment as the company's clock reads it: `{ date: "Oct 8, 2026", time: "11:47" }`. */
+/**
+ * The date and time of a stored moment as the company's clock reads it:
+ * `{ date: "Oct 8, 2026", time: "11:47 AM" }`, the clock the rest of the app prints.
+ */
 export function overrideMoment(importedAt: string, timeZone: string): { date: string; time: string } {
-  const [day, time] = stampInTimeZone(importedAt, timeZone).split(" ");
+  const day = stampInTimeZone(importedAt, timeZone).slice(0, 10);
+  const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone }).format(new Date(importedAt));
   return { date: shortDate(day), time };
+}
+
+/**
+ * A reason quoted and closed as the end of a sentence: `“Bank typo”.`, but
+ * `“The bank misprinted it.”` when the reason ends its own sentence, rather than
+ * a second full stop after the quote.
+ */
+export function quotedReason(reason: string): string {
+  const said = reason.trim();
+  return /[.!?…]$/.test(said) ? `“${said}”` : `“${said}”.`;
 }
 
 /** The calendar day of a stored moment in the company's time zone: `2026-10-08`. */
@@ -78,7 +92,8 @@ export interface OverrideFacts {
 /** Facts for a sentence, from an override, its person's name and the company's time zone. */
 export function overrideFacts(override: NamedStatementOverride, timeZone: string): OverrideFacts {
   return {
-    outByMinor: override.outByMinor,
+    // How far out, whichever way: the sign only says which side was short.
+    outByMinor: Math.abs(override.outByMinor),
     name: override.overriddenByName,
     ...overrideMoment(override.importedAt, timeZone),
     reason: override.reason,
@@ -87,14 +102,14 @@ export function overrideFacts(override: NamedStatementOverride, timeZone: string
 
 /**
  * The import record's detail:
- * "Out by $12.00. Imported by Dana Reyes on Oct 8, 2026 at 11:47: “reason”. Open until a reconciliation through Sep 30, 2026 is completed."
+ * "Out by $12.00. Imported by Dana Reyes on Oct 8, 2026 at 11:47 AM: “reason”. Open until a reconciliation through Sep 30, 2026 is completed."
  */
 export function importRecordDetail(
   facts: OverrideFacts,
   settle: { status: "open"; lastLineDate: string | null } | { status: "settled"; settledThrough: string },
   money: Money,
 ): string {
-  const head = `Out by ${money(facts.outByMinor)}. Imported by ${facts.name} on ${facts.date} at ${facts.time}: “${facts.reason}”.`;
+  const head = `Out by ${money(facts.outByMinor)}. Imported by ${facts.name} on ${facts.date} at ${facts.time}: ${quotedReason(facts.reason)}`;
   if (settle.status === "settled") return `${head} Settled by the reconciliation to ${shortDate(settle.settledThrough)}.`;
   const through = settle.lastLineDate ? ` through ${shortDate(settle.lastLineDate)}` : "";
   return `${head} Open until a reconciliation${through} is completed.`;
@@ -112,13 +127,13 @@ export function importRecordDetailOf(override: NamedStatementOverride, timeZone:
 export function reconciliationNotice(facts: OverrideFacts, money: Money): string {
   return (
     `A statement in this period was imported out of balance: out by ${money(facts.outByMinor)}, ` +
-    `by ${facts.name} on ${facts.date}, “${facts.reason}”. Completing this reconciliation settles it.`
+    `by ${facts.name} on ${facts.date}, ${quotedReason(facts.reason)} Completing this reconciliation settles it.`
   );
 }
 
 /** The line in the report of the completed reconciliation that settled the override. */
 export function reconciliationReportLine(facts: OverrideFacts, money: Money): string {
-  return `Settles a statement imported out of balance: out by ${money(facts.outByMinor)}, by ${facts.name} on ${facts.date}, “${facts.reason}”.`;
+  return `Settles a statement imported out of balance: out by ${money(facts.outByMinor)}, by ${facts.name} on ${facts.date}, ${quotedReason(facts.reason)}`;
 }
 
 /** Where a reconciliation in progress sits: its account, its statement end date, and the end of the one completed before it. */

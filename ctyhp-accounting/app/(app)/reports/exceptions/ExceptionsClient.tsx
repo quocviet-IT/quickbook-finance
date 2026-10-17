@@ -53,6 +53,7 @@ import {
   OVERRIDE_SINCE_WIDTH,
 } from "./override-columns";
 import clearingStyles from "./clearing-table.module.css";
+import overridesStyles from "./overrides-table.module.css";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -625,6 +626,7 @@ export default function ExceptionsClient({
           state={state("statementOverride", r.statementOverride.length)}
           why="An administrator may import a statement that does not add up, with a reason. It stays here until a completed reconciliation of the same bank account reaches the date of its last line. The import record and the reconciliation it belongs to say the same."
         >
+          <div className={overridesStyles.overridesTable}>
           <DataTable<StatementOverrideRow>
             rowKey="batchId"
             pagination={false}
@@ -649,7 +651,7 @@ export default function ExceptionsClient({
                 key: "outBy",
                 width: COLUMN.MONEY_WIDE,
                 align: "right",
-                render: (_, row) => <span className={styles.negative}>{money(row.outByMinor)}</span>,
+                render: (_, row) => money(row.outByMinor),
               },
               sentenceColumn<StatementOverrideRow>({ title: "Reason", key: "reason", floor: OVERRIDE_REASON_FLOOR, render: (_, row) => row.reason }),
               {
@@ -660,6 +662,7 @@ export default function ExceptionsClient({
               },
             ]}
           />
+          </div>
         </ReportSection>
       </>
     );

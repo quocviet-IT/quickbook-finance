@@ -436,7 +436,7 @@ describe("getExceptionReport: the statements imported out of balance read", () =
         byName: "Dana Example",
         outByMinor: 1250,
         importedDay: "2026-09-09",
-        importedTime: "19:30",
+        importedTime: "7:30 PM",
       }),
     ]);
   });

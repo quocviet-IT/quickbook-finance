@@ -77,14 +77,14 @@ describe("the statements imported out of balance check", () => {
       filename: "example-june.csv",
       importedDay: "2026-09-09",
       importedDate: "Sep 9, 2026",
-      importedTime: "19:30",
+      importedTime: "7:30 PM",
       byName: "Dana Example",
       outByMinor: 1250,
       reason: "Bank confirmed its printed total is wrong",
       openSince: "2026-09-09",
     });
     expect(statementOverrideSentence(row, money)).toBe(
-      "example-june.csv, imported Sep 9, 2026 at 19:30 by Dana Example, out by $12.50: “Bank confirmed its printed total is wrong”. Open since Sep 9, 2026.",
+      "example-june.csv, imported Sep 9, 2026 at 7:30 PM by Dana Example, out by $12.50: “Bank confirmed its printed total is wrong”. Open since Sep 9, 2026.",
     );
   });
 
@@ -115,7 +115,7 @@ describe("the statements imported out of balance check", () => {
         check: CHECK_LABEL.statementOverride,
         date: "2026-09-09",
         type: "Imported out of balance",
-        name: "example-june.csv, imported Sep 9, 2026 at 19:30 by Dana Example, out by $12.50: “Bank confirmed its printed total is wrong”. Open since Sep 9, 2026.",
+        name: "example-june.csv, imported Sep 9, 2026 at 7:30 PM by Dana Example, out by $12.50: “Bank confirmed its printed total is wrong”. Open since Sep 9, 2026.",
         account: "Business Checking",
         amount: 12.5,
       },
