@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
@@ -16,7 +16,11 @@ export const dynamic = "force-dynamic";
 
 export default async function FromFilesPage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
   const { account } = await searchParams;
-  if (!account || !z.uuid().safeParse(account).success) notFound();
+  // This page reconciles one account, and the Reconcile page is where that
+  // account is chosen. A link or an address without it (the release notes link
+  // here bare, and so does anyone who types it) goes there to choose one,
+  // rather than to "Page not found".
+  if (!account || !z.uuid().safeParse(account).success) redirect("/banking/reconcile");
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
   const [banks, currencies, reconciliations, { asOf }] = await Promise.all([
@@ -26,7 +30,8 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
     getBankingContext(sb),
   ]);
   const bank = banks.find((b) => b.id === account);
-  if (!bank) notFound();
+  // An account that is gone, or not this company's: choose again.
+  if (!bank) redirect("/banking/reconcile");
   const base = currencies.find((c) => c.is_base);
   // Newest first, as listReconciliations orders them.
   const completed = reconciliations.filter((r) => r.status === "completed");

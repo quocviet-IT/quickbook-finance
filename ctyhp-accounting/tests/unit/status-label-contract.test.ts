@@ -59,6 +59,19 @@ function sourceFiles(dir: string, root: string, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * Every file read once and kept. Each rule used to read the whole tree again,
+ * which ran this test to its 5s limit when the suite ran in parallel.
+ */
+const fileLines = new Map<string, string[]>();
+function linesOf(file: string): string[] {
+  let lines = fileLines.get(file);
+  if (!lines) {
+    lines = readFileSync(join(process.cwd(), file), "utf8").split("\n");
+    fileLines.set(file, lines);
+  }
+  return lines;
+}
 const isComment = (line: string) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 describe("statuses and actions read one way on every screen", () => {
@@ -66,6 +79,8 @@ describe("statuses and actions read one way on every screen", () => {
   const files = [...sourceFiles(join(root, "app"), root), ...sourceFiles(join(root, "components"), root)].filter(
     (file) => !FROZEN.some((frozen) => frozen.test(file)),
   );
+  // Read while the suite is collected, so no single test carries the disk time.
+  for (const file of files) linesOf(file);
 
   it("finds the files it is supposed to be guarding", () => {
     expect(files).toContain("app/(app)/bills/BillsClient.tsx");
@@ -77,8 +92,7 @@ describe("statuses and actions read one way on every screen", () => {
       const offenders: string[] = [];
       for (const file of files) {
         if (rule.exempt?.some((exempt) => exempt.test(file))) continue;
-        readFileSync(join(root, file), "utf8")
-          .split("\n")
+        linesOf(file)
           .forEach((line, index) => {
             if (!isComment(line) && rule.pattern.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`);
           });

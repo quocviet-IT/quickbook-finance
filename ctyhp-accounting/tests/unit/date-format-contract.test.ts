@@ -85,6 +85,19 @@ function sourceFiles(dir: string, root: string, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * Every file read once and kept. Each rule used to read the whole tree again,
+ * which ran this test to its 5s limit when the suite ran in parallel.
+ */
+const fileLines = new Map<string, string[]>();
+function linesOf(file: string): string[] {
+  let lines = fileLines.get(file);
+  if (!lines) {
+    lines = readFileSync(join(process.cwd(), file), "utf8").split("\n");
+    fileLines.set(file, lines);
+  }
+  return lines;
+}
 const isComment = (line: string) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 describe("dates on screen go through lib/format", () => {
@@ -93,6 +106,8 @@ describe("dates on screen go through lib/format", () => {
     (file) => !FROZEN.some((frozen) => frozen.test(file)),
   );
   const services = sourceFiles(join(root, "lib", "services"), root);
+  // Read while the suite is collected, so no single test carries the disk time.
+  for (const file of [...screens, ...services]) linesOf(file);
 
   it("finds the files it is supposed to be guarding", () => {
     expect(screens).toContain("app/(app)/bills/BillsClient.tsx");
@@ -106,8 +121,7 @@ describe("dates on screen go through lib/format", () => {
       const offenders: string[] = [];
       for (const file of files) {
         if (EXEMPT[file] === rule.name) continue;
-        readFileSync(join(root, file), "utf8")
-          .split("\n")
+        linesOf(file)
           .forEach((line, index) => {
             if (!isComment(line) && rule.pattern.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`);
           });
@@ -119,8 +133,7 @@ describe("dates on screen go through lib/format", () => {
   it("no screen formats a date picker value for display (only YYYY-MM-DD, YYYY-MM or YYYY go to the server)", () => {
     const offenders: string[] = [];
     for (const file of screens) {
-      readFileSync(join(root, file), "utf8")
-        .split("\n")
+      linesOf(file)
         .forEach((line, index) => {
           if (isComment(line)) return;
           for (const match of line.matchAll(/\.format\(\s*["']([^"']*)["']\s*\)/g)) {

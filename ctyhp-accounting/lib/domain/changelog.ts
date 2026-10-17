@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.23",
+    date: "2026-10-17",
+    headline: "Reconcile from statement files opens from its own address.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Reconcile from statement files no longer says Page not found",
+        detail:
+          "Opening /banking/reconcile/from-files directly, from a bookmark or from these release notes said Page not found, because the page needs to know which bank account to reconcile. It now takes you to Bank Reconciliation to choose the account; Reconcile from statement files there opens it for that account, as the button always did.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "2.22",
     date: "2026-10-17",
     headline: "A table that fits on one page shows no pager, and a report’s total sits under its column.",
