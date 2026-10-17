@@ -630,6 +630,25 @@ body {
 }
 
 /*
+ * A switch such as Accountant | Management, in the page's own colours.
+ *
+ * The tokens give Ant Design the same values, but Ant Design files them under
+ * a class named for the theme, and an element whose server render was light
+ * keeps that class when it hydrates late. These read the variables that
+ * data-theme sets on <html>, which nothing leaves behind. The ring lets the
+ * well show on a dark page, where it is the page's own colour; in light it
+ * is the well's colour and does not show.
+ */
+:root .ant-segmented.ant-segmented {
+  --ant-segmented-track-bg: var(--ob-surface-inset);
+  --ant-segmented-item-color: var(--ob-text-secondary);
+  --ant-segmented-item-hover-color: var(--ob-text-heading);
+  --ant-segmented-item-selected-bg: var(--ob-surface-raised);
+  --ant-segmented-item-selected-color: var(--ob-text-heading);
+  box-shadow: inset 0 0 0 1px var(--ob-border-subtle);
+}
+
+/*
  * Ant Design's purple tag (Contra, Brought forward, adjusting, matched by AI),
  * in this app's purple. The preset read at 3.39:1 in dark. The extra class
  * outweighs the preset's own rule, which antd.css declares after this file.

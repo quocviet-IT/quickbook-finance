@@ -16,7 +16,7 @@ import { statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import { fromMinor } from "@/lib/domain/money";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
-import { formatDateRange } from "@/lib/format";
+import { formatDateRange, formatDate } from "@/lib/format";
 
 export const RETAINED_EARNINGS_KEY = "retained-earnings-before-period";
 export const RETAINED_EARNINGS_LABEL = "Retained earnings — before this period";
@@ -285,7 +285,7 @@ export function workingTrialBalanceSheet(report: WorkingTrialBalance, meta: WtbS
     rows.push({ account: "The adjustments", ud: null, uc: null, ad: null, ac: null, nd: null, nc: null, why: null });
     for (const a of report.adjustments) {
       rows.push({
-        account: a.first ? `${a.number} · ${a.date} · ${a.name} — ${a.account}` : `— ${a.account}`,
+        account: a.first ? `${a.number} · ${formatDate(a.date)} · ${a.name} — ${a.account}` : `— ${a.account}`,
         ud: null,
         uc: null,
         ad: amount(a.debit),

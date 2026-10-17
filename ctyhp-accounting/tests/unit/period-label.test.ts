@@ -28,18 +28,18 @@ describe("naming the period a column covers", () => {
 
   it("shows the dates themselves for a range somebody picked by hand", () => {
     // Naming this would mean inventing one. The dates are the honest answer.
-    expect(periodColumnLabel("2026-01-01", "2026-08-15")).toBe("2026-01-01 – 2026-08-15");
-    expect(periodColumnLabel("2026-03-15", "2026-04-20")).toBe("2026-03-15 – 2026-04-20");
+    expect(periodColumnLabel("2026-01-01", "2026-08-15")).toBe("01/01/2026 – 08/15/2026");
+    expect(periodColumnLabel("2026-03-15", "2026-04-20")).toBe("03/15/2026 – 04/20/2026");
   });
 
   it("does not pretend a February that stops short is a whole month", () => {
     // The leap day is the boundary that decides it: 28 February 2024 is not the
     // end of that month, and a column headed "Feb 2024" would be a day short.
-    expect(periodColumnLabel("2024-02-01", "2024-02-28")).toBe("2024-02-01 – 2024-02-28");
+    expect(periodColumnLabel("2024-02-01", "2024-02-28")).toBe("02/01/2024 – 02/28/2024");
   });
 
   it("shows what it was given rather than guessing when a date is unreadable", () => {
-    expect(periodColumnLabel("", "2026-12-31")).toBe(" – 2026-12-31");
-    expect(periodColumnLabel("not a date", "2026-12-31")).toBe("not a date – 2026-12-31");
+    expect(periodColumnLabel("", "2026-12-31")).toBe(" – 12/31/2026");
+    expect(periodColumnLabel("not a date", "2026-12-31")).toBe("not a date – 12/31/2026");
   });
 });

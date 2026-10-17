@@ -224,7 +224,7 @@ describe("workingTrialBalanceSheet", () => {
     expect(sheet.rows[total]).toEqual({ account: "Total", ud: 17000, uc: 17000, ad: 500, ac: 500, nd: 17500, nc: 17500, why: null });
     expect(sheet.rows[total + 1]).toMatchObject({ account: "The adjustments" });
     expect(sheet.rows[total + 2]).toMatchObject({
-      account: "AJE 1 · 2026-03-31 · Harbour Property Ltd — 6100 Rent",
+      account: "AJE 1 · 03/31/2026 · Harbour Property Ltd — 6100 Rent",
       ad: 500,
       ac: null,
       why: "March rent billed in April",

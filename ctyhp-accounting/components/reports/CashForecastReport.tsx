@@ -65,7 +65,7 @@ export default function CashForecastReport({
         fileName: `13-week-cash-forecast-${forecast.today}`,
         companyName,
         title: "13 Week Cash Forecast",
-        subtitle: `From ${forecast.today} · ${mode === "due" ? "By due date" : "As they usually pay"}`,
+        subtitle: `From ${formatDate(forecast.today)} · ${mode === "due" ? "By due date" : "As they usually pay"}`,
         currencyCode,
         columns: [
           { key: "week", header: "Week", kind: "text", width: 14 },

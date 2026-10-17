@@ -91,7 +91,7 @@ describe("bankReconciliationControl", () => {
       evaluatedAt: AT,
     });
     expect(c.status).toBe("healthy");
-    expect(c.detail).toMatch(/2026-07-31/);
+    expect(c.detail).toContain("Last reconciled through 07/31/2026.");
   });
 
   it("needs attention while transactions are unmatched, naming both facts", () => {

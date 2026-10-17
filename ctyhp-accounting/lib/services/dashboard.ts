@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getLedgerBalances } from "./reports";
 import { getArAging, getApAging, type AgingReport } from "./aging";
@@ -385,7 +386,8 @@ async function getPeriodComparison(
   const prior = performanceSnapshot(priorRows);
   return {
     currentLabel: `${asOf.slice(0, 7)} MTD`,
-    priorLabel: `${previous.label} 1-${Number(previous.to.slice(-2))}`,
+    // "09/01–09/17": the app's date style without the year, which fits a KPI card's trend line.
+    priorLabel: `${formatDate(previous.from).slice(0, 5)}–${formatDate(previous.to).slice(0, 5)}`,
     current,
     prior,
     revenueChangePercent: percentChange(current.revenueMinor, prior.revenueMinor),

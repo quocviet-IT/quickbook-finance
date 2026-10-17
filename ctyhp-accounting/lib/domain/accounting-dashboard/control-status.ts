@@ -1,5 +1,5 @@
 import type { AccountingControl, ControlKey } from "./types";
-import { plural } from "@/lib/format";
+import { formatDate, plural } from "@/lib/format";
 
 /**
  * What each accounting control means, and when it has passed.
@@ -140,7 +140,7 @@ export function bankReconciliationControl(input: {
   const lastPart =
     input.lastCompletedOn === null
       ? "No completed reconciliation on record."
-      : `Last reconciled through ${input.lastCompletedOn}.`;
+      : `Last reconciled through ${formatDate(input.lastCompletedOn)}.`;
   const unmatchedPart =
     input.unmatchedCount === 0
       ? "No unmatched bank activity."
