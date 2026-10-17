@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { App, Form, Input, Modal, Select, Typography } from "antd";
 import type { PaymentRow } from "@/lib/db/types";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { updatePaymentDetailsAction } from "./actions";
 
 export interface EditPaymentDetailsModalProps {
@@ -80,7 +81,7 @@ export default function EditPaymentDetailsModal({
                 placeholder="Method"
                 options={["cash", "bank_transfer", "card", "check"].map((m) => ({
                   value: m,
-                  label: m,
+                  label: humanizeStatus(m),
                 }))}
               />
             </Form.Item>

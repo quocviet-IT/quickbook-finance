@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import { useCompanyClock } from "@/components/CompanyClock";
 import type { PurchaseOrderLineRow, PurchasingConfigRow } from "@/lib/db/types";
 import { threeWayMatchLine, type ThreeWayMatchResult } from "@/lib/domain/purchasing";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { createBillFromPoAction } from "../actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
 
@@ -192,12 +193,12 @@ function BillFromPoModalBody({
               render: (_, r) => {
                 const m = matches[r.id];
                 if (!m) return "—";
-                if (!m.requiresApproval) return <Tag color="green">matched</Tag>;
+                if (!m.requiresApproval) return <Tag color="green">Matched</Tag>;
                 return (
                   <>
                     {m.exceptions.map((e) => (
                       <Tag color="orange" key={e.kind}>
-                        {e.kind} {(e.varianceBps / 100).toFixed(2)}%
+                        {humanizeStatus(e.kind)} {(e.varianceBps / 100).toFixed(2)}%
                       </Tag>
                     ))}
                   </>

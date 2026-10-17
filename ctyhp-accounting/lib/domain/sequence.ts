@@ -10,6 +10,7 @@
 
 import { toCsv, type CsvColumn } from "@/lib/csv";
 import { plural, pluralWord } from "@/lib/format";
+import { statusLabel } from "@/lib/domain/status-label";
 
 export interface SequenceDefinition {
   sequence_key: string;
@@ -178,7 +179,7 @@ export interface SequenceCsvRow extends Record<string, unknown> {
 
 const CSV_COLUMNS: CsvColumn<SequenceCsvRow>[] = [
   { key: "number", header: "Number" },
-  { key: "state", header: "State" },
+  { key: "state", header: "On file" },
   { key: "document_date", header: "Date" },
   { key: "document_status", header: "Status" },
   { key: "document_id", header: "Document id" },
@@ -187,8 +188,8 @@ const CSV_COLUMNS: CsvColumn<SequenceCsvRow>[] = [
 
 const STATE_LABELS: Record<SequenceRowState, string> = {
   present: "On file",
-  missing: "MISSING",
-  beyond_sequence: "AHEAD OF SEQUENCE",
+  missing: "Missing",
+  beyond_sequence: "Ahead of sequence",
 };
 
 export function sequenceStateLabel(state: SequenceRowState): string {
@@ -202,7 +203,7 @@ export function sequenceCsv(audit: SequenceAudit): string {
       number: row.number,
       state: sequenceStateLabel(row.state),
       document_date: row.documentDate ?? "",
-      document_status: row.documentStatus ?? "",
+      document_status: row.documentStatus ? statusLabel(row.documentStatus) : "",
       document_id: row.documentId ?? "",
       gap_reason: row.note?.reason ?? "",
     })),

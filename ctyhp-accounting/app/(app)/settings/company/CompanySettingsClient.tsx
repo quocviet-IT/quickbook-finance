@@ -17,6 +17,7 @@ import { timeZoneLabel } from "@/lib/format";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
 import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -114,7 +115,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
                 <Descriptions.Item label="Fiscal year start">
                   {MONTHS[(current.fiscal_year_start_month ?? 1) - 1]}
                 </Descriptions.Item>
-                <Descriptions.Item label="Accounting basis">{current.accounting_basis}</Descriptions.Item>
+                <Descriptions.Item label="Accounting basis">{humanizeStatus(current.accounting_basis)}</Descriptions.Item>
                 <Descriptions.Item label="Base currency">{current.base_currency_code}</Descriptions.Item>
                 <Descriptions.Item label="Time zone">{`${timeZoneLabel(current.time_zone)} (${current.time_zone})`}</Descriptions.Item>
                 <Descriptions.Item label="Default terms (days)">
@@ -217,7 +218,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
             { title: "Version", dataIndex: "version" },
             { title: "Effective", dataIndex: "effective_from" },
             { title: "Legal name", dataIndex: "legal_name" },
-            { title: "Basis", dataIndex: "accounting_basis" },
+            { title: "Basis", dataIndex: "accounting_basis", render: (v: string) => humanizeStatus(v) },
             { title: "Employer Identification Number", render: (_, r) => maskEin(r.ein_ref) },
           ]} />
       </Card>

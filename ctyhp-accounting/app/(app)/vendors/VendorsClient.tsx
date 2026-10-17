@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Form, Input, InputNumber, Modal, Select, Space, Tag } from "antd";
+import { App, Button, Form, Input, InputNumber, Modal, Select, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AccountRow, Box1099Row, VendorRow } from "@/lib/db/types";
 import { parsePaymentTerms } from "@/lib/domain/payment-terms";
@@ -124,7 +125,7 @@ export default function VendorsClient({
           {
             title: "Status",
             dataIndex: "is_active",
-            render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Active" : "Inactive"}</Tag>,
+            render: (v: boolean) => <StatusTag status={v ? "active" : "inactive"} />,
           },
           {
             title: "Actions",

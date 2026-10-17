@@ -324,10 +324,10 @@ export default function BankTransactionsTable({
         <Space style={{ marginBottom: 12 }} wrap>
           <Typography.Text strong>{selectedIds.length} selected</Typography.Text>
           <Button size="small" onClick={() => onBatchAssign("category")}>
-            Set Category
+            Set category
           </Button>
           <Button size="small" onClick={() => onBatchAssign("account")}>
-            Set Account
+            Set account
           </Button>
         </Space>
       ) : null}

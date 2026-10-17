@@ -26,6 +26,7 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import BankTransactionsFilters, { ALL_ACCOUNTS } from "./BankTransactionsFilters";
+import StatusTag from "@/components/ui/StatusTag";
 import { EmptyState } from "@/components/ui/PageStates";
 import BankTransactionsTable from "./BankTransactionsTable";
 import BankImportList from "./BankImportList";
@@ -701,9 +702,7 @@ export default function BankingClient({
             </Typography.Text>
           </div>
           {selectedConnection ? (
-            <Tag color={selectedConnection.status === "active" ? "green" : "orange"}>
-              {selectedConnection.status.replaceAll("_", " ")}
-            </Tag>
+            <StatusTag status={selectedConnection.status} />
           ) : null}
           {plaidEnvironment !== "production" ? <Tooltip title="This bank feed uses the provider's test service: its lines are sample data, not your bank's."><Tag color="blue">Test mode</Tag></Tooltip> : null}
           {selectedConnection && canWrite ? (

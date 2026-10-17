@@ -1,3 +1,4 @@
+import { statusLabel } from "@/lib/domain/status-label";
 import { sourceLabel } from "@/lib/domain/entry-detail";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -34,7 +35,7 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       : { settles: [], unavailable: false };
   return (
     <div>
-      <PageHeader title="Reconciliation report" description={`Base currency ${base?.code ?? "USD"} · Status ${detail.status}`} />
+      <PageHeader title="Reconciliation report" description={`Base currency ${base?.code ?? "USD"} · Status ${statusLabel(detail.status)}`} />
       <p><Link href={`/banking/reconcile/${id}`}>← Back to session</Link></p>
       {header.broughtForward ? <p><strong>{header.note ?? "Brought forward"}</strong></p> : null}
       {settles.map((line) => <p key={line.batchId}>{line.text}</p>)}

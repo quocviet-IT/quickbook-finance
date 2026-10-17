@@ -44,7 +44,7 @@ export interface BatchAssignAccountModalProps {
 }
 
 /**
- * Set Category / Set Account for a batch of selected bank lines (RQ-05).
+ * Set category / Set account for a batch of selected bank lines (RQ-05).
  *
  * Two steps in one dialog: a confirmation that states how many rows will
  * change and how many will be skipped because they are already posted
@@ -126,7 +126,7 @@ export default function BatchAssignAccountModal({
     setOutcomes(result.data.outcomes);
   }
 
-  const title = target?.kind === "account" ? "Set Account" : "Set Category";
+  const title = target?.kind === "account" ? "Set account" : "Set category";
   const summary: BatchActionSummary | null = outcomes
     ? summarizeBatchResults(outcomes, skipped.length)
     : null;

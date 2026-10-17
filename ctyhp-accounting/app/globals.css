@@ -630,6 +630,57 @@ body {
 }
 
 /*
+ * A status (components/ui/StatusTag.tsx): icon, word and the tone's colour on
+ * a tint of itself. Every colour is a theme variable, so the tag is as legible
+ * in dark mode as in light; the tint is mixed from the same colour over
+ * transparent, so it sits on a card, a table row or the page alike.
+ * tests/unit/status-tag-contrast.test.ts holds the word to 4.5:1 on its tint.
+ */
+.status-tag {
+  --status-tone: var(--ob-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--status-tone) 32%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-tone) 10%, transparent);
+  /* A step toward the heading colour: darker in light, lighter in dark. The
+     tone alone fell to 4.1:1 on its own tint in light (green and amber). */
+  color: color-mix(in srgb, var(--status-tone) 85%, var(--ob-text-heading));
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.status-tag__icon {
+  display: inline-flex;
+  font-size: 11px;
+}
+
+.status-tag--positive {
+  --status-tone: var(--ob-intent-success);
+}
+
+.status-tag--neutral {
+  --status-tone: var(--ob-intent-info);
+}
+
+.status-tag--warning {
+  --status-tone: var(--ob-intent-warning);
+}
+
+.status-tag--danger {
+  --status-tone: var(--ob-intent-danger);
+}
+
+.status-tag--muted {
+  --status-tone: var(--ob-text-secondary);
+}
+
+/*
  * A switch such as Accountant | Management, in the page's own colours.
  *
  * The tokens give Ant Design the same values, but Ant Design files them under

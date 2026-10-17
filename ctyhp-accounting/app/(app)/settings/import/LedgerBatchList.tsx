@@ -118,7 +118,7 @@ export default function LedgerBatchList({
             width: 110,
             render: (_, row) =>
               row.status === "voided" ? (
-                <Tag color="default">undone</Tag>
+                <Tag color="default">Undone</Tag>
               ) : canManage ? (
                 <Button size="small" danger onClick={() => setUndoing(row)}>
                   Undo

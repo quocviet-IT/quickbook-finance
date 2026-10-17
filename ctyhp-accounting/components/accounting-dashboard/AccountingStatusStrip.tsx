@@ -1,6 +1,7 @@
 "use client";
 import { Tag, Typography } from "antd";
 import { CalendarOutlined, ClockCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import StatusTag from "@/components/ui/StatusTag";
 import { formatDate, formatTime, timeZoneLabel } from "@/lib/format";
 import type { AccountingDashboardContext } from "@/lib/services/accounting-dashboard";
 import styles from "./accounting-dashboard.module.css";
@@ -33,9 +34,9 @@ export default function AccountingStatusStrip({
         <CalendarOutlined aria-hidden="true" />
         <span>{period ? period.label : `Fiscal year ${context.fiscalYear}`}</span>
         {period ? (
-          <Tag color={period.status === "open" ? "blue" : "green"}>{period.status}</Tag>
+          <StatusTag status={period.status} />
         ) : (
-          <Tag>no period defined</Tag>
+          <Tag>No period defined</Tag>
         )}
         {period ? (
           // The last day the period covers — never called a close deadline,

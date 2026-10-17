@@ -6,7 +6,8 @@ import { moneyDisplay } from "@/lib/domain/money-display";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { TOKENS } from "@/lib/design/tokens";
 import { formatDate } from "@/lib/format";
-import { ToneBadge, type Tone } from "@/lib/design/tone";
+import { type Tone } from "@/lib/design/tone";
+import StatusTag from "@/components/ui/StatusTag";
 
 /**
  * The column builders.
@@ -149,17 +150,11 @@ export function statusColumn<T>(spec: StatusColumnSpec<T>): ColumnType<T> {
       // what this tone vocabulary exists to prevent. The em dash is the same
       // answer the date and text builders give.
       if (value == null || value === "") return ABSENT;
-      const mapped = spec.tones[value];
-      // An unmapped status shows its raw value in the muted tone. Rendering
-      // nothing would hide the row's state; this shows the state and the gap
-      // in the screen's declaration at the same time.
-      //
-      // Rendered through ToneBadge rather than by repeating its markup here.
-      // The two would be identical spans, and two copies of one appearance is
-      // exactly the drift this kit exists to end — a change to the badge that
-      // did not reach the column would leave a table looking unlike every
-      // other place the same status is shown.
-      return <ToneBadge tone={mapped?.tone ?? "muted"}>{mapped?.label ?? value}</ToneBadge>;
+      // Rendered through StatusTag, the one way every screen shows a status,
+      // rather than by repeating its markup here. A status the screen did not
+      // map still shows, as words in the shared reading (lib/domain/status-label),
+      // so the row's state is never hidden and never printed as a code.
+      return <StatusTag status={value} looks={spec.tones} />;
     },
   };
 }

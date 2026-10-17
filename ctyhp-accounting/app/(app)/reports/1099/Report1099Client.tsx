@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Alert, App, Button, Card, Col, InputNumber, Row, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
 import FilterBar from "@/components/ui/FilterBar";
+import StatusTag from "@/components/ui/StatusTag";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { fromMinor } from "@/lib/domain/money";
 import { formatMoney } from "@/lib/format";
 import { toCsv } from "@/lib/csv";
@@ -9,8 +11,6 @@ import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import type { Report1099, Vendor1099Assessed } from "@/lib/services/vendorTax";
 import { report1099Action } from "../../vendors/tax-actions";
 import { TOKENS } from "@/lib/design/tokens";
-
-const label = (v: string) => v.replace(/_/g, " ");
 
 export default function Report1099Client({
   defaultYear,
@@ -148,17 +148,17 @@ export default function Report1099Client({
               {
                 title: "Classification",
                 dataIndex: "classification",
-                render: (v: string | null) => (v ? label(v) : "—"),
+                render: (v: string | null) => (v ? humanizeStatus(v) : "—"),
               },
               {
                 title: "W-9",
                 dataIndex: "w9_status",
-                render: (v: string) => <Tag color={v === "on_file" ? "green" : v === "expired" ? "red" : "gold"}>{label(v)}</Tag>,
+                render: (v: string) => <StatusTag status={v} />,
               },
               {
                 title: "TIN",
                 dataIndex: "tin_on_file",
-                render: (v: boolean) => (v ? <Tag color="green">on file</Tag> : <Tag color="red">missing</Tag>),
+                render: (v: boolean) => (v ? <StatusTag status="on_file" /> : <StatusTag status="missing" />),
               },
               {
                 title: "Box",
@@ -175,19 +175,19 @@ export default function Report1099Client({
               {
                 title: "Reportable",
                 dataIndex: "reportable",
-                render: (v: boolean) => (v ? <Tag color="blue">yes</Tag> : <Tag>no</Tag>),
+                render: (v: boolean) => (v ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>),
               },
               {
                 title: "Exceptions",
                 key: "exceptions",
                 render: (_, r) =>
                   r.exceptions.length === 0 ? (
-                    <Tag color="green">clean</Tag>
+                    <Tag color="green">Clean</Tag>
                   ) : (
                     <Space direction="vertical" size={2}>
                       {r.exceptions.map((e) => (
                         <Tooltip key={e.code} title={e.message}>
-                          <Tag color={e.severity === "blocker" ? "red" : "orange"}>{label(e.code)}</Tag>
+                          <Tag color={e.severity === "blocker" ? "red" : "orange"}>{humanizeStatus(e.code)}</Tag>
                         </Tooltip>
                       ))}
                     </Space>

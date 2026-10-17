@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { APPLIED_LABELS } from "@/lib/domain/status-label";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
@@ -31,17 +33,6 @@ interface LineForm {
   expense_account_id?: string;
   amount?: number;
 }
-
-// Typed against the union on purpose: this map used to carry a key `voided`
-// for a status the type spells `void`, so a voided credit's tag silently fell
-// back to grey. A misspelt key is now a compile error instead.
-const STATUS_COLOR: Record<CreditStatus, string> = {
-  draft: "default",
-  issued: "blue",
-  partial: "gold",
-  applied: "green",
-  void: "red",
-};
 
 export default function VendorCreditsClient({
   canWrite,
@@ -224,7 +215,7 @@ export default function VendorCreditsClient({
         emptyTitle={keyword || statusFilter !== "all" ? "No vendor credits match these filters" : "No vendor credits yet"}
         emptyDescription="Record a vendor credit to reduce what you owe a vendor."
         columns={[
-          { title: "Number", dataIndex: "vendor_credit_number", render: (n) => n ?? <Tag>draft</Tag> },
+          { title: "Number", dataIndex: "vendor_credit_number", render: (n) => n ?? <StatusTag status="draft" /> },
           { title: "Vendor", key: "vendor", render: (_, c) => vendorNameById.get(c.vendor_id) ?? "—" },
           { title: "Date", dataIndex: "credit_date", render: (v: string) => formatDate(v) },
           { title: "Total", align: "right", render: (_, c) => fmt(c.total_minor) },
@@ -232,7 +223,7 @@ export default function VendorCreditsClient({
           {
             title: "Status",
             dataIndex: "status",
-            render: (s: CreditStatus) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+            render: (s: CreditStatus) => <StatusTag status={s} labels={APPLIED_LABELS} />,
           },
           {
             title: "",
@@ -254,7 +245,7 @@ export default function VendorCreditsClient({
 
       <Modal
         open={open}
-        title="New Vendor Credit"
+        title="New vendor credit"
         width={780}
         onCancel={() => setOpen(false)}
         onOk={submit}

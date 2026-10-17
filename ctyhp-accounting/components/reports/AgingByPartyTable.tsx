@@ -171,7 +171,7 @@ export default function AgingByPartyTable({
                 row.oldestDueDate ? (
                   <Space size="small">
                     {name}
-                    <Tag color="red">oldest due {formatDate(row.oldestDueDate)}</Tag>
+                    <Tag color="red">Oldest due {formatDate(row.oldestDueDate)}</Tag>
                   </Space>
                 ) : (
                   name

@@ -6,6 +6,7 @@ import { ArrowRightOutlined, MoreOutlined } from "@ant-design/icons";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import StatusTag from "@/components/ui/StatusTag";
 import type { SectionEnvelope, Severity, SurfaceWorkItem } from "@/lib/domain/work-surface/types";
 import {
   matchesFilter,
@@ -167,10 +168,10 @@ export default function WorkQueuePanel({
                     {/* `new` renders as nothing: it is the absence of a
                         decision, and a tag saying so would be noise on most of
                         the queue most of the time. */}
-                    {item.lifecycle === "acknowledged" ? <Tag color="blue">acknowledged</Tag> : null}
-                    {item.lifecycle === "in_progress" ? <Tag color="cyan">in progress</Tag> : null}
+                    {item.lifecycle === "acknowledged" ? <StatusTag status="acknowledged" /> : null}
+                    {item.lifecycle === "in_progress" ? <StatusTag status="in_progress" /> : null}
                     {item.lifecycle === "dismissed" ? (
-                      <Tag title={item.dismissReason ?? undefined}>dismissed</Tag>
+                      <StatusTag status="dismissed" title={item.dismissReason ?? undefined} />
                     ) : null}
                   </span>
                   <span className={styles.queueReason} title={item.reason}>

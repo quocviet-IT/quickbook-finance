@@ -10,6 +10,7 @@ import {
   sha256Hex,
   type ExportControlTotals,
 } from "@/lib/domain/company-export";
+import { statusLabel } from "@/lib/domain/status-label";
 import { restoreOrder, type ForeignKeyConstraint } from "@/lib/domain/restore-order";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import { loadMigrationSources, type MigrationSource } from "@/lib/db/migration-sources";
@@ -632,7 +633,7 @@ export async function restoreBackupIntoNewCompany(
   const row = data as unknown as BackupRegisterRow;
   if (row.status !== "stored" || !row.storage_path) {
     throw new RestoreError(
-      `Only a stored snapshot can be restored; this one is "${row.status}" and holds no file.`,
+      `Only a stored snapshot can be restored; this one is ${statusLabel(row.status).toLowerCase()} and holds no file.`,
     );
   }
 

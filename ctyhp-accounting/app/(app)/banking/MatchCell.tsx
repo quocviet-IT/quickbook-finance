@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { Button, Space, Tag, Typography } from "antd";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
 import type { BankTransactionRow } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
@@ -75,7 +76,7 @@ export default function MatchCell({
       <Space size={6} wrap>
         <Tag color="blue">{match.target_number ?? "Ledger entry"}</Tag>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {match.target_type.replaceAll("_", " ")} · {Math.round(match.confidence * 100)}%
+          {humanizeStatus(match.target_type)} · {Math.round(match.confidence * 100)}%
         </Typography.Text>
       </Space>
       {match.target_description ? (

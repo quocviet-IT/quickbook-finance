@@ -27,6 +27,8 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { PAID_LABELS } from "@/lib/domain/status-label";
 import FilterBar from "@/components/ui/FilterBar";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -81,14 +83,6 @@ import {
 } from "./actions";
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
-
-const STATUS: Record<InvoiceStatus, { text: string; color: string }> = {
-  draft: { text: "Draft", color: "default" },
-  issued: { text: "Issued", color: "blue" },
-  partial: { text: "Partially paid", color: "gold" },
-  paid: { text: "Paid", color: "green" },
-  void: { text: "Void", color: "red" },
-};
 
 interface LineForm {
   description?: string;
@@ -555,7 +549,7 @@ export default function InvoicesClient({
       // sequence, which is how a break becomes visible while scrolling.
       defaultSortOrder: "descend",
       sorter: (a, b) => (a.invoice_number ?? "￿").localeCompare(b.invoice_number ?? "￿"),
-      render: (n) => n ?? <Tag>draft</Tag>,
+      render: (n) => n ?? <StatusTag status="draft" />,
     },
     {
       // The elastic column: no width, so it takes whatever the measured ones
@@ -643,7 +637,7 @@ export default function InvoicesClient({
             : outstandingAge({ issueDate: r.issue_date, dueDate: r.due_date, asOf: today });
         return (
           <div>
-            <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>
+            <StatusTag status={s} labels={PAID_LABELS} />
             {age
               ? secondaryLine(
                   age.isOverdue ? (
@@ -741,7 +735,7 @@ export default function InvoicesClient({
           onClose={() => setEstimateNoticeShown(null)}
           action={
             <Button size="small" onClick={() => router.push("/estimates")}>
-              Open Estimates
+              Open estimates
             </Button>
           }
         />

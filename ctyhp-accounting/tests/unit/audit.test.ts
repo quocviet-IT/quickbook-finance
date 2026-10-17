@@ -104,7 +104,7 @@ describe("value formatting", () => {
 describe("summarizeAuditChanges", () => {
   it("reads as field: before → after", () => {
     expect(summarizeAuditChanges(diffAuditEntry(ISSUE))).toBe(
-      "Invoice number: (empty) → INV-000014; Status: draft → issued",
+      "Invoice number: (empty) → INV-000014; Status: Draft → Issued",
     );
   });
 

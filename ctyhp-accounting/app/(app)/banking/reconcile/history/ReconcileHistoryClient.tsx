@@ -225,7 +225,7 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
       },
     },
     {
-      title: "State",
+      title: "Status",
       key: "state",
       width: W.state,
       render: (_: unknown, row: HistoryAccount) => (

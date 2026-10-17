@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, Typography,
+  App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Typography,
 } from "antd";
 import dayjs from "dayjs";
 import { PlusOutlined } from "@ant-design/icons";
@@ -22,6 +22,7 @@ import {
 import RecordTaxPaymentModal from "@/components/sales-tax/RecordTaxPaymentModal";
 import { LIABILITY_REPORT_LINK_LABEL } from "@/lib/domain/sales-tax-liability";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import StatusTag from "@/components/ui/StatusTag";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -215,7 +216,7 @@ export default function SalesTaxClient(props: Props) {
                 { title: "Date", dataIndex: "payment_date", render: (v: string) => formatDate(v) },
                 { title: "Period", key: "period", render: (_, r) => (r.period_start && r.period_end ? `${formatDate(r.period_start)} → ${formatDate(r.period_end)}` : "—") },
                 { title: "Amount", dataIndex: "amount_minor", align: "right", render: (v: number) => money(v) },
-                { title: "Status", dataIndex: "status", render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag> },
+                { title: "Status", dataIndex: "status", render: (s: string) => <StatusTag status={s} /> },
                 {
                   title: "Actions", key: "actions",
                   render: (_, r) => props.canWrite && r.status !== "void"
@@ -251,7 +252,7 @@ export default function SalesTaxClient(props: Props) {
                   { title: "Name", dataIndex: "name" },
                   { title: "Rate", dataIndex: "rate_percent", align: "right", render: (v: number) => `${v}%` },
                   { title: "Direction", dataIndex: "direction" },
-                  { title: "Status", dataIndex: "is_active", render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Active" : "Inactive"}</Tag> },
+                  { title: "Status", dataIndex: "is_active", render: (v: boolean) => <StatusTag status={v ? "active" : "inactive"} /> },
                   {
                     title: "Actions", key: "actions",
                     render: (_, r) => props.isAdmin ? (

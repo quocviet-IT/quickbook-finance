@@ -55,7 +55,7 @@ export default function ImportColumnsTable({
             render: (label: string, field) => (
               <Space size={6}>
                 {label}
-                {field.required ? <Tag color="red">required</Tag> : null}
+                {field.required ? <Tag color="red">Required</Tag> : null}
               </Space>
             ),
           },
@@ -80,7 +80,7 @@ export default function ImportColumnsTable({
             key: "source",
             width: 130,
             render: (_: unknown, field) =>
-              aiFields.includes(field.key) ? <Tag color="purple">matched by AI</Tag> : null,
+              aiFields.includes(field.key) ? <Tag color="purple">Matched by AI</Tag> : null,
           },
           { title: "", dataIndex: "hint", render: (hint: string | undefined) => hint ?? "" },
         ]}

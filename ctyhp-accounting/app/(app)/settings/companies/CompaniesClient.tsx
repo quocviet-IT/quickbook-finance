@@ -4,6 +4,7 @@ import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Space, Table, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import StatusTag from "@/components/ui/StatusTag";
 import NewCompanyModal from "./NewCompanyModal";
 import {
   getCompanyRequestAction,
@@ -174,7 +175,7 @@ export default function CompaniesClient({
             render: (name: string, r: CompanyRow) => (
               <Space size={6}>
                 <span>{name}</span>
-                {r.is_sample ? <Tag color="orange">sample</Tag> : null}
+                {r.is_sample ? <Tag color="orange">Sample</Tag> : null}
               </Space>
             ),
           },
@@ -182,7 +183,7 @@ export default function CompaniesClient({
             title: "Status",
             dataIndex: "status",
             width: 120,
-            render: (s: string) => <Tag color={s === "active" ? "green" : "default"}>{s}</Tag>,
+            render: (s: string) => <StatusTag status={s} />,
           },
         ]}
       />

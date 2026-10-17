@@ -8,19 +8,14 @@ import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/li
 import { canDecide } from "@/lib/domain/access";
 import { formatDateTime, formatMoney, plural, pluralWord } from "@/lib/format";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
+import StatusTag from "@/components/ui/StatusTag";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 /** Rows a page for the decided-requests table. See table-pagination.ts for
  * why this has to live in state rather than as a literal on `pagination`. */
 const DECIDED_DEFAULT_PAGE_SIZE = 20;
-
-const STATUS_COLOR: Record<ApprovalStatus, string> = {
-  pending: "gold",
-  approved: "green",
-  rejected: "red",
-  cancelled: "default",
-};
 
 export default function ApprovalsClient({
   initialFocusId,
@@ -121,7 +116,7 @@ export default function ApprovalsClient({
 
   const commonColumns = [
     { title: "Request", dataIndex: "title" },
-    { title: "Action", dataIndex: "action_key", render: (v: string) => <Tag>{v.replace(/_/g, " ")}</Tag> },
+    { title: "Action", dataIndex: "action_key", render: (v: string) => <Tag>{humanizeStatus(v)}</Tag> },
     {
       title: "Amount",
       dataIndex: "amount_minor",
@@ -247,7 +242,7 @@ export default function ApprovalsClient({
             {
               title: "Status",
               dataIndex: "status",
-              render: (v: ApprovalStatus) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
+              render: (v: ApprovalStatus) => <StatusTag status={v} />,
             },
             { title: "Decided", dataIndex: "decided_at", render: (v: string | null) => formatDateTime(v, timeZone) },
             { title: "Note", dataIndex: "decision_note", ...longTextColumn() },

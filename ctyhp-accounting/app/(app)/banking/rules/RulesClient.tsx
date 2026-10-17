@@ -117,7 +117,7 @@ export default function RulesClient({
         render: (_: unknown, rule: RuleListRow) => (
           <Space size={6} wrap>
             <Typography.Text code>{rule.matchText}</Typography.Text>
-            {rule.matchKind === "regex" ? <Tag>regular expression</Tag> : null}
+            {rule.matchKind === "regex" ? <Tag>Regular expression</Tag> : null}
           </Space>
         ),
       }),

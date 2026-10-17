@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { APPLIED_LABELS } from "@/lib/domain/status-label";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
@@ -32,17 +34,6 @@ interface LineForm {
   income_account_id?: string;
   tax_code_id?: string | null;
 }
-
-// Typed against the union on purpose: this map used to carry a key `voided`
-// for a status the type spells `void`, so a voided memo's tag silently fell
-// back to grey. A misspelt key is now a compile error instead.
-const STATUS_COLOR: Record<CreditStatus, string> = {
-  draft: "default",
-  issued: "blue",
-  partial: "gold",
-  applied: "green",
-  void: "red",
-};
 
 export default function CreditMemosClient({
   canWrite,
@@ -221,7 +212,7 @@ export default function CreditMemosClient({
         emptyTitle={keyword || statusFilter !== "all" ? "No credit memos match these filters" : "No credit memos yet"}
         emptyDescription="Issue a credit memo to reduce what a customer owes."
         columns={[
-          { title: "Number", dataIndex: "credit_memo_number", render: (n) => n ?? <Tag>draft</Tag> },
+          { title: "Number", dataIndex: "credit_memo_number", render: (n) => n ?? <StatusTag status="draft" /> },
           { title: "Customer", key: "customer", render: (_, m) => customerNameById.get(m.customer_id) ?? "—" },
           { title: "Date", dataIndex: "memo_date", render: (v: string) => formatDate(v) },
           { title: "Total", align: "right", render: (_, m) => fmt(m.total_minor) },
@@ -229,7 +220,7 @@ export default function CreditMemosClient({
           {
             title: "Status",
             dataIndex: "status",
-            render: (s: CreditStatus) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+            render: (s: CreditStatus) => <StatusTag status={s} labels={APPLIED_LABELS} />,
           },
           {
             title: "",
@@ -251,7 +242,7 @@ export default function CreditMemosClient({
 
       <Modal
         open={open}
-        title="New Credit Memo"
+        title="New credit memo"
         width={780}
         onCancel={() => setOpen(false)}
         onOk={submit}

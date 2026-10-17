@@ -1,9 +1,10 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
-import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag } from "antd";
+import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -175,7 +176,7 @@ export default function ExpensesClient({
           flexColumn<ExpenseWithVendor>({ title: "Vendor", dataIndex: "vendor_name" }),
           { title: "Date", dataIndex: "expense_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
           { title: "Total", dataIndex: "total_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
-          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag> },
+          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <StatusTag status={s} /> },
           {
             title: "Actions",
             key: "actions",

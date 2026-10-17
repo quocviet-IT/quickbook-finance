@@ -24,15 +24,11 @@ import { maskTin } from "@/lib/domain/vendorTax";
 import { TAX_CLASSIFICATIONS, TIN_TYPES, W9_STATUSES } from "@/lib/domain/schemas";
 import { listVendorTaxVersionsAction, saveVendorTaxProfileAction } from "./tax-actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
+import StatusTag from "@/components/ui/StatusTag";
+import { humanizeStatus, statusLabel } from "@/lib/domain/status-label";
 
-const W9_COLOR: Record<string, string> = {
-  not_requested: "default",
-  requested: "gold",
-  on_file: "green",
-  expired: "red",
-};
-
-const label = (v: string) => v.replace(/_/g, " ");
+// humanizeStatus would spell the LLC classification "Llc".
+const classificationLabel = (c: string) => (c === "llc" ? "LLC" : humanizeStatus(c));
 
 interface Props {
   open: boolean;
@@ -171,7 +167,7 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
 
       <Form form={form} layout="vertical" disabled={!canManage} initialValues={{ w9_status: "not_requested", country: "US" }}>
         <Form.Item name="w9_status" label="W-9 status" rules={[{ required: true }]}>
-          <Select options={W9_STATUSES.map((status) => ({ value: status, label: label(status) }))} />
+          <Select options={W9_STATUSES.map((status) => ({ value: status, label: statusLabel(status) }))} />
         </Form.Item>
         <Space size="middle">
           <Form.Item name="w9_received_date" label="W-9 received">
@@ -184,7 +180,7 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
         <Form.Item name="classification" label="Tax classification">
           <Select
             allowClear
-            options={TAX_CLASSIFICATIONS.map((c) => ({ value: c, label: label(c) }))}
+            options={TAX_CLASSIFICATIONS.map((c) => ({ value: c, label: classificationLabel(c) }))}
           />
         </Form.Item>
         <Form.Item name="reporting_name" label="Legal reporting name" extra="As it appears on the W-9, if different from the display name">
@@ -258,12 +254,12 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
           {
             title: "W-9",
             dataIndex: "w9_status",
-            render: (v: string) => <Tag color={W9_COLOR[v]}>{label(v)}</Tag>,
+            render: (v: string) => <StatusTag status={v} />,
           },
           {
             title: "1099",
             dataIndex: "is_1099_eligible",
-            render: (v: boolean, r) => (v ? <Tag color="blue">{r.box_code}</Tag> : <Tag>no</Tag>),
+            render: (v: boolean, r) => (v ? <Tag color="blue">{r.box_code}</Tag> : <Tag>No</Tag>),
           },
           { title: "Reason", dataIndex: "change_reason", ...longTextColumn() },
           { title: "Saved", dataIndex: "created_at", render: (v: string) => formatDateInTimeZone(v, timeZone) },

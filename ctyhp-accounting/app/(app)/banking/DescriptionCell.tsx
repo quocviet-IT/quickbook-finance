@@ -1,6 +1,7 @@
 "use client";
 import { Tooltip, Typography } from "antd";
 import type { CSSProperties } from "react";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import type { BankReviewRow } from "@/lib/domain/banking-import";
 import type { BankTransactionRow } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
@@ -36,7 +37,7 @@ const ONE_LINE: CSSProperties = {
  */
 export default function DescriptionCell({ row }: { row: Row }) {
   const origin = row.transaction.category
-    ? row.transaction.category.replaceAll("_", " ")
+    ? humanizeStatus(row.transaction.category)
     : row.transaction.source === "bank_feed"
       ? "Direct bank feed"
       : "File upload";

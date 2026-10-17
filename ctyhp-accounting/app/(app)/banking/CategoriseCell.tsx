@@ -307,7 +307,7 @@ export default function CategoriseCell({
         ) : null}
         {holding ? (
           <div>
-            <Tag color="gold">needs coding</Tag>
+            <Tag color="gold">Needs coding</Tag>
           </div>
         ) : null}
         <Space size={6} wrap>

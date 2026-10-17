@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import StatusTag from "@/components/ui/StatusTag";
 import { toMinor } from "@/lib/domain/money";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
@@ -174,7 +175,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
               title: "Status",
               render: (_, r) => (
                 <Space size={4} wrap>
-                  <Tag color={r.status === "completed" ? "green" : "blue"}>{r.status}</Tag>
+                  <StatusTag status={r.status} />
                   {r.brought_forward ? (
                     <Tag color="purple" title={r.note ?? undefined}>
                       Brought forward

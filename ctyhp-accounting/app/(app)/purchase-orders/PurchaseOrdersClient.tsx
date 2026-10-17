@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Input, Select, Space, Tag } from "antd";
+import { Button, Input, Select, Space } from "antd";
 import { PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
@@ -15,15 +15,10 @@ import type { PurchaseOrderWithVendor } from "@/lib/services/purchasing";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { formatDate, formatMoney } from "@/lib/format";
 import PurchaseOrderFormModal from "./PurchaseOrderFormModal";
+import StatusTag from "@/components/ui/StatusTag";
+import { RECEIVED_LABELS } from "@/lib/domain/status-label";
 
-const STATUS_COLOR: Record<PoStatus, string> = {
-  draft: "default",
-  open: "blue",
-  partial: "gold",
-  received: "green",
-  closed: "purple",
-  cancelled: "red",
-};
+// US spelling, as the status filter reads.
 
 const STATUS_OPTIONS: { value: PoStatus | "all"; label: string }[] = [
   { value: "all", label: "All statuses" },
@@ -139,7 +134,7 @@ export default function PurchaseOrdersClient({
           {
             title: "Status",
             dataIndex: "status",
-            render: (s: PoStatus) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+            render: (s: PoStatus) => <StatusTag status={s} labels={RECEIVED_LABELS} />,
           },
           {
             title: "Actions",

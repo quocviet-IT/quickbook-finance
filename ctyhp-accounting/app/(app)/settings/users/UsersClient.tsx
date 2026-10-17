@@ -12,19 +12,13 @@ import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
 import { passwordPolicyProblems } from "@/lib/domain/password-policy";
 import { createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import StatusTag from "@/components/ui/StatusTag";
+import { humanizeStatus, type StatusLook } from "@/lib/domain/status-label";
 
-const STATUS_COLOR: Record<UserStatus, string> = {
-  invited: "blue",
-  active: "green",
-  suspended: "orange",
-  offboarded: "red",
-};
-
-const STATUS_LABEL: Record<UserStatus, string> = {
-  invited: "Pending",
-  active: "Active",
-  suspended: "Suspended",
-  offboarded: "Offboarded",
+const STATUS_LOOKS: Record<string, StatusLook> = {
+  invited: { tone: "neutral", label: "Pending" },
+  suspended: { tone: "warning", label: "Suspended" },
+  offboarded: { tone: "danger", label: "Offboarded" },
 };
 
 const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
@@ -157,7 +151,7 @@ export default function UsersClient({
               render: (_: unknown, r: AppUserRow) => (
                 <div style={{ minWidth: 0 }}>
                   <span title={r.email}>{r.email}</span>
-                  {r.id === currentUserId ? <Tag style={{ marginLeft: 6 }}>you</Tag> : null}
+                  {r.id === currentUserId ? <Tag style={{ marginLeft: 6 }}>You</Tag> : null}
                   {secondaryLine(
                     [r.full_name || "No name recorded", r.status_reason].filter(Boolean).join(" · "),
                   )}
@@ -182,7 +176,7 @@ export default function UsersClient({
                   onChange={(role) => changeRole(r, role)}
                 />
               ) : (
-                <Tag>{v}</Tag>
+                <Tag>{humanizeStatus(v)}</Tag>
               ),
           },
           {
@@ -191,8 +185,8 @@ export default function UsersClient({
             width: 150,
             render: (v: UserStatus, r) => (
               <Space size={4} wrap>
-                <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v]}</Tag>
-                {isLastActiveAdmin(users, r.id) && <Tag color="gold">last admin</Tag>}
+                <StatusTag status={v} looks={STATUS_LOOKS} />
+                {isLastActiveAdmin(users, r.id) && <Tag color="gold">Last admin</Tag>}
               </Space>
             ),
           },
@@ -202,11 +196,11 @@ export default function UsersClient({
             width: 130,
             render: (v: boolean, r) =>
               v ? (
-                <Tag color="green">enrolled</Tag>
+                <StatusTag status="enrolled" />
               ) : r.role === "viewer" ? (
-                <Tag>not required</Tag>
+                <StatusTag status="not_required" />
               ) : (
-                <Tag color="orange">not enrolled</Tag>
+                <StatusTag status="not_enrolled" />
               ),
           },
           {

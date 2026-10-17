@@ -30,17 +30,20 @@ export const TONES = ["positive", "neutral", "warning", "danger", "muted"] as co
 export type Tone = (typeof TONES)[number];
 
 export interface ToneToken {
+  /** The light theme's value, for a canvas or a chart that cannot read a CSS variable. */
   color: string;
+  /** The same colour as the theme's CSS variable, which follows dark mode. */
+  variable: string;
   icon: ReactNode;
   label: string;
 }
 
 const TONE: Record<Tone, ToneToken> = {
-  positive: { color: TOKENS.intent.success, icon: <CheckCircleFilled />, label: "Good" },
-  neutral: { color: TOKENS.intent.info, icon: <InfoCircleFilled />, label: "In progress" },
-  warning: { color: TOKENS.intent.warning, icon: <ClockCircleFilled />, label: "Needs attention" },
-  danger: { color: TOKENS.intent.danger, icon: <ExclamationCircleFilled />, label: "Problem" },
-  muted: { color: TOKENS.text.secondary, icon: <MinusCircleFilled />, label: "Inactive" },
+  positive: { color: TOKENS.intent.success, variable: "var(--ob-intent-success)", icon: <CheckCircleFilled />, label: "Good" },
+  neutral: { color: TOKENS.intent.info, variable: "var(--ob-intent-info)", icon: <InfoCircleFilled />, label: "In progress" },
+  warning: { color: TOKENS.intent.warning, variable: "var(--ob-intent-warning)", icon: <ClockCircleFilled />, label: "Needs attention" },
+  danger: { color: TOKENS.intent.danger, variable: "var(--ob-intent-danger)", icon: <ExclamationCircleFilled />, label: "Problem" },
+  muted: { color: TOKENS.text.secondary, variable: "var(--ob-text-secondary)", icon: <MinusCircleFilled />, label: "Inactive" },
 };
 
 export function toneToken(tone: Tone): ToneToken {
@@ -55,7 +58,9 @@ export function toneToken(tone: Tone): ToneToken {
  * "Awaiting review" — with the tone supplying only the colour and the icon.
  */
 export function ToneBadge({ tone, children }: { tone: Tone; children: string }) {
-  const { color, icon } = toneToken(tone);
+  // The CSS variable, not the light value: a badge drawn in the light theme's
+  // green on a dark card was the dark-mode gap this replaces.
+  const { variable: color, icon } = toneToken(tone);
   return (
     <span style={{ color, display: "inline-flex", alignItems: "center", gap: 6 }}>
       {icon}

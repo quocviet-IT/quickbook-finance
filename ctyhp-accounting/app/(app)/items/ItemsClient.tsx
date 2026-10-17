@@ -12,7 +12,6 @@ import {
   Select,
   Space,
   Switch,
-  Tag,
   Tooltip,
   Typography,
 } from "antd";
@@ -26,6 +25,7 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -319,7 +319,7 @@ export default function ItemsClient({
             title: "Status",
             dataIndex: "is_active",
             width: COLUMN.STATUS,
-            render: (v: boolean) => <Tag color={v ? "green" : "default"}>{v ? "Active" : "Inactive"}</Tag>,
+            render: (v: boolean) => <StatusTag status={v ? "active" : "inactive"} />,
           },
           {
             title: "Actions",

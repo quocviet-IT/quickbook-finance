@@ -163,7 +163,7 @@ describe("changeLogDetail", () => {
         before_json: { id: "1", status: "draft", memo: "a", customer_id: "c", updated_at: "x" },
         after_json: { id: "1", status: "issued", memo: "a", customer_id: "c2", updated_at: "y" },
       }),
-    ).toBe("Status: draft → issued");
+    ).toBe("Status: Draft → Issued");
   });
 
   it("says what a new record holds, without a column of arrows from nothing", () => {

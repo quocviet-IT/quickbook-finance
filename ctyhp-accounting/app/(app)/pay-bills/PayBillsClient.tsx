@@ -12,12 +12,13 @@ import {
   Select,
   Space,
   Table,
-  Tag,
   Typography,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import { flexColumn } from "@/components/ui/columns";
+import StatusTag from "@/components/ui/StatusTag";
+import { APPLIED_LABELS, humanizeStatus } from "@/lib/domain/status-label";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { allocateAcrossBills } from "@/lib/domain/payables";
 import { describeNoOpenBills } from "@/lib/domain/settlement";
@@ -203,7 +204,7 @@ export default function PayBillsClient({
           { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
           { title: "Amount", dataIndex: "amount_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
           { title: "Unapplied", dataIndex: "unapplied_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
-          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "blue"}>{s}</Tag> },
+          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <StatusTag status={s} labels={APPLIED_LABELS} /> },
           {
             title: "Actions",
             key: "actions",
@@ -265,7 +266,7 @@ export default function PayBillsClient({
                 placeholder="Method"
                 options={["ACH", "check", "wire", "bank_transfer", "card", "cash"].map((m) => ({
                   value: m,
-                  label: m,
+                  label: humanizeStatus(m),
                 }))}
               />
             </Form.Item>

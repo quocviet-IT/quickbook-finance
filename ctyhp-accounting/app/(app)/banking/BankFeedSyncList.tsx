@@ -12,6 +12,7 @@ import {
   type BankFeedSyncStatus,
   type BankFeedSyncView,
 } from "@/lib/domain/bank-feeds";
+import StatusTag from "@/components/ui/StatusTag";
 import { serverFailure } from "@/lib/domain/statement-evidence";
 import { bankFeedSyncsAction, undoBankFeedSyncAction } from "./actions";
 
@@ -130,7 +131,7 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
             render: (name: string, row) => (
               <Space size={6}>
                 <span>{name}</span>
-                {row.connectionStatus === "disconnected" ? <Tag>disconnected</Tag> : null}
+                {row.connectionStatus === "disconnected" ? <StatusTag status="disconnected" /> : null}
               </Space>
             ),
           },

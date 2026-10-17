@@ -32,7 +32,7 @@ describe("ToneBadge", () => {
     const [icon, label] = badge.props.children as [unknown, string];
     expect(isValidElement(icon)).toBe(true);
     expect(label).toBe("Overdue");
-    expect(badge.props.style.color).toBe(toneToken("danger").color);
+    expect(badge.props.style.color).toBe(toneToken("danger").variable);
   });
 });
 

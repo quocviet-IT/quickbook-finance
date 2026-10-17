@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type Key } from "react";
 import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
 import { formatDate, formatMoney } from "@/lib/format";
 import { journalReportAction } from "./actions";
@@ -106,7 +107,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals, initia
           { title: "Description", dataIndex: "description" },
           {
             title: "Status",
-            render: (_, e) => (e.isReversed ? <Tag color="orange">reversed</Tag> : <Tag color="green">{e.status}</Tag>),
+            render: (_, e) => (e.isReversed ? <StatusTag status="reversed" /> : <StatusTag status={e.status} />),
           },
         ]}
       />

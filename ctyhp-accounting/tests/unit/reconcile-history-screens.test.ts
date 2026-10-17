@@ -496,7 +496,7 @@ describe("the Reconcile history page", () => {
     expect(client).not.toMatch(/scroll=\{\{[^}]*\bx\s*:/);
     expect(client).not.toMatch(/pageSize:\s*\d/);
     expect(client).toContain("reconciliationHistoryAction()");
-    for (const title of ["Account", "Lines not reconciled", "First – last", "Last reconciled", "Since", "State"]) {
+    for (const title of ["Account", "Lines not reconciled", "First – last", "Last reconciled", "Since", "Status"]) {
       expect(client, title).toContain(`title: "${title}"`);
     }
   });

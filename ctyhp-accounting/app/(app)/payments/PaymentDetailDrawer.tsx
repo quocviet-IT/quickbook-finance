@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Alert, Descriptions, Drawer, Table, Tag, Typography } from "antd";
+import { PAID_LABELS, humanizeStatus, statusLabel } from "@/lib/domain/status-label";
 import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
 import type { AuditEntryRow, PaymentDetail, PaymentRow } from "@/lib/db/types";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -73,7 +74,7 @@ export default function PaymentDetailDrawer({
           <Descriptions size="small" column={2} bordered style={{ marginBottom: 16 }}>
             <Descriptions.Item label="Customer">{payment.customer_name}</Descriptions.Item>
             <Descriptions.Item label="Date">{formatDate(payment.payment_date)}</Descriptions.Item>
-            <Descriptions.Item label="Method">{payment.method ?? "—"}</Descriptions.Item>
+            <Descriptions.Item label="Method">{humanizeStatus(payment.method)}</Descriptions.Item>
             <Descriptions.Item label="Reference">{payment.reference ?? "—"}</Descriptions.Item>
             <Descriptions.Item label="Amount">
               {formatMoney(payment.amount_minor, payment.currency_code, decimals)}
@@ -129,7 +130,12 @@ export default function PaymentDetailDrawer({
                 align: "right",
                 render: (v: number, r) => formatMoney(v, r.currencyCode, decimalsOf(r.currencyCode)),
               },
-              { title: "Invoice status", dataIndex: "invoiceStatus", width: 130 },
+              {
+                title: "Invoice status",
+                dataIndex: "invoiceStatus",
+                width: 130,
+                render: (s: string) => statusLabel(s, { labels: PAID_LABELS }),
+              },
             ]}
           />
 
@@ -137,7 +143,7 @@ export default function PaymentDetailDrawer({
             Journal entry{" "}
             {detail?.journal ? (
               <Tag color={detail.journal.status === "posted" ? "green" : "red"}>
-                {detail.journal.entryNumber} · {detail.journal.status}
+                {detail.journal.entryNumber} · {statusLabel(detail.journal.status)}
               </Tag>
             ) : null}
           </Typography.Text>

@@ -9,12 +9,12 @@ import {
   Select,
   Space,
   Table,
-  Tag,
-  Tooltip,
   type MenuProps,
   type TableColumnsType,
 } from "antd";
 import FilterBar from "@/components/ui/FilterBar";
+import StatusTag from "@/components/ui/StatusTag";
+import { APPLIED_LABELS, humanizeStatus } from "@/lib/domain/status-label";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import {
   DeleteOutlined,
@@ -50,13 +50,6 @@ export type PaymentListRow = PaymentRow & { customer_name: string };
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const PAYMENTS_DEFAULT_PAGE_SIZE = 20;
-
-const STATUS: Record<PaymentStatus, { text: string; color: string }> = {
-  unapplied: { text: "Unapplied", color: "orange" },
-  partial: { text: "Partially applied", color: "gold" },
-  applied: { text: "Applied", color: "green" },
-  void: { text: "Void", color: "red" },
-};
 
 
 /** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
@@ -202,7 +195,7 @@ export default function PaymentsClient({
           <div style={{ minWidth: 0 }}>
             <span title={r.customer_name}>{r.customer_name}</span>
             {secondaryLine(
-              [r.method, r.reference ? `Ref ${r.reference}` : null].filter(Boolean).join(" · ") ||
+              [r.method ? humanizeStatus(r.method) : null, r.reference ? `Ref ${r.reference}` : null].filter(Boolean).join(" · ") ||
                 "No method recorded",
             )}
           </div>
@@ -228,11 +221,9 @@ export default function PaymentsClient({
       title: "Status",
       dataIndex: "status",
       width: 150,
-      render: (s: PaymentStatus, r) => {
-        const tag = <Tag color={STATUS[s].color}>{STATUS[s].text}</Tag>;
-        const detail = describeVoid(r);
-        return detail ? <Tooltip title={detail}>{tag}</Tooltip> : tag;
-      },
+      render: (s: PaymentStatus, r) => (
+        <StatusTag status={s} labels={APPLIED_LABELS} title={describeVoid(r) ?? undefined} />
+      ),
     },
     {
       title: "Actions",

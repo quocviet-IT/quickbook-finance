@@ -23,6 +23,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, formatDateInTimeZone } from "@/lib/format";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -337,7 +338,7 @@ export default function AnalysisClient({
               title: "Status",
               dataIndex: "status",
               width: COLUMN.STATUS,
-              render: (s: string) => <Tag color={s === "active" ? "green" : "default"}>{s}</Tag>,
+              render: (s: string) => <StatusTag status={s} />,
             },
             {
               title: "Actions",
@@ -485,7 +486,7 @@ export default function AnalysisClient({
               <Tag>
                 {formatDate(viewing.period_start)} → {formatDate(viewing.period_end)}
               </Tag>
-              <Tag color={viewing.status === "active" ? "green" : "default"}>{viewing.status}</Tag>
+              <StatusTag status={viewing.status} />
               <Button size="small" onClick={() => loadAssumptions(viewing)}>
                 Load assumptions into workspace
               </Button>

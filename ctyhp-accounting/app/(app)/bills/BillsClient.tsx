@@ -22,6 +22,8 @@ import {
 } from "antd";
 import { DeleteOutlined, MoreOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { PAID_LABELS } from "@/lib/domain/status-label";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -45,14 +47,6 @@ import {
 import WriteOffModal from "../settlements/WriteOffModal";
 import SettlementHistory from "@/components/settlements/SettlementHistory";
 import type { SettlementEvent } from "@/lib/domain/settlement";
-
-const STATUS_COLOR: Record<string, string> = {
-  draft: "default",
-  open: "blue",
-  partial: "gold",
-  paid: "green",
-  void: "red",
-};
 
 interface LineForm {
   description?: string;
@@ -301,7 +295,7 @@ export default function BillsClient({
             : "Enter a vendor bill to track Accounts Payable and due dates."
         }
         columns={[
-          { title: "Bill Number", dataIndex: "bill_number", width: COLUMN.CODE, render: (v) => v ?? <Tag>draft</Tag> },
+          { title: "Bill Number", dataIndex: "bill_number", width: COLUMN.CODE, render: (v) => v ?? <StatusTag status="draft" /> },
           {
             // The elastic column. Its second line carries the vendor's own
             // reference and the journal entry, which were columns of their own
@@ -347,7 +341,7 @@ export default function BillsClient({
             title: "Status",
             dataIndex: "status",
             width: COLUMN.STATUS,
-            render: (s: string) => <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+            render: (s: string) => <StatusTag status={s} labels={PAID_LABELS} />,
           },
           {
             title: "Actions",
