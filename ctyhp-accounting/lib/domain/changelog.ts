@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.21",
+    date: "2026-10-17",
+    headline: "The Change Log reads in plain sentences and shows the changes to the books first.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Change Log details in plain sentences",
+        detail:
+          "Details read like Status changed from Draft to Void, Due date set to 10/20/2026 and Memo cleared, instead of due_date: (empty) and lifecycle: dismissed. Amounts read as money ($4,265.00, not 426500), dates as 10/17/2026, stored codes as words (Other expense) and what someone typed in quotes. Actions read as words too: Matched by reconciliation, Statement file kept, Backed up, Uncategorized.",
+        route: "/reports/change-log",
+      },
+      {
+        kind: "changed",
+        title: "System activity is hidden until you ask for it",
+        detail:
+          "Work queue states, statement files kept beside an import or a reconciliation, the bank lines a completed reconciliation matched on its own, backups and anything no person did made up a large part of the Change Log. They are hidden by default; the report says how many, and Show system activity brings them back. Exports follow what is shown.",
+        route: "/reports/change-log",
+      },
+    ],
+  },
+  {
     version: "2.20",
     date: "2026-10-17",
     headline: "Status tags keep their whole border.",

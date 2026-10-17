@@ -1,12 +1,18 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Alert, Select, Tag } from "antd";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, Select, Switch, Tag, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
-import { changeLogSheet, CHANGE_LOG_LIMIT, type ChangeLogEntry, type ChangeLogReport } from "@/lib/domain/change-log";
+import {
+  changeLogSheet,
+  CHANGE_LOG_LIMIT,
+  visibleChanges,
+  type ChangeLogEntry,
+  type ChangeLogReport,
+} from "@/lib/domain/change-log";
 import type { PresetContext } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { formatDateTime, plural } from "@/lib/format";
@@ -40,21 +46,28 @@ export default function ChangeLogClient({
 }) {
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [record, setRecord] = useState<string | null>(null);
-  const [records, setRecords] = useState<string[]>([]);
+  // The system's own activity (work queue states, kept statement files, a
+  // reconciliation's matches, backups) is hidden until asked for: it buried the
+  // changes to the books a reader came for.
+  const [showSystem, setShowSystem] = useState(false);
+  const [loaded, setLoaded] = useState<ChangeLogReport | null>(null);
+
+  const visible = useMemo(() => (loaded ? visibleChanges(loaded, showSystem).lines : []), [loaded, showSystem]);
+  const records = useMemo(() => [...new Set(visible.map((line) => line.record))].sort(), [visible]);
+  const hidden = loaded ? loaded.lines.filter((line) => line.system).length : 0;
 
   const view = useCallback(
-    (report: ChangeLogReport): ChangeLogReport =>
-      record ? { ...report, lines: report.lines.filter((line) => line.record === record) } : report,
-    [record],
+    (report: ChangeLogReport): ChangeLogReport => {
+      const shown = visibleChanges(report, showSystem);
+      return record ? { ...shown, lines: shown.lines.filter((line) => line.record === record) } : shown;
+    },
+    [record, showSystem],
   );
   const sheet = useCallback(
     (report: ChangeLogReport, when: ReportWhen) =>
       changeLogSheet(report, { companyName, from: when.from ?? when.to, to: when.to, currencyCode, timeZone }),
     [companyName, currencyCode, timeZone],
   );
-  const listRecords = useCallback((report: ChangeLogReport) => {
-    setRecords([...new Set(report.lines.map((line) => line.record))].sort());
-  }, []);
 
   return (
     <SimpleReport<ChangeLogReport>
@@ -63,24 +76,36 @@ export default function ChangeLogClient({
       currencyCode={currencyCode}
       period={{ kind: "range", ctx: presets, preset: "month" }}
       load={load}
-      onLoaded={listRecords}
+      onLoaded={setLoaded}
       view={view}
       sheet={sheet}
       runningText="Reading the audit log…"
       filters={
-        <Select
-          allowClear
-          aria-label="Record type"
-          placeholder="All records"
-          style={{ minWidth: 200 }}
-          value={record ?? undefined}
-          onChange={(value) => setRecord(value ?? null)}
-          options={records.map((value) => ({ value, label: value }))}
-        />
+        <>
+          <Select
+            allowClear
+            aria-label="Record type"
+            placeholder="All records"
+            style={{ minWidth: 200 }}
+            value={record ?? undefined}
+            onChange={(value) => setRecord(value ?? null)}
+            options={records.map((value) => ({ value, label: value }))}
+          />
+          <label className={styles.inlineSwitch}>
+            <Switch size="small" checked={showSystem} onChange={setShowSystem} />
+            <span>Show system activity</span>
+          </label>
+        </>
       }
       render={(report, _when, { printing }) => (
         <>
           <StatRow items={[{ label: "Changes", value: report.lines.length.toLocaleString("en-US") }]} />
+          {!showSystem && hidden > 0 && !printing ? (
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+              {plural(hidden, "system event")} hidden: work queue states, kept statement files, bank lines matched
+              when a reconciliation was completed, and backups. Turn on Show system activity to see them.
+            </Typography.Paragraph>
+          ) : null}
           {report.truncated ? (
             <Alert
               type="warning"
