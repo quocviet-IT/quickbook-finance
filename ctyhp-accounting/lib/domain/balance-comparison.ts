@@ -384,8 +384,9 @@ export function buildComparison(input: BuildInput): Comparison {
         },
         // `figures` reads a contra account on its own side (the Chart of
         // Accounts convention); here it carries its section's sign, so
-        // Accumulated Depreciation is negative under Assets.
-        account.isContra ? -balance : balance,
+        // Accumulated Depreciation is negative under Assets. A nil balance
+        // stays nil: minus zero would print as -$0.00.
+        account.isContra && balance !== 0 ? -balance : balance,
       ),
     );
   }

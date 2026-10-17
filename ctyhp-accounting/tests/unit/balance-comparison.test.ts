@@ -160,6 +160,12 @@ describe("contra accounts carry their section's sign", () => {
     expect(c.groups[3].totals.onebookMinor).toBe(800_00 - 20_00);
   });
 
+  it("keeps a nil contra account at zero, never minus zero (which prints as -$0.00)", () => {
+    const c = buildComparison({ accounts, figures: { ...figures, dep: 0, disc: 0 }, typed: {}, externals: [] });
+    expect(Object.is(c.groups[0].rows.find((r) => r.accountId === "dep")!.onebookMinor, 0)).toBe(true);
+    expect(Object.is(c.groups[3].rows.find((r) => r.accountId === "disc")!.onebookMinor, 0)).toBe(true);
+  });
+
   it("gives no difference when its printed negative is typed, and reads CR on the section's side", () => {
     const typed = {
       "a:dep": (parseExternalBalance("(50.00)", "debit") as { minor: number }).minor,
