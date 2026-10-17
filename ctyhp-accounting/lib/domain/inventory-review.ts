@@ -107,7 +107,7 @@ export function reviewStock(
     // outranks how fast they are selling.
     verdict = "above_nrv";
     reason =
-      `Carried at ${money(row.valueMinor)} against a realisable ` +
+      `Carried at ${money(row.valueMinor)} against a realizable ` +
       `${money(nrvMinor!)} — ${money(shortfallMinor)} above value`;
   } else if (daysSinceMovement !== null && daysSinceMovement >= STALE_DAYS && row.lastSaleOn === null) {
     verdict = "stale";
@@ -133,7 +133,7 @@ export const VERDICT_LABEL: Record<StockVerdict, string> = {
   moving: "Moving",
   slow_moving: "Slow moving",
   stale: "Stale",
-  above_nrv: "Above realisable value",
+  above_nrv: "Above realizable value",
   empty: "No stock",
 };
 
@@ -202,7 +202,7 @@ export function describeInventoryReview(review: InventoryReview): string | null 
   const writeDowns = review.rows.filter((row) => row.verdict === "above_nrv");
   if (writeDowns.length > 0) {
     parts.push(
-      `${writeDowns.length} item(s) carried above realisable value — ` +
+      `${writeDowns.length} item(s) carried above realizable value — ` +
         `${money(review.totals.shortfallMinor)} to write down`,
     );
   }

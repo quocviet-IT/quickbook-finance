@@ -180,7 +180,7 @@ export default function ImportPreviewPanel({
               />
               <Typography.Text type="secondary">
                 {target === "customers" || target === "vendors"
-                  ? "Raised as one opening document each, so the ageing and the control account agree."
+                  ? "Raised as one opening document each, so the aging and the control account agree."
                   : "Posted against Opening Balance Equity."}
               </Typography.Text>
             </Space>

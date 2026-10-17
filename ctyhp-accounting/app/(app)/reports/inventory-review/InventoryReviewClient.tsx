@@ -129,7 +129,7 @@ export default function InventoryReviewClient({
           description={
             <>
               Inventory is measured at <b>{METHOD_LABEL[review.method] ?? review.method}</b>, at the
-              lower of cost and net realisable value. Realisable value is taken as the selling price
+              lower of cost and net realizable value. Realizable value is taken as the selling price
               less {Math.round(SELLING_COST_RATE * 100)}% for the cost of selling.
             </>
           }
@@ -193,7 +193,7 @@ export default function InventoryReviewClient({
             render: (value: number) => <b>{money(value)}</b>,
           },
           {
-            title: "Realisable",
+            title: "Realizable",
             key: "nrv",
             width: 120,
             align: "right",
@@ -267,7 +267,7 @@ export default function InventoryReviewClient({
             <Form form={form} layout="vertical" requiredMark={false}>
               <Form.Item
                 name="nrv"
-                label={`Net realisable value (${baseCurrency})`}
+                label={`Net realizable value (${baseCurrency})`}
                 tooltip="What the stock on hand would actually fetch, after the cost of selling it"
                 rules={[{ required: true, message: "Enter what the stock would fetch" }]}
               >

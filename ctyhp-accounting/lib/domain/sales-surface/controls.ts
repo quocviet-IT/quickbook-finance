@@ -53,7 +53,7 @@ export function overdueReceivablesControl(input: {
     return {
       ...base,
       status: "unavailable",
-      detail: "The receivables ageing could not be read, so nothing here is proven.",
+      detail: "The receivables aging could not be read, so nothing here is proven.",
     };
   }
   if (input.overdueCount === 0) {

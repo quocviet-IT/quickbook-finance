@@ -59,7 +59,7 @@ export default function InventoryValuationClient({
             message={
               <>
                 Measured at <b>{METHOD_LABEL[valuationMethod] ?? valuationMethod}</b>, at the lower
-                of cost and net realisable value (ASC 330-10-35-1B). Base currency {baseCurrency},
+                of cost and net realizable value (ASC 330-10-35-1B). Base currency {baseCurrency},
                 as of {rep.asOf}.
               </>
             }

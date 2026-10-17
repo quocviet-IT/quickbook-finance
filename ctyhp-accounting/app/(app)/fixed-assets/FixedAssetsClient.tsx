@@ -93,7 +93,7 @@ const SCHEDULE_STATUS: Record<string, { label: string; color: string }> = {
   planned: { label: "Planned", color: "default" },
   opening: { label: "Opening balance", color: "cyan" },
   posted: { label: "Posted", color: "green" },
-  cancelled: { label: "Cancelled", color: "default" },
+  cancelled: { label: "Canceled", color: "default" },
 };
 
 // Rows a page for the two tables on this screen. See table-pagination.ts for

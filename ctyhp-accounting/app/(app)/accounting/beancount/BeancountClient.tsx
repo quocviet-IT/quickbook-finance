@@ -217,7 +217,7 @@ export default function BeancountClient({
       </div>
 
       {summaryError ? (
-        <Alert type="error" showIcon title="The book could not be summarised" description={summaryError} style={{ marginBottom: 16 }} />
+        <Alert type="error" showIcon title="The book could not be summarized" description={summaryError} style={{ marginBottom: 16 }} />
       ) : summary ? (
         <StatRow
           items={[

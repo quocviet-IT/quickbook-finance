@@ -172,14 +172,14 @@ export default function PurchaseOrderDetailClient({
                   onClick={() =>
                     promptReason(
                       "Cancel this purchase order?",
-                      "Only an order with no receipts and no bills can be cancelled.",
+                      "Only an order with no receipts and no bills can be canceled.",
                       async (reason) => {
                         const res = await cancelPurchaseOrderAction(order.id, { reason });
                         if (!res.ok) {
                           message.error(res.error ?? "Failed to cancel");
                           throw new Error(res.error);
                         }
-                        message.success("Purchase order cancelled");
+                        message.success("Purchase order canceled");
                         router.refresh();
                       },
                     )

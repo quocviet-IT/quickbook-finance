@@ -150,7 +150,7 @@ const CONTACT_FIELDS = (noun: string): readonly FieldSpec[] => [
     required: false,
     kind: "money",
     aliases: ["balance", "open balance", "opening balance", "outstanding balance"],
-    hint: "Brought across as a single opening document, so the ageing and the control account still agree.",
+    hint: "Brought across as a single opening document, so the aging and the control account still agree.",
   },
 ];
 

@@ -352,7 +352,7 @@ function balanceGrowth(
           ? [{ label: `Largest ${who.names.length}`, value: who.names.join(", ") }]
           : []),
       ],
-      recommendedAction: { label: "Open the ageing report", href },
+      recommendedAction: { label: "Open the aging report", href },
       generatedAsOf: facts.generatedAsOf,
     },
   ];

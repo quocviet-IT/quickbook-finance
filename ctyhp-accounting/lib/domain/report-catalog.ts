@@ -124,7 +124,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
     id: "inventory-review",
     title: "Inventory Review",
     description:
-      "Slow-moving and obsolete stock, and anything carried above net realisable value.",
+      "Slow-moving and obsolete stock, and anything carried above net realizable value.",
     href: "/reports/inventory-review",
     group: "inventory-tax",
   },

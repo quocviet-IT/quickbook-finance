@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.14",
+    date: "2026-10-17",
+    headline: "US spelling throughout the screens.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "US spelling on every screen",
+        detail:
+          "Words that were spelled the British way now use US spelling: Realizable and net realizable value on Inventory Review and Inventory Valuation, Canceled for a purchase order or fixed asset, Not categorized yet in the Bank Transactions filter, the aging report, summarized, recognized, behavior, and enroll and enrollment for multi-factor sign-in. Nothing else about these screens changes. Release notes already published keep their original wording.",
+        route: "/reports/inventory-review",
+      },
+    ],
+  },
+  {
     version: "2.13",
     date: "2026-10-17",
     headline: "Tables and totals show money the same way on every screen: $1,234.56, and -$1,234.56 below zero.",

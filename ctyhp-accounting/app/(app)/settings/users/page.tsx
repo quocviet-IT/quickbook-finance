@@ -17,7 +17,7 @@ export default async function UsersPage() {
   if (!canManage) {
     return (
       <div>
-        <PageHeader title="Users" description="Roles, access status, and multi-factor enrolment." />
+        <PageHeader title="Users" description="Roles, access status, and multi-factor enrollment." />
         <Alert
           type="warning"
           showIcon

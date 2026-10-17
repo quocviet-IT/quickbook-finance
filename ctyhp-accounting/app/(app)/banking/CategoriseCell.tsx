@@ -138,7 +138,7 @@ export default function CategoriseCell({
     const res = await categoriseBankTransactionAction(transactionId, accountId);
     setBusy(false);
     if (!res.ok || !res.data) {
-      message.error(res.error ?? "Could not categorise this line");
+      message.error(res.error ?? "Could not categorize this line");
       return;
     }
     message.success(

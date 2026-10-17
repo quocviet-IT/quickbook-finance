@@ -50,7 +50,7 @@ export default function ThemeToggle() {
       <Tooltip title={`Theme: ${LABEL[mode]}`} placement="bottom">
         <Button
           type="text"
-          aria-label={`Colour theme: ${LABEL[mode]}. Choose another.`}
+          aria-label={`Color theme: ${LABEL[mode]}. Choose another.`}
           icon={theme === "dark" ? <MoonOutlined /> : <BulbOutlined />}
         />
       </Tooltip>
