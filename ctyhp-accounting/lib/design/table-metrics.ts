@@ -24,8 +24,12 @@ export const COLUMN = {
   MONEY_WIDE: 124,
   /** A document number, an account code, a prefix. */
   CODE: 110,
-  /** One tag, such as "For review". */
-  STATUS: 104,
+  /**
+   * One status tag, up to "Partially received": a 93px word and 31px of
+   * icon, padding and border, in a cell with 8px either side, measured on the
+   * page. At 104 the shared tag's border stopped short of "Partially paid".
+   */
+  STATUS: 140,
   /** A count or a percentage. */
   QTY: 88,
   /** A select rendered inside the cell, which needs room for its arrow. */

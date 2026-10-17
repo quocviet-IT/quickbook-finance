@@ -45,9 +45,10 @@ function asElement(node: unknown, what: string): ReactElement<CellProps> {
   return node as ReactElement<CellProps>;
 }
 
-/** `children` is `ReactNode`, so an icon-plus-label pair needs naming to read. */
-function pair(cell: ReactElement<CellProps>): [ReactNode, string] {
-  return cell.props.children as [ReactNode, string];
+/** A StatusTag's icon, and its word, which sits in a span of its own so a narrow column shortens the word, not the border. */
+function tagParts(tag: ReactElement<CellProps>): [ReactNode, string] {
+  const [icon, label] = tag.props.children as [ReactNode, ReactElement<CellProps>];
+  return [icon, label.props.children as string];
 }
 
 interface Row {
@@ -179,7 +180,7 @@ describe("statusColumn", () => {
     // it, with an icon beside the word.
     const rendered = asElement(StatusTag(cell.props as unknown as Parameters<typeof StatusTag>[0]), "StatusTag");
     expect(rendered.props.className).toBe("status-tag status-tag--muted");
-    const [icon, label] = pair(rendered);
+    const [icon, label] = tagParts(rendered);
     expect(isValidElement(icon)).toBe(true);
     expect(label).toBe("Void");
   });
@@ -196,7 +197,7 @@ describe("statusColumn", () => {
     for (const [code, word] of [["void", "Void"], ["not_requested", "Not requested"], ["some_new_state", "Some new state"]]) {
       const cell = asElement(column.render!(code as Row["status"], row, 0), "statusColumn");
       const rendered = asElement(StatusTag(cell.props as unknown as Parameters<typeof StatusTag>[0]), "StatusTag");
-      expect(pair(rendered)[1]).toBe(word);
+      expect(tagParts(rendered)[1]).toBe(word);
     }
   });
 

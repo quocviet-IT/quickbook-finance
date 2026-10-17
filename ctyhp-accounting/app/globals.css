@@ -641,7 +641,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* Never wider than its cell, and the border always whole: a longer word is
+     shortened inside it (.status-tag__label). Without the overflow the box
+     shrank to the cell while the word ran on past its right edge. */
+  box-sizing: border-box;
   max-width: 100%;
+  overflow: hidden;
+  vertical-align: middle;
   padding: 0 7px;
   border: 1px solid color-mix(in srgb, var(--status-tone) 32%, transparent);
   border-radius: 4px;
@@ -657,7 +663,14 @@ body {
 
 .status-tag__icon {
   display: inline-flex;
+  flex: 0 0 auto;
   font-size: 11px;
+}
+
+.status-tag__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-tag--positive {
