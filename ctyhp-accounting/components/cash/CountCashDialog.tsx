@@ -107,6 +107,7 @@ function CountForm({
     } catch {
       if (run !== latestRead.current) return;
       setBook(null);
+      setWaits(false);
       setBookError("The book balance could not be read. Check the connection and try again.");
     } finally {
       if (run === latestRead.current) setReading(false);
@@ -117,6 +118,9 @@ function CountForm({
   function read(on: string, countedMinor: number | null) {
     setReading(true);
     setBookError(null);
+    // The old date's figures must not stand in for the new one's while it is read.
+    setBook(null);
+    setWaits(false);
     return load(on, countedMinor);
   }
 
@@ -144,7 +148,7 @@ function CountForm({
   }, []);
 
   const parsed = useMemo(() => parseCountedAmount(raw, decimals), [raw, decimals]);
-  const difference = parsed.ok && book !== null ? cashVariance(parsed.minor, book) : null;
+  const difference = parsed.ok && book !== null && !reading ? cashVariance(parsed.minor, book) : null;
   const variance = difference === null ? null : varianceView(difference, money);
   const offsetChoices = useMemo(
     () =>
@@ -208,7 +212,7 @@ function CountForm({
         <Alert
           type="info"
           showIcon
-          title="This company has no Cash Over and Short account. Choose the account the difference goes to."
+          title="7510 Cash Over and Short cannot take this entry here. Choose the account the difference goes to."
         />
       ) : null}
 
@@ -293,7 +297,7 @@ function CountForm({
         {waits ? <span className={styles.waits}>{WAITS_FOR_APPROVAL_NOTE}</span> : null}
         <Space>
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" onClick={() => void submit()} loading={saving} disabled={options === null}>
+          <Button type="primary" onClick={() => void submit()} loading={saving} disabled={options === null || reading}>
             Record count
           </Button>
         </Space>
