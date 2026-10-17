@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listAccounts } from "@/lib/services/accounts";
+import { getCashStanding } from "@/lib/services/cash-count";
 import { getChartBalances } from "@/lib/services/chart-balances";
 import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { companyClock } from "@/lib/services/report-context";
@@ -13,7 +14,7 @@ export default async function AccountsPage() {
   // The company's own day, in its time zone: at 6 p.m. in New York it is
   // already tomorrow in UTC, and the balances would run a day ahead.
   const clock = companyClock(sb);
-  const [accounts, currencies, taxCodes, role, { today }, balances] = await Promise.all([
+  const [accounts, currencies, taxCodes, role, { today }, balances, cashStanding] = await Promise.all([
     listAccounts(sb),
     listCurrencies(sb),
     listTaxCodes(sb),
@@ -26,6 +27,14 @@ export default async function AccountsPage() {
       (data) => data,
       (e: unknown) => {
         console.error("Chart of Accounts: balances could not be read", e);
+        return null;
+      },
+    ),
+    // Read on its own as well: a failed read leaves the list as it is and says so.
+    clock.then(({ today }) => getCashStanding(sb, today)).then(
+      (data) => data,
+      (e: unknown) => {
+        console.error("Chart of Accounts: cash counts could not be read", e);
         return null;
       },
     ),
@@ -42,6 +51,7 @@ export default async function AccountsPage() {
       // null when the read failed. Inventory accounts then sit under Other
       // current assets, as there are no inventory account ids, until balances load.
       initialBalances={balances}
+      initialCashStanding={cashStanding}
       baseCurrency={base?.code ?? "USD"}
       baseDecimals={base?.decimal_places ?? 2}
     />

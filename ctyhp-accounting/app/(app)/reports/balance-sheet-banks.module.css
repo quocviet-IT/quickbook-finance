@@ -74,3 +74,31 @@
     flex-basis: 100%;
   }
 }
+
+/* A cash on hand account: the sentence names it, so the line is one block with its button. */
+.cashRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ob-border-default);
+  min-width: 0;
+}
+
+.cashRow:first-child {
+  border-top: 0;
+}
+
+.cashText {
+  flex: 1 1 320px;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cashProblem {
+  margin: 8px 0 10px;
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+}
