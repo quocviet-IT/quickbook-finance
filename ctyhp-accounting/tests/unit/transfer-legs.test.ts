@@ -36,6 +36,9 @@ const base: TransferRow = {
   candidateDate: null,
   candidateEntryId: null,
   candidateEntryNumber: null,
+  reversedByEntryId: null,
+  reversedByEntryNumber: null,
+  reversalOfEntryId: null,
 };
 
 const leg = (over: Partial<TransferRow> & Pick<TransferRow, "entryId" | "entryNumber" | "bankAccountId" | "signedMinor">): TransferRow => ({
@@ -133,8 +136,8 @@ describe("fixture B: after the correction", () => {
   it("names the correcting entry and where the money went, and never offers to reverse anything", () => {
     const [c] = check.corrected;
     expect(c.correctingEntryNumber).toBe("JE-900003");
-    expect(NAMES[c.movedToBankAccountId]).toBe("Example Reserve");
-    const sentence = correctedSentence(c, NAMES[c.movedToBankAccountId], money);
+    expect(NAMES[c.movedToBankAccountId ?? ""]).toBe("Example Reserve");
+    const sentence = correctedSentence(c, NAMES[c.movedToBankAccountId ?? ""], money);
     expect(sentence).toBe("JE-900001 was corrected by JE-900003 and moved $1000.00 to Example Reserve.");
     const everything = [sentence, transferNote(check), destinationSentence(null), candidateNote(2) ?? ""].join(" ");
     expect(everything).not.toMatch(/revers|void|undo/i);
@@ -199,6 +202,39 @@ describe("what is not raised", () => {
     expect(check.skipped).toBe(1);
     expect(check.flagged).toEqual([]);
     expect(transferNote(check)).toBe("0 transfers · 0 could not be checked yet · 0 corrected · 1 skipped");
+  });
+});
+
+describe("a reversed transfer", () => {
+  /** The original, reversed by JE-900004, and the reversal itself with its two legs. */
+  const reversedPair = (): TransferRow[] => [
+    ...transfer().map((r) => ({ ...r, reversedByEntryId: "e4", reversedByEntryNumber: "JE-900004" })),
+    leg({ entryId: "e4", entryNumber: "JE-900004", entryDate: "2026-06-12", bankAccountId: CHECKING, signedMinor: 100000, reversalOfEntryId: "e1", coveredThrough: "2026-06-30" }),
+    leg({ entryId: "e4", entryNumber: "JE-900004", entryDate: "2026-06-12", bankAccountId: SAVINGS, signedMinor: -100000, reversalOfEntryId: "e1", coveredThrough: "2026-06-30" }),
+  ];
+
+  it("is not flagged, and is counted as corrected by the reversal", () => {
+    const check = checkTransfers([...reversedPair(), evidence()], TODAY);
+    expect(check.flagged).toEqual([]);
+    expect(check.corrected).toHaveLength(1);
+    expect(check.corrected[0]).toMatchObject({ entryNumber: "JE-900001", correctingEntryNumber: "JE-900004", movedToBankAccountId: null });
+    expect(correctedSentence(check.corrected[0], null, money)).toBe("JE-900001 was reversed by JE-900004.");
+  });
+
+  it("never judges the reversing entry as a transfer of its own", () => {
+    const onlyReversal = reversedPair().filter((r) => r.entryId === "e4");
+    expect(checkTransfers(onlyReversal, TODAY)).toEqual({ flagged: [], notYetCheckable: 0, corrected: [], skipped: 0 });
+    // Even with one side ticked, an entry that reverses another is left out.
+    const ticked = onlyReversal.map((r) => (r.bankAccountId === CHECKING ? { ...r, tickedReconciliationId: "r-x", tickedStatementDate: "2026-06-30" } : r));
+    expect(checkTransfers(ticked, TODAY).flagged).toEqual([]);
+  });
+
+  it("reads the reversal columns of an RPC row", () => {
+    const row = toTransferRow({
+      row_key: "leg:1", row_kind: "leg", entry_id: "e1", entry_number: "JE-900001", entry_date: "2026-06-10",
+      reversed_by_entry_id: "e4", reversed_by_entry_number: "JE-900004", reversal_of_entry_id: null,
+    });
+    expect(row).toMatchObject({ reversedByEntryId: "e4", reversedByEntryNumber: "JE-900004", reversalOfEntryId: null });
   });
 });
 

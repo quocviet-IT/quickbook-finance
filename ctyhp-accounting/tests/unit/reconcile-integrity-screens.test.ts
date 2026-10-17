@@ -94,6 +94,9 @@ const transferRow = (over: Partial<TransferRow>): TransferRow => ({
   candidateDate: null,
   candidateEntryId: null,
   candidateEntryNumber: null,
+  reversedByEntryId: null,
+  reversedByEntryNumber: null,
+  reversalOfEntryId: null,
   ...over,
 });
 

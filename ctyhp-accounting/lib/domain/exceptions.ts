@@ -390,7 +390,7 @@ export interface CorrectedTransferRow {
   amountMinor: number;
   correctingEntryId: string;
   correctingEntryNumber: string;
-  movedToName: string;
+  movedToName: string | null;
 }
 
 /** What the transfer check set aside, for its note. */
@@ -440,7 +440,7 @@ export function transfersClearedOnOneSide(
         amountMinor: c.amountMinor,
         correctingEntryId: c.correctingEntryId,
         correctingEntryNumber: c.correctingEntryNumber,
-        movedToName: nameOf(c.movedToBankAccountId),
+        movedToName: c.movedToBankAccountId === null ? null : nameOf(c.movedToBankAccountId),
       })),
     },
   };

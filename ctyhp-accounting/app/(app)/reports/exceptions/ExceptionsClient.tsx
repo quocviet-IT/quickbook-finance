@@ -518,8 +518,8 @@ export default function ExceptionsClient({
                   floor: CHANGED_SENTENCES_FLOOR,
                   render: (_, row) => (
                     <>
-                      {reconciliationChangeSentences(row, money).map((sentence) => (
-                        <div key={sentence}>{sentence}</div>
+                      {reconciliationChangeSentences(row, money).map((sentence, i) => (
+                        <div key={`${i}:${sentence}`}>{sentence}</div>
                       ))}
                     </>
                   ),

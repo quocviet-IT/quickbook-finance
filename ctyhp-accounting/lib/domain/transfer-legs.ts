@@ -41,6 +41,11 @@ export interface TransferRow {
   candidateDate: string | null;
   candidateEntryId: string | null;
   candidateEntryNumber: string | null;
+  /** The posted entry that reverses this one, when there is one. */
+  reversedByEntryId: string | null;
+  reversedByEntryNumber: string | null;
+  /** The entry this one reverses, when it is itself a reversal. */
+  reversalOfEntryId: string | null;
 }
 
 const KINDS: readonly string[] = ["leg", "candidate", "skipped"];
@@ -76,6 +81,9 @@ export function toTransferRow(row: Record<string, unknown>): TransferRow {
     candidateDate: dayOrNull(row.candidate_date),
     candidateEntryId: textOrNull(row.candidate_entry_id),
     candidateEntryNumber: textOrNull(row.candidate_entry_number),
+    reversedByEntryId: textOrNull(row.reversed_by_entry_id),
+    reversedByEntryNumber: textOrNull(row.reversed_by_entry_number),
+    reversalOfEntryId: textOrNull(row.reversal_of_entry_id),
   };
 }
 
@@ -114,8 +122,8 @@ export interface CorrectedTransfer {
   correctingEntryId: string;
   correctingEntryNumber: string;
   correctingEntryDate: string;
-  /** The third bank account the correcting entry moved the money to. */
-  movedToBankAccountId: string;
+  /** The third bank account the correcting entry moved the money to; null when the correcting entry is a reversal. */
+  movedToBankAccountId: string | null;
 }
 
 export interface TransferCheck {
@@ -168,6 +176,8 @@ export function checkTransfers(rows: readonly TransferRow[], today: string): Tra
     if (row.rowKind === "skipped") {
       skipped += 1;
     } else if (row.rowKind === "leg") {
+      // An entry that reverses another is not a transfer of its own.
+      if (row.reversalOfEntryId !== null) continue;
       const leg = asLeg(row);
       if (leg) legsByEntry.set(row.entryId, [...(legsByEntry.get(row.entryId) ?? []), leg]);
     } else if (row.journalLineId !== null) {
@@ -189,6 +199,22 @@ export function checkTransfers(rows: readonly TransferRow[], today: string): Tra
     if (!open || open.bankAccountId === cleared.bankAccountId) continue;
     const entry = open.row;
     if (daysBetween(entry.entryDate, today) <= TRANSFER_AGE_DAYS) continue;
+    // A posted reversal cancels the transfer, including its open leg.
+    const reversal = legs.find((l) => l.row.reversedByEntryId !== null)?.row;
+    if (reversal) {
+      corrected.push({
+        entryId: entry.entryId,
+        entryNumber: entry.entryNumber,
+        entryDate: entry.entryDate,
+        amountMinor: Math.abs(open.signedMinor),
+        openBankAccountId: open.bankAccountId,
+        correctingEntryId: reversal.reversedByEntryId as string,
+        correctingEntryNumber: reversal.reversedByEntryNumber ?? "its reversal",
+        correctingEntryDate: entry.entryDate,
+        movedToBankAccountId: null,
+      });
+      continue;
+    }
     if (open.row.coveredThrough === null || open.row.coveredThrough < entry.entryDate) {
       notYetCheckable += 1;
       continue;
@@ -272,6 +298,7 @@ export function candidateNote(count: number): string | null {
 export function correctedSentence(
   c: Pick<CorrectedTransfer, "entryNumber" | "correctingEntryNumber" | "amountMinor">,
   movedToName: string | null, money: (minor: number) => string): string {
+  if (movedToName === null) return `${c.entryNumber} was reversed by ${c.correctingEntryNumber}.`;
   const where = movedToName ? ` and moved ${money(c.amountMinor)} to ${movedToName}` : "";
   return `${c.entryNumber} was corrected by ${c.correctingEntryNumber}${where}.`;
 }
