@@ -52,7 +52,7 @@ const SUBLEDGER_TITLE: Record<"ar-to-gl" | "ap-to-gl" | "inventory-to-gl", strin
 const SUBLEDGER_SUBJECT: Record<"ar-to-gl" | "ap-to-gl" | "inventory-to-gl", string> = {
   "ar-to-gl": "The open invoices",
   "ap-to-gl": "The open bills",
-  "inventory-to-gl": "The inventory on hand",
+  "inventory-to-gl": "The items on hand",
 };
 
 export function subledgerControl(
