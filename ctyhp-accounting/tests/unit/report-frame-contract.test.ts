@@ -15,6 +15,18 @@ const PAGED_BODIES = [
   "app/(app)/reports/voided-entries/VoidedEntriesClient.tsx",
 ];
 
+describe("the balance and activity summaries", () => {
+  it("print the total as the table's own last row, not a separate box under the pager", () => {
+    for (const path of ["components/reports/PartyBalancesReport.tsx", "components/reports/PartyActivityReport.tsx"]) {
+      const source = read(path);
+      expect(source, path).toMatch(/summary=\{\(\) =>/);
+      expect(source, path).toMatch(/<SummaryCell index=\{0\}>\s*<b>Total<\/b>/);
+      expect(source, path).not.toContain("TOTALS_STYLE");
+      expect(source, path).not.toContain('aria-label="Total"');
+    }
+  });
+});
+
 describe("the report frame", () => {
   it("prints every row, and pages them on screen", () => {
     expect(reportPagination(true, 50, () => {}, 50)).toBe(false);

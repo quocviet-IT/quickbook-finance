@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { TOTALS_STYLE } from "@/components/reports/OpenDocumentsReport";
+import { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
 import ProofLine from "@/components/reports/ProofLine";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
@@ -77,15 +77,21 @@ export default function PartyBalancesReport({
                 render: (minor: number) => <span className={minor < 0 ? styles.negative : undefined}>{money(minor)}</span>,
               },
             ]}
+            // The total is the table's last row, under its own column, not a
+            // separate box that a pager could push away from the figures.
+            summary={() =>
+              report.lines.length === 0 ? null : (
+                <SummaryRow>
+                  <SummaryCell index={0}>
+                    <b>Total</b>
+                  </SummaryCell>
+                  <SummaryCell index={1} align="right">
+                    <b className={report.totalMinor < 0 ? styles.negative : undefined}>{money(report.totalMinor)}</b>
+                  </SummaryCell>
+                </SummaryRow>
+              )
+            }
           />
-          <table className={styles.rpt} style={TOTALS_STYLE} aria-label="Total">
-            <tbody>
-              <tr className={styles.rGrand}>
-                <td>Total</td>
-                <td className={styles.r}>{money(report.totalMinor)}</td>
-              </tr>
-            </tbody>
-          </table>
           <ProofLine
             against={customers ? "the A/R control account" : "the A/P control account"}
             tie={control}

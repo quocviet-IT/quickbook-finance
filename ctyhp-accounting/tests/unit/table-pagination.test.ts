@@ -2,11 +2,47 @@
 // data-table-contract.test.ts: importing antd's runtime costs about 55
 // seconds against this file's fraction of a second.
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   clientTablePagination,
   fallbackPagination,
+  hideSinglePage,
   pageSizeOptionsFor,
 } from "@/components/ui/table-pagination";
+
+describe("hideSinglePage (no pager under a table that fits on one page)", () => {
+  it("hides the pager on a single page at the size the table opened with", () => {
+    expect(hideSinglePage({ pageSize: 50 }, 50)).toMatchObject({ pageSize: 50, hideOnSinglePage: true });
+  });
+
+  it("keeps the pager once the reader picked another size, so they can pick again", () => {
+    expect(hideSinglePage({ pageSize: 100 }, 50)).toMatchObject({ hideOnSinglePage: false });
+    expect(hideSinglePage({ pageSize: 10 }, 50)).toMatchObject({ hideOnSinglePage: false });
+  });
+
+  it("leaves a caller's own choice and pagination switched off alone", () => {
+    expect(hideSinglePage({ pageSize: 50, hideOnSinglePage: false }, 50)).toMatchObject({ hideOnSinglePage: false });
+    expect(hideSinglePage(false, 50)).toBe(false);
+  });
+
+  it("keeps everything else the table was given", () => {
+    const onChange = vi.fn();
+    expect(hideSinglePage({ pageSize: 20, total: 3, showSizeChanger: true, onChange }, 20)).toEqual({
+      pageSize: 20,
+      total: 3,
+      showSizeChanger: true,
+      onChange,
+      hideOnSinglePage: true,
+    });
+  });
+
+  it("is what DataTable hands Ant Design, measured against the opening size", () => {
+    const source = readFileSync(join(process.cwd(), "components/ui/DataTable.tsx"), "utf8");
+    expect(source).toMatch(/const \[openedPageSize\] = useState\(/);
+    expect(source).toContain("pagination={hideSinglePage(resolved.pagination, openedPageSize)}");
+  });
+});
 
 describe("clientTablePagination (the mechanism behind the RQ-04 sweep)", () => {
   it("hands back whatever pageSize the caller is holding, not a fixed number", () => {
