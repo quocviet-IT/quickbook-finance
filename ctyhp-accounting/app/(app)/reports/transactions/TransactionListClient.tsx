@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, DatePicker, Input, Select, Space, Statistic, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -34,7 +35,7 @@ const NO_FILTER: TransactionListFilter = {
 };
 
 function documentTypeLabel(sourceType: string): string {
-  return sourceType.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+  return sourceLabel(sourceType);
 }
 
 export default function TransactionListClient({
@@ -238,7 +239,7 @@ export default function TransactionListClient({
                   {secondaryLine(
                     [
                       row.entryNumber,
-                      row.sourceType.replaceAll("_", " "),
+                      sourceLabel(row.sourceType),
                       row.categoryLabel,
                       row.moneyLabel,
                     ]

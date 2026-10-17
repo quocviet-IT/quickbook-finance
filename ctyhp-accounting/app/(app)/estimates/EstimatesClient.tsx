@@ -188,7 +188,7 @@ export default function EstimatesClient({
         <span className={styles.money}>{formatMoney(minor, row.currency_code, USD_DECIMAL_PLACES)}</span>
       ),
     },
-    statusColumn<EstimateListEntry>({ title: "State", dataIndex: "state", tones: ESTIMATE_STATE_TONES, width: W.state }),
+    statusColumn<EstimateListEntry>({ title: "Status", dataIndex: "state", tones: ESTIMATE_STATE_TONES, width: W.state }),
     {
       // The invoice made from it that is not void: its number once issued.
       title: "Invoice",
@@ -259,7 +259,7 @@ export default function EstimatesClient({
 
   return (
     <div>
-      <div className={styles.pills} role="group" aria-label="Estimate state">
+      <div className={styles.pills} role="group" aria-label="Estimate status">
         {ESTIMATE_FILTERS.map((pill) => (
           <button
             key={pill.key}

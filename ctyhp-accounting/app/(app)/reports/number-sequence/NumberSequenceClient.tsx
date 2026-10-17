@@ -18,6 +18,7 @@ import {
 } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
 import { downloadCsvFile } from "@/lib/client/report-export";
 import { csvWithReportIdentity } from "@/lib/domain/report-export";
@@ -290,7 +291,7 @@ export default function NumberSequenceClient({
         columns={[
           { title: "Number", dataIndex: "number", width: 180 },
           {
-            title: "State",
+            title: "On file",
             dataIndex: "state",
             width: 180,
             render: (state: SequenceRow["state"]) => (
@@ -302,7 +303,7 @@ export default function NumberSequenceClient({
             title: "Status",
             dataIndex: "documentStatus",
             width: 130,
-            render: (v: string | null) => v ?? "—",
+            render: (v: string | null) => <StatusTag status={v} />,
           },
           {
             title: "Documented reason",

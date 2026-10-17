@@ -10,6 +10,7 @@
  */
 import type { AppRole, UserStatus } from "@/lib/db/types";
 import type { Minor } from "./money";
+import { statusLabel } from "./status-label";
 import { APP_ROLES } from "./schemas";
 
 /**
@@ -78,7 +79,7 @@ export function describeStatusChange(from: UserStatus, to: UserStatus): string {
   if (to === "offboarded") return "Offboard this user — access is revoked and the history is kept";
   if (to === "active" && from === "suspended") return "Reactivate this user";
   if (to === "active") return "Activate this user";
-  return `Change status from ${from} to ${to}`;
+  return `Change status from ${statusLabel(from)} to ${statusLabel(to)}`;
 }
 
 export interface ControlledAction {

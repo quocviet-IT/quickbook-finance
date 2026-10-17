@@ -36,6 +36,8 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import type { StatusLook } from "@/lib/domain/status-label";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -75,18 +77,18 @@ import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table
 const TEMPLATES_DEFAULT_PAGE_SIZE = 15;
 const RUNS_DEFAULT_PAGE_SIZE = 15;
 
-const TEMPLATE_STATUS: Record<RecurringTemplateStatus, { label: string; color: string }> = {
-  active: { label: "Active", color: "green" },
-  paused: { label: "Paused", color: "gold" },
-  ended: { label: "Ended", color: "default" },
+const TEMPLATE_STATUS: Record<RecurringTemplateStatus, StatusLook> = {
+  active: { label: "Active", tone: "positive" },
+  paused: { label: "Paused", tone: "warning" },
+  ended: { label: "Ended", tone: "muted" },
 };
 
-const RUN_STATUS: Record<RecurringRunStatus, { label: string; color: string }> = {
-  processing: { label: "Processing", color: "processing" },
-  generated: { label: "Generated", color: "green" },
-  pending_review: { label: "Review required", color: "gold" },
-  awaiting_approval: { label: "Awaiting approval", color: "blue" },
-  failed: { label: "Failed", color: "red" },
+const RUN_STATUS: Record<RecurringRunStatus, StatusLook> = {
+  processing: { label: "Processing", tone: "neutral" },
+  generated: { label: "Generated", tone: "positive" },
+  pending_review: { label: "Review required", tone: "warning" },
+  awaiting_approval: { label: "Awaiting approval", tone: "neutral" },
+  failed: { label: "Failed", tone: "danger" },
 };
 
 interface LineFormValue {
@@ -416,11 +418,9 @@ export default function RecurringClient({
       width: 130,
       render: (value: RecurringTemplateStatus, template) => (
         <Space direction="vertical" size={2}>
-          <Tag color={TEMPLATE_STATUS[value].color}>{TEMPLATE_STATUS[value].label}</Tag>
+          <StatusTag status={value} looks={TEMPLATE_STATUS} />
           {template.last_run_status ? (
-            <Tag color={RUN_STATUS[template.last_run_status].color}>
-              {RUN_STATUS[template.last_run_status].label}
-            </Tag>
+            <StatusTag status={template.last_run_status} looks={RUN_STATUS} />
           ) : null}
           {template.last_error ? (
             <Typography.Text type="danger" style={{ fontSize: 12 }} ellipsis={{ tooltip: template.last_error }}>
@@ -495,7 +495,7 @@ export default function RecurringClient({
       dataIndex: "status",
       render: (value: RecurringRunStatus, run) => (
         <Space direction="vertical" size={0}>
-          <Tag color={RUN_STATUS[value].color}>{RUN_STATUS[value].label}</Tag>
+          <StatusTag status={value} looks={RUN_STATUS} />
           {run.error_message ? (
             <Typography.Text type="danger" ellipsis={{ tooltip: run.error_message }}>
               {run.error_message}

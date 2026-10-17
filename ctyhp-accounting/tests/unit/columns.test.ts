@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { TOKENS } from "@/lib/design/tokens";
-import { ToneBadge, toneToken, type Tone } from "@/lib/design/tone";
+import { type Tone } from "@/lib/design/tone";
+import StatusTag from "@/components/ui/StatusTag";
 
 /**
  * The props these cells actually carry. Named because React 19 narrows
@@ -163,44 +164,40 @@ describe("dateColumn", () => {
 });
 
 describe("statusColumn", () => {
-  it("renders the screen's own word in the tone the screen chose", () => {
-    const column = statusColumn<Row>({
-      title: "Status",
-      dataIndex: "status",
-      tones: { paid: { tone: "positive", label: "Paid" }, void: { tone: "muted", label: "Void" } },
-    });
+  it("renders the screen's own word in the tone the screen chose, through the shared StatusTag", () => {
+    const tones = { paid: { tone: "positive" as const, label: "Paid" }, void: { tone: "muted" as const, label: "Void" } };
+    const column = statusColumn<Row>({ title: "Status", dataIndex: "status", tones });
     const cell = asElement(column.render!(row.status, row, 0), "statusColumn");
-    // The column's own job is choosing the tone and the wording; the badge owns
-    // how that looks. Asserting the element IS the badge is what keeps the two
+    // The column's own job is choosing the tone and the wording; the tag owns
+    // how that looks. Asserting the element IS the tag is what keeps the two
     // from drifting into separate copies of the same markup.
-    expect(cell.type).toBe(ToneBadge);
-    expect(cell.props.tone).toBe("muted");
-    expect(cell.props.children).toBe("Void");
+    expect(cell.type).toBe(StatusTag);
+    expect(cell.props.status).toBe("void");
+    expect(cell.props.looks).toBe(tones);
 
-    // And once through the badge, the chosen tone really does reach the colour —
-    // so the composition is proven, not just the wiring.
-    const rendered = asElement(
-      ToneBadge(cell.props as { tone: Tone; children: string }),
-      "ToneBadge",
-    );
-    expect(rendered.props.style?.color).toBe(toneToken("muted").color);
+    // And once through the tag, the chosen tone reaches the class that colours
+    // it, with an icon beside the word.
+    const rendered = asElement(StatusTag(cell.props as unknown as Parameters<typeof StatusTag>[0]), "StatusTag");
+    expect(rendered.props.className).toBe("status-tag status-tag--muted");
     const [icon, label] = pair(rendered);
     expect(isValidElement(icon)).toBe(true);
     expect(label).toBe("Void");
   });
 
-  it("shows an unmapped status as its raw value rather than swallowing it", () => {
+  it("shows a status the screen did not map as words, never as its code", () => {
     // A status nobody mapped is a gap in the screen's declaration. Rendering
-    // nothing would hide a row's state; rendering the raw value shows both the
-    // state and the gap.
+    // nothing would hide a row's state; rendering the code would print
+    // "not_requested". It reads in the shared vocabulary instead.
     const column = statusColumn<Row>({
       title: "Status",
       dataIndex: "status",
       tones: { paid: { tone: "positive", label: "Paid" } },
     });
-    const cell = asElement(column.render!("void" as Row["status"], row, 0), "statusColumn");
-    expect(cell.props.tone).toBe("muted");
-    expect(cell.props.children).toBe("void");
+    for (const [code, word] of [["void", "Void"], ["not_requested", "Not requested"], ["some_new_state", "Some new state"]]) {
+      const cell = asElement(column.render!(code as Row["status"], row, 0), "statusColumn");
+      const rendered = asElement(StatusTag(cell.props as unknown as Parameters<typeof StatusTag>[0]), "StatusTag");
+      expect(pair(rendered)[1]).toBe(word);
+    }
   });
 
   it("shows an em dash for a row with no status, rather than a wordless icon", () => {

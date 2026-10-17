@@ -143,7 +143,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Record the money received",
-        control: "New payment",
+        control: "Receive payment",
         route: "/payments",
         note:
           "Allocate it against one or more open invoices. The allocation cannot " +
@@ -263,9 +263,11 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Give money back",
-        control: "New refund",
-        route: "/credit-memos",
-        note: "Records the cash going out and clears the credit it came from.",
+        control: "Refund",
+        route: "/payments",
+        note:
+          "In a payment's menu, when part of it is not applied to an invoice. Records the cash going out " +
+          "of the bank account you choose and reduces what is left of the payment.",
       },
       {
         action: "Write off what will never be collected",
@@ -869,7 +871,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Set up agencies and rates",
-        control: "New tax code",
+        control: "New rate",
         route: "/sales-tax",
         note: "Overlapping or invalid effective periods are rejected.",
       },
@@ -926,7 +928,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     purpose: "Give people the access their job needs, and no more.",
     route: "/settings/users",
     steps: [
-      { action: "Add or suspend a person", control: "New user", route: "/settings/users" },
+      { action: "Add or suspend a person", control: "Add user", route: "/settings/users" },
       {
         action: "Set what each role may do",
         control: "Permissions",

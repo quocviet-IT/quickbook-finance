@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Descriptions, Space, Table, Tag, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { PAID_LABELS, RECEIVED_LABELS, humanizeStatus } from "@/lib/domain/status-label";
 import { formatDate, formatDateInTimeZone, formatMoney } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
-import type { AccountRow, CurrencyRow, ItemRow, PoStatus, PurchasingConfigRow, VendorRow } from "@/lib/db/types";
+import type { AccountRow, CurrencyRow, ItemRow, PurchasingConfigRow, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderDetail } from "@/lib/services/purchasing";
 import { remainingQty } from "@/lib/domain/purchasing";
 import PurchaseOrderFormModal from "../PurchaseOrderFormModal";
@@ -21,14 +23,7 @@ import {
   voidGoodsReceiptAction,
 } from "../actions";
 
-const STATUS_COLOR: Record<PoStatus, string> = {
-  draft: "default",
-  open: "blue",
-  partial: "gold",
-  received: "green",
-  closed: "purple",
-  cancelled: "red",
-};
+// US spelling, as the status filter reads.
 
 export default function PurchaseOrderDetailClient({
   initialBillOpen,
@@ -118,7 +113,7 @@ export default function PurchaseOrderDetailClient({
         title={
           <Space>
             <span>Order</span>
-            <Tag color={STATUS_COLOR[order.status]}>{order.status}</Tag>
+            <StatusTag status={order.status} labels={RECEIVED_LABELS} />
           </Space>
         }
         extra={
@@ -231,7 +226,7 @@ export default function PurchaseOrderDetailClient({
               title: "Remaining",
               key: "remaining",
               align: "right",
-              render: (_, r) => (r.is_closed ? <Tag>closed</Tag> : remainingQty(Number(r.quantity), Number(r.qty_received))),
+              render: (_, r) => (r.is_closed ? <StatusTag status="closed" /> : remainingQty(Number(r.quantity), Number(r.qty_received))),
             },
             {
               title: "Unit Cost",
@@ -262,7 +257,7 @@ export default function PurchaseOrderDetailClient({
             {
               title: "Status",
               dataIndex: "status",
-              render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag>,
+              render: (s: string) => <StatusTag status={s} />,
             },
             { title: "Void reason", dataIndex: "void_reason", render: (v: string | null) => v ?? "—" },
             {
@@ -313,7 +308,7 @@ export default function PurchaseOrderDetailClient({
             },
             { title: "Date", dataIndex: "bill_date", render: (v: string) => formatDate(v) },
             { title: "Total", dataIndex: "total_minor", align: "right", render: (v: number) => formatMoney(v, order.currency_code, decimals) },
-            { title: "Status", dataIndex: "status", render: (s: string) => <Tag>{s}</Tag> },
+            { title: "Status", dataIndex: "status", render: (s: string) => <StatusTag status={s} labels={PAID_LABELS} /> },
           ]}
         />
       </Card>
@@ -326,7 +321,7 @@ export default function PurchaseOrderDetailClient({
             pagination={false}
             dataSource={exceptions}
               columns={[
-              { title: "Kind", dataIndex: "kind", render: (v: string) => <Tag color="orange">{v}</Tag> },
+              { title: "Kind", dataIndex: "kind", render: (v: string) => <Tag color="orange">{humanizeStatus(v)}</Tag> },
               { title: "Expected", dataIndex: "expected_value", align: "right", render: (v: number) => Number(v) },
               { title: "Actual", dataIndex: "actual_value", align: "right", render: (v: number) => Number(v) },
               {

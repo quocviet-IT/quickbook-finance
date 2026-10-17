@@ -59,7 +59,7 @@ export default function CompanySwitcher({
         <Typography.Text strong ellipsis style={{ maxWidth: 220 }}>
           {active.legalName}
         </Typography.Text>
-        {active.isSample ? <Tag color="orange">sample</Tag> : null}
+        {active.isSample ? <Tag color="orange">Sample</Tag> : null}
       </Space>
     );
   }
@@ -119,7 +119,7 @@ export default function CompanySwitcher({
         label: (
           <Space size={6}>
             <span>{company.dbaName || company.legalName}</span>
-            {company.isSample ? <Tag color="orange">sample</Tag> : null}
+            {company.isSample ? <Tag color="orange">Sample</Tag> : null}
           </Space>
         ),
       }))}

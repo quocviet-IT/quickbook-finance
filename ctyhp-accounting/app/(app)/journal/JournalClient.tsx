@@ -2,6 +2,7 @@
 import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useEffect, useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
+import StatusTag from "@/components/ui/StatusTag";
 import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
@@ -207,7 +208,7 @@ export default function JournalClient({
       <Space wrap>
         {canWrite && (
           <Button type="primary" onClick={() => setOpen(true)}>
-            New Journal Entry
+            New journal entry
           </Button>
         )}
         <DatePicker.RangePicker
@@ -338,8 +339,8 @@ export default function JournalClient({
             width: 170,
             render: (_, e) => (
               <Space size={4} wrap>
-                {e.isReversed ? <Tag color="orange">reversed</Tag> : <Tag color="green">{e.status}</Tag>}
-                {e.adjusting ? <Tag color="purple">adjusting</Tag> : null}
+                <StatusTag status={e.isReversed ? "reversed" : e.status} />
+                {e.adjusting ? <Tag color="purple">Adjusting</Tag> : null}
               </Space>
             ),
           },
@@ -390,7 +391,7 @@ export default function JournalClient({
       ) : null}
       <Modal
         open={open}
-        title="New Journal Entry"
+        title="New journal entry"
         onCancel={() => setOpen(false)}
         onOk={submit}
         confirmLoading={saving}

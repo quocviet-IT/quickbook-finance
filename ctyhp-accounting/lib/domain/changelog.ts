@@ -41,6 +41,48 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.19",
+    date: "2026-10-17",
+    headline: "Every status reads the same way, and every button is written the same way.",
+    changes: [
+      {
+        kind: "changed",
+        title: "One look for every status",
+        detail:
+          "Statuses on Bills, Invoices, Credit Memos, Vendor Credits, Purchase Orders, Payments, Pay Bills, Expenses, Journal Entries, Accounting Periods, Approvals, Users, Reconcile, the 1099 report and the other reports now share one look: an icon, the word with a capital first letter, and a color that reads in dark mode as well as light. Statuses that showed as stored, such as open, received, void and not enrolled, now read Open, Received, Void and Not enrolled. Partial says what it means on each screen: Partially paid, Partially applied or Partially received.",
+        route: "/bills",
+      },
+      {
+        kind: "fixed",
+        title: "Codes no longer show through",
+        detail:
+          "The dashboard's recent activity and the Transaction List showed an entry's source as stock_count or stock count; they now say Stock count and Bill payment like the rest of the books. Payment methods read Bank transfer and ACH, Company Settings shows the accounting basis as Accrual, and the Change Log reads Status: Draft → Issued.",
+        route: "/reports/transactions",
+      },
+      {
+        kind: "changed",
+        title: "Status, not State",
+        detail:
+          "Estimates and Reconcile history called their status column State; it is Status, as on every other list. On the Number Sequence report the column that says whether a number has a document is now On file, and its values read Missing and Ahead of sequence instead of capitals.",
+        route: "/estimates",
+      },
+      {
+        kind: "changed",
+        title: "Buttons and tags written one way",
+        detail:
+          "New Journal Entry, New Credit Memo, New Vendor Credit, Set Account and Set Category are now written like New invoice: New journal entry, Set account. Tags start with a capital letter: Sample, Needs coding, You, Matched by AI.",
+        route: "/journal",
+      },
+      {
+        kind: "fixed",
+        title: "The guide names the buttons you see",
+        detail:
+          "System guide steps named buttons that are not on the screen. They now say Receive payment, Add user and New rate, and giving money back points to Refund in a payment's menu rather than to Credit Memos.",
+        route: "/payments",
+      },
+    ],
+  },
+  {
     version: "2.18",
     date: "2026-10-17",
     headline: "Another ledger’s balances, typed in beside OneBook’s and kept by date.",

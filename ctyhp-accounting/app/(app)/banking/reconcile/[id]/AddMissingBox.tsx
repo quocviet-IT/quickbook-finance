@@ -68,7 +68,7 @@ export default function AddMissingBox({ plan, bankAccountId, money, adding, onAd
                         <span>{item.accountLabel}</span>
                       </Tooltip>
                       {item.source === "uncategorized" ? (
-                        <Tag color="gold">needs coding</Tag>
+                        <Tag color="gold">Needs coding</Tag>
                       ) : (
                         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                           {item.short}

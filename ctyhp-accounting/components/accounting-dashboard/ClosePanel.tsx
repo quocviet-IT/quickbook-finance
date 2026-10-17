@@ -13,6 +13,7 @@ import type { CloseStepStatus } from "@/lib/domain/accounting-dashboard/close-ch
 import type { CloseReadiness } from "@/lib/services/accounting-dashboard";
 import type { SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
 import { closePeriodAction, reopenPeriodAction } from "@/app/(app)/accounting/actions";
+import StatusTag from "@/components/ui/StatusTag";
 import styles from "./accounting-dashboard.module.css";
 import { FreshnessNote, UnavailableNote } from "./DataStateNote";
 
@@ -120,7 +121,7 @@ export default function ClosePanel({
       extra={
         <span className={styles.closeExtra}>
           <Typography.Text type="secondary">covers through {period.periodEnd}</Typography.Text>
-          <Tag color={isClosed ? "green" : "blue"}>{period.status}</Tag>
+          <StatusTag status={period.status} />
         </span>
       }
     >

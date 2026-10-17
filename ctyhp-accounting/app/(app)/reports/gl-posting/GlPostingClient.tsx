@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Alert, App, Button, DatePicker, Segmented, Space, Statistic, Table, Tag } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { statusLabel } from "@/lib/domain/status-label";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
@@ -176,7 +178,7 @@ export default function GlPostingClient({
                     number: row.documentNumber ?? "(unnumbered)",
                     date: row.documentDate,
                     party: row.partyName,
-                    status: row.documentStatus,
+                    status: statusLabel(row.documentStatus),
                     // row.amountMinor is integer minor units; the export cell
                     // is the display edge, same as the `money` callback above.
                     amount: fromMinor(row.amountMinor, baseDecimals),
@@ -230,7 +232,12 @@ export default function GlPostingClient({
                   </div>
                 ),
               }),
-              { title: "Status", dataIndex: "documentStatus", width: COLUMN.STATUS },
+              {
+                title: "Status",
+                dataIndex: "documentStatus",
+                width: COLUMN.STATUS,
+                render: (v: string | null) => <StatusTag status={v} />,
+              },
               {
                 title: "Amount",
                 dataIndex: "amountMinor",
@@ -287,7 +294,7 @@ export default function GlPostingClient({
               align: "right",
               render: (_: unknown, row) =>
                 row.tiesOut ? (
-                  <Tag color="green">ties out</Tag>
+                  <Tag color="green">Ties out</Tag>
                 ) : (
                   <b style={{ color: TOKENS.intent.danger }}>{money(row.varianceMinor)}</b>
                 ),
@@ -301,7 +308,7 @@ export default function GlPostingClient({
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={4} align="right">
                   {recon.allTieOut ? (
-                    <Tag color="green">all tie out</Tag>
+                    <Tag color="green">All tie out</Tag>
                   ) : (
                     <Tag color="red">{recon.exceptions.length} out</Tag>
                   )}

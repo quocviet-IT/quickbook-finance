@@ -13,6 +13,8 @@ import {
   type AttributionSource,
   type AuditFieldChange,
 } from "@/lib/domain/audit";
+import { humanizeStatus } from "@/lib/domain/status-label";
+import { ACTIVITY_VERBS } from "@/lib/domain/audit-entities";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 // See table-pagination.ts for why this has to live in state rather than as a
@@ -105,7 +107,7 @@ export default function DocumentAuditTrail({
                 title: "Action",
                 dataIndex: "action",
                 width: 90,
-                render: (value: string) => <Tag>{value}</Tag>,
+                render: (value: string) => <Tag>{ACTIVITY_VERBS[value] ?? humanizeStatus(value)}</Tag>,
               },
               {
                 title: "Changed",

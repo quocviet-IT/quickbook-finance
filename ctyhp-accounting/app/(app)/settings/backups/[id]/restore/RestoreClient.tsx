@@ -5,6 +5,7 @@ import { formatDateTime, plural } from "@/lib/format";
 import { useState } from "react";
 import { Alert, Button, Descriptions, Input, Space, Typography } from "antd";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
+import { statusLabel } from "@/lib/domain/status-label";
 import { restoreBackupAction } from "./actions";
 
 export interface RestoreSnapshot {
@@ -102,7 +103,7 @@ export default function RestoreClient({
           type="warning"
           showIcon
           message="This snapshot holds no file"
-          description={`Only a stored snapshot can be restored; this one is "${snapshot.status}". A skipped night means the books had not changed — the previous stored snapshot holds the same content.`}
+          description={`Only a stored snapshot can be restored; this one is "${statusLabel(snapshot.status)}". A skipped night means the books had not changed — the previous stored snapshot holds the same content.`}
         />
       ) : (
         <>

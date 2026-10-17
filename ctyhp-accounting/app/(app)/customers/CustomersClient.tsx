@@ -17,6 +17,7 @@ import {
 } from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -215,7 +216,7 @@ export default function CustomersClient({
       title: "Status",
       dataIndex: "is_active",
       width: 100,
-      render: (a: boolean) => <Tag color={a ? "green" : "default"}>{a ? "Active" : "Inactive"}</Tag>,
+      render: (a: boolean) => <StatusTag status={a ? "active" : "inactive"} />,
     },
     ...(canWrite
       ? [

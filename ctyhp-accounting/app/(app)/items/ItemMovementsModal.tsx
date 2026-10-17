@@ -4,6 +4,7 @@ import { App, Modal, Table, Tag } from "antd";
 import type { InventoryTxnRow, ItemRow } from "@/lib/db/types";
 import { listItemMovementsAction } from "./inventory-actions";
 import { formatDate, formatMoney } from "@/lib/format";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
@@ -69,7 +70,7 @@ function ItemMovementsModalBody({ item, onClose, baseCurrency, baseDecimals }: P
           {
             title: "Source",
             dataIndex: "source",
-            render: (v: string) => <Tag color={SOURCE_COLOR[v]}>{v.replace("_", " ")}</Tag>,
+            render: (v: string) => <Tag color={SOURCE_COLOR[v]}>{humanizeStatus(v)}</Tag>,
           },
           { title: "Quantity", dataIndex: "qty_delta", align: "right", render: (v: number) => Number(v) },
           { title: "Cost", dataIndex: "cost_delta_minor", align: "right", render: (v: number) => money(Number(v)) },

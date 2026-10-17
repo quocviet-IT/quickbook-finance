@@ -73,7 +73,7 @@ function FlowBody({
               <Tag>{step.control}</Tag>
               {step.route ? (
                 step.route === here ? (
-                  <Tag color="green">you are here</Tag>
+                  <Tag color="green">You are here</Tag>
                 ) : (
                   <Link href={step.route} onClick={onNavigate}>
                     {step.route} <ArrowRightOutlined />
@@ -259,7 +259,7 @@ export default function SystemGuideDrawer({
               label: (
                 <Space size={6} wrap>
                   <span>{flow.title}</span>
-                  {flow.route === screen.route ? <Tag color="green">starts here</Tag> : null}
+                  {flow.route === screen.route ? <Tag color="green">Starts here</Tag> : null}
                 </Space>
               ),
               children: <FlowBody flow={flow} onNavigate={onClose} here={screen.route} />,

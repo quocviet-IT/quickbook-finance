@@ -41,6 +41,7 @@ import {
 } from "@/lib/domain/navigation";
 import CompanySwitcher, { type CompanyChoice } from "./CompanySwitcher";
 import ThemeToggle from "./theme/ThemeToggle";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import GlobalSearch from "./GlobalSearch";
 import NewMenu from "./NewMenu";
 import AssistantLauncher from "./assistant/AssistantLauncher";
@@ -291,7 +292,7 @@ export default function AppShell({
         label: (
           <div className="app-shell__account-summary">
             <Typography.Text strong>{email}</Typography.Text>
-            {role && <Typography.Text type="secondary">{role}</Typography.Text>}
+            {role && <Typography.Text type="secondary">{humanizeStatus(role)}</Typography.Text>}
           </div>
         ),
         disabled: true,

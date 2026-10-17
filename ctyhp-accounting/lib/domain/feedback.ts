@@ -6,6 +6,8 @@
  * agree on one set of rules.
  */
 
+import { statusLabel } from "./status-label";
+
 export const FEEDBACK_KINDS = ["broken", "suggestion"] as const;
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
 
@@ -184,7 +186,7 @@ export function describeFeedbackStatusChange(
   if (to === "reviewing") return "Start reviewing this report";
   if (to === "resolved") return "Mark this report resolved";
   if (to === "declined") return "Decline this report — it will not be actioned";
-  return `Change status from ${from} to ${to}`;
+  return `Change status from ${statusLabel(from)} to ${statusLabel(to)}`;
 }
 
 export function queueCounts(

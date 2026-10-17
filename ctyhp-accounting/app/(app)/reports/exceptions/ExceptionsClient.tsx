@@ -461,7 +461,7 @@ export default function ExceptionsClient({
                 key: "last",
                 width: 140,
                 render: (_, row) =>
-                  row.lastReconciledDate ? formatDate(row.lastReconciledDate) : <Tag color="orange">never</Tag>,
+                  row.lastReconciledDate ? formatDate(row.lastReconciledDate) : <Tag color="orange">Never</Tag>,
               },
               {
                 title: "Since",
@@ -631,7 +631,7 @@ export default function ExceptionsClient({
                 key: "last",
                 width: 140,
                 render: (_, row) =>
-                  row.lastStatementDate ? formatDate(row.lastStatementDate) : <Tag color="orange">never</Tag>,
+                  row.lastStatementDate ? formatDate(row.lastStatementDate) : <Tag color="orange">Never</Tag>,
               },
               { title: "Not on a statement", key: "outstanding", width: 150, align: "right", render: (_, row) => row.outstandingCount },
               {

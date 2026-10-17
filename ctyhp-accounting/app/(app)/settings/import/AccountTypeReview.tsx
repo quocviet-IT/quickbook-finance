@@ -84,7 +84,7 @@ export default function AccountTypeReview({ readings, onChange }: AccountTypeRev
                   }))}
                   onChange={(value) => onChange(row.source, (value as AccountType) ?? null)}
                 />
-                {row.chosen ? <Tag color="blue">yours</Tag> : null}
+                {row.chosen ? <Tag color="blue">Yours</Tag> : null}
               </Space>
             ),
           },

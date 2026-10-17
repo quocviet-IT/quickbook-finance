@@ -38,6 +38,8 @@ import {
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import type { StatusLook } from "@/lib/domain/status-label";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -84,17 +86,17 @@ const CATEGORIES = [
   "Other",
 ];
 
-const STATUS_LABELS: Record<FixedAssetStatus, { label: string; color: string }> = {
-  in_service: { label: "In service", color: "blue" },
-  fully_depreciated: { label: "Fully depreciated", color: "green" },
-  disposed: { label: "Disposed", color: "default" },
+const STATUS_LABELS: Record<FixedAssetStatus, StatusLook> = {
+  in_service: { label: "In service", tone: "neutral" },
+  fully_depreciated: { label: "Fully depreciated", tone: "positive" },
+  disposed: { label: "Disposed", tone: "muted" },
 };
 
-const SCHEDULE_STATUS: Record<string, { label: string; color: string }> = {
-  planned: { label: "Planned", color: "default" },
-  opening: { label: "Opening balance", color: "cyan" },
-  posted: { label: "Posted", color: "green" },
-  cancelled: { label: "Canceled", color: "default" },
+const SCHEDULE_STATUS: Record<string, StatusLook> = {
+  planned: { label: "Planned", tone: "muted" },
+  opening: { label: "Opening balance", tone: "neutral" },
+  posted: { label: "Posted", tone: "positive" },
+  cancelled: { label: "Canceled", tone: "muted" },
 };
 
 // Rows a page for the two tables on this screen. See table-pagination.ts for
@@ -768,7 +770,7 @@ export default function FixedAssetsClient({
       width: COLUMN.STATUS,
       render: (value: FixedAssetStatus, asset) => (
         <Space direction="vertical" size={2}>
-          <Tag color={STATUS_LABELS[value].color}>{STATUS_LABELS[value].label}</Tag>
+          <StatusTag status={value} looks={STATUS_LABELS} />
           {asset.due_depreciation_minor > 0 ? <Tag color="orange">Posting due</Tag> : null}
         </Space>
       ),
@@ -845,10 +847,7 @@ export default function FixedAssetsClient({
       title: "Status",
       dataIndex: "status",
       width: 135,
-      render: (value: string) => {
-        const config = SCHEDULE_STATUS[value] ?? { label: value, color: "default" };
-        return <Tag color={config.color}>{config.label}</Tag>;
-      },
+      render: (value: string) => <StatusTag status={value} looks={SCHEDULE_STATUS} />,
     },
     {
       title: "Journal",

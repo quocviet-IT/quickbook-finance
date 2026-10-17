@@ -17,6 +17,7 @@ import {
 } from "antd";
 import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow } from "@/lib/db/types";
 import { formatMoney, toMinorUnits } from "@/lib/format";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { describeNoOpenInvoices, unappliedRemainderMinor } from "@/lib/domain/settlement";
 import { paymentReplacementDraft } from "@/lib/domain/payment-void";
 import { correctPaymentAction, getOpenInvoicesAction, recordPaymentAction } from "./actions";
@@ -274,7 +275,7 @@ export default function ReceivePaymentModal({
             <Select
               allowClear
               placeholder="Method"
-              options={["cash", "bank_transfer", "card", "check"].map((m) => ({ value: m, label: m }))}
+              options={["cash", "bank_transfer", "card", "check"].map((m) => ({ value: m, label: humanizeStatus(m) }))}
             />
           </Form.Item>
           <Form.Item

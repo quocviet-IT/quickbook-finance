@@ -2,6 +2,7 @@ import type { DuplicateCharge } from "@/lib/domain/duplicate-charges";
 import type { DerivedWorkItem, Severity } from "@/lib/domain/work-surface/types";
 
 import { formatDate, plural } from "@/lib/format";
+import { statusLabel } from "@/lib/domain/status-label";
 /** The prefix of a duplicate-charge key, for the service that keeps those keys alive. */
 export const DUPLICATE_KEY_PREFIX = "dupe-charge:";
 
@@ -90,6 +91,12 @@ export function unmatchedBankItem(
   };
 }
 
+/** How the connection stands, as a sentence: "The connection needs attention." / "The connection is disconnected." */
+function connectionState(status: string): string {
+  if (status === "attention_required") return "The connection needs attention.";
+  return `The connection is ${statusLabel(status).toLowerCase()}.`;
+}
+
 export function brokenFeedItem(
   connection: { id: string; institutionName: string; status: string; lastError: string | null },
   input: { ageDays: number; confirmedAt: string },
@@ -101,7 +108,7 @@ export function brokenFeedItem(
     title: `${connection.institutionName} is not syncing`,
     reason:
       connection.lastError?.trim() ||
-      `The connection is ${connection.status}. New activity may not be arriving.`,
+      `${connectionState(connection.status)} New activity may not be arriving.`,
     severity: "high",
     ageDays: input.ageDays,
     href: "/banking",

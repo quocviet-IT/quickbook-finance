@@ -1,6 +1,7 @@
 "use client";
 import { Alert, Space, Table, Tag, Typography } from "antd";
 import { formatDate, formatMoney } from "@/lib/format";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import {
   buildSettlementHistory,
   settlementTypeLabel,
@@ -79,7 +80,7 @@ export default function SettlementHistory({
             ),
           },
           { title: "Number", dataIndex: "documentNumber", width: 140, render: (v: string | null) => v ?? "—" },
-          { title: "Method", dataIndex: "method", width: 110, render: (v: string | null) => v ?? "—" },
+          { title: "Method", dataIndex: "method", width: 110, render: (v: string | null) => humanizeStatus(v) },
           {
             title: "Journal entry",
             dataIndex: "entryNumber",

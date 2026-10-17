@@ -42,7 +42,7 @@ export default function ReportEntityBadge({
       {isSample ? (
         <>
           {" "}
-          <Tag color="orange">sample company</Tag>
+          <Tag color="orange">Sample company</Tag>
         </>
       ) : null}
     </Typography.Text>

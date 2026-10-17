@@ -1,6 +1,8 @@
 "use client";
 import { Card, Collapse, Typography } from "antd";
 import ReportTable from "@/components/ui/ReportTable";
+import StatusTag from "@/components/ui/StatusTag";
+import { sourceLabel } from "@/lib/domain/entry-detail";
 import type { SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
 import type { SecondaryAnalysis as SecondaryAnalysisData } from "@/lib/services/accounting-dashboard";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -101,7 +103,7 @@ export default function SecondaryAnalysis({
                 columns={[
                   { title: "Entry", dataIndex: "entryNumber" },
                   { title: "Date", dataIndex: "entryDate", render: (value: string) => formatDate(value) },
-                  { title: "Source", dataIndex: "sourceType" },
+                  { title: "Source", dataIndex: "sourceType", render: (v: string) => sourceLabel(v) },
                   {
                     title: "Description",
                     dataIndex: "description",
@@ -115,7 +117,7 @@ export default function SecondaryAnalysis({
                     align: "right",
                     render: (v: number) => money(v),
                   },
-                  { title: "Status", dataIndex: "status" },
+                  { title: "Status", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
                 ]}
               />
             ),

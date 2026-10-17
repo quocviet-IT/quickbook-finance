@@ -11,6 +11,7 @@ import {
   reopenPeriodAction,
   periodCloseBlockersAction,
 } from "./actions";
+import StatusTag from "@/components/ui/StatusTag";
 import type { AccountingPeriodRow } from "@/lib/db/types";
 
 export default function PeriodsClient({
@@ -185,7 +186,7 @@ export default function PeriodsClient({
           {
             title: "Status",
             dataIndex: "status",
-            render: (s: string) => <Tag color={s === "closed" ? "red" : "green"}>{s}</Tag>,
+            render: (s: string) => <StatusTag status={s} />,
           },
           {
             title: "",

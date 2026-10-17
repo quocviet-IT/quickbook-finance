@@ -19,6 +19,7 @@ import {
   type RankedCandidate,
 } from "@/lib/domain/bank-settlement";
 import { formatDate, formatMoney } from "@/lib/format";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import type { SettlementCandidateRow } from "@/lib/services/banking";
 import {
   getSettlementCandidatesAction,
@@ -192,7 +193,7 @@ export default function SettleFromBankModal({
                 <Space size={6}>
                   <span>{row.candidate.documentNumber ?? "—"}</span>
                   {row.exactAmount ? (
-                    <Tag color="green">exact amount</Tag>
+                    <Tag color="green">Exact amount</Tag>
                   ) : null}
                 </Space>
               ),
@@ -249,7 +250,7 @@ export default function SettleFromBankModal({
             onChange={(value) => setMethod(value ?? null)}
             options={["cash", "bank_transfer", "card", "check"].map((m) => ({
               value: m,
-              label: m,
+              label: humanizeStatus(m),
             }))}
           />
           <Input

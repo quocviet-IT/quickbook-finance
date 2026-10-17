@@ -9,6 +9,7 @@
  */
 
 import { toCsv, type CsvColumn } from "@/lib/csv";
+import { statusLabel } from "@/lib/domain/status-label";
 
 export interface AuditFieldChange {
   field: string;
@@ -99,12 +100,19 @@ export function auditFieldLabel(field: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** One scannable line for a table cell: `Status: draft → issued`. */
+const STATUS_FIELDS = new Set(["status", "lifecycle", "state"]);
+
+/** A changed value as the line shows it: a status reads as its label, anything else as stored. */
+function summaryValue(field: string, value: string | null): string {
+  return STATUS_FIELDS.has(field) && value ? statusLabel(value) : formatAuditValue(value);
+}
+
+/** One scannable line for a table cell: `Status: Draft → Issued`. */
 export function summarizeAuditChanges(changes: readonly AuditFieldChange[], limit = 3): string {
   if (changes.length === 0) return "No field changed";
   const shown = changes
     .slice(0, limit)
-    .map((c) => `${auditFieldLabel(c.field)}: ${formatAuditValue(c.before)} → ${formatAuditValue(c.after)}`)
+    .map((c) => `${auditFieldLabel(c.field)}: ${summaryValue(c.field, c.before)} → ${summaryValue(c.field, c.after)}`)
     .join("; ");
   const rest = changes.length - Math.min(limit, changes.length);
   return rest > 0 ? `${shown} (+${rest} more)` : shown;

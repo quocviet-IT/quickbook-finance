@@ -194,10 +194,10 @@ describe("sequenceCsv", () => {
     });
 
     expect(sequenceCsv(audit).split("\r\n")).toEqual([
-      "Number,State,Date,Status,Document id,Documented reason",
-      "INV-000001,On file,2026-07-01,issued,doc-1,",
-      "INV-000002,MISSING,,,,Test invoice removed by an administrator",
-      "INV-000003,On file,2026-07-02,paid,doc-3,",
+      "Number,On file,Date,Status,Document id,Documented reason",
+      "INV-000001,On file,2026-07-01,Issued,doc-1,",
+      "INV-000002,Missing,,,,Test invoice removed by an administrator",
+      "INV-000003,On file,2026-07-02,Paid,doc-3,",
     ]);
     expect(sequenceCsvFileName(audit)).toBe("number-sequence-invoice.csv");
   });

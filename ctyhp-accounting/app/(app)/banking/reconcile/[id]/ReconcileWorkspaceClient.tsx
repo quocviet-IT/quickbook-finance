@@ -1,4 +1,5 @@
 "use client";
+import StatusTag from "@/components/ui/StatusTag";
 import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
@@ -650,7 +651,7 @@ export default function ReconcileWorkspaceClient({
           <Statistic title="Reconciled balance" value={money(detail.reconciledBalanceMinor)} />
           <Statistic title="Statement ending" value={money(detail.statementEndingMinor)} />
           <Statistic title="Difference" value={money(detail.differenceMinor)} />
-          <Tag color={completed ? "green" : "blue"}>{detail.status}</Tag>
+          <StatusTag status={detail.status} />
           {statement?.broughtForward ? <Tag color="purple">Brought forward</Tag> : null}
         </Space>
       )}

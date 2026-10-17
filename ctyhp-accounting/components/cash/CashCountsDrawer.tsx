@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Alert, Drawer, Spin, Tag } from "antd";
+import { Alert, Drawer, Spin } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
+import type { StatusLook } from "@/lib/domain/status-label";
 import { flexColumn } from "@/components/ui/columns";
 import { COUNT_STATUS_LABEL, type CashCountRow } from "@/lib/domain/cash-count";
 import { formatDate } from "@/lib/format";
@@ -15,7 +17,11 @@ import {
 import { COLUMN } from "@/lib/design/table-metrics";
 import styles from "./count-cash.module.css";
 
-const STATUS_COLOR = { posted: "green", pending_approval: "orange", rejected: "default" } as const;
+const STATUS_LOOK: Record<CashCountRow["status"], StatusLook> = {
+  posted: { tone: "positive", label: COUNT_STATUS_LABEL.posted },
+  pending_approval: { tone: "warning", label: COUNT_STATUS_LABEL.pending_approval },
+  rejected: { tone: "muted", label: COUNT_STATUS_LABEL.rejected },
+};
 
 /** One cash account's counts, newest first: date, counted, book, difference, entry and who counted. */
 export default function CashCountsDrawer({
@@ -88,7 +94,7 @@ function Counts({ accountId, money }: { accountId: string; money: (minor: number
             title: "Status",
             key: "status",
             width: COLUMN.STATUS,
-            render: (_, row) => <Tag color={STATUS_COLOR[row.status]}>{COUNT_STATUS_LABEL[row.status]}</Tag>,
+            render: (_, row) => <StatusTag status={row.status} looks={STATUS_LOOK} />,
           },
           { title: "Entry", key: "entry", width: COUNT_ENTRY_WIDTH, render: (_, row) => row.entryNumber ?? "—" },
           flexColumn<CashCountRow>({

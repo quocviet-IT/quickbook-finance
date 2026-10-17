@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Card, Empty, Input, Modal, Space, Table, Tag } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
+import StatusTag from "@/components/ui/StatusTag";
 import { SAVED_REPORT_SOURCE_LABEL, type SavedReportSource } from "@/lib/domain/saved-reports";
 import type { SavedReportRow } from "@/lib/services/saved-reports";
 import { archiveSavedReportAction } from "./actions";
@@ -119,7 +120,7 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
             width: 110,
             render: (_, row) =>
               row.status === "archived" ? (
-                <Tag color="default">archived</Tag>
+                <StatusTag status="archived" />
               ) : canManage ? (
                 <Button size="small" onClick={() => setArchiving(row)}>
                   Archive
