@@ -198,6 +198,17 @@
   color: var(--ob-text-secondary);
 }
 
+/* A switch and its words, sitting among a report's filters. */
+.inlineSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ob-text-body);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .mono {
   font-family: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
   font-size: 12px;
