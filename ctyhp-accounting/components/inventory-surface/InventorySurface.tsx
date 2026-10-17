@@ -1,5 +1,4 @@
 "use client";
-import { formatDate, timeZoneLabel } from "@/lib/format";
 import SurfaceScreen from "@/components/work-surface/SurfaceScreen";
 import type { Assignee } from "@/components/work-surface/WorkItemActions";
 import type { InventorySurfaceData } from "@/lib/services/inventory-surface";
@@ -31,7 +30,6 @@ export default function InventorySurface({
   const { context, controls, queue } = data;
   return (
     <SurfaceScreen
-      facts={[`As of ${formatDate(context.asOf)}`, context.currencyCode, timeZoneLabel(context.timeZone)]}
       queue={queue}
       controls={controls}
       queueTitle="What to sort out"

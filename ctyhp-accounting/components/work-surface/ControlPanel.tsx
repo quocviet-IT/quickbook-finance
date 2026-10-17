@@ -10,6 +10,7 @@ import type {
 import { formatMoney } from "@/lib/format";
 import styles from "./work-surface.module.css";
 import { FreshnessNote, UnavailableNote } from "./DataStateNote";
+import { sectionFreshnessNote } from "@/lib/domain/work-surface/surface-meta";
 
 /**
  * Whether a surface's own checks passed, failures first.
@@ -54,6 +55,7 @@ export default function ControlPanel({
   timeZone,
   title = "Control health",
   unavailableFallback = "These checks could not be evaluated.",
+  freshness = "always",
   className,
 }: {
   controls: SectionEnvelope<readonly SurfaceControl[]>;
@@ -63,11 +65,14 @@ export default function ControlPanel({
   timeZone: string;
   title?: string;
   unavailableFallback?: string;
+  /** "when-stale" where the page header already prints the time. */
+  freshness?: "always" | "when-stale";
   className?: string;
 }) {
   const rows = [...(controls.data ?? [])].sort(
     (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
   );
+  const controlsNote = controls.data ? sectionFreshnessNote(controls, freshness) : null;
 
   return (
     <Card size="small" title={title} className={className}>
@@ -106,8 +111,8 @@ export default function ControlPanel({
           })}
         </div>
       )}
-      {controls.data ? (
-        <FreshnessNote generatedAt={controls.generatedAt} dataState={controls.dataState} timeZone={timeZone} />
+      {controlsNote ? (
+        <FreshnessNote generatedAt={controls.generatedAt} dataState={controlsNote} timeZone={timeZone} />
       ) : null}
     </Card>
   );

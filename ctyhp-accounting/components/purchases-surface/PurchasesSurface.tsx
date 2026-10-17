@@ -1,5 +1,4 @@
 "use client";
-import { formatDate, timeZoneLabel } from "@/lib/format";
 import SurfaceScreen from "@/components/work-surface/SurfaceScreen";
 import type { Assignee } from "@/components/work-surface/WorkItemActions";
 import type { PurchasesSurfaceData } from "@/lib/services/purchases-surface";
@@ -32,7 +31,6 @@ export default function PurchasesSurface({
   const { context, controls, queue } = data;
   return (
     <SurfaceScreen
-      facts={[`As of ${formatDate(context.asOf)}`, context.currencyCode, timeZoneLabel(context.timeZone)]}
       queue={queue}
       controls={controls}
       queueTitle="What to settle"
