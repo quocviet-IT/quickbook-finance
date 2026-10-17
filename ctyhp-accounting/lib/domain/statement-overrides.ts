@@ -12,7 +12,7 @@
  * Pure: money is formatted by the caller's helper, and the moment is printed in
  * the company's time zone, passed in — never the machine's.
  */
-import { shortDate } from "./pdf-statement-view";
+import { shortDate } from "./report-presets";
 import { stampInTimeZone } from "./stamp";
 
 /** Formats minor units for the company, as the reconcile screens do. */
@@ -58,7 +58,7 @@ export function overrideStatus(
 /** The date and time of a stored moment as the company's clock reads it: `{ date: "Oct 8, 2026", time: "11:47" }`. */
 export function overrideMoment(importedAt: string, timeZone: string): { date: string; time: string } {
   const [day, time] = stampInTimeZone(importedAt, timeZone).split(" ");
-  return { date: shortDate(day, true), time };
+  return { date: shortDate(day), time };
 }
 
 /** The calendar day of a stored moment in the company's time zone: `2026-10-08`. */
@@ -95,8 +95,8 @@ export function importRecordDetail(
   money: Money,
 ): string {
   const head = `Out by ${money(facts.outByMinor)}. Imported by ${facts.name} on ${facts.date} at ${facts.time}: “${facts.reason}”.`;
-  if (settle.status === "settled") return `${head} Settled by the reconciliation to ${shortDate(settle.settledThrough, true)}.`;
-  const through = settle.lastLineDate ? ` through ${shortDate(settle.lastLineDate, true)}` : "";
+  if (settle.status === "settled") return `${head} Settled by the reconciliation to ${shortDate(settle.settledThrough)}.`;
+  const through = settle.lastLineDate ? ` through ${shortDate(settle.lastLineDate)}` : "";
   return `${head} Open until a reconciliation${through} is completed.`;
 }
 

@@ -48,7 +48,7 @@ import {
   overrideStatus,
   type NamedStatementOverride,
 } from "@/lib/domain/statement-overrides";
-import { shortDate } from "@/lib/domain/pdf-statement-view";
+import { shortDate } from "@/lib/domain/report-presets";
 
 /** Re-exported so a caller needs one import to build the input, not three. */
 export type { LedgerBalance, TransactionListRow };
@@ -582,7 +582,7 @@ export function openStatementOverrides(
 export function statementOverrideSentence(row: StatementOverrideRow, money: Money): string {
   return (
     `${row.filename}, imported ${row.importedDate} at ${row.importedTime} by ${row.byName}, ` +
-    `out by ${money(row.outByMinor)}: “${row.reason}”. Open since ${shortDate(row.openSince, true)}.`
+    `out by ${money(row.outByMinor)}: “${row.reason}”. Open since ${shortDate(row.openSince)}.`
   );
 }
 
