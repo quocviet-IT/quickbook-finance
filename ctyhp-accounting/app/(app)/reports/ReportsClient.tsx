@@ -44,7 +44,9 @@ import {
 } from "@/lib/domain/statement";
 import { fiscalYearStartOf, pointColumns, rangeColumns, type CompareMode } from "@/lib/domain/statement-columns";
 import type { BalanceSheetBank } from "@/lib/domain/bank-standing";
-import BalanceSheetBanksPanel from "./BalanceSheetBanksPanel";
+import BalanceSheetBanksPanel, { type CashPanel } from "./BalanceSheetBanksPanel";
+import CountCashDialog, { type CountableAccount } from "@/components/cash/CountCashDialog";
+import { cashStandingAction } from "@/components/cash/actions";
 import { balanceSheetBanksAction, getBudgetVsActualAction, getLedgerBalancesAction, getStatementOfEquityAction } from "./actions";
 
 interface ReportsClientProps {
@@ -194,6 +196,9 @@ export default function ReportsClient({
   const [notice, setNotice] = useState<string | null>(null);
   // The Balance Sheet's bank accounts panel, with the end date it was read for.
   const [bankPanel, setBankPanel] = useState<{ asOf: string; banks: BalanceSheetBank[] } | null>(null);
+  // The same panel's cash on hand lines, read apart from the banks so one failing leaves the other.
+  const [cashPanel, setCashPanel] = useState<{ asOf: string; cash: CashPanel | null } | null>(null);
+  const [counting, setCounting] = useState<CountableAccount | null>(null);
   const [ran, setRan] = useState(initialRange);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState<ZoomSpec | null>(null);
@@ -303,7 +308,10 @@ export default function ReportsClient({
       const plan = pointColumns(compare, to, from, fiscalStartMonth);
       if (!plan.ok) return refuse(plan.message);
       // The panel belongs to the date it was read for: drop the old one before this run reads anything.
-      if (type === "balance") setBankPanel(null);
+      if (type === "balance") {
+        setBankPanel(null);
+        setCashPanel(null);
+      }
       const balances = await Promise.all(plan.columns.map((c) => read(null, c.to)));
       if (type === "trial") {
         show(trialBalanceStatement({ columns: plan.columns, tbs: balances.map(buildTrialBalance), accounts: index }), null, null, { from, to });
@@ -323,6 +331,19 @@ export default function ReportsClient({
         },
         () => {
           if (current()) setBankPanel(null);
+        },
+      );
+      void cashStandingAction(to).then(
+        (result) => {
+          if (current()) {
+            setCashPanel({
+              asOf: to,
+              cash: result.ok && result.data ? { lines: result.data.lines, canCount: result.data.canCount } : null,
+            });
+          }
+        },
+        () => {
+          if (current()) setCashPanel({ asOf: to, cash: null });
         },
       );
       show(
@@ -529,14 +550,33 @@ export default function ReportsClient({
           ) : (
             paper
           )}
-          {type === "balance" && bankPanel && !notice && shownStatement && !shownStatement.empty ? (
+          {type === "balance" && (bankPanel || cashPanel) && !notice && shownStatement && !shownStatement.empty ? (
             // Outside the printed paper and the export: a help beside the statement, not part of it.
-            <BalanceSheetBanksPanel banks={bankPanel.banks} asOf={bankPanel.asOf} money={money} />
+            <BalanceSheetBanksPanel
+              banks={bankPanel?.banks ?? []}
+              asOf={bankPanel?.asOf ?? cashPanel?.asOf ?? to}
+              money={money}
+              cash={cashPanel?.cash ?? null}
+              cashUnavailable={cashPanel !== null && cashPanel.cash === null}
+              onCount={setCounting}
+            />
           ) : null}
         </div>
       </Spin>
 
       <ZoomSheet spec={zoom} onClose={() => setZoom(null)} money={money} />
+
+      <CountCashDialog
+        account={counting}
+        today={today}
+        money={money}
+        decimals={baseDecimals}
+        onClose={() => setCounting(null)}
+        onRecorded={() => {
+          // The sheet's figures move with the count; read the whole report again.
+          void run();
+        }}
+      />
 
       {type === "budget" && canManageBudget ? (
         <BudgetEditorDrawer

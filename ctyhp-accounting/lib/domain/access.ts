@@ -93,6 +93,7 @@ export const CONTROLLED_ACTIONS: ControlledAction[] = [
   { key: "manual_journal", label: "Manual journal entry", usesThreshold: true },
   { key: "write_off", label: "Balance write-off", usesThreshold: true },
   { key: "inventory_adjustment", label: "Inventory adjustment", usesThreshold: true },
+  { key: "cash_count", label: "Cash count", usesThreshold: true },
   { key: "period_reopen", label: "Accounting period reopen", usesThreshold: false },
   { key: "reconciliation_reopen", label: "Reconciliation reopen", usesThreshold: false },
   { key: "vendor_tax_profile", label: "Vendor tax profile change", usesThreshold: false },

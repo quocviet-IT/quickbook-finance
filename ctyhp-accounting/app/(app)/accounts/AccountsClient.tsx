@@ -66,6 +66,11 @@ import type { ZoomSpec } from "@/lib/domain/statement";
 import { formatMoney } from "@/lib/format";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import type { ChartBalances } from "@/lib/services/chart-balances";
+import CashCountsDrawer from "@/components/cash/CashCountsDrawer";
+import CountCashDialog, { type CountableAccount } from "@/components/cash/CountCashDialog";
+import { cashStandingAction } from "@/components/cash/actions";
+import { lastCountedLabel, CASH_COUNT_AMBER_DAYS, type CashStanding } from "@/lib/domain/cash-count";
+import { daysFromTo } from "@/lib/domain/bank-standing";
 import ClassifyAccountsButton from "./ClassifyAccountsButton";
 import {
   chartBalancesAction,
@@ -165,6 +170,7 @@ export default function AccountsClient({
   canWrite,
   initialAsOf,
   initialBalances,
+  initialCashStanding,
   baseCurrency,
   baseDecimals,
 }: {
@@ -176,6 +182,8 @@ export default function AccountsClient({
   initialAsOf: string;
   /** Read on the server at the company's today; null when that read failed. */
   initialBalances: ChartBalances | null;
+  /** The company's cash on hand accounts and when each was last counted; null when that read failed. */
+  initialCashStanding: CashStanding[] | null;
   baseCurrency: string;
   baseDecimals: number;
 }) {
@@ -201,6 +209,22 @@ export default function AccountsClient({
   const [requestedAsOf, setRequestedAsOf] = useState<string | null>(null);
   const latestRun = useRef(0);
   const [zoom, setZoom] = useState<ZoomSpec | null>(null);
+
+  // Cash on hand: when each account was last counted, read at the company's today.
+  const [cashStanding, setCashStanding] = useState<CashStanding[] | null>(initialCashStanding);
+  const [counting, setCounting] = useState<CountableAccount | null>(null);
+  const [viewingCounts, setViewingCounts] = useState<CountableAccount | null>(null);
+  const cashById = useMemo(() => new Map((cashStanding ?? []).map((c) => [c.accountId, c])), [cashStanding]);
+
+  async function rereadCash() {
+    try {
+      const result = await cashStandingAction(initialAsOf);
+      if (result.ok && result.data) setCashStanding(result.data.lines);
+      else setCashStanding(null);
+    } catch {
+      setCashStanding(null);
+    }
+  }
 
   const money = useCallback((minor: number) => formatMoney(minor, baseCurrency, baseDecimals), [baseCurrency, baseDecimals]);
   const inventoryAccountIds = useMemo(() => new Set(balances?.inventoryAccountIds ?? []), [balances?.inventoryAccountIds]);
@@ -365,6 +389,28 @@ export default function AccountsClient({
     </div>
   );
 
+  /** A cash on hand account's small line: when it was last counted, and the way to count it. */
+  const cashLine = (account: AccountRow) => {
+    const cash = cashById.get(account.id);
+    if (!cash) return null;
+    const age = cash.lastCountedOn ? daysFromTo(cash.lastCountedOn, initialAsOf) : null;
+    const overdue = cash.lastCountedOn ? age === null || age > CASH_COUNT_AMBER_DAYS : cash.balanceMinor !== 0;
+    const target = { id: account.id, name: account.name };
+    return (
+      <div className={styles.cashLine}>
+        {overdue ? <Tag color="orange">{lastCountedLabel(cash.lastCountedOn)}</Tag> : <span>{lastCountedLabel(cash.lastCountedOn)}</span>}
+        {canWrite ? (
+          <Button type="link" size="small" onClick={() => setCounting(target)}>
+            Count cash
+          </Button>
+        ) : null}
+        <Button type="link" size="small" onClick={() => setViewingCounts(target)}>
+          Counts
+        </Button>
+      </div>
+    );
+  };
+
   const nameCell = (account: AccountRow, depth: number) => {
     const under = [
       detailLabel(account.account_type, account.detail_type),
@@ -398,7 +444,7 @@ export default function AccountsClient({
             <Tag color={STATUS_LABELS[account.status].color}>{STATUS_LABELS[account.status].text}</Tag>
           ) : null}
         </div>
-        {balancesView ? null : secondaryLine(under)}
+        {balancesView ? cashLine(account) : secondaryLine(under)}
       </div>
     );
   };
@@ -618,6 +664,14 @@ export default function AccountsClient({
         )}
       </FilterBar>
 
+      {balancesView && cashStanding === null ? (
+        <Alert
+          type="warning"
+          showIcon
+          title="When cash was last counted could not be read. Reload the page to try again."
+        />
+      ) : null}
+
       {balancesView && balancesUnavailable ? (
         <Alert
           type="warning"
@@ -644,6 +698,19 @@ export default function AccountsClient({
       </div>
 
       <ZoomSheet spec={zoom} onClose={() => setZoom(null)} money={money} />
+
+      <CountCashDialog
+        account={counting}
+        today={initialAsOf}
+        money={money}
+        decimals={baseDecimals}
+        onClose={() => setCounting(null)}
+        onRecorded={() => {
+          void rereadCash();
+          void rereadBalances(requestedAsOf ?? asOf);
+        }}
+      />
+      <CashCountsDrawer account={viewingCounts} money={money} onClose={() => setViewingCounts(null)} />
 
       <Modal
         title={editing ? "Edit account" : "New account"}

@@ -1,0 +1,81 @@
+/*
+ * The Count cash dialog and the list of an account's counts. Every colour is a
+ * theme token, so the dark theme follows.
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.field > :global(.ant-input),
+.field > :global(.ant-select) {
+  font-weight: 400;
+}
+
+.book {
+  min-height: 22px;
+  color: var(--ob-text-body);
+}
+
+.problem {
+  color: var(--ob-money-negative);
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.variance {
+  padding: 8px 12px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-subtle);
+  color: var(--ob-text-secondary);
+  font-weight: 600;
+}
+
+.variance[data-kind="short"] {
+  color: var(--ob-money-negative);
+}
+
+.variance[data-kind="over"] {
+  color: var(--ob-text-heading);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
+.waits {
+  flex: 1 1 200px;
+  min-width: 0;
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+}
+
+/*
+ * The counts table, on a phone. Its columns are held to their measured widths
+ * below 640px and the table scrolls inside its own box while the page does not.
+ * The figure is COUNTS_MIN_WIDTH in components/cash/count-columns.ts; change one
+ * and change the other.
+ */
+@media (max-width: 640px) {
+  /* COUNTS_MIN_WIDTH */
+  .countsTable :global(.ant-table-content) > table {
+    min-width: 806px;
+  }
+}

@@ -26,6 +26,7 @@ const SOURCE_LABEL: Record<string, string> = {
   inventory: "Inventory",
   inventory_adjustment: "Stock adjustment",
   stock_count: "Stock count",
+  cash_count: "Cash count",
   depreciation: "Depreciation",
   asset_disposal: "Asset disposal",
 };
