@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite, getUserRole } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
-import { isRealIsoDate } from "@/lib/domain/balance-comparison";
+import { LOAD_FAILED, isRealIsoDate } from "@/lib/domain/balance-comparison";
 import { loadBalanceComparison, type BalanceComparisonData } from "@/lib/services/balance-comparison";
 import { reportPageContext } from "@/lib/services/report-context";
 import BalanceComparisonClient from "./BalanceComparisonClient";
@@ -25,7 +25,9 @@ export default async function BalanceComparisonPage({
   try {
     data = await loadBalanceComparison(sb, asOf);
   } catch (e) {
-    loadError = e instanceof Error ? e.message : "The balances could not be read.";
+    // The reader sees a plain sentence; the cause stays in the server log.
+    console.error("Balance comparison could not be loaded", e);
+    loadError = LOAD_FAILED;
   }
 
   return (

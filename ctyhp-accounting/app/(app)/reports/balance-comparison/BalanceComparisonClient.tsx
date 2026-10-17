@@ -1,8 +1,8 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Checkbox, DatePicker, Input, Select, Space, Tag, type TableColumnsType } from "antd";
+import { Alert, App, Button, Checkbox, DatePicker, Input, Select, Space, Tag, type InputRef, type TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
 import DataTable from "@/components/ui/DataTable";
@@ -15,6 +15,8 @@ import {
   BALANCE_BASIS_NOTE,
   COMPARISON_GROUPS,
   INACTIVE_ROW_NOTE,
+  LOAD_FAILED,
+  NO_DIFFERENCES,
   balanceComparisonHeading,
   balanceComparisonSheet,
   buildComparison,
@@ -58,15 +60,21 @@ function FigureBox({
   initialText,
   error,
   onText,
+  rowKey,
+  register,
 }: {
   label: string;
   initialText: string;
   error: string | null;
   onText: (text: string) => void;
+  /** Lets Save read the box as it stands, whether or not it has lost focus. */
+  rowKey: string;
+  register: (key: string, el: HTMLInputElement | null) => void;
 }) {
   return (
     <>
       <Input
+        ref={(r) => register(rowKey, r?.input ?? null)}
         aria-label={label}
         aria-invalid={error ? true : undefined}
         status={error ? "error" : undefined}
@@ -228,6 +236,14 @@ export default function BalanceComparisonClient({
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // The figure boxes on screen, the Compared with box and the Note box, read as they stand when Save is pressed.
+  const boxes = useRef(new Map<string, HTMLInputElement>());
+  const withRef = useRef<InputRef>(null);
+  const noteRef = useRef<InputRef>(null);
+  const registerBox = useCallback((key: string, el: HTMLInputElement | null) => {
+    if (el) boxes.current.set(key, el);
+    else boxes.current.delete(key);
+  }, []);
 
   const money = useCallback((minor: number) => formatMoney(minor, currencyCode, decimals), [currencyCode, decimals]);
 
@@ -254,7 +270,11 @@ export default function BalanceComparisonClient({
     [comparison, asOf, comparedWith, companyName, currencyCode, decimals, onlyDifferences],
   );
 
-  const lines = useMemo(() => tableLines(comparison, onlyDifferences), [comparison, onlyDifferences]);
+  const lines = useMemo(
+    () => tableLines(comparison, onlyDifferences, new Set(Object.keys(errors))),
+    [comparison, onlyDifferences, errors],
+  );
+  const nothingToShow = onlyDifferences && !lines.some((l) => l.kind === "row");
 
   const commit = useCallback(
     (row: ComparisonRow, text: string) => {
@@ -311,11 +331,43 @@ export default function BalanceComparisonClient({
 
   const save = async () => {
     setSaveError(null);
-    if (Object.keys(errors).length > 0) {
+    // Read every box as it stands: a value typed and saved without leaving the box (some browsers do not blur on a button click) still counts.
+    const withName = withRef.current?.input?.value ?? comparedWith;
+    const noteText = noteRef.current?.input?.value ?? note;
+    const nextTyped = { ...typed };
+    const nextErrors = { ...errors };
+    const nextRaw = { ...rawText };
+    for (const group of comparison.groups) {
+      for (const row of group.rows) {
+        const el = boxes.current.get(row.key);
+        if (!el) continue;
+        const parsed = parseExternalBalance(el.value, row.side, decimals);
+        nextRaw[row.key] = el.value;
+        if (parsed.ok) {
+          delete nextErrors[row.key];
+          nextTyped[row.key] = parsed.minor;
+        } else {
+          nextErrors[row.key] = parsed.error;
+          nextTyped[row.key] = null;
+        }
+      }
+    }
+    setComparedWith(withName);
+    setNote(noteText);
+    setRawText(nextRaw);
+    setTyped(nextTyped);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
       setSaveError("Some figures are not numbers. Fix the boxes marked in red, or empty them, before saving.");
       return;
     }
-    const draft = { asOf, comparedWith, note, lines: draftLines(comparison) };
+    const fresh = buildComparison({
+      accounts: data?.accounts ?? [],
+      figures: data?.figures ?? {},
+      typed: nextTyped,
+      externals,
+    });
+    const draft = { asOf, comparedWith: withName, note: noteText, lines: draftLines(fresh) };
     const problem = draftProblem(draft);
     if (problem) {
       setSaveError(problem);
@@ -328,7 +380,7 @@ export default function BalanceComparisonClient({
       setSaveError(result.error ?? "The comparison could not be saved.");
       return;
     }
-    setBaseline(draftKey(comparedWith, note, comparison));
+    setBaseline(draftKey(withName, noteText, fresh));
     message.success(result.data.message);
     router.refresh();
   };
@@ -338,8 +390,7 @@ export default function BalanceComparisonClient({
       <Alert
         type="warning"
         showIcon
-        title="The balances could not be read"
-        description={loadError ?? "Try again in a moment."}
+        title={loadError ?? LOAD_FAILED}
         action={
           <Button size="small" onClick={() => router.refresh()}>
             Try again
@@ -364,6 +415,8 @@ export default function BalanceComparisonClient({
         initialText={rawText[r.key] ?? (r.otherMinor === null ? "" : formatFigureText(r.otherMinor, decimals))}
         error={errors[r.key] ?? null}
         onText={(text) => commit(r, text)}
+        rowKey={r.key}
+        register={registerBox}
       />
     );
   };
@@ -485,6 +538,7 @@ export default function BalanceComparisonClient({
           }}
         />
         <Input
+          ref={withRef}
           aria-label="Compared with"
           prefix={<span className={paper.muted}>Compared with</span>}
           placeholder="For example, QuickBooks"
@@ -496,6 +550,7 @@ export default function BalanceComparisonClient({
           onPressEnter={(e) => e.currentTarget.blur()}
         />
         <Input
+          ref={noteRef}
           aria-label="Note"
           prefix={<span className={paper.muted}>Note</span>}
           placeholder="Optional"
@@ -559,17 +614,21 @@ export default function BalanceComparisonClient({
             onCancel={() => setAdding(false)}
           />
         ) : null}
-        <div className={paper.det}>
-          <DataTable<TableLine>
-            className={styles.comparisonTable}
-            rowKey="key"
-            pagination={false}
-            dataSource={lines}
-            columns={columns}
-            rowClassName={rowClassName}
-            emptyTitle="No accounts to compare"
-          />
-        </div>
+        {nothingToShow ? (
+          <div className={paper.empty}>{NO_DIFFERENCES}</div>
+        ) : (
+          <div className={paper.det}>
+            <DataTable<TableLine>
+              className={styles.comparisonTable}
+              rowKey="key"
+              pagination={false}
+              dataSource={lines}
+              columns={columns}
+              rowClassName={rowClassName}
+              emptyTitle="No accounts to compare"
+            />
+          </div>
+        )}
         <ReportFoot>
           {canSave
             ? "Type each figure as the other system prints it, for example 1,234.56, (1,234.56) or 1,234.56 CR. Leave a box empty when there is no figure; an empty box is never saved as zero. The difference is OneBook minus the other system."

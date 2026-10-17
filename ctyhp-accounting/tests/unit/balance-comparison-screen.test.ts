@@ -97,7 +97,16 @@ describe("the screen follows the project's rules", () => {
   it("shows a failed read as a small warning, not a broken page", () => {
     expect(page).toMatch(/catch \(e\)/);
     expect(client).toContain('type="warning"');
-    expect(client).toContain("The balances could not be read");
+    expect(client).toContain("LOAD_FAILED");
+    expect(page).toContain("console.error(");
+    expect(page).not.toMatch(/loadError = e instanceof Error/);
+  });
+
+  it("reads every box as it stands when Save is pressed, and says when Only differences has nothing", () => {
+    expect(client).toContain("boxes.current.get(row.key)");
+    expect(client).toContain("withRef.current?.input?.value");
+    expect(client).toContain("NO_DIFFERENCES");
+    expect(client).toContain("new Set(Object.keys(errors))");
   });
 
   it("imports no PDF reader into the browser", () => {

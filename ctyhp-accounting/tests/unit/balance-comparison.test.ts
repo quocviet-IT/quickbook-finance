@@ -16,7 +16,8 @@ import {
   nothingTypedMessage,
   parseExternalBalance,
   savedMessage,
-  sideOfAccount,
+  LOAD_FAILED,
+  NO_DIFFERENCES,
   sideOfGroup,
   tableLines,
   type ComparisonAccount,
@@ -126,16 +127,10 @@ describe("parseExternalBalance", () => {
 });
 
 describe("natural sign", () => {
-  it("reads liabilities, equity and income on the credit side, and assets and expenses on the debit side", () => {
-    expect(sideOfAccount(ACCOUNTS[0])).toBe("debit");
-    expect(sideOfAccount(ACCOUNTS[3])).toBe("credit");
-    expect(sideOfAccount(ACCOUNTS[5])).toBe("credit");
-    expect(sideOfAccount(ACCOUNTS[6])).toBe("credit");
-    expect(sideOfAccount(ACCOUNTS[7])).toBe("debit");
-  });
-
-  it("reads a contra account on the side opposite its type", () => {
-    expect(sideOfAccount(ACCOUNTS[2])).toBe("credit");
+  it("reads every row on its group's side, as a balance sheet prints it", () => {
+    const c = buildComparison({ accounts: ACCOUNTS, figures: FIGURES, typed: {}, externals: [] });
+    const sides = Object.fromEntries(c.groups.flatMap((g) => g.rows.map((r) => [r.accountId, r.side])));
+    expect(sides).toMatchObject({ bank: "debit", ap: "credit", cap: "credit", sales: "credit", rent: "debit", dep: "debit" });
   });
 
   it("groups other income with income and cost of goods sold with expenses", () => {
@@ -144,6 +139,57 @@ describe("natural sign", () => {
     expect(comparisonGroupOf("credit_card")).toBe("liability");
     expect(sideOfGroup("liability")).toBe("credit");
     expect(sideOfGroup("expense")).toBe("debit");
+  });
+});
+
+describe("contra accounts carry their section's sign", () => {
+  const accounts = [
+    acct("bank", "1000", "Cash", "bank"),
+    acct("dep", "1500", "Accumulated Wear", "fixed_asset", { isContra: true }),
+    acct("sales", "4000", "Sales", "income"),
+    acct("disc", "4900", "Sales Discounts", "income", { isContra: true }),
+  ];
+  // The Chart of Accounts reads a contra account on its own side: positive when it holds its usual balance.
+  const figures = { bank: 1_000_00, dep: 5_000, sales: 800_00, disc: 20_00 };
+
+  it("shows Accumulated Depreciation negative under Assets, and a contra-income account negative under Income", () => {
+    const c = buildComparison({ accounts, figures, typed: {}, externals: [] });
+    expect(c.groups[0].rows.find((r) => r.accountId === "dep")).toMatchObject({ onebookMinor: -5_000, side: "debit" });
+    expect(c.groups[3].rows.find((r) => r.accountId === "disc")).toMatchObject({ onebookMinor: -20_00, side: "credit" });
+    expect(c.groups[0].totals.onebookMinor).toBe(1_000_00 - 5_000);
+    expect(c.groups[3].totals.onebookMinor).toBe(800_00 - 20_00);
+  });
+
+  it("gives no difference when its printed negative is typed, and reads CR on the section's side", () => {
+    const typed = {
+      "a:dep": (parseExternalBalance("(50.00)", "debit") as { minor: number }).minor,
+      "a:disc": (parseExternalBalance("20.00 DR", "credit") as { minor: number }).minor,
+    };
+    expect(typed).toEqual({ "a:dep": -5_000, "a:disc": -20_00 });
+    const c = buildComparison({ accounts, figures, typed, externals: [] });
+    expect(c.groups[0].rows[1].differenceMinor).toBe(0);
+    expect(c.groups[3].rows[1].differenceMinor).toBe(0);
+    expect(c.differenceCount).toBe(0);
+    // CR on a debit-section row is negative: the same figure a balance sheet prints in brackets.
+    expect(parseExternalBalance("50.00 CR", "debit")).toEqual({ ok: true, minor: -5_000 });
+  });
+
+  it("still totals nil, debits less credits, on a balanced ledger that includes contra accounts", () => {
+    // Debits: cash 1,000.00 and rent 50.00; credits: wear 50.00 (a credit balance), capital 800.00, sales 200.00.
+    const bal = [
+      acct("bank", "1000", "Cash", "bank"),
+      acct("dep", "1500", "Accumulated Wear", "fixed_asset", { isContra: true }),
+      acct("cap", "3000", "Capital", "equity"),
+      acct("sales", "4000", "Sales", "income"),
+      acct("rent", "6000", "Rent", "expense"),
+    ];
+    const c = buildComparison({
+      accounts: bal,
+      figures: { bank: 1_000_00, dep: 50_00, cap: 800_00, sales: 200_00, rent: 50_00 },
+      typed: {},
+      externals: [],
+    });
+    expect(c.grand.onebookMinor).toBe(0);
   });
 });
 
@@ -157,13 +203,23 @@ describe("buildComparison", () => {
     expect(c.groups[0].rows.map((r) => r.code)).toEqual(["1010", "1200", "1590"]);
     expect(c.groups[1].rows.map((r) => r.code)).toEqual(["2000", "2500"]);
     const expenses = c.groups[4].rows;
-    expect(expenses.map((r) => r.code)).toEqual(["6100", "6900"]);
+    expect(expenses.map((r) => r.code)).toEqual(["6100", "6900", "6950"]); // 6950 is inactive but still holds a balance
     expect(expenses[1]).toMatchObject({ name: "Never Posted", onebookMinor: 0, otherMinor: null, differenceMinor: null });
   });
 
-  it("leaves out an inactive account unless a saved figure still points at it", () => {
-    expect(build({}).groups[4].rows.some((r) => r.accountId === "old")).toBe(false);
-    const withSaved = build({ "a:old": 10_00 });
+  it("shows an inactive account that still holds a balance, counted in the totals, and hides one at nil", () => {
+    const c = build({});
+    const old = c.groups[4].rows.find((r) => r.accountId === "old");
+    expect(old).toMatchObject({ inactive: true, onebookMinor: 15_00, otherMinor: null });
+    expect(c.groups[4].totals.onebookMinor).toBe(120_00 + 15_00);
+    const quiet = buildComparison({ accounts: ACCOUNTS, figures: { ...FIGURES, old: 0 }, typed: {}, externals: [] });
+    expect(quiet.groups[4].rows.some((r) => r.accountId === "old")).toBe(false);
+  });
+
+  it("leaves out an inactive account at nil unless a saved figure still points at it", () => {
+    const nil = { ...FIGURES, old: 0 };
+    expect(buildComparison({ accounts: ACCOUNTS, figures: nil, typed: {}, externals: [] }).groups[4].rows.some((r) => r.accountId === "old")).toBe(false);
+    const withSaved = buildComparison({ accounts: ACCOUNTS, figures: FIGURES, typed: { "a:old": 10_00 }, externals: [] });
     const row = withSaved.groups[4].rows.find((r) => r.accountId === "old")!;
     expect(row).toMatchObject({ inactive: true, onebookMinor: 15_00, otherMinor: 10_00, differenceMinor: 5_00 });
   });
@@ -180,12 +236,12 @@ describe("buildComparison", () => {
   it("totals each group and the whole report from what is shown", () => {
     const c = build({ "a:bank": 900_00, "a:ar": 250_00, "a:ap": 350_00 });
     const [assets, liabilities, equity] = c.groups;
-    expect(assets.totals).toEqual({ onebookMinor: 1_000_00 + 250_00 + 40_00, otherMinor: 1_150_00, differenceMinor: 100_00 });
+    expect(assets.totals).toEqual({ onebookMinor: 1_000_00 + 250_00 - 40_00, otherMinor: 1_150_00, differenceMinor: 100_00 });
     expect(liabilities.totals).toEqual({ onebookMinor: 2_300_00, otherMinor: 350_00, differenceMinor: -50_00 });
     expect(equity.totals).toEqual({ onebookMinor: 500_00, otherMinor: null, differenceMinor: null });
     // Debits less credits: assets and expenses minus liabilities, equity and income, each row on its own side.
     expect(c.grand).toEqual({
-      onebookMinor: 1_000_00 + 250_00 + 120_00 - (40_00 + 300_00 + 2_000_00 + 500_00 + 900_00),
+      onebookMinor: 1_000_00 + 250_00 + 120_00 + 15_00 - (40_00 + 300_00 + 2_000_00 + 500_00 + 900_00),
       otherMinor: 900_00 + 250_00 - 350_00,
       differenceMinor: 100_00 + 0 - -50_00,
     });
@@ -284,9 +340,25 @@ describe("tableLines", () => {
     expect(lines.at(-1)).toMatchObject({ grand: true, totals: c.grand });
   });
 
+  it("keeps a row whose box is in error, even though its difference is gone", () => {
+    const withError = buildComparison({ accounts: ACCOUNTS, figures: FIGURES, typed: { "a:bank": 900_00, "a:rent": null }, externals: [] });
+    const keys = tableLines(withError, true, new Set(["a:rent"])).filter((l) => l.kind === "row").map((l) => l.key);
+    expect(keys).toEqual(["a:bank", "a:rent"]);
+    expect(tableLines(withError, true).filter((l) => l.kind === "row").map((l) => l.key)).toEqual(["a:bank"]);
+    // Without the filter every row is there anyway.
+    expect(tableLines(withError, false, new Set(["a:rent"])).filter((l) => l.kind === "row").length).toBeGreaterThan(2);
+  });
+
   it("is just the grand total when nothing differs", () => {
     const none = buildComparison({ accounts: ACCOUNTS, figures: FIGURES, typed: {}, externals: [] });
     expect(tableLines(none, true)).toHaveLength(1);
+  });
+});
+
+describe("the words for an empty filter and a failed load", () => {
+  it("says them plainly", () => {
+    expect(NO_DIFFERENCES).toBe("No differences to show.");
+    expect(LOAD_FAILED).toBe("The comparison could not be loaded. Try again in a moment.");
   });
 });
 

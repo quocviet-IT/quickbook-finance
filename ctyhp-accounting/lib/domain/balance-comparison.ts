@@ -11,7 +11,7 @@
  * credit side. The typed figure is read in the same sign, so the difference is
  * a plain subtraction.
  */
-import { accountNormalBalance, type AccountType, type NormalBalance } from "./accounts";
+import type { AccountType, NormalBalance } from "./accounts";
 import { chartClassOf, type ChartClass } from "./chart-groups";
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
@@ -43,11 +43,6 @@ export function comparisonGroupOf(type: AccountType): ComparisonGroup {
 /** The side an account that exists only in the other system is read on, from the group chosen for it. */
 export function sideOfGroup(group: ComparisonGroup): NormalBalance {
   return group === "asset" || group === "expense" ? "debit" : "credit";
-}
-
-/** The side an account's balance normally sits on, the contra rule included. */
-export function sideOfAccount(account: Pick<ComparisonAccount, "type" | "isContra">): NormalBalance {
-  return accountNormalBalance(account.type, account.isContra);
 }
 
 /* ------------------------------------------------------------------ parser */
@@ -208,6 +203,12 @@ export function savedMessage(count: number, asOf: string): string {
   return `Saved ${count} ${count === 1 ? "figure" : "figures"} for ${shortDate(asOf)}.`;
 }
 
+/** What Only differences says when no row differs. */
+export const NO_DIFFERENCES = "No differences to show.";
+
+/** What the page says when the comparison could not be read; the cause is logged on the server. */
+export const LOAD_FAILED = "The comparison could not be loaded. Try again in a moment.";
+
 export const INACTIVE_ROW_NOTE = "This account is inactive; its figure is not saved again.";
 
 /* ---------------------------------------------------------------- rows */
@@ -334,7 +335,7 @@ function totalsOf(rows: readonly ComparisonRow[], debitsLessCredits = false): Co
 
 export interface BuildInput {
   accounts: readonly ComparisonAccount[];
-  /** OneBook's natural balance by account id; an account never posted to is absent and reads as nil. */
+  /** OneBook's balance by account id as the Chart of Accounts reads it (a contra account on its own side); an account never posted to is absent and reads as nil. */
   figures: Readonly<Record<string, number>>;
   /** The typed figure by row key; a missing key or null is "no figure". */
   typed: Readonly<Record<string, number | null | undefined>>;
@@ -364,7 +365,9 @@ export function buildComparison(input: BuildInput): Comparison {
   const byGroup = new Map<ComparisonGroup, ComparisonRow[]>(COMPARISON_GROUPS.map((g) => [g.key, []]));
   for (const account of input.accounts) {
     const key = accountRowKey(account.id);
-    if (!account.active && typeof input.typed[key] !== "number") continue;
+    const balance = input.figures[account.id] ?? 0;
+    // An inactive account is shown while a saved figure points at it or it still holds a balance.
+    if (!account.active && typeof input.typed[key] !== "number" && balance === 0) continue;
     const group = comparisonGroupOf(account.type);
     byGroup.get(group)!.push(
       make(
@@ -374,11 +377,15 @@ export function buildComparison(input: BuildInput): Comparison {
           code: account.code,
           name: account.name,
           group,
-          side: sideOfAccount(account),
+          // Every row is read on its group's side, as a balance sheet prints it.
+          side: sideOfGroup(group),
           external: false,
           inactive: !account.active,
         },
-        input.figures[account.id] ?? 0,
+        // `figures` reads a contra account on its own side (the Chart of
+        // Accounts convention); here it carries its section's sign, so
+        // Accumulated Depreciation is negative under Assets.
+        account.isContra ? -balance : balance,
       ),
     );
   }
@@ -425,17 +432,23 @@ export type TableLine =
   | { kind: "row"; key: string; row: ComparisonRow }
   | { kind: "total"; key: string; label: string; totals: ComparisonTotals; grand: boolean };
 
+export const GRAND_TOTAL_LABEL = "Debits less credits";
+
 /**
  * The lines the table draws, in order: a heading, its accounts, its total, for
  * each group, then the whole-report total. "Only differences" keeps just the
- * rows that differ, drops a group with none, and keeps the totals whole.
+ * rows that differ, and any row whose box is in error (`errorKeys`), so a figure
+ * that does not read never disappears with its message; it drops a group with
+ * none, and keeps the totals whole.
  */
-export const GRAND_TOTAL_LABEL = "Debits less credits";
-
-export function tableLines(comparison: Comparison, onlyDifferences: boolean): TableLine[] {
+export function tableLines(
+  comparison: Comparison,
+  onlyDifferences: boolean,
+  errorKeys: ReadonlySet<string> = new Set(),
+): TableLine[] {
   const lines: TableLine[] = [];
   for (const group of comparison.groups) {
-    const rows = onlyDifferences ? group.rows.filter(rowDiffers) : group.rows;
+    const rows = onlyDifferences ? group.rows.filter((r) => rowDiffers(r) || errorKeys.has(r.key)) : group.rows;
     if (rows.length === 0) continue;
     lines.push({ kind: "heading", key: `h:${group.key}`, label: group.title });
     for (const row of rows) lines.push({ kind: "row", key: row.key, row });
