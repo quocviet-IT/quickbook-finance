@@ -62,6 +62,20 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.20",
+    date: "2026-10-17",
+    headline: "Status tags keep their whole border.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Long statuses no longer run past their border",
+        detail:
+          "On Invoices, Bills, Credit Memos, Vendor Credits, Payments, Pay Bills and Purchase Orders, a status such as Partially paid, Partially applied or Partially received ran past the right edge of its tag, which looked broken. The status column is wider, so these fit whole, and where a column is still too narrow the word is shortened inside a complete border; point at it to read it in full.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "2.19",
     date: "2026-10-17",
     headline: "Every status reads the same way, and every button is written the same way.",

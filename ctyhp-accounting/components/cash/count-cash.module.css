@@ -76,6 +76,6 @@
 @media (max-width: 640px) {
   /* COUNTS_MIN_WIDTH */
   .countsTable :global(.ant-table-content) > table {
-    min-width: 806px;
+    min-width: 842px;
   }
 }

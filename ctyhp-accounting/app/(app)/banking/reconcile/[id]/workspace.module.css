@@ -32,7 +32,7 @@
 
   /* LEDGER_LINES_MIN_WIDTH. */
   .ledgerLines :global(.ant-table-content) > table {
-    min-width: 1016px;
+    min-width: 1088px;
   }
 
   /* ADD_MISSING_MIN_WIDTH. */
