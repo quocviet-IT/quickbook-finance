@@ -43,6 +43,8 @@ export const ACTIVITY_ENTITIES: Record<
   // Cash on hand counts (feat/cash-count, migration 0154). Listed here so that
   // branch's entry in lib/services/dashboard.ts has a home once both merge.
   acc_cash_count: { entity: "Cash count", href: "/accounts", category: "banking" },
+  acc_balance_comparison: { entity: "Balance comparison", href: "/reports/balance-comparison", category: "close" },
+  acc_balance_comparison_line: { entity: "Balance comparison line", href: "/reports/balance-comparison", category: "close" },
   acc_bank_account: { entity: "Bank account", href: "/banking", category: "banking" },
   acc_account: { entity: "Account", href: "/settings/audit", category: "other" },
   acc_item: { entity: "Product or service", href: "/items", category: "inventory" },
