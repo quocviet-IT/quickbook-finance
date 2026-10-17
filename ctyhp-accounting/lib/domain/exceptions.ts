@@ -1,5 +1,5 @@
 /**
- * The twelve checks a reviewer runs by hand.
+ * The thirteen checks a reviewer runs by hand.
  *
  * From the client's prototype: "None of these is proof of an error. Each is a
  * question worth answering." Nothing here accuses; each check raises a
@@ -50,12 +50,24 @@ import {
   type NamedStatementOverride,
 } from "@/lib/domain/statement-overrides";
 import { shortDate } from "@/lib/domain/report-presets";
+import {
+  groupReconciliationChanges,
+  type ChangedReconciliation,
+  type ReconciliationChange,
+  reconciliationChangeSentences,
+} from "@/lib/domain/reconciliation-changes";
+import {
+  candidateNote,
+  checkTransfers,
+  destinationSentence,
+  type TransferRow,
+} from "@/lib/domain/transfer-legs";
 
 /** Re-exported so a caller needs one import to build the input, not three. */
 export type { LedgerBalance, TransactionListRow };
 
 /**
- * The twelve, named once.
+ * The thirteen, named once.
  *
  * The screen draws its section headings from here and the service names a
  * failed read from here, so a check cannot be called two different things in
@@ -74,6 +86,7 @@ export const CHECK_LABEL = {
   belowZero: "Bank accounts below zero since their last statement",
   noLongerAgree: "Reconciliations that no longer agree",
   statementOverride: "Statements imported out of balance",
+  transferOneSide: "Transfers cleared on one side only",
 } as const;
 
 export type CheckKey = keyof typeof CHECK_LABEL;
@@ -320,43 +333,123 @@ export function unreconciledBankAccounts(
   return rows.sort((x, y) => x.accountName.localeCompare(y.accountName));
 }
 
-export interface NoLongerAgreeRow {
-  bankAccountId: string;
+/** A completed reconciliation that has changed since it was signed off, with its bank account's name. */
+export interface NoLongerAgreeRow extends ChangedReconciliation {
   accountName: string;
-  /** Entries ticked on a completed reconciliation and voided since. */
-  entryCount: number;
-  amountMinor: number;
-  /** The completed reconciliation they were ticked on. */
-  reconciliationDate: string | null;
 }
 
 /**
- * Reconciliations whose ticked entries were voided afterwards.
+ * Completed reconciliations that no longer agree: one row each, with every
+ * change made to it since sign-off (voided, reversed, posted afterwards, or a
+ * total that no longer adds up).
  *
- * One row per bank account with at least one such entry, named from the bank
- * accounts it is joined to; a standing row for an account that is not in the
- * list has no name to show and is left out.
+ * Named from the bank accounts it is joined to; a reconciliation of an account
+ * that is not in the list has no name to show and is left out. `asOf` leaves
+ * out reconciliations whose statement ends after the report date.
  */
 export function reconciliationsNoLongerAgreeing(
   banks: readonly ExceptionBankAccount[],
-  standing: readonly BankStanding[],
+  changes: readonly ReconciliationChange[],
+  asOf?: string,
 ): NoLongerAgreeRow[] {
   const nameById = new Map(banks.map((b) => [b.bankAccountId, b.accountName]));
   const rows: NoLongerAgreeRow[] = [];
-  for (const x of standing) {
-    const accountName = nameById.get(x.bankAccountId);
-    if (accountName === undefined || x.voidTickedCount <= 0) continue;
-    rows.push({
-      bankAccountId: x.bankAccountId,
-      accountName,
-      entryCount: x.voidTickedCount,
-      amountMinor: x.voidTickedMinor,
-      reconciliationDate: x.voidReconciliationDate,
-    });
+  for (const rec of groupReconciliationChanges(changes, asOf)) {
+    const accountName = nameById.get(rec.bankAccountId);
+    if (accountName !== undefined) rows.push({ ...rec, accountName });
   }
   return rows.sort(
-    (a, b) => a.accountName.localeCompare(b.accountName) || a.bankAccountId.localeCompare(b.bankAccountId),
+    (a, b) =>
+      a.accountName.localeCompare(b.accountName) ||
+      a.statementEndingDate.localeCompare(b.statementEndingDate) ||
+      a.reconciliationId.localeCompare(b.reconciliationId),
   );
+}
+
+/** One transfer cleared on one side only, with its accounts named. */
+export interface TransferOneSideRow {
+  entryId: string;
+  entryNumber: string;
+  entryDate: string;
+  amountMinor: number;
+  clearedBankAccountId: string;
+  clearedAccountName: string;
+  clearedStatementDate: string;
+  openBankAccountId: string;
+  openAccountName: string;
+  /** The account the money most likely went to; null when no other account shows it. */
+  destinationName: string | null;
+  candidateCount: number;
+}
+
+/** A transfer that a later entry corrected, named and with where the money went. */
+export interface CorrectedTransferRow {
+  entryId: string;
+  entryNumber: string;
+  entryDate: string;
+  amountMinor: number;
+  correctingEntryId: string;
+  correctingEntryNumber: string;
+  movedToName: string;
+}
+
+/** What the transfer check set aside, for its note. */
+export interface TransferSummary {
+  /** Transfers with an open leg whose statements do not yet reach the entry date. */
+  notYetCheckable: number;
+  corrected: CorrectedTransferRow[];
+  /** Entries with more than two bank lines. */
+  skipped: number;
+}
+
+const UNNAMED_BANK_ACCOUNT = "A bank account not on the list";
+
+/**
+ * Transfers whose two legs did not clear on both statements, from the rows of
+ * `acc_transfer_legs()`. `today` is the company's, supplied by the caller.
+ */
+export function transfersClearedOnOneSide(
+  banks: readonly ExceptionBankAccount[],
+  rows: readonly TransferRow[],
+  today: string,
+): { rows: TransferOneSideRow[]; summary: TransferSummary } {
+  const nameById = new Map(banks.map((b) => [b.bankAccountId, b.accountName]));
+  const nameOf = (id: string) => nameById.get(id) ?? UNNAMED_BANK_ACCOUNT;
+  const check = checkTransfers(rows, today);
+  return {
+    rows: check.flagged.map((f) => ({
+      entryId: f.entryId,
+      entryNumber: f.entryNumber,
+      entryDate: f.entryDate,
+      amountMinor: f.amountMinor,
+      clearedBankAccountId: f.clearedBankAccountId,
+      clearedAccountName: nameOf(f.clearedBankAccountId),
+      clearedStatementDate: f.clearedStatementDate,
+      openBankAccountId: f.openBankAccountId,
+      openAccountName: nameOf(f.openBankAccountId),
+      destinationName: f.destination ? nameOf(f.destination.bankAccountId) : null,
+      candidateCount: f.candidateCount,
+    })),
+    summary: {
+      notYetCheckable: check.notYetCheckable,
+      skipped: check.skipped,
+      corrected: check.corrected.map((c) => ({
+        entryId: c.entryId,
+        entryNumber: c.entryNumber,
+        entryDate: c.entryDate,
+        amountMinor: c.amountMinor,
+        correctingEntryId: c.correctingEntryId,
+        correctingEntryNumber: c.correctingEntryNumber,
+        movedToName: nameOf(c.movedToBankAccountId),
+      })),
+    },
+  };
+}
+
+/** A flagged transfer as one sentence, for the export. */
+export function transferOneSideSentence(row: TransferOneSideRow): string {
+  const found = candidateNote(row.candidateCount);
+  return `${row.entryNumber} cleared on ${row.clearedAccountName} (${shortDate(row.clearedStatementDate)} statement) and not on ${row.openAccountName}. ${destinationSentence(row.destinationName)}${found ? ` (${found})` : ""}.`;
 }
 
 const INCOME_TYPES: ReadonlySet<AccountType> = new Set<AccountType>(["income", "other_income"]);
@@ -612,9 +705,19 @@ export interface ExceptionReportInput {
   statementAlerts?: readonly BankAccountAlerts[];
   /**
    * Each bank account's standing at `to`. Left out (or empty), the "not agreed"
-   * rows carry no since figures and the voided-tick check finds nothing.
+   * rows carry no since figures.
    */
   bankStanding?: readonly BankStanding[];
+  /**
+   * Every change made to a completed reconciliation since it was signed off, as
+   * `acc_reconciliation_changes()` returns them. Left out, the check finds nothing.
+   */
+  reconciliationChanges?: readonly ReconciliationChange[];
+  /**
+   * The legs of every transfer between two bank accounts, as `acc_transfer_legs()`
+   * returns them. Left out, the check finds nothing.
+   */
+  transferRows?: readonly TransferRow[];
   /**
    * Every statement imported out of balance and not undone, open and settled,
    * as `acc_statement_overrides()` returns them. Only the open ones are listed.
@@ -633,7 +736,7 @@ export interface ExceptionReportInput {
 export interface ExceptionReport {
   entriesExamined: number;
   questionsRaised: number;
-  checksRun: 12;
+  checksRun: 13;
   unavailable: CheckKey[];
   duplicates: DuplicateGroup[];
   checkNumberClashes: CheckNumberClash[];
@@ -647,6 +750,9 @@ export interface ExceptionReport {
   belowZero: BelowZeroRow[];
   noLongerAgree: NoLongerAgreeRow[];
   statementOverride: StatementOverrideRow[];
+  transferOneSide: TransferOneSideRow[];
+  /** What the transfer check set aside: not yet checkable, corrected, skipped. */
+  transferSummary: TransferSummary;
 }
 
 /**
@@ -672,7 +778,7 @@ function referencesByEntry(
   return out;
 }
 
-/** Run all twelve. Nothing here reads a clock, a database or a file. */
+/** Run all thirteen. Nothing here reads a clock, a database or a file. */
 export function buildExceptionReport(input: ExceptionReportInput): ExceptionReport {
   const balanceByAccountId = new Map<string, number>(
     input.accounts.map((a) => [a.accountId, signedBalance(a)]),
@@ -695,7 +801,12 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
   const holding = holdingAccounts(input.accounts);
   const statementBalance = statementBalanceRows(input.statementAlerts ?? []);
   const belowZero = belowZeroRows(input.statementAlerts ?? []);
-  const noLongerAgree = reconciliationsNoLongerAgreeing(input.bankAccounts, input.bankStanding ?? []);
+  const noLongerAgree = input.unavailable.includes("noLongerAgree")
+    ? []
+    : reconciliationsNoLongerAgreeing(input.bankAccounts, input.reconciliationChanges ?? [], input.to);
+  const transfers = input.unavailable.includes("transferOneSide")
+    ? { rows: [], summary: { notYetCheckable: 0, corrected: [], skipped: 0 } }
+    : transfersClearedOnOneSide(input.bankAccounts, input.transferRows ?? [], input.today);
   const statementOverride = input.unavailable.includes("statementOverride")
     ? []
     : openStatementOverrides(input.statementOverrides ?? [], input.bankAccounts, input.timeZone ?? DEFAULT_TIME_ZONE);
@@ -714,8 +825,9 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
       statementBalance.length +
       belowZero.length +
       noLongerAgree.length +
-      statementOverride.length,
-    checksRun: 12,
+      statementOverride.length +
+      transfers.rows.length,
+    checksRun: 13,
     unavailable: [...input.unavailable],
     duplicates,
     checkNumberClashes,
@@ -729,6 +841,8 @@ export function buildExceptionReport(input: ExceptionReportInput): ExceptionRepo
     belowZero,
     noLongerAgree,
     statementOverride,
+    transferOneSide: transfers.rows,
+    transferSummary: transfers.summary,
   };
 }
 
@@ -879,11 +993,11 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
     "noLongerAgree",
     report.noLongerAgree.map((r) => ({
       check: CHECK_LABEL.noLongerAgree,
-      date: r.reconciliationDate ?? "",
-      type: "Voided after reconciliation",
-      name: r.entryCount === 1 ? "1 entry" : `${r.entryCount} entries`,
+      date: r.statementEndingDate,
+      type: "Changed after sign-off",
+      name: reconciliationChangeSentences(r, sentenceMoney).join(" "),
       account: r.accountName,
-      amount: money(r.amountMinor),
+      amount: null,
     })),
   );
 
@@ -896,6 +1010,18 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       name: statementOverrideSentence(r, sentenceMoney),
       account: r.accountName,
       amount: money(r.outByMinor),
+    })),
+  );
+
+  add(
+    "transferOneSide",
+    report.transferOneSide.map((r) => ({
+      check: CHECK_LABEL.transferOneSide,
+      date: r.entryDate,
+      type: "Cleared on one side only",
+      name: transferOneSideSentence(r),
+      account: r.openAccountName,
+      amount: money(r.amountMinor),
     })),
   );
 

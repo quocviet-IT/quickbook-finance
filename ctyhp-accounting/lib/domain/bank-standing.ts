@@ -8,6 +8,7 @@
  */
 import type { Tone } from "@/lib/design/tone";
 import { shortDate } from "@/lib/domain/report-presets";
+import { groupReconciliationChanges, type ReconciliationChange } from "@/lib/domain/reconciliation-changes";
 
 /** Days after the last agreed statement at which an account turns amber. */
 export const STANDING_AMBER_DAYS = 60;
@@ -29,6 +30,16 @@ export interface BankStanding {
   voidTickedMinor: number;
   voidReconciliationDate: string | null;
   bookMinor: number;
+  /**
+   * How many completed reconciliations of the account have changed since they
+   * were signed off (a void, a reversal, an entry posted afterwards, or a total
+   * that no longer adds up), counted as the Exceptions check counts them. Left
+   * out when the changes were not read; the badge then falls back to the
+   * voided-entry count above.
+   */
+  changedReconciliations?: number;
+  /** The statement date of the latest of them; null when there are none. */
+  changedStatementDate?: string | null;
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -96,9 +107,45 @@ function toneForAge(ageDays: number): StandingTone {
   return "positive";
 }
 
+/** The badge's line when the changes were read: it counts the reconciliations the Exceptions check lists. */
+function changedLine(count: number, latestDate: string | null): string | null {
+  if (count <= 0) return null;
+  if (count === 1) {
+    return `No longer agrees: the ${latestDate ? `${shortDate(latestDate)} ` : ""}reconciliation has changed since it was signed off`;
+  }
+  return `No longer agrees: ${count} reconciliations have changed since they were signed off`;
+}
+
+/**
+ * Put the changes to completed reconciliations on each account's standing, so
+ * the badge counts the same reconciliations as the Exceptions check. An account
+ * with none gets a count of 0, which hides the badge.
+ */
+export function withReconciliationChanges(
+  standings: readonly BankStanding[],
+  changes: readonly ReconciliationChange[],
+  asOf: string,
+): BankStanding[] {
+  const latest = new Map<string, { count: number; date: string }>();
+  for (const rec of groupReconciliationChanges(changes, asOf)) {
+    const seen = latest.get(rec.bankAccountId);
+    latest.set(rec.bankAccountId, {
+      count: (seen?.count ?? 0) + 1,
+      date: seen && seen.date > rec.statementEndingDate ? seen.date : rec.statementEndingDate,
+    });
+  }
+  return standings.map((s) => ({
+    ...s,
+    changedReconciliations: latest.get(s.bankAccountId)?.count ?? 0,
+    changedStatementDate: latest.get(s.bankAccountId)?.date ?? null,
+  }));
+}
+
 export function describeStanding(s: BankStanding, asOf: string, money: Money): StandingView {
   const noLongerAgrees =
-    s.voidTickedCount > 0
+    s.changedReconciliations !== undefined
+      ? changedLine(s.changedReconciliations, s.changedStatementDate ?? null)
+      : s.voidTickedCount > 0
       ? `No longer agrees: ${entries(s.voidTickedCount)} ticked on ${
           s.voidReconciliationDate ? `the ${shortDate(s.voidReconciliationDate)}` : "a completed"
         } reconciliation ${s.voidTickedCount === 1 ? "was" : "were"} voided (${money(s.voidTickedMinor)})`

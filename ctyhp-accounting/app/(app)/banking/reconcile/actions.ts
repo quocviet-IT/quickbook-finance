@@ -19,7 +19,7 @@ import {
 } from "@/lib/services/bankrec";
 import type { StatementReconciliationRow } from "@/lib/db/types";
 import type { BankStanding } from "@/lib/domain/bank-standing";
-import { getBankStanding } from "@/lib/services/bank-standing";
+import { getBankStandingWithChanges } from "@/lib/services/bank-standing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { matchAfterCompletion, type CompletionMatching } from "@/lib/services/statement-bank-lines";
 import {
@@ -130,7 +130,7 @@ export async function bankStandingAction(bankAccountId: string): Promise<ActionR
   try {
     const sb = await createSupabaseServerClient();
     const { asOf } = await getBankingContext(sb);
-    const standings = await getBankStanding(sb, asOf);
+    const standings = await getBankStandingWithChanges(sb, asOf);
     return { ok: true, data: standings.find((s) => s.bankAccountId === bankAccountId) ?? null };
   }
   catch (e) { return { ok: false, error: msg(e) }; }

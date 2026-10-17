@@ -27,7 +27,7 @@ import type { ZoomSpec } from "@/lib/domain/statement";
 import { zoomSpecProblem, type ZoomResult } from "@/lib/domain/zoom";
 import { getZoom } from "@/lib/services/zoom";
 import { balanceSheetBanks, type BalanceSheetBank } from "@/lib/domain/bank-standing";
-import { getBankStanding } from "@/lib/services/bank-standing";
+import { getBankStandingWithChanges } from "@/lib/services/bank-standing";
 import { getBelowZeroBankAccounts, readBankAccounts } from "@/lib/services/statement-alerts";
 
 export interface ActionResult<T> {
@@ -154,7 +154,7 @@ export async function balanceSheetBanksAction(asOf: string): Promise<ActionResul
     if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return { ok: false, error: "The date is not valid" };
     const sb = await createSupabaseServerClient();
     const [standings, belowZero, banks] = await Promise.all([
-      getBankStanding(sb, asOf),
+      getBankStandingWithChanges(sb, asOf),
       getBelowZeroBankAccounts(sb, asOf),
       readBankAccounts(sb),
     ]);

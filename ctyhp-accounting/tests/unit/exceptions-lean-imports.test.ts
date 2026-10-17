@@ -10,7 +10,12 @@ import { describe, expect, it } from "vitest";
  * the PDF modules.
  */
 describe("the domain the Exceptions screen ships to the browser", () => {
-  for (const path of ["lib/domain/exceptions.ts", "lib/domain/statement-overrides.ts"]) {
+  for (const path of [
+    "lib/domain/exceptions.ts",
+    "lib/domain/statement-overrides.ts",
+    "lib/domain/reconciliation-changes.ts",
+    "lib/domain/transfer-legs.ts",
+  ]) {
     it(`${path} imports no PDF statement module`, () => {
       const source = readFileSync(join(process.cwd(), path), "utf8");
       expect(source).not.toMatch(/from\s+["'][^"']*pdf-statement/);

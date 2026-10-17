@@ -36,6 +36,7 @@ import {
   type IncomeNoCostRow,
   type NoLongerAgreeRow,
   type StatementOverrideRow,
+  type TransferOneSideRow,
   type TransactionListRow,
   type UnreconciledRow,
   type WrongWayRow,
@@ -43,7 +44,18 @@ import {
 import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/lib/domain/statement-alerts";
 import { CLEARING_WHY, CLEARING_FIFO_NOTE, LEFT_STANDING } from "@/lib/domain/clearing-accounts";
 import { ToneBadge } from "@/lib/design/tone";
+import { reconciliationChangeSentences } from "@/lib/domain/reconciliation-changes";
+import { candidateNote, correctedSentence, destinationSentence, transferNote } from "@/lib/domain/transfer-legs";
 import { CLEARING_TAG_WIDTH } from "./clearing-columns";
+import {
+  CHANGED_ACCOUNT_FLOOR,
+  CHANGED_SENTENCES_FLOOR,
+  CHANGED_STATEMENT_WIDTH,
+  TRANSFER_CLEARED_FLOOR,
+  TRANSFER_DESTINATION_FLOOR,
+  TRANSFER_ENTRY_WIDTH,
+  TRANSFER_OPEN_FLOOR,
+} from "./integrity-columns";
 import {
   OVERRIDE_ACCOUNT_FLOOR,
   OVERRIDE_BY_FLOOR,
@@ -54,6 +66,7 @@ import {
 } from "./override-columns";
 import clearingStyles from "./clearing-table.module.css";
 import overridesStyles from "./overrides-table.module.css";
+import integrityStyles from "./integrity-tables.module.css";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -89,7 +102,7 @@ function sentenceColumn<T>(spec: FlexColumnSpec<T>) {
 /**
  * The Exception Report, laid out as the client's prototype lays it out
  * (`reportExceptions` in Accounting-System-v3.html): a period picker, the
- * report on paper under its heading, three figures, then the twelve checks —
+ * report on paper under its heading, three figures, then the thirteen checks —
  * each with its question, why it matters, and what it found. Every section is
  * drawn, including the ones with nothing in them, because a reviewer has to see
  * that a check ran. Clicking a line opens the entry behind it in a side sheet.
@@ -477,30 +490,43 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.noLongerAgree}
-          note={plural(r.noLongerAgree.length, "account", "accounts")}
+          note={plural(r.noLongerAgree.length, "reconciliation", "reconciliations")}
           state={state("noLongerAgree", r.noLongerAgree.length)}
-          why="Entries ticked on a completed reconciliation were voided afterwards, so the reconciliation no longer agrees with the books."
+          why="A completed reconciliation changed after it was signed off: an entry ticked on it was voided or reversed, an entry dated inside its period was posted afterwards, or its saved total no longer adds up. Each line says what changed."
         >
-          <DataTable<NoLongerAgreeRow>
-            rowKey="bankAccountId"
-            pagination={false}
-            dataSource={r.noLongerAgree}
-            columns={[
-              flexColumn<NoLongerAgreeRow>({
-                title: "Bank account",
-                key: "account",
-                render: (_, row) => <Link href={reconcileHref(row.bankAccountId)}>{row.accountName}</Link>,
-              }),
-              {
-                title: "Reconciliation",
-                key: "reconciliation",
-                width: 140,
-                render: (_, row) => (row.reconciliationDate ? shortDate(row.reconciliationDate) : "—"),
-              },
-              { title: "Entries voided", key: "entries", width: 130, align: "right", render: (_, row) => row.entryCount },
-              { title: "Amount", key: "amount", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.amountMinor) },
-            ]}
-          />
+          <div className={integrityStyles.changedTable}>
+            <DataTable<NoLongerAgreeRow>
+              rowKey="reconciliationId"
+              pagination={false}
+              dataSource={r.noLongerAgree}
+              columns={[
+                sentenceColumn<NoLongerAgreeRow>({
+                  title: "Bank account",
+                  key: "account",
+                  floor: CHANGED_ACCOUNT_FLOOR,
+                  render: (_, row) => <Link href={reconcileHref(row.bankAccountId)}>{row.accountName}</Link>,
+                }),
+                {
+                  title: "Statement",
+                  key: "statement",
+                  width: CHANGED_STATEMENT_WIDTH,
+                  render: (_, row) => shortDate(row.statementEndingDate),
+                },
+                sentenceColumn<NoLongerAgreeRow>({
+                  title: "What changed",
+                  key: "changes",
+                  floor: CHANGED_SENTENCES_FLOOR,
+                  render: (_, row) => (
+                    <>
+                      {reconciliationChangeSentences(row, money).map((sentence) => (
+                        <div key={sentence}>{sentence}</div>
+                      ))}
+                    </>
+                  ),
+                }),
+              ]}
+            />
+          </div>
         </ReportSection>
 
         <ReportSection
@@ -664,6 +690,86 @@ export default function ExceptionsClient({
           />
           </div>
         </ReportSection>
+
+        <ReportSection
+          title={CHECK_LABEL.transferOneSide}
+          note={transferNote({
+            flagged: r.transferOneSide,
+            notYetCheckable: r.transferSummary.notYetCheckable,
+            corrected: r.transferSummary.corrected,
+            skipped: r.transferSummary.skipped,
+          })}
+          state={state("transferOneSide", r.transferOneSide.length)}
+          why="A transfer has two legs, one on each bank account’s statement. One leg cleared and the other did not, although that account’s statements already cover the date and the transfer is more than 30 days old. The money may have gone somewhere else; the last column says where another account shows it. A transfer a later entry has already moved on is counted as corrected, not listed."
+        >
+          <div className={integrityStyles.transferTable}>
+            <DataTable<TransferOneSideRow>
+              rowKey="entryId"
+              pagination={false}
+              dataSource={r.transferOneSide}
+              columns={[
+                {
+                  title: "Entry",
+                  key: "entry",
+                  width: TRANSFER_ENTRY_WIDTH,
+                  render: (_, row) => (
+                    <span>
+                      <Button type="link" size="small" style={{ padding: 0, height: "auto" }} onClick={() => setOpenEntry(row.entryId)}>
+                        {row.entryNumber}
+                      </Button>
+                      <br />
+                      <span className={styles.muted}>{shortDate(row.entryDate)}</span>
+                    </span>
+                  ),
+                },
+                { title: "Amount", key: "amount", width: COLUMN.MONEY_WIDE, align: "right", render: (_, row) => money(row.amountMinor) },
+                sentenceColumn<TransferOneSideRow>({
+                  title: "Cleared on",
+                  key: "cleared",
+                  floor: TRANSFER_CLEARED_FLOOR,
+                  render: (_, row) => (
+                    <span>
+                      {row.clearedAccountName}
+                      <br />
+                      <span className={styles.muted}>{shortDate(row.clearedStatementDate)} statement</span>
+                    </span>
+                  ),
+                }),
+                sentenceColumn<TransferOneSideRow>({
+                  title: "Not cleared on",
+                  key: "open",
+                  floor: TRANSFER_OPEN_FLOOR,
+                  render: (_, row) => row.openAccountName,
+                }),
+                sentenceColumn<TransferOneSideRow>({
+                  title: "Where it went",
+                  key: "destination",
+                  floor: TRANSFER_DESTINATION_FLOOR,
+                  render: (_, row) => (
+                    <span>
+                      {destinationSentence(row.destinationName)}
+                      {candidateNote(row.candidateCount) ? (
+                        <>
+                          <br />
+                          <span className={styles.muted}>{candidateNote(row.candidateCount)}</span>
+                        </>
+                      ) : null}
+                    </span>
+                  ),
+                }),
+              ]}
+            />
+          </div>
+          {r.transferSummary.corrected.length > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              {r.transferSummary.corrected.map((c) => (
+                <div key={c.entryId} className={styles.muted}>
+                  {correctedSentence(c, c.movedToName, money)}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </ReportSection>
       </>
     );
   };
@@ -706,7 +812,7 @@ export default function ExceptionsClient({
           {loading ? (
             <Space orientation="vertical" size={12}>
               <Spin size="large" />
-              <span className={styles.muted}>Running twelve checks over the books…</span>
+              <span className={styles.muted}>Running thirteen checks over the books…</span>
             </Space>
           ) : (
             <span className={styles.muted}>The report has not been run.</span>
