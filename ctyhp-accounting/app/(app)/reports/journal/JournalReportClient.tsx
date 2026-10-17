@@ -21,6 +21,7 @@ const SOURCES = [
   "bill_payment",
   "tax_payment",
   "stock_count",
+  "cash_count",
 ];
 
 interface Props {

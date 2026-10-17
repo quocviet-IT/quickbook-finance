@@ -15,6 +15,7 @@ describe("the domain the Exceptions screen ships to the browser", () => {
     "lib/domain/statement-overrides.ts",
     "lib/domain/reconciliation-changes.ts",
     "lib/domain/transfer-legs.ts",
+    "lib/domain/cash-count.ts",
   ]) {
     it(`${path} imports no PDF statement module`, () => {
       const source = readFileSync(join(process.cwd(), path), "utf8");

@@ -23,7 +23,8 @@ export type JournalSource =
   | "inventory_adjustment"
   | "depreciation"
   | "asset_disposal"
-  | "stock_count";
+  | "stock_count"
+  | "cash_count";
 export type JournalStatus = "posted" | "void";
 export type AppRole = "admin" | "accountant" | "sales" | "viewer";
 

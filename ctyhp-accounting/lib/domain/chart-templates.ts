@@ -152,6 +152,7 @@ const RETAIL_JEWELRY: readonly TemplateAccount[] = [
   opex("6900", "Bad Debt Expense", "expense", { system: true, cashFlowRole: "operating" }),
   // Other Expenses
   oexp("7500", "Other Expenses", "other_expense", { system: true, cashFlowRole: "operating" }),
+  oexp("7510", "Cash Over and Short", "other_expense", { system: true, cashFlowRole: "operating" }),
   oexp("8990", "Loss on Asset Disposal", "other_expense", { system: true }),
 ];
 
@@ -167,7 +168,7 @@ export const CHART_TEMPLATES: Record<ChartTemplateKey, ChartTemplate> = {
     key: "retail_jewelry",
     label: "Retail & Jewelry",
     description:
-      "84 accounts for a jewelry or retail business: every bank account in one section, inventory by kind, fixtures and equipment, customer deposits and gift cards, long-term loans, and jewelry sales and cost of sales.",
+      "85 accounts for a jewelry or retail business: every bank account in one section, inventory by kind, fixtures and equipment, customer deposits and gift cards, long-term loans, and jewelry sales and cost of sales.",
     accounts: RETAIL_JEWELRY,
   },
 };

@@ -110,11 +110,12 @@ describe("describeStatusChange", () => {
 });
 
 describe("controlled action catalog", () => {
-  it("covers exactly the six wired actions", () => {
+  it("covers exactly the seven wired actions", () => {
     expect(CONTROLLED_ACTIONS.map((a) => a.key)).toEqual([
       "manual_journal",
       "write_off",
       "inventory_adjustment",
+      "cash_count",
       "period_reopen",
       "reconciliation_reopen",
       "vendor_tax_profile",

@@ -10,8 +10,8 @@ const byCode = new Map(retail.map((a) => [a.code, a]));
 
 /**
  * Every account a migration seeds, with its type: `('1210', 'Undeposited Funds', 'current_asset'`.
- * A name may carry a doubled quote (`'Owner''s Equity'`). On 2026-09-29 this finds exactly the
- * 26 system codes the template marks `system: true`.
+ * A name may carry a doubled quote (`'Owner''s Equity'`). On 2026-10-17 this finds exactly the
+ * 27 system codes the template marks `system: true`.
  */
 function seeded(): Map<string, string> {
   const dir = join(process.cwd(), "supabase/migrations");
@@ -25,14 +25,14 @@ function seeded(): Map<string, string> {
 }
 
 describe("the Retail & Jewelry template", () => {
-  it("has the 84 accounts of the approved table, each code once", () => {
-    expect(retail.length).toBe(84);
-    expect(byCode.size).toBe(84);
+  it("has the 85 accounts of the approved table, each code once", () => {
+    expect(retail.length).toBe(85);
+    expect(byCode.size).toBe(85);
   });
 
   it("keeps every system account at its seeded code and type, and puts nothing else on a seeded code", () => {
     const seeds = seeded();
-    expect(retail.filter((a) => a.system).length).toBe(26);
+    expect(retail.filter((a) => a.system).length).toBe(27);
     for (const a of retail) {
       if (a.system) expect(seeds.get(a.code), a.code).toBe(a.type);
       else expect(seeds.has(a.code), a.code).toBe(false);
@@ -75,7 +75,7 @@ describe("chartTemplateStatements", () => {
     const statements = chartTemplateStatements("retail_jewelry");
     const upserts = statements.filter((s) => /insert into acc_account/i.test(s.sql));
     const parents = statements.filter((s) => /set parent_account_id/i.test(s.sql));
-    expect(upserts.length).toBe(84);
+    expect(upserts.length).toBe(85);
     expect(parents.length).toBe(retail.filter((a) => a.parent).length);
     expect(upserts[0].sql).toMatch(/on conflict \(account_code\) do update/i);
     expect(statements.indexOf(parents[0])).toBeGreaterThan(statements.indexOf(upserts[upserts.length - 1]));
