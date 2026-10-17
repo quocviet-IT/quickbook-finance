@@ -1,5 +1,6 @@
 import type { AccountingControl, QueueSeverity } from "./types";
 import { isConfigured, type WorkPolicy } from "./policy";
+import { plural, pluralWord } from "@/lib/format";
 
 /**
  * What changed, why it matters, and where it is concentrated.
@@ -92,10 +93,6 @@ const SEVERITY_RANK: Record<QueueSeverity, number> = {
 
 function money(minor: number): string {
   return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -221,7 +218,7 @@ export function buildInsights(facts: InsightFacts): AccountingInsight[] {
       severity: "high",
       title: "An approval has waited too long",
       summary:
-        `${plural(facts.approvals.pendingCount, "controlled action")} are waiting, and the ` +
+        `${plural(facts.approvals.pendingCount, "controlled action")} ${pluralWord(facts.approvals.pendingCount, "is", "are")} waiting, and the ` +
         `oldest has waited ${plural(facts.approvals.oldestAgeDays, "day")} against a policy of ` +
         `${plural(facts.policy.approvalSlaDays ?? 0, "day")}.`,
       ageDays: facts.approvals.oldestAgeDays,
@@ -248,7 +245,7 @@ export function buildInsights(facts: InsightFacts): AccountingInsight[] {
       severity: "high",
       title: "Bank activity has gone unmatched",
       summary:
-        `${plural(facts.unmatchedBank.count, "bank line")} are unmatched, the oldest for ` +
+        `${plural(facts.unmatchedBank.count, "bank line")} ${pluralWord(facts.unmatchedBank.count, "is", "are")} unmatched, the oldest for ` +
         `${plural(facts.unmatchedBank.oldestAgeDays, "day")} against a policy of ` +
         `${plural(facts.policy.unmatchedBankAgeDays ?? 0, "day")}.`,
       ageDays: facts.unmatchedBank.oldestAgeDays,
@@ -327,9 +324,9 @@ function balanceGrowth(
   }
 
   const who = concentration(source.rows, source.nowMinor);
-  const party = side === "ar" ? "customers" : "vendors";
+  const party = side === "ar" ? "customer" : "vendor";
   const concentrationSentence = who
-    ? ` ${plural(who.names.length, party.slice(0, -1))} — ${who.names.join(", ")} — represent ` +
+    ? ` ${plural(who.names.length, party)} — ${who.names.join(", ")} — ${pluralWord(who.names.length, "represents", "represent")} ` +
       `${who.sharePercent}% of what is outstanding.`
     : "";
 

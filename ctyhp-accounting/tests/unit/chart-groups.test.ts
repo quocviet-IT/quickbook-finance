@@ -235,16 +235,16 @@ describe("chartZoomSpec", () => {
 
 describe("the lede and the range label", () => {
   it("reads in the plural", () => {
-    expect(chartLede(45, 28, "2026-10-10")).toBe("45 accounts, 28 carrying a balance at Oct 10, 2026.");
-    expect(chartLede(0, 0, "2026-10-10")).toBe("0 accounts, 0 carrying a balance at Oct 10, 2026.");
+    expect(chartLede(45, 28, "2026-10-10")).toBe("45 accounts, 28 carrying a balance at 10/10/2026.");
+    expect(chartLede(0, 0, "2026-10-10")).toBe("0 accounts, 0 carrying a balance at 10/10/2026.");
   });
 
   it("reads in the singular", () => {
-    expect(chartLede(1, 1, "2026-01-05")).toBe("1 account, 1 carrying a balance at Jan 5, 2026.");
+    expect(chartLede(1, 1, "2026-01-05")).toBe("1 account, 1 carrying a balance at 01/05/2026.");
   });
 
   it("names the year to date", () => {
-    expect(groupRangeLabel("2026-01-01")).toBe("Year to date, from Jan 1, 2026");
-    expect(groupRangeLabel("2025-04-01")).toBe("Year to date, from Apr 1, 2025");
+    expect(groupRangeLabel("2026-01-01")).toBe("Year to date, from 01/01/2026");
+    expect(groupRangeLabel("2025-04-01")).toBe("Year to date, from 04/01/2025");
   });
 });

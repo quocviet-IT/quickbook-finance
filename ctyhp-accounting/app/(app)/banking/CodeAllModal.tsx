@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, plural } from "@/lib/format";
 import { useState } from "react";
 import { Alert, App, Button, Modal, Space, Typography, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
@@ -58,7 +59,7 @@ export default function CodeAllModal({
   }
 
   const columns: TableColumnsType<CodeAllRow> = [
-    { title: "Date", key: "date", dataIndex: "txnDate", width: COLUMN.DATE },
+    { title: "Date", key: "date", dataIndex: "txnDate", width: COLUMN.DATE, render: (value: string) => formatDate(value) },
     {
       ...flexColumn<CodeAllRow>({
         title: "Line",
@@ -87,7 +88,7 @@ export default function CodeAllModal({
   return (
     <Modal
       open={rows !== null}
-      title={summary ? "Coded from suggestions" : `Code ${list.length} line${list.length === 1 ? "" : "s"} from their suggestions`}
+      title={summary ? "Coded from suggestions" : `Code ${plural(list.length, "line")} from their suggestions`}
       width={980}
       onCancel={close}
       destroyOnHidden
@@ -103,7 +104,7 @@ export default function CodeAllModal({
                 Cancel
               </Button>,
               <Button key="post" type="primary" loading={saving} onClick={post}>
-                Post {list.length} line{list.length === 1 ? "" : "s"}
+                Post {plural(list.length, "line")}
               </Button>,
             ]
       }
@@ -117,7 +118,7 @@ export default function CodeAllModal({
                 const row = byId.get(failure.id);
                 return (
                   <div key={failure.id} style={{ marginBottom: 8 }}>
-                    <Typography.Text>{row ? `${row.txnDate} · ${row.description} · ${row.amount}` : failure.id}</Typography.Text>
+                    <Typography.Text>{row ? `${formatDate(row.txnDate)} · ${row.description} · ${row.amount}` : failure.id}</Typography.Text>
                     <br />
                     <Typography.Text type="danger" style={{ fontSize: 12 }}>
                       {failure.error}

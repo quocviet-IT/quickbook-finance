@@ -23,7 +23,10 @@ export const ALERT_CARD = {
 export const ALERT_TABLE_BOX =
   TABLE_BOX_AT_1280 - ALERT_CARD.border - ALERT_CARD.accent - 2 * ALERT_CARD.paddingX - ALERT_CARD.gutter;
 
-/** A date written "Sep 26, 2026", which is wider than the 2026-09-26 that COLUMN.DATE measures. */
+/**
+ * A date on an alert card. Sized when these dates were written out, "Sep 26,
+ * 2026", wider than COLUMN.DATE; "09/26/2026" fits with room.
+ */
 const SHORT_DATE = 112;
 
 /** The workings of a balance posted as payments. Coded to carries no width and takes what is left. */

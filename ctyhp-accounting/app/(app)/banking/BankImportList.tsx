@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateInTimeZone, plural, pluralWord } from "@/lib/format";
 import { getStatementImportsAction, undoStatementImportAction } from "./actions";
 
 export interface BankImportListProps {
@@ -34,6 +36,7 @@ export default function BankImportList({
   onChanged,
 }: BankImportListProps) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const [rows, setRows] = useState<BankStatementImportRow[]>([]);
   // Until the first answer the register is loading, not empty: it reads after
   // the bank lines in Next's one-at-a-time queue of Server Actions.
@@ -60,7 +63,7 @@ export default function BankImportList({
       message.error(result.error ?? "Could not undo this import");
       return;
     }
-    message.success(`${result.data.removed} line(s) removed`);
+    message.success(`${plural(result.data.removed, "line")} removed`);
     setUndoing(null);
     setReason("");
     refresh();
@@ -130,7 +133,7 @@ export default function BankImportList({
             title: "Imported",
             dataIndex: "imported_at",
             width: 120,
-            render: (value: string) => value.slice(0, 10),
+            render: (value: string) => formatDateInTimeZone(value, timeZone),
           },
           {
             title: "",
@@ -158,7 +161,7 @@ export default function BankImportList({
                   <Space size={6}>
                     {review}
                     <Tooltip
-                      title={`${row.locked_lines} line(s) are matched to the ledger. Unmatch them first — removing a line an entry points at would leave the books short.`}
+                      title={`${plural(row.locked_lines, "line")} ${pluralWord(row.locked_lines, "is", "are")} matched to the ledger. Unmatch them first — removing a line an entry points at would leave the books short.`}
                     >
                       <Button size="small" danger disabled>
                         Undo
@@ -192,7 +195,7 @@ export default function BankImportList({
         }}
       >
         <p>
-          {undoing?.lines_here ?? 0} bank line(s) will be removed from{" "}
+          {plural(undoing?.lines_here ?? 0, "bank line")} will be removed from{" "}
           <b>
             {undoing?.account_code} — {undoing?.account_name}
           </b>

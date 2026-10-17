@@ -9,6 +9,7 @@
  * A row this cannot read is *skipped and counted*, never guessed at: a
  * statement line with the wrong date or amount is worse than a missing one.
  */
+import { formatDate, plural } from "@/lib/format";
 
 export interface StatementLine {
   txn_date: string;
@@ -201,14 +202,14 @@ export function parseStatementRows(
 export function describeStatementParse(result: StatementParseResult): string {
   if (result.rows.length === 0) {
     return result.skipped > 0
-      ? `No readable rows — ${result.skipped} row(s) had no date or amount.`
+      ? `No readable rows — ${plural(result.skipped, "row")} had no date or amount.`
       : "No rows found in this file.";
   }
   const dates = result.rows.map((row) => row.txn_date).sort();
   const money = result.rows.reduce((sum, row) => sum + row.amount_minor, 0);
   const net = `${money < 0 ? "-" : ""}$${Math.abs(money / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   return (
-    `${result.rows.length} transaction(s) from ${dates[0]} to ${dates[dates.length - 1]}, net ${net}` +
-    (result.skipped > 0 ? ` · ${result.skipped} unreadable row(s) skipped` : "")
+    `${plural(result.rows.length, "transaction")} from ${formatDate(dates[0])} to ${formatDate(dates[dates.length - 1])}, net ${net}` +
+    (result.skipped > 0 ? ` · ${plural(result.skipped, "unreadable row")} skipped` : "")
   );
 }

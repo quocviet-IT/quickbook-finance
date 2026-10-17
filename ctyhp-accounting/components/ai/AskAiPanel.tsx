@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Alert, Button, Drawer, Empty, Input, Space, Tag, Typography } from "antd";
 import { HistoryOutlined, ReloadOutlined } from "@ant-design/icons";
+import { formatDateTime } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { ASK_AI_GROUNDING_NOTE, ASK_AI_MAX_QUESTION_LENGTH } from "@/lib/ai/ask-prompt";
 import {
   screenContextFor,
@@ -84,6 +86,7 @@ export default function AskAiPanel({
   onReportProblem: () => void;
 }) {
   const pathname = usePathname() ?? "/";
+  const { timeZone } = useCompanyClock();
   const [question, setQuestion] = useState("");
   const [thread, setThread] = useState<AskAiExchange[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -275,7 +278,7 @@ export default function AskAiPanel({
                     <br />
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       {entry.route ? `${entry.route} · ` : ""}
-                      {new Date(entry.askedAt).toLocaleString("en-US")}
+                      {formatDateTime(entry.askedAt, timeZone)}
                     </Typography.Text>
                   </Button>
                 ))}

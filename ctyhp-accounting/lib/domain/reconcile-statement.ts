@@ -4,9 +4,10 @@
  * dialog and the reconciliation show. Pure, so the wording is tested where it
  * is written.
  */
-import { periodLabel, shortDate } from "./pdf-statement-view";
+import { periodLabel } from "./pdf-statement-view";
 import { matchStatement, type PairBookLine, type PairStatementLine } from "./statement-pairing";
 
+import { formatDate, plural, pluralWord } from "@/lib/format";
 /** What bringing an account forward through a day would sign off. */
 export interface BroughtForwardPreview {
   hasReconciliations: boolean;
@@ -29,8 +30,6 @@ export function dayBefore(iso: string): string {
   return day.toISOString().slice(0, 10);
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
 /**
  * Whether the first reconciliation of an account can bring the earlier lines
  * forward, as the prototype does: the book balance on the day before the
@@ -46,11 +45,11 @@ export function bringForwardAdvice(
 ): BringForwardAdvice | null {
   if (preview.hasReconciliations || !statement.from || statement.openingMinor === null) return null;
   const through = dayBefore(statement.from);
-  const books = `The books hold ${money(preview.bookBalanceMinor)} on ${shortDate(through, true)}`;
+  const books = `The books hold ${money(preview.bookBalanceMinor)} on ${formatDate(through)}`;
   const opens = `the statement opens at ${money(statement.openingMinor)}`;
   if (preview.bookBalanceMinor === statement.openingMinor) {
     if (preview.openLines === 0) return null;
-    const lines = preview.openLines === 1 ? "The 1 earlier line" : `The ${preview.openLines} earlier lines`;
+    const lines = `The ${plural(preview.openLines, "earlier line")}`;
     return { canBringForward: true, through, text: `${books} — ${opens}. ${lines} can be brought forward as reconciled.` };
   }
   if (preview.openLines === 0) {
@@ -75,7 +74,7 @@ export function broughtForwardNote(from: string | null, to: string | null): stri
 
 /** "1 entry", "1,204 entries". */
 export function entriesCount(n: number): string {
-  return n === 1 ? "1 entry" : `${n.toLocaleString("en-US")} entries`;
+  return plural(n, "entry", "entries");
 }
 
 // --- Bringing the history forward from inside a reconciliation (2.03) --------
@@ -165,7 +164,7 @@ export function sessionHistoryAdvice(
 ): SessionHistoryAdvice | null {
   if (!facts) return null;
   const { through, openingMinor, bookBalanceMinor, entries } = facts;
-  const date = shortDate(through, true);
+  const date = formatDate(through);
   if (facts.reconciled) return { canBringForward: false, through, entries, text: ALREADY_RECONCILED };
   if (bookBalanceMinor !== openingMinor) {
     return {
@@ -187,7 +186,7 @@ export function sessionHistoryAdvice(
 
 /** The question Bring the history forward asks before it marks anything. */
 export function bringHistoryForwardConfirmation(entries: number, through: string): string {
-  return `${entriesCount(entries)} up to ${shortDate(through, true)} will be marked reconciled. Nothing is posted to the books.`;
+  return `${entriesCount(entries)} up to ${formatDate(through)} will be marked reconciled. Nothing is posted to the books.`;
 }
 
 // --- Discarding a reconciliation in progress (2.03) --------------------------
@@ -203,7 +202,7 @@ export function discardedReturnPath(bankAccountId: string): string {
 /** Said once a reconciliation is discarded: "Reconciliation discarded, with its 12 ticks." */
 export function discardedMessage(ticksRemoved: number): string {
   if (ticksRemoved <= 0) return "Reconciliation discarded.";
-  const ticks = ticksRemoved === 1 ? "1 tick" : `${ticksRemoved.toLocaleString("en-US")} ticks`;
+  const ticks = plural(ticksRemoved, "tick");
   return `Reconciliation discarded, with its ${ticks}.`;
 }
 
@@ -392,7 +391,7 @@ export interface PairingOutcome {
 export function pairingMessage(outcome: PairingOutcome): string {
   let text = `${outcome.paired} of ${plural(outcome.lines, "statement line")} paired with the books; ${outcome.ticked} newly ticked.`;
   if (outcome.missing > 0) {
-    text += ` ${outcome.missing} not in the books — code ${outcome.missing === 1 ? "it" : "them"} in Bank Transactions, then Match again.`;
+    text += ` ${outcome.missing} not in the books — code ${pluralWord(outcome.missing, "it", "them")} in Bank Transactions, then Match again.`;
   }
   if (outcome.flipped) text += " The statement's amounts were read the other way around to pair them.";
   return text;

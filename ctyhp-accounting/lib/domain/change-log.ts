@@ -12,6 +12,7 @@
 import { auditFieldLabel, diffAuditEntry, formatAuditValue, summarizeAuditChanges, type AuditEntryLike } from "./audit";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { stampInTimeZone } from "./stamp";
+import { formatDateRange } from "@/lib/format";
 
 /** Keys, links and stamps: true, but a reader learns nothing from a uuid or a hash. */
 const NOT_FOR_READING = /(^id$|_id$|_by$|_at$|_hash$)/;
@@ -82,7 +83,7 @@ export function changeLogSheet(
     fileName: sanitizeExportFileName(`change-log-${ctx.from}-to-${ctx.to}`),
     companyName: ctx.companyName,
     title: "Change Log",
-    subtitle: `${ctx.from} to ${ctx.to}`,
+    subtitle: formatDateRange(ctx.from, ctx.to),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "at", header: "When", kind: "text", width: 20 },

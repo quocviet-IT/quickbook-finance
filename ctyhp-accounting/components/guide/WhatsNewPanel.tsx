@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { Space, Tag, Typography } from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
@@ -31,7 +32,7 @@ export default function WhatsNewPanel({ releases, onNavigate }: WhatsNewPanelPro
         <section key={release.version} className="release-notes__release">
           <div className="release-notes__head">
             <Typography.Text strong>Version {release.version}</Typography.Text>
-            <Typography.Text type="secondary">{release.date}</Typography.Text>
+            <Typography.Text type="secondary">{formatDate(release.date)}</Typography.Text>
           </div>
           <Typography.Paragraph type="secondary" className="release-notes__headline">
             {release.headline}

@@ -9,6 +9,7 @@
  */
 
 import { toCsv, type CsvColumn } from "@/lib/csv";
+import { plural, pluralWord } from "@/lib/format";
 
 export interface SequenceDefinition {
   sequence_key: string;
@@ -144,14 +145,14 @@ export function describeSequenceIntegrity(audit: SequenceAudit): string | null {
     const shown = gaps.slice(0, 5).map((row) => row.number).join(", ");
     const rest = gaps.length - Math.min(5, gaps.length);
     parts.push(
-      `${gaps.length} number${gaps.length === 1 ? "" : "s"} issued by the sequence ` +
-        `${gaps.length === 1 ? "is" : "are"} not on any document: ${shown}` +
+      `${plural(gaps.length, "number")} issued by the sequence ` +
+        `${pluralWord(gaps.length, "is", "are")} not on any document: ${shown}` +
         (rest > 0 ? ` and ${rest} more` : ""),
     );
   }
   if (summary.beyondSequence > 0) {
     parts.push(
-      `${summary.beyondSequence} document${summary.beyondSequence === 1 ? " is" : "s are"} ` +
+      `${plural(summary.beyondSequence, "document")} ${pluralWord(summary.beyondSequence, "is", "are")} ` +
         `numbered above ${summary.nextNumber}, which the counter says has not been issued yet`,
     );
   }

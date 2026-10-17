@@ -5,7 +5,7 @@ import { COLUMN } from "@/lib/design/table-metrics";
  * (see `fitsBox`): the date and time, the amount and the open-since date are
  * fixed, and four text columns share what is left, each with its own floor.
  */
-// "Oct 14, 2026 11:47 AM" on one line.
+// "10/14/2026 11:47 AM" on one line.
 export const OVERRIDE_IMPORTED_WIDTH = 170;
 export const OVERRIDE_SINCE_WIDTH = 120;
 export const OVERRIDE_FIXED_WIDTHS: readonly number[] = [

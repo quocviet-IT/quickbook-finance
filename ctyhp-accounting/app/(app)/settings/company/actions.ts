@@ -13,6 +13,8 @@ import { activeSchema } from "@/lib/db/company";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import type { CompanySettingRow } from "@/lib/db/types";
 import { exportFileName } from "@/lib/domain/company-export";
+import { todayInTimeZone } from "@/lib/format";
+import { companyClock } from "@/lib/services/report-context";
 import {
   buildExportArchive,
   collectExportDatasets,
@@ -94,7 +96,8 @@ export async function exportCompanyDataAction(): Promise<ActionResult<CompanyExp
     // manifest disagree with itself; buildExportArchive no longer reads its
     // own clock, so this is the only reading left to keep in sync.
     const generatedAt = new Date().toISOString();
-    const asOf = generatedAt.slice(0, 10);
+    const { timeZone } = await companyClock(sb);
+    const asOf = todayInTimeZone(timeZone, new Date(generatedAt));
     const [datasets, controlTotals, schemaVersion, versions] = await Promise.all([
       collectExportDatasets(sb),
       readControlTotals(sb, asOf),

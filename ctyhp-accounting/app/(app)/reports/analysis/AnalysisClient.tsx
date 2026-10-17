@@ -20,6 +20,8 @@ import {
 } from "antd";
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, formatDateInTimeZone } from "@/lib/format";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -85,7 +87,8 @@ export default function AnalysisClient({
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
-  const today = dayjs();
+  const { timeZone, today: companyToday } = useCompanyClock();
+  const today = dayjs(companyToday);
   const [range, setRange] = useState<[Dayjs, Dayjs]>([today.startOf("year"), today]);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<LoadedData | null>(null);
@@ -320,7 +323,7 @@ export default function AnalysisClient({
               title: "Period",
               key: "period",
               width: 190,
-              render: (_, r) => `${r.period_start} → ${r.period_end}`,
+              render: (_, r) => `${formatDate(r.period_start)} → ${formatDate(r.period_end)}`,
             },
             {
               // The date alone. The minute a scenario was frozen has never
@@ -328,7 +331,7 @@ export default function AnalysisClient({
               title: "Created",
               dataIndex: "created_at",
               width: COLUMN.DATE,
-              render: (v: string) => v.slice(0, 10),
+              render: (v: string) => formatDateInTimeZone(v, timeZone),
             },
             {
               title: "Status",
@@ -480,7 +483,7 @@ export default function AnalysisClient({
           <Space direction="vertical" size="large" style={{ display: "flex" }}>
             <Space wrap>
               <Tag>
-                {viewing.period_start} → {viewing.period_end}
+                {formatDate(viewing.period_start)} → {formatDate(viewing.period_end)}
               </Tag>
               <Tag color={viewing.status === "active" ? "green" : "default"}>{viewing.status}</Tag>
               <Button size="small" onClick={() => loadAssumptions(viewing)}>

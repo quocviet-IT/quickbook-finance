@@ -1,5 +1,6 @@
 import type { DerivedWorkItem, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
+import { plural, formatDate } from "@/lib/format";
 
 /**
  * Every work key the Inventory overview derives starts with one of these; its
@@ -31,10 +32,6 @@ export const INVENTORY_WORK_KEY_PREFIXES = [
 
 function money(minor: number): string {
   return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 export const INVENTORY_NOUNS: SurfaceNouns = {
@@ -121,7 +118,7 @@ export function valuationTiesOutControl(input: {
   const base = {
     key: "inventory-ties-out",
     title: "Stock ties to the ledger",
-    passCondition: `The value of what is on hand equals the inventory control account at ${input.asOf}.`,
+    passCondition: `The value of what is on hand equals the inventory control account at ${formatDate(input.asOf)}.`,
     evaluatedAt: input.evaluatedAt,
     href: "/reports/gl-posting",
     blocking: true,
@@ -138,7 +135,7 @@ export function valuationTiesOutControl(input: {
     return {
       ...base,
       status: "healthy" as const,
-      detail: `Both sides read ${money(input.controlMinor)} at ${input.asOf}.`,
+      detail: `Both sides read ${money(input.controlMinor)} at ${formatDate(input.asOf)}.`,
     };
   }
   return {
@@ -260,7 +257,7 @@ export function depreciationDueItem(
     sourceId: asset.id,
     title: `${asset.assetNumber} — ${asset.name}`,
     reason: asset.nextDate
-      ? `Depreciation due since ${asset.nextDate} and not posted`
+      ? `Depreciation due since ${formatDate(asset.nextDate)} and not posted`
       : "Depreciation due and not posted",
     severity: input.ageDays > 60 ? "high" : "medium",
     amountMinor: Math.abs(asset.dueMinor),

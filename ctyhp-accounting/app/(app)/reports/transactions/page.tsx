@@ -3,6 +3,8 @@ import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { getTransactionList } from "@/lib/services/reports";
 import { getCurrentCompanySettings } from "@/lib/services/company";
+import { todayInTimeZone } from "@/lib/format";
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
@@ -11,10 +13,10 @@ import TransactionListClient from "./TransactionListClient";
 export const dynamic = "force-dynamic";
 
 /** Default range: the month being worked on, which is what people reconcile. */
-function defaultRange(): { from: string; to: string } {
-  const now = new Date();
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+function defaultRange(today: string): { from: string; to: string } {
+  const [year, month] = today.split("-").map(Number);
+  const from = new Date(Date.UTC(year, month - 1, 1));
+  const to = new Date(Date.UTC(year, month, 0));
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 
@@ -26,17 +28,16 @@ export default async function TransactionListPage({
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const params = await searchParams;
-  const fallback = defaultRange();
+  const sb = await createSupabaseServerClient();
+  const settings = await getCurrentCompanySettings(sb);
+  const fallback = defaultRange(todayInTimeZone(settings?.time_zone || DEFAULT_TIME_ZONE));
   const from = ISO_DATE.test(params.from ?? "") ? params.from! : fallback.from;
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : fallback.to;
 
-  const sb = await createSupabaseServerClient();
-
   const entity = await resolveActiveCompany();
-  const [rows, currencies, settings, accounts] = await Promise.all([
+  const [rows, currencies, accounts] = await Promise.all([
     getTransactionList(sb, from, to),
     listCurrencies(sb),
-    getCurrentCompanySettings(sb),
     // Only to label the account filter. The rows decide which accounts are
     // offered; the chart decides what each one is called.
     listAccounts(sb),

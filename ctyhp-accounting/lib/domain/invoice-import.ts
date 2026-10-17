@@ -11,6 +11,7 @@
  * Nothing here posts. The importer raises drafts; issuing them stays a separate,
  * deliberate act, so a bad file costs a review rather than a period.
  */
+import { formatDate } from "@/lib/format";
 
 /** One mapped row, as `applyMapping` produces it for the invoices target. */
 export interface InvoiceImportRecord {
@@ -145,7 +146,7 @@ export function groupInvoiceRows(
       continue;
     }
     if (dueDate !== null && dueDate < issueDate) {
-      fail(`Due date ${dueDate} is before the issue date ${issueDate}`);
+      fail(`Due date ${formatDate(dueDate)} is before the issue date ${formatDate(issueDate)}`);
       continue;
     }
 

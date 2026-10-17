@@ -1,4 +1,5 @@
 "use client";
+import { plural, pluralWord } from "@/lib/format";
 import { Alert, Select, Space, Table, Tag, Typography } from "antd";
 import type { FieldSpec } from "@/lib/domain/import-mapping";
 
@@ -97,7 +98,7 @@ export default function ImportColumnsTable({
         <Alert
           type="info"
           showIcon
-          message={`${unmapped.length} column(s) in the file are not used: ${unmapped.join(", ")}`}
+          message={`${plural(unmapped.length, "column")} in the file ${pluralWord(unmapped.length, "is", "are")} not used: ${unmapped.join(", ")}`}
         />
       ) : null}
     </>

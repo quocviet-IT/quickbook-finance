@@ -19,7 +19,7 @@
  * units, which is what the prototype's round-to-the-cent comes to.
  */
 
-import { shortDate } from "@/lib/domain/report-presets";
+import { formatDate, plural, pluralWord } from "@/lib/format";
 
 /** The fewest lines a payee needs before it can be a balance (prototype `GHOST_MIN`). */
 export const GHOST_MIN = 3;
@@ -346,11 +346,11 @@ export interface Segment {
 /** How money and dates are written: the screen passes its own formatter, this module has no currency. */
 export interface CopyFormat {
   money: (minor: number) => string;
-  /** Defaults to `Sep 26, 2026`. */
+  /** Defaults to `09/26/2026`. */
   date?: (iso: string) => string;
 }
 
-const dateOf = (fmt: CopyFormat) => fmt.date ?? shortDate;
+const dateOf = (fmt: CopyFormat) => fmt.date ?? formatDate;
 
 /** The plain text of a sentence. */
 export function segmentsText(segments: readonly Segment[]): string {
@@ -393,7 +393,7 @@ export function ghostCard(group: GhostGroup, fmt: CopyFormat): GhostCard {
         ? `, give or take ${fmt.money(Math.abs(group.offsetMinor))} that is outstanding for other reasons`
         : "";
   return {
-    title: `${n} ${n === 1 ? "entry here looks" : "entries here look"} like the statement's balance, not payments`,
+    title: `${plural(n, "entry", "entries")} here ${pluralWord(n, "looks", "look")} like the statement's balance, not payments`,
     body: [
       plain("Every one of them is named "),
       bold(group.payee),
@@ -405,11 +405,11 @@ export function ghostCard(group: GhostGroup, fmt: CopyFormat): GhostCard {
     ],
     showWorkings: "Show me the workings",
     hideWorkings: "Hide the workings",
-    removeLabel: `Remove these ${n} ${n === 1 ? "entry" : "entries"}`,
+    removeLabel: `Remove these ${plural(n, "entry", "entries")}`,
     confirmLabel: `Confirm — remove all ${n}`,
     workingsColumns: ["Date", "Posted as", "This account on that date", "Difference", "Coded to"],
     workingsFootnote: "The middle column is worked out with these entries removed, so it is not an argument with itself.",
-    removedMessage: (count) => `${count} ${count === 1 ? "entry" : "entries"} removed. They were balances, not payments.`,
+    removedMessage: (count) => `${plural(count, "entry", "entries")} removed. They were balances, not payments.`,
     goneMessage: GHOST_GONE,
     difference: (minor) => (minor === 0 ? "—" : fmt.money(minor)),
   };
@@ -546,7 +546,7 @@ export function belowZeroRows(accounts: readonly BankAccountAlerts[]): BelowZero
 
 /** The words of a Statement-balance row in the Exceptions sheet. */
 export const statementBalanceSheetText = (row: StatementBalanceRow) => ({
-  type: `${row.entryCount} ${row.entryCount === 1 ? "entry" : "entries"}`,
+  type: plural(row.entryCount, "entry", "entries"),
   name: row.payee,
 });
 
@@ -555,6 +555,6 @@ export function belowZeroSheetText(row: BelowZeroRow, money: (minor: number) => 
   const lowest = row.worstMinor !== null ? `Lowest ${money(row.worstMinor)} · ` : "";
   return {
     type: `Last reconciled ${row.lastStatementDate ?? "never"}`,
-    name: `${lowest}${row.outstandingCount} ${row.outstandingCount === 1 ? "payment" : "payments"} not yet on a statement`,
+    name: `${lowest}${plural(row.outstandingCount, "payment")} not yet on a statement`,
   };
 }

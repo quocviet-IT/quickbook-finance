@@ -8,15 +8,13 @@ import { flexColumn } from "@/components/ui/columns";
 import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import {
   reconciliationListSheet,
   type ReconciliationListLine,
   type ReconciliationListReport,
 } from "@/lib/domain/reconciliation-list";
-import { longDate, shortDate } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
-import { stampInTimeZone } from "@/lib/domain/stamp";
 
 const PAGE_SIZE = 50;
 
@@ -61,7 +59,7 @@ export default function ReconciliationsClient({
     for (const line of report.lines) seen.set(line.bankAccountId, line.bankAccountName);
     setAccounts([...seen].map(([value, label]) => ({ value, label })));
   }, []);
-  const caption = useMemo(() => `Signed-off reconciliations, as of ${longDate(today)}`, [today]);
+  const caption = useMemo(() => `Signed-off reconciliations, as of ${formatDate(today)}`, [today]);
 
   return (
     <SimpleReport<ReconciliationListReport>
@@ -109,7 +107,7 @@ export default function ReconciliationsClient({
                 title: "Statement ending",
                 dataIndex: "statementEndingDate",
                 width: COLUMN.DATE + 32,
-                render: (d: string) => shortDate(d),
+                render: (d: string) => formatDate(d),
               },
               {
                 title: "Ending balance",
@@ -124,7 +122,7 @@ export default function ReconciliationsClient({
                 width: 220,
                 render: (_: unknown, line: ReconciliationListLine) => (
                   <span>
-                    {line.completedAt ? stampInTimeZone(line.completedAt, timeZone) : "—"}
+                    {line.completedAt ? formatDateTime(line.completedAt, timeZone) : "—"}
                     {line.completedByName ? <span className={styles.muted}> · {line.completedByName}</span> : null}
                   </span>
                 ),

@@ -93,13 +93,13 @@ describe("statementFileAccount", () => {
 describe("statementFileTitle", () => {
   it("names the account and the statement's period", () => {
     expect(statementFileTitle("Example Bank ****1183", { from: "2026-05-01", to: "2026-05-31" })).toBe(
-      "Example Bank ****1183 — statement May 1 – May 31, 2026",
+      "Example Bank ****1183 — statement 05/01/2026 – 05/31/2026",
     );
   });
 
   it("names a statement that printed only its closing day", () => {
     expect(statementFileTitle("Example Bank", { from: null, to: "2026-05-31" })).toBe(
-      "Example Bank — statement closing May 31, 2026",
+      "Example Bank — statement closing 05/31/2026",
     );
   });
 
@@ -170,13 +170,13 @@ describe("statementFileMismatch", () => {
   it("refuses another month's statement, saying both", () => {
     const read = { to: "2026-06-30", closingMinor: 659501, lines: MAY.keptLines };
     expect(statementFileMismatch(read, MAY, money)).toBe(
-      "This file's statement closes Jun 30, 2026 at $6,595.01; this reconciliation is to May 31, 2026 at $6,160.01.",
+      "This file's statement closes 06/30/2026 at $6,595.01; this reconciliation is to 05/31/2026 at $6,160.01.",
     );
   });
 
   it("refuses a statement of the same day that closes at another balance", () => {
     const read = { to: "2026-05-31", closingMinor: 616000, lines: MAY.keptLines };
-    expect(statementFileMismatch(read, MAY, money)).toMatch(/closes May 31, 2026 at \$6,160\.00; this reconciliation is to May 31, 2026 at \$6,160\.01/);
+    expect(statementFileMismatch(read, MAY, money)).toMatch(/closes 05\/31\/2026 at \$6,160\.00; this reconciliation is to 05\/31\/2026 at \$6,160\.01/);
   });
 
   it("refuses a statement whose lines differ, naming the first that does", () => {
@@ -189,14 +189,14 @@ describe("statementFileMismatch", () => {
       ],
     };
     expect(statementFileMismatch(read, MAY, money)).toBe(
-      "Line 1 differs: the file has May 4, 2026 at -$15.00; this reconciliation kept May 4, 2026 at -$12.00.",
+      "Line 1 differs: the file has 05/04/2026 at -$15.00; this reconciliation kept 05/04/2026 at -$12.00.",
     );
   });
 
   it("refuses a statement with a line more or less", () => {
     const read = { to: "2026-05-31", closingMinor: 616001, lines: MAY.keptLines.slice(0, 1) };
     expect(statementFileMismatch(read, MAY, money)).toBe(
-      "This reconciliation kept 2 lines from May 4, 2026 to May 31, 2026; this file has 1 line in those days.",
+      "This reconciliation kept 2 lines from 05/04/2026 to 05/31/2026; this file has 1 line in those days.",
     );
   });
 
@@ -226,7 +226,7 @@ describe("statementFileMismatch", () => {
   it("needs a closing balance when the reconciliation kept no lines", () => {
     const byHand: EvidenceTarget = { ...MAY, keptLines: [] };
     expect(statementFileMismatch({ to: null, closingMinor: null, lines: MAY.keptLines }, byHand, money)).toBe(
-      "This file does not show the statement's closing balance, so it cannot be matched to this reconciliation. Attach the bank's PDF statement for May 31, 2026.",
+      "This file does not show the statement's closing balance, so it cannot be matched to this reconciliation. Attach the bank's PDF statement for 05/31/2026.",
     );
     expect(statementFileMismatch({ to: "2026-05-31", closingMinor: 616001, lines: [] }, byHand, money)).toBeNull();
   });
@@ -234,7 +234,7 @@ describe("statementFileMismatch", () => {
 
 describe("statementFileKeepSchema", () => {
   const valid = {
-    title: "Example Bank — statement May 1 – May 31, 2026",
+    title: "Example Bank — statement 05/01/2026 – 05/31/2026",
     period_start: "2026-05-01",
     period_end: "2026-05-31",
     file_name: "may.pdf",
@@ -294,7 +294,7 @@ describe("attachMismatch (2.04)", () => {
   it("compares the lines the file counts: a line marked Not a transaction is left out", () => {
     expect(attachMismatch(read, [1], target, money)).toBeNull();
     expect(attachMismatch(read, [], target, money)).toBe(
-      "This reconciliation kept 2 lines from May 4, 2026 to May 31, 2026; this file has 3 lines in those days.",
+      "This reconciliation kept 2 lines from 05/04/2026 to 05/31/2026; this file has 3 lines in those days.",
     );
   });
 

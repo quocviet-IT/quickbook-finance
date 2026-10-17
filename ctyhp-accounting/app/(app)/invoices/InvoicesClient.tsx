@@ -47,7 +47,8 @@ import type {
 } from "@/lib/db/types";
 import type { InvoiceEstimateLink, InvoiceWithCustomer } from "@/lib/services/invoicing";
 import type { CustomerCreditRow } from "@/lib/services/credit";
-import { formatMoney, toMinorUnits } from "@/lib/format";
+import { formatDate, formatDateInTimeZone, formatMoney, toMinorUnits } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import SalesLineItems from "@/components/SalesLineItems";
 import {
@@ -219,7 +220,7 @@ export default function InvoicesClient({
   );
 
   // One "today" for every row, so a list cannot show two different ages.
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { today, timeZone } = useCompanyClock();
 
   const creditByCustomer = useMemo(
     () => new Map(credit.map((row) => [row.customerId, row])),
@@ -337,8 +338,8 @@ export default function InvoicesClient({
       customerTermsDays: customer?.credit_terms_days,
       defaultTermsDays,
     });
-    return { ...values, due_date: dayjs().add(dueInDays, "day") };
-  }, [fromEstimate, localCustomers, baseCurrency, defaultTermsDays]);
+    return { ...values, due_date: dayjs(today).add(dueInDays, "day") };
+  }, [fromEstimate, localCustomers, baseCurrency, defaultTermsDays, today]);
 
   /**
    * Most states tax a sale where it is delivered, so picking a customer fills
@@ -353,7 +354,7 @@ export default function InvoicesClient({
     // invoice the moment the customer is known — net 15 for a retail buyer and
     // net 30 for a trade account are different due dates, not a preference.
     const terms = customer?.credit_terms_days ?? defaultTermsDays;
-    const issue = form.getFieldValue("issue_date") ?? dayjs();
+    const issue = form.getFieldValue("issue_date") ?? dayjs(today);
     form.setFieldValue("due_date", issue.add(terms, "day"));
 
     const rate = defaultTaxCodeForState(customer?.region, taxCodes);
@@ -568,7 +569,7 @@ export default function InvoicesClient({
           const attribution = documentAttribution(r, directory);
           const under = [
             r.entry_number ?? null,
-            `raised ${attribution.createdAt.slice(0, 10)} by ${attribution.createdBy}`,
+            `raised ${formatDateInTimeZone(attribution.createdAt, timeZone)} by ${attribution.createdBy}`,
           ]
             .filter(Boolean)
             .join(" · ");
@@ -598,6 +599,7 @@ export default function InvoicesClient({
       title: "Issued",
       dataIndex: "issue_date",
       width: COLUMN.DATE,
+      render: (v: string) => formatDate(v),
       sorter: (a, b) => a.issue_date.localeCompare(b.issue_date),
     },
     {
@@ -773,7 +775,7 @@ export default function InvoicesClient({
         {initialQueue ? (
           <div className="accounting-queue-filter">
             <Tag color="red">Work queue · overdue invoices</Tag>
-            <Typography.Text type="secondary">As of {initialQueue.asOf}</Typography.Text>
+            <Typography.Text type="secondary">As of {formatDate(initialQueue.asOf)}</Typography.Text>
             <Button onClick={() => router.push("/invoices")}>Show all</Button>
           </div>
         ) : null}

@@ -11,9 +11,9 @@
  * sentences.
  */
 import type { BankStanding } from "./bank-standing";
-import { shortDate } from "./pdf-statement-view";
 import { entriesCount } from "./reconcile-statement";
 
+import { formatDate } from "@/lib/format";
 /** One row of acc_reconciliation_history. */
 export interface ReconciliationHistoryRow {
   bankAccountId: string;
@@ -87,8 +87,8 @@ export function historySinceCell(standing: BankStanding | null | undefined, mone
 /** The open lines' dates in one cell: the first, then "– last" under it; null when there are none. */
 export function historyDatedCell(first: string | null, last: string | null): string[] | null {
   if (!first && !last) return null;
-  if (first && last && first !== last) return [shortDate(first, true), `– ${shortDate(last, true)}`];
-  return [shortDate((first ?? last) as string, true)];
+  if (first && last && first !== last) return [formatDate(first), `– ${formatDate(last)}`];
+  return [formatDate((first ?? last) as string)];
 }
 
 const noHistory = (bankAccountId: string): ReconciliationHistoryRow => ({
@@ -128,9 +128,9 @@ export const HISTORY_STATE_LABELS: Record<HistoryState, string> = {
   reconciled: "Reconciled",
 };
 
-/** The session in progress, under the state: "In progress, ending Sep 30, 2026". */
+/** The session in progress, under the state: "In progress, ending 09/30/2026". */
 export function inProgressText(endingDate: string): string {
-  return `In progress, ending ${shortDate(endingDate, true)}`;
+  return `In progress, ending ${formatDate(endingDate)}`;
 }
 
 /** The link beside "Finish or discard the reconciliation in progress first." */
@@ -160,20 +160,20 @@ export function historyBroughtForwardMessage(
   rebasedBeginsMinor: number | null,
   money: (minor: number) => string,
 ): string {
-  const done = `Brought forward: ${entriesCount(lines)} up to ${shortDate(through, true)} marked reconciled. Nothing was posted to the books.`;
+  const done = `Brought forward: ${entriesCount(lines)} up to ${formatDate(through)} marked reconciled. Nothing was posted to the books.`;
   return rebasedBeginsMinor === null ? done : `${done} The reconciliation in progress now begins at ${money(rebasedBeginsMinor)}.`;
 }
 
 export const FINISH_IN_PROGRESS_FIRST = "Finish or discard the reconciliation in progress first.";
 
-/** "Reconciled up to Aug 31, 2026" */
+/** "Reconciled up to 08/31/2026" */
 export function reconciledUpTo(date: string): string {
-  return `Reconciled up to ${shortDate(date, true)}`;
+  return `Reconciled up to ${formatDate(date)}`;
 }
 
-/** "Books on Aug 31, 2026 read $5,000.00 ✓" */
+/** "Books on 08/31/2026 read $5,000.00 ✓" */
 export function booksReadText(through: string, bookBalanceMinor: number, money: (minor: number) => string): string {
-  return `Books on ${shortDate(through, true)} read ${money(bookBalanceMinor)} ✓`;
+  return `Books on ${formatDate(through)} read ${money(bookBalanceMinor)} ✓`;
 }
 
 /** "Bring forward 214 entries", "Bring forward 1 entry" */
@@ -188,7 +188,7 @@ export function historyOutByText(outByMinor: number, money: (minor: number) => s
 
 /** The note a reconciliation brought forward from the history page keeps. */
 export function historyBroughtForwardNote(balanceMinor: number, through: string, money: (minor: number) => string): string {
-  return `Brought forward, proved by the statement balance of ${money(balanceMinor)} on ${shortDate(through, true)}`;
+  return `Brought forward, proved by the statement balance of ${money(balanceMinor)} on ${formatDate(through)}`;
 }
 
 /** What the books hold through a date, as acc_brought_forward_preview reads them. */

@@ -10,10 +10,10 @@ import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { ReportFoot, ReportPaper, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDateRange, formatDate } from "@/lib/format";
 import { downloadTextFile } from "@/lib/client/download";
 import { csvFromExportSheet } from "@/lib/domain/report-export";
-import { PERIOD_PRESETS, presetRange, rangeText, shortDate, type PeriodPreset } from "@/lib/domain/report-presets";
+import { PERIOD_PRESETS, presetRange, type PeriodPreset } from "@/lib/domain/report-presets";
 import { workingTrialBalanceSheet, type AjeRow, type WorkingTrialBalance } from "@/lib/domain/working-trial-balance";
 import { workingTrialBalanceAction } from "./actions";
 
@@ -175,7 +175,7 @@ export default function WorkingTrialBalanceClient({
 
   const ajeColumns: TableColumnsType<AjeRow> = [
     { title: "No.", key: "no", width: 80, render: (_, r) => r.number ?? "" },
-    { title: "Date", key: "date", width: 108, render: (_, r) => (r.date ? shortDate(r.date) : "") },
+    { title: "Date", key: "date", width: 108, render: (_, r) => (r.date ? formatDate(r.date) : "") },
     flexColumn<AjeRow>({ title: "Name", key: "name", floor: 140, render: (_, r) => r.name ?? "" }),
     flexColumn<AjeRow>({
       title: "Account",
@@ -261,7 +261,7 @@ export default function WorkingTrialBalanceClient({
     <ReportPaper
       companyName={companyName}
       title="Working Trial Balance"
-      range={rangeText(ran.from, ran.to)}
+      range={formatDateRange(ran.from, ran.to)}
       currencyCode={baseCurrency}
     >
       {report ? (

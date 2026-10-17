@@ -148,14 +148,12 @@ describe("moneyColumn", () => {
 });
 
 describe("dateColumn", () => {
-  it("marks the date up as a date, keeping the text it already showed", () => {
-    // The displayed string is unchanged on purpose: this batch adds semantics
-    // and one code path, not a new date format across every screen.
+  it("marks the date up as a date: ISO for machines, the one date style for readers", () => {
     const column = dateColumn<Row>({ title: "Due", dataIndex: "due_date" });
     const cell = asElement(column.render!(row.due_date, row, 0), "dateColumn");
     expect(cell.type).toBe("time");
     expect(cell.props.dateTime).toBe("2026-08-13");
-    expect(cell.props.children).toBe("2026-08-13");
+    expect(cell.props.children).toBe("08/13/2026");
   });
 
   it("shows an em dash for no date, rather than an empty cell", () => {

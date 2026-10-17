@@ -9,7 +9,8 @@ import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { fromMinor } from "@/lib/domain/money";
-import { formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
   describeControlExceptions,
   describePostingExceptions,
@@ -51,10 +52,11 @@ export default function GlPostingClient({
   baseDecimals: number;
 }) {
   const { message } = App.useApp();
+  const { today } = useCompanyClock();
   const [view, setView] = useState<"documents" | "controls">("documents");
-  const [from, setFrom] = useState<Dayjs>(dayjs().startOf("month"));
-  const [to, setTo] = useState<Dayjs>(dayjs());
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs());
+  const [from, setFrom] = useState<Dayjs>(dayjs(today).startOf("month"));
+  const [to, setTo] = useState<Dayjs>(dayjs(today));
+  const [asOf, setAsOf] = useState<Dayjs>(dayjs(today));
   const [report, setReport] = useState<PostingReport | null>(null);
   const [recon, setRecon] = useState<ControlReconciliation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,7 +124,7 @@ export default function GlPostingClient({
           showIcon
           message={
             postingWarning ??
-            `Every document between ${from.format("YYYY-MM-DD")} and ${to.format("YYYY-MM-DD")} ` +
+            `Every document between ${formatDate(from.format("YYYY-MM-DD"))} and ${formatDate(to.format("YYYY-MM-DD"))} ` +
               `is accounted for: ${report.summary.posted} posted, ${report.summary.offLedger} correctly off the ledger.`
           }
         />
@@ -133,7 +135,7 @@ export default function GlPostingClient({
           showIcon
           message={
             controlWarning ??
-            `Every control account ties to its subledger as of ${recon.asOf}.`
+            `Every control account ties to its subledger as of ${formatDate(recon.asOf)}.`
           }
         />
       ) : null}
@@ -157,7 +159,7 @@ export default function GlPostingClient({
                   fileName: `gl-posting-${from.format("YYYY-MM-DD")}-${to.format("YYYY-MM-DD")}`,
                   companyName,
                   title: "General Ledger Posting",
-                  subtitle: `${from.format("YYYY-MM-DD")} to ${to.format("YYYY-MM-DD")}`,
+                  subtitle: `${formatDate(from.format("YYYY-MM-DD"))} to ${formatDate(to.format("YYYY-MM-DD"))}`,
                   currencyCode: baseCurrency,
                   columns: [
                     { key: "type", header: "Type", kind: "text" },
@@ -206,7 +208,7 @@ export default function GlPostingClient({
                 width: COLUMN.CODE,
                 render: (value: string | null) => value ?? <i>unnumbered</i>,
               },
-              { title: "Date", dataIndex: "documentDate", width: COLUMN.DATE },
+              { title: "Date", dataIndex: "documentDate", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
               // The elastic column: the journal entry used to be a column of
               // its own, 160px printing a reference that belongs to the row it
               // is on.
@@ -295,7 +297,7 @@ export default function GlPostingClient({
             recon ? (
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0} colSpan={4}>
-                  <b>As of {recon.asOf}</b>
+                  <b>As of {formatDate(recon.asOf)}</b>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={4} align="right">
                   {recon.allTieOut ? (

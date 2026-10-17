@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { formatDate } from "@/lib/format";
 import { getPurchaseOrder, getPurchasingConfig } from "@/lib/services/purchasing";
 import { listVendors } from "@/lib/services/payables";
 import { listAccounts } from "@/lib/services/accounts";
@@ -46,7 +47,7 @@ export default async function PurchaseOrderDetailPage({
     <div>
       <PageHeader
         title={`Purchase Order ${detail.order.po_number ?? "(draft)"}`}
-        description={`${detail.order.vendor_name} — ordered ${detail.order.order_date}`}
+        description={`${detail.order.vendor_name} — ordered ${formatDate(detail.order.order_date)}`}
         breadcrumbItems={[
           { title: "Purchase Orders", href: "/purchase-orders" },
           { title: detail.order.po_number ?? "Draft" },

@@ -4,7 +4,8 @@ import { Alert, App, Button, DatePicker, Space, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { InventoryValuationRow } from "@/lib/db/types";
 import type { InventoryValuation } from "@/lib/services/inventory";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
@@ -23,7 +24,8 @@ export default function InventoryValuationClient({
   policyMemo: string | null;
 }) {
   const { message } = App.useApp();
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs());
+  const { today } = useCompanyClock();
+  const [asOf, setAsOf] = useState<Dayjs>(dayjs(today));
   const [rep, setRep] = useState<InventoryValuation | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -60,7 +62,7 @@ export default function InventoryValuationClient({
               <>
                 Measured at <b>{METHOD_LABEL[valuationMethod] ?? valuationMethod}</b>, at the lower
                 of cost and net realizable value (ASC 330-10-35-1B). Base currency {baseCurrency},
-                as of {rep.asOf}.
+                as of {formatDate(rep.asOf)}.
               </>
             }
             description={

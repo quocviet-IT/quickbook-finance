@@ -8,7 +8,7 @@ import AgingByPartyTable, {
   type AgingGrouping,
 } from "@/components/reports/AgingByPartyTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { apAgingAction } from "./actions";
 import type { AgingReport } from "@/lib/services/aging";
 
@@ -66,7 +66,7 @@ export default function ApAgingClient({
       {rep && (
         <>
           <Typography.Text type="secondary">
-            Current open balances in {baseCurrency} · aged as of {asOf!.format("YYYY-MM-DD")} · Accrual basis
+            Current open balances in {baseCurrency} · aged as of {formatDate(asOf!.format("YYYY-MM-DD"))} · Accrual basis
           </Typography.Text>
           <Alert
             type={rep.reconciled ? "success" : "warning"}
@@ -103,7 +103,7 @@ export default function ApAgingClient({
                   { title: "Vendor", dataIndex: "entityName" },
                   { title: "Type", dataIndex: "docType" },
                   { title: "Number", dataIndex: "docNumber" },
-                  { title: "Due", dataIndex: "dueDate" },
+                  { title: "Due", dataIndex: "dueDate", render: (v: string) => formatDate(v) },
                   { title: "Bucket", dataIndex: "bucket" },
                   { title: "Balance", align: "right", render: (_, r) => fmt(r.balanceMinor) },
                 ]}

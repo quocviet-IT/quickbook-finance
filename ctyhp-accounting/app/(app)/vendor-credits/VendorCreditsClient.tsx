@@ -7,7 +7,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { fromMinor, toMinor } from "@/lib/domain/money";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { withVendor } from "@/lib/domain/vendors";
 import NewVendorButton from "@/components/NewVendorButton";
 import {
@@ -226,7 +226,7 @@ export default function VendorCreditsClient({
         columns={[
           { title: "Number", dataIndex: "vendor_credit_number", render: (n) => n ?? <Tag>draft</Tag> },
           { title: "Vendor", key: "vendor", render: (_, c) => vendorNameById.get(c.vendor_id) ?? "—" },
-          { title: "Date", dataIndex: "credit_date" },
+          { title: "Date", dataIndex: "credit_date", render: (v: string) => formatDate(v) },
           { title: "Total", align: "right", render: (_, c) => fmt(c.total_minor) },
           { title: "Remaining", align: "right", render: (_, c) => fmt(c.balance_remaining_minor) },
           {

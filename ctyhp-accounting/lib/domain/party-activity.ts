@@ -13,6 +13,7 @@
 
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { formatDateRange } from "@/lib/format";
 
 /** One posted ledger line on an income (or expense) account, signed so that a sale (or a spend) is positive. */
 export interface PartyLedgerLine {
@@ -120,7 +121,7 @@ export function partyActivitySheet(
     fileName: sanitizeExportFileName(`${sales ? "sales-by-customer" : "expenses-by-vendor"}-${ctx.from}-to-${ctx.to}`),
     companyName: ctx.companyName,
     title: sales ? "Sales by Customer Summary" : "Expenses by Vendor Summary",
-    subtitle: `${ctx.from} to ${ctx.to}`,
+    subtitle: formatDateRange(ctx.from, ctx.to),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "party", header: sales ? "Customer" : "Vendor", kind: "text", width: 36 },

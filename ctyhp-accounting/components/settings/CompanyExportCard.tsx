@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format";
 import { useState } from "react";
 import { Alert, App, Button, Card, Space, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
@@ -26,7 +27,7 @@ export function CompanyExportCard() {
       link.click();
       URL.revokeObjectURL(url);
       setLastExport({ rows: result.data.totalRows, sha: result.data.manifestSha256 });
-      message.success(`Exported ${result.data.totalRows.toLocaleString("en-US")} rows`);
+      message.success(`Exported ${plural(result.data.totalRows, "row")}`);
     } finally {
       setBusy(false);
     }
@@ -50,7 +51,7 @@ export function CompanyExportCard() {
         </Button>
         {lastExport ? (
           <Typography.Text type="secondary">
-            Last export in this session: {lastExport.rows.toLocaleString("en-US")} rows, manifest
+            Last export in this session: {plural(lastExport.rows, "row")}, manifest
             sha256 {lastExport.sha.slice(0, 12)}…
           </Typography.Text>
         ) : null}

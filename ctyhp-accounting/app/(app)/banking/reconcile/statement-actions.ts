@@ -10,7 +10,6 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
-import { shortDate } from "@/lib/domain/pdf-statement-view";
 import {
   reconciliationStatementSchema, runMonthSchema, runPreviewSchema, type ReconciliationStatementInput,
 } from "@/lib/domain/schemas";
@@ -26,7 +25,7 @@ import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } 
 import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate } from "@/lib/format";
 import {
   PROOF_REFUSAL, needsAdministrator, proofRefusal, proveStatementPayload, sentWithoutProof,
 } from "@/lib/domain/statement-proof";
@@ -304,7 +303,7 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
     if (startedId && input.kind === "month") {
       return {
         ok: false,
-        error: `The reconciliation to ${shortDate(input.statement_date, true)} was started with its statement but not signed off: ${msg(e)}. Open it to finish it.`,
+        error: `The reconciliation to ${formatDate(input.statement_date)} was started with its statement but not signed off: ${msg(e)}. Open it to finish it.`,
       };
     }
     return { ok: false, error: msg(e) };

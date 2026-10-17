@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, plural, pluralWord } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { App, Alert, Button, Divider, Modal, Select, Space, Tooltip, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
@@ -149,7 +150,7 @@ export default function BatchAssignAccountModal({
               disabled={!accountId || eligible.length === 0}
               onClick={() => void confirm()}
             >
-              {eligible.length > 0 ? `Assign to ${eligible.length} transaction${eligible.length === 1 ? "" : "s"}` : "Nothing to assign"}
+              {eligible.length > 0 ? `Assign to ${plural(eligible.length, "transaction")}` : "Nothing to assign"}
             </Button>
           </Space>
         )
@@ -166,7 +167,7 @@ export default function BatchAssignAccountModal({
             <Alert
               type="info"
               showIcon
-              message={`${skipped.length} of the selected transactions already ${skipped.length === 1 ? "has" : "have"} a journal entry`}
+              message={`${skipped.length} of the selected transactions already ${pluralWord(skipped.length, "has", "have")} a journal entry`}
               description="A line that is already matched or settled is left exactly as it is — changing it would mean voiding its entry and posting a new one, which this batch action does not do."
             />
           ) : null}
@@ -213,7 +214,7 @@ export default function BatchAssignAccountModal({
                     return (
                       <div key={failure.id}>
                         <Typography.Text>
-                          {row ? `${row.txnDate} · ${row.description} · ${row.amount}` : failure.id}
+                          {row ? `${formatDate(row.txnDate)} · ${row.description} · ${row.amount}` : failure.id}
                         </Typography.Text>
                         <br />
                         <Typography.Text type="danger" style={{ fontSize: 12 }}>

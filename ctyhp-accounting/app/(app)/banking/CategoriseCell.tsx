@@ -8,7 +8,7 @@ import type { CodingSuggestionView } from "@/lib/domain/coding";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import { isHoldingDetail } from "@/lib/domain/uncategorized";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, pluralWord } from "@/lib/format";
 import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
 import RecodedCategory from "./RecodedCategory";
 import LoanSplitModal from "./LoanSplitModal";
@@ -301,7 +301,7 @@ export default function CategoriseCell({
         {others.length ? (
           <Tooltip title={everyAccount}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              + {others.length} more account{others.length === 1 ? "" : "s"}
+              + {others.length} more {pluralWord(others.length, "account")}
             </Typography.Text>
           </Tooltip>
         ) : null}

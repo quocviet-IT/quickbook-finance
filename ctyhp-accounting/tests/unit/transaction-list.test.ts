@@ -97,8 +97,8 @@ describe("buildTransactionListSheet", () => {
   it("names the file and subtitle after the range it covers", () => {
     expect(sheet.fileName).toContain("2026-08-01");
     expect(sheet.fileName).toContain("2026-08-31");
-    expect(sheet.subtitle).toContain("2026-08-01");
-    expect(sheet.subtitle).toContain("2026-08-31");
+    expect(sheet.subtitle).toContain("08/01/2026");
+    expect(sheet.subtitle).toContain("08/31/2026");
     expect(sheet.title).toBe("Transaction List by Date");
   });
 

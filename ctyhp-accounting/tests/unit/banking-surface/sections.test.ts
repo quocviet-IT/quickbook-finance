@@ -146,7 +146,7 @@ describe("bankingWorkQueue", () => {
     );
     expect(items.map((item) => item.sourceId)).toEqual(["old", "new"]);
     expect(items[0].reason).toContain("Operating");
-    expect(items[0].reason).toContain("2026-01-05");
+    expect(items[0].reason).toContain("01/05/2026");
   });
 
   it("never produces a control row, because every check here is a summary of these rows", () => {

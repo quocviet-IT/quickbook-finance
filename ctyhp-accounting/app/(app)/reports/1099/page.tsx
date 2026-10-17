@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
+import { companyClock } from "@/lib/services/report-context";
 import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
@@ -12,8 +13,9 @@ export default async function Report1099Page() {
   const entity = await resolveActiveCompany();
   const base = (await listCurrencies(sb)).find((c) => c.is_base);
   // Default to the year most likely being prepared: the one just ended.
-  const now = new Date();
-  const defaultYear = now.getUTCMonth() < 3 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  const { today } = await companyClock(sb);
+  const [thisYear, thisMonth] = today.split("-").map(Number);
+  const defaultYear = thisMonth <= 3 ? thisYear - 1 : thisYear;
 
   return (
     <div>

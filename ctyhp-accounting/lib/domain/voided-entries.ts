@@ -13,6 +13,7 @@
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { dateInTimeZone, stampInTimeZone } from "./stamp";
+import { formatDateRange } from "@/lib/format";
 
 export interface VoidedEntry {
   entryId: string;
@@ -126,7 +127,7 @@ export function voidedEntriesSheet(
     fileName: sanitizeExportFileName(`voided-and-reversed-entries-${ctx.from}-to-${ctx.to}`),
     companyName: ctx.companyName,
     title: "Voided and Reversed Entries",
-    subtitle: `${ctx.from} to ${ctx.to}`,
+    subtitle: formatDateRange(ctx.from, ctx.to),
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "date", header: "Date of entry", kind: "text", width: 12 },

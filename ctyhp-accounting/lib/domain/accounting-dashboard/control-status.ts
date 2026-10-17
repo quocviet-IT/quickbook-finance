@@ -1,4 +1,5 @@
 import type { AccountingControl, ControlKey } from "./types";
+import { plural } from "@/lib/format";
 
 /**
  * What each accounting control means, and when it has passed.
@@ -17,10 +18,6 @@ import type { AccountingControl, ControlKey } from "./types";
 /** Minor units as a plain decimal string: the detail lines read as English. */
 function money(minor: number): string {
   return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 export function trialBalanceControl(input: {

@@ -4,6 +4,25 @@ import enUS from "antd/locale/en_US";
 import { antdThemeTokens } from "@/lib/design/tokens";
 import { useTheme } from "@/components/theme/ThemeProvider";
 
+/**
+ * English, with dates the way American readers write them. Ant Design has no
+ * app-wide date format of its own: a date picker takes its format from the
+ * locale, and the stock one shows `2026-10-16`. Every screen prints
+ * `10/16/2026` (lib/format.ts), so every picker does too. Values sent to the
+ * server are still formatted `YYYY-MM-DD` where they are sent.
+ */
+const LOCALE = {
+  ...enUS,
+  DatePicker: {
+    ...enUS.DatePicker!,
+    lang: {
+      ...enUS.DatePicker!.lang,
+      fieldDateFormat: "MM/DD/YYYY",
+      fieldDateTimeFormat: "MM/DD/YYYY h:mm A",
+    },
+  },
+};
+
 const SANS =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
@@ -26,7 +45,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const { token, components } = antdThemeTokens(theme);
   return (
     <ConfigProvider
-      locale={enUS}
+      locale={LOCALE}
       theme={{
         algorithm: theme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         /*

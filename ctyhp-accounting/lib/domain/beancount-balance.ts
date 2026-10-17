@@ -16,6 +16,7 @@
  *
  * Pure: it imports nothing from `@/lib/db` or `@/lib/services`.
  */
+import { formatDate } from "@/lib/format";
 
 export interface CompletedReconciliation {
   id: string;
@@ -103,7 +104,7 @@ export function balanceAssertions(rows: BalanceAssertionRows, baseCurrency: stri
   const out: BalanceAssertion[] = [];
   for (const r of rows.reconciliations) {
     const bank = bankById.get(r.bankAccountId);
-    if (!bank) throw new Error(`The reconciliation of ${r.statementDate} names a bank account that was not read`);
+    if (!bank) throw new Error(`The reconciliation of ${formatDate(r.statementDate)} names a bank account that was not read`);
     const base: AssertionBase = {
       reconciliationId: r.id,
       date: nextDay(r.statementDate),

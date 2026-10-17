@@ -7,7 +7,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { fromMinor, toMinor } from "@/lib/domain/money";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
   createCreditMemoAction,
   listCreditMemosAction,
@@ -223,7 +223,7 @@ export default function CreditMemosClient({
         columns={[
           { title: "Number", dataIndex: "credit_memo_number", render: (n) => n ?? <Tag>draft</Tag> },
           { title: "Customer", key: "customer", render: (_, m) => customerNameById.get(m.customer_id) ?? "—" },
-          { title: "Date", dataIndex: "memo_date" },
+          { title: "Date", dataIndex: "memo_date", render: (v: string) => formatDate(v) },
           { title: "Total", align: "right", render: (_, m) => fmt(m.total_minor) },
           { title: "Remaining", align: "right", render: (_, m) => fmt(m.balance_remaining_minor) },
           {

@@ -148,7 +148,7 @@ describe("transactionFileChecksum", () => {
 describe("describeTransactionRow", () => {
   it("reads as the line a person would check", () => {
     const line = describeTransactionRow({ ...base, amount: -320000 }, -320000);
-    expect(line).toContain("2026-01-15");
+    expect(line).toContain("01/15/2026");
     expect(line).toContain("Inventory Purchase");
     expect(line).toContain("Zelle Transfer");
   });

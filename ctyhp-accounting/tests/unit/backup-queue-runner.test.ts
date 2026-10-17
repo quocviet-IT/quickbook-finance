@@ -88,7 +88,7 @@ describe("runDueCompanyBackups", () => {
         hash: "h",
         path: "p",
         sizeBytes: 1,
-        retentionWarning: "3 expired backup file(s) could not be removed",
+        retentionWarning: "3 expired backup files could not be removed",
       }),
       today: "2026-08-15",
     });
@@ -98,7 +98,7 @@ describe("runDueCompanyBackups", () => {
     expect(run.results[0]).toMatchObject({
       ok: true,
       status: "stored",
-      retentionWarning: "3 expired backup file(s) could not be removed",
+      retentionWarning: "3 expired backup files could not be removed",
     });
   });
 

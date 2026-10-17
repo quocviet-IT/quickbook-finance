@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Descriptions, Space, Table, Tag, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatDateInTimeZone, formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, PurchasingConfigRow, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderDetail } from "@/lib/services/purchasing";
 import { remainingQty } from "@/lib/domain/purchasing";
@@ -54,6 +55,7 @@ export default function PurchaseOrderDetailClient({
   canWrite: boolean;
 }) {
   const { message, modal } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const router = useRouter();
   const { order, lines, receipts, bills, exceptions } = detail;
   const [editOpen, setEditOpen] = useState(false);
@@ -194,8 +196,8 @@ export default function PurchaseOrderDetailClient({
       >
         <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small">
           <Descriptions.Item label="Vendor">{order.vendor_name}</Descriptions.Item>
-          <Descriptions.Item label="Order date">{order.order_date}</Descriptions.Item>
-          <Descriptions.Item label="Expected date">{order.expected_date ?? "—"}</Descriptions.Item>
+          <Descriptions.Item label="Order date">{formatDate(order.order_date)}</Descriptions.Item>
+          <Descriptions.Item label="Expected date">{formatDate(order.expected_date)}</Descriptions.Item>
           <Descriptions.Item label="Currency">{order.currency_code}</Descriptions.Item>
           <Descriptions.Item label="Order total">{formatMoney(order.total_minor, order.currency_code, decimals)}</Descriptions.Item>
           <Descriptions.Item label="Ship to">{order.ship_to ?? "—"}</Descriptions.Item>
@@ -251,7 +253,7 @@ export default function PurchaseOrderDetailClient({
           emptyDescription="Record a goods receipt when the shipment arrives."
           columns={[
             { title: "Receipt", dataIndex: "receipt_number", render: (v: string | null) => v ?? "—" },
-            { title: "Date", dataIndex: "receipt_date" },
+            { title: "Date", dataIndex: "receipt_date", render: (v: string) => formatDate(v) },
             {
               title: "Lines",
               key: "lines",
@@ -309,7 +311,7 @@ export default function PurchaseOrderDetailClient({
               dataIndex: "bill_number",
               render: (v: string | null) => <Link href="/bills">{v ?? "(draft)"}</Link>,
             },
-            { title: "Date", dataIndex: "bill_date" },
+            { title: "Date", dataIndex: "bill_date", render: (v: string) => formatDate(v) },
             { title: "Total", dataIndex: "total_minor", align: "right", render: (v: number) => formatMoney(v, order.currency_code, decimals) },
             { title: "Status", dataIndex: "status", render: (s: string) => <Tag>{s}</Tag> },
           ]}
@@ -334,7 +336,7 @@ export default function PurchaseOrderDetailClient({
                 render: (v: number) => `${(v / 100).toFixed(2)}%`,
               },
               { title: "Reason", dataIndex: "reason", ...longTextColumn() },
-              { title: "Recorded", dataIndex: "created_at", render: (v: string) => v.slice(0, 10) },
+              { title: "Recorded", dataIndex: "created_at", render: (v: string) => formatDateInTimeZone(v, timeZone) },
             ]}
           />
         </Card>

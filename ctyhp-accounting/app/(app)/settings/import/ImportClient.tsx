@@ -1,4 +1,5 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { useCallback, useState } from "react";
 import {
   Alert,
@@ -15,7 +16,7 @@ import { excludedRowsCsv } from "@/lib/domain/excluded-rows";
 import { downloadTextFile } from "@/lib/client/download";
 import type { AccountRow } from "@/lib/db/types";
 import type { AccountType } from "@/lib/domain/accounts";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, plural, pluralWord } from "@/lib/format";
 import {
   fieldsFor,
   type ImportTarget,
@@ -77,11 +78,12 @@ export default function ImportClient({
   templateExamples: TemplateExamples;
 }) {
   const { message, modal } = App.useApp();
+  const { today } = useCompanyClock();
   const [target, setTarget] = useState<ImportTarget>("chart_of_accounts");
   const [bankAccountId, setBankAccountId] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [withBalances, setWithBalances] = useState(false);
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs().startOf("year"));
+  const [asOf, setAsOf] = useState<Dayjs>(dayjs(today).startOf("year"));
   const [busy, setBusy] = useState(false);
   const [imported, setImported] = useState(0);
   // What the reader decided a name in the file means, as an account code.
@@ -180,7 +182,7 @@ export default function ImportClient({
         // something that stays on screen long enough to be acted on.
         if (problems && problems.length > 0) {
           modal.info({
-            title: `${problems.length} record(s) were not imported`,
+            title: `${plural(problems.length, "record")} ${pluralWord(problems.length, "was", "were")} not imported`,
             width: 560,
             content: (
               <List
@@ -210,15 +212,15 @@ export default function ImportClient({
         message.success(
           `${created} created, ${updated} updated, ${skipped} skipped` +
             (openingCreated
-              ? `, ${openingCreated} opening balance(s) brought across`
+              ? `, ${plural(openingCreated, "opening balance")} brought across`
               : "") +
             // Said out loud because it used to be silent, and its absence only
             // showed up later as a Cash Flow Statement stuck in review.
             (classification && classification.rolesSet > 0
-              ? `. ${classification.rolesSet} account(s) classified for cash flow`
+              ? `. ${plural(classification.rolesSet, "account")} classified for cash flow`
               : "") +
             (classification && classification.stillUnclassified.length > 0
-              ? `; ${classification.stillUnclassified.length} still need a policy — set it under Chart of accounts`
+              ? `; ${classification.stillUnclassified.length} still ${pluralWord(classification.stillUnclassified.length, "needs", "need")} a policy — set it under Chart of accounts`
               : ""),
         );
         reset();

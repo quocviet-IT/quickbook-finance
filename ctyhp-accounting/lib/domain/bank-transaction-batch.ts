@@ -22,6 +22,7 @@
  * the video pointed at without inventing a distinction the schema does not
  * have.
  */
+import { plural } from "@/lib/format";
 
 // --- Selection (RQ-03) -------------------------------------------------------
 
@@ -100,9 +101,9 @@ export function splitBatchEligibility<T extends BatchEligibilityRow>(
  * not just the total selected.
  */
 export function describeBatchPreview(eligibleCount: number, skippedCount: number): string {
-  const change = `${eligibleCount} transaction${eligibleCount === 1 ? "" : "s"}`;
+  const change = plural(eligibleCount, "transaction");
   if (skippedCount === 0) return `This will change ${change}.`;
-  const skip = `${skippedCount} transaction${skippedCount === 1 ? "" : "s"}`;
+  const skip = plural(skippedCount, "transaction");
   return `This will change ${change} and skip ${skip} already posted to the ledger.`;
 }
 

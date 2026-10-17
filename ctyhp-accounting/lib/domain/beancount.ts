@@ -12,6 +12,7 @@
 import type { AccountType } from "@/lib/domain/accounts";
 import type { BalanceAssertion } from "@/lib/domain/beancount-balance";
 import { companySlugFromName } from "@/lib/domain/company-slug";
+import { plural } from "@/lib/format";
 
 export class BeancountError extends Error {}
 
@@ -512,7 +513,7 @@ export function buildBeancountLines(input: BeancountInput): BeancountTextLine[] 
           throw new BeancountError(`A reconciliation is in ${a.currencyCode}, which has no currency record`);
         }
         const diff = a.amountMinor - a.statementMinor;
-        const uncleared = `${a.unclearedCount} line${a.unclearedCount === 1 ? "" : "s"} not yet cleared`;
+        const uncleared = `${plural(a.unclearedCount, "line")} not yet cleared`;
         const agreement =
           diff === 0
             ? `Books agree with the statement.${a.unclearedCount > 0 ? ` ${uncleared} net to zero.` : ""}`

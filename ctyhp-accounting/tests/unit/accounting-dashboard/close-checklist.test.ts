@@ -93,7 +93,7 @@ describe("trialBalanceStep", () => {
   it("passes on a balanced ledger and names the date it checked", () => {
     const s = trialBalanceStep({ periodEnd: PERIOD_END, differenceMinor: 0 });
     expect(s.status).toBe("complete");
-    expect(s.evidence).toContain(PERIOD_END);
+    expect(s.evidence).toContain("03/31/2026");
     expect(s.blocksClose).toBe(true);
   });
 
@@ -218,7 +218,7 @@ describe("bankReconciledStep", () => {
       unmatchedCount: 0,
     });
     expect(s.status).toBe("outstanding");
-    expect(s.evidence).toContain("2026-02-28");
+    expect(s.evidence).toContain("02/28/2026");
   });
 
   it("a company with no bank account has nothing to reconcile", () => {
@@ -248,7 +248,7 @@ describe("approvalsStep", () => {
   it("counts only what was requested by the period end", () => {
     const s = approvalsStep({ periodEnd: PERIOD_END, pendingCount: 3 });
     expect(s.status).toBe("outstanding");
-    expect(s.evidence).toContain(PERIOD_END);
+    expect(s.evidence).toContain("03/31/2026");
   });
 
   it("an unreadable queue is not an empty queue", () => {

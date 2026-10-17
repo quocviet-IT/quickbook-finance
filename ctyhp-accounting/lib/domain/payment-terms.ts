@@ -8,6 +8,7 @@
  * 2. Ranking open bills, because a list sorted by date does not say *why* one
  *    bill should be paid before another, and that is the whole question.
  */
+import { formatDate, plural } from "@/lib/format";
 
 export interface PaymentTerms {
   /** Days from the bill date until the full amount is due. */
@@ -173,22 +174,22 @@ export function rankPayable(bill: PayableBill, today: string): RankedBill {
 
   if (daysOverdue !== null && daysOverdue > 0) {
     priority = "overdue";
-    reason = `${daysOverdue} day(s) overdue`;
+    reason = `${plural(daysOverdue, "day")} overdue`;
   } else if (discountLive) {
     priority = daysToDiscount! <= DISCOUNT_WARNING_DAYS ? "discount_expiring" : "scheduled";
     reason =
       `Discount of ${(discountAvailableMinor / 100).toFixed(2)} ` +
-      `until ${bill.discountDueDate}${daysToDiscount === 0 ? " — today" : ` (${daysToDiscount} day(s))`}`;
+      `until ${formatDate(bill.discountDueDate)}${daysToDiscount === 0 ? " — today" : ` (${plural(daysToDiscount!, "day")})`}`;
   } else if (daysOverdue !== null && daysOverdue >= -DUE_SOON_DAYS) {
     priority = "due_soon";
-    reason = daysOverdue === 0 ? "Due today" : `Due in ${-daysOverdue} day(s)`;
+    reason = daysOverdue === 0 ? "Due today" : `Due in ${plural(-daysOverdue, "day")}`;
   } else if (daysOverdue === null) {
     // No due date at all: it cannot be scheduled, so it needs a person.
     priority = "due_soon";
     reason = "No due date on this bill";
   } else {
     priority = "scheduled";
-    reason = `Due ${bill.dueDate}`;
+    reason = `Due ${formatDate(bill.dueDate)}`;
   }
 
   return {
@@ -267,8 +268,8 @@ export function describePayRun(run: PayRun): string | null {
   if (overdue.length > 0) {
     const worst = overdue[0];
     parts.push(
-      `${overdue.length} bill(s) overdue, ${(run.totals.overdueMinor / 100).toFixed(2)} in total — ` +
-        `the oldest is ${worst.vendorName} at ${worst.daysOverdue} days`,
+      `${plural(overdue.length, "bill")} overdue, ${(run.totals.overdueMinor / 100).toFixed(2)} in total — ` +
+        `the oldest is ${worst.vendorName} at ${plural(worst.daysOverdue ?? 0, "day")}`,
     );
   }
   if (expiring.length > 0) {

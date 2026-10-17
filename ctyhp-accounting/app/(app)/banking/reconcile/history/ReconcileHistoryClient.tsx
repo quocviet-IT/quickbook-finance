@@ -7,7 +7,6 @@ import DataTable from "@/components/ui/DataTable";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { ToneBadge } from "@/lib/design/tone";
 import { toMinor } from "@/lib/domain/money";
-import { shortDate } from "@/lib/domain/pdf-statement-view";
 import {
   OPEN_IN_PROGRESS,
   STATEMENT_BALANCE_ON,
@@ -24,7 +23,7 @@ import {
   type HistoryPreview,
 } from "@/lib/domain/reconcile-history";
 import { bringHistoryForwardConfirmation } from "@/lib/domain/reconcile-statement";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate } from "@/lib/format";
 import { bringHistoryForwardAction, historyPreviewAction, reconciliationHistoryAction } from "../history-actions";
 import { HISTORY_COLUMN_WIDTH as W, HISTORY_ELASTIC_FLOOR, HISTORY_STATE_TONES } from "./history-columns";
 import styles from "./history.module.css";
@@ -32,8 +31,8 @@ import styles from "./history.module.css";
 /** How long the preview waits after the date changes before it reads the books. */
 const PREVIEW_DELAY_MS = 350;
 
-/** A date in the table as the card under it prints one, "Sep 30, 2026"; a dash when there is none. */
-const historyDateCell = (iso: string | null) => (iso ? <time dateTime={iso}>{shortDate(iso, true)}</time> : "—");
+/** A date in the table as the card under it prints one, "09/30/2026"; a dash when there is none. */
+const historyDateCell = (iso: string | null) => (iso ? <time dateTime={iso}>{formatDate(iso)}</time> : "—");
 
 /**
  * Reconcile history (2.03): every bank account with the posted lines no

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Drawer, Skeleton } from "antd";
-import { formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatMoney, formatDate } from "@/lib/format";
 import { entryHeadline, entryTotals, type EntryDetail } from "@/lib/domain/entry-detail";
-import { shortDate } from "@/lib/domain/report-presets";
 import { entryDetailAction } from "@/app/(app)/reports/entry-actions";
 import { SourceTag, reportPaperStyles as styles } from "./ReportPaper";
 
@@ -61,7 +61,7 @@ export default function EntryDetailDrawer({
   };
 
   const money = (minor: number) => (detail ? formatMoney(minor, detail.currencyCode, detail.decimals) : "");
-  const today = new Date().toISOString().slice(0, 10);
+  const { today } = useCompanyClock();
 
   const title = (
     <div>
@@ -146,8 +146,8 @@ function EntryBody({
         <div className={styles.payee}>{payee}</div>
         {narration ? <div className={styles.narration}>{narration}</div> : null}
         <div className={styles.when}>
-          {shortDate(detail.entryDate)}
-          {doc?.dueDate ? ` · due ${shortDate(doc.dueDate)}` : ""}
+          {formatDate(detail.entryDate)}
+          {doc?.dueDate ? ` · due ${formatDate(doc.dueDate)}` : ""}
           {doc?.number ? ` · entry ${detail.entryNumber}` : ""}
         </div>
       </div>
@@ -261,7 +261,7 @@ function EntryBody({
                     onClick={r.entryId ? () => onOpen(r.entryId) : undefined}
                     title={r.entryId ? "Open this entry" : undefined}
                   >
-                    <td>{shortDate(r.date)}</td>
+                    <td>{formatDate(r.date)}</td>
                     <td>
                       <SourceTag sourceType={r.sourceType} number={r.number} />
                     </td>

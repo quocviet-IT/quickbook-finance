@@ -8,11 +8,9 @@ import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate, formatDateTime } from "@/lib/format";
 import type { PresetContext } from "@/lib/domain/report-presets";
-import { shortDate } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
-import { stampInTimeZone } from "@/lib/domain/stamp";
 import { voidedEntriesSheet, type VoidedEntriesLine, type VoidedEntriesReport } from "@/lib/domain/voided-entries";
 
 const PAGE_SIZE = 50;
@@ -86,7 +84,7 @@ export default function VoidedEntriesClient({
               emptyTitle="Nothing was voided or reversed in this period"
               emptyDescription="Widen the dates."
               columns={[
-                { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE + 20, render: (d: string) => shortDate(d) },
+                { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE + 20, render: (d: string) => formatDate(d) },
                 {
                   title: "Entry",
                   key: "entry",
@@ -125,7 +123,7 @@ export default function VoidedEntriesClient({
                   width: 190,
                   render: (_: unknown, line: VoidedEntriesLine) => (
                     <span>
-                      {line.actedAt ? stampInTimeZone(line.actedAt, timeZone) : <span className={styles.muted}>Not recorded</span>}
+                      {line.actedAt ? formatDateTime(line.actedAt, timeZone) : <span className={styles.muted}>Not recorded</span>}
                       {line.by ? <span className={styles.muted}> · {line.by}</span> : null}
                     </span>
                   ),

@@ -1,6 +1,6 @@
 "use client";
 import { Alert, Space, Table, Tag, Typography } from "antd";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
   buildSettlementHistory,
   settlementTypeLabel,
@@ -69,7 +69,7 @@ export default function SettlementHistory({
         dataSource={history.lines}
         locale={{ emptyText }}
         columns={[
-          { title: "Date", dataIndex: "settledOn", width: 110 },
+          { title: "Date", dataIndex: "settledOn", width: 110, render: (v: string) => formatDate(v) },
           {
             title: "Type",
             dataIndex: "settlementType",

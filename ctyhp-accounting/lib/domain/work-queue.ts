@@ -1,3 +1,5 @@
+import { plural } from "@/lib/format";
+
 export type WorkQueueKind =
   | "overdue_invoice"
   | "due_bill"
@@ -74,7 +76,7 @@ function timingFor(source: WorkQueueSource, asOf: string): {
   if (source.kind === "overdue_invoice") {
     return {
       priority: ageDays > 30 ? "critical" : "high",
-      timingLabel: `${Math.max(1, ageDays)} day${ageDays === 1 ? "" : "s"} overdue`,
+      timingLabel: `${plural(Math.max(1, ageDays), "day")} overdue`,
     };
   }
 
@@ -84,7 +86,7 @@ function timingFor(source: WorkQueueSource, asOf: string): {
       const overdueDays = Math.abs(daysUntilDue);
       return {
         priority: overdueDays > 30 ? "critical" : "high",
-        timingLabel: `${overdueDays} day${overdueDays === 1 ? "" : "s"} overdue`,
+        timingLabel: `${plural(overdueDays, "day")} overdue`,
       };
     }
     if (daysUntilDue === 0) {
@@ -92,7 +94,7 @@ function timingFor(source: WorkQueueSource, asOf: string): {
     }
     return {
       priority: "normal",
-      timingLabel: `Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`,
+      timingLabel: `Due in ${plural(daysUntilDue, "day")}`,
     };
   }
 
@@ -102,7 +104,7 @@ function timingFor(source: WorkQueueSource, asOf: string): {
       timingLabel:
         ageDays === 0
           ? "New bank activity"
-          : `Unmatched for ${ageDays} day${ageDays === 1 ? "" : "s"}`,
+          : `Unmatched for ${plural(ageDays, "day")}`,
     };
   }
 
@@ -111,7 +113,7 @@ function timingFor(source: WorkQueueSource, asOf: string): {
     timingLabel:
       ageDays === 0
         ? "Submitted today"
-        : `Waiting ${ageDays} day${ageDays === 1 ? "" : "s"}`,
+        : `Waiting ${plural(ageDays, "day")}`,
   };
 }
 

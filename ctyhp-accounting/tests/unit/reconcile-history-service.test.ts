@@ -135,7 +135,7 @@ describe("bringing the history forward", () => {
   });
 
   it("passes the database's refusal on as it is", async () => {
-    const message = "The books hold 4,987.65 on Aug 31, 2026; the statement shows 5,123.40. Out by 135.75.";
+    const message = "The books hold 4,987.65 on 08/31/2026; the statement shows 5,123.40. Out by 135.75.";
     const { sb } = fakeClient({}, { acc_bring_history_forward: refused(message) });
     await expect(bringHistoryForward(sb, "bank-1", "2026-08-31", 512340, "A note")).rejects.toThrow(new BankRecError(message));
   });
@@ -174,7 +174,7 @@ describe("bringing the history forward", () => {
       p_bank_account_id: "bank-1",
       p_through: "2026-08-31",
       p_balance_minor: 512340,
-      p_note: "Brought forward, proved by the opening balance on the statement for Sep 1 – Sep 30, 2026",
+      p_note: "Brought forward, proved by the opening balance on the statement for 09/01/2026 – 09/30/2026",
     });
     // The statement's file is the new reconciliation's evidence too.
     expect(calls.find((c) => c.fn === "acc_link_reconciliation_statement_file")?.args).toEqual({

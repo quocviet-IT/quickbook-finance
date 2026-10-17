@@ -9,6 +9,7 @@ import {
   type RelatedCompanyInput,
 } from "@/lib/domain/related-companies";
 import { phrasesOf } from "@/lib/domain/repayments";
+import { companyToday } from "./company";
 import { listAccounts } from "./accounts";
 import { readAllPages } from "./paging";
 import { baseCurrencyBankIds, listRepayments } from "./repayment-register";
@@ -106,13 +107,14 @@ export async function relatedWaitingCounts(
 export async function relatedBalances(
   sb: SupabaseClient,
   accountIds: readonly string[],
-  asOf: string = new Date().toISOString().slice(0, 10),
+  asOf?: string,
 ): Promise<Record<string, number>> {
   if (!accountIds.length) return {};
+  const through = asOf ?? (await companyToday(sb));
   const rows = await readAllPages<{ account_id: string; debit_base: number; credit_base: number }>(
     (from, to) =>
       sb
-        .rpc("acc_ledger_balances", { p_from: null, p_to: asOf })
+        .rpc("acc_ledger_balances", { p_from: null, p_to: through })
         .in("account_id", [...accountIds])
         // account_id is unique per row, so this order is total and the pages cannot overlap or skip.
         .order("account_id")

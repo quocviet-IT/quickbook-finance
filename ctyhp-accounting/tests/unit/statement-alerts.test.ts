@@ -468,7 +468,7 @@ describe("the copy", () => {
     const card = negativeCard("Operating Checking", watch(), fmt);
     expect(card.title).toBe("Operating Checking reads below zero, and still does today");
     expect(segmentsText(card.body)).toBe(
-      "The last statement you agreed on this account closed at $300.00 on Jan 5, 2026, so the balance was right on the day it was proved. Since then it drops to -$150.00 on Jan 12, 2026. It reads -$120.00 today. A bank would have charged you for an overdraft and shown it on the statement; where it has not, what is dragging it under is usually an entry that is not a payment — a balance posted as one, or the same thing entered twice.",
+      "The last statement you agreed on this account closed at $300.00 on 01/05/2026, so the balance was right on the day it was proved. Since then it drops to -$150.00 on 01/12/2026. It reads -$120.00 today. A bank would have charged you for an overdraft and shown it on the statement; where it has not, what is dragging it under is usually an entry that is not a payment — a balance posted as one, or the same thing entered twice.",
     );
     expect(card.body.filter((s) => s.bold).map((s) => s.text)).toEqual(["$300.00", "-$150.00"]);
     expect(card.listHeading).toBe("The largest 1 of the 9 payments not yet on a statement:");

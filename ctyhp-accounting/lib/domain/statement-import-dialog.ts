@@ -15,7 +15,7 @@
  * will be imported; and a statement that does not add up is never attached,
  * so nobody is offered "Import anyway…" there.
  */
-import { shortDate } from "./pdf-statement-view";
+import { formatDate } from "@/lib/format";
 import type { StatementLine } from "./statement-import";
 import {
   PROOF_REFUSAL,
@@ -251,10 +251,10 @@ export function linesCheckFailed(reason: string): string {
   return `The lines could not be checked against Bank Transactions (${why}), so nothing can be imported yet. Choose the file again to try once more.`;
 }
 
-/** "Mar 31, 2026 · PAYROLL · -$412.30": one line, as the other-source list names it. */
+/** "03/31/2026 · PAYROLL · -$412.30": one line, as the other-source list names it. */
 export function previewLineLabel(
   line: Pick<StatementLine, "txn_date" | "description" | "amount_minor">,
   money: (minor: number) => string,
 ): string {
-  return `${shortDate(line.txn_date, true)} · ${line.description || "(no description)"} · ${money(line.amount_minor)}`;
+  return `${formatDate(line.txn_date)} · ${line.description || "(no description)"} · ${money(line.amount_minor)}`;
 }

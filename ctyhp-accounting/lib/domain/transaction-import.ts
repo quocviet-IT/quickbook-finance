@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { formatDate } from "@/lib/format";
 
 /**
  * One categorized transaction, as the column mapper hands it over.
@@ -122,7 +123,7 @@ export function describeTransactionRow(
 ): string {
   const direction = signedMinor > 0 ? "in" : "out";
   return (
-    `${record.txn_date} · ${record.description || "(no description)"} · ` +
+    `${formatDate(record.txn_date)} · ${record.description || "(no description)"} · ` +
     `${record.category_account} · ${direction}`
   );
 }

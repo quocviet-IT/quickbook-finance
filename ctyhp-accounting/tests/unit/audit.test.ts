@@ -6,7 +6,6 @@ import {
   diffAuditEntry,
   documentAttribution,
   formatActor,
-  formatAuditTimestamp,
   formatAuditValue,
   summarizeAuditChanges,
   type AuditEntryLike,
@@ -99,10 +98,6 @@ describe("value formatting", () => {
     expect(formatActor(null)).toBe("system");
     expect(formatActor("")).toBe("system");
     expect(formatActor("admin@ctyhp.vn")).toBe("admin@ctyhp.vn");
-  });
-
-  it("trims a stored timestamp to seconds", () => {
-    expect(formatAuditTimestamp("2026-07-31T01:05:07.262484+00:00")).toBe("2026-07-31 01:05:07");
   });
 });
 

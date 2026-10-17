@@ -3,10 +3,10 @@ import Link from "next/link";
 import { Alert, Button, Space, Tag, Tooltip, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { ADD_ANYWAY, HELD_BACK_HEADING, type AddItem, type AddMissingPlan, type HeldLine } from "@/lib/domain/add-missing";
-import { shortDate } from "@/lib/domain/pdf-statement-view";
 import { ADD_MISSING_WIDTH as AW } from "./statement-line-columns";
 import styles from "./workspace.module.css";
 
+import { formatDate, plural } from "@/lib/format";
 /**
  * The statement lines the books do not have, and one click that adds them all
  * (the prototype's "Add all N to the books", p24b.html). The table shows what
@@ -43,7 +43,7 @@ export default function AddMissingBox({ plan, bankAccountId, money, adding, onAd
     <Alert
       type="warning"
       showIcon
-      title={`The bank shows ${missing} ${missing === 1 ? "thing" : "things"} your books do not.`}
+      title={`The bank shows ${plural(missing, "thing")} your books do not.`}
       description={
         <Space direction="vertical" size="small" style={{ width: "100%" }}>
           <Typography.Text>{INTRO}</Typography.Text>
@@ -56,7 +56,7 @@ export default function AddMissingBox({ plan, bankAccountId, money, adding, onAd
               pagination={false}
               dataSource={items}
               columns={[
-                { title: "Date", render: (_, item) => shortDate(item.txnDate, true), width: AW.date },
+                { title: "Date", render: (_, item) => formatDate(item.txnDate), width: AW.date },
                 { title: "Description", dataIndex: "description" },
                 { title: "Amount", align: "right", render: (_, item) => money(item.amountMinor), width: AW.amount },
                 {
@@ -88,7 +88,7 @@ export default function AddMissingBox({ plan, bankAccountId, money, adding, onAd
                   <li key={line.lineNo} style={{ marginBottom: 6 }}>
                     <Space size={[8, 2]} wrap align="center">
                       <span>
-                        {shortDate(line.txnDate, true)} · {line.description || "(no description)"} · {money(line.amountMinor)} →{" "}
+                        {formatDate(line.txnDate)} · {line.description || "(no description)"} · {money(line.amountMinor)} →{" "}
                         <Tooltip title={line.why}>
                           <span>{line.accountLabel}</span>
                         </Tooltip>
@@ -118,7 +118,7 @@ export default function AddMissingBox({ plan, bankAccountId, money, adding, onAd
               <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
                 {cannot.map((line) => (
                   <li key={line.lineNo}>
-                    {shortDate(line.txnDate, true)} · {line.description || "(no description)"} · {money(line.amountMinor)} — {line.note}
+                    {formatDate(line.txnDate)} · {line.description || "(no description)"} · {money(line.amountMinor)} — {line.note}
                   </li>
                 ))}
               </ul>

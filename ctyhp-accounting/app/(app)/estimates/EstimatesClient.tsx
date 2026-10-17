@@ -20,7 +20,7 @@ import {
   estimateMessages,
   type EstimateFilter,
 } from "@/lib/domain/estimates";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
   declineEstimateAction,
   deleteEstimateAction,
@@ -115,7 +115,7 @@ export default function EstimatesClient({
       return;
     }
     modal.confirm({
-      title: estimateMessages.expiredConfirm(target.estimate_number, target.expiry_date),
+      title: estimateMessages.expiredConfirm(target.estimate_number, formatDate(target.expiry_date)),
       okText: "Turn into an invoice",
       cancelText: "Cancel",
       onOk: go,

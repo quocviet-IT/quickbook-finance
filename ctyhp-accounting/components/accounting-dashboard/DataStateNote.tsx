@@ -11,5 +11,4 @@ export {
   HealthyEmpty,
   UnavailableNote,
   freshnessOf,
-  timeOnly,
 } from "@/components/work-surface/DataStateNote";

@@ -1,4 +1,6 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, formatDateInTimeZone, plural } from "@/lib/format";
 import { useState } from "react";
 import { App, Button, Input, Modal, Table, Tag, Typography } from "antd";
 import type { ImportBatchRow } from "@/lib/services/ledger-import";
@@ -29,6 +31,7 @@ export default function LedgerBatchList({
   emptyText,
 }: LedgerBatchListProps) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const [undoing, setUndoing] = useState<ImportBatchRow | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,12 +48,12 @@ export default function LedgerBatchList({
     const { removed, kept } = result.data;
     message.success(
       undoing.source === "invoices"
-        ? `${removed} draft invoice(s) removed` +
+        ? `${plural(removed, "draft invoice")} removed` +
             (kept > 0 ? `; ${kept} left in place because they have been issued` : "")
         : LIST_SOURCES.includes(undoing.source)
-          ? `${removed} record(s) removed` +
+          ? `${plural(removed, "record")} removed` +
             (kept > 0 ? `; ${kept} left in place because something else uses them` : "")
-          : `${removed} entries voided`,
+          : `${plural(removed, "entry", "entries")} voided`,
     );
     setUndoing(null);
     setReason("");
@@ -90,7 +93,7 @@ export default function LedgerBatchList({
             title: "Covers",
             width: 200,
             render: (_, row) =>
-              row.from_date ? `${row.from_date} → ${row.to_date ?? row.from_date}` : "—",
+              row.from_date ? `${formatDate(row.from_date)} → ${formatDate(row.to_date ?? row.from_date)}` : "—",
           },
           { title: "Entries", dataIndex: "entry_count", width: 90, align: "right" },
           { title: "Lines", dataIndex: "line_count", width: 90, align: "right" },
@@ -108,7 +111,7 @@ export default function LedgerBatchList({
             title: "Imported",
             dataIndex: "imported_at",
             width: 120,
-            render: (value: string) => value.slice(0, 10),
+            render: (value: string) => formatDateInTimeZone(value, timeZone),
           },
           {
             title: "",
@@ -140,14 +143,14 @@ export default function LedgerBatchList({
         <p>
           {undoing && LIST_SOURCES.includes(undoing.source) ? (
             <>
-              This removes the {undoing?.entry_count ?? 0} record(s) this import created. Anything
+              This removes the {plural(undoing?.entry_count ?? 0, "record")} this import created. Anything
               it only updated is left as it is — the values it replaced were never kept, so there
               is nothing to put back. A record something else now uses — an account with a posted
               entry, a customer named on an invoice — is left where it is and reported back.
             </>
           ) : undoing?.source === "invoices" ? (
             <>
-              This deletes the {undoing?.entry_count ?? 0} draft invoice(s) this import raised.
+              This deletes the {plural(undoing?.entry_count ?? 0, "draft invoice")} this import raised.
               A draft has no number and has posted nothing, so removing it leaves no trace and no
               gap. Any of them already issued is left exactly where it is and reported back —
               those hold a number and a journal entry, and taking one out is a void, on the
@@ -155,7 +158,7 @@ export default function LedgerBatchList({
             </>
           ) : (
             <>
-              This voids the {undoing?.entry_count ?? 0} entries this import created. Voided
+              This voids the {plural(undoing?.entry_count ?? 0, "entry", "entries")} this import created. Voided
               entries stay in the ledger and drop out of every report, exactly as a voided invoice
               does. An entry dated in a closed period cannot be voided — reverse it instead.
             </>

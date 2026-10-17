@@ -112,7 +112,7 @@ describe("a statement that is out", () => {
     const misread = { ...PRINTED, closingMinor: 120000 };
     const out = view({ figures: misread });
     expect(out.proof.sentences.detail).toBe(
-      "It equals the statement line “SERVICE FEE” of Mar 20, 2026 (−20.00), which may have been misread. Mark it Not a transaction if it is not one.",
+      "It equals the statement line “SERVICE FEE” of 03/20/2026 (−20.00), which may have been misread. Mark it Not a transaction if it is not one.",
     );
     const fixed = view({ figures: misread, marks: marks({ aside: [2] }) });
     expect(fixed.tone).toBe("adds");
@@ -152,15 +152,15 @@ describe("a balance missing", () => {
   it("offers the prior statement's closing when the start is not known, and hides the field once it is taken", () => {
     const qif = { kind: "qif" as const, figures: {}, prior: { date: "2026-02-28", endingMinor: 100000 } };
     const offered = view({ ...qif, marks: marks({ typedClosingMinor: 118000 }) });
-    expect(offered.priorOffer).toEqual({ label: "Use $1,000.00 (the closing of the reconciliation to Feb 28, 2026)", taken: false });
+    expect(offered.priorOffer).toEqual({ label: "Use $1,000.00 (the closing of the reconciliation to 02/28/2026)", taken: false });
     expect(offered.showOpeningField).toBe(true);
     expect(offered.missingText).toBe(PROOF_REFUSAL.noOpening);
 
     const taken = view({ ...qif, marks: marks({ typedClosingMinor: 118000, usePrior: true }) });
-    expect(taken.priorOffer).toEqual({ label: "Use $1,000.00 (the closing of the reconciliation to Feb 28, 2026)", taken: true });
+    expect(taken.priorOffer).toEqual({ label: "Use $1,000.00 (the closing of the reconciliation to 02/28/2026)", taken: true });
     expect(taken.showOpeningField).toBe(false);
     expect(taken.tone).toBe("adds");
-    expect(taken.proof.sentences.summary).toContain("Opening $1,000.00 (from the reconciliation to Feb 28, 2026)");
+    expect(taken.proof.sentences.summary).toContain("Opening $1,000.00 (from the reconciliation to 02/28/2026)");
   });
 });
 
@@ -198,13 +198,13 @@ describe("lines ticked Not a transaction", () => {
       view({ lines: payroll, figures, marks: marks({ aside }), check: checkStatementLinesFrom(payroll, aside, facts) });
 
     expect(tick([]).repeats.map((group) => group.text)).toEqual([
-      "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
+      "3 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
     ]);
     // The first ticked: the second is sent with the key the first had, so it is the one already here.
     const ticked = tick([0]);
     expect(checkStatementLinesFrom(payroll, [0], facts).present).toEqual([1]);
     expect(ticked.repeats.map((group) => group.text)).toEqual([
-      "2 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 1 will be imported.",
+      "2 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 1 will be imported.",
     ]);
     expect(ticked.checking).toBe(false);
     expect(ticked.okDisabled).toBe(false);
@@ -267,7 +267,7 @@ describe("repeated lines", () => {
       check: { present: [0], otherSource: [] },
     });
     expect(v.repeats.map((group) => group.text)).toEqual([
-      "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
+      "3 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
     ]);
     expect(confirmStatement(PAYROLL, NO_MARKS, v).repeats).toBe(v.repeats);
   });
@@ -305,8 +305,8 @@ describe("the preview's words", () => {
     expect(NOT_A_TRANSACTION).toBe("Not a transaction");
     expect(OTHER_SOURCE_NOTE).toBe("These lines are skipped. Tick one to import it as well.");
     expect(CHECKING_LINES).toBe("Checking the lines against Bank Transactions…");
-    expect(previewLineLabel(line("2026-03-31", -41230, "PAYROLL"), money)).toBe("Mar 31, 2026 · PAYROLL · -$412.30");
-    expect(previewLineLabel(line("2026-03-31", 500, ""), money)).toBe("Mar 31, 2026 · (no description) · $5.00");
+    expect(previewLineLabel(line("2026-03-31", -41230, "PAYROLL"), money)).toBe("03/31/2026 · PAYROLL · -$412.30");
+    expect(previewLineLabel(line("2026-03-31", 500, ""), money)).toBe("03/31/2026 · (no description) · $5.00");
   });
 
   it("say when the lines could not be checked, and how to try again", () => {

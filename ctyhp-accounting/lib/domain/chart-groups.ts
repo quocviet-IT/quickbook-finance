@@ -14,9 +14,9 @@ import {
 } from "./accounts";
 import { isBankSectionDetail } from "./account-detail";
 import { fiscalYearForDate } from "./fiscal";
-import { shortDate } from "./report-presets";
 import type { ZoomSpec } from "./statement";
 
+import { formatDate, plural } from "@/lib/format";
 export type ChartGroupKey =
   | "bank_cash"
   | "receivables"
@@ -214,12 +214,12 @@ export function chartZoomSpec(
   };
 }
 
-/** "45 accounts, 28 carrying a balance at Oct 10, 2026." */
+/** "45 accounts, 28 carrying a balance at 10/10/2026." */
 export function chartLede(total: number, withBalance: number, asOf: string): string {
-  return `${total} ${total === 1 ? "account" : "accounts"}, ${withBalance} carrying a balance at ${shortDate(asOf)}.`;
+  return `${plural(total, "account")}, ${withBalance} carrying a balance at ${formatDate(asOf)}.`;
 }
 
-/** "Year to date, from Jan 1, 2026" */
+/** "Year to date, from 01/01/2026" */
 export function groupRangeLabel(fiscalYearStart: string): string {
-  return `Year to date, from ${shortDate(fiscalYearStart)}`;
+  return `Year to date, from ${formatDate(fiscalYearStart)}`;
 }

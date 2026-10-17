@@ -53,7 +53,7 @@ describe("labels", () => {
     expect(signedAmountText(0, fmt)).toBe("$0.00");
   });
   it("words the button as the spec does", () => {
-    expect(adjustButtonLabel(-505, "2026-06-30", fmt)).toBe("Adjust inventory by -$5.05 at 2026-06-30");
+    expect(adjustButtonLabel(-505, "2026-06-30", fmt)).toBe("Adjust inventory by -$5.05 at 06/30/2026");
   });
   it("carries the hint and footnote verbatim", () => {
     expect(PASTE_HINT).toBe(

@@ -13,7 +13,7 @@ import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, ItemRow, PoStatus, VendorRow } from "@/lib/db/types";
 import type { PurchaseOrderWithVendor } from "@/lib/services/purchasing";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import PurchaseOrderFormModal from "./PurchaseOrderFormModal";
 
 const STATUS_COLOR: Record<PoStatus, string> = {
@@ -128,8 +128,8 @@ export default function PurchaseOrdersClient({
             render: (v: string | null, r) => <Link href={`/purchase-orders/${r.id}`}>{v ?? "(draft)"}</Link>,
           },
           { title: "Vendor", dataIndex: "vendor_name" },
-          { title: "Order Date", dataIndex: "order_date" },
-          { title: "Expected", dataIndex: "expected_date", render: (v: string | null) => v ?? "—" },
+          { title: "Order Date", dataIndex: "order_date", render: (v: string) => formatDate(v) },
+          { title: "Expected", dataIndex: "expected_date", render: (v: string | null) => formatDate(v) },
           {
             title: "Total",
             dataIndex: "total_minor",

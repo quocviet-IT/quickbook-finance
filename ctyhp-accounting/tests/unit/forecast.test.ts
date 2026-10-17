@@ -65,8 +65,8 @@ describe("helpers", () => {
   });
 
   it("writes a month and day", () => {
-    expect(monthDay("2026-10-16")).toBe("Oct 16");
-    expect(monthDay("2026-01-05")).toBe("Jan 5");
+    expect(monthDay("2026-10-16")).toBe("10/16");
+    expect(monthDay("2026-01-05")).toBe("01/05");
   });
 
   it("cuts a long template name to 40 characters, ellipsis included", () => {
@@ -108,7 +108,7 @@ describe("buildCashForecast: the weeks", () => {
     const forecast = buildCashForecast({ today: TODAY, mode: "due", openingMinor: 0, openItems: [] });
     expect(forecast.weeks).toHaveLength(13);
     expect(forecast.weeks[0]).toMatchObject({ label: "This week", start: "2026-07-31", end: "2026-08-06" });
-    expect(forecast.weeks[1]).toMatchObject({ label: "w/c Aug 7", start: "2026-08-07", end: "2026-08-13" });
+    expect(forecast.weeks[1]).toMatchObject({ label: "w/c 08/07", start: "2026-08-07", end: "2026-08-13" });
     expect(forecast.weeks[12].end).toBe("2026-10-29");
   });
 
@@ -149,7 +149,7 @@ describe("buildCashForecast: the weeks", () => {
       openingMinor: 1_000_00,
       openItems: [payable({ dueDate: "2026-08-12", balanceMinor: 300_00 }), receivable({ dueDate: "2026-08-20", balanceMinor: 900_00 })],
     });
-    expect(dipping.lowest).toEqual({ label: "w/c Aug 7", start: "2026-08-07", minor: 700_00 });
+    expect(dipping.lowest).toEqual({ label: "w/c 08/07", start: "2026-08-07", minor: 700_00 });
     expect(dipping.firstBelowZero).toBeNull();
   });
 
@@ -361,7 +361,7 @@ describe("buildCashForecast: recurring in the weeks", () => {
     const points = chartPoints(forecast);
     expect(points).toHaveLength(13);
     expect(points[0].label).toBe("Now");
-    expect(points[1]).toEqual({ label: "Aug 7", inMinor: 50_00, outMinor: 0, closingMinor: 150_00 });
+    expect(points[1]).toEqual({ label: "08/07", inMinor: 50_00, outMinor: 0, closingMinor: 150_00 });
   });
 });
 

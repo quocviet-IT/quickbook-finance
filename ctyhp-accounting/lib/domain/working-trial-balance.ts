@@ -16,7 +16,7 @@ import { statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import { fromMinor } from "@/lib/domain/money";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
-import { rangeText } from "@/lib/domain/report-presets";
+import { formatDateRange } from "@/lib/format";
 
 export const RETAINED_EARNINGS_KEY = "retained-earnings-before-period";
 export const RETAINED_EARNINGS_LABEL = "Retained earnings — before this period";
@@ -301,7 +301,7 @@ export function workingTrialBalanceSheet(report: WorkingTrialBalance, meta: WtbS
     fileName: sanitizeExportFileName(`working-trial-balance-${report.from}-to-${report.to}`),
     companyName: meta.companyName,
     title: "Working Trial Balance",
-    subtitle: `${rangeText(report.from, report.to)} · Accrual basis`,
+    subtitle: `${formatDateRange(report.from, report.to)} · Accrual basis`,
     currencyCode: meta.currencyCode,
     columns: [
       { key: "account", header: "Account", width: 44 },

@@ -9,7 +9,7 @@ import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/r
 import SimpleReport from "@/components/reports/SimpleReport";
 import { closeLogSheet, type CloseLogLine, type CloseLogReport } from "@/lib/domain/close-log";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
-import { stampInTimeZone } from "@/lib/domain/stamp";
+import { formatDateTime } from "@/lib/format";
 
 const EVENT_COLOR: Record<CloseLogLine["event"], string | undefined> = {
   Closed: "blue",
@@ -79,7 +79,7 @@ export default function CloseLogClient({
                 title: "When",
                 dataIndex: "at",
                 width: 150,
-                render: (at: string | null) => (at ? stampInTimeZone(at, timeZone) : "—"),
+                render: (at: string | null) => (at ? formatDateTime(at, timeZone) : "—"),
               },
               { title: "By", dataIndex: "by", width: 200, ellipsis: true, render: (by: string | null) => by ?? "—" },
               flexColumn<CloseLogLine>({

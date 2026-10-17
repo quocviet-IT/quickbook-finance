@@ -5,7 +5,7 @@ import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { journalReportAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
 
@@ -70,7 +70,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals, initia
           placeholder="Source"
           value={source}
           onChange={setSource}
-          options={SOURCES.map((s) => ({ value: s, label: sourceLabel(s) }))}
+          options={SOURCES.map((source) => ({ value: source, label: sourceLabel(source) }))}
         />
         <DatePicker.RangePicker value={range} onChange={(v) => setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)} />
       </FilterBar>
@@ -100,8 +100,8 @@ export default function JournalReportClient({ baseCurrency, baseDecimals, initia
         }}
         columns={[
           { title: "Number", dataIndex: "entryNumber" },
-          { title: "Date", dataIndex: "entryDate" },
-          { title: "Source", dataIndex: "sourceType", render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
+          { title: "Date", dataIndex: "entryDate", render: (v: string) => formatDate(v) },
+          { title: "Source", dataIndex: "sourceType", render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
           { title: "Description", dataIndex: "description" },
           {
             title: "Status",

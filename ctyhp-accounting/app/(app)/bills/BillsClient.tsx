@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -141,7 +142,7 @@ export default function BillsClient({
 
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "overdue" | BillStatus>("all");
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { today } = useCompanyClock();
 
   const visibleBills = useMemo(() => {
     if (!initialQueue) return bills;
@@ -253,7 +254,7 @@ export default function BillsClient({
         {initialQueue ? (
           <div className="accounting-queue-filter">
             <Tag color="orange">Work queue · bills due</Tag>
-            <span>Through {initialQueue.dueThrough}</span>
+            <span>Through {formatDate(initialQueue.dueThrough)}</span>
             <Button onClick={() => router.push("/bills")}>Show all</Button>
           </div>
         ) : null}
@@ -326,8 +327,8 @@ export default function BillsClient({
               ),
             }),
           },
-          { title: "Date", dataIndex: "bill_date", width: COLUMN.DATE },
-          { title: "Due", dataIndex: "due_date", width: COLUMN.DATE, render: (v) => v ?? "—" },
+          { title: "Date", dataIndex: "bill_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
+          { title: "Due", dataIndex: "due_date", width: COLUMN.DATE, render: (v: string | null) => formatDate(v) },
           {
             title: "Total",
             dataIndex: "total_minor",
@@ -464,7 +465,7 @@ export default function BillsClient({
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
-              message={`${vendorOrders.length} purchase order${vendorOrders.length > 1 ? "s" : ""} from this vendor received and not yet billed`}
+              message={`${plural(vendorOrders.length, "purchase order")} from this vendor received and not yet billed`}
               description={
                 <Space direction="vertical" size={8} style={{ width: "100%" }}>
                   <span>
@@ -479,7 +480,7 @@ export default function BillsClient({
                     onChange={(id: string) => router.push(`/purchase-orders/${id}?bill=1`)}
                     options={vendorOrders.map((order) => ({
                       value: order.purchaseOrderId,
-                      label: `${order.poNumber ?? "Draft order"} · ${order.lineCount} line${order.lineCount > 1 ? "s" : ""} · ${formatMoney(order.valueMinor, order.currencyCode, decimalsOf(order.currencyCode))}`,
+                      label: `${order.poNumber ?? "Draft order"} · ${plural(order.lineCount, "line")} · ${formatMoney(order.valueMinor, order.currencyCode, decimalsOf(order.currencyCode))}`,
                     }))}
                   />
                 </Space>

@@ -11,6 +11,7 @@ import {
 } from "@/lib/domain/company-automation";
 import { nextRecurringDate } from "@/lib/domain/recurring";
 import { listBankConnections, syncBankConnection } from "@/lib/services/banking";
+import { companyToday } from "@/lib/services/company";
 import {
   listDocumentsAwaitingScan,
   scanDocumentAttachment,
@@ -169,12 +170,15 @@ export interface RecurringItemResult {
 }
 
 export interface RecurringCompanyResult {
+  /** The day this company was run for: its own today unless the caller named one. */
+  asOf: string;
   scheduleCount: number;
   results: RecurringItemResult[];
 }
 
 export interface RecurringJobResult {
-  asOf: string;
+  /** The day the caller named, or null when each company ran for its own today. */
+  asOf: string | null;
   companyCount: number;
   failedCompanyCount: number;
   scheduleCount: number;
@@ -199,15 +203,17 @@ export interface RecurringJobDependencies extends CompanyDependencies {
   ) => Promise<{ status: string; documentId: string | null; claimed: boolean }>;
 }
 
+/** `asOf` left out, every company runs for its own today, in its own time zone. */
 export async function runRecurringAutomationJob(
-  asOf: string,
+  asOf?: string,
   deps: RecurringJobDependencies = {},
 ): Promise<RecurringJobResult> {
   const listDueTemplates = deps.listDueTemplates ?? listDueRecurringTemplates;
   const generateTemplate = deps.generateTemplate ?? generateRecurringTemplate;
 
   const run = await runPerCompany<RecurringCompanyResult>(deps, async (_company, sb) => {
-    const templates = await listDueTemplates(sb, asOf, RECURRING_TEMPLATE_LIMIT);
+    const runDay = asOf ?? (await companyToday(sb));
+    const templates = await listDueTemplates(sb, runDay, RECURRING_TEMPLATE_LIMIT);
     const results: RecurringItemResult[] = [];
 
     // The budget is per company, so it is declared here and nowhere higher up.
@@ -216,7 +222,7 @@ export async function runRecurringAutomationJob(
       let scheduledDate = template.next_run_date;
       let scheduleOccurrences = 0;
       while (
-        scheduledDate <= asOf &&
+        scheduledDate <= runDay &&
         (!template.end_date || scheduledDate <= template.end_date) &&
         scheduleOccurrences < RECURRING_TEMPLATE_OCCURRENCE_LIMIT &&
         occurrenceCount < RECURRING_OCCURRENCE_LIMIT
@@ -253,11 +259,11 @@ export async function runRecurringAutomationJob(
       }
     }
 
-    return { scheduleCount: templates.length, results };
+    return { asOf: runDay, scheduleCount: templates.length, results };
   });
 
   return {
-    asOf,
+    asOf: asOf ?? null,
     ...run,
     scheduleCount: sumOverCompanies(run.companies, (result) => result.scheduleCount),
   };

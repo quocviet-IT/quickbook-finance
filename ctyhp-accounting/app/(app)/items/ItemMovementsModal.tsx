@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { App, Modal, Table, Tag } from "antd";
 import type { InventoryTxnRow, ItemRow } from "@/lib/db/types";
 import { listItemMovementsAction } from "./inventory-actions";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
@@ -65,7 +65,7 @@ function ItemMovementsModalBody({ item, onClose, baseCurrency, baseDecimals }: P
         scroll={{ x: "max-content" }}
         locale={{ emptyText: "No movements yet" }}
         columns={[
-          { title: "Date", dataIndex: "txn_date" },
+          { title: "Date", dataIndex: "txn_date", render: (v: string) => formatDate(v) },
           {
             title: "Source",
             dataIndex: "source",

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, App, Button, List, Modal, Space, Typography } from "antd";
+import { plural, pluralWord } from "@/lib/format";
 import { classifyAccountsAction, planClassificationAction } from "./actions";
 
 export interface ClassifyAccountsButtonProps {
@@ -56,10 +57,10 @@ export default function ClassifyAccountsButton({ canWrite }: ClassifyAccountsBut
     }
     const { rolesSet, detailsSet, stillUnclassified } = result.data;
     message.success(
-      `${rolesSet} account(s) classified` +
-        (detailsSet > 0 ? `, ${detailsSet} bank account(s) given a kind` : "") +
+      `${plural(rolesSet, "account")} classified` +
+        (detailsSet > 0 ? `, ${plural(detailsSet, "bank account")} given a kind` : "") +
         (stillUnclassified.length > 0
-          ? `. ${stillUnclassified.length} still need a policy.`
+          ? `. ${stillUnclassified.length} still ${pluralWord(stillUnclassified.length, "needs", "need")} a policy.`
           : "."),
     );
     setOpen(false);
@@ -70,7 +71,7 @@ export default function ClassifyAccountsButton({ canWrite }: ClassifyAccountsBut
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Classify {pending} account(s)</Button>
+      <Button onClick={() => setOpen(true)}>Classify {plural(pending, "account")}</Button>
       <Modal
         open={open}
         title="Classify these accounts by their type?"
@@ -84,14 +85,14 @@ export default function ClassifyAccountsButton({ canWrite }: ClassifyAccountsBut
           <Typography.Paragraph style={{ marginBottom: 0 }}>
             {plan.roles > 0 ? (
               <>
-                <b>{plan.roles}</b> account(s) will be given the cash-flow role their type
-                implies — the same one an account created by hand receives.{" "}
+                <b>{plan.roles}</b> {pluralWord(plan.roles, "account")} will be given the cash-flow role{" "}
+                {pluralWord(plan.roles, "its", "their")} type implies — the same one an account created by hand receives.{" "}
               </>
             ) : null}
             {plan.details > 0 ? (
               <>
-                <b>{plan.details}</b> bank account(s) will be given the kind their name plainly
-                states.
+                <b>{plan.details}</b> {pluralWord(plan.details, "bank account")} will be given the kind{" "}
+                {pluralWord(plan.details, "its", "their")} name plainly states.
               </>
             ) : null}
           </Typography.Paragraph>

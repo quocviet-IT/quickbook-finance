@@ -1,4 +1,5 @@
 "use client";
+import { formatDate } from "@/lib/format";
 import { useState } from "react";
 import { Alert, Checkbox, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
@@ -113,7 +114,7 @@ export default function StatementLinesPreview({ lines, aside, onAside, view, onB
                 />
               ),
             },
-            { title: "Date", key: "date", width: PW.date, render: (_, row) => cell(row, row.line.txn_date) },
+            { title: "Date", key: "date", width: PW.date, render: (_, row) => cell(row, formatDate(row.line.txn_date)) },
             { title: "Description", key: "description", render: (_, row) => cell(row, row.line.description || "—") },
             {
               title: "Amount",

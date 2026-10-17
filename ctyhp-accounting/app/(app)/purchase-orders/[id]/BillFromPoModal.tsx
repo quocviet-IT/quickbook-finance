@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { Alert, App, DatePicker, Form, Input, InputNumber, Modal, Table, Tag } from "antd";
 import dayjs from "dayjs";
+import { useCompanyClock } from "@/components/CompanyClock";
 import type { PurchaseOrderLineRow, PurchasingConfigRow } from "@/lib/db/types";
 import { threeWayMatchLine, type ThreeWayMatchResult } from "@/lib/domain/purchasing";
 import { createBillFromPoAction } from "../actions";
@@ -46,6 +47,7 @@ function BillFromPoModalBody({
   decimals,
 }: Props) {
   const { message } = App.useApp();
+  const { today } = useCompanyClock();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
 
@@ -130,7 +132,7 @@ function BillFromPoModalBody({
       okText="Create draft bill"
       width={860}
     >
-      <Form form={form} layout="vertical" initialValues={{ bill_date: dayjs() }}>
+      <Form form={form} layout="vertical" initialValues={{ bill_date: dayjs(today) }}>
         <Form.Item name="bill_date" label="Bill date" rules={[{ required: true, message: "Bill date" }]}>
           <DatePicker />
         </Form.Item>

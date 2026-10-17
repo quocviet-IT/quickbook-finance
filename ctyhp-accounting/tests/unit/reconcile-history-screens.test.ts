@@ -139,9 +139,9 @@ describe("Add missing lines: the lines held back", () => {
   it("lists each held line with its date, description, amount, note and its own Add anyway", () => {
     const out = text(renderBox(plan([wire], [held(shop, "duplicate", duplicate), held(fee, "extra", EXTRA_LINE_NOTE)])));
     expect(out).toContain(HELD_BACK_HEADING);
-    expect(out).toContain("Jul 28, 2026 · POS EXAMPLE SHOP · -$42.00");
+    expect(out).toContain("07/28/2026 · POS EXAMPLE SHOP · -$42.00");
     expect(out).toContain("Looks like JE-000310 already in the books.");
-    expect(out).toContain("Jul 28, 2026 · SERVICE FEE · -$15.00");
+    expect(out).toContain("07/28/2026 · SERVICE FEE · -$15.00");
     expect(out).toContain(EXTRA_LINE_NOTE);
     expect(out.split(ADD_ANYWAY).length - 1).toBe(2);
   });
@@ -308,13 +308,13 @@ describe("the difference, explained", () => {
       onStatement: { count: 0, amountMinor: 0, ids: [] },
       tickedNotOnStatement: { count: 0, amountMinor: 0, ids: [] },
       leftMinor: 1500,
-      hint: "It equals JE-000123 of Sep 5, 2026 ($15.00). Check that one first.",
+      hint: "It equals JE-000123 of 09/05/2026 ($15.00). Check that one first.",
     });
     expect(out).not.toContain("Opening");
     expect(out).not.toContain("On the statement, not in the books");
     expect(out).not.toContain("Ticked here, not on the statement");
     expect(out).toContain("Left to explain $15.00");
-    expect(out).toContain("It equals JE-000123 of Sep 5, 2026 ($15.00). Check that one first.");
+    expect(out).toContain("It equals JE-000123 of 09/05/2026 ($15.00). Check that one first.");
   });
 
   it("draws what explainDifference works out from the workspace's own objects", () => {
@@ -505,7 +505,7 @@ describe("the Reconcile history page", () => {
     expect(HISTORY_ELASTIC_FLOOR).toBe(COLUMN.TEXT_MIN);
     expect(fitsBox(sum(Object.values(HISTORY_COLUMN_WIDTH)), HISTORY_ELASTIC_FLOOR)).toBe(true);
     expect(HISTORY_COLUMN_WIDTH.choose).toBe(COLUMN.SELECTION);
-    // Closing and Since are money cells: the money token fits them, and the merged dates carry a 12px "– Sep 30, 2026" line.
+    // Closing and Since are money cells: the money token fits them, and the merged dates carry a 12px "– 09/30/2026" line.
     expect(HISTORY_COLUMN_WIDTH.since).toBe(COLUMN.MONEY);
     expect(HISTORY_COLUMN_WIDTH.lastReconciled).toBeGreaterThanOrEqual(COLUMN.MONEY);
     expect(HISTORY_COLUMN_WIDTH.dated).toBeGreaterThanOrEqual(HISTORY_SHORT_DATE);
@@ -514,7 +514,7 @@ describe("the Reconcile history page", () => {
     expect(sum(Object.values(HISTORY_COLUMN_WIDTH)) + HISTORY_ELASTIC_FLOOR).toBe(954);
     // "(brought forward)" at 12px is 94px, plus 24px of cell padding.
     expect(HISTORY_COLUMN_WIDTH.lastReconciled).toBeGreaterThanOrEqual(94 + 24);
-    // "Sep 30, 2026" is wider than the 2026-09-30 the date token measures, and fits Last reconciled too.
+    // "09/30/2026" is wider than the 2026-09-30 the date token measures, and fits Last reconciled too.
     expect(HISTORY_SHORT_DATE).toBeGreaterThan(COLUMN.DATE);
     expect(HISTORY_COLUMN_WIDTH.lastReconciled).toBeGreaterThanOrEqual(HISTORY_SHORT_DATE);
     expect(client).toContain("columnWidth: W.choose");
@@ -523,13 +523,13 @@ describe("the Reconcile history page", () => {
     }
   });
 
-  it("prints its dates as its card does, Sep 30, 2026", () => {
+  it("prints its dates as its card does, 09/30/2026", () => {
     // Last reconciled keeps its date; the open dates are one two-line cell, the last under the first.
     expect(client).toContain("historyDateCell(row.lastReconciledDate)");
     expect(client).toContain("historyDatedCell(row.firstOpenDate, row.lastOpenDate)");
     expect(client).toContain("historyClosingCell(row.standing, money)");
     expect(client).toContain("historySinceCell(row.standing, money)");
-    expect(client).toContain('(iso ? <time dateTime={iso}>{shortDate(iso, true)}</time> : "—")');
+    expect(client).toContain('(iso ? <time dateTime={iso}>{formatDate(iso)}</time> : "—")');
     expect(client).not.toContain("dateColumn");
   });
 

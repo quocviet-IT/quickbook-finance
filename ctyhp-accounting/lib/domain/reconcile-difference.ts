@@ -20,9 +20,9 @@
  * ticked, plus whatever the statement itself does not account for. When exactly
  * one line is that size, it is named. Pure: the screen holds every figure.
  */
-import { shortDate } from "./pdf-statement-view";
 import type { Standing } from "./reconcile-statement";
 
+import { formatDate, plural } from "@/lib/format";
 export const DIFFERENCE_LABELS = {
   opening: "Opening",
   onStatement: "On the statement, not in the books",
@@ -90,7 +90,7 @@ export function differenceHeading(differenceMinor: number, money: (minor: number
 
 /** How many lines a part holds: "1 line", "1,204 lines". */
 export function linesCount(n: number): string {
-  return n === 1 ? "1 line" : `${n.toLocaleString("en-US")} lines`;
+  return plural(n, "line");
 }
 
 /** "This reconciliation begins at {Y}; the statement opens at {X}." */
@@ -98,16 +98,16 @@ export function openingPartText(beginningMinor: number, openingMinor: number, mo
   return `This reconciliation begins at ${money(beginningMinor)}; the statement opens at ${money(openingMinor)}.`;
 }
 
-/** A statement line, named short: the statement line “SERVICE FEE” of Sep 5, 2026. */
+/** A statement line, named short: the statement line “SERVICE FEE” of 09/05/2026. */
 export function statementLineName(line: { description: string; txnDate: string }): string {
   const words = line.description.trim();
-  const date = shortDate(line.txnDate, true);
+  const date = formatDate(line.txnDate);
   return words ? `the statement line “${words}” of ${date}` : `the statement line of ${date}`;
 }
 
-/** A book line, named short: JE-000123 of Sep 5, 2026. */
+/** A book line, named short: JE-000123 of 09/05/2026. */
 export function bookLineName(line: { entryNumber: string | null; entryDate: string }): string {
-  return `${line.entryNumber ?? "the entry"} of ${shortDate(line.entryDate, true)}`;
+  return `${line.entryNumber ?? "the entry"} of ${formatDate(line.entryDate)}`;
 }
 
 /** "It equals {line} ({amount}). Check that one first." */

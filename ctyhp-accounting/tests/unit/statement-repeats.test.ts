@@ -219,12 +219,12 @@ describe.each(FILES)("payroll in a %s file: 2 + 3 identical lines on one day", (
     const { check, repeats, result, summary } = await importAsTheDialogDoes(bank, rows, proof);
     expect(check).toEqual({ present: [], otherSource: [] });
     expect(repeats.map((g) => g.text)).toEqual([
-      "2 identical lines on Mar 31, 2026 (−655.20): 2 will be imported.",
-      "3 identical lines on Mar 31, 2026 (−412.30): 3 will be imported.",
+      "2 identical lines on 03/31/2026 (−655.20): 2 will be imported.",
+      "3 identical lines on 03/31/2026 (−412.30): 3 will be imported.",
     ]);
     expect(result).toMatchObject({ inserted: 5, skipped: 0, otherSource: 0 });
     expect(bank.stored).toHaveLength(5);
-    expect(summary).toBe("Imported 5 lines. 5 repeated lines on Mar 31 kept.");
+    expect(summary).toBe("Imported 5 lines. 5 repeated lines on 03/31/2026 kept.");
   });
 
   it("imports two of three identical lines when one is already present", async () => {
@@ -236,10 +236,10 @@ describe.each(FILES)("payroll in a %s file: 2 + 3 identical lines on one day", (
     const { check, repeats, result, summary } = await importAsTheDialogDoes(bank, rows, proof);
     expect(check).toEqual({ present: [2], otherSource: [] });
     expect(repeats[1]).toMatchObject({ identical: 3, alreadyPresent: 1, otherSource: 0, toImport: 2 });
-    expect(repeats[1].text).toBe("3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.");
+    expect(repeats[1].text).toBe("3 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.");
     expect(result).toMatchObject({ inserted: 4, skipped: 1 });
     expect(bank.stored.filter((s) => s.amount_minor === -41230)).toHaveLength(3);
-    expect(summary).toBe("Imported 4 lines. 1 was already here from this statement; 4 repeated lines on Mar 31 kept.");
+    expect(summary).toBe("Imported 4 lines. 1 was already here from this statement; 4 repeated lines on 03/31/2026 kept.");
   });
 
   it("imports nothing when the same file is imported again", async () => {
@@ -249,8 +249,8 @@ describe.each(FILES)("payroll in a %s file: 2 + 3 identical lines on one day", (
     const again = await importAsTheDialogDoes(bank, rows, proof);
     expect(again.check).toEqual({ present: [0, 1, 2, 3, 4], otherSource: [] });
     expect(again.repeats.map((g) => g.text)).toEqual([
-      "2 identical lines on Mar 31, 2026 (−655.20): 2 already in Bank Transactions, none will be imported.",
-      "3 identical lines on Mar 31, 2026 (−412.30): 3 already in Bank Transactions, none will be imported.",
+      "2 identical lines on 03/31/2026 (−655.20): 2 already in Bank Transactions, none will be imported.",
+      "3 identical lines on 03/31/2026 (−412.30): 3 already in Bank Transactions, none will be imported.",
     ]);
     expect(again.result).toMatchObject({ inserted: 0, skipped: 5 });
     expect(bank.stored).toHaveLength(5);
@@ -271,14 +271,14 @@ describe("lines already in Bank Transactions from another source", () => {
       { index: 2, source: "books", bankLineId: "line-000001" },
     ]);
     expect(repeats.map((g) => g.text)).toEqual([
-      "2 identical lines on Mar 31, 2026 (−655.20): 1 already in Bank Transactions, 1 will be imported.",
-      "3 identical lines on Mar 31, 2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
+      "2 identical lines on 03/31/2026 (−655.20): 1 already in Bank Transactions, 1 will be imported.",
+      "3 identical lines on 03/31/2026 (−412.30): 1 already in Bank Transactions, 2 will be imported.",
     ]);
     const sent = bank.imports[0].p_rows as { skip?: boolean }[];
     expect(sent.map((r) => r.skip === true)).toEqual([true, false, true, false, false]);
     expect(result).toMatchObject({ inserted: 3, skipped: 0, otherSource: 2 });
     expect(summary).toBe(
-      "Imported 3 lines. 2 skipped as already in Bank Transactions from another source; 3 repeated lines on Mar 31 kept.",
+      "Imported 3 lines. 2 skipped as already in Bank Transactions from another source; 3 repeated lines on 03/31/2026 kept.",
     );
   });
 
@@ -396,8 +396,8 @@ describe("describeRepeats", () => {
   it("lists only lines that repeat, with how many are already here and how many will be imported", () => {
     const [group] = describeRepeats(lines, [], [0], [1], money);
     expect(group).toMatchObject({ indexes: [0, 1, 3], identical: 3, alreadyPresent: 1, otherSource: 1, toImport: 1 });
-    expect(group.text).toBe("3 identical lines on Mar 31, 2026 (−412.30): 2 already in Bank Transactions, 1 will be imported.");
-    expect(describeRepeats(lines, [], [], [], money)[0].text).toBe("3 identical lines on Mar 31, 2026 (−412.30): 3 will be imported.");
+    expect(group.text).toBe("3 identical lines on 03/31/2026 (−412.30): 2 already in Bank Transactions, 1 will be imported.");
+    expect(describeRepeats(lines, [], [], [], money)[0].text).toBe("3 identical lines on 03/31/2026 (−412.30): 3 will be imported.");
   });
 
   it("leaves out a line marked Not a transaction, and a set it leaves single", () => {
@@ -417,24 +417,24 @@ describe("importedSummary", () => {
 
   it("says each part only when it is not zero", () => {
     expect(importedSummary({ inserted: 40, alreadyHere: 2, otherSource: 3, repeats: [group("2026-03-31", 3)] })).toBe(
-      "Imported 40 lines. 2 were already here from this statement; 3 skipped as already in Bank Transactions from another source; 3 repeated lines on Mar 31 kept.",
+      "Imported 40 lines. 2 were already here from this statement; 3 skipped as already in Bank Transactions from another source; 3 repeated lines on 03/31/2026 kept.",
     );
     expect(importedSummary({ inserted: 40, alreadyHere: 0, otherSource: 0, repeats: [] })).toBe("Imported 40 lines.");
     expect(importedSummary({ inserted: 1, alreadyHere: 1, otherSource: 1, repeats: [group("2026-03-31", 1)] })).toBe(
-      "Imported 1 line. 1 was already here from this statement; 1 skipped as already in Bank Transactions from another source; 1 repeated line on Mar 31 kept.",
+      "Imported 1 line. 1 was already here from this statement; 1 skipped as already in Bank Transactions from another source; 1 repeated line on 03/31/2026 kept.",
     );
   });
 
   it("names the days of the repeats, up to three", () => {
     const say = (dates: string[]) => importedSummary({ inserted: 99, alreadyHere: 0, otherSource: 0, repeats: dates.map((d) => group(d, 2)) });
-    expect(say(["2026-04-30", "2026-03-31"])).toBe("Imported 99 lines. 4 repeated lines on Mar 31 and Apr 30 kept.");
-    expect(say(["2026-03-31", "2026-04-30", "2026-05-31"])).toBe("Imported 99 lines. 6 repeated lines on Mar 31, Apr 30 and May 31 kept.");
+    expect(say(["2026-04-30", "2026-03-31"])).toBe("Imported 99 lines. 4 repeated lines on 03/31/2026 and 04/30/2026 kept.");
+    expect(say(["2026-03-31", "2026-04-30", "2026-05-31"])).toBe("Imported 99 lines. 6 repeated lines on 03/31/2026, 04/30/2026 and 05/31/2026 kept.");
     expect(say(["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"])).toBe("Imported 99 lines. 8 repeated lines on 4 days kept.");
   });
 
   it("never says more repeats were kept than lines were imported", () => {
     expect(importedSummary({ inserted: 1, alreadyHere: 2, otherSource: 0, repeats: [group("2026-03-31", 3)] })).toBe(
-      "Imported 1 line. 2 were already here from this statement; 1 repeated line on Mar 31 kept.",
+      "Imported 1 line. 2 were already here from this statement; 1 repeated line on 03/31/2026 kept.",
     );
   });
 });

@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { companyClock } from "@/lib/services/report-context";
 import { manualJournalSchema, reverseEntrySchema } from "@/lib/domain/schemas";
 import { createManualJournal, reverseEntry, listJournalEntries, countJournalEntries, JOURNAL_LIST_LIMIT, listReversedEntries, JournalError, type JournalFilters, type JournalEntrySummary, type ReversedEntryRow } from "@/lib/services/journal";
 import {
@@ -35,7 +36,7 @@ export async function createJournalAction(raw: unknown): Promise<ActionResult<Co
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    const entryDate = parsed.data.entry_date || new Date().toISOString().slice(0, 10);
+    const entryDate = parsed.data.entry_date || (await companyClock(sb)).today;
     const input = { ...parsed.data, entry_date: entryDate };
     const amountMinor = input.lines.reduce((sum, line) => sum + line.debit_minor, 0);
     const outcome = await executeOrSubmitForApproval({

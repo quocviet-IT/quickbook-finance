@@ -277,7 +277,7 @@ describe("stockCountSheet", () => {
   it("prints every line, then the counted total, the books and the difference", () => {
     const sheet = stockCountSheet(base);
     expect(sheet.title).toBe("Stock Count");
-    expect(sheet.subtitle).toBe("SC-000007 · As of 2026-06-30 · Draft · Year end");
+    expect(sheet.subtitle).toBe("SC-000007 · As of 06/30/2026 · Draft · Year end");
     expect(sheet.fileName).toBe("stock-count-SC-000007");
     expect(sheet.rows).toHaveLength(5);
     expect(sheet.rows[0]).toEqual({ name: "Brass bolt", sku: "B-1", quantity: 10, cost: 2.5, value: 25, sellsFor: 4 });
@@ -291,7 +291,7 @@ describe("stockCountSheet", () => {
   it("leaves out the books and difference when they are not known, and the memo when empty", () => {
     const sheet = stockCountSheet({ ...base, bookMinor: null, memo: null, status: "posted" });
     expect(sheet.rows.map((r) => r.name)).toEqual(["Brass bolt", "Nut", "Counted at cost"]);
-    expect(sheet.subtitle).toBe("SC-000007 · As of 2026-06-30 · Posted");
+    expect(sheet.subtitle).toBe("SC-000007 · As of 06/30/2026 · Posted");
   });
 
   it("writes whole-unit currencies without decimals", () => {

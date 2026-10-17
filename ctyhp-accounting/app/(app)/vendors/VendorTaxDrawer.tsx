@@ -17,6 +17,8 @@ import {
   Typography,
 } from "antd";
 import dayjs from "dayjs";
+import { formatDateInTimeZone } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import type { Box1099Row, VendorRow, VendorTaxProfileRow } from "@/lib/db/types";
 import { maskTin } from "@/lib/domain/vendorTax";
 import { TAX_CLASSIFICATIONS, TIN_TYPES, W9_STATUSES } from "@/lib/domain/schemas";
@@ -48,6 +50,7 @@ export default function VendorTaxDrawer(props: Props) {
 
 function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { vendor: VendorRow }) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [form] = Form.useForm();
   const [versions, setVersions] = useState<VendorTaxProfileRow[]>([]);
@@ -168,7 +171,7 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
 
       <Form form={form} layout="vertical" disabled={!canManage} initialValues={{ w9_status: "not_requested", country: "US" }}>
         <Form.Item name="w9_status" label="W-9 status" rules={[{ required: true }]}>
-          <Select options={W9_STATUSES.map((s) => ({ value: s, label: label(s) }))} />
+          <Select options={W9_STATUSES.map((status) => ({ value: status, label: label(status) }))} />
         </Form.Item>
         <Space size="middle">
           <Form.Item name="w9_received_date" label="W-9 received">
@@ -263,7 +266,7 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
             render: (v: boolean, r) => (v ? <Tag color="blue">{r.box_code}</Tag> : <Tag>no</Tag>),
           },
           { title: "Reason", dataIndex: "change_reason", ...longTextColumn() },
-          { title: "Saved", dataIndex: "created_at", render: (v: string) => v.slice(0, 10) },
+          { title: "Saved", dataIndex: "created_at", render: (v: string) => formatDateInTimeZone(v, timeZone) },
         ]}
       />
     </Drawer>

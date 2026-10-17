@@ -6,7 +6,7 @@ import { searchAccounts } from "@/lib/domain/account-search";
 import { ACCOUNT_TYPE_LABEL, type AccountType } from "@/lib/domain/accounts";
 import type { BankRuleInput } from "@/lib/domain/bank-rules";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural } from "@/lib/format";
 import type { RulePreview } from "@/lib/services/coding";
 import { previewBankRuleAction, saveBankRuleAction } from "./actions";
 
@@ -213,12 +213,12 @@ export default function RuleFormModal({
           <Typography.Text strong>
             {preview.count === 0
               ? "Matches no line waiting to be coded"
-              : `Matches ${preview.count} line${preview.count === 1 ? "" : "s"} waiting to be coded`}
+              : `Matches ${plural(preview.count, "line")} waiting to be coded`}
           </Typography.Text>
           {preview.examples.map((example) => (
             <div key={example.id}>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {example.txnDate} · {example.description} · {money(example.amountMinor)}
+                {formatDate(example.txnDate)} · {example.description} · {money(example.amountMinor)}
               </Typography.Text>
             </div>
           ))}

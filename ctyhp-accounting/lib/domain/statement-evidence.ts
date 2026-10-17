@@ -7,10 +7,11 @@
  * file cannot be kept.
  */
 import { z } from "zod";
-import { periodLabel, shortDate } from "./pdf-statement-view";
+import { periodLabel } from "./pdf-statement-view";
 import { SAVED_REPORT_MAX_BYTES } from "./saved-reports";
 import { statementProofPayloadSchema } from "./statement-proof-schema";
 
+import { formatDate, plural } from "@/lib/format";
 /** A bank's own download (OFX, QFX, QBO, QIF) is text, and kept as text. */
 export const STATEMENT_FILE_MIME_TYPES = ["application/pdf", "text/csv", "text/plain"] as const;
 export type StatementFileMime = (typeof STATEMENT_FILE_MIME_TYPES)[number];
@@ -67,7 +68,7 @@ export function statementFileAccount(name: string, maskedNumber: string | null):
   return [name.trim(), (maskedNumber ?? "").trim()].filter(Boolean).join(" ");
 }
 
-/** "Example Bank ****1183 — statement May 1 – May 31, 2026", as Reports › Saved lists it. */
+/** "Example Bank ****1183 — statement 05/01/2026 – 05/31/2026", as Reports › Saved lists it. */
 export function statementFileTitle(account: string, period: StatementPeriod): string {
   const what = period.from || period.to ? `statement ${periodLabel(period.from, period.to)}` : "statement file";
   return `${account.trim() || "Bank account"} — ${what}`.slice(0, 200);
@@ -137,7 +138,7 @@ export function statementFileMismatch(
   target: EvidenceTarget,
   money: (minor: number) => string,
 ): string | null {
-  const date = (iso: string) => shortDate(iso, true);
+  const date = (iso: string) => formatDate(iso);
   if (read.to !== null && read.closingMinor !== null) {
     if (read.to !== target.endingDate || read.closingMinor !== target.endingMinor) {
       return (
@@ -165,11 +166,10 @@ export function statementFileMismatch(
   const same = (candidate: readonly EvidenceLine[]) => candidate.length === kept.length && firstDifference(candidate) < 0;
   if (same(lines) || same(month)) return null;
 
-  const plural = (n: number) => `${n} line${n === 1 ? "" : "s"}`;
   if (month.length !== kept.length) {
     return (
-      `This reconciliation kept ${plural(kept.length)} from ${date(firstKeptDay)} to ${date(target.endingDate)}; ` +
-      `this file has ${plural(month.length)} in those days.`
+      `This reconciliation kept ${plural(kept.length, "line")} from ${date(firstKeptDay)} to ${date(target.endingDate)}; ` +
+      `this file has ${plural(month.length, "line")} in those days.`
     );
   }
   const at = firstDifference(month);

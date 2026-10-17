@@ -1,4 +1,5 @@
 "use client";
+import { plural } from "@/lib/format";
 import { useMemo, type ReactNode } from "react";
 import { AutoComplete, Badge, Button, Input, Popover, Select, Space, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
@@ -109,7 +110,7 @@ export default function BankTransactionsFilters({
               {suggestion.value}
             </Typography.Text>
             <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-              {suggestion.count} line{suggestion.count === 1 ? "" : "s"}
+              {plural(suggestion.count, "line")}
               {suggestion.field === "reference" ? " · reference" : ""}
             </Typography.Text>
           </Space>

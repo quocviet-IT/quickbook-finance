@@ -4,7 +4,7 @@ import { App, Form, Input, Modal, Select, Switch, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { seedRelatedWords } from "@/lib/domain/related-companies";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural } from "@/lib/format";
 import type { RelatedPreview } from "@/lib/services/related-companies";
 import { previewRelatedCompanyAction, saveRelatedCompanyAction } from "./actions";
 import styles from "./repayments.module.css";
@@ -96,7 +96,6 @@ export default function RelatedCompanyFormModal({
     onSaved();
   }
 
-  const s = (n: number) => (n === 1 ? "" : "s");
   return (
     <Modal
       open={open}
@@ -155,11 +154,11 @@ export default function RelatedCompanyFormModal({
       {preview && words ? (
         <div className={styles.preview}>
           <Typography.Text strong>
-            Names {preview.waiting} waiting line{s(preview.waiting)}
+            Names {plural(preview.waiting, "waiting line")}
           </Typography.Text>
           {preview.lines.map((line, i) => (
             <Typography.Text key={`${line.date}-${i}`} type="secondary" className={styles.missed}>
-              {line.date} · {line.description} · {formatMoney(line.amountMinor, USD_CURRENCY_CODE, 2)}
+              {formatDate(line.date)} · {line.description} · {formatMoney(line.amountMinor, USD_CURRENCY_CODE, 2)}
             </Typography.Text>
           ))}
           {preview.waiting > preview.lines.length ? (

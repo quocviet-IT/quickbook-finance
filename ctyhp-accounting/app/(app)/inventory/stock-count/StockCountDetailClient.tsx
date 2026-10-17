@@ -43,8 +43,7 @@ import {
   type PasteProblem,
   type StockCountLineInput,
 } from "@/lib/domain/stock-count";
-import { dateInTimeZone } from "@/lib/domain/stamp";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatDateInTimeZone, formatMoney } from "@/lib/format";
 import type { PostingContext } from "@/lib/services/stock-count";
 import { bookValueAction, saveStockCountAction, type PostStockCountOutcome } from "./actions";
 import PostCountDialog, { PostOutcomeDialog } from "./PostCountDialog";
@@ -308,7 +307,7 @@ function DraftCount({
       <ReportTable<EditorLine>
         rowKey="key"
         dataSource={rows}
-        pagination={pager && { ...pager, current: page, onChange: (p, s) => { setPage(p); setPageSize(s); } }}
+        pagination={pager && { ...pager, current: page, onChange: (nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); } }}
         emptyTitle="No lines yet"
         emptyDescription="Add a line, or paste a count sheet below."
         columns={[
@@ -571,7 +570,7 @@ function LockedCount({ count, lines, liveBookMinor, companyName, currencyCode, d
           title={
             <>
               Posted{count.postedByName ? ` by ${count.postedByName}` : ""}
-              {count.postedAt ? ` on ${dateInTimeZone(count.postedAt, timeZone)}` : ""}.{" "}
+              {count.postedAt ? ` on ${formatDateInTimeZone(count.postedAt, timeZone)}` : ""}.{" "}
               {count.journalEntryId ? (
                 <Link href={`/journal?entry=${count.journalEntryId}`}>
                   {count.journalEntryNumber ? `Open ${count.journalEntryNumber}` : "Open the entry"}
@@ -615,7 +614,7 @@ function LockedCount({ count, lines, liveBookMinor, companyName, currencyCode, d
         <ReportPaper
           companyName={companyName}
           title="Stock Count"
-          range={`${count.countNumber} · As of ${count.asOf} · ${stockCountStatusLabel(count.status)}`}
+          range={`${count.countNumber} · As of ${formatDate(count.asOf)} · ${stockCountStatusLabel(count.status)}`}
           basis={count.memo?.trim() ? count.memo.trim() : "Periodic count"}
           currencyCode={currencyCode}
         >

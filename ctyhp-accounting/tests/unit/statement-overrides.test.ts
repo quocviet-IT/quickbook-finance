@@ -54,19 +54,19 @@ describe("the three sentences", () => {
   const facts = overrideFacts(override(), "America/New_York");
 
   it("prints the moment in the company's time zone", () => {
-    expect(facts).toEqual({ outByMinor: 1234, name: "Dana Example", date: "Oct 8, 2026", time: "2:47 PM", reason: "Bank confirmed its printed total is wrong" });
+    expect(facts).toEqual({ outByMinor: 1234, name: "Dana Example", date: "10/08/2026", time: "2:47 PM", reason: "Bank confirmed its printed total is wrong" });
   });
 
   it("reads the import record while open", () => {
     expect(importRecordDetailOf(override(), "America/New_York", money)).toBe(
-      "Out by $12.34. Imported by Dana Example on Oct 8, 2026 at 2:47 PM: “Bank confirmed its printed total is wrong”. Open until a reconciliation through Sep 30, 2026 is completed.",
+      "Out by $12.34. Imported by Dana Example on 10/08/2026 at 2:47 PM: “Bank confirmed its printed total is wrong”. Open until a reconciliation through 09/30/2026 is completed.",
     );
   });
 
   it("reads the import record once settled", () => {
     const settled = override({ settledByReconciliationId: "rec-1", settledThrough: "2026-10-15" });
     expect(importRecordDetailOf(settled, "America/New_York", money)).toBe(
-      "Out by $12.34. Imported by Dana Example on Oct 8, 2026 at 2:47 PM: “Bank confirmed its printed total is wrong”. Settled by the reconciliation to Oct 15, 2026.",
+      "Out by $12.34. Imported by Dana Example on 10/08/2026 at 2:47 PM: “Bank confirmed its printed total is wrong”. Settled by the reconciliation to 10/15/2026.",
     );
   });
 
@@ -76,13 +76,13 @@ describe("the three sentences", () => {
 
   it("reads the notice above a reconciliation in progress", () => {
     expect(reconciliationNotice(facts, money)).toBe(
-      "A statement in this period was imported out of balance: out by $12.34, by Dana Example on Oct 8, 2026, “Bank confirmed its printed total is wrong”. Completing this reconciliation settles it.",
+      "A statement in this period was imported out of balance: out by $12.34, by Dana Example on 10/08/2026, “Bank confirmed its printed total is wrong”. Completing this reconciliation settles it.",
     );
   });
 
   it("reads the line in the report of the reconciliation that settled it", () => {
     expect(reconciliationReportLine(facts, money)).toBe(
-      "Settles a statement imported out of balance: out by $12.34, by Dana Example on Oct 8, 2026, “Bank confirmed its printed total is wrong”.",
+      "Settles a statement imported out of balance: out by $12.34, by Dana Example on 10/08/2026, “Bank confirmed its printed total is wrong”.",
     );
   });
 });
@@ -99,12 +99,12 @@ describe("the company's time zone, not the machine's", () => {
       process.env.TZ = tz;
       return overrideMoment("2026-10-08T03:30:00Z", "America/New_York");
     });
-    for (const reading of readings) expect(reading).toEqual({ date: "Oct 7, 2026", time: "11:30 PM" });
+    for (const reading of readings) expect(reading).toEqual({ date: "10/07/2026", time: "11:30 PM" });
   });
 
   it("follows the company's zone across midnight", () => {
-    expect(overrideMoment("2026-10-08T03:30:00Z", "America/New_York")).toEqual({ date: "Oct 7, 2026", time: "11:30 PM" });
-    expect(overrideMoment("2026-10-08T03:30:00Z", "Asia/Tokyo")).toEqual({ date: "Oct 8, 2026", time: "12:30 PM" });
+    expect(overrideMoment("2026-10-08T03:30:00Z", "America/New_York")).toEqual({ date: "10/07/2026", time: "11:30 PM" });
+    expect(overrideMoment("2026-10-08T03:30:00Z", "Asia/Tokyo")).toEqual({ date: "10/08/2026", time: "12:30 PM" });
   });
 });
 
@@ -137,7 +137,7 @@ describe("how an override reads (2.11, after the screenshots)", () => {
   });
 
   it("prints the time on the twelve-hour clock the rest of the app uses", () => {
-    expect(overrideMoment("2026-10-14T09:37:18Z", "America/New_York")).toEqual({ date: "Oct 14, 2026", time: "5:37 AM" });
+    expect(overrideMoment("2026-10-14T09:37:18Z", "America/New_York")).toEqual({ date: "10/14/2026", time: "5:37 AM" });
     expect(overrideMoment("2026-10-08T18:47:00Z", "America/New_York").time).toBe("2:47 PM");
   });
 

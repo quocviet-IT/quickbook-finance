@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Input, Modal, Space, Tag, Tooltip, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime } from "@/lib/format";
 import {
   SYNC_STATUS_LABEL,
   syncUndoState,
@@ -28,9 +30,6 @@ const STATUS_COLOR: Record<BankFeedSyncStatus, string | undefined> = {
   undone: undefined,
 };
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-
 /**
  * Bank feed syncs, and the way back out of one (1.89). Shown only for an
  * account a bank feed has fed. Undo is offered on one sync at a time — the
@@ -39,6 +38,8 @@ const when = (iso: string) =>
  */
 export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, onChanged }: BankFeedSyncListProps) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
+  const when = (iso: string) => formatDateTime(iso, timeZone);
   const [rows, setRows] = useState<BankFeedSyncView[]>([]);
   const [undoing, setUndoing] = useState<BankFeedSyncView | null>(null);
   const [reason, setReason] = useState("");

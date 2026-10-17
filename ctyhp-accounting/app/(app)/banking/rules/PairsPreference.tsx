@@ -1,4 +1,5 @@
 "use client";
+import { plural } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Select, Space, Typography } from "antd";
@@ -7,7 +8,7 @@ import type { BankingPreference } from "@/lib/services/banking-preference";
 import { saveBankingPreferenceAction } from "./actions";
 import styles from "./pairs-preference.module.css";
 
-const windowLabel = (days: number) => (days === 0 ? "Same day" : days === 1 ? "1 day" : `${days} days`);
+const windowLabel = (days: number) => (days === 0 ? "Same day" : plural(days, "day"));
 
 /**
  * Where funding pairs post, and how far apart a pair may be. The account is

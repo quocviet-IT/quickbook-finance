@@ -29,7 +29,7 @@ import {
 } from "@/components/charts/FinancialCharts";
 import { TOKENS } from "@/lib/design/tokens";
 import { fromMinor } from "@/lib/domain/money";
-import { formatMoney as formatCurrency, timeZoneLabel } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney as formatCurrency, plural, timeZoneLabel } from "@/lib/format";
 import { INTERNAL_REPORT_HREFS } from "@/lib/domain/report-catalog";
 import type {
   DashboardActivity,
@@ -84,7 +84,7 @@ export default function DashboardClient({
         description="Profitability, liquidity, working capital, inventory, exceptions, and accounting activity in one operational view."
         meta={
           <div className="dashboard-context">
-            <Tag>As of {analytics.asOf}</Tag>
+            <Tag>As of {formatDate(analytics.asOf)}</Tag>
             <Tag>{accountingBasis === "cash" ? "Cash basis" : "Accrual basis"}</Tag>
             <Tag>{baseCurrency}</Tag>
             <Tag>{timeZoneLabel(timeZone)}</Tag>
@@ -101,7 +101,7 @@ export default function DashboardClient({
             <strong>Analysis window</strong>
             <small>
               Trends and activity use the selected period. Balance and aging
-              figures remain as of {analytics.asOf}.
+              figures remain as of {formatDate(analytics.asOf)}.
             </small>
           </span>
         </div>
@@ -202,7 +202,7 @@ export default function DashboardClient({
             href="/reports/inventory-valuation"
             icon={<ShopOutlined />}
             tone={inventory.tiesOut ? "positive" : "negative"}
-            trend={`${formatInteger(inventory.itemCount)} items / ${formatInteger(inventory.quantity)} units`}
+            trend={`${plural(inventory.itemCount, "item")} / ${plural(inventory.quantity, "unit")}`}
             trendLabel={inventory.tiesOut ? "subledger balanced" : "tie-out required"}
           />
         </div>
@@ -268,7 +268,7 @@ export default function DashboardClient({
         <div className="dashboard-layout dashboard-layout--analysis">
           <ComparisonBars
             title="Liquidity structure"
-            description={`Current balance-sheet position as of ${analytics.asOf}.`}
+            description={`Current balance-sheet position as of ${formatDate(analytics.asOf)}.`}
             data={[
               {
                 key: "current-assets",
@@ -452,7 +452,7 @@ function OperatingPulsePanel({
             </span>
             <span className="dashboard-pulse-row__body">
               <span>{row.label}</span>
-              <small>{formatInteger(row.count)} transactions</small>
+              <small>{plural(row.count, "transaction")}</small>
             </span>
             <strong>{row.value}</strong>
             <ArrowRightOutlined aria-hidden="true" />
@@ -515,7 +515,7 @@ function InventoryPanel({
                 </span>
                 <span>
                   <strong>{formatMoney(holding.valueMinor)}</strong>
-                  <small>{holding.quantity.toLocaleString("en-US")} units</small>
+                  <small>{plural(holding.quantity, "unit")}</small>
                 </span>
               </div>
               <div
@@ -651,11 +651,7 @@ function ActivityTimeline({
                 </Link>
                 <Typography.Text type="secondary" className="dashboard-activity__meta">
                   {activity.actor} ·{" "}
-                  {new Date(activity.occurredAt).toLocaleString("en-US", {
-                    timeZone,
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}
+                  {formatDateTime(activity.occurredAt, timeZone)}
                 </Typography.Text>
               </div>
             ),

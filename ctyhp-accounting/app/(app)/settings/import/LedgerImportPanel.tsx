@@ -1,4 +1,5 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -16,7 +17,7 @@ import { UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { parseCsvGrid } from "@/lib/csv";
 import { calculateFileSha256 } from "@/lib/client/documents";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import {
   isWaveLedgerGrid,
   parseWaveLedger,
@@ -85,10 +86,11 @@ export default function LedgerImportPanel({
   accounts,
 }: LedgerImportPanelProps) {
   const { message } = App.useApp();
+  const { today } = useCompanyClock();
   const [file, setFile] = useState<File | null>(null);
   const [parse, setParse] = useState<WaveLedgerParse | null>(null);
   const [mode, setMode] = useState<"history" | "balances">("history");
-  const [asOf, setAsOf] = useState(dayjs());
+  const [asOf, setAsOf] = useState(dayjs(today));
   const [busy, setBusy] = useState(false);
   const [batches, setBatches] = useState<ImportBatchRow[]>([]);
   // Null while the question has not been asked or answered yet, so the button
@@ -182,7 +184,7 @@ export default function LedgerImportPanel({
         throw new Error(imported.error ?? "The import was refused");
       }
       message.success(
-        `${imported.data.entries} entries and ${imported.data.lines} lines posted into ${companyName}.`,
+        `${plural(imported.data.entries, "entry", "entries")} and ${plural(imported.data.lines, "line")} posted into ${companyName}.`,
       );
 
       // The ledger is the important half. A failed copy is worth a warning, not
@@ -231,7 +233,7 @@ export default function LedgerImportPanel({
             <Statistic title="Total debits" value={money(parse.totalDebitMinor)} />
             <Statistic
               title="Covers"
-              value={parse.fromDate ? `${parse.fromDate} → ${parse.toDate}` : "—"}
+              value={parse.fromDate ? `${formatDate(parse.fromDate)} → ${formatDate(parse.toDate)}` : "—"}
             />
           </Space>
 
@@ -240,7 +242,7 @@ export default function LedgerImportPanel({
               style={{ marginTop: 12 }}
               type="info"
               showIcon
-              message={`${parse.skippedZeroRows} row(s) carry no money and will be left out.`}
+              message={`${plural(parse.skippedZeroRows, "row")} ${pluralWord(parse.skippedZeroRows, "carries", "carry")} no money and will be left out.`}
             />
           ) : null}
 
@@ -254,7 +256,7 @@ export default function LedgerImportPanel({
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
                   {parse.unbalancedDates.slice(0, 8).map((day) => (
                     <li key={day.date}>
-                      {day.date}: off by {money(day.differenceMinor)}
+                      {formatDate(day.date)}: off by {money(day.differenceMinor)}
                     </li>
                   ))}
                 </ul>
@@ -283,7 +285,7 @@ export default function LedgerImportPanel({
               style={{ marginTop: 12 }}
               type="error"
               showIcon
-              message={`${missingAccounts.length} name(s) in this file do not name one account`}
+              message={`${plural(missingAccounts.length, "name")} in this file ${pluralWord(missingAccounts.length, "does", "do")} not name one account`}
               description="Point each at an account that already exists, or create it above. A ledger row never creates an account on its own — the same name can mean different things in two charts, and a typo would become a permanent account."
             />
           ) : null}
@@ -316,11 +318,11 @@ export default function LedgerImportPanel({
             <Radio.Group value={mode} onChange={(event) => setMode(event.target.value)}>
               <Space direction="vertical">
                 <Radio value="history">
-                  The whole history — {parse.entries.length} entries, {parse.lineCount} lines, dated
+                  The whole history — {plural(parse.entries.length, "entry", "entries")}, {plural(parse.lineCount, "line")}, dated
                   as the file dates them
                 </Radio>
                 <Radio value="balances">
-                  Closing balances only — one entry, {parse.balances.length} lines
+                  Closing balances only — one entry, {plural(parse.balances.length, "line")}
                 </Radio>
               </Space>
             </Radio.Group>

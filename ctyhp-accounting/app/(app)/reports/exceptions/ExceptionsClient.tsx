@@ -18,12 +18,12 @@ import {
   type SectionState,
 } from "@/components/reports/ReportPaper";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDateRange, formatDate, plural } from "@/lib/format";
 import { downloadTextFile } from "@/lib/client/download";
 import { ACCOUNT_TYPE_LABEL } from "@/lib/domain/accounts";
 import { entryDisplayName } from "@/lib/domain/entry-detail";
 import { csvFromExportSheet } from "@/lib/domain/report-export";
-import { PERIOD_PRESETS, presetRange, rangeText, shortDate, type PeriodPreset } from "@/lib/domain/report-presets";
+import { PERIOD_PRESETS, presetRange, type PeriodPreset } from "@/lib/domain/report-presets";
 import {
   CHECK_LABEL,
   clearingSentences,
@@ -87,13 +87,11 @@ interface ClashTableRow {
   groupStart: boolean;
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 /**
  * An elastic column that holds a sentence and wraps it, rather than cutting it.
  * An elastic column cuts with an ellipsis, and on a phone every DataTable cell
  * is kept to one line (globals.css); a style on the cell itself outranks both,
- * so "oldest Nov 19, 2025" is never the part that goes missing.
+ * so "oldest 11/19/2025" is never the part that goes missing.
  */
 function sentenceColumn<T>(spec: FlexColumnSpec<T>) {
   return { ...flexColumn<T>(spec), ellipsis: false, onCell: () => ({ style: { whiteSpace: "normal" as const } }) };
@@ -207,7 +205,7 @@ export default function ExceptionsClient({
   /* ---------------------------------------------------------- tables */
 
   const entryColumns = (withTimes: boolean): TableColumnsType<EntryTableRow> => [
-    { title: "Date", key: "date", width: 108, render: (_, r) => shortDate(r.row.entryDate) },
+    { title: "Date", key: "date", width: 108, render: (_, r) => formatDate(r.row.entryDate) },
     {
       title: "Type",
       key: "type",
@@ -296,7 +294,7 @@ export default function ExceptionsClient({
       <>
         <ReportSection
           title={CHECK_LABEL.duplicates}
-          note={plural(r.duplicates.length, "group", "groups")}
+          note={plural(r.duplicates.length, "group")}
           state={state("duplicates", r.duplicates.length)}
           why="Same date, same name, same reference, same accounts, same amount. Repeated wages on one day are normal when several people are paid the same; the same supplier paid twice usually is not."
         >
@@ -305,7 +303,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.checkNumber}
-          note={plural(r.checkNumberClashes.length, "number", "numbers")}
+          note={plural(r.checkNumberClashes.length, "number")}
           state={state("checkNumber", r.checkNumberClashes.length)}
           why="Counted per bank account, so the same number in two different check books is not flagged. Two entries against one number on one account means one of them is miscoded, or the check was reissued."
         >
@@ -327,7 +325,7 @@ export default function ExceptionsClient({
                 width: COLUMN.CODE,
                 render: (_, row) => <span className={styles.mono}>{row.number ?? ""}</span>,
               },
-              { title: "Date", key: "date", width: 108, render: (_, row) => shortDate(row.payment.paymentDate) },
+              { title: "Date", key: "date", width: 108, render: (_, row) => formatDate(row.payment.paymentDate) },
               flexColumn<ClashTableRow>({
                 title: "Name",
                 key: "name",
@@ -346,7 +344,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.clearing}
-          note={plural(r.clearing.length, "account", "accounts")}
+          note={plural(r.clearing.length, "account")}
           state={state("clearing", r.clearing.length)}
           why={`${CLEARING_WHY} ${CLEARING_FIFO_NOTE}`}
         >
@@ -385,7 +383,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.wrongWay}
-          note={`${plural(r.wrongWay.length, "account", "accounts")} · as of ${shortDate(ran.to)}`}
+          note={`${plural(r.wrongWay.length, "account")} · as of ${formatDate(ran.to)}`}
           state={state("wrongWay", r.wrongWay.length)}
           why="An asset in credit or a liability in debit. Sometimes right — an overdrawn account, a supplier overpaid — and sometimes a posting on the wrong side. Contra accounts are left out of this check."
         >
@@ -401,7 +399,7 @@ export default function ExceptionsClient({
               }),
               { title: "Type", key: "type", width: 170, render: (_, row) => <Tag>{ACCOUNT_TYPE_LABEL[row.accountType]}</Tag> },
               {
-                title: `Balance as of ${shortDate(ran.to)}`,
+                title: `Balance as of ${formatDate(ran.to)}`,
                 key: "balance",
                 width: 220,
                 align: "right",
@@ -413,7 +411,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.incomeNoCost}
-          note={`${plural(r.incomeNoCost.length, "year", "years")} · looks at every year in the books`}
+          note={`${plural(r.incomeNoCost.length, "year")} · looks at every year in the books`}
           state={state("incomeNoCost", r.incomeNoCost.length)}
           why="Revenue with nothing spent against it almost always means the period is only part-entered. The profit shown for that year is not a profit."
         >
@@ -438,7 +436,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.unreconciled}
-          note={plural(r.unreconciled.length, "account", "accounts")}
+          note={plural(r.unreconciled.length, "account")}
           state={state("unreconciled", r.unreconciled.length)}
           why={
             <>
@@ -463,7 +461,7 @@ export default function ExceptionsClient({
                 key: "last",
                 width: 140,
                 render: (_, row) =>
-                  row.lastReconciledDate ? shortDate(row.lastReconciledDate) : <Tag color="orange">never</Tag>,
+                  row.lastReconciledDate ? formatDate(row.lastReconciledDate) : <Tag color="orange">never</Tag>,
               },
               {
                 title: "Since",
@@ -490,7 +488,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.noLongerAgree}
-          note={plural(r.noLongerAgree.length, "reconciliation", "reconciliations")}
+          note={plural(r.noLongerAgree.length, "reconciliation")}
           state={state("noLongerAgree", r.noLongerAgree.length)}
           why="A completed reconciliation changed after it was signed off: an entry ticked on it was voided or reversed, an entry dated inside its period was posted afterwards, or its saved total no longer adds up. Each line says what changed."
         >
@@ -510,7 +508,7 @@ export default function ExceptionsClient({
                   title: "Statement",
                   key: "statement",
                   width: CHANGED_STATEMENT_WIDTH,
-                  render: (_, row) => shortDate(row.statementEndingDate),
+                  render: (_, row) => formatDate(row.statementEndingDate),
                 },
                 sentenceColumn<NoLongerAgreeRow>({
                   title: "What changed",
@@ -531,7 +529,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.futureDated}
-          note={`${plural(r.futureDated.length, "entry", "entries")} · dated after ${shortDate(today)}`}
+          note={`${plural(r.futureDated.length, "entry", "entries")} · dated after ${formatDate(today)}`}
           state={state("futureDated", r.futureDated.length)}
           why="Dated after today. Usually a typing slip in the year."
         >
@@ -540,7 +538,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.holding}
-          note={plural(r.holding.length, "account", "accounts")}
+          note={plural(r.holding.length, "account")}
           state={state("holding", r.holding.length)}
           why="Anything left in Uncategorized has not been given an account yet, so it is in the wrong place on both statements."
         >
@@ -567,7 +565,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.statementBalance}
-          note={plural(r.statementBalance.length, "group", "groups")}
+          note={plural(r.statementBalance.length, "group")}
           state={state("statementBalance", r.statementBalance.length)}
           why="When a statement’s Balance column is read as amounts, a run of entries for one payee lands exactly on what the account comes to on each date. A payment does not track the balance of the account it is paid from. Open Reconcile to see the workings and remove them."
         >
@@ -596,7 +594,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.belowZero}
-          note={plural(r.belowZero.length, "account", "accounts")}
+          note={plural(r.belowZero.length, "account")}
           state={state("belowZero", r.belowZero.length)}
           why="Once a statement is agreed, the balance was right on that day. What drags the account under afterwards is far more often an entry that is not a payment than a real overdraft, which the bank would have printed."
         >
@@ -624,7 +622,7 @@ export default function ExceptionsClient({
                   ) : (
                     <span>
                       <span className={styles.negative}>{money(row.worstMinor)}</span>{" "}
-                      <span className={styles.muted}>{shortDate(row.worstDate)}</span>
+                      <span className={styles.muted}>{formatDate(row.worstDate)}</span>
                     </span>
                   ),
               },
@@ -633,7 +631,7 @@ export default function ExceptionsClient({
                 key: "last",
                 width: 140,
                 render: (_, row) =>
-                  row.lastStatementDate ? shortDate(row.lastStatementDate) : <Tag color="orange">never</Tag>,
+                  row.lastStatementDate ? formatDate(row.lastStatementDate) : <Tag color="orange">never</Tag>,
               },
               { title: "Not on a statement", key: "outstanding", width: 150, align: "right", render: (_, row) => row.outstandingCount },
               {
@@ -648,7 +646,7 @@ export default function ExceptionsClient({
 
         <ReportSection
           title={CHECK_LABEL.statementOverride}
-          note={plural(r.statementOverride.length, "statement", "statements")}
+          note={plural(r.statementOverride.length, "statement")}
           state={state("statementOverride", r.statementOverride.length)}
           why="An administrator may import a statement that does not add up, with a reason. It stays here until a completed reconciliation of the same bank account reaches the date of its last line. The import record and the reconciliation it belongs to say the same."
         >
@@ -669,7 +667,7 @@ export default function ExceptionsClient({
                 title: "Imported",
                 key: "imported",
                 width: OVERRIDE_IMPORTED_WIDTH,
-                render: (_, row) => `${row.importedDate} ${row.importedTime}`,
+                render: (_, row) => `${formatDate(row.importedDay)} ${row.importedTime}`,
               },
               flexColumn<StatementOverrideRow>({ title: "By", key: "by", floor: OVERRIDE_BY_FLOOR, render: (_, row) => row.byName }),
               {
@@ -684,7 +682,7 @@ export default function ExceptionsClient({
                 title: "Open since",
                 key: "since",
                 width: OVERRIDE_SINCE_WIDTH,
-                render: (_, row) => shortDate(row.openSince),
+                render: (_, row) => formatDate(row.openSince),
               },
             ]}
           />
@@ -718,7 +716,7 @@ export default function ExceptionsClient({
                         {row.entryNumber}
                       </Button>
                       <br />
-                      <span className={styles.muted}>{shortDate(row.entryDate)}</span>
+                      <span className={styles.muted}>{formatDate(row.entryDate)}</span>
                     </span>
                   ),
                 },
@@ -731,7 +729,7 @@ export default function ExceptionsClient({
                     <span>
                       {row.clearedAccountName}
                       <br />
-                      <span className={styles.muted}>{shortDate(row.clearedStatementDate)} statement</span>
+                      <span className={styles.muted}>{formatDate(row.clearedStatementDate)} statement</span>
                     </span>
                   ),
                 }),
@@ -777,7 +775,7 @@ export default function ExceptionsClient({
   /* ---------------------------------------------------------- page */
 
   const paper = (
-    <ReportPaper companyName={companyName} title="Exception Report" range={rangeText(ran.from, ran.to)} currencyCode={baseCurrency}>
+    <ReportPaper companyName={companyName} title="Exception Report" range={formatDateRange(ran.from, ran.to)} currencyCode={baseCurrency}>
       {report ? (
         <>
           <StatRow
@@ -795,7 +793,7 @@ export default function ExceptionsClient({
               type="warning"
               showIcon
               style={{ marginBottom: 20 }}
-              title={`${report.unavailable.length} of ${report.checksRun} checks could not be run`}
+              title={`${report.unavailable.length} of ${plural(report.checksRun, "check")} could not be run`}
               description={`${report.unavailable.map((c) => CHECK_LABEL[c]).join("; ")}. The rest of the report is complete. A check that could not run is not saying the books are clear — run the report again.`}
             />
           ) : null}

@@ -19,6 +19,7 @@ import {
 } from "@/lib/domain/account-type-readings";
 import type { AccountType } from "@/lib/domain/accounts";
 import { classifyAccounts, type ClassificationOutcome } from "./account-classification";
+import { plural } from "@/lib/format";
 
 // The class lives beside the lookups that throw it; re-exported here because
 // every caller has always imported it from this module.
@@ -224,7 +225,7 @@ export async function previewImport(
       target,
       rows: importable.map((invoice) => ({
         key: invoice.customer,
-        name: `${invoice.externalReference} · ${invoice.customer} · ${invoice.lines.length} line${invoice.lines.length === 1 ? "" : "s"}`,
+        name: `${invoice.externalReference} · ${invoice.customer} · ${plural(invoice.lines.length, "line")}`,
         action: "create" as const,
         openingBalanceMinor: invoice.subtotalMinor,
         values: {},

@@ -1,4 +1,5 @@
 "use client";
+import { plural, pluralWord } from "@/lib/format";
 import { useState } from "react";
 import { Alert, Button, Checkbox, DatePicker, Space, Statistic, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
@@ -117,7 +118,7 @@ export default function ImportPreviewPanel({
       {preview.excluded && preview.excluded.length > 0 && onDownloadExcluded ? (
         <Space>
           <Button size="small" icon={<DownloadOutlined />} onClick={onDownloadExcluded}>
-            Download the {preview.excluded.length} row(s) left out
+            Download the {plural(preview.excluded.length, "row")} left out
           </Button>
           <Typography.Text type="secondary">
             The file&apos;s own columns, with the line number and the reason beside each.
@@ -129,7 +130,7 @@ export default function ImportPreviewPanel({
         <Alert
           type="info"
           showIcon
-          message={`${preview.emptyRows} row(s) carry no money and will be left out`}
+          message={`${plural(preview.emptyRows, "row")} ${pluralWord(preview.emptyRows, "carries", "carry")} no money and will be left out`}
           description="A fee that was waived, or a line recorded as 0.00. There is nothing to post for them, and nothing to fix."
         />
       ) : null}
@@ -144,7 +145,7 @@ export default function ImportPreviewPanel({
             // that first — it is the only sentence that changes what to do next.
             preview.rows.length === 0
               ? `Nothing in this file can be imported — all ${preview.problems.length} were refused`
-              : `${preview.problems.length} row(s) will be left out`
+              : `${plural(preview.problems.length, "row")} will be left out`
           }
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -277,7 +278,7 @@ export default function ImportPreviewPanel({
         <Alert
           type="info"
           showIcon
-          message={`${preview.duplicates} row(s) were imported before and will be skipped.`}
+          message={`${plural(preview.duplicates, "row")} ${pluralWord(preview.duplicates, "was", "were")} imported before and will be skipped.`}
         />
       ) : null}
 
@@ -287,7 +288,7 @@ export default function ImportPreviewPanel({
         loading={busy}
         disabled={preview.rows.length === 0 || blocked}
       >
-        Import {preview.rows.length} row(s)
+        Import {plural(preview.rows.length, "row")}
       </Button>
     </>
   );

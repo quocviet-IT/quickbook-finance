@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format";
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -157,10 +158,7 @@ export default function WorkQueueCard({
                   {item.amountMinor === 0 ? "—" : formatMoney(item.amountMinor)}
                   <small>
                     {KIND_LABEL[item.kind]} ·{" "}
-                    {new Date(`${item.eventDate}T00:00:00.000Z`).toLocaleDateString(
-                      "en-US",
-                      { month: "short", day: "numeric", timeZone: "UTC" },
-                    )}
+                    {formatDate(item.eventDate)}
                   </small>
                 </span>
                 <Tag color={tag.color}>{tag.label}</Tag>

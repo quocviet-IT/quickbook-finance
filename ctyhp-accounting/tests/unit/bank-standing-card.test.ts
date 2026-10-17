@@ -32,7 +32,7 @@ const never: BankStanding = {
 describe("reconcileCard", () => {
   it("says nothing new since, in the tone of the statement's age", () => {
     const card = reconcileCard("Example Checking", reconciled, "2026-07-15", money);
-    expect(card.text).toBe("Reconciled to Jun 30, 2026; nothing new since.");
+    expect(card.text).toBe("Reconciled to 06/30/2026; nothing new since.");
     expect(card.tone).toBe("positive");
     expect(card.noLongerAgrees).toBeNull();
   });
@@ -49,16 +49,16 @@ describe("reconcileCard", () => {
       "2026-07-15",
       money,
     );
-    expect(card.text).toBe("Reconciled to Jun 30, 2026; nothing new since.");
+    expect(card.text).toBe("Reconciled to 06/30/2026; nothing new since.");
     expect(card.noLongerAgrees).toBe(
-      "No longer agrees: 2 entries ticked on the Jun 30, 2026 reconciliation were voided ($120.00)",
+      "No longer agrees: 2 entries ticked on the 06/30/2026 reconciliation were voided ($120.00)",
     );
     expect(card.tone).toBe("danger");
   });
 
   it("words an account with activity since the last statement", () => {
     const card = reconcileCard("Example Checking", { ...reconciled, sinceCount: 4, sinceNetMinor: -2_500 }, "2026-07-15", money);
-    expect(card.text).toBe("Agreed to Jun 30, 2026 at $12500.00 · 4 entries since, -$25.00 not on a statement");
+    expect(card.text).toBe("Agreed to 06/30/2026 at $12500.00 · 4 entries since, -$25.00 not on a statement");
   });
 
   it("says never reconciled with what is waiting, in the danger tone", () => {

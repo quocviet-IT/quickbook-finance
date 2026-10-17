@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { fromMinor } from "@/lib/domain/money";
-import { formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatMoney, pluralWord } from "@/lib/format";
 import {
   describeInventoryReview,
   METHOD_LABEL,
@@ -42,7 +43,8 @@ export default function InventoryReviewClient({
   baseDecimals: number;
 }) {
   const { message } = App.useApp();
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs());
+  const { today } = useCompanyClock();
+  const [asOf, setAsOf] = useState<Dayjs>(dayjs(today));
   const [windowDays, setWindowDays] = useState(90);
   const [review, setReview] = useState<InventoryReview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -176,7 +178,7 @@ export default function InventoryReviewClient({
             dataIndex: "qtyOnHand",
             width: 90,
             align: "right",
-            render: (value: number) => value.toLocaleString(),
+            render: (value: number) => value.toLocaleString("en-US"),
           },
           {
             title: "Unit cost",
@@ -215,7 +217,7 @@ export default function InventoryReviewClient({
                 <>
                   {value}
                   <br />
-                  <Typography.Text type="secondary">{row.daysSinceMovement} days</Typography.Text>
+                  <Typography.Text type="secondary">{row.daysSinceMovement} {pluralWord(row.daysSinceMovement ?? 0, "day")}</Typography.Text>
                 </>
               ) : (
                 "never"

@@ -7,6 +7,7 @@ import {
 } from "@ant-design/icons";
 import type { SectionDataState } from "@/lib/domain/work-surface/types";
 import { freshnessOf } from "@/lib/domain/work-surface/freshness";
+import { formatTime } from "@/lib/format";
 import styles from "./work-surface.module.css";
 
 /**
@@ -22,17 +23,6 @@ import styles from "./work-surface.module.css";
 // read and tested without a browser. Re-exported so the components that draw it
 // keep importing from one place.
 export { freshnessOf };
-
-/**
- * The time of day, in the company's own zone. The zone is required and has no
- * default: without it the server (UTC) and the browser (the reader's zone) print
- * different text for the same instant, and React rejects the page (error 418).
- */
-export function timeOnly(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", timeZone }).format(
-    new Date(iso),
-  );
-}
 
 /** The one-line freshness note that sits under a section's own content. */
 export function FreshnessNote({
@@ -54,7 +44,7 @@ export function FreshnessNote({
         <CheckCircleOutlined aria-hidden="true" />
       )}
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        {stale ? "Last computed" : "Computed"} at {timeOnly(generatedAt, timeZone)}
+        {stale ? "Last computed" : "Computed"} at {formatTime(generatedAt, timeZone)}
         {stale ? " — refresh before relying on it." : ""}
       </Typography.Text>
     </div>

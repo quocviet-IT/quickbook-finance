@@ -2,7 +2,7 @@
 import { Tag } from "antd";
 import { ClockCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import styles from "./work-surface.module.css";
-import { timeOnly } from "./DataStateNote";
+import { formatTime } from "@/lib/format";
 
 /**
  * Where the reader is, and how far the page can be trusted, in one strip.
@@ -45,7 +45,7 @@ export default function SurfaceStatusStrip({
           </span>
         ))}
         <span className={styles.stripFact}>
-          <ClockCircleOutlined aria-hidden="true" /> {timeOnly(generatedAt, timeZone)}
+          <ClockCircleOutlined aria-hidden="true" /> {formatTime(generatedAt, timeZone)}
         </span>
         {unavailableSections.length > 0 ? (
           <Tag color="warning" icon={<WarningOutlined />}>

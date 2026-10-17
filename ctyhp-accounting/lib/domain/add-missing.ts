@@ -20,6 +20,7 @@
 import type { Standing } from "./reconcile-statement";
 import { statementLineKey } from "./statement-bank-lines";
 import type { HoldingAccounts } from "./uncategorized";
+import { plural, pluralWord } from "@/lib/format";
 
 /** The most lines one click adds; matches acc_add_statement_lines_to_books. */
 export const ADD_MISSING_LIMIT = 500;
@@ -343,14 +344,14 @@ export function chooseLinesToAdd(
 
 /** When the lines were posted but pairing them afterwards failed: they are in the books, not yet ticked. */
 export function addedNotPairedMessage(added: number, uncategorized: number, problem: string): string {
-  const them = added === 1 ? "it" : "them";
-  const head = `${added} ${added === 1 ? "entry" : "entries"} added from the statement`;
+  const them = pluralWord(added, "it", "them");
+  const head = `${plural(added, "entry", "entries")} added from the statement`;
   const holding = uncategorized ? `, ${uncategorized} to Uncategorized` : "";
   return `${head}${holding}, but pairing ${them} with the statement failed (${problem}). Click Match again to tick ${them}.`;
 }
 
 /** The message after adding: "3 entries added from the statement and ticked; 1 went to Uncategorized." */
 export function addedMessage(added: number, uncategorized: number): string {
-  const head = `${added} ${added === 1 ? "entry" : "entries"} added from the statement and ticked`;
+  const head = `${plural(added, "entry", "entries")} added from the statement and ticked`;
   return uncategorized ? `${head}; ${uncategorized} went to Uncategorized.` : `${head}.`;
 }

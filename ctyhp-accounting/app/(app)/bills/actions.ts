@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getPayRun } from "@/lib/services/pay-run";
+import { companyClock } from "@/lib/services/report-context";
 import type { PayRun } from "@/lib/domain/payment-terms";
 import { listBillSettlements } from "@/lib/services/settlements";
 import type { SettlementEvent } from "@/lib/domain/settlement";
@@ -103,7 +104,7 @@ export async function voidBillAction(id: string): Promise<ActionResult> {
 export async function payRunAction(asOf?: string): Promise<ActionResult<PayRun>> {
   try {
     const sb = await createSupabaseServerClient();
-    const today = asOf ?? new Date().toISOString().slice(0, 10);
+    const today = asOf ?? (await companyClock(sb)).today;
     return { ok: true, data: await getPayRun(sb, today) };
   } catch (err) {
     return { ok: false, error: msg(err) };

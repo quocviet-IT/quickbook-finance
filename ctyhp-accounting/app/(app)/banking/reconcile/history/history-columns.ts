@@ -12,9 +12,10 @@ export const HISTORY_STATE_TONES: Record<HistoryState, { tone: Tone; label: stri
 };
 
 /**
- * A date as the page prints it, "Sep 30, 2026" — as the card under the table
- * and the in-progress link do — which is wider than the 2026-09-30 that
- * COLUMN.DATE measures (the statement-alert cards measure the same).
+ * A date as the page prints it, "09/30/2026", as the card under the table and
+ * the in-progress link do. Sized when it was written out, "Sep 30, 2026",
+ * wider than COLUMN.DATE (the statement-alert cards the same); the shorter
+ * form fits with room.
  */
 export const HISTORY_SHORT_DATE = 112;
 
@@ -30,8 +31,9 @@ export const HISTORY_COLUMN_WIDTH = {
   openLines: 150,
   /**
    * The open lines' first date, and "– {last date}" under it, under the one-line
-   * heading "First – last". "– Sep 30, 2026" at the secondary 12px measures
-   * 77px, "Sep 30, 2026" 79px, plus the cell's 24px of padding.
+   * heading "First – last". Measured as "– Sep 30, 2026" (77px at the
+   * secondary 12px) and "Sep 30, 2026" (79px), plus the cell's 24px of
+   * padding; "09/30/2026" is narrower.
    */
   dated: HISTORY_SHORT_DATE,
   /**
@@ -42,7 +44,7 @@ export const HISTORY_COLUMN_WIDTH = {
   lastReconciled: 120,
   /** What has happened since: "1,234 entries" over a net amount up to -$1,234,567.89. */
   since: COLUMN.MONEY,
-  /** "Never reconciled", and under it "In progress, ending Sep 30, 2026". */
+  /** "Never reconciled", and under it "In progress, ending 09/30/2026". */
   state: 220,
 } as const;
 

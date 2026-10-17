@@ -18,7 +18,7 @@ import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts
 import { ReportBody } from "@/components/reports/ReportAudience";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural } from "@/lib/format";
 import { cashFlowAction, cashFlowDetailAction } from "./actions";
 import type { CashFlowDetail, CashFlowReport } from "@/lib/services/cashflow";
 
@@ -239,7 +239,7 @@ export default function CashFlowClient({
             description={
               report.tiesOut
                 ? `${fmt(report.openingMinor)} + CFO ${fmt(report.operating)} + CFI ${fmt(report.investing)} + CFF ${fmt(report.financing)} = ${fmt(report.balanceSheetCashMinor)}`
-                : `Difference ${fmt(report.differenceMinor)} · ${report.unclassifiedCount} unclassified journal entr${report.unclassifiedCount === 1 ? "y" : "ies"}. Assign cash-flow roles and investigate before closing the period.`
+                : `Difference ${fmt(report.differenceMinor)} · ${plural(report.unclassifiedCount, "unclassified journal entry", "unclassified journal entries")}. Assign cash-flow roles and investigate before closing the period.`
             }
           />
           <ReportBody
@@ -275,7 +275,7 @@ export default function CashFlowClient({
                         dataSource={state.rows}
                         emptyTitle="No journal evidence"
                         columns={[
-                          { title: "Date", dataIndex: "entryDate", width: 110 },
+                          { title: "Date", dataIndex: "entryDate", width: 110, render: (v: string) => formatDate(v) },
                           {
                             title: "Journal",
                             render: (_, detail) => (
@@ -324,7 +324,7 @@ export default function CashFlowClient({
                     width: 100,
                     align: "right",
                     render: (count?: number) =>
-                      count ? <Tag>{count.toLocaleString()} journal{count === 1 ? "" : "s"}</Tag> : "—",
+                      count ? <Tag>{plural(count, "journal")}</Tag> : "—",
                   },
                   {
                     title: `Amount (${baseCurrency})`,

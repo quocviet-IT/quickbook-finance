@@ -61,9 +61,8 @@ import {
   type ChartListRow,
   type ChartView,
 } from "@/lib/domain/chart-list";
-import { shortDate } from "@/lib/domain/report-presets";
 import type { ZoomSpec } from "@/lib/domain/statement";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatDate } from "@/lib/format";
 import type { AccountRow, CurrencyRow, TaxCodeRow, AccountStatus } from "@/lib/db/types";
 import type { ChartBalances } from "@/lib/services/chart-balances";
 import ClassifyAccountsButton from "./ClassifyAccountsButton";
@@ -456,7 +455,7 @@ export default function AccountsClient({
       title: (
         <span className={styles.balanceHead}>
           <span>Balance</span>
-          <span>{shortDate(asOf)}</span>
+          <span>{formatDate(asOf)}</span>
         </span>
       ),
       key: "balance",

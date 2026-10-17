@@ -9,6 +9,8 @@ import { archiveSavedReportAction } from "./actions";
 import SaveReportModal from "./SaveReportModal";
 import SavedReportViewer from "./SavedReportViewer";
 import { TOKENS } from "@/lib/design/tokens";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDate, formatDateInTimeZone } from "@/lib/format";
 
 export interface SavedReportsClientProps {
   reports: SavedReportRow[];
@@ -23,7 +25,7 @@ function formatBytes(bytes: number): string {
 
 function formatPeriod(row: SavedReportRow): string {
   if (!row.period_start && !row.period_end) return "—";
-  return `${row.period_start ?? "…"} → ${row.period_end ?? "…"}`;
+  return `${row.period_start ? formatDate(row.period_start) : "…"} → ${row.period_end ? formatDate(row.period_end) : "…"}`;
 }
 
 /**
@@ -35,6 +37,7 @@ function formatPeriod(row: SavedReportRow): string {
  */
 export default function SavedReportsClient({ reports, canManage }: SavedReportsClientProps) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [viewing, setViewing] = useState<SavedReportRow | null>(null);
@@ -109,7 +112,7 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
             title: "Saved",
             dataIndex: "uploaded_at",
             width: 130,
-            render: (value: string) => value.slice(0, 10),
+            render: (value: string) => formatDateInTimeZone(value, timeZone),
           },
           {
             title: "",

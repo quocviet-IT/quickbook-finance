@@ -35,7 +35,8 @@ import type {
   PaymentRow,
   PaymentStatus,
 } from "@/lib/db/types";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import EditPaymentDetailsModal from "./EditPaymentDetailsModal";
 import PaymentDetailDrawer from "./PaymentDetailDrawer";
 import ReceivePaymentModal, { type ReceivePaymentBasis } from "./ReceivePaymentModal";
@@ -98,6 +99,7 @@ export default function PaymentsClient({
   const [receiveOpen, setReceiveOpen] = useInitiallyOpen(initialCreateOpen);
   // Bumped on every open, so the form is a fresh mount rather than a reset:
   // yesterday's allocations must never survive into the next receipt.
+  const { timeZone } = useCompanyClock();
   const [receiveSession, setReceiveSession] = useState(0);
   const [basis, setBasis] = useState<ReceivePaymentBasis | null>(null);
   const [detailFor, setDetailFor] = useState<PaymentListRow | null>(null);
@@ -126,7 +128,7 @@ export default function PaymentsClient({
   function describeVoid(row: PaymentListRow): string | null {
     if (row.status !== "void") return null;
     const who = row.voided_by ? (directory.get(row.voided_by) ?? "another user") : "the system";
-    const when = row.voided_at ? new Date(row.voided_at).toLocaleString() : "an earlier date";
+    const when = row.voided_at ? formatDateTime(row.voided_at, timeZone) : "an earlier date";
     return `Voided by ${who} on ${when}.${row.void_reason ? ` ${row.void_reason}` : ""}`;
   }
 
@@ -207,7 +209,7 @@ export default function PaymentsClient({
         ),
       }),
     },
-    { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE },
+    { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
     {
       title: "Amount",
       dataIndex: "amount_minor",

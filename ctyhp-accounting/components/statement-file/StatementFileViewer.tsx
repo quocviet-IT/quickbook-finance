@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Spin, Typography } from "antd";
 import { savedReportPreview, savedReportView, type SavedReportPreview } from "@/lib/domain/saved-reports";
+import { plural } from "@/lib/format";
 import { PDF_MESSAGES } from "@/lib/domain/pdf-statement-view";
 import { savedReportDownloadUrlAction, savedReportPreviewAction } from "@/app/(app)/reports/saved/actions";
 import DataTable from "@/components/ui/DataTable";
@@ -97,7 +98,7 @@ export default function StatementFileViewer({ id, mimeType }: StatementFileViewe
           <Alert
             type="info"
             showIcon
-            message={`Showing the first ${current.images.length} of ${current.pageCount} pages. Download the original for the rest.`}
+            message={`Showing the first ${current.images.length} of ${plural(current.pageCount, "page")}. Download the original for the rest.`}
           />
         ) : null}
         {current.images.map((src, index) => (

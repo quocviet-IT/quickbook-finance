@@ -1,4 +1,5 @@
 "use client";
+import { plural } from "@/lib/format";
 import type { ReactNode } from "react";
 import { Alert, Select, Space, Spin, Typography } from "antd";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
@@ -73,14 +74,14 @@ export default function PdfStatementPreview({
       {statements.length > 1 ? (
         <div style={{ marginTop: 12 }}>
           <Typography.Text type="secondary" style={{ display: "block", fontSize: 12 }}>
-            This PDF holds {statements.length} statements. {pickPrompt}
+            This PDF holds {plural(statements.length, "statement")}. {pickPrompt}
           </Typography.Text>
           <Select
             aria-label="Statement"
             style={{ width: "100%" }}
             value={picked}
             onChange={(value: number) => onPick(value)}
-            options={statements.map((s, i) => ({ value: i, label: statementLabel(s) }))}
+            options={statements.map((st, i) => ({ value: i, label: statementLabel(st) }))}
           />
         </div>
       ) : null}

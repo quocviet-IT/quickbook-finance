@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format";
 import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { App, Alert, Button, Input, List, Modal, Radio, Space, Spin, Typography, Upload } from "antd";
@@ -197,12 +198,12 @@ export default function ReportDialog({
       }
       if (attachments.stored > 0) {
         parts.push(
-          `${attachments.stored} attachment${attachments.stored === 1 ? "" : "s"} included`,
+          `${plural(attachments.stored, "attachment")} included`,
         );
       }
       if (attachments.failed > 0) {
         message.warning(
-          `${attachments.failed} attachment${attachments.failed === 1 ? "" : "s"} could not be uploaded; the report was still sent.`,
+          `${plural(attachments.failed, "attachment")} could not be uploaded; the report was still sent.`,
         );
       }
       message.success(`${parts.join(", ")}. Thank you.`);

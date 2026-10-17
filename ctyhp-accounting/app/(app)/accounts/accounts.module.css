@@ -49,11 +49,14 @@
   outline-offset: 2px;
 }
 
-/* The pressed pill is filled with ink: dark on a light page, light on a dark one. */
+/*
+ * The pressed pill takes the brand tint, like every other chosen thing. It
+ * was filled with ink, which inverts: on a dark page it was a white block.
+ */
 .pill[aria-pressed="true"] {
-  color: var(--ob-surface-card);
-  background: var(--ob-text-heading);
-  border-color: var(--ob-text-heading);
+  color: var(--ob-accent-strong);
+  background: var(--ob-accent-hover);
+  border-color: var(--ob-intent-primary);
   font-weight: 600;
 }
 

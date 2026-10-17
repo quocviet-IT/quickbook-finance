@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { longDate, presetRange, rangeText, shortDate, PERIOD_PRESETS, type PresetContext } from "@/lib/domain/report-presets";
+import { presetRange, PERIOD_PRESETS, type PresetContext } from "@/lib/domain/report-presets";
 
 const ctx = (over: Partial<PresetContext> = {}): PresetContext => ({
   today: "2026-09-26",
@@ -92,21 +92,5 @@ describe("presetRange", () => {
   it("gets February's last day right, in a leap year and out of one", () => {
     expect(presetRange("month", ctx({ today: "2028-02-29" })).to).toBe("2028-02-29");
     expect(presetRange("quarter", ctx({ today: "2027-03-31" }))).toEqual({ from: "2027-01-01", to: "2027-03-31" });
-  });
-});
-
-describe("dates at the head of a report", () => {
-  it("writes a long date the way the prototype does", () => {
-    expect(longDate("2026-01-01")).toBe("January 1, 2026");
-    expect(longDate("2026-09-26")).toBe("September 26, 2026");
-  });
-
-  it("writes a short date for a table cell", () => {
-    expect(shortDate("2026-02-02")).toBe("Feb 2, 2026");
-  });
-
-  it("writes a range, or an as-of date when there is no start", () => {
-    expect(rangeText("2026-01-01", "2026-09-26")).toBe("January 1, 2026 – September 26, 2026");
-    expect(rangeText(null, "2026-09-26")).toBe("As of September 26, 2026");
   });
 });

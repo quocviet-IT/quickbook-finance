@@ -1,5 +1,5 @@
 "use client";
-import { timeZoneLabel } from "@/lib/format";
+import { formatDate, timeZoneLabel } from "@/lib/format";
 import SurfaceScreen from "@/components/work-surface/SurfaceScreen";
 import type { Assignee } from "@/components/work-surface/WorkItemActions";
 import type { BankingSurfaceData } from "@/lib/services/banking-surface";
@@ -32,7 +32,7 @@ export default function BankingSurface({
   const { context, controls, queue } = data;
   return (
     <SurfaceScreen
-      facts={[`As of ${context.asOf}`, context.currencyCode, timeZoneLabel(context.timeZone)]}
+      facts={[`As of ${formatDate(context.asOf)}`, context.currencyCode, timeZoneLabel(context.timeZone)]}
       queue={queue}
       controls={controls}
       queueTitle="What needs matching"

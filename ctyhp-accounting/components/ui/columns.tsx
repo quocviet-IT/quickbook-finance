@@ -5,6 +5,7 @@ import type { ColumnType } from "antd/es/table";
 import { moneyDisplay } from "@/lib/domain/money-display";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { TOKENS } from "@/lib/design/tokens";
+import { formatDate } from "@/lib/format";
 import { ToneBadge, type Tone } from "@/lib/design/tone";
 
 /**
@@ -119,10 +120,8 @@ export function dateColumn<T>(spec: DateColumnSpec<T>): ColumnType<T> {
     width: spec.width,
     render: (value: string | null) => {
       if (!value) return ABSENT;
-      // The text is deliberately what these screens already showed. This batch
-      // buys the semantic element and one code path; changing how every date
-      // in the application reads is a visible change nobody asked for.
-      return <time dateTime={value}>{value}</time>;
+      // The attribute stays ISO for machines; the text is the one date style.
+      return <time dateTime={value}>{formatDate(value)}</time>;
     },
   };
 }

@@ -150,11 +150,6 @@ export function documentAttribution(
   };
 }
 
-/** Trim a stored timestamp to what a report shows: `2026-07-31 01:05:07`. */
-export function formatAuditTimestamp(value: string): string {
-  return value.slice(0, 19).replace("T", " ");
-}
-
 export interface AuditTrailCsvRow extends Record<string, unknown> {
   changed_at: string;
   changed_by: string;
@@ -190,7 +185,7 @@ export function auditTrailRows(
   const rows: AuditTrailCsvRow[] = [];
   for (const entry of entries) {
     const base = {
-      changed_at: formatAuditTimestamp(entry.created_at),
+      changed_at: entry.created_at.slice(0, 19).replace("T", " "),
       changed_by: formatActor(entry.actor_email),
       table_name: entry.table_name,
       record_id: entry.record_id ?? "",

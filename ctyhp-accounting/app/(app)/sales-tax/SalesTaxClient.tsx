@@ -14,7 +14,7 @@ import {
   stateName,
   type StateLiabilityLine,
 } from "@/lib/domain/tax-jurisdiction";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
   liabilityAction, voidTaxPaymentAction,
   createTaxCodeAction, updateTaxCodeAction, setTaxCodeActiveAction,
@@ -212,8 +212,8 @@ export default function SalesTaxClient(props: Props) {
               )}
               columns={[
                 { title: "Number", dataIndex: "payment_number", render: (v) => v ?? "—" },
-                { title: "Date", dataIndex: "payment_date" },
-                { title: "Period", key: "period", render: (_, r) => (r.period_start && r.period_end ? `${r.period_start} → ${r.period_end}` : "—") },
+                { title: "Date", dataIndex: "payment_date", render: (v: string) => formatDate(v) },
+                { title: "Period", key: "period", render: (_, r) => (r.period_start && r.period_end ? `${formatDate(r.period_start)} → ${formatDate(r.period_end)}` : "—") },
                 { title: "Amount", dataIndex: "amount_minor", align: "right", render: (v: number) => money(v) },
                 { title: "Status", dataIndex: "status", render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag> },
                 {

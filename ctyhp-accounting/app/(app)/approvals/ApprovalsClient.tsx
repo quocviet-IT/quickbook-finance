@@ -1,11 +1,12 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/lib/db/types";
 import { canDecide } from "@/lib/domain/access";
-import { formatMoney } from "@/lib/format";
+import { formatDateTime, formatMoney, plural, pluralWord } from "@/lib/format";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
@@ -41,6 +42,7 @@ export default function ApprovalsClient({
   baseDecimals: number;
 }) {
   const { message, modal } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [decidedPageSize, setDecidedPageSize] = useState<number>(DECIDED_DEFAULT_PAGE_SIZE);
@@ -127,7 +129,7 @@ export default function ApprovalsClient({
       render: (v: number) => (v ? money(Number(v)) : "—"),
     },
     { title: "Reason", dataIndex: "reason", ...longTextColumn() },
-    { title: "Requested", dataIndex: "requested_at", render: (v: string) => v.slice(0, 16).replace("T", " ") },
+    { title: "Requested", dataIndex: "requested_at", render: (v: string) => formatDateTime(v, timeZone) },
   ];
 
   const enabledPolicies = policies.filter((p) => p.enabled);
@@ -165,7 +167,7 @@ export default function ApprovalsClient({
           type="info"
           showIcon
           message="Nothing has been submitted yet"
-          description={`${enabledPolicies.length} ${enabledPolicies.length === 1 ? "policy is" : "policies are"} enabled (${enabledPolicies
+          description={`${plural(enabledPolicies.length, "policy", "policies")} ${pluralWord(enabledPolicies.length, "is", "are")} enabled (${enabledPolicies
             .map((p) => p.label)
             .join(", ")}). A request appears here the moment someone performs one of those actions.`}
         />
@@ -247,7 +249,7 @@ export default function ApprovalsClient({
               dataIndex: "status",
               render: (v: ApprovalStatus) => <Tag color={STATUS_COLOR[v]}>{v}</Tag>,
             },
-            { title: "Decided", dataIndex: "decided_at", render: (v: string | null) => (v ? v.slice(0, 16).replace("T", " ") : "—") },
+            { title: "Decided", dataIndex: "decided_at", render: (v: string | null) => formatDateTime(v, timeZone) },
             { title: "Note", dataIndex: "decision_note", ...longTextColumn() },
           ]}
         />

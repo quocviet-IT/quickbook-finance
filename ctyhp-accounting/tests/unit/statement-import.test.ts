@@ -114,7 +114,7 @@ describe("describeStatementParse", () => {
       { date: "2026-07-15", description: "Deposit", amount: "2806.51" },
     ]);
     expect(describeStatementParse(result)).toBe(
-      "2 transaction(s) from 2026-07-03 to 2026-07-15, net -$393.49",
+      "2 transactions from 07/03/2026 to 07/15/2026, net -$393.49",
     );
   });
 
@@ -123,7 +123,7 @@ describe("describeStatementParse", () => {
       { date: "2026-07-03", description: "Rent", amount: "-3200.00" },
       { date: "", description: "Broken", amount: "" },
     ]);
-    expect(describeStatementParse(result)).toContain("1 unreadable row(s) skipped");
+    expect(describeStatementParse(result)).toContain("1 unreadable row skipped");
   });
 
   it("says plainly when there is nothing readable", () => {

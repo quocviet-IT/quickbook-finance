@@ -8,6 +8,7 @@ import {
   type MergedMapping,
 } from "./mapping-prompt";
 import { proposeMapping, type ImportTarget } from "@/lib/domain/import-mapping";
+import { plural } from "@/lib/format";
 
 export interface SuggestedMapping extends MergedMapping {
   /** Shown beside the mapping when there is something a person should know. */
@@ -72,7 +73,7 @@ export async function suggestMapping(
     ...merged,
     note:
       merged.aiFields.length > 0
-        ? `${merged.aiFields.length} column${merged.aiFields.length === 1 ? "" : "s"} matched by the model — check them before importing.`
+        ? `${plural(merged.aiFields.length, "column")} matched by the model — check them before importing.`
         : null,
   };
 }

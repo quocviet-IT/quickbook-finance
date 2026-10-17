@@ -1,4 +1,5 @@
 "use client";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Collapse, Space, Spin } from "antd";
@@ -7,10 +8,10 @@ import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import { downloadTextFile } from "@/lib/client/download";
 import type { BeancountTextLine } from "@/lib/domain/beancount";
-import { shortDate } from "@/lib/domain/report-presets";
 import type { BeancountSummary } from "@/lib/services/beancount";
 import { beancountExportAction, beancountPreviewAction } from "./actions";
 
+import { formatDate, plural } from "@/lib/format";
 /** How many lines are drawn at a time. A large book is thousands; the file itself is always whole. */
 const LINES_PER_STEP = 3000;
 
@@ -67,7 +68,7 @@ export default function BeancountClient({
       return;
     }
     downloadTextFile(r.data.fileName, r.data.text, "text/plain;charset=utf-8");
-    message.success(`Saved ${r.data.fileName}: ${r.data.entryCount.toLocaleString("en-US")} entries. Recorded in the audit log.`);
+    message.success(`Saved ${r.data.fileName}: ${plural(r.data.entryCount, "entry", "entries")}. Recorded in the audit log.`);
   };
 
   const copy = async () => {
@@ -98,7 +99,7 @@ export default function BeancountClient({
     }
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const { today } = useCompanyClock();
   const ledgerHref = (accountId: string) => `/reports/general-ledger?account=${accountId}&to=${today}`;
 
   const rendered = useMemo(() => {
@@ -223,8 +224,8 @@ export default function BeancountClient({
           items={[
             { label: "Posted entries", value: summary.entryCount.toLocaleString("en-US") },
             { label: "Accounts", value: summary.accountCount.toLocaleString("en-US") },
-            { label: "First entry", value: summary.firstDate ? shortDate(summary.firstDate) : "—" },
-            { label: "Last entry", value: summary.lastDate ? shortDate(summary.lastDate) : "—" },
+            { label: "First entry", value: summary.firstDate ? formatDate(summary.firstDate) : "—" },
+            { label: "Last entry", value: summary.lastDate ? formatDate(summary.lastDate) : "—" },
             { label: "Currencies", value: summary.currencies.length > 0 ? summary.currencies.join(", ") : "—" },
             { label: "Reconciled statements", value: summary.reconciledStatements.toLocaleString("en-US") },
           ]}
@@ -264,13 +265,13 @@ export default function BeancountClient({
         </div>
       ) : (
         <>
-          <pre className={`${styles.code} ${styles.codeTall}`} aria-label={`${fileName}, ${lines.length} lines`}>
+          <pre className={`${styles.code} ${styles.codeTall}`} aria-label={`${fileName}, ${plural(lines.length, "line")}`}>
             {rendered}
           </pre>
           {lines.length > shown ? (
             <div className={styles.codeMore}>
               <span>
-                Showing the first {shown.toLocaleString("en-US")} of {lines.length.toLocaleString("en-US")} lines. Save
+                Showing the first {shown.toLocaleString("en-US")} of {plural(lines.length, "line")}. Save
                 file always has them all.
               </span>
               <Button size="small" onClick={() => setShown((n) => n + LINES_PER_STEP)}>

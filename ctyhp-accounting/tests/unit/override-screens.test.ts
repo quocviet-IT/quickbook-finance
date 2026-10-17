@@ -97,7 +97,7 @@ describe("the sentences of a reconciliation", () => {
     expect(out.notices).toEqual([
       {
         batchId: "b1",
-        text: "A statement in this period was imported out of balance: out by $12.50, by Dana Example on Sep 9, 2026, “Bank typo”. Completing this reconciliation settles it.",
+        text: "A statement in this period was imported out of balance: out by $12.50, by Dana Example on 09/09/2026, “Bank typo”. Completing this reconciliation settles it.",
       },
     ]);
   });
@@ -117,7 +117,7 @@ describe("the sentences of a reconciliation", () => {
     expect(out.settles).toEqual([
       {
         batchId: "b1",
-        text: "Settles a statement imported out of balance: out by $12.50, by Dana Example on Sep 9, 2026, “Bank typo”.",
+        text: "Settles a statement imported out of balance: out by $12.50, by Dana Example on 09/09/2026, “Bank typo”.",
       },
     ]);
   });
@@ -151,7 +151,7 @@ describe("the import history", () => {
     listStatementOverrides.mockResolvedValue([override()]);
     const rows = await listBankStatementImports(sb, null);
     expect(rows[0].override_detail).toBe(
-      "Out by $12.50. Imported by Dana Example on Sep 9, 2026 at 4:30 PM: “Bank typo”. Open until a reconciliation through Sep 30, 2026 is completed.",
+      "Out by $12.50. Imported by Dana Example on 09/09/2026 at 4:30 PM: “Bank typo”. Open until a reconciliation through 09/30/2026 is completed.",
     );
     expect(rows[1].override_detail).toBeNull();
   });
@@ -159,7 +159,7 @@ describe("the import history", () => {
   it("says the override is settled once a reconciliation reached it", async () => {
     listStatementOverrides.mockResolvedValue([override({ settledByReconciliationId: "r1", settledThrough: "2026-09-30" })]);
     const rows = await listBankStatementImports(sb, null);
-    expect(rows[0].override_detail).toMatch(/Settled by the reconciliation to Sep 30, 2026\.$/);
+    expect(rows[0].override_detail).toMatch(/Settled by the reconciliation to 09\/30\/2026\.$/);
   });
 
   it("is drawn with the tag and the sentence under the file name, only when there is one", () => {

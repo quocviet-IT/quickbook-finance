@@ -6,7 +6,7 @@ import { Alert, App, Button, Space, Spin, Tag, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import { readRunFile } from "@/lib/client/run-files";
-import { periodLabel, shortDate } from "@/lib/domain/pdf-statement-view";
+import { periodLabel } from "@/lib/domain/pdf-statement-view";
 import {
   checkRun,
   monthSentence,
@@ -18,7 +18,7 @@ import {
   type RunPreview,
   type RunStatement,
 } from "@/lib/domain/statement-run";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import { keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
 import {
   NO_BANK_LINE_MATCHES,
@@ -72,7 +72,7 @@ function matchedSaid(done: Done): string | null {
 function before(done: Done): string | null {
   const parts = [
     done.broughtForward ? "The earlier lines were brought forward" : null,
-    done.signed > 0 ? `${done.signed} month${done.signed === 1 ? "" : "s"} signed off` : null,
+    done.signed > 0 ? `${plural(done.signed, "month")} signed off` : null,
   ].filter((p): p is string => p !== null);
   return parts.length ? `${parts.join(" and ")} before this.` : null;
 }
@@ -190,7 +190,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
   const needsLook = preview?.months[preview.toSign]?.outcome.kind !== "waiting" ? preview?.months[preview.toSign] ?? null : null;
   const bringForward = preview?.broughtForward?.canBringForward ? preview.broughtForward : null;
   const signLabel = preview?.toSign
-    ? `Sign off ${preview.toSign} month${preview.toSign === 1 ? "" : "s"}`
+    ? `Sign off ${plural(preview.toSign, "month")}`
     : needsLook
       ? bringForward
         ? "Bring the earlier lines forward and start the month that needs a look"
@@ -248,7 +248,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
       let kept = 0;
       for (const [file, read] of byFile) {
         kept += 1;
-        setProgress(`Keeping the statement file${byFile.size === 1 ? "" : "s"} — ${kept} of ${byFile.size}`);
+        setProgress(`Keeping the ${pluralWord(byFile.size, "statement file")} — ${kept} of ${byFile.size}`);
         const result = await keep(file, fileAccount, statementFileSpan(read));
         if (result.ok) for (const st of read) fileIdOf.set(st.key, result.id);
         else message.warning(keepFailureMessage(`${file.name}: ${result.reason}`, "reconciliation"), 10);
@@ -274,7 +274,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
       const statement = previewedByKey.get(month.key);
       if (!statement) break;
       step += 1;
-      setProgress(`Signing ${shortDate(month.statementDate, true)} — ${step} of ${total}`);
+      setProgress(`Signing ${formatDate(month.statementDate)} — ${step} of ${total}`);
       const res = await reconcileRunMonthAction({
         kind: "month",
         bank_account_id: bankAccount.id,
@@ -299,12 +299,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
       }
       signed += 1;
       if (res.data.matched) matched = addMatchCounts(matched, res.data.matched);
-      if (res.data.matchError) unmatched.push(bankLinesNotMatchedSentence(res.data.matchError, shortDate(month.statementDate, true)));
+      if (res.data.matchError) unmatched.push(bankLinesNotMatchedSentence(res.data.matchError, formatDate(month.statementDate)));
     }
     let open: Done["open"] = null;
     const statement = statementOfNeedsLook;
     if (needsLook && statement) {
-      setProgress(`Starting ${shortDate(needsLook.statementDate, true)}, which needs a look`);
+      setProgress(`Starting ${formatDate(needsLook.statementDate)}, which needs a look`);
       const res = await reconcileRunMonthAction({
         kind: "month",
         bank_account_id: bankAccount.id,
@@ -351,7 +351,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         <Space>
           <Spin size="small" />
           <Typography.Text type="secondary">
-            Reading {reading} file{reading === 1 ? "" : "s"}…
+            Reading {plural(reading, "file")}…
           </Typography.Text>
         </Space>
       ) : null}
@@ -416,7 +416,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
               disabled={check.stops.length > 0 || reading > 0 || busy}
               onClick={() => void runPreview()}
             >
-              Preview {check.usable.length} statement{check.usable.length === 1 ? "" : "s"}
+              Preview {plural(check.usable.length, "statement")}
             </Button>
             <Button onClick={startAgain} disabled={busy || previewing}>
               Start again
@@ -453,7 +453,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
                     pagination={false}
                     dataSource={(statement?.lines ?? []).map((line, i) => ({ line, standing: m.standings[i] }))}
                     columns={[
-                      { title: "Date", render: (_, r) => r.line.txn_date, width: 110 },
+                      { title: "Date", render: (_, r) => formatDate(r.line.txn_date), width: 110 },
                       { title: "Description", render: (_, r) => r.line.description },
                       { title: "Amount", align: "right", render: (_, r) => money(r.line.amount_minor), width: 130 },
                       { title: "With the books", render: (_, r) => (r.standing ? <StandingTag standing={r.standing} /> : null), width: 280 },
@@ -463,7 +463,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
               },
             }}
             columns={[
-              { title: "Statement", render: (_, m) => shortDate(m.statementDate, true), width: 130 },
+              { title: "Statement", render: (_, m) => formatDate(m.statementDate), width: 130 },
               { title: "File", render: (_, m) => previewedByKey.get(m.key)?.fileName ?? "" },
               {
                 title: "Beginning",
@@ -498,15 +498,15 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
           title={
             done.error ??
             (done.signed
-              ? `${done.signed} month${done.signed === 1 ? "" : "s"} signed off.`
-              : `The reconciliation to ${shortDate((done.open as NonNullable<Done["open"]>).date, true)} needs a look.`)
+              ? `${plural(done.signed, "month")} signed off.`
+              : `The reconciliation to ${formatDate((done.open as NonNullable<Done["open"]>).date)} needs a look.`)
           }
           description={
             done.open ? (
               <span>
                 {done.broughtForward ? "The earlier lines were brought forward. " : ""}
                 {matchedSaid(done) ? `${matchedSaid(done)} ` : ""}
-                {done.open.sentence.replace(/\.?$/, ".")} The reconciliation to {shortDate(done.open.date, true)} is started, with its pairs ticked.{" "}
+                {done.open.sentence.replace(/\.?$/, ".")} The reconciliation to {formatDate(done.open.date)} is started, with its pairs ticked.{" "}
                 <Link href={`/banking/reconcile/${done.open.id}`}>Open it</Link>
               </span>
             ) : done.error ? (

@@ -1,5 +1,7 @@
 "use client";
 
+import { useCompanyClock } from "@/components/CompanyClock";
+import { formatDateTime } from "@/lib/format";
 import { useMemo } from "react";
 import { Empty, Space, Tag, Typography, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
@@ -38,6 +40,7 @@ export default function MyReportsClient({
   reports: FeedbackReportView[];
   attachments: FeedbackAttachmentView[];
 }) {
+  const { timeZone } = useCompanyClock();
   const rows = useMemo(() => sortNewestFirst(reports), [reports]);
   const attachmentCount = useMemo(() => {
     const counts = new Map<string, number>();
@@ -84,7 +87,7 @@ export default function MyReportsClient({
       title: "Filed",
       dataIndex: "createdAt",
       width: 180,
-      render: (value: string) => new Date(value).toLocaleString(),
+      render: (value: string) => formatDateTime(value, timeZone),
     },
   ];
 

@@ -5,6 +5,10 @@ import { countPendingApprovals } from "@/lib/services/access";
 import { currentAccess } from "@/lib/db/settings-access";
 import AppShell from "@/components/AppShell";
 import NoCompanyNotice from "@/components/NoCompanyNotice";
+import { CompanyClockProvider } from "@/components/CompanyClock";
+import { getCurrentCompanySettings } from "@/lib/services/company";
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
+import { todayInTimeZone } from "@/lib/format";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Which company is open decides which schema everything below reads, so it is
@@ -40,32 +44,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Access comes from currentAccess() rather than being rebuilt here, so the
   // shell, the settings hub and every settings guard read one answer. It is
   // cache()d, so sharing it costs no extra queries.
-  const [pendingApprovals, { role, permissionKeys }] = await Promise.all([
+  //
+  // The company's time zone rides along in the same round trip, so client
+  // screens name the company's today rather than the browser's or UTC's. A
+  // failed read falls back to the default zone; it never blocks the shell.
+  const [pendingApprovals, { role, permissionKeys }, settings] = await Promise.all([
     countPendingApprovals(sb).catch(() => 0),
     currentAccess(),
+    getCurrentCompanySettings(sb).catch(() => null),
   ]);
+  const timeZone = settings?.time_zone || DEFAULT_TIME_ZONE;
 
   return (
-    <AppShell
-      email={user.email ?? ""}
-      role={role}
-      canCreateCompany={canCreateCompany}
-      activeCompany={{
-        slug: active.slug,
-        legalName: active.legalName,
-        dbaName: active.dbaName,
-        isSample: active.isSample,
-      }}
-      companyOptions={options.map((company) => ({
-        slug: company.slug,
-        legalName: company.legalName,
-        dbaName: company.dbaName,
-        isSample: company.isSample,
-      }))}
-      permissionKeys={permissionKeys}
-      pendingApprovals={pendingApprovals}
-    >
-      {children}
-    </AppShell>
+    <CompanyClockProvider timeZone={timeZone} today={todayInTimeZone(timeZone)}>
+      <AppShell
+        email={user.email ?? ""}
+        role={role}
+        canCreateCompany={canCreateCompany}
+        activeCompany={{
+          slug: active.slug,
+          legalName: active.legalName,
+          dbaName: active.dbaName,
+          isSample: active.isSample,
+        }}
+        companyOptions={options.map((company) => ({
+          slug: company.slug,
+          legalName: company.legalName,
+          dbaName: company.dbaName,
+          isSample: company.isSample,
+        }))}
+        permissionKeys={permissionKeys}
+        pendingApprovals={pendingApprovals}
+      >
+        {children}
+      </AppShell>
+    </CompanyClockProvider>
   );
 }

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { companyToday } from "./company";
 import type {
   AssetDepreciationScheduleRow,
   FixedAssetMethod,
@@ -20,8 +21,9 @@ export interface FixedAssetView extends FixedAssetRow {
   total_periods: number;
 }
 
-export async function listFixedAssets(sb: SupabaseClient): Promise<FixedAssetView[]> {
-  const today = new Date().toISOString().slice(0, 10);
+/** `companyDay` is the company's today; left out, it is read from the company's settings. */
+export async function listFixedAssets(sb: SupabaseClient, companyDay?: string): Promise<FixedAssetView[]> {
+  const today = companyDay ?? (await companyToday(sb));
   const [
     { data: assets, error: assetError },
     { data: schedules, error: scheduleError },

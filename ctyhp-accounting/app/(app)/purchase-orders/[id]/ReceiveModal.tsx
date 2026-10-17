@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { App, DatePicker, Form, Input, InputNumber, Modal, Table, Typography } from "antd";
 import dayjs from "dayjs";
+import { useCompanyClock } from "@/components/CompanyClock";
 import type { PurchaseOrderLineRow } from "@/lib/db/types";
 import { remainingQty } from "@/lib/domain/purchasing";
 import { receivePurchaseOrderAction } from "../actions";
@@ -30,6 +31,7 @@ export default function ReceiveModal(props: Props) {
 
 function ReceiveModalBody({ onClose, onDone, purchaseOrderId, lines }: Props) {
   const { message } = App.useApp();
+  const { today } = useCompanyClock();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
 
@@ -76,7 +78,7 @@ function ReceiveModalBody({ onClose, onDone, purchaseOrderId, lines }: Props) {
       okText="Record receipt"
       width={720}
     >
-      <Form form={form} layout="vertical" initialValues={{ receipt_date: dayjs() }}>
+      <Form form={form} layout="vertical" initialValues={{ receipt_date: dayjs(today) }}>
         <Form.Item name="receipt_date" label="Receipt date" rules={[{ required: true, message: "Receipt date" }]}>
           <DatePicker />
         </Form.Item>

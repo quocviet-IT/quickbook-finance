@@ -9,6 +9,7 @@
  * document without an entry should be impossible. This module exists to prove
  * that continuously rather than to assume it.
  */
+import { formatDate, plural, pluralWord } from "@/lib/format";
 
 export interface PostingRow {
   sourceType: string;
@@ -136,7 +137,7 @@ export function describePostingExceptions(report: PostingReport): string | null 
   if (unposted) parts.push(`${unposted} whose entry is not posted`);
   if (mismatched) parts.push(`${mismatched} whose entry does not carry the document total`);
   if (inError) parts.push(`${inError} posted that should not be`);
-  return `${report.exceptions.length} document(s) need attention: ${parts.join(", ")}.`;
+  return `${plural(report.exceptions.length, "document")} ${pluralWord(report.exceptions.length, "needs", "need")} attention: ${parts.join(", ")}.`;
 }
 
 export const POSTING_VERDICT_LABEL: Record<PostingVerdict, string> = {
@@ -227,5 +228,5 @@ export function describeControlExceptions(recon: ControlReconciliation): string 
         : `${row.label} holds ${amount} with no subledger behind it`;
     })
     .join("; ");
-  return `${recon.exceptions.length} control account(s) do not tie out as of ${recon.asOf}: ${named}.`;
+  return `${plural(recon.exceptions.length, "control account")} ${pluralWord(recon.exceptions.length, "does", "do")} not tie out as of ${formatDate(recon.asOf)}: ${named}.`;
 }
