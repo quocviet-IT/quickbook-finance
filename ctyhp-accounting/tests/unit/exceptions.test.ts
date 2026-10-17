@@ -549,9 +549,9 @@ const emptyInput = (over: Partial<ExceptionReportInput> = {}): ExceptionReportIn
 });
 
 describe("buildExceptionReport", () => {
-  it("runs eleven checks and raises nothing on an empty book", () => {
+  it("runs twelve checks and raises nothing on an empty book", () => {
     const report = buildExceptionReport(emptyInput());
-    expect(report.checksRun).toBe(11);
+    expect(report.checksRun).toBe(12);
     expect(report.questionsRaised).toBe(0);
     expect(report.entriesExamined).toBe(0);
     expect(report.unavailable).toEqual([]);
@@ -690,7 +690,7 @@ describe("exceptionReportSheet", () => {
   it("keeps every check, saying which found nothing and which could not run", () => {
     const report = buildExceptionReport(emptyInput({ unavailable: ["incomeNoCost"] }));
     const sheet = exceptionReportSheet(report, meta);
-    expect(sheet.rows).toHaveLength(11);
+    expect(sheet.rows).toHaveLength(12);
     const byCheck = new Map(sheet.rows.map((r) => [r.check, r.name]));
     expect(byCheck.get("A year with income and no costs")).toBe("Could not run");
     expect(byCheck.get("Entries dated in the future")).toBe("Nothing found");
@@ -769,11 +769,11 @@ describe("the clearing check in the report", () => {
       clearingStanding: [standing()],
     });
 
-  it("counts its rows among the questions and still runs eleven checks", () => {
+  it("counts its rows among the questions and still runs twelve checks", () => {
     const report = buildExceptionReport(input());
     expect(report.clearing).toHaveLength(1);
     expect(report.questionsRaised).toBe(1);
-    expect(report.checksRun).toBe(11);
+    expect(report.checksRun).toBe(12);
   });
 
   it("carries a failed read as unavailable, not as nothing found", () => {
@@ -879,7 +879,7 @@ describe("Reconciliations that no longer agree", () => {
       emptyInput({ bankAccounts: banks, bankStanding: [standing({ voidTickedCount: 1, voidTickedMinor: 100 })] }),
     );
     expect(withVoid.questionsRaised).toBe(1);
-    expect(withVoid.checksRun).toBe(11);
+    expect(withVoid.checksRun).toBe(12);
     expect(buildExceptionReport(emptyInput({ bankAccounts: banks })).noLongerAgree).toEqual([]);
   });
 

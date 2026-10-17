@@ -1,5 +1,6 @@
 "use server";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { companyClock } from "@/lib/services/report-context";
 import { ExceptionsError, getExceptionReport } from "@/lib/services/exceptions";
 import type { ExceptionReport } from "@/lib/domain/exceptions";
 
@@ -25,7 +26,7 @@ export async function exceptionReportAction(
 ): Promise<ActionResult<ExceptionReport>> {
   try {
     const sb = await createSupabaseServerClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const { today } = await companyClock(sb);
     return { ok: true, data: await getExceptionReport(sb, from, to, today) };
   } catch (e) {
     return { ok: false, error: messageFrom(e) };

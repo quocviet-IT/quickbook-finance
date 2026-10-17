@@ -1,3 +1,4 @@
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveActiveCompany } from "@/lib/db/company";
 import type { PresetContext } from "@/lib/domain/report-presets";
@@ -22,7 +23,7 @@ export interface ReportPageContext {
 /** The company's today and time zone, for a report action that needs no more. */
 export async function companyClock(sb: SupabaseClient): Promise<{ today: string; timeZone: string }> {
   const settings = await getCurrentCompanySettings(sb);
-  const timeZone = settings?.time_zone || "UTC";
+  const timeZone = settings?.time_zone || DEFAULT_TIME_ZONE;
   return { today: todayInTimeZone(timeZone), timeZone };
 }
 
@@ -34,7 +35,7 @@ export async function reportPageContext(sb: SupabaseClient): Promise<ReportPageC
     postedEntryDateSpan(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
-  const timeZone = settings?.time_zone || "UTC";
+  const timeZone = settings?.time_zone || DEFAULT_TIME_ZONE;
   const today = todayInTimeZone(timeZone);
   return {
     companyName: entity.active?.dbaName || entity.active?.legalName || settings?.legal_name || "Company name not set",

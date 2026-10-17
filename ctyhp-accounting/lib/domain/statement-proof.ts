@@ -25,7 +25,8 @@
  *      "Opening Balance" record;
  *   2. the first balance of a CSV less the lines up to it;
  *   3. the closing of the account's last completed reconciliation — taken
- *      when the statement's start is known and is the day after it, offered
+ *      when the statement's start is known and is the day after it, or, for a
+ *      CSV that prints no balance, when every line falls after it; offered
  *      when the start is not known, and neither when a line falls on or before
  *      that reconciliation's date;
  *   4. typed by the person.
@@ -403,6 +404,9 @@ export function proveStatement(input: StatementProofInput, money: (minor: number
     const start = figures.start ?? null;
     if (counted.some(({ line }) => line.txn_date <= prior.date)) status = "refused";
     else if (start) status = start === dayAfter(prior.date) ? "auto" : "refused";
+    // A CSV that prints no balance has no start day to compare: every counted
+    // line falling after the prior end is what says the statement follows it.
+    else if (input.kind === "csv" && counted.length > 0) status = "auto";
     else status = input.usePrior ? "taken" : "offered";
     if (status === "auto" || status === "taken") opening = { minor: prior.endingMinor, basis: "prior" };
   }

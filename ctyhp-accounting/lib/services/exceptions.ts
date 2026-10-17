@@ -1,3 +1,4 @@
+import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildExceptionReport,
@@ -18,6 +19,9 @@ import type { BankStanding } from "@/lib/domain/bank-standing";
 import { getBankStanding } from "@/lib/services/bank-standing";
 import type { ClearingStanding } from "@/lib/domain/clearing-accounts";
 import { getClearingStanding } from "@/lib/services/clearing-accounts";
+import { listStatementOverrides } from "@/lib/services/statement-overrides";
+import { getCurrentCompanySettings } from "@/lib/services/company";
+import type { NamedStatementOverride } from "@/lib/domain/statement-overrides";
 import { getAllStatementAlerts } from "@/lib/services/statement-alerts";
 import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
 import {
@@ -292,7 +296,7 @@ export async function getExceptionReport(
     creditBase: b.creditBase,
   }));
 
-  const [refs, byMonth, statementAlerts, bankStanding, clearingStanding] = await Promise.all([
+  const [refs, byMonth, statementAlerts, bankStanding, clearingStanding, statementOverrides, timeZone] = await Promise.all([
     readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
     readOr(unavailable, ["incomeNoCost"], new Map<string, LedgerBalance[]>(), () =>
       earliest === null
@@ -310,6 +314,10 @@ export async function getExceptionReport(
     // Only the clearing check needs it: the balances above still stand, but
     // without the standing nothing can be said about how old they are.
     readOr(unavailable, ["clearing"], [] as ClearingStanding[], () => getClearingStanding(sb, to)),
+    // The statements imported out of balance, and the company's time zone their
+    // date and time are printed in: without either the check cannot say when.
+    readOr(unavailable, ["statementOverride"], [] as NamedStatementOverride[], () => listStatementOverrides(sb)),
+    readOr(unavailable, ["statementOverride"], DEFAULT_TIME_ZONE as string, async () => (await getCurrentCompanySettings(sb))?.time_zone || DEFAULT_TIME_ZONE),
   ]);
 
   const yearTotals = yearTotalsFromMonthly(byMonth);
@@ -343,6 +351,8 @@ export async function getExceptionReport(
     paymentReferences: refs,
     statementAlerts,
     bankStanding,
+    statementOverrides,
+    timeZone,
     unavailable,
   });
 }

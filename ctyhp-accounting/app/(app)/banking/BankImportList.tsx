@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
+import { Alert, App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
 import { getStatementImportsAction, undoStatementImportAction } from "./actions";
 
@@ -69,6 +69,14 @@ export default function BankImportList({
 
   return (
     <>
+      {rows.some((row) => row.overrides_unavailable) ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Could not check which of these imports were out of balance."
+        />
+      ) : null}
       <Table<BankStatementImportRow>
         size="small"
         rowKey="id"
@@ -81,15 +89,30 @@ export default function BankImportList({
             title: "File",
             dataIndex: "filename",
             // The file itself, kept when it was read (1.83); imports before then kept only its name.
-            render: (filename: string, row) =>
-              row.statement_file_id ? (
+            render: (filename: string, row) => {
+              const name = row.statement_file_id ? (
                 <Space size={8}>
                   <span>{filename}</span>
                   <Link href={`/banking/statement-files/${row.statement_file_id}`}>View</Link>
                 </Space>
               ) : (
                 filename
-              ),
+              );
+              // A statement an administrator imported out of balance (2.11) says so
+              // under its file name, with who, when, why and by how much.
+              if (row.override_detail === null) return name;
+              return (
+                <div>
+                  <Space size={8} wrap>
+                    {name}
+                    <Tag color="orange">Imported out of balance</Tag>
+                  </Space>
+                  <div style={{ marginTop: 4, color: "var(--ant-color-text-secondary)", fontSize: 12 }}>
+                    {row.override_detail}
+                  </div>
+                </div>
+              );
+            },
           },
           {
             title: "Into",

@@ -35,6 +35,7 @@ import {
   type HoldingRow,
   type IncomeNoCostRow,
   type NoLongerAgreeRow,
+  type StatementOverrideRow,
   type TransactionListRow,
   type UnreconciledRow,
   type WrongWayRow,
@@ -43,7 +44,16 @@ import { reconcileHref, type BelowZeroRow, type StatementBalanceRow } from "@/li
 import { CLEARING_WHY, CLEARING_FIFO_NOTE, LEFT_STANDING } from "@/lib/domain/clearing-accounts";
 import { ToneBadge } from "@/lib/design/tone";
 import { CLEARING_TAG_WIDTH } from "./clearing-columns";
+import {
+  OVERRIDE_ACCOUNT_FLOOR,
+  OVERRIDE_BY_FLOOR,
+  OVERRIDE_FILE_FLOOR,
+  OVERRIDE_IMPORTED_WIDTH,
+  OVERRIDE_REASON_FLOOR,
+  OVERRIDE_SINCE_WIDTH,
+} from "./override-columns";
 import clearingStyles from "./clearing-table.module.css";
+import overridesStyles from "./overrides-table.module.css";
 import { exceptionReportAction } from "./actions";
 
 /** A row of an entry table, with where it sits in its group of look-alikes. */
@@ -79,7 +89,7 @@ function sentenceColumn<T>(spec: FlexColumnSpec<T>) {
 /**
  * The Exception Report, laid out as the client's prototype lays it out
  * (`reportExceptions` in Accounting-System-v3.html): a period picker, the
- * report on paper under its heading, three figures, then the eleven checks —
+ * report on paper under its heading, three figures, then the twelve checks —
  * each with its question, why it matters, and what it found. Every section is
  * drawn, including the ones with nothing in them, because a reviewer has to see
  * that a check ran. Clicking a line opens the entry behind it in a side sheet.
@@ -609,6 +619,51 @@ export default function ExceptionsClient({
             ]}
           />
         </ReportSection>
+
+        <ReportSection
+          title={CHECK_LABEL.statementOverride}
+          note={plural(r.statementOverride.length, "statement", "statements")}
+          state={state("statementOverride", r.statementOverride.length)}
+          why="An administrator may import a statement that does not add up, with a reason. It stays here until a completed reconciliation of the same bank account reaches the date of its last line. The import record and the reconciliation it belongs to say the same."
+        >
+          <div className={overridesStyles.overridesTable}>
+          <DataTable<StatementOverrideRow>
+            rowKey="batchId"
+            pagination={false}
+            dataSource={r.statementOverride}
+            columns={[
+              flexColumn<StatementOverrideRow>({ title: "Bank account", key: "account", floor: OVERRIDE_ACCOUNT_FLOOR, render: (_, row) => row.accountName }),
+              flexColumn<StatementOverrideRow>({
+                title: "File",
+                floor: OVERRIDE_FILE_FLOOR,
+                key: "file",
+                render: (_, row) => <span title={row.filename}>{row.filename}</span>,
+              }),
+              {
+                title: "Imported",
+                key: "imported",
+                width: OVERRIDE_IMPORTED_WIDTH,
+                render: (_, row) => `${row.importedDate} ${row.importedTime}`,
+              },
+              flexColumn<StatementOverrideRow>({ title: "By", key: "by", floor: OVERRIDE_BY_FLOOR, render: (_, row) => row.byName }),
+              {
+                title: "Out by",
+                key: "outBy",
+                width: COLUMN.MONEY_WIDE,
+                align: "right",
+                render: (_, row) => money(row.outByMinor),
+              },
+              sentenceColumn<StatementOverrideRow>({ title: "Reason", key: "reason", floor: OVERRIDE_REASON_FLOOR, render: (_, row) => row.reason }),
+              {
+                title: "Open since",
+                key: "since",
+                width: OVERRIDE_SINCE_WIDTH,
+                render: (_, row) => shortDate(row.openSince),
+              },
+            ]}
+          />
+          </div>
+        </ReportSection>
       </>
     );
   };
@@ -651,7 +706,7 @@ export default function ExceptionsClient({
           {loading ? (
             <Space orientation="vertical" size={12}>
               <Spin size="large" />
-              <span className={styles.muted}>Running eleven checks over the books…</span>
+              <span className={styles.muted}>Running twelve checks over the books…</span>
             </Space>
           ) : (
             <span className={styles.muted}>The report has not been run.</span>

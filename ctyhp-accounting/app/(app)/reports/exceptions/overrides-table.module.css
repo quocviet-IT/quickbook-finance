@@ -1,0 +1,17 @@
+/*
+ * The statements-imported-out-of-balance table, on a phone. Layout only, no colour.
+ *
+ * Its Reason cell holds a sentence that wraps rather than being cut. In a
+ * phone's box the columns would otherwise be squeezed until the reason wraps a
+ * letter at a time, so below 640px the table is held to its measured widths and
+ * scrolls inside its own box (DataTable's content box already scrolls) while the
+ * page does not. The figure is OVERRIDE_MIN_WIDTH in override-columns.ts; change
+ * one and change the other. At 1280 none of this applies.
+ */
+
+@media (max-width: 640px) {
+  /* OVERRIDE_MIN_WIDTH */
+  .overridesTable :global(.ant-table-content) > table {
+    min-width: 974px;
+  }
+}
