@@ -59,6 +59,15 @@ export const ACTIVITY_ENTITIES: Record<
   acc_purchasing_config: { entity: "Purchasing settings", href: "/settings/audit", category: "governance" },
   acc_role_permission: { entity: "Role permission", href: "/settings/audit", category: "governance" },
   acc_write_off: { entity: "Write-off", href: "/settings/audit", category: "sales" },
+  acc_bank_import_batch: { entity: "Statement import", href: "/banking", category: "banking" },
+  acc_bank_connection: { entity: "Bank connection", href: "/banking", category: "banking" },
+  acc_bank_feed_sync_run: { entity: "Bank feed update", href: "/banking", category: "banking" },
+  acc_reconciliation: { entity: "Bank match", href: "/banking", category: "banking" },
+  acc_repayment_account: { entity: "Card or loan", href: "/banking/rules", category: "banking" },
+  acc_related_company: { entity: "Related company", href: "/banking/rules", category: "banking" },
+  acc_saved_report: { entity: "Saved report", href: "/reports/saved", category: "other" },
+  acc_number_gap_note: { entity: "Number gap note", href: "/reports/number-sequence", category: "governance" },
+  acc_backup: { entity: "Backup", href: "/settings/backups", category: "governance" },
 };
 
 export const ACTIVITY_VERBS: Record<string, string> = {
@@ -68,7 +77,36 @@ export const ACTIVITY_VERBS: Record<string, string> = {
   void: "Voided",
   reverse: "Reversed",
   delete: "Deleted",
+  // Actions with their own names, in the past tense like the rest.
+  disconnect: "Disconnected",
+  undo: "Undone",
+  recode: "Recoded",
+  undo_recode: "Recode undone",
+  uncategorise: "Uncategorized",
+  override: "Imported out of balance",
+  add_statement_lines: "Statement lines added",
+  remove_balance_entries: "Balance entries removed",
+  statement_file: "Statement file kept",
+  keep_statement_file: "Statement file kept",
+  match_from_reconciliation: "Matched by reconciliation",
+  "company.backup": "Backed up",
 };
+
+/**
+ * What the application does around the books, rather than a change to them:
+ * the work queue's own bookkeeping, statement files kept beside an import or a
+ * reconciliation, the bank lines a completed reconciliation matched on its
+ * own, saved reports, nightly backups, and anything no person did.
+ *
+ * True, and kept in the audit log. But on the Change Log they buried the
+ * changes a reader came for, so it hides them until asked.
+ */
+const SYSTEM_TABLES = new Set(["acc_work_item_state", "acc_saved_report", "acc_backup"]);
+const SYSTEM_ACTIONS = new Set(["statement_file", "keep_statement_file", "match_from_reconciliation", "company.backup"]);
+
+export function isSystemActivity(row: { table_name: string; action: string; actor_id: string | null }): boolean {
+  return row.actor_id === null || SYSTEM_TABLES.has(row.table_name) || SYSTEM_ACTIONS.has(row.action);
+}
 
 /** A table name as a person would say it: mapped label, else the name with its prefix and underscores removed. */
 export function auditEntityLabel(tableName: string): string {

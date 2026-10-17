@@ -11,6 +11,8 @@ import { voidedEntries, type ReversedEntry, type VoidedEntriesReport, type Voide
 import { searchAudit } from "./access";
 import { getDiscrepancies } from "./bankrec";
 import { describeAuditActivity } from "./dashboard";
+import { ACTIVITY_VERBS, isSystemActivity } from "@/lib/domain/audit-entities";
+import { humanizeStatus } from "@/lib/domain/status-label";
 import { PAGE_SIZE, readAllPages } from "./paging";
 
 /**
@@ -89,11 +91,11 @@ export async function getReconciliationList(sb: SupabaseClient): Promise<Reconci
 
 // --- Change Log -------------------------------------------------------------------------
 
-const capitalize = (text: string) => (text ? text[0].toUpperCase() + text.slice(1) : text);
-
 /**
  * What changed between two dates, newest first, from the audit log. The
  * database refuses anybody without `audit.read`; this does not ask again.
+ * Every entry comes back, the system's own activity marked, so the screen can
+ * hide it without asking the database twice.
  */
 export async function getChangeLog(sb: SupabaseClient, from: string, to: string): Promise<ChangeLogReport> {
   const rows = await searchAudit(sb, { from, to, limit: CHANGE_LOG_LIMIT });
@@ -103,10 +105,12 @@ export async function getChangeLog(sb: SupabaseClient, from: string, to: string)
       id: row.id,
       at: row.created_at,
       who: row.actor_email ?? "System",
-      what: capitalize(activity.verb.replaceAll("_", " ")),
-      record: capitalize(activity.entity),
+      // An action nobody named still reads as words, never as its code.
+      what: ACTIVITY_VERBS[row.action] ?? humanizeStatus(activity.verb),
+      record: activity.entity,
       reference: activity.reference,
       detail: changeLogDetail(row),
+      system: isSystemActivity(row),
     };
   });
   return changeLog(entries);
