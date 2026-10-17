@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.12",
+    date: "2026-10-17",
+    headline: "A reconciliation that has changed since it was signed off says so, and a transfer is checked on both statements.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Reconciliations that no longer agree catch more than voids",
+        detail:
+          "The Exception Report’s Reconciliations that no longer agree listed only entries ticked on a signed-off reconciliation and voided afterwards. It now also lists an entry reversed after it was ticked, an entry posted after sign-off but dated inside the signed-off period, and a reconciliation whose saved ending no longer equals its beginning plus its ticked lines, each in its own sentence, such as “JE-000123 was reversed by JE-000130.” The No longer agrees badge on Reconcile and on the Balance Sheet names the same reconciliations. Nothing is blocked: reversing and voiding work as before.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "Transfers cleared on one side only",
+        detail:
+          "A transfer between two bank accounts that cleared on one statement but not on the other, more than 30 days on, is now listed in the Exception Report, its thirteenth check, with the account most likely to have received the money instead. It is listed only once the other account’s statements have been reconciled through the transfer’s date; until then it is counted as not yet checkable. A transfer already put right by a later entry is counted as corrected, naming that entry, and nothing offers to reverse it.",
+        route: "/reports/exceptions",
+      },
+    ],
+  },
+  {
     version: "2.11",
     date: "2026-10-16",
     headline: "A statement imported out of balance stays in sight until a reconciliation settles it.",

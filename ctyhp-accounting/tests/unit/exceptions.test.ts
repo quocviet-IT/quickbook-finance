@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import type { ClearingStanding } from "@/lib/domain/clearing-accounts";
 import type { BankAccountAlerts } from "@/lib/domain/statement-alerts";
+import type { ReconciliationChange } from "@/lib/domain/reconciliation-changes";
 import {
   CHECK_LABEL,
   buildExceptionReport,
@@ -549,9 +550,9 @@ const emptyInput = (over: Partial<ExceptionReportInput> = {}): ExceptionReportIn
 });
 
 describe("buildExceptionReport", () => {
-  it("runs twelve checks and raises nothing on an empty book", () => {
+  it("runs thirteen checks and raises nothing on an empty book", () => {
     const report = buildExceptionReport(emptyInput());
-    expect(report.checksRun).toBe(12);
+    expect(report.checksRun).toBe(13);
     expect(report.questionsRaised).toBe(0);
     expect(report.entriesExamined).toBe(0);
     expect(report.unavailable).toEqual([]);
@@ -690,7 +691,7 @@ describe("exceptionReportSheet", () => {
   it("keeps every check, saying which found nothing and which could not run", () => {
     const report = buildExceptionReport(emptyInput({ unavailable: ["incomeNoCost"] }));
     const sheet = exceptionReportSheet(report, meta);
-    expect(sheet.rows).toHaveLength(12);
+    expect(sheet.rows).toHaveLength(13);
     const byCheck = new Map(sheet.rows.map((r) => [r.check, r.name]));
     expect(byCheck.get("A year with income and no costs")).toBe("Could not run");
     expect(byCheck.get("Entries dated in the future")).toBe("Nothing found");
@@ -769,11 +770,11 @@ describe("the clearing check in the report", () => {
       clearingStanding: [standing()],
     });
 
-  it("counts its rows among the questions and still runs twelve checks", () => {
+  it("counts its rows among the questions and still runs thirteen checks", () => {
     const report = buildExceptionReport(input());
     expect(report.clearing).toHaveLength(1);
     expect(report.questionsRaised).toBe(1);
-    expect(report.checksRun).toBe(12);
+    expect(report.checksRun).toBe(13);
   });
 
   it("carries a failed read as unavailable, not as nothing found", () => {
@@ -856,31 +857,62 @@ describe("Reconciliations that no longer agree", () => {
     expect(CHECK_LABEL.noLongerAgree).toBe("Reconciliations that no longer agree");
   });
 
-  it("lists only accounts with a voided tick, sorted by account name", () => {
+  const change = (over: Partial<ReconciliationChange> & Pick<ReconciliationChange, "kind">): ReconciliationChange => ({
+    changeKey: `${over.kind}:${over.reconciliationId ?? "r1"}:${over.entryId ?? ""}`,
+    reconciliationId: "r1",
+    bankAccountId: "b1",
+    statementEndingDate: "2026-06-30",
+    completedAt: "2026-07-02T10:00:00Z",
+    entryId: null,
+    entryNumber: null,
+    entryDate: null,
+    signedMinor: null,
+    reversalEntryId: null,
+    reversalEntryNumber: null,
+    differenceMinor: null,
+    ...over,
+  });
+
+  it("lists every reconciliation with a change, sorted by account name then statement date", () => {
     const report = buildExceptionReport(
       emptyInput({
         bankAccounts: banks,
-        bankStanding: [
-          standing({ bankAccountId: "b1", voidTickedCount: 2, voidTickedMinor: -12_550, voidReconciliationDate: "2026-06-30" }),
-          standing({ bankAccountId: "b2", voidTickedCount: 1, voidTickedMinor: 4_000, voidReconciliationDate: "2026-05-31" }),
-          standing({ bankAccountId: "b3" }),
-          standing({ bankAccountId: "zz", voidTickedCount: 3 }),
+        reconciliationChanges: [
+          change({ kind: "voided", reconciliationId: "r1", bankAccountId: "b1", entryId: "e1", entryNumber: "JE-900001", signedMinor: 500 }),
+          change({ kind: "reversed", reconciliationId: "r2", bankAccountId: "b2", statementEndingDate: "2026-05-31", entryId: "e2", entryNumber: "JE-900002", reversalEntryNumber: "JE-900009" }),
+          change({ kind: "added", reconciliationId: "r3", bankAccountId: "b1", statementEndingDate: "2026-03-31", entryId: "e3", entryNumber: "JE-900003", entryDate: "2026-03-30" }),
+          change({ kind: "voided", reconciliationId: "r9", bankAccountId: "zz", entryId: "e9", entryNumber: "JE-900008", signedMinor: 1 }),
         ],
       }),
     );
-    expect(report.noLongerAgree).toEqual([
-      { bankAccountId: "b2", accountName: "Ascent Savings", entryCount: 1, amountMinor: 4_000, reconciliationDate: "2026-05-31" },
-      { bankAccountId: "b1", accountName: "Business Checking", entryCount: 2, amountMinor: -12_550, reconciliationDate: "2026-06-30" },
+    expect(report.noLongerAgree.map((r) => [r.accountName, r.statementEndingDate])).toEqual([
+      ["Ascent Savings", "2026-05-31"],
+      ["Business Checking", "2026-03-31"],
+      ["Business Checking", "2026-06-30"],
     ]);
   });
 
-  it("counts toward the questions raised, and finds nothing without a standing", () => {
+  it("counts toward the questions raised, and finds nothing without changes", () => {
     const withVoid = buildExceptionReport(
-      emptyInput({ bankAccounts: banks, bankStanding: [standing({ voidTickedCount: 1, voidTickedMinor: 100 })] }),
+      emptyInput({
+        bankAccounts: banks,
+        reconciliationChanges: [change({ kind: "voided", entryId: "e1", entryNumber: "JE-900001", signedMinor: 100 })],
+      }),
     );
     expect(withVoid.questionsRaised).toBe(1);
-    expect(withVoid.checksRun).toBe(12);
+    expect(withVoid.checksRun).toBe(13);
     expect(buildExceptionReport(emptyInput({ bankAccounts: banks })).noLongerAgree).toEqual([]);
+  });
+
+  it("leaves out a reconciliation whose statement ends after the report date", () => {
+    const report = buildExceptionReport(
+      emptyInput({
+        to: "2026-06-29",
+        bankAccounts: banks,
+        reconciliationChanges: [change({ kind: "voided", entryId: "e1", entryNumber: "JE-900001", signedMinor: 100 })],
+      }),
+    );
+    expect(report.noLongerAgree).toEqual([]);
   });
 
   it("carries the since figures onto an account not agreed, and null when unknown", () => {
@@ -909,15 +941,34 @@ describe("Reconciliations that no longer agree", () => {
         ],
         bankAccounts: banks,
         bankStanding: [
-          standing({ bankAccountId: "b1", sinceCount: 1, sinceNetMinor: 50, voidTickedCount: 1, voidTickedMinor: 2_500, voidReconciliationDate: "2026-06-30" }),
-          standing({ bankAccountId: "b2", sinceCount: 4, sinceNetMinor: 90, voidTickedCount: 3, voidTickedMinor: -700, voidReconciliationDate: null }),
+          standing({ bankAccountId: "b1", sinceCount: 1, sinceNetMinor: 50 }),
+          standing({ bankAccountId: "b2", sinceCount: 4, sinceNetMinor: 90 }),
+        ],
+        reconciliationChanges: [
+          change({ kind: "voided", bankAccountId: "b1", entryId: "e1", entryNumber: "JE-900001", signedMinor: 2_500 }),
+          change({ kind: "drift", bankAccountId: "b1", differenceMinor: 3_700 }),
+          change({ kind: "added", reconciliationId: "r2", bankAccountId: "b2", statementEndingDate: "2026-05-31", entryId: "e2", entryNumber: "JE-900002", entryDate: "2026-05-30" }),
         ],
       }),
     );
     const rows = exceptionReportSheet(report, meta).rows;
     expect(rows.filter((r) => r.check === CHECK_LABEL.noLongerAgree)).toEqual([
-      { check: CHECK_LABEL.noLongerAgree, date: "", type: "Voided after reconciliation", name: "3 entries", account: "Ascent Savings", amount: -7 },
-      { check: CHECK_LABEL.noLongerAgree, date: "2026-06-30", type: "Voided after reconciliation", name: "1 entry", account: "Business Checking", amount: 25 },
+      {
+        check: CHECK_LABEL.noLongerAgree,
+        date: "2026-05-31",
+        type: "Changed after sign-off",
+        name: "JE-900002, dated May 30, 2026, was posted after the reconciliation was signed off.",
+        account: "Ascent Savings",
+        amount: null,
+      },
+      {
+        check: CHECK_LABEL.noLongerAgree,
+        date: "2026-06-30",
+        type: "Changed after sign-off",
+        name: "JE-900001 was voided. The reconciliation no longer adds up: it is out by $12.00.",
+        account: "Business Checking",
+        amount: null,
+      },
     ]);
     const names = new Map(rows.filter((r) => r.check === CHECK_LABEL.unreconciled).map((r) => [r.account, r.name]));
     expect(names.get("Business Checking")).toBe("1 entry since");

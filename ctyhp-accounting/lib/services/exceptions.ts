@@ -17,6 +17,10 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts, type BankAccountWithGl } from "@/lib/services/banking";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { getBankStanding } from "@/lib/services/bank-standing";
+import { getReconciliationChanges } from "@/lib/services/reconciliation-changes";
+import { getTransferRows } from "@/lib/services/transfer-legs";
+import type { ReconciliationChange } from "@/lib/domain/reconciliation-changes";
+import type { TransferRow } from "@/lib/domain/transfer-legs";
 import type { ClearingStanding } from "@/lib/domain/clearing-accounts";
 import { getClearingStanding } from "@/lib/services/clearing-accounts";
 import { listStatementOverrides } from "@/lib/services/statement-overrides";
@@ -276,7 +280,9 @@ export async function getExceptionReport(
       readOr(unavailable, ["futureDated"], [] as TransactionListRow[], () =>
         getTransactionList(sb, addDays(today, 1), "9999-12-31"),
       ),
-      readOr(unavailable, ["unreconciled"], [] as BankAccountWithGl[], () => listBankAccounts(sb)),
+      // The two reconciliation-integrity checks name their accounts from this
+      // list, so without it neither can say "nothing found".
+      readOr(unavailable, ["unreconciled", "noLongerAgree", "transferOneSide"], [] as BankAccountWithGl[], () => listBankAccounts(sb)),
       readOr(unavailable, ["unreconciled"], new Map<string, string>(), () =>
         lastReconciledByBankAccount(sb),
       ),
@@ -296,7 +302,7 @@ export async function getExceptionReport(
     creditBase: b.creditBase,
   }));
 
-  const [refs, byMonth, statementAlerts, bankStanding, clearingStanding, statementOverrides, timeZone] = await Promise.all([
+  const [refs, byMonth, statementAlerts, bankStanding, clearingStanding, statementOverrides, timeZone, reconciliationChanges, transferRows] = await Promise.all([
     readOr(unavailable, ["checkNumber", "duplicates"], [] as ExceptionPaymentRef[], () => paymentReferences(sb)),
     readOr(unavailable, ["incomeNoCost"], new Map<string, LedgerBalance[]>(), () =>
       earliest === null
@@ -308,9 +314,9 @@ export async function getExceptionReport(
     readOr(unavailable, ["statementBalance", "belowZero"], [] as BankAccountAlerts[], () =>
       getAllStatementAlerts(sb),
     ),
-    // Only the voided-tick check cannot run without the standing. The "not
-    // agreed" rows stand on balances, so they stay and show no since figures.
-    readOr(unavailable, ["noLongerAgree"], [] as BankStanding[], () => getBankStanding(sb, to)),
+    // The standing only adds the since figures to the "not agreed" rows,
+    // which stand on balances, so they stay when it cannot be read.
+    readOr(unavailable, [], [] as BankStanding[], () => getBankStanding(sb, to)),
     // Only the clearing check needs it: the balances above still stand, but
     // without the standing nothing can be said about how old they are.
     readOr(unavailable, ["clearing"], [] as ClearingStanding[], () => getClearingStanding(sb, to)),
@@ -318,6 +324,10 @@ export async function getExceptionReport(
     // date and time are printed in: without either the check cannot say when.
     readOr(unavailable, ["statementOverride"], [] as NamedStatementOverride[], () => listStatementOverrides(sb)),
     readOr(unavailable, ["statementOverride"], DEFAULT_TIME_ZONE as string, async () => (await getCurrentCompanySettings(sb))?.time_zone || DEFAULT_TIME_ZONE),
+    // What happened to each completed reconciliation after it was signed off.
+    readOr(unavailable, ["noLongerAgree"], [] as ReconciliationChange[], () => getReconciliationChanges(sb)),
+    // Both legs of every transfer between two bank accounts, and the evidence for an open one.
+    readOr(unavailable, ["transferOneSide"], [] as TransferRow[], () => getTransferRows(sb)),
   ]);
 
   const yearTotals = yearTotalsFromMonthly(byMonth);
@@ -351,6 +361,8 @@ export async function getExceptionReport(
     paymentReferences: refs,
     statementAlerts,
     bankStanding,
+    reconciliationChanges,
+    transferRows,
     statementOverrides,
     timeZone,
     unavailable,

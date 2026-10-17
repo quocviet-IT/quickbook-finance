@@ -84,3 +84,68 @@ describe("getBankStanding", () => {
     await expect(getBankStanding(sb, "2026-09-30")).rejects.toThrow("function acc_bank_standing does not exist");
   });
 });
+
+describe("getBankStandingWithChanges", () => {
+  /** One client answering both reads: the standing, and the changes to completed reconciliations. */
+  function twoReads(changes: Rows | Error) {
+    const calls: string[] = [];
+    const orders: Record<string, string[]> = {};
+    const sb = {
+      rpc: (fn: string) => {
+        calls.push(fn);
+        const chain = {
+          order: (column: string) => {
+            (orders[fn] ??= []).push(column);
+            return chain;
+          },
+          range: () => {
+            if (fn === "acc_reconciliation_changes" && changes instanceof Error) {
+              return Promise.resolve({ data: null, error: { message: changes.message } });
+            }
+            return Promise.resolve({ data: fn === "acc_bank_standing" ? [row(1), row(2)] : changes, error: null });
+          },
+        };
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+    return { sb, calls, orders };
+  }
+
+  const change = {
+    change_key: "voided:r1:e1",
+    reconciliation_id: "r1",
+    bank_account_id: "acct-00001",
+    statement_ending_date: "2026-08-31",
+    completed_at: "2026-09-02T10:00:00Z",
+    kind: "voided",
+    entry_id: "e1",
+    entry_number: "JE-900001",
+    entry_date: "2026-08-20",
+    signed_minor: "100",
+  };
+
+  it("counts the changed reconciliations on each account, with one extra read ordered by change_key", async () => {
+    const { sb, calls, orders } = twoReads([change]);
+    const { getBankStandingWithChanges } = await import("@/lib/services/bank-standing");
+    const out = await getBankStandingWithChanges(sb, "2026-09-30");
+    expect([...calls].sort()).toEqual(["acc_bank_standing", "acc_reconciliation_changes"]);
+    expect(orders.acc_reconciliation_changes).toEqual(["change_key"]);
+    expect(out.map((s) => s.changedReconciliations)).toEqual([1, 0]);
+  });
+
+  it("returns the plain standing when the changes cannot be read", async () => {
+    const { sb } = twoReads(new Error("acc_reconciliation_changes missing"));
+    const { getBankStandingWithChanges } = await import("@/lib/services/bank-standing");
+    const out = await getBankStandingWithChanges(sb, "2026-09-30");
+    expect(out).toHaveLength(2);
+    expect(out[0].changedReconciliations).toBeUndefined();
+  });
+
+  it("uses changes already read by the caller, with no further read", async () => {
+    const { sb, calls } = twoReads([]);
+    const { toReconciliationChange } = await import("@/lib/domain/reconciliation-changes");
+    const out = await getBankStanding(sb, "2026-09-30", [toReconciliationChange(change)]);
+    expect(calls).toEqual(["acc_bank_standing"]);
+    expect(out.map((s) => s.changedReconciliations)).toEqual([1, 0]);
+  });
+});

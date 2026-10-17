@@ -40,9 +40,9 @@ const input = (over: Partial<ExceptionReportInput> = {}): ExceptionReportInput =
 const meta = { companyName: "Riverbend Trading LLC", currencyCode: "USD", decimals: 2, from: "2026-01-01", to: "2026-09-30" };
 
 describe("the statements imported out of balance check", () => {
-  it("is named, and the report runs twelve checks", () => {
+  it("is named, and the report runs thirteen checks", () => {
     expect(CHECK_LABEL.statementOverride).toBe("Statements imported out of balance");
-    expect(buildExceptionReport(input()).checksRun).toBe(12);
+    expect(buildExceptionReport(input()).checksRun).toBe(13);
   });
 
   it("lists open overrides only", () => {

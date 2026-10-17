@@ -5,7 +5,7 @@ import { getExceptionReport } from "@/lib/services/exceptions";
 /**
  * The `unavailable` mechanism, which is where this branch's worst bugs lived.
  *
- * `getExceptionReport` reads twelve checks' worth of data behind `readOr`,
+ * `getExceptionReport` reads thirteen checks' worth of data behind `readOr`,
  * which is supposed to tag exactly the checks a failed read affects — no
  * more, no fewer — and let the rest of the report through untouched. Each
  * test here fails exactly one read and inspects what got tagged, because a
@@ -36,6 +36,8 @@ interface ReaderConfig {
   monthlyBalances: Source;
   reconciliationLines: Source;
   bankStanding: Source;
+  reconciliationChanges: Source;
+  transferRows: Source;
   clearingStanding: Source;
   statementOverrides: Source;
   actors: Source;
@@ -57,6 +59,8 @@ function defaultConfig(): ReaderConfig {
     monthlyBalances: [],
     reconciliationLines: [],
     bankStanding: [],
+    reconciliationChanges: [],
+    transferRows: [],
     clearingStanding: [],
     statementOverrides: [],
     actors: [],
@@ -171,6 +175,8 @@ function fakeClient(overrides: Partial<ReaderConfig> = {}): SupabaseClient {
       if (name === "acc_monthly_ledger_balances") return paged(c.monthlyBalances);
       if (name === "acc_statement_overrides") return { order: () => ({ order: () => paged(c.statementOverrides) }) };
       if (name === "acc_actor_directory") return resultOf(c.actors);
+      if (name === "acc_reconciliation_changes") return { order: () => paged(c.reconciliationChanges) };
+      if (name === "acc_transfer_legs") return { order: () => ({ order: () => ({ order: () => paged(c.transferRows) }) }) };
       if (name === "acc_clearing_standing") return { order: () => paged(c.clearingStanding) };
       if (name === "acc_bank_standing") {
         const ordered = { order: () => paged(c.bankStanding) };
@@ -290,7 +296,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     const sb = fakeClient();
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
     expect(report.unavailable).toEqual([]);
-    expect(report.checksRun).toBe(12);
+    expect(report.checksRun).toBe(13);
   });
 
   it("tags both statement checks, and only them, when the bank-account lines cannot be read", async () => {
@@ -380,29 +386,106 @@ describe("getExceptionReport: the bank standing read", () => {
     void_reconciliation_date: "2026-06-30",
   };
 
-  it("fills the voided-tick rows and the since figures from one standing read", async () => {
-    const sb = fakeClient({ bankAccounts: [BANK], ledgerBalances: [LEDGER], bankStanding: [STANDING] });
+  const CHANGE = {
+    change_key: "voided:rec-1:e-1",
+    reconciliation_id: "rec-1",
+    bank_account_id: "bank-1",
+    statement_ending_date: "2026-06-30",
+    completed_at: "2026-07-02T10:00:00Z",
+    kind: "voided",
+    entry_id: "e-1",
+    entry_number: "JE-900001",
+    entry_date: "2026-06-12",
+    signed_minor: "9900",
+  };
+
+  it("fills the since figures from the standing read and the changed reconciliations from their own read", async () => {
+    const sb = fakeClient({ bankAccounts: [BANK], ledgerBalances: [LEDGER], bankStanding: [STANDING], reconciliationChanges: [CHANGE] });
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
     expect(report.unavailable).toEqual([]);
-    expect(report.noLongerAgree).toEqual([
-      { bankAccountId: "bank-1", accountName: "Operating Checking", entryCount: 2, amountMinor: 9_900, reconciliationDate: "2026-06-30" },
-    ]);
+    expect(report.noLongerAgree).toHaveLength(1);
+    expect(report.noLongerAgree[0]).toMatchObject({
+      reconciliationId: "rec-1",
+      accountName: "Operating Checking",
+      statementEndingDate: "2026-06-30",
+      items: [{ kind: "voided", entryNumber: "JE-900001" }],
+    });
     expect(report.unreconciled).toHaveLength(1);
     expect(report.unreconciled[0]).toMatchObject({ sinceCount: 3, sinceNetMinor: -4_500 });
   });
 
-  it("tags only the voided-tick check when the standing cannot be read, and keeps the not-agreed rows", async () => {
+  it("tags only the no-longer-agree check when the changes cannot be read", async () => {
     const sb = fakeClient({
       bankAccounts: [BANK],
       ledgerBalances: [LEDGER],
-      bankStanding: new Error("acc_bank_standing missing"),
+      bankStanding: [STANDING],
+      reconciliationChanges: new Error("acc_reconciliation_changes missing"),
     });
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
     expect(report.unavailable).toEqual(["noLongerAgree"]);
     expect(report.noLongerAgree).toEqual([]);
-    expect(report.unreconciled).toHaveLength(1);
+    expect(report.unreconciled[0]).toMatchObject({ sinceCount: 3 });
+  });
+
+  it("tags only the transfer check when the transfer legs cannot be read", async () => {
+    const sb = fakeClient({ bankAccounts: [BANK], transferRows: new Error("acc_transfer_legs missing") });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual(["transferOneSide"]);
+    expect(report.transferOneSide).toEqual([]);
+  });
+
+  it("keeps the since figures off, and tags nothing, when only the standing cannot be read", async () => {
+    const sb = fakeClient({
+      bankAccounts: [BANK],
+      ledgerBalances: [LEDGER],
+      reconciliationChanges: [CHANGE],
+      bankStanding: new Error("acc_bank_standing missing"),
+    });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual([]);
+    expect(report.noLongerAgree).toHaveLength(1);
     expect(report.unreconciled[0].sinceCount).toBeNull();
     expect(report.unreconciled[0].sinceNetMinor).toBeNull();
+  });
+
+  it("finds a transfer cleared on one side from the transfer legs, ranking the third account first", async () => {
+    const leg = (over: Row): Row => ({
+      row_key: "x",
+      row_kind: "leg",
+      entry_id: "t-1",
+      entry_number: "JE-900050",
+      entry_date: "2026-05-04",
+      journal_line_id: null,
+      signed_minor: null,
+      ticked_reconciliation_id: null,
+      ticked_statement_date: null,
+      covered_through: "2026-05-31",
+      ...over,
+    });
+    const rows: Row[] = [
+      leg({ row_key: "leg:1", bank_account_id: "bank-1", journal_line_id: "l-1", signed_minor: "-25000", ticked_reconciliation_id: "rec-9", ticked_statement_date: "2026-05-31" }),
+      leg({ row_key: "leg:2", bank_account_id: "bank-2", journal_line_id: "l-2", signed_minor: "25000" }),
+      leg({ row_key: "candidate:l-2:ledger_line:c", row_kind: "candidate", bank_account_id: "bank-2", journal_line_id: "l-2", signed_minor: "25000", candidate_source: "ledger_line", candidate_id: "c", candidate_bank_account_id: "bank-3", candidate_date: "2026-05-04", candidate_entry_number: "JE-900051" }),
+    ];
+    const banks = [
+      BANK,
+      { ...BANK, id: "bank-2", account_id: "gl-2", acc_account: { name: "Example Savings" } },
+      { ...BANK, id: "bank-3", account_id: "gl-3", acc_account: { name: "Example Reserve" } },
+    ];
+    const sb = fakeClient({ bankAccounts: banks, transferRows: rows });
+    const report = await getExceptionReport(sb, FROM, TO, TODAY);
+    expect(report.unavailable).toEqual([]);
+    expect(report.transferOneSide).toHaveLength(1);
+    expect(report.transferOneSide[0]).toMatchObject({
+      entryNumber: "JE-900050",
+      amountMinor: 25000,
+      clearedAccountName: "Operating Checking",
+      clearedStatementDate: "2026-05-31",
+      openAccountName: "Example Savings",
+      destinationName: "Example Reserve",
+      candidateCount: 1,
+    });
+    expect(report.questionsRaised).toBeGreaterThanOrEqual(1);
   });
 });
 
