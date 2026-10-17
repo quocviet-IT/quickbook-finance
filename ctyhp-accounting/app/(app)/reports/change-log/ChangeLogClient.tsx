@@ -102,8 +102,8 @@ export default function ChangeLogClient({
           <StatRow items={[{ label: "Changes", value: report.lines.length.toLocaleString("en-US") }]} />
           {!showSystem && hidden > 0 && !printing ? (
             <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-              {plural(hidden, "system event")} hidden: work queue states, kept statement files, a reconciliation's
-              own matches and backups. Turn on Show system activity to see them.
+              {plural(hidden, "system event")} hidden: work queue states, kept statement files, bank lines matched
+              when a reconciliation was completed, and backups. Turn on Show system activity to see them.
             </Typography.Paragraph>
           ) : null}
           {report.truncated ? (
