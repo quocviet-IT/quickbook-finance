@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveToken, type ThemeName, type TokenPath } from "@/lib/design/tokens";
+import { COLUMN } from "@/lib/design/table-metrics";
 
 /**
  * A status tag writes its word in the tone's colour on a tint of the same
@@ -45,6 +46,25 @@ function mixes(): { tint: number; word: number } {
   if (!tintMatch || !wordMatch) throw new Error("the status tag's colours were not found in globals.css");
   return { tint: Number(tintMatch[1]) / 100, word: Number(wordMatch[1]) / 100 };
 }
+
+describe("a status tag in a column narrower than its word", () => {
+  // At 104px the status column left "Partially paid" a pixel past the tag's
+  // right border, and "Partially received" 23px past it.
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`), css.indexOf("}", css.indexOf(`${selector} {`)));
+
+  it("keeps its border whole and shortens the word inside it", () => {
+    expect(rule(".status-tag")).toMatch(/max-width: 100%;/);
+    expect(rule(".status-tag")).toMatch(/overflow: hidden;/);
+    expect(rule(".status-tag__label")).toMatch(/text-overflow: ellipsis;/);
+    expect(rule(".status-tag__label")).toMatch(/min-width: 0;/);
+  });
+
+  it("has a column wide enough for the longest shared word, Partially received", () => {
+    // A 93px word and 31px of icon, padding and border, measured on the page, plus the cell's 8px either side.
+    expect(COLUMN.STATUS).toBeGreaterThanOrEqual(140);
+  });
+});
 
 describe("a status tag's word on its own tint", () => {
   const { tint: share, word } = mixes();

@@ -48,12 +48,15 @@ export default function StatusTag({
   // The rest of the props reach the span, so a Tooltip or a title can sit on a tag.
   if (!status) return <span ref={ref} {...rest} className="status-tag status-tag--muted">—</span>;
   const { tone, label } = statusLook(status, { looks, labels });
+  // The word sits in its own span so a column narrower than the tag shortens
+  // the word inside a whole border, never the border around a whole word; the
+  // title gives the full word back on hover.
   return (
-    <span ref={ref} {...rest} className={`status-tag status-tag--${tone}`}>
+    <span ref={ref} title={label} {...rest} className={`status-tag status-tag--${tone}`}>
       <span className="status-tag__icon" aria-hidden="true">
         {CODE_ICON[status] ?? TONE_ICON[tone]}
       </span>
-      {label}
+      <span className="status-tag__label">{label}</span>
     </span>
   );
 }
