@@ -32,6 +32,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { AccountRow, InventoryValuationRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
+import { formatMoney } from "@/lib/format";
 import { createItemAction, updateItemAction, setItemActiveAction } from "./actions";
 import AdjustInventoryModal from "./AdjustInventoryModal";
 import ItemMovementsModal from "./ItemMovementsModal";
@@ -54,6 +55,9 @@ interface Props {
    * holds the first and not the second.
    */
   canAdjustInventory: boolean;
+  /** The company's base currency: item prices and costs are kept in it. */
+  baseCurrency: string;
+  baseDecimals: number;
 }
 
 export default function ItemsClient({
@@ -67,6 +71,8 @@ export default function ItemsClient({
   onHand,
   canManageItems,
   canAdjustInventory,
+  baseCurrency,
+  baseDecimals,
 }: Props) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
@@ -251,7 +257,7 @@ export default function ItemsClient({
             dataIndex: "sales_price_minor",
             width: COLUMN.MONEY,
             align: "right",
-            render: (v: number, r) => (r.is_sold ? `$${(v / 100).toFixed(2)}` : "—"),
+            render: (v: number, r) => (r.is_sold ? formatMoney(v, baseCurrency, baseDecimals) : "—"),
           },
           {
             // Two costs, one column. The card cost is what somebody typed on
@@ -265,7 +271,7 @@ export default function ItemsClient({
             align: "right",
             render: (_, r) => {
               const card = Number(r.purchase_cost_minor ?? 0);
-              const cardLine = r.is_purchased ? secondaryLine(`card $${(card / 100).toFixed(2)}`) : null;
+              const cardLine = r.is_purchased ? secondaryLine(`card ${formatMoney(card, baseCurrency, baseDecimals)}`) : null;
               if (!r.is_inventory) {
                 return (
                   <div>
@@ -275,7 +281,7 @@ export default function ItemsClient({
               }
               const unit = Number(onHandById.get(r.id)?.unit_cost_minor ?? 0);
               const differs = card > 0 && unit > 0 && unit !== card;
-              const text = `$${(unit / 100).toFixed(2)}`;
+              const text = formatMoney(unit, baseCurrency, baseDecimals);
               return (
                 <div>
                   {differs ? (
@@ -304,7 +310,7 @@ export default function ItemsClient({
               return (
                 <div>
                   {Number(row?.qty_on_hand ?? 0)}
-                  {secondaryLine(`$${((row?.value_minor ?? 0) / 100).toFixed(2)}`)}
+                  {secondaryLine(formatMoney(row?.value_minor ?? 0, baseCurrency, baseDecimals))}
                 </div>
               );
             },
@@ -475,7 +481,13 @@ export default function ItemsClient({
         onHandQty={adjusting ? Number(onHandById.get(adjusting.id)?.qty_on_hand ?? 0) : 0}
         onClose={() => setAdjusting(null)}
       />
-      <ItemMovementsModal open={!!viewing} item={viewing} onClose={() => setViewing(null)} />
+      <ItemMovementsModal
+        open={!!viewing}
+        item={viewing}
+        onClose={() => setViewing(null)}
+        baseCurrency={baseCurrency}
+        baseDecimals={baseDecimals}
+      />
     </>
   );
 }

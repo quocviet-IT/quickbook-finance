@@ -4,7 +4,7 @@ import { Alert, App, Button, DatePicker, Space, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import type { InventoryValuationRow } from "@/lib/db/types";
 import type { InventoryValuation } from "@/lib/services/inventory";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
@@ -27,8 +27,7 @@ export default function InventoryValuationClient({
   const [rep, setRep] = useState<InventoryValuation | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fmt = (m: number) =>
-    fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   async function run() {
     setLoading(true);
@@ -116,7 +115,7 @@ export default function InventoryValuationClient({
             type={rep.tiesOut ? "success" : "warning"}
             showIcon
             message={
-              `Subledger ${fmt(rep.subledgerValueMinor)} vs inventory control accounts ${fmt(rep.controlBalanceMinor)} ${baseCurrency}` +
+              `Subledger ${fmt(rep.subledgerValueMinor)} vs inventory control accounts ${fmt(rep.controlBalanceMinor)}` +
               (rep.tiesOut ? " ✓ reconciled" : " — does not reconcile, investigate")
             }
             description={

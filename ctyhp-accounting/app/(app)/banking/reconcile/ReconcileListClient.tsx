@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
-import { fromMinor, toMinor } from "@/lib/domain/money";
+import { toMinor } from "@/lib/domain/money";
 import { formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
@@ -87,7 +87,6 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankId]);
 
-  const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
   // The card is a sentence, read beside the Balance Sheet's: money with its currency, as there.
   const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
@@ -168,8 +167,8 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
           dataSource={rows}
           columns={[
             { title: "Ending date", dataIndex: "statement_ending_date" },
-            { title: "Beginning", align: "right", render: (_, r) => fmt(r.beginning_balance_minor) },
-            { title: "Statement ending", align: "right", render: (_, r) => fmt(r.statement_ending_balance_minor) },
+            { title: "Beginning", align: "right", render: (_, r) => money(r.beginning_balance_minor) },
+            { title: "Statement ending", align: "right", render: (_, r) => money(r.statement_ending_balance_minor) },
             { title: "Statement", render: (_, r) => r.statement_ref ?? "—" },
             {
               title: "Status",

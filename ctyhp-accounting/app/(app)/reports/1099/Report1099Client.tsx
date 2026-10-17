@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Alert, App, Button, Card, Col, InputNumber, Row, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
 import FilterBar from "@/components/ui/FilterBar";
 import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { toCsv } from "@/lib/csv";
 import { csvWithReportIdentity } from "@/lib/domain/report-export";
 import type { Report1099, Vendor1099Assessed } from "@/lib/services/vendorTax";
@@ -28,8 +29,7 @@ export default function Report1099Client({
   const [rep, setRep] = useState<Report1099 | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const money = (m: number) =>
-    fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   async function run() {
     setLoading(true);
@@ -200,7 +200,7 @@ export default function Report1099Client({
             type={rep.tiesOut ? "success" : "warning"}
             showIcon
             message={
-              `Rows total ${money(rep.rowsTotalMinor)} vs payments recorded ${money(rep.controlTotalMinor)} ${baseCurrency}` +
+              `Rows total ${money(rep.rowsTotalMinor)} vs payments recorded ${money(rep.controlTotalMinor)}` +
               (rep.tiesOut ? " ✓ reconciled" : " — does not reconcile, investigate")
             }
             description={

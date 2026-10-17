@@ -7,6 +7,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { withVendor } from "@/lib/domain/vendors";
 import NewVendorButton from "@/components/NewVendorButton";
 import {
@@ -84,8 +85,7 @@ export default function VendorCreditsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fmt = (m: number) =>
-    fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   // The row carries only the vendor's id; the picker's list is the same
   // vendors, so the name comes from there for the column and the search.
@@ -326,7 +326,7 @@ export default function VendorCreditsClient({
             Add line
           </Button>
           <div style={{ marginTop: 12 }}>
-            Total: {fmt(total)} {baseCurrency}
+            Total: {fmt(total)}
           </div>
         </Card>
       </Modal>
@@ -340,7 +340,7 @@ export default function VendorCreditsClient({
         destroyOnHidden
       >
         <p>
-          Remaining: {applyFor ? fmt(applyFor.balance_remaining_minor) : ""} {baseCurrency}
+          Remaining: {applyFor ? fmt(applyFor.balance_remaining_minor) : ""}
         </p>
         <Table
           rowKey="id"

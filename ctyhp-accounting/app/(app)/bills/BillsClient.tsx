@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
+import { formatMoney } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -179,11 +180,6 @@ export default function BillsClient({
     return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
   }
 
-  function fmt(minor: number, code: string): string {
-    const d = decimalsOf(code);
-    return `${(minor / 10 ** d).toFixed(d)} ${code}`;
-  }
-
   async function submit() {
     const values = await form.validateFields();
     const lines = (values.lines as LineForm[]).map((l) => ({
@@ -337,14 +333,14 @@ export default function BillsClient({
             dataIndex: "total_minor",
             width: COLUMN.MONEY,
             align: "right",
-            render: (v: number, r) => fmt(v, r.currency_code),
+            render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
           {
             title: "Balance",
             dataIndex: "balance_due_minor",
             width: COLUMN.MONEY,
             align: "right",
-            render: (v: number, r) => fmt(v, r.currency_code),
+            render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
           {
             title: "Status",
@@ -483,7 +479,7 @@ export default function BillsClient({
                     onChange={(id: string) => router.push(`/purchase-orders/${id}?bill=1`)}
                     options={vendorOrders.map((order) => ({
                       value: order.purchaseOrderId,
-                      label: `${order.poNumber ?? "Draft order"} · ${order.lineCount} line${order.lineCount > 1 ? "s" : ""} · ${fmt(order.valueMinor, order.currencyCode)}`,
+                      label: `${order.poNumber ?? "Draft order"} · ${order.lineCount} line${order.lineCount > 1 ? "s" : ""} · ${formatMoney(order.valueMinor, order.currencyCode, decimalsOf(order.currencyCode))}`,
                     }))}
                   />
                 </Space>

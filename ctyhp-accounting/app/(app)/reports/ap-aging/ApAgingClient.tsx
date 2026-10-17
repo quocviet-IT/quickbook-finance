@@ -8,7 +8,7 @@ import AgingByPartyTable, {
   type AgingGrouping,
 } from "@/components/reports/AgingByPartyTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { apAgingAction } from "./actions";
 import type { AgingReport } from "@/lib/services/aging";
 
@@ -36,7 +36,7 @@ export default function ApAgingClient({
   // The party view first: "who is late" is the question this report is
   // opened with; the document list is one click away.
   const [grouping, setGrouping] = useState<AgingGrouping>("grid");
-  const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   const run = async () => {
     if (!asOf) {
@@ -72,7 +72,7 @@ export default function ApAgingClient({
             type={rep.reconciled ? "success" : "warning"}
             message={
               rep.reconciled
-                ? `Reconciled to Accounts Payable control account: ${fmt(rep.total)} ${baseCurrency}.`
+                ? `Reconciled to Accounts Payable control account: ${fmt(rep.total)}.`
                 : `Aging total ${fmt(rep.total)} does not match Accounts Payable control ${fmt(rep.controlBalanceMinor)} — investigate.`
             }
           />
@@ -118,7 +118,7 @@ export default function ApAgingClient({
                   d61_90: rep.buckets.d61_90 ?? 0,
                   d90_plus: rep.buckets.d90_plus ?? 0,
                 }}
-                formatMoney={(value) => `${fmt(value)} ${baseCurrency}`}
+                formatMoney={fmt}
               />
             }
           />

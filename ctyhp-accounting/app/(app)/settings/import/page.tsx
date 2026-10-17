@@ -48,6 +48,7 @@ export default async function ImportPage() {
         companyName={active?.legalName ?? "this company"}
         isSampleCompany={active?.isSample ?? false}
         baseDecimals={base?.decimal_places ?? 2}
+        baseCurrency={base?.code ?? "USD"}
         bankAccounts={bankAccounts}
         accounts={accounts}
         templateExamples={{

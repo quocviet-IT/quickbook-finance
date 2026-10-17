@@ -14,6 +14,7 @@ import type { AccountRow, CurrencyRow, ExpenseStatus, VendorRow } from "@/lib/db
 import type { ExpenseWithVendor } from "@/lib/services/payables";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { withVendor } from "@/lib/domain/vendors";
+import { formatMoney } from "@/lib/format";
 import NewVendorButton from "@/components/NewVendorButton";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
 
@@ -86,9 +87,8 @@ export default function ExpensesClient({
     [currencies, currency],
   );
 
-  function fmt(minor: number, code: string): string {
-    const d = currencies.find((c) => c.code === code)?.decimal_places ?? 2;
-    return `${(minor / 10 ** d).toFixed(d)} ${code}`;
+  function decimalsOf(code: string): number {
+    return currencies.find((c) => c.code === code)?.decimal_places ?? 2;
   }
 
   async function submit() {
@@ -174,7 +174,7 @@ export default function ExpensesClient({
           // picked in advance.
           flexColumn<ExpenseWithVendor>({ title: "Vendor", dataIndex: "vendor_name" }),
           { title: "Date", dataIndex: "expense_date", width: COLUMN.DATE },
-          { title: "Total", dataIndex: "total_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => fmt(v, r.currency_code) },
+          { title: "Total", dataIndex: "total_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
           { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <Tag color={s === "void" ? "red" : "green"}>{s}</Tag> },
           {
             title: "Actions",

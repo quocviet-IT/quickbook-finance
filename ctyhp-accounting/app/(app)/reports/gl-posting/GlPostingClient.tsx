@@ -8,6 +8,7 @@ import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import ReportExportButtons from "@/components/reports/ReportExportButtons";
 import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import {
   describeControlExceptions,
   describePostingExceptions,
@@ -59,10 +60,8 @@ export default function GlPostingClient({
 
   const money = useCallback(
     (minor: number) =>
-      fromMinor(minor, baseDecimals).toLocaleString(undefined, {
-        minimumFractionDigits: baseDecimals,
-      }),
-    [baseDecimals],
+      formatMoney(minor, baseCurrency, baseDecimals),
+    [baseCurrency, baseDecimals],
   );
 
   const load = useCallback(async () => {

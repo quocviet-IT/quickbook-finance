@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { App, Modal, Table, Tag } from "antd";
 import type { InventoryTxnRow, ItemRow } from "@/lib/db/types";
 import { listItemMovementsAction } from "./inventory-actions";
+import { formatMoney } from "@/lib/format";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
@@ -22,6 +23,8 @@ interface Props {
   open: boolean;
   item: ItemRow | null;
   onClose: () => void;
+  baseCurrency: string;
+  baseDecimals: number;
 }
 
 /** Every movement behind an item's quantity and value — the audit trail. */
@@ -30,7 +33,7 @@ export default function ItemMovementsModal(props: Props) {
   return <ItemMovementsModalBody {...props} item={props.item} />;
 }
 
-function ItemMovementsModalBody({ item, onClose }: Props & { item: ItemRow }) {
+function ItemMovementsModalBody({ item, onClose, baseCurrency, baseDecimals }: Props & { item: ItemRow }) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<InventoryTxnRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +52,7 @@ function ItemMovementsModalBody({ item, onClose }: Props & { item: ItemRow }) {
     };
   }, [item.id, message]);
 
-  const money = (m: number) => `$${(m / 100).toFixed(2)}`;
+  const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   return (
     <Modal title={`Inventory movements — ${item.name}`} open onCancel={onClose} footer={null} width={860}>

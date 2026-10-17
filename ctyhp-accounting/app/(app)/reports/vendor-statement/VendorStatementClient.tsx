@@ -4,7 +4,7 @@ import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "a
 import type { Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { vendorStatementAction } from "./actions";
 import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
@@ -24,7 +24,7 @@ export default function VendorStatementClient({ vendors, baseCurrency, baseDecim
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [rep, setRep] = useState<StatementReport | null>(null);
   const [loading, setLoading] = useState(false);
-  const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   const run = async () => {
     if (!vendorId || !range) {

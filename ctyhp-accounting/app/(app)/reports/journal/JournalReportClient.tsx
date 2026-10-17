@@ -4,7 +4,7 @@ import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { journalReportAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
 
@@ -37,7 +37,7 @@ export default function JournalReportClient({ baseCurrency, baseDecimals, initia
   const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>(
     initialEntryId ? [initialEntryId] : [],
   );
-  const fmt = (m: number) => (m ? fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals }) : "");
+  const fmt = (m: number) => (m ? formatMoney(m, baseCurrency, baseDecimals) : "");
 
   const load = useCallback(async () => {
     setLoading(true);

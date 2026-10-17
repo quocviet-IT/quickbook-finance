@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import {
   describeInventoryReview,
   METHOD_LABEL,
@@ -50,10 +51,8 @@ export default function InventoryReviewClient({
 
   const money = useCallback(
     (minor: number) =>
-      fromMinor(minor, baseDecimals).toLocaleString(undefined, {
-        minimumFractionDigits: baseDecimals,
-      }),
-    [baseDecimals],
+      formatMoney(minor, baseCurrency, baseDecimals),
+    [baseCurrency, baseDecimals],
   );
 
   const load = useCallback(async () => {

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { App, Input, InputNumber, Modal, Select, Space, Typography } from "antd";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { writeOffAction } from "./actions";
 import type { AccountRow } from "@/lib/db/types";
 
@@ -84,7 +85,7 @@ export default function WriteOffModal({
     >
       <Space direction="vertical" style={{ width: "100%" }} size="middle">
         <Typography.Text type="secondary">
-          Balance: {maxAmount.toLocaleString(undefined, { minimumFractionDigits: baseDecimals })} {currency}
+          Balance: {formatMoney(balanceMinor, currency, baseDecimals)}
         </Typography.Text>
         <div>
           <Typography.Text>Amount</Typography.Text>

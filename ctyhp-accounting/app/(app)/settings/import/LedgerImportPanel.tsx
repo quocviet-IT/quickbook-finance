@@ -16,7 +16,7 @@ import { UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { parseCsvGrid } from "@/lib/csv";
 import { calculateFileSha256 } from "@/lib/client/documents";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import {
   isWaveLedgerGrid,
   parseWaveLedger,
@@ -42,6 +42,7 @@ export interface LedgerImportPanelProps {
   companyName: string;
   isSampleCompany: boolean;
   baseDecimals: number;
+  baseCurrency: string;
   canManage: boolean;
   /** The whole chart, for pointing a name in the file at an account. */
   accounts: AccountRow[];
@@ -79,6 +80,7 @@ export default function LedgerImportPanel({
   companyName,
   isSampleCompany,
   baseDecimals,
+  baseCurrency,
   canManage,
   accounts,
 }: LedgerImportPanelProps) {
@@ -105,10 +107,7 @@ export default function LedgerImportPanel({
 
   useEffect(refresh, [refresh]);
 
-  const money = (minor: number) =>
-    fromMinor(minor, baseDecimals).toLocaleString(undefined, {
-      minimumFractionDigits: baseDecimals,
-    });
+  const money = (minor: number) => formatMoney(minor, baseCurrency, baseDecimals);
 
   function readFile(candidate: File) {
     const reader = new FileReader();

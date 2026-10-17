@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, App, Button, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import {
   DISCOUNT_WARNING_DAYS,
   describePayRun,
@@ -30,9 +30,11 @@ const PRIORITY_COLOR: Record<PayPriority, string> = {
  * reason spelled out on every row.
  */
 export default function PayRunPanel({
+  baseCurrency,
   baseDecimals,
   onPayVendor,
 }: {
+  baseCurrency: string;
   baseDecimals: number;
   /** Opens the existing payment dialog for a vendor. */
   onPayVendor?: (vendorId: string) => void;
@@ -42,11 +44,8 @@ export default function PayRunPanel({
   const [loading, setLoading] = useState(false);
 
   const money = useCallback(
-    (minor: number) =>
-      fromMinor(minor, baseDecimals).toLocaleString(undefined, {
-        minimumFractionDigits: baseDecimals,
-      }),
-    [baseDecimals],
+    (minor: number) => formatMoney(minor, baseCurrency, baseDecimals),
+    [baseCurrency, baseDecimals],
   );
 
   const load = useCallback(async () => {

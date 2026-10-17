@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { App, InputNumber, Modal, Select, Space, Typography } from "antd";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { recordRefundAction } from "./actions";
 import type { AccountRow } from "@/lib/db/types";
 
@@ -105,7 +106,7 @@ export default function RefundModal({
         </div>
         {source && (
           <Typography.Text type="secondary">
-            Remaining: {maxAmount.toLocaleString(undefined, { minimumFractionDigits: baseDecimals })} {currency}
+            Remaining: {formatMoney(source?.remainingMinor ?? 0, currency, baseDecimals)}
           </Typography.Text>
         )}
         <div>

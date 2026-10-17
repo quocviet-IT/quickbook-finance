@@ -9,7 +9,7 @@ import AgingByPartyTable, {
 } from "@/components/reports/AgingByPartyTable";
 import FilterBar from "@/components/ui/FilterBar";
 import AllowanceForDoubtfulAccounts from "@/components/reports/AllowanceForDoubtfulAccounts";
-import { fromMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import { arAgingAction } from "./actions";
 import type { AgingReport } from "@/lib/services/aging";
 
@@ -39,7 +39,7 @@ export default function ArAgingClient({
   // The party view first: "who is late" is the question this report is
   // opened with; the document list is one click away.
   const [grouping, setGrouping] = useState<AgingGrouping>("grid");
-  const fmt = (m: number) => fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   const run = async () => {
     if (!asOf) {
@@ -75,7 +75,7 @@ export default function ArAgingClient({
             type={rep.reconciled ? "success" : "warning"}
             message={
               rep.reconciled
-                ? `Reconciled to Accounts Receivable control account: ${fmt(rep.total)} ${baseCurrency}.`
+                ? `Reconciled to Accounts Receivable control account: ${fmt(rep.total)}.`
                 : `Aging total ${fmt(rep.total)} does not match Accounts Receivable control ${fmt(rep.controlBalanceMinor)} — investigate.`
             }
           />
@@ -90,7 +90,7 @@ export default function ArAgingClient({
           {/* The valuation belongs beside the control it is derived from. */}
           <AllowanceForDoubtfulAccounts
             asOf={asOf!.format("YYYY-MM-DD")}
-            money={(minor) => `${fmt(minor)} ${baseCurrency}`}
+            money={fmt}
             currencyCode={baseCurrency}
             canPost={canPostAllowance}
           />
@@ -128,7 +128,7 @@ export default function ArAgingClient({
                   d61_90: rep.buckets.d61_90 ?? 0,
                   d90_plus: rep.buckets.d90_plus ?? 0,
                 }}
-                formatMoney={(value) => `${fmt(value)} ${baseCurrency}`}
+                formatMoney={fmt}
               />
             }
           />

@@ -7,6 +7,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { fromMinor, toMinor } from "@/lib/domain/money";
+import { formatMoney } from "@/lib/format";
 import {
   createCreditMemoAction,
   listCreditMemosAction,
@@ -96,8 +97,7 @@ export default function CreditMemosClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fmt = (m: number) =>
-    fromMinor(m, baseDecimals).toLocaleString(undefined, { minimumFractionDigits: baseDecimals });
+  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   const total = useMemo(
     () => lines.reduce((s, l) => s + toMinor((l.quantity ?? 0) * (l.unit_price ?? 0), baseDecimals), 0),
@@ -333,7 +333,7 @@ export default function CreditMemosClient({
             Add line
           </Button>
           <div style={{ marginTop: 12 }}>
-            Total: {fmt(total)} {baseCurrency}
+            Total: {fmt(total)}
           </div>
         </Card>
       </Modal>
@@ -347,7 +347,7 @@ export default function CreditMemosClient({
         destroyOnHidden
       >
         <p>
-          Remaining: {applyFor ? fmt(applyFor.balance_remaining_minor) : ""} {baseCurrency}
+          Remaining: {applyFor ? fmt(applyFor.balance_remaining_minor) : ""}
         </p>
         <Table
           rowKey="id"
