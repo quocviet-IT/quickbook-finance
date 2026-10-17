@@ -55,6 +55,27 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.22",
+    date: "2026-10-17",
+    headline: "A table that fits on one page shows no pager, and a report’s total sits under its column.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "No pager under a table that fits on one page",
+        detail:
+          "Vendor Balances, Expenses by Vendor and other lists showed “50 / page” under one to three rows. A table now shows its pager only when it runs to more than one page. If you pick another page size, the pager stays, so you can pick again.",
+        route: "/reports/vendor-balances",
+      },
+      {
+        kind: "fixed",
+        title: "The total is the table’s last row",
+        detail:
+          "On Vendor Balances, Customer Balances, Expenses by Vendor and Sales by Customer, the Total sat in a box of its own below the pager. It is now the last row of the table, under the column it adds up.",
+        route: "/reports/expenses-by-vendor",
+      },
+    ],
+  },
+  {
     version: "2.21",
     date: "2026-10-17",
     headline: "The Change Log reads in plain sentences and shows the changes to the books first.",

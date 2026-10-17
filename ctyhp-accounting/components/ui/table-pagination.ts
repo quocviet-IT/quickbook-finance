@@ -67,6 +67,28 @@ export function clientTablePagination(
 }
 
 /**
+ * Hides the pager while every row fits on one page at the size the table
+ * opened with.
+ *
+ * Vendor Balances and Expenses by Vendor showed "50 / page" under a table of
+ * one to three rows, with the report's Total pushed below it. A pager with one
+ * page has nothing to do. Ant Design's `hideOnSinglePage` hides it once the
+ * row count is at most the page size (`total <= pageSize` in
+ * `@rc-component/pagination`).
+ *
+ * Only at the opening size: a reader who picked 100 rows a page for a 60-row
+ * list still needs the size changer to pick 50 again, so the pager stays. A
+ * caller that sets `hideOnSinglePage` itself keeps its own choice.
+ */
+export function hideSinglePage(
+  pagination: TablePaginationConfig | false,
+  openedPageSize: number | undefined,
+): TablePaginationConfig | false {
+  if (pagination === false || pagination.hideOnSinglePage !== undefined) return pagination;
+  return { ...pagination, hideOnSinglePage: pagination.pageSize === openedPageSize };
+}
+
+/**
  * The page size for a table whose caller never mentioned pagination at all.
  *
  * This was the RQ-04 controlled-prop bug's last hiding place. A screen that

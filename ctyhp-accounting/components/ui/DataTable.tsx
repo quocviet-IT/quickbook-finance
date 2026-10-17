@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Empty, Table, Typography, type TableProps } from "antd";
 import { resolveTableData, type ServerPage } from "./table-data";
-import { fallbackPagination } from "./table-pagination";
+import { fallbackPagination, hideSinglePage } from "./table-pagination";
 import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
 
 export type { ServerPage };
@@ -55,6 +55,9 @@ export default function DataTable<RecordType extends object>({
     dataSource,
     pagination: page ? pagination : fallbackPagination(pagination, fallbackSize, setFallbackSize),
   });
+  // The size the table opened with: the pager hides on a single page only at
+  // that size, so a reader who chose another size can still choose again.
+  const [openedPageSize] = useState(resolved.pagination === false ? undefined : resolved.pagination.pageSize);
   const isLoading =
     typeof props.loading === "object" ? Boolean(props.loading?.spinning) : Boolean(props.loading);
 
@@ -64,7 +67,7 @@ export default function DataTable<RecordType extends object>({
         {...props}
         size={size}
         dataSource={resolved.data as RecordType[]}
-        pagination={resolved.pagination}
+        pagination={hideSinglePage(resolved.pagination, openedPageSize)}
         // A fixed layout is what makes a declared width binding and lets the
         // columns that declare none share what is left. Under `auto` — which
         // is what rc-table falls back to — a width is a hint the browser may
