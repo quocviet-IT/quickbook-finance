@@ -3,11 +3,12 @@ import { RELEASES } from "@/lib/domain/changelog";
 import { CHECK_LABEL } from "@/lib/domain/exceptions";
 
 describe("2.11 in the release notes", () => {
-  const release = RELEASES[0];
+  // Looked up by number: later releases sit above it.
+  const release = RELEASES.find((r) => r.version === "2.11")!;
   const said = release.changes.map((c) => `${c.title} ${c.detail ?? ""}`).join(" ");
 
-  it("is the newest release, dated the day it was built", () => {
-    expect(release.version).toBe("2.11");
+  it("is in the release notes, dated the day it was built", () => {
+    expect(release).toBeDefined();
     expect(release.date).toBe("2026-10-16");
   });
 
