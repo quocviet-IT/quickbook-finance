@@ -245,6 +245,7 @@ describe("the cash count screens", () => {
   });
 
   it("list the new entity in the dashboard's recent activity", () => {
-    expect(read("lib/services/dashboard.ts")).toContain("acc_cash_count:");
+    // The activity entities moved to one shared map with 2.15.
+    expect(read("lib/domain/audit-entities.ts")).toContain("acc_cash_count:");
   });
 });
