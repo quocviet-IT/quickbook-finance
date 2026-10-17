@@ -29,7 +29,9 @@ import pg from "pg";
 import { planCompanySchema } from "../lib/domain/schema-template.ts";
 
 const FILE = "0150_reconcile_integrity.sql";
+const FILE2 = "0151_reversed_change_settles.sql";
 const MIGRATION = readFileSync(new URL(`../supabase/migrations/${FILE}`, import.meta.url), "utf8");
+const MIGRATION2 = readFileSync(new URL(`../supabase/migrations/${FILE2}`, import.meta.url), "utf8");
 const SAMPLE = "co_pc";
 const OUTSIDER = "00000000-0000-0000-0000-000000000000";
 const CHANGES_COLUMNS =
@@ -263,6 +265,18 @@ async function behaviour(base) {
   check("rows come ordered by reconciliation, then change_key",
     JSON.stringify(everything.map((r) => r.change_key)) === JSON.stringify(expectedOrder.map((r) => r.change_key)));
 
+  // ---- 0151: a reversed row settles once the reversal is itself reconciled
+  console.log("  a reversal that is reconciled settles the reversed row");
+  check("a ticked entry reversed, the reversal ticked nowhere, still gives a reversed row",
+    forRec(rows, recR2).some((r) => r.kind === "reversed" && r.reversal_entry_id === reversal.id));
+  const reversalLine = await lineOf(reversal.id, banks.R2.gl);
+  const recR2b = await signOff(banks.R2, "2099-04-30", [reversalLine], 0, SIGNED2);
+  const settled = await changes();
+  check("once the reversal is ticked on a later completed reconciliation of the account, the reversed row is gone",
+    !settled.some((r) => r.kind === "reversed" && r.entry_id === r1), JSON.stringify(forRec(settled, recR2).map((r) => r.kind)));
+  check("…nothing else changes for the old reconciliation", forRec(settled, recR2).length === 0);
+  check("…and the later one is clean: no drift, nothing added", forRec(settled, recR2b).length === 0, JSON.stringify(forRec(settled, recR2b).map((r) => r.kind)));
+
   // ============ Part 2: transfer legs ============
   console.log("  transfer legs");
   const { S, R, Y, Z } = banks;
@@ -369,10 +383,15 @@ try {
       const sql = schema === "public"
         ? MIGRATION
         : planCompanySchema([{ file: FILE, sql: MIGRATION }], schema).statements.join("\n;\n");
+      const sql2 = schema === "public"
+        ? MIGRATION2
+        : planCompanySchema([{ file: FILE2, sql: MIGRATION2 }], schema).statements.join("\n;\n");
       await client.query(sql);
-      console.log("  (0150 applied inside the transaction, never committed)");
+      await client.query(sql2);
+      console.log("  (0150 and 0151 applied inside the transaction, never committed)");
       await client.query(sql);
-      check("applying 0150 a second time is harmless", true);
+      await client.query(sql2);
+      check("applying 0150 and 0151 a second time is harmless", true);
       await client.query(`set local search_path = ${schema}, extensions`);
       structure(schema, "acc_reconciliation_changes", CHANGES_COLUMNS, (await one(factsFor("acc_reconciliation_changes()"), [schema])).facts);
       structure(schema, "acc_transfer_legs", LEGS_COLUMNS, (await one(factsFor("acc_transfer_legs()"), [schema])).facts);
