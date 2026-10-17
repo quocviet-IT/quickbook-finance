@@ -280,30 +280,30 @@ async function behaviour(base) {
   // ============ Part 2: transfer legs ============
   console.log("  transfer legs");
   const { S, R, Y, Z } = banks;
-  const t1 = await post("2099-02-01", [[R.gl, 15000], [S.gl, -15000]]); // S ticked, R open, money went to Y
+  const t1 = await post("2099-02-01", [[R.gl, 25000], [S.gl, -25000]]); // S ticked, R open, money went to Y
   const t2 = await post("2099-02-10", [[Z.gl, 20000], [S.gl, -20000]]); // Z's statements stop before this
   const t3 = await post("2099-02-12", [[R.gl, 10000], [Z.gl, 20000], [S.gl, -30000]]); // three bank lines
   const t4 = await post("2099-02-14", [[Y.gl, 5000], [S.gl, -5000]]); // cleared on both sides
   const t5 = await post("2099-02-16", [[Z.gl, 700], [R.gl, -700]]); // neither side ticked, then reversed
   const reversal5 = (await one(`select acc_reverse_entry($1, 'verify reversal', '2099-02-17') as id`, [t5])).id;
-  const ye = await bankEntry("2099-02-01", Y, 15000); // a ledger line elsewhere with the same amount that day
-  const re = await bankEntry("2099-02-03", R, 15000); // the open leg's own account never counts as evidence
+  const ye = await bankEntry("2099-02-01", Y, 25000); // a ledger line elsewhere with the same amount that day
+  const re = await bankEntry("2099-02-03", R, 25000); // the open leg's own account never counts as evidence
   void re;
 
-  const recS = await signOff(S, "2099-02-28", [await lineOf(t1, S.gl), await lineOf(t2, S.gl), await lineOf(t4, S.gl)], -40000);
+  const recS = await signOff(S, "2099-02-28", [await lineOf(t1, S.gl), await lineOf(t2, S.gl), await lineOf(t4, S.gl)], -50000);
   const recR = await signOff(R, "2099-02-28", [], 0);
   const recZ = await signOff(Z, "2099-02-05", [], 0);
-  const recY = await signOff(Y, "2099-02-28", [await lineOf(ye, Y.gl), await lineOf(t4, Y.gl)], 20000);
+  const recY = await signOff(Y, "2099-02-28", [await lineOf(ye, Y.gl), await lineOf(t4, Y.gl)], 30000);
   // statement lines the reconciliations hold: the same amount on Y near t1, a copy that was set aside on Z,
   // one on Y too far away, and one the other way round on Y
   const stmt = (rec, no, date, amount, aside = false) =>
     asOwner(admin, () => client.query(
       `insert into acc_reconciliation_statement_line (reconciliation_id, line_no, txn_date, description, amount_minor, set_aside)
        values ($1, $2, $3, 'VERIFY', $4, $5)`, [rec, no, date, amount, aside]));
-  await stmt(recY, 0, "2099-02-02", 15000);
-  await stmt(recY, 1, "2099-02-12", 15000);
-  await stmt(recY, 2, "2099-02-02", -15000);
-  await stmt(recZ, 0, "2099-02-04", 15000, true);
+  await stmt(recY, 0, "2099-02-02", 25000);
+  await stmt(recY, 1, "2099-02-12", 25000);
+  await stmt(recY, 2, "2099-02-02", -25000);
+  await stmt(recZ, 0, "2099-02-04", 25000, true);
   void recR;
 
   const legsAll = await all(`select * from acc_transfer_legs()`);
@@ -318,7 +318,7 @@ async function behaviour(base) {
   const l1s = leg(t1, S);
   const l1r = leg(t1, R);
   check("a leg carries its account, signed amount, entry number and date",
-    l1s?.signed_minor !== undefined && Number(l1s.signed_minor) === -15000 && Number(l1r.signed_minor) === 15000
+    l1s?.signed_minor !== undefined && Number(l1s.signed_minor) === -25000 && Number(l1r.signed_minor) === 25000
       && l1s.entry_number === (await numberOf(t1)) && l1s.entry_date === "2099-02-01" && l1s.journal_line_id === (await lineOf(t1, S.gl)));
   check("the ticked leg names its reconciliation and statement date", l1s.ticked_reconciliation_id === recS && l1s.ticked_statement_date === "2099-02-28");
   check("the other leg is not ticked", l1r.ticked_reconciliation_id === null && l1r.ticked_statement_date === null);

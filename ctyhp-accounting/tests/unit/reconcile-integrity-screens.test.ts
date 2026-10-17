@@ -223,10 +223,10 @@ describe("the No longer agrees badge counts what the Exceptions check lists", ()
   });
 
   it("falls back to the voided count when the changes were not read", () => {
-    const plain = standing("b-chk", { void_ticked_count: 2, void_ticked_minor: "15000", void_reconciliation_date: "2026-06-30" });
+    const plain = standing("b-chk", { void_ticked_count: 2, void_ticked_minor: "27500", void_reconciliation_date: "2026-06-30" });
     expect(plain.changedReconciliations).toBeUndefined();
     expect(describeStanding(plain, "2026-09-30", money).noLongerAgrees).toBe(
-      "No longer agrees: 2 entries ticked on the Jun 30, 2026 reconciliation were voided ($150.00)",
+      "No longer agrees: 2 entries ticked on the Jun 30, 2026 reconciliation were voided ($275.00)",
     );
   });
 
