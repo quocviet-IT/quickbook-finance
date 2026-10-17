@@ -221,7 +221,7 @@ export default function BankTransactionsFilters({
         optionFilterProp="label"
         options={[
           { value: "all", label: "All accounts posted to" },
-          { value: "none", label: "Not categorised yet" },
+          { value: "none", label: "Not categorized yet" },
           // Lines added to Uncategorized and not recoded yet: the review queue for them.
           { value: "needs_coding", label: `Needs coding${needsCodingCount ? ` (${needsCodingCount})` : ""}` },
           // Only accounts these lines actually use: the whole chart here

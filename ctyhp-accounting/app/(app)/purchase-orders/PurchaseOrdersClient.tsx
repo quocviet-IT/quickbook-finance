@@ -32,7 +32,7 @@ const STATUS_OPTIONS: { value: PoStatus | "all"; label: string }[] = [
   { value: "partial", label: "Partially received" },
   { value: "received", label: "Fully received" },
   { value: "closed", label: "Closed" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "cancelled", label: "Canceled" },
 ];
 
 

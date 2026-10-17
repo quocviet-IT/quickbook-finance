@@ -111,7 +111,7 @@ export function evaluateBankTransactionDelete(
   if (!input.posting.ownEntry) {
     return {
       kind: "blocked",
-      reason: `This line's entry was posted by ${humanize(input.posting.sourceType)}, not by categorising it here. Undo that match first, then delete the line.`,
+      reason: `This line's entry was posted by ${humanize(input.posting.sourceType)}, not by categorizing it here. Undo that match first, then delete the line.`,
     };
   }
   return { kind: "void_then_delete", entryNumber: input.posting.entryNumber };

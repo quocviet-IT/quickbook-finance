@@ -85,7 +85,7 @@ describe("the banking category column", () => {
     // in two tiers; the data it filters on is still fetched by the client.
     const filters = read("BankTransactionsFilters.tsx");
     expect(filters).toContain("All accounts posted to");
-    expect(filters).toContain("Not categorised yet");
+    expect(filters).toContain("Not categorized yet");
     // Fetched beside the lines, in the one request the screen loads them with.
     expect(read("BankingClient.tsx")).toContain("getBankingViewAction");
     expect(read("actions.ts")).toMatch(/getBankingViewAction[\s\S]*?listBankTransactionPostings\(sb, bankAccountId\)/);

@@ -110,7 +110,7 @@ export default function ApprovalsClient({
   async function cancel(req: ApprovalRequestRow) {
     const res = await cancelRequestAction(req.id);
     if (res.ok) {
-      message.success("Request cancelled");
+      message.success("Request canceled");
       router.refresh();
     } else {
       message.error(res.error ?? "Failed to cancel");

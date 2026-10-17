@@ -1065,7 +1065,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "is a bank and the other is not — so nothing is imported under it. Two ways to answer " +
           "it. Put the code in the file: either \"1000\" on its own, or \"1000 - Cash on Hand\" " +
           "with the spaced hyphen; \"1000 Cash on Hand\" without the hyphen is not a form the " +
-          "chart recognises. Or, when the file is somebody else's export and cannot be edited, " +
+          "chart recognizes. Or, when the file is somebody else's export and cannot be edited, " +
           "set the account you do not use to Inactive in Chart of Accounts, under Setup — one live account " +
           "of that name is no longer a question.",
       },
@@ -1084,7 +1084,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "what dates, by whom. Undo voids the entries it posted and removes its bank lines, " +
           "which is what frees the file to be imported again once it is corrected. Loading the " +
           "very same file while its import is still live is refused rather than skipped in " +
-          "silence — rows from a *different* file that overlap are still recognised and skipped.",
+          "silence — rows from a *different* file that overlap are still recognized and skipped.",
       },
       {
         title: "Rows carrying no money are left out, and that is not a fault",

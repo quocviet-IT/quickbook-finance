@@ -18,7 +18,7 @@ export default async function BeancountPage() {
   try {
     summary = await readBeancountSummary(sb);
   } catch (e) {
-    summaryError = e instanceof Error ? e.message : "The book could not be summarised.";
+    summaryError = e instanceof Error ? e.message : "The book could not be summarized.";
   }
   const permission = await sb.rpc("acc_has_permission", { p_key: "company.export" });
   const canExport = permission.error === null && permission.data === true;
