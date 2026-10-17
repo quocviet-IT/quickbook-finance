@@ -15,10 +15,12 @@ alter table acc_balance_comparison_line add column if not exists external_group 
 
 alter table acc_balance_comparison_line drop constraint if exists acc_balance_comparison_line_group_ck;
 alter table acc_balance_comparison_line add constraint acc_balance_comparison_line_group_ck
+  -- "is not null" first: a null group would make the "in" test null, and a
+  -- check that comes out null passes.
   check (
-    external_group in ('asset', 'liability', 'equity', 'income', 'expense')
-    and account_id is null
-    or external_group is null and account_id is not null
+    (account_id is null and external_group is not null
+      and external_group in ('asset', 'liability', 'equity', 'income', 'expense'))
+    or (account_id is not null and external_group is null)
   );
 
 -- ----------------------------------------------------------------------------

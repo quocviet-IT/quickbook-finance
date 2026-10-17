@@ -284,6 +284,17 @@ async function behaviour() {
     SAVE, ["2001-04-30", "S", null, L({ account_id: a2, other_balance_minor: 1 }, { account_id: inactive, other_balance_minor: 2 })], "active account");
   check("…the earlier lines are still there", (await linesOn("2001-04-30")).length === 1 && Number((await linesOn("2001-04-30"))[0].minor) === 99);
 
+  // ---- the group check holds on its own, written past the function
+  await asOwner(admin.id, async () => {
+    const direct = (group, account) => [
+      `insert into acc_balance_comparison_line (as_of, account_id, external_code, external_name, external_group, other_balance_minor) values ('2001-04-30', $1, $2, $3, $4, 1)`,
+      [account, account ? null : "Z-1", account ? null : "Direct", group],
+    ];
+    await refused("the table refuses an external line with no group", ...direct(null, null), "acc_balance_comparison_line_group_ck");
+    await refused("the table refuses an external line with an unknown group", ...direct("revenue", null), "acc_balance_comparison_line_group_ck");
+    await refused("the table refuses an account line with a group", ...direct("asset", a2), "acc_balance_comparison_line_group_ck");
+  });
+
   // ---- writes go through the function only
   await refused("a signed-in user cannot insert into the header",
     `insert into acc_balance_comparison (as_of, compared_with) values ('2001-09-30', 'S')`, [], /permission denied|row-level security/);

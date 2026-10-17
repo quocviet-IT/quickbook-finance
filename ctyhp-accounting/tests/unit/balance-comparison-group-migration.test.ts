@@ -38,8 +38,9 @@ describe("0156 keeps the group of an account only the other system has", () => {
     const check = sql.match(/add constraint acc_balance_comparison_line_group_ck\s+check \(([\s\S]*?)\);/i)![1];
     for (const g of COMPARISON_GROUPS) expect(check).toContain(`'${g.key}'`);
     expect([...check.matchAll(/'(\w+)'/g)].map((m) => m[1])).toEqual(COMPARISON_GROUPS.map((g) => g.key));
-    expect(check).toMatch(/account_id is null/i);
-    expect(check).toMatch(/external_group is null and account_id is not null/i);
+    // A null group must fail the check, not pass it as an unknown "in" result.
+    expect(check).toMatch(/account_id is null and external_group is not null\s+and external_group in/i);
+    expect(check).toMatch(/account_id is not null and external_group is null/i);
   });
 
   it("replaces the save function with the same signature, security definer, search path and staff check", () => {
