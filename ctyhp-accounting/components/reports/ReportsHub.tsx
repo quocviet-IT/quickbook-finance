@@ -21,6 +21,7 @@ import {
   StarFilled,
   StarOutlined,
   StopOutlined,
+  SwapOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Input, Select, Tabs, Typography } from "antd";
@@ -52,6 +53,7 @@ const REPORT_ICONS: Record<string, ReactNode> = {
   "vendor-statements": <FileTextOutlined />,
   "1099-review": <FileSearchOutlined />,
   "trial-balance": <AuditOutlined />,
+  "balance-comparison": <SwapOutlined />,
   "general-ledger": <BankOutlined />,
   "journal-report": <FileTextOutlined />,
   "saved-reports": <InboxOutlined />,
