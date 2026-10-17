@@ -1,4 +1,4 @@
-# Cash on hand is counted, and the count is dated (release 2.13)
+# Cash on hand is counted, and the count is dated (release 2.16)
 
 ## Why
 

@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.16",
+    date: "2026-10-17",
+    headline: "Cash on hand is counted, and the count is dated.",
+    changes: [
+      {
+        kind: "added",
+        title: "Count cash",
+        detail:
+          "A cash-on-hand account now has Count cash, on its Chart of Accounts row and on the Balance Sheet’s bank panel. Enter the date and the amount counted; the dialog shows what the books hold on that date and the difference as you type. Record count posts the difference to 7510 Cash Over and Short, or to an account you choose, and never overwrites the balance; a count that agrees posts nothing but is still dated. The Chart of Accounts row says when the account was last counted, with the list of its counts, and the Balance Sheet line turns amber 90 days after the last count, or at once when cash holding a balance was never counted.",
+        route: "/accounts",
+      },
+      {
+        kind: "added",
+        title: "7510 Cash Over and Short, and a Cash count approval policy",
+        detail:
+          "Every company has a new account, 7510 Cash Over and Short, unless that code was already in use. A count’s difference can be made to wait for approval with the new Cash count policy, which stays off until an administrator turns it on, as Stock Count’s does.",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
     version: "2.15",
     date: "2026-10-17",
     headline: "Plain words where the screens used the system's own names.",
