@@ -393,7 +393,7 @@ export default function RecurringClient({
       }),
     },
     {
-      title: "Next occurrence",
+      title: "Next date",
       dataIndex: "next_run_date",
       width: 110,
       render: (value: string, template) => (

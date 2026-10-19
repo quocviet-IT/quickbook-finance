@@ -139,9 +139,10 @@ export default function RulesClient({
         ),
     },
     {
-      title: "Waiting lines",
+      title: "Waiting",
       key: "waiting",
-      width: COLUMN.STATUS,
+      // A count under a short heading, as on the cards and related companies.
+      width: COLUMN.QTY,
       align: "right",
       render: (_: unknown, rule: RuleListRow) => rule.waiting,
     },

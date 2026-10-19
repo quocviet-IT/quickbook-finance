@@ -99,7 +99,11 @@ export default function RelatedCompaniesSection({
       ...flexColumn<RelatedListRow>({
         title: "Matches on",
         key: "match",
-        render: (_: unknown, row: RelatedListRow) => <Typography.Text code>{row.matchWords}</Typography.Text>,
+        render: (_: unknown, row: RelatedListRow) => (
+          <Typography.Text code title={row.matchWords}>
+            {row.matchWords}
+          </Typography.Text>
+        ),
       }),
     },
     {
@@ -125,7 +129,7 @@ export default function RelatedCompaniesSection({
       ),
     },
     {
-      title: "Waiting lines",
+      title: "Waiting",
       key: "waiting",
       width: RELATED_COLUMN_WIDTH.waiting,
       align: "right",

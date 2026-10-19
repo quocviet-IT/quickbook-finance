@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.29",
+    date: "2026-10-19",
+    headline: "No word is broken in half or cut off with no way to read the rest.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Words no longer break in half",
+        detail:
+          "Approvals gives each column the room its contents need, so a heading no longer breaks mid-word (Requested read Requeste over d). What kind of request it is now reads under the request, and when it was decided reads under its status. On Pay Bills, the reason a bill is listed no longer breaks (overdue read overdu over e), and its terms read under the due date.",
+        route: "/approvals",
+      },
+      {
+        kind: "fixed",
+        title: "Nothing cut off at the edge",
+        detail:
+          "The work queue filters on the Dashboard and on the Banking, Purchases, Sales and Accounting overviews move onto a second row when there is not room for them, instead of being cut off at the card's edge (Approvals read Apprc, Dismissed read Dismissec). The sentence under the Dashboard's Work queue heading wraps instead of ending in …or autho. Search boxes on Bills, Credit Memos, Expenses, Items, Payments, Vendor Credits and Transaction List by Date are wide enough for their hint, and the account search in a bank line's Category column now reads Find account.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Column headings on one line",
+        detail:
+          "Headings that stacked over two or three lines are shorter: Expense Number and Payment Number are Number, Was on the books is Book value, Past payments caught is Past matches, Waiting lines is Waiting, Next occurrence is Next date, Quantity Outstanding is Qty outstanding, Bought net of returns is Net purchases, and Statement ending (a date) is Statement date. The exports of Purchases & Inventory and Reconciliations use the same names. The Screenshot column in Feedback is wide enough for its heading.",
+        route: "/expenses",
+      },
+      {
+        kind: "fixed",
+        title: "Whatever is cut is one hover away",
+        detail:
+          "Text cut short to fit a column now shows in full when you point at it: the second line under a vendor, customer or description, a bank account name, the work items on the Dashboard, a suggested account in Banking, and the company name in the header.",
+        route: "/reports/transactions",
+      },
+    ],
+  },
+  {
     version: "2.28",
     date: "2026-10-19",
     headline: "The main button is in the same place on every page, and every icon button says what it does.",

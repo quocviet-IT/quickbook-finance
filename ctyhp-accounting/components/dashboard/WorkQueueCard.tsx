@@ -149,8 +149,11 @@ export default function WorkQueueCard({
                   aria-hidden="true"
                 />
                 <span className="dashboard-work-item__main">
-                  <span className="dashboard-work-item__title">{item.title}</span>
-                  <span className="dashboard-work-item__subtitle">
+                  {/* Both lines are cut to the card; each is whole on hover. */}
+                  <span className="dashboard-work-item__title" title={item.title}>
+                    {item.title}
+                  </span>
+                  <span className="dashboard-work-item__subtitle" title={`${item.subtitle} · ${item.timingLabel}`}>
                     {item.subtitle} · {item.timingLabel}
                   </span>
                 </span>

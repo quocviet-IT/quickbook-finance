@@ -375,7 +375,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Purchases and Inventory",
         route: "/reports/purchases-inventory",
         note:
-          "Year by year, Opening stock plus Bought net of returns plus Count adjustment, less Cost of sales, comes " +
+          "Year by year, Opening stock plus Net purchases plus Count adjustment, less Cost of sales, comes " +
           "to Closing stock; a year that does not is marked off by the difference. Who it was bought from and " +
           "Month by month follow the dates you pick.",
       },

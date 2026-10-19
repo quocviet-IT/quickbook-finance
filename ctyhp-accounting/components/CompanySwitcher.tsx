@@ -56,7 +56,7 @@ export default function CompanySwitcher({
     return (
       <Space size={6} className="app-shell__company">
         <BankOutlined />
-        <Typography.Text strong ellipsis style={{ maxWidth: 220 }}>
+        <Typography.Text strong ellipsis={{ tooltip: active.legalName }} style={{ maxWidth: 220 }}>
           {active.legalName}
         </Typography.Text>
         {active.isSample ? <Tag color="orange">Sample</Tag> : null}

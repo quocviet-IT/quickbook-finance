@@ -229,9 +229,16 @@ export function flexColumn<T>(spec: FlexColumnSpec<T>): ColumnType<T> & { minWid
     minWidth: spec.floor ?? COLUMN.TEXT_MIN,
     // No width. See the note above.
     ellipsis: { showTitle: false },
-    render:
-      spec.render ??
-      ((value: unknown) => {
+    render: spec.render
+      ? // A screen's own render that returns plain words is cut like any other
+        // cell, so it carries them as its title too. Without this the Bank
+        // account on Exceptions and a dozen like it were cut with no way to read
+        // the rest (UI review, 2026-10-19).
+        (value: unknown, record: T, index: number) => {
+          const out = spec.render!(value, record, index);
+          return typeof out === "string" || typeof out === "number" ? <span title={String(out)}>{out}</span> : out;
+        }
+      : ((value: unknown) => {
         const text = typeof value === "string" ? value.trim() : "";
         if (text === "") return ABSENT;
         // `title` rather than Ant Design's Tooltip: this renders inside a cell
@@ -250,10 +257,15 @@ export function flexColumn<T>(spec: FlexColumnSpec<T>): ColumnType<T> & { minWid
  * account a line came from, the reference the bank sent, the entry it posted
  * to. One line, cut with an ellipsis, so a row never grows a third line and
  * the table keeps scrolling only downwards.
+ *
+ * What is cut is one hover away: plain text carries itself as the title, and a
+ * caller that builds the line from pieces (a link in it) passes the words.
  */
-export function secondaryLine(text: ReactNode): ReactElement {
+export function secondaryLine(text: ReactNode, title?: string): ReactElement {
+  const whole = title ?? (typeof text === "string" || typeof text === "number" ? String(text) : undefined);
   return (
     <span
+      title={whole}
       style={{
         display: "block",
         fontSize: 12,

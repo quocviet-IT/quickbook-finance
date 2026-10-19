@@ -41,7 +41,7 @@ export default function ReceivedNotBilledClient({
           { title: "Order Date", dataIndex: "order_date", render: (v: string) => formatDate(v) },
           { title: "Description", dataIndex: "description", render: (v: string) => v || "—" },
           {
-            title: "Quantity Outstanding",
+            title: "Qty outstanding",
             dataIndex: "qty_outstanding",
             align: "right",
             render: (v: number) => Number(v),

@@ -87,7 +87,7 @@ export default function StockCountListClient({
           dateColumn<CountListRow>({ title: "As of", dataIndex: "as_of", width: LIST_FIXED_WIDTHS[1] }),
           statusColumn<CountListRow>({ title: "Status", dataIndex: "status", tones: TONES, width: LIST_FIXED_WIDTHS[2] }),
           money("Counted", "counted_minor", LIST_FIXED_WIDTHS[3]),
-          money("Was on the books", "book_minor", LIST_FIXED_WIDTHS[4]),
+          money("Book value", "book_minor", LIST_FIXED_WIDTHS[4]),
           money("Adjusted by", "difference_minor", LIST_FIXED_WIDTHS[5]),
           {
             title: "Lines",

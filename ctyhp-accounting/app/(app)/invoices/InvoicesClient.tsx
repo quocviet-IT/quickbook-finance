@@ -578,6 +578,7 @@ export default function InvoicesClient({
                 ) : (
                   under
                 ),
+                under,
               )}
             </div>
           );

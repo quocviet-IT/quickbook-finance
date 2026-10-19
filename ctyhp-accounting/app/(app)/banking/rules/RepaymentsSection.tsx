@@ -27,6 +27,9 @@ export interface RepaymentListRow extends RepaymentAccount {
 
 const money = (minor: number) => formatMoney(minor, USD_CURRENCY_CODE, 2);
 
+/** "Past matches" on one line, and "12 of 40" under it. */
+const PAST_MATCHES_WIDTH = 112;
+
 const valuesOf = (entry: RepaymentAccount): RepaymentFormValues => ({
   accountId: entry.accountId,
   matchWords: entry.matchWords,
@@ -125,8 +128,16 @@ export default function RepaymentsSection({
       ...flexColumn<RepaymentListRow>({
         title: "Matches on",
         key: "match",
+        // As wide as the cell, so the words and the digits wrap inside it rather
+        // than run past its edge, cut with no way to read them (UI review,
+        // 2026-10-19); the title carries both.
         render: (_: unknown, row: RepaymentListRow) => (
-          <Space size={6} wrap>
+          <Space
+            size={6}
+            wrap
+            style={{ width: "100%" }}
+            title={[row.matchWords, row.matchDigits ? `••${row.matchDigits}` : null].filter(Boolean).join(" · ")}
+          >
             {row.matchWords ? <Typography.Text code>{row.matchWords}</Typography.Text> : null}
             {row.matchDigits ? <Typography.Text code>••{row.matchDigits}</Typography.Text> : null}
           </Space>
@@ -143,17 +154,19 @@ export default function RepaymentsSection({
         </Typography.Text>
       ),
     },
+    // Counts, under short headings, so count-wide columns. At a status tag's
+    // width each, they left Matches on 70px at 1280 and cut its words.
     {
-      title: "Past payments caught",
+      title: "Past matches",
       key: "past",
-      width: COLUMN.STATUS,
+      width: PAST_MATCHES_WIDTH,
       align: "right",
       render: (_: unknown, row: RepaymentListRow) => (row.stats.past === 0 ? "—" : `${row.stats.caught} of ${row.stats.past}`),
     },
     {
-      title: "Waiting lines",
+      title: "Waiting",
       key: "waiting",
-      width: COLUMN.STATUS,
+      width: COLUMN.QTY,
       align: "right",
       render: (_: unknown, row: RepaymentListRow) => row.stats.waiting,
     },

@@ -256,7 +256,7 @@ export default function BillsClient({
           allowClear
           aria-label="Search bills by number, vendor, or vendor reference"
           placeholder="Search number, vendor, or reference"
-          style={{ width: 280 }}
+          style={{ width: 310 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />
@@ -316,6 +316,7 @@ export default function BillsClient({
                         </>
                       ) : null}
                     </>,
+                    [r.vendor_ref ? `Ref ${r.vendor_ref}` : "No vendor reference", r.entry_number].filter(Boolean).join(" · "),
                   )}
                 </div>
               ),

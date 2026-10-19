@@ -147,7 +147,7 @@ export default function ExpensesClient({
           allowClear
           aria-label="Search expenses by number, vendor, or memo"
           placeholder="Search number, vendor, or memo"
-          style={{ width: 280 }}
+          style={{ width: 300 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />
@@ -169,7 +169,7 @@ export default function ExpensesClient({
         emptyTitle={keyword || statusFilter !== "all" ? "No expenses match these filters" : "No expenses yet"}
         emptyDescription="Record money already paid from a bank or credit card account."
         columns={[
-          { title: "Expense Number", dataIndex: "expense_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
+          { title: "Number", dataIndex: "expense_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
           // The elastic column: a vendor name is text somebody typed, so it
           // takes whatever the measured columns leave rather than a number
           // picked in advance.

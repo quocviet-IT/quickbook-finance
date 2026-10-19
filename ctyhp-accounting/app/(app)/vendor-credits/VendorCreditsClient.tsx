@@ -190,7 +190,7 @@ export default function VendorCreditsClient({
           allowClear
           aria-label="Search vendor credits by number, vendor, or reference"
           placeholder="Search number, vendor, or reference"
-          style={{ width: 280 }}
+          style={{ width: 310 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />

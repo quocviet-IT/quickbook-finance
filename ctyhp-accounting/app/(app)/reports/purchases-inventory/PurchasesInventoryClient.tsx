@@ -92,7 +92,7 @@ export default function PurchasesInventoryClient({
                 columns={[
                   flexColumn<PurchaseYearRow>({ title: "Year", dataIndex: "label" }),
                   { title: "Opening stock", dataIndex: "openingMinor", width: COLUMN.MONEY_WIDE, align: "right", render: moneyCell },
-                  { title: "Bought net of returns", dataIndex: "boughtMinor", width: COLUMN.MONEY_WIDE + 20, align: "right", render: moneyCell },
+                  { title: "Net purchases", dataIndex: "boughtMinor", width: COLUMN.MONEY_WIDE + 20, align: "right", render: moneyCell },
                   { title: "Count adjustment", dataIndex: "countAdjustmentMinor", width: COLUMN.MONEY_WIDE + 8, align: "right", render: moneyCell },
                   { title: "Cost of sales", dataIndex: "costOfSalesMinor", width: COLUMN.MONEY_WIDE, align: "right", render: moneyCell },
                   {

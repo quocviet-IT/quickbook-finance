@@ -361,7 +361,7 @@ export function purchasesInventorySheet(
       { key: "item", header: "Year, supplier or month", kind: "text", width: 32 },
       { key: "count", header: "Purchases", kind: "text", width: 11 },
       { key: "opening", header: "Opening stock", kind: "text", width: 16 },
-      { key: "bought", header: "Bought net of returns", kind: "text", width: 20 },
+      { key: "bought", header: "Net purchases", kind: "text", width: 20 },
       { key: "adjustment", header: "Count adjustment", kind: "text", width: 16 },
       { key: "costOfSales", header: "Cost of sales", kind: "text", width: 16 },
       { key: "closing", header: "Closing stock", kind: "text", width: 16 },

@@ -240,13 +240,28 @@
 }
 
 /* Nine filters need their own line: beside the card title they truncated it. */
+/*
+ * The filters wrap onto a second row rather than scroll. Scrolled, the last one
+ * was cut at the card's edge and read "Dismissec" (UI review, 2026-10-19).
+ * The sliding thumb is turned off: it moves along one row, so on a wrapped bar
+ * it slid across the first row to reach an option on the second. The chosen
+ * option still carries its own background.
+ */
 .queueFilters {
   margin-bottom: 10px;
-  overflow-x: auto;
 }
 
 .queueFilters :global(.ant-segmented) {
-  width: max-content;
+  max-width: 100%;
+}
+
+.queueFilters :global(.ant-segmented-group) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.queueFilters :global(.ant-segmented-thumb) {
+  display: none;
 }
 
 /* --- The facts under an overview's subtitle ----------------------------- */

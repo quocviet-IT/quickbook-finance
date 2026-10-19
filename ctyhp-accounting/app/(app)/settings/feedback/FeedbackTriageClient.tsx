@@ -231,7 +231,9 @@ export default function FeedbackTriageClient({
     },
     {
       title: "Screenshot",
-      width: COLUMN.ACTION + 16,
+      // Wide enough for its heading on one line. At 56px the button fitted and
+      // "Screenshot" broke into "Screensh/ot" (UI review, 2026-10-19).
+      width: COLUMN.ACTION + 64,
       align: "center",
       render: (_, row) =>
         row.screenshot ? (
