@@ -1,12 +1,12 @@
 "use client";
-import { useState } from "react";
-import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "antd";
-import type { Dayjs } from "dayjs";
-import DataTable from "@/components/ui/DataTable";
-import FilterBar from "@/components/ui/FilterBar";
-import { formatDate, formatMoney } from "@/lib/format";
+import { useCallback, useState } from "react";
+import { Select } from "antd";
+import SimpleReport from "@/components/reports/SimpleReport";
+import StatementBody, { type PartyStatement } from "@/components/reports/StatementBody";
+import { partyStatementSheet } from "@/lib/domain/ledger-report-sheets";
+import type { PresetContext } from "@/lib/domain/report-presets";
+import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { vendorStatementAction } from "./actions";
-import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
 interface Vendor {
   id: string;
@@ -14,80 +14,70 @@ interface Vendor {
 }
 interface Props {
   vendors: Vendor[];
+  companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  presets: PresetContext;
 }
 
-export default function VendorStatementClient({ vendors, baseCurrency, baseDecimals }: Props) {
-  const { message } = App.useApp();
+export default function VendorStatementClient({ vendors, companyName, baseCurrency, baseDecimals, presets }: Props) {
   const [vendorId, setVendorId] = useState<string>();
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
-  const [rep, setRep] = useState<StatementReport | null>(null);
-  const [loading, setLoading] = useState(false);
-  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
+  // Choosing another vendor runs the report again over the dates last run.
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const run = async () => {
-    if (!vendorId || !range) {
-      message.warning("Pick a vendor and date range");
-      return;
-    }
-    setLoading(true);
-    const r = await vendorStatementAction(vendorId, range[0].format("YYYY-MM-DD"), range[1].format("YYYY-MM-DD"));
-    setLoading(false);
-    if (r.ok && r.data) setRep(r.data);
-    else message.error(r.error ?? "Failed to load");
-  };
+  const load = useCallback(
+    async (when: ReportWhen): Promise<ReportRunResult<PartyStatement>> => {
+      const vendor = vendors.find((v) => v.id === vendorId);
+      if (!vendor) return { ok: false, error: "Choose a vendor." };
+      const r = await vendorStatementAction(vendor.id, when.from ?? when.to, when.to);
+      if (!r.ok || !r.data) return { ok: false, error: r.error };
+      return { ok: true, data: { partyName: vendor.name, report: r.data } };
+    },
+    [vendors, vendorId],
+  );
+  const sheet = useCallback(
+    (data: PartyStatement, when: ReportWhen) =>
+      partyStatementSheet("vendor", data.partyName, data.report, when, { companyName, currencyCode: baseCurrency, baseDecimals }),
+    [companyName, baseCurrency, baseDecimals],
+  );
 
   return (
-    <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <FilterBar
-        resultCount={rep?.rows.length}
-        ariaLabel="Vendor statement filters"
-        actions={
-          <Button type="primary" loading={loading} onClick={run}>
-            Run statement
-          </Button>
-        }
-      >
+    <SimpleReport<PartyStatement>
+      companyName={companyName}
+      title="Vendor Statement"
+      currencyCode={baseCurrency}
+      period={{ kind: "range", ctx: presets, preset: "year" }}
+      load={load}
+      sheet={sheet}
+      runningText="Reading the vendor's documents…"
+      refreshKey={refreshKey}
+      waitFor={
+        vendorId
+          ? null
+          : {
+              title: "Choose a vendor",
+              description:
+                "Pick the vendor whose statement you want. It opens for this year; change the dates and Run report for another period.",
+            }
+      }
+      filters={
         <Select
           showSearch
-          style={{ width: 320 }}
+          style={{ width: 280 }}
           placeholder="Vendor"
+          aria-label="Vendor"
           optionFilterProp="label"
           value={vendorId}
           options={vendors.map((v) => ({ value: v.id, label: v.name }))}
-          onChange={setVendorId}
+          onChange={(id) => {
+            if (vendorId) setRefreshKey((key) => key + 1);
+            setVendorId(id);
+          }}
         />
-        <DatePicker.RangePicker value={range} onChange={(v) => v && setRange([v[0]!, v[1]!])} />
-      </FilterBar>
-      {rep && (
-        <>
-          <Typography.Text type="secondary">Base currency {baseCurrency} · Accrual basis</Typography.Text>
-          <Typography.Text type="secondary">
-            Opening balance reflects current open items dated before the period (historical point-in-time statements
-            are a later enhancement).
-          </Typography.Text>
-          <Space size="large">
-            <Statistic title="Opening balance" value={fmt(rep.openingMinor)} />
-            <Statistic title="Closing balance" value={fmt(rep.closingMinor)} />
-          </Space>
-          <DataTable<StatementRow>
-            rowKey={(r) => `${r.docType}-${r.docNumber}-${r.txnDate}`}
-            dataSource={rep.rows}
-            pagination={false}
-            loading={loading}
-            emptyTitle="No statement activity"
-            emptyDescription="No vendor transactions were found for this date range."
-            columns={[
-              { title: "Date", dataIndex: "txnDate", render: (v: string) => formatDate(v) },
-              { title: "Type", dataIndex: "docType" },
-              { title: "Number", dataIndex: "docNumber" },
-              { title: "Amount", align: "right", render: (_, r) => fmt(r.amountMinor) },
-              { title: "Running", align: "right", render: (_, r) => fmt(r.runningMinor) },
-            ]}
-          />
-        </>
+      }
+      render={(data, _when, { printing }) => (
+        <StatementBody kind="vendor" data={data} currencyCode={baseCurrency} decimals={baseDecimals} printing={printing} />
       )}
-    </Space>
+    />
   );
 }

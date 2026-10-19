@@ -19,6 +19,7 @@ export default function FilterBar({
   actions,
   resultCount,
   ariaLabel = "Filters and actions",
+  className,
 }: {
   children?: ReactNode;
   /**
@@ -38,10 +39,12 @@ export default function FilterBar({
   actions?: ReactNode;
   resultCount?: number;
   ariaLabel?: string;
+  /** A modifier, such as the report bar's, which lets the actions share the controls' lines. */
+  className?: string;
 }) {
   if (!secondary) {
     return (
-      <section className="accounting-filter-bar" aria-label={ariaLabel}>
+      <section className={className ? `accounting-filter-bar ${className}` : "accounting-filter-bar"} aria-label={ariaLabel}>
         <div className="accounting-filter-bar__controls">{children}</div>
         <div className="accounting-filter-bar__actions">
           <ResultCount resultCount={resultCount} />

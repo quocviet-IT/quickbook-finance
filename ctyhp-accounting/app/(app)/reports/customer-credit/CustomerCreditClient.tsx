@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Alert,
-  Button,
   Segmented,
   Space,
   Statistic,
@@ -10,17 +10,14 @@ import {
   Tooltip,
   Typography,
 } from "antd";
-import { DownloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
-import FilterBar from "@/components/ui/FilterBar";
-import { downloadCsvFile } from "@/lib/client/report-export";
-import { toCsv } from "@/lib/csv";
-import { csvWithReportIdentity } from "@/lib/domain/report-export";
+import ReportBar from "@/components/reports/ReportBar";
 import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import { creditStateColor, sortByCreditRisk } from "@/lib/domain/credit";
 import type { CustomerCreditRow } from "@/lib/services/credit";
 import { TOKENS } from "@/lib/design/tokens";
 import { statusToken } from "@/lib/design/status";
+import { customerCreditSheet } from "./credit-sheet";
 
 type View = "attention" | "all";
 
@@ -36,7 +33,9 @@ export default function CustomerCreditClient({
   /** Whose books the exported file belongs to. */
   companyName: string;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<View>("attention");
+  const [refreshing, startRefresh] = useTransition();
 
   const ranked = sortByCreditRisk(rows);
   const needsAttention = ranked.filter(
@@ -67,50 +66,15 @@ export default function CustomerCreditClient({
       ? Math.round((totalOwed / windowSales) * salesWindowDays)
       : null;
 
-  function exportCsv() {
-    downloadCsvFile(
-      csvWithReportIdentity(
-        toCsv(
-          ranked.map((row) => ({
-            customer: row.name,
-            credit_limit:
-              row.creditLimitMinor === null
-                ? ""
-                : (row.creditLimitMinor / 100).toFixed(2),
-            owed: (row.openBalanceMinor / 100).toFixed(2),
-            available:
-              row.status.availableMinor === null
-                ? ""
-                : (row.status.availableMinor / 100).toFixed(2),
-            overdue: (row.overdueMinor / 100).toFixed(2),
-            oldest_due: row.oldestDueDate ?? "",
-            dso: row.status.daysSalesOutstanding ?? "",
-            state: row.status.label,
-            terms_days: row.creditTermsDays ?? "",
-            billing_address: row.hasBillingAddress ? "yes" : "no",
-          })),
-          [
-            { key: "customer", header: "Customer" },
-            { key: "credit_limit", header: "Credit limit" },
-            { key: "owed", header: "Owed now" },
-            { key: "available", header: "Available" },
-            { key: "overdue", header: "Past due" },
-            { key: "oldest_due", header: "Oldest due date" },
-            { key: "dso", header: "DSO (days)" },
-            { key: "state", header: "Credit status" },
-            { key: "terms_days", header: "Terms (days)" },
-            { key: "billing_address", header: "Billing address on file" },
-          ],
-        ),
-        {
-          companyName,
-          title: "Customer Credit Exposure",
-          subtitle: `Sales window ${plural(salesWindowDays, "day")}`,
-          currencyCode: "USD",
-        },
-      ),
-      "customer-credit-exposure.csv",
-    );
+  const sheet = useMemo(
+    () => (shown.length > 0 ? customerCreditSheet(shown, { companyName, salesWindowDays }) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, view, companyName, salesWindowDays],
+  );
+
+  // The snapshot is read on the server, so running it again is reading it again.
+  function run() {
+    startRefresh(() => router.refresh());
   }
 
   return (
@@ -144,31 +108,27 @@ export default function CustomerCreditClient({
         />
       ) : null}
 
-      <FilterBar
-        resultCount={shown.length}
+      <ReportBar
         ariaLabel="Customer credit filters"
-        actions={
-          <Button
-            icon={<DownloadOutlined />}
-            disabled={rows.length === 0}
-            onClick={exportCsv}
-          >
-            Export CSV
-          </Button>
+        resultCount={shown.length}
+        dates={{ kind: "none" }}
+        onRun={run}
+        loading={refreshing}
+        sheet={sheet}
+        filters={
+          <Segmented
+            value={view}
+            onChange={(value) => setView(value as View)}
+            options={[
+              {
+                label: `Needs attention (${needsAttention.length})`,
+                value: "attention",
+              },
+              { label: `All customers (${rows.length})`, value: "all" },
+            ]}
+          />
         }
-      >
-        <Segmented
-          value={view}
-          onChange={(value) => setView(value as View)}
-          options={[
-            {
-              label: `Needs attention (${needsAttention.length})`,
-              value: "attention",
-            },
-            { label: `All customers (${rows.length})`, value: "all" },
-          ]}
-        />
-      </FilterBar>
+      />
 
       <DataTable<CustomerCreditRow>
         rowKey="customerId"

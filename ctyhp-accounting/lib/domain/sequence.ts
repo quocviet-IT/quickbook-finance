@@ -11,6 +11,7 @@
 import { toCsv, type CsvColumn } from "@/lib/csv";
 import { plural, pluralWord } from "@/lib/format";
 import { statusLabel } from "@/lib/domain/status-label";
+import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 
 export interface SequenceDefinition {
   sequence_key: string;
@@ -213,4 +214,35 @@ export function sequenceCsv(audit: SequenceAudit): string {
 
 export function sequenceCsvFileName(audit: SequenceAudit): string {
   return `number-sequence-${audit.definition.sequence_key}.csv`;
+}
+
+/** What Copy, CSV, PDF and Excel hand over: the rows on screen, with the CSV's columns. */
+export function sequenceSheet(
+  audit: SequenceAudit,
+  rows: readonly SequenceRow[],
+  ctx: { companyName: string; currencyCode: string },
+): ReportExportSheet {
+  return {
+    fileName: sanitizeExportFileName(`number-sequence-${audit.definition.sequence_key}`),
+    companyName: ctx.companyName,
+    title: "Document Number Sequence",
+    subtitle: audit.definition.label,
+    currencyCode: ctx.currencyCode,
+    columns: [
+      { key: "number", header: "Number", kind: "text" },
+      { key: "state", header: "On file", kind: "text" },
+      { key: "date", header: "Date", kind: "text" },
+      { key: "status", header: "Status", kind: "text" },
+      { key: "document_id", header: "Document id", kind: "text" },
+      { key: "reason", header: "Documented reason", kind: "text" },
+    ],
+    rows: rows.map((row) => ({
+      number: row.number,
+      state: sequenceStateLabel(row.state),
+      date: row.documentDate ?? "",
+      status: row.documentStatus ? statusLabel(row.documentStatus) : "",
+      document_id: row.documentId ?? "",
+      reason: row.note?.reason ?? "",
+    })),
+  };
 }

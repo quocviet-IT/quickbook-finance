@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { resolveActiveCompany } from "@/lib/db/company";
+import { reportPageContext } from "@/lib/services/report-context";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import GlPostingClient from "./GlPostingClient";
@@ -11,9 +12,10 @@ export const dynamic = "force-dynamic";
 export default async function GlPostingPage() {
   const sb = await createSupabaseServerClient();
   const entity = await resolveActiveCompany();
-  const [currencies, company] = await Promise.all([
+  const [currencies, company, context] = await Promise.all([
     listCurrencies(sb),
     getCurrentCompanySettings(sb),
+    reportPageContext(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   return (
@@ -32,6 +34,7 @@ export default async function GlPostingPage() {
         companyName={company?.legal_name ?? "Company name not set"}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        presets={context.presets}
       />
     </div>
   );

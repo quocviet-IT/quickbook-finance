@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.27",
+    date: "2026-10-19",
+    headline: "Every report has the same bar, opens already run, and exports the same way.",
+    changes: [
+      {
+        kind: "changed",
+        title: "One report bar on every report",
+        detail:
+          "Every report now has the same bar. On the left are the dates, the report's own filters and Run report. On the right are the report's own actions, then Copy this report, CSV, PDF, Excel and Print, always in that order. The run button was called Run, Run report, Run review, Run statement or Apply depending on the page; it is Run report everywhere. Dates are chosen the same way everywhere too: a period such as This year with From and To, or a single As of date, or a tax year. Transaction List by Date now opens on This month, the first of the month to today, rather than on a Custom range to the month's last day. When the bar is too full for one line, the exports move below it rather than pushing Run report onto a line of its own.",
+        route: "/reports",
+      },
+      {
+        kind: "changed",
+        title: "Reports open already run",
+        detail:
+          "AP Aging, AR Aging, Cash Flow, 1099 Review, Inventory Valuation and Analysis waited for Run and showed an empty page until then. They now open already run, as of today or for this year. Customer Statement, Vendor Statement and General Ledger need a customer, vendor or account first; until one is chosen the page says so, and choosing one runs the report.",
+        route: "/reports/ar-aging",
+      },
+      {
+        kind: "added",
+        title: "Exports on every report",
+        detail:
+          "Cash Flow, the statements, General Ledger, Journal, Inventory Valuation, Inventory Review and Analysis had no export, and several reports had only CSV or only PDF and Excel. Every report now has Copy, CSV, PDF, Excel and Print, and each hands over what the screen shows, including the filters you have chosen. Statements and aging exports name document types and aging buckets in words.",
+        route: "/reports/general-ledger",
+      },
+    ],
+  },
+  {
     version: "2.26",
     date: "2026-10-19",
     headline: "The header fits a phone, and the Purchases overview’s payment links open a page.",

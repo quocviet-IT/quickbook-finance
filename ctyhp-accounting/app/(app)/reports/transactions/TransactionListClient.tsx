@@ -1,14 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, DatePicker, Input, Select, Space, Statistic, Tag, Typography } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
+import { Button, Card, Input, Select, Space, Statistic, Tag, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { sourceLabel } from "@/lib/domain/entry-detail";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
-import FilterBar from "@/components/ui/FilterBar";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import ReportBar from "@/components/reports/ReportBar";
+import { presetRange, type PeriodPreset, type PresetContext } from "@/lib/domain/report-presets";
 import {
   buildTransactionListSheet,
   filterTransactionList,
@@ -34,6 +33,8 @@ const NO_FILTER: TransactionListFilter = {
   search: "",
 };
 
+const PRESETS_TO_MATCH = ["month", "quarter", "year", "last3", "last5", "all"] as const;
+
 function documentTypeLabel(sourceType: string): string {
   return sourceLabel(sourceType);
 }
@@ -46,6 +47,7 @@ export default function TransactionListClient({
   baseCurrency,
   baseDecimals,
   accountNames,
+  presets,
 }: {
   rows: TransactionListRow[];
   from: string;
@@ -55,9 +57,21 @@ export default function TransactionListClient({
   baseDecimals: number;
   /** Account id to "code — name", for labelling the account filter. */
   accountNames: Record<string, string>;
+  presets: PresetContext;
 }) {
   const router = useRouter();
-  const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs(from), dayjs(to)]);
+  const [pending, startNavigation] = useTransition();
+  // The page opens on the current month; a link with other dates shows the
+  // preset those dates are, or Custom.
+  const [preset, setPreset] = useState<PeriodPreset>(() => {
+    const named = PRESETS_TO_MATCH.find((key) => {
+      const range = presetRange(key, presets);
+      return range.from === from && range.to === to;
+    });
+    return named ?? "custom";
+  });
+  const [pickedFrom, setPickedFrom] = useState(from);
+  const [pickedTo, setPickedTo] = useState(to);
   const [filter, setFilter] = useState<TransactionListFilter>(NO_FILTER);
   const [pageSize, setPageSize] = useState<number>(TRANSACTION_LIST_DEFAULT_PAGE_SIZE);
 
@@ -83,12 +97,18 @@ export default function TransactionListClient({
 
   // The range is a server round-trip because the range is what the query is;
   // filtering it in the browser would only ever hide rows already fetched.
-  function applyRange() {
-    const next = new URLSearchParams({
-      from: range[0].format("YYYY-MM-DD"),
-      to: range[1].format("YYYY-MM-DD"),
-    });
-    router.push(`/reports/transactions?${next.toString()}`);
+  function runRange(f: string, t: string) {
+    const next = new URLSearchParams({ from: f, to: t });
+    startNavigation(() => router.push(`/reports/transactions?${next.toString()}`));
+  }
+
+  function choosePreset(key: PeriodPreset) {
+    setPreset(key);
+    if (key === "custom") return;
+    const range = presetRange(key, presets);
+    setPickedFrom(range.from);
+    setPickedTo(range.to);
+    runRange(range.from, range.to);
   }
 
   const sheet = buildTransactionListSheet({
@@ -120,90 +140,97 @@ export default function TransactionListClient({
         </Card>
       </Space>
 
-      <FilterBar
+      <ReportBar
         resultCount={visible.length}
-        actions={<ReportExportButtons sheet={sheet} disabled={visible.length === 0} />}
-      >
-        <Space wrap>
-          <DatePicker.RangePicker
-            value={range}
-            allowClear={false}
-            onChange={(value) => {
-              if (value?.[0] && value?.[1]) setRange([value[0], value[1]]);
-            }}
-          />
-          <Button type="primary" onClick={applyRange}>
-            Apply
-          </Button>
-
-          <Input.Search
-            allowClear
-            placeholder="Search description, number, name"
-            style={{ width: 260 }}
-            value={filter.search}
-            onChange={(event) => set("search", event.target.value)}
-          />
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            aria-label="Filter by customer or vendor"
-            placeholder="Customer or vendor"
-            style={{ minWidth: 210 }}
-            value={filter.party ?? undefined}
-            onChange={(value) => set("party", value ?? null)}
-            options={[
-              ...choices.parties.map((party) => ({ value: party, label: party })),
-              { value: NO_PARTY, label: "— No customer or vendor —" },
-            ]}
-          />
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            aria-label="Filter by account"
-            placeholder="Account"
-            style={{ minWidth: 240 }}
-            value={filter.accountId ?? undefined}
-            onChange={(value) => set("accountId", value ?? null)}
-            options={choices.accountIds.map((id) => ({
-              value: id,
-              label: accountNames[id] ?? "An account no longer in the chart",
-            }))}
-          />
-          <Select
-            allowClear
-            aria-label="Filter by document type"
-            placeholder="Document type"
-            style={{ minWidth: 170 }}
-            value={filter.sourceType ?? undefined}
-            onChange={(value) => set("sourceType", value ?? null)}
-            options={choices.sourceTypes.map((type) => ({
-              value: type,
-              label: documentTypeLabel(type),
-            }))}
-          />
-          <Select
-            aria-label="Filter by reconciled"
-            value={filter.reconciled}
-            style={{ minWidth: 170 }}
-            onChange={(value) => set("reconciled", value)}
-            options={[
-              { value: "all", label: "All transactions" },
-              { value: "no", label: "Not reconciled" },
-              { value: "yes", label: "Reconciled" },
-            ]}
-          />
-          {narrowed ? (
-            <Space size={8}>
-              <Button onClick={() => setFilter(NO_FILTER)}>Clear filters</Button>
-              <Typography.Text type="secondary">
-                Showing {visible.length} of {rows.length}
-              </Typography.Text>
-            </Space>
-          ) : null}
-        </Space>
-      </FilterBar>
+        dates={{
+          kind: "range",
+          preset,
+          from: pickedFrom,
+          to: pickedTo,
+          onPreset: choosePreset,
+          onFrom: (d) => {
+            setPickedFrom(d);
+            setPreset("custom");
+          },
+          onTo: (d) => {
+            setPickedTo(d);
+            setPreset("custom");
+          },
+        }}
+        onRun={() => runRange(pickedFrom, pickedTo)}
+        loading={pending}
+        sheet={visible.length > 0 ? sheet : null}
+        filters={
+          <>
+            <Input.Search
+              allowClear
+              placeholder="Search description, number, name"
+              style={{ width: 260 }}
+              value={filter.search}
+              onChange={(event) => set("search", event.target.value)}
+            />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              aria-label="Filter by customer or vendor"
+              placeholder="Customer or vendor"
+              style={{ minWidth: 210 }}
+              value={filter.party ?? undefined}
+              onChange={(value) => set("party", value ?? null)}
+              options={[
+                ...choices.parties.map((party) => ({ value: party, label: party })),
+                { value: NO_PARTY, label: "— No customer or vendor —" },
+              ]}
+            />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              aria-label="Filter by account"
+              placeholder="Account"
+              style={{ minWidth: 240 }}
+              value={filter.accountId ?? undefined}
+              onChange={(value) => set("accountId", value ?? null)}
+              options={choices.accountIds.map((id) => ({
+                value: id,
+                label: accountNames[id] ?? "An account no longer in the chart",
+              }))}
+            />
+            <Select
+              allowClear
+              aria-label="Filter by document type"
+              placeholder="Document type"
+              style={{ minWidth: 170 }}
+              value={filter.sourceType ?? undefined}
+              onChange={(value) => set("sourceType", value ?? null)}
+              options={choices.sourceTypes.map((type) => ({
+                value: type,
+                label: documentTypeLabel(type),
+              }))}
+            />
+            <Select
+              aria-label="Filter by reconciled"
+              value={filter.reconciled}
+              style={{ minWidth: 170 }}
+              onChange={(value) => set("reconciled", value)}
+              options={[
+                { value: "all", label: "All transactions" },
+                { value: "no", label: "Not reconciled" },
+                { value: "yes", label: "Reconciled" },
+              ]}
+            />
+            {narrowed ? (
+              <Space size={8}>
+                <Button onClick={() => setFilter(NO_FILTER)}>Clear filters</Button>
+                <Typography.Text type="secondary">
+                  Showing {visible.length} of {rows.length}
+                </Typography.Text>
+              </Space>
+            ) : null}
+          </>
+        }
+      />
 
       <DataTable<TransactionListRow>
         rowKey="entryId"

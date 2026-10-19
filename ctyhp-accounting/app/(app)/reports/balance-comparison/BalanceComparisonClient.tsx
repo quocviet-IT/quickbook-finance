@@ -2,14 +2,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Checkbox, DatePicker, Input, Select, Space, Tag, type InputRef, type TableColumnsType } from "antd";
-import dayjs from "dayjs";
-import FilterBar from "@/components/ui/FilterBar";
+import { Alert, App, Button, Checkbox, Input, Select, Space, Tag, type InputRef, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import ReportBar from "@/components/reports/ReportBar";
 import { ReportFoot, ReportPaper, StatRow, reportPaperStyles as paper } from "@/components/reports/ReportPaper";
-import { downloadTextFile } from "@/lib/client/download";
 import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
 import {
   BALANCE_BASIS_NOTE,
@@ -35,7 +32,6 @@ import {
   type ExternalRow,
   type TableLine,
 } from "@/lib/domain/balance-comparison";
-import { csvFromExportSheet } from "@/lib/domain/report-export";
 import { formatMoney } from "@/lib/format";
 import type { BalanceComparisonData } from "@/lib/services/balance-comparison";
 import { saveBalanceComparisonAction } from "./actions";
@@ -236,6 +232,8 @@ export default function BalanceComparisonClient({
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // The date picked in the bar; Run report goes there.
+  const [pickedAsOf, setPickedAsOf] = useState(asOf);
   // The figure boxes on screen, the Compared with box and the Note box, read as they stand when Save is pressed.
   const boxes = useRef(new Map<string, HTMLInputElement>());
   const withRef = useRef<InputRef>(null);
@@ -514,54 +512,48 @@ export default function BalanceComparisonClient({
 
   return (
     <div>
-      <FilterBar
+      <ReportBar
         ariaLabel="Comparison date, other system and exports"
-        actions={
-          <Space wrap>
-            <ReportExportButtons sheet={sheet} />
-            <Button onClick={() => downloadTextFile(`${sheet.fileName}.csv`, csvFromExportSheet(sheet))}>CSV</Button>
-            {canSave ? (
-              <Button type="primary" onClick={() => void save()} loading={saving}>
-                Save
-              </Button>
-            ) : null}
-          </Space>
+        dates={{ kind: "asOf", to: pickedAsOf, onTo: setPickedAsOf }}
+        onRun={() => (pickedAsOf === asOf ? router.refresh() : goTo(pickedAsOf))}
+        loading={false}
+        sheet={sheet}
+        filters={
+          <>
+            <Input
+              ref={withRef}
+              aria-label="Compared with"
+              prefix={<span className={paper.muted}>Compared with</span>}
+              placeholder="For example, QuickBooks"
+              maxLength={80}
+              defaultValue={initial.comparedWith}
+              disabled={!canSave}
+              style={{ width: 280 }}
+              onBlur={(e) => setComparedWith(e.currentTarget.value)}
+              onPressEnter={(e) => e.currentTarget.blur()}
+            />
+            <Input
+              ref={noteRef}
+              aria-label="Note"
+              prefix={<span className={paper.muted}>Note</span>}
+              placeholder="Optional"
+              maxLength={500}
+              defaultValue={initial.note}
+              disabled={!canSave}
+              style={{ width: 280 }}
+              onBlur={(e) => setNote(e.currentTarget.value)}
+              onPressEnter={(e) => e.currentTarget.blur()}
+            />
+          </>
         }
-      >
-        <DatePicker
-          aria-label="As of"
-          prefix={<span className={paper.muted}>As of</span>}
-          value={dayjs(asOf)}
-          allowClear={false}
-          onChange={(d) => {
-            if (d) goTo(d.format("YYYY-MM-DD"));
-          }}
-        />
-        <Input
-          ref={withRef}
-          aria-label="Compared with"
-          prefix={<span className={paper.muted}>Compared with</span>}
-          placeholder="For example, QuickBooks"
-          maxLength={80}
-          defaultValue={initial.comparedWith}
-          disabled={!canSave}
-          style={{ width: 280 }}
-          onBlur={(e) => setComparedWith(e.currentTarget.value)}
-          onPressEnter={(e) => e.currentTarget.blur()}
-        />
-        <Input
-          ref={noteRef}
-          aria-label="Note"
-          prefix={<span className={paper.muted}>Note</span>}
-          placeholder="Optional"
-          maxLength={500}
-          defaultValue={initial.note}
-          disabled={!canSave}
-          style={{ width: 280 }}
-          onBlur={(e) => setNote(e.currentTarget.value)}
-          onPressEnter={(e) => e.currentTarget.blur()}
-        />
-      </FilterBar>
+        actions={
+          canSave ? (
+            <Button type="primary" onClick={() => void save()} loading={saving}>
+              Save
+            </Button>
+          ) : null
+        }
+      />
 
       {nothing ? (
         <Alert

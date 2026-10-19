@@ -1,19 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { App, Button, DatePicker, InputNumber, Select, Space, Switch, Tooltip } from "antd";
-import { CopyOutlined, PrinterOutlined } from "@ant-design/icons";
-import dayjs from "dayjs";
+import { InputNumber, Select, Space, Switch, Tooltip } from "antd";
 import FilterBar from "@/components/ui/FilterBar";
 import { ReportAudienceToggle } from "@/components/reports/ReportAudience";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import { REPORT_BAR_CLASS, ReportActions, ReportDateControl, RunReportButton } from "@/components/reports/ReportBar";
 import { reportPaperStyles as styles } from "@/components/reports/ReportPaper";
-import { downloadTextFile } from "@/lib/client/download";
-import { printReport } from "@/lib/client/print-report";
 import type { FiscalMonth } from "@/lib/domain/fiscal";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
-import { csvFromExportSheet, tsvFromExportSheet, type ReportExportSheet } from "@/lib/domain/report-export";
-import { PERIOD_PRESETS, type PeriodPreset } from "@/lib/domain/report-presets";
+import type { ReportExportSheet } from "@/lib/domain/report-export";
+import type { PeriodPreset } from "@/lib/domain/report-presets";
 import { PERCENT_OF_INCOME_TOOLTIP } from "@/lib/domain/reports";
 import { COMPARE_OPTIONS, type CompareMode } from "@/lib/domain/statement-columns";
 
@@ -68,40 +64,14 @@ export interface ReportToolbarProps {
  * report, CSV, PDF, Excel, Print.
  */
 export default function ReportToolbar(props: ReportToolbarProps) {
-  const { message } = App.useApp();
   const { dates, sheet, loading } = props;
-  const idle = !sheet || loading;
-
-  const copy = async () => {
-    if (!sheet) return;
-    try {
-      await navigator.clipboard.writeText(tsvFromExportSheet(sheet));
-      message.success("Copied. Paste it into a spreadsheet and the columns stay.");
-    } catch {
-      message.error("The browser would not let this page copy. Use CSV instead.");
-    }
-  };
-
   const label = (text: string) => <span className={styles.muted}>{text}</span>;
 
   return (
     <FilterBar
       ariaLabel="Report options and actions"
-      actions={
-        <Space wrap>
-          {props.extraActions}
-          <Button icon={<CopyOutlined />} disabled={idle} onClick={() => void copy()}>
-            Copy this report
-          </Button>
-          <Button disabled={idle} onClick={() => sheet && downloadTextFile(`${sheet.fileName}.csv`, csvFromExportSheet(sheet))}>
-            CSV
-          </Button>
-          {sheet ? <ReportExportButtons sheet={sheet} disabled={loading} /> : null}
-          <Button icon={<PrinterOutlined />} disabled={idle} onClick={printReport}>
-            Print
-          </Button>
-        </Space>
-      }
+      className={REPORT_BAR_CLASS}
+      actions={<ReportActions sheet={sheet} loading={loading} before={props.extraActions} />}
     >
       <ReportAudienceToggle />
       <Select<InternalReportId>
@@ -138,31 +108,20 @@ export default function ReportToolbar(props: ReportToolbarProps) {
           />
         </>
       ) : (
-        <>
-          <Select<PeriodPreset>
-            aria-label="Period"
-            value={dates.preset}
-            onChange={dates.onPreset}
-            options={PERIOD_PRESETS.map((p) => ({ value: p.key, label: p.label }))}
-            style={{ width: 150 }}
-          />
-          {dates.showFrom ? (
-            <DatePicker
-              aria-label={dates.kind === "point" ? "Columns from" : "From"}
-              prefix={label(dates.kind === "point" ? "Columns from" : "From")}
-              value={dayjs(dates.from)}
-              allowClear={false}
-              onChange={(d) => d && dates.onFrom(d.format("YYYY-MM-DD"))}
-            />
-          ) : null}
-          <DatePicker
-            aria-label={dates.kind === "point" ? "As of" : "To"}
-            prefix={label(dates.kind === "point" ? "As of" : "To")}
-            value={dayjs(dates.to)}
-            allowClear={false}
-            onChange={(d) => d && dates.onTo(d.format("YYYY-MM-DD"))}
-          />
-        </>
+        <ReportDateControl
+          dates={{
+            kind: "range",
+            preset: dates.preset,
+            from: dates.from,
+            to: dates.to,
+            onPreset: dates.onPreset,
+            onFrom: dates.onFrom,
+            onTo: dates.onTo,
+            showFrom: dates.showFrom,
+            fromLabel: dates.kind === "point" ? "Columns from" : "From",
+            toLabel: dates.kind === "point" ? "As of" : "To",
+          }}
+        />
       )}
       {props.compare ? (
         <Select<CompareMode>
@@ -181,9 +140,7 @@ export default function ReportToolbar(props: ReportToolbarProps) {
           </Space>
         </Tooltip>
       ) : null}
-      <Button type="primary" onClick={props.onRun} loading={loading}>
-        Run
-      </Button>
+      <RunReportButton onRun={props.onRun} loading={loading} />
     </FilterBar>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, App, Button, Form, Input, InputNumber, Modal, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
+import ReportBar, { reportFieldLabel } from "@/components/reports/ReportBar";
+import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import { fromMinor } from "@/lib/domain/money";
 import { useCompanyClock } from "@/components/CompanyClock";
-import { formatMoney, pluralWord } from "@/lib/format";
+import { formatDate, formatMoney, pluralWord } from "@/lib/format";
 import {
   describeInventoryReview,
   METHOD_LABEL,
@@ -37,17 +38,21 @@ export default function InventoryReviewClient({
   canWrite,
   baseCurrency,
   baseDecimals,
+  companyName,
 }: {
   canWrite: boolean;
   baseCurrency: string;
   baseDecimals: number;
+  companyName: string;
 }) {
   const { message } = App.useApp();
   const { today } = useCompanyClock();
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs(today));
+  const [asOf, setAsOf] = useState(today);
   const [windowDays, setWindowDays] = useState(90);
   const [review, setReview] = useState<InventoryReview | null>(null);
-  const [loading, setLoading] = useState(false);
+  // The date and window the shown review was run for.
+  const [ran, setRan] = useState<{ asOf: string; windowDays: number } | null>(null);
+  const [loading, setLoading] = useState(true);
   const [writeDownFor, setWriteDownFor] = useState<ReviewedStock | null>(null);
   const [form] = Form.useForm();
 
@@ -59,9 +64,12 @@ export default function InventoryReviewClient({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await inventoryReviewAction(asOf.format("YYYY-MM-DD"), windowDays);
+    const res = await inventoryReviewAction(asOf, windowDays);
     setLoading(false);
-    if (res.ok && res.data) setReview(res.data);
+    if (res.ok && res.data) {
+      setReview(res.data);
+      setRan({ asOf, windowDays });
+    }
     else message.error(res.error ?? "Failed to review inventory");
   }, [asOf, windowDays, message]);
 
@@ -85,7 +93,7 @@ export default function InventoryReviewClient({
     const values = await form.validateFields();
     const res = await writeDownInventoryAction({
       itemId: writeDownFor.itemId,
-      date: asOf.format("YYYY-MM-DD"),
+      date: asOf,
       nrvMinor: Math.round((values.nrv ?? 0) * 10 ** baseDecimals),
       reason: values.reason,
     });
@@ -98,28 +106,66 @@ export default function InventoryReviewClient({
     }
   }
 
+  const sheet = useMemo<ReportExportSheet | null>(() => {
+    if (!review || !ran) return null;
+    const major = (minor: number) => fromMinor(minor, baseDecimals);
+    return {
+      fileName: sanitizeExportFileName(`inventory-review-${ran.asOf}`),
+      companyName,
+      title: "Inventory Review",
+      subtitle: `As of ${formatDate(ran.asOf)} · ${ran.windowDays}-day window`,
+      currencyCode: baseCurrency,
+      columns: [
+        { key: "status", header: "Status", kind: "text" },
+        { key: "item", header: "Item", kind: "text" },
+        { key: "qty", header: "On hand", kind: "number" },
+        { key: "unit", header: "Unit cost", kind: "money" },
+        { key: "value", header: "Value", kind: "money" },
+        { key: "nrv", header: "Realizable", kind: "money" },
+        { key: "last", header: "Last moved", kind: "text" },
+        { key: "reason", header: "Assessment", kind: "text" },
+      ],
+      rows: review.rows.map((row) => ({
+        status: VERDICT_LABEL[row.verdict],
+        item: row.name,
+        qty: row.qtyOnHand,
+        unit: major(row.unitCostMinor),
+        value: major(row.valueMinor),
+        nrv: row.nrvMinor === null ? null : major(row.nrvMinor),
+        last: row.lastMovementOn ?? "never",
+        reason: row.reason,
+      })),
+    };
+  }, [review, ran, companyName, baseCurrency, baseDecimals]);
+
   const warning = review ? describeInventoryReview(review) : null;
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-      <Space wrap>
-        <DatePicker value={asOf} onChange={(d) => d && setAsOf(d)} allowClear={false} />
-        <Tooltip title="How far back to measure the selling rate">
-          <InputNumber
-            addonBefore="Window"
-            addonAfter="days"
-            min={30}
-            max={365}
-            value={windowDays}
-            onChange={(v) => setWindowDays(Number(v ?? 90))}
-            style={{ width: 200 }}
-          />
-        </Tooltip>
-        <Button type="primary" loading={loading} onClick={load}>
-          Run review
-        </Button>
-      </Space>
+      <ReportBar
+        dates={{ kind: "asOf", to: asOf, onTo: setAsOf }}
+        filters={
+          <Tooltip title="How far back to measure the selling rate">
+            <InputNumber
+              aria-label="Window in days"
+              prefix={reportFieldLabel("Window")}
+              suffix={reportFieldLabel("days")}
+              min={30}
+              max={365}
+              value={windowDays}
+              onChange={(v) => setWindowDays(Number(v ?? 90))}
+              style={{ width: 160 }}
+            />
+          </Tooltip>
+        }
+        onRun={() => void load()}
+        loading={loading}
+        sheet={sheet}
+        resultCount={review?.rows.length}
+      />
 
+      <div className="report-print-area">
+      <Space direction="vertical" size="middle" style={{ width: "100%" }}>
       {review ? (
         <Alert
           type={warning ? "warning" : "success"}
@@ -241,6 +287,8 @@ export default function InventoryReviewClient({
             : []),
         ]}
       />
+      </Space>
+      </div>
 
       <Modal
         title={writeDownFor ? `Write down ${writeDownFor.name}` : "Write down"}

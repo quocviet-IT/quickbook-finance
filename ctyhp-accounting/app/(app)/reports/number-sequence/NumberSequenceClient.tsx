@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   App,
@@ -16,16 +16,12 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { DownloadOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
-import FilterBar from "@/components/ui/FilterBar";
-import { downloadCsvFile } from "@/lib/client/report-export";
-import { csvWithReportIdentity } from "@/lib/domain/report-export";
+import ReportBar from "@/components/reports/ReportBar";
 import {
   describeSequenceIntegrity,
-  sequenceCsv,
-  sequenceCsvFileName,
+  sequenceSheet,
   sequenceStateLabel,
   totalUnexplained,
   type SequenceAudit,
@@ -73,6 +69,7 @@ export default function NumberSequenceClient({
   const [noteFor, setNoteFor] = useState<SequenceRow | null>(null);
   const [noteForm] = Form.useForm();
   const [savingNote, setSavingNote] = useState(false);
+  const [running, setRunning] = useState(false);
 
   const overviewLoading = overview === null;
   const audit = detail?.key === sequenceKey ? detail.audit : null;
@@ -117,6 +114,12 @@ export default function NumberSequenceClient({
     if (all.ok && all.data) setOverview(all.data);
   }
 
+  async function run() {
+    setRunning(true);
+    await refresh();
+    setRunning(false);
+  }
+
   async function saveNote() {
     if (!noteFor || !audit) return;
     const values = await noteForm.validateFields();
@@ -143,6 +146,12 @@ export default function NumberSequenceClient({
       ? audit.rows.filter((row) => row.state !== "present")
       : audit.rows
     : [];
+
+  const sheet = useMemo(
+    () => (audit && rows.length > 0 ? sequenceSheet(audit, rows, { companyName, currencyCode: "USD" }) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [audit, view, companyName],
+  );
 
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
@@ -219,46 +228,33 @@ export default function NumberSequenceClient({
         />
       </Card>
 
-      <FilterBar
-        resultCount={rows.length}
+      <ReportBar
         ariaLabel="Document sequence filters"
-        actions={
-          <Button
-            icon={<DownloadOutlined />}
-            disabled={!audit || audit.rows.length === 0}
-            onClick={() => {
-              if (!audit) return;
-              downloadCsvFile(
-                csvWithReportIdentity(sequenceCsv(audit), {
-                  companyName,
-                  title: "Document Number Sequence",
-                  subtitle: audit.definition.label,
-                  currencyCode: "USD",
-                }),
-                sequenceCsvFileName(audit),
-              );
-            }}
-          >
-            Export CSV
-          </Button>
+        resultCount={rows.length}
+        dates={{ kind: "none" }}
+        onRun={() => void run()}
+        loading={loading || running}
+        sheet={sheet}
+        filters={
+          <>
+            <Select
+              style={{ width: 240 }}
+              value={sequenceKey}
+              onChange={setSequenceKey}
+              options={catalog.map((row) => ({ value: row.sequence_key, label: row.label }))}
+              aria-label="Document type"
+            />
+            <Segmented
+              value={view}
+              onChange={(value) => setView(value as View)}
+              options={[
+                { label: "Breaks only", value: "breaks" },
+                { label: "Every number", value: "all" },
+              ]}
+            />
+          </>
         }
-      >
-        <Select
-          style={{ width: 240 }}
-          value={sequenceKey}
-          onChange={setSequenceKey}
-          options={catalog.map((row) => ({ value: row.sequence_key, label: row.label }))}
-          aria-label="Document type"
-        />
-        <Segmented
-          value={view}
-          onChange={(value) => setView(value as View)}
-          options={[
-            { label: "Breaks only", value: "breaks" },
-            { label: "Every number", value: "all" },
-          ]}
-        />
-      </FilterBar>
+      />
 
       {audit ? (
         <>

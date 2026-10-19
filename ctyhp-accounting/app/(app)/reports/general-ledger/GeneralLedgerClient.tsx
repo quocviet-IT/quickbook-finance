@@ -1,13 +1,18 @@
 "use client";
 import { sourceLabel } from "@/lib/domain/entry-detail";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
-import { App, Button, DatePicker, Input, Select, Space, Statistic, Tooltip, Typography } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
+import { Alert, Button, Input, Select, Space, Spin, Tooltip } from "antd";
 import DataTable from "@/components/ui/DataTable";
-import FilterBar from "@/components/ui/FilterBar";
-import { formatDate, formatMoney } from "@/lib/format";
+import ReportBar, { ReportPrompt, type ReportDates } from "@/components/reports/ReportBar";
+import { ReportPaper, StatRow, reportPaperStyles as paperStyles } from "@/components/reports/ReportPaper";
+import { reportPagination } from "@/components/reports/SimpleReport";
+import { watchReportPrinting } from "@/lib/client/print-report";
+import { formatDate, formatDateRange, formatMoney } from "@/lib/format";
 import { sourceHref as documentHref } from "@/lib/domain/entry-detail";
+import { generalLedgerSheet } from "@/lib/domain/ledger-report-sheets";
+import { presetRange, type PeriodPreset, type PresetContext } from "@/lib/domain/report-presets";
 import {
   filterGeneralLedgerRows,
   parseAmountFilterInput,
@@ -15,7 +20,6 @@ import {
 } from "@/lib/domain/transaction-filter";
 import { generalLedgerAction } from "./actions";
 import type { GeneralLedger, GeneralLedgerRow } from "@/lib/services/journal";
-import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { ColumnHeaderCell } from "@/components/ui/ColumnHeaderCell";
 import { useColumnResize } from "@/components/ui/useColumnResize";
 import {
@@ -38,6 +42,8 @@ interface Account {
 }
 interface Props {
   accounts: Account[];
+  companyName: string;
+  presets: PresetContext;
   baseCurrency: string;
   baseDecimals: number;
   initialAccountId?: string;
@@ -74,24 +80,30 @@ function sourceHref(sourceType: string, sourceId: string | null): string | null 
 
 export default function GeneralLedgerClient({
   accounts,
+  companyName,
+  presets,
   baseCurrency,
   baseDecimals,
   initialAccountId,
   initialFrom,
   initialTo,
 }: Props) {
-  const { message } = App.useApp();
   const validInitialAccount = accounts.some((account) => account.id === initialAccountId)
     ? initialAccountId
     : undefined;
   const [accountId, setAccountId] = useState<string | undefined>(validInitialAccount);
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(
-    initialTo
-      ? [dayjs(initialFrom ?? "2000-01-01"), dayjs(initialTo)]
-      : null,
+  // A deep link (?account=&to=) opens on its own range; otherwise this year.
+  const [preset, setPreset] = useState<PeriodPreset>(initialTo ? "custom" : "year");
+  const [draft, setDraft] = useState<{ from: string; to: string }>(() =>
+    initialTo ? { from: initialFrom ?? "2000-01-01", to: initialTo } : presetRange("year", presets),
   );
+  const [ran, setRan] = useState(draft);
   const [gl, setGl] = useState<GeneralLedger | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(validInitialAccount));
+  const [error, setError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  /** Counts runs, so only the newest one's answer is shown. */
+  const latestRun = useRef(0);
   // RQ-02: keyword (Entry number, Memo, Source) and amount, applied to the
   // full set of posted lines the server already returned for this account and
   // date range — not just whichever page the table is currently showing.
@@ -113,23 +125,77 @@ export default function GeneralLedgerClient({
     GENERAL_LEDGER_WIDTH_STORAGE_KEY_V1,
   );
 
-  const run = useCallback(async () => {
-    if (!accountId || !range) {
-      message.warning("Pick an account and date range");
+  const run = async (account: string, when: { from: string; to: string }) => {
+    if (when.from > when.to) {
+      setError("The start date is after the end date.");
       return;
     }
+    const thisRun = ++latestRun.current;
+    const overtaken = () => thisRun !== latestRun.current;
     setLoading(true);
-    const r = await generalLedgerAction(accountId, range[0].format("YYYY-MM-DD"), range[1].format("YYYY-MM-DD"));
-    setLoading(false);
-    if (r.ok && r.data) setGl(r.data);
-    else message.error(r.error ?? "Failed to load");
-  }, [accountId, range, message]);
+    setError(null);
+    try {
+      const r = await generalLedgerAction(account, when.from, when.to);
+      if (overtaken()) return;
+      if (r.ok && r.data) {
+        setGl(r.data);
+        setRan(when);
+      } else {
+        setError(r.error ?? "The report could not be produced.");
+      }
+    } catch {
+      if (overtaken()) return;
+      setError("The report could not be produced. Check the connection and run it again.");
+    } finally {
+      if (!overtaken()) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Deep-linked report filters intentionally trigger the initial server load.
+    // Opens already run: on the deep-linked account, or once one is chosen.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (validInitialAccount && initialTo) void run();
-  }, [validInitialAccount, initialTo, run]);
+    if (validInitialAccount) void run(validInitialAccount, draft);
+    // Only on arrival; afterwards a choice, a period or Run report runs it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const stop = watchReportPrinting();
+    // Synchronous on purpose: the browser takes its print snapshot right after
+    // `beforeprint`, so every row must be in the page by the time it returns.
+    const before = () => flushSync(() => setPrinting(true));
+    const after = () => setPrinting(false);
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+      stop();
+    };
+  }, []);
+
+  const choosePreset = (key: PeriodPreset) => {
+    setPreset(key);
+    if (key === "custom") return;
+    const next = presetRange(key, presets);
+    setDraft(next);
+    if (accountId) void run(accountId, next);
+  };
+  const dates: ReportDates = {
+    kind: "range",
+    preset,
+    from: draft.from,
+    to: draft.to,
+    onPreset: choosePreset,
+    onFrom: (from) => {
+      setDraft({ ...draft, from });
+      setPreset("custom");
+    },
+    onTo: (to) => {
+      setDraft({ ...draft, to });
+      setPreset("custom");
+    },
+  };
   const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   // The report itself is always in base currency (see getGeneralLedger), so
@@ -147,29 +213,21 @@ export default function GeneralLedgerClient({
   // shows: `gl.rows` is every posted line the server matched for this account
   // and date range (DataTable pages it at 50/page in the browser), so this
   // narrows the real result set the same way the account/date filters do.
-  const visibleRows = gl ? filterGeneralLedgerRows(gl.rows, keyword, amountFilter) : [];
+  const { exactMinor, minMinor, maxMinor } = amountFilter;
+  const visibleRows = useMemo(
+    () => (gl ? filterGeneralLedgerRows(gl.rows, keyword, { exactMinor, minMinor, maxMinor }) : []),
+    [gl, keyword, exactMinor, minMinor, maxMinor],
+  );
+  const sheet = useMemo(
+    () => (gl ? generalLedgerSheet(gl, visibleRows, ran, { companyName, currencyCode: baseCurrency, baseDecimals }) : null),
+    [gl, visibleRows, ran, companyName, baseCurrency, baseDecimals],
+  );
 
-  return (
-    <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <FilterBar
-        resultCount={gl ? visibleRows.length : undefined}
-        ariaLabel="General Ledger filters"
-        actions={
-          <Button type="primary" loading={loading} onClick={() => void run()}>
-            Run report
-          </Button>
-        }
-      >
-        <Select
-          showSearch
-          style={{ width: 320 }}
-          placeholder="Account"
-          optionFilterProp="label"
-          value={accountId}
-          options={accounts.map((a) => ({ value: a.id, label: `${a.account_code} ${a.name}` }))}
-          onChange={setAccountId}
-        />
-        <DatePicker.RangePicker value={range} onChange={(v) => v && setRange([v[0]!, v[1]!])} />
+  // These narrow what is shown of the rows already run, not the query, so they
+  // sit on the report and not in the bar. They are left off the printed page.
+  const viewFilters = (
+    <div style={{ marginBottom: 12 }}>
+      <Space wrap>
         <Input.Search
           allowClear
           aria-label="Search the General Ledger by entry number, memo, or source"
@@ -214,16 +272,36 @@ export default function GeneralLedgerClient({
             Clear filters
           </Button>
         ) : null}
-      </FilterBar>
-      {gl && (
+      </Space>
+    </div>
+  );
+
+  const accountPicker = (
+    <Select
+      showSearch
+      style={{ width: 280 }}
+      placeholder="Account"
+      aria-label="Account"
+      optionFilterProp="label"
+      value={accountId}
+      options={accounts.map((a) => ({ value: a.id, label: `${a.account_code} ${a.name}` }))}
+      onChange={(id) => {
+        setAccountId(id);
+        void run(id, draft);
+      }}
+    />
+  );
+
+  const body = gl ? (
         <>
-          <Typography.Text type="secondary">
-            {gl.accountCode} {gl.accountName} · Base currency {baseCurrency} · Accrual basis
-          </Typography.Text>
-          <Space size="large">
-            <Statistic title="Opening" value={fmt(gl.openingMinor)} />
-            <Statistic title="Closing" value={fmt(gl.closingMinor)} />
-          </Space>
+          <StatRow
+            items={[
+              { label: "Account", value: `${gl.accountCode} ${gl.accountName}` },
+              { label: "Opening", value: fmt(gl.openingMinor) },
+              { label: "Closing", value: fmt(gl.closingMinor) },
+            ]}
+          />
+          {printing ? null : viewFilters}
           <DataTable<GeneralLedgerRow>
             rowKey="lineId"
             dataSource={visibleRows}
@@ -245,8 +323,7 @@ export default function GeneralLedgerClient({
             // the table back to 50 the instant anything re-rendered it, no
             // matter what the size changer reported (RQ-04's bug, found again
             // on this screen). See table-pagination.ts for the mechanism.
-            pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(GENERAL_LEDGER_DEFAULT_PAGE_SIZE))}
-            loading={loading}
+            pagination={reportPagination(printing, pageSize, setPageSize, GENERAL_LEDGER_DEFAULT_PAGE_SIZE)}
             emptyTitle={hasKeywordOrAmountFilter ? "Nothing matches these filters" : "No ledger activity"}
             emptyDescription={
               hasKeywordOrAmountFilter
@@ -340,7 +417,53 @@ export default function GeneralLedgerClient({
             ]}
           />
         </>
+  ) : null;
+
+  const paper = (
+    <div className="report-print-area">
+      <ReportPaper companyName={companyName} title="General Ledger" range={formatDateRange(ran.from, ran.to)} currencyCode={baseCurrency}>
+        {body ??
+          (accountId ? (
+            <div style={{ textAlign: "center", padding: "48px 0" }}>
+              {loading ? (
+                <Space orientation="vertical" size={12}>
+                  <Spin size="large" />
+                  <span className={paperStyles.muted}>Reading the ledger…</span>
+                </Space>
+              ) : (
+                <span className={paperStyles.muted}>The report has not been run.</span>
+              )}
+            </div>
+          ) : (
+            <ReportPrompt
+              title="Choose an account"
+              description="Pick the account whose activity you want. It opens for this year; change the dates and Run report for another period."
+            />
+          ))}
+      </ReportPaper>
+    </div>
+  );
+
+  return (
+    <div>
+      <ReportBar
+        dates={dates}
+        resultCount={gl ? visibleRows.length : undefined}
+        ariaLabel="General Ledger filters"
+        onRun={() => accountId && void run(accountId, draft)}
+        loading={loading}
+        runDisabled={!accountId}
+        sheet={sheet}
+        filters={accountPicker}
+      />
+      {error ? <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} /> : null}
+      {gl && loading ? (
+        <Spin spinning description="Running the report again…">
+          {paper}
+        </Spin>
+      ) : (
+        paper
       )}
-    </Space>
+    </div>
   );
 }

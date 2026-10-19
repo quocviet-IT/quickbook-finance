@@ -1,12 +1,11 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
   App,
   Button,
   Card,
-  DatePicker,
   Drawer,
   Empty,
   Form,
@@ -19,14 +18,15 @@ import {
   Typography,
 } from "antd";
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
-import dayjs, { type Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, formatDateInTimeZone } from "@/lib/format";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
-import FilterBar from "@/components/ui/FilterBar";
+import ReportBar from "@/components/reports/ReportBar";
+import { presetRange, type PeriodPreset, type PresetContext } from "@/lib/domain/report-presets";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { FinancialAnalysisRow } from "@/lib/db/types";
 import {
@@ -39,7 +39,7 @@ import {
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import { archiveAnalysisAction, freezeAnalysisAction, getAnalysisDataAction } from "./actions";
-import AnalysisReportTables from "./AnalysisReportTables";
+import AnalysisReportTables, { analysisSheet } from "./AnalysisReportTables";
 
 interface LoadedData {
   pnlRows: LedgerBalance[];
@@ -80,17 +80,25 @@ export default function AnalysisClient({
   frozenReports,
   baseCurrency,
   baseDecimals,
+  companyName,
+  presets,
 }: {
   canFreeze: boolean;
   frozenReports: FinancialAnalysisRow[];
   baseCurrency: string;
   baseDecimals: number;
+  companyName: string;
+  presets: PresetContext;
 }) {
   const { message, modal } = App.useApp();
   const router = useRouter();
-  const { timeZone, today: companyToday } = useCompanyClock();
-  const today = dayjs(companyToday);
-  const [range, setRange] = useState<[Dayjs, Dayjs]>([today.startOf("year"), today]);
+  const { timeZone } = useCompanyClock();
+  const initial = useMemo(() => presetRange("year", presets), [presets]);
+  const [preset, setPreset] = useState<PeriodPreset>("year");
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
+  /** The period the figures on screen were loaded for; a freeze keeps this one. */
+  const [ran, setRan] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<LoadedData | null>(null);
   const [adjustments, setAdjustments] = useState<AnalysisAdjustment[]>([]);
@@ -102,15 +110,30 @@ export default function AnalysisClient({
   const [editorForm] = Form.useForm();
   const [freezeForm] = Form.useForm();
 
-  async function run() {
+  async function run(f: string = from, t: string = to) {
     setLoading(true);
-    const res = await getAnalysisDataAction(
-      range[0].format("YYYY-MM-DD"),
-      range[1].format("YYYY-MM-DD"),
-    );
+    const res = await getAnalysisDataAction(f, t);
     setLoading(false);
-    if (res.ok && res.data) setData(res.data);
-    else message.error(res.error ?? "Failed to load the ledger");
+    if (res.ok && res.data) {
+      setData(res.data);
+      setRan({ from: f, to: t });
+    } else message.error(res.error ?? "Failed to load the ledger");
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void run(initial.from, initial.to);
+    // Runs once on arrival; a period choice or Run report runs it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function choosePreset(key: PeriodPreset) {
+    setPreset(key);
+    if (key === "custom") return;
+    const range = presetRange(key, presets);
+    setFrom(range.from);
+    setTo(range.to);
+    void run(range.from, range.to);
   }
 
   const analysis = useMemo(() => {
@@ -122,6 +145,14 @@ export default function AnalysisClient({
       return null;
     }
   }, [data, adjustments, message]);
+
+  const sheet = useMemo(
+    () =>
+      analysis
+        ? analysisSheet(analysis, { companyName, currencyCode: baseCurrency, decimals: baseDecimals, from: ran.from, to: ran.to })
+        : null,
+    [analysis, companyName, baseCurrency, baseDecimals, ran],
+  );
 
   function openEditor(adjustment: AnalysisAdjustment | null) {
     setEditing(adjustment);
@@ -167,8 +198,8 @@ export default function AnalysisClient({
     const res = await freezeAnalysisAction({
       title: values.title,
       notes: values.notes?.trim() ? values.notes.trim() : null,
-      periodStart: range[0].format("YYYY-MM-DD"),
-      periodEnd: range[1].format("YYYY-MM-DD"),
+      periodStart: ran.from,
+      periodEnd: ran.to,
       adjustments,
     });
     setFreezing(false);
@@ -214,7 +245,9 @@ export default function AnalysisClient({
       return;
     }
     setAdjustments(stored);
-    setRange([dayjs(row.period_start), dayjs(row.period_end)]);
+    setPreset("custom");
+    setFrom(dayjs(row.period_start).format("YYYY-MM-DD"));
+    setTo(dayjs(row.period_end).format("YYYY-MM-DD"));
     setViewing(null);
     message.success("Assumptions loaded into the workspace — run the report to apply them");
   }
@@ -238,7 +271,25 @@ export default function AnalysisClient({
 
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
-      <FilterBar
+      <ReportBar
+        dates={{
+          kind: "range",
+          preset,
+          from,
+          to,
+          onPreset: choosePreset,
+          onFrom: (d) => {
+            setFrom(d);
+            setPreset("custom");
+          },
+          onTo: (d) => {
+            setTo(d);
+            setPreset("custom");
+          },
+        }}
+        onRun={() => void run()}
+        loading={loading}
+        sheet={sheet}
         actions={
           canFreeze && analysis && adjustments.length > 0 ? (
             <Button type="primary" onClick={() => setFreezeOpen(true)}>
@@ -246,17 +297,7 @@ export default function AnalysisClient({
             </Button>
           ) : null
         }
-      >
-        <DatePicker.RangePicker
-          aria-label="Analysis period"
-          value={range}
-          allowClear={false}
-          onChange={(value) => value && setRange([value[0]!, value[1]!])}
-        />
-        <Button type="primary" ghost onClick={() => void run()} loading={loading}>
-          Run
-        </Button>
-      </FilterBar>
+      />
 
       {data && (
         <Card
@@ -305,7 +346,7 @@ export default function AnalysisClient({
         />
       ) : (
         <Card size="small">
-          <Empty description="Pick a period and press Run to load the actual figures." />
+          <Empty description={loading ? "Loading the actual figures…" : "The actual figures could not be loaded. Press Run report to try again."} />
         </Card>
       )}
 

@@ -23,7 +23,8 @@ const RULES: { name: string; pattern: RegExp }[] = [
     // A word, then "(s)", but not a call with an argument named s, such as
     // hasActivity(s)) or toStatementLines(s), which code carries on from.
     name: 'a noun with "(s)"',
-    pattern: /[A-Za-z]\(s\)(?!\s*(\)|,|;|\?\?|&&|\|\||\.[A-Za-z_$]|\{))/,
+    // `}` and `]` close a call too: `{sourceLabel(s)}`, `[label(s)]`.
+    pattern: /[A-Za-z]\(s\)(?!\s*(\)|,|;|\?\?|&&|\|\||\.[A-Za-z_$]|\{|\}|\]))/,
   },
   { name: "a private plural helper", pattern: /\bfunction\s+plural\s*\(|\bconst\s+plural\s*=/ },
   {

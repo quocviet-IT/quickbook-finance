@@ -6,17 +6,19 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite } from "@/lib/domain/roles";
 import { listFinancialAnalyses } from "@/lib/services/financial-analysis";
 import { listCurrencies } from "@/lib/services/reference";
+import { reportPageContext } from "@/lib/services/report-context";
 import AnalysisClient from "./AnalysisClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinancialAnalysisPage() {
   const sb = await createSupabaseServerClient();
-  const [entity, role, frozen, currencies] = await Promise.all([
+  const [entity, role, frozen, currencies, context] = await Promise.all([
     resolveActiveCompany(),
     getUserRole(),
     listFinancialAnalyses(sb, true),
     listCurrencies(sb),
+    reportPageContext(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   return (
@@ -36,6 +38,8 @@ export default async function FinancialAnalysisPage() {
         frozenReports={frozen}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        companyName={context.companyName}
+        presets={context.presets}
       />
     </div>
   );
