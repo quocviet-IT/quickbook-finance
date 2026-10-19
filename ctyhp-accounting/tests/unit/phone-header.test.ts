@@ -26,7 +26,8 @@ describe("the header on a phone", () => {
   });
 
   it("shows the company's name alone in the closed list, not a Sample tag cut to a sliver", () => {
-    expect(phoneBlock).toMatch(/\.app-shell__company-select \.ant-tag \{\s*display: none;/);
+    expect(phoneBlock).toMatch(/\.app-shell__company-select \.ant-tag,[\s\S]*?\.app-shell__company-select \.ant-select-prefix \{\s*display: none;/);
+    expect(phoneBlock).toMatch(/\.app-shell__company-select \.ant-space-item \{\s*overflow: hidden;\s*text-overflow: ellipsis;/);
   });
 
   it("wraps onto two rows, with the search field across the second", () => {

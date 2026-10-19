@@ -3817,9 +3817,25 @@ body {
   }
 
   /* The closed list shows the name alone: the Sample tag beside it was cut to
-     a sliver. The open list, drawn outside this element, still shows it. */
-  .app-shell__company-select .ant-tag {
+     a sliver, and the bank icon took room the name needs. The open list,
+     drawn outside this element, still shows the tag. A long name ends in an
+     ellipsis rather than being cut mid-letter. */
+  .app-shell__company-select .ant-tag,
+  .app-shell__company-select .ant-space-item:has(> .ant-tag),
+  .app-shell__company-select .ant-select-prefix {
     display: none;
+  }
+
+  .app-shell__company-select .ant-space,
+  .app-shell__company-select .ant-space-item {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-shell__company-select .ant-space-item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .app-shell__header-search {
