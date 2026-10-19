@@ -55,6 +55,27 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.24",
+    date: "2026-10-19",
+    headline: "The overviews say when they were worked out once, under their subtitle.",
+    changes: [
+      {
+        kind: "changed",
+        title: "As of, currency, time zone and time in the subtitle",
+        detail:
+          "Sales, Purchases, Banking and Inventory overviews opened with a box that held “As of 10/17/2026 · USD · Eastern Time” and the time on its right and nothing on its left. Those facts are now one line under each overview’s subtitle, with “Computed at” and the time at the end, and the box is gone.",
+        route: "/sales",
+      },
+      {
+        kind: "changed",
+        title: "“Computed at” once a page",
+        detail:
+          "The same time was printed up to three times on each overview: in the box, under the work list and under the checks. It is now printed once, in the subtitle. A section says it again only when its figures are more than ten minutes old, as “Last computed at … refresh before relying on it”.",
+        route: "/banking/overview",
+      },
+    ],
+  },
+  {
     version: "2.23",
     date: "2026-10-17",
     headline: "Reconcile from statement files opens from its own address.",

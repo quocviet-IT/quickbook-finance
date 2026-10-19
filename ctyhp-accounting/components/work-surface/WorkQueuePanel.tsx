@@ -17,6 +17,7 @@ import {
 import type { Assignee, ChangeAction } from "./WorkItemActions";
 import styles from "./work-surface.module.css";
 import { FreshnessNote, HealthyEmpty, UnavailableNote } from "./DataStateNote";
+import { sectionFreshnessNote } from "@/lib/domain/work-surface/surface-meta";
 
 /**
  * Loaded when a row is on screen, not when the page is.
@@ -78,6 +79,7 @@ export default function WorkQueuePanel({
   emptyState,
   filteredEmptyEvidence = "Clear the filter to see the rest of the queue.",
   unavailableFallback = "The work queue could not be loaded.",
+  freshness = "always",
   className,
 }: {
   queue: SectionEnvelope<readonly SurfaceWorkItem[]>;
@@ -100,6 +102,8 @@ export default function WorkQueuePanel({
   emptyState: QueueEmptyState;
   filteredEmptyEvidence?: string;
   unavailableFallback?: string;
+  /** "when-stale" where the page header already prints the time. */
+  freshness?: "always" | "when-stale";
   className?: string;
 }) {
   const router = useRouter();
@@ -107,6 +111,7 @@ export default function WorkQueuePanel({
   const [showAll, setShowAll] = useState(false);
 
   const filters = useMemo(() => surfaceFilters(kindFilters), [kindFilters]);
+  const queueNote = queue.data ? sectionFreshnessNote(queue, freshness) : null;
   const matching = useMemo(
     () =>
       (queue.data ?? []).filter((item) =>
@@ -215,9 +220,7 @@ export default function WorkQueuePanel({
           ) : null}
         </>
       )}
-      {queue.data ? (
-        <FreshnessNote generatedAt={queue.generatedAt} dataState={queue.dataState} timeZone={timeZone} />
-      ) : null}
+      {queueNote ? <FreshnessNote generatedAt={queue.generatedAt} dataState={queueNote} timeZone={timeZone} /> : null}
     </Card>
   );
 }
