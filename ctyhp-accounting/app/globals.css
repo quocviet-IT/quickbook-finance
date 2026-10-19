@@ -3816,6 +3816,12 @@ body {
     min-width: 0;
   }
 
+  /* The closed list shows the name alone: the Sample tag beside it was cut to
+     a sliver. The open list, drawn outside this element, still shows it. */
+  .app-shell__company-select .ant-tag {
+    display: none;
+  }
+
   .app-shell__header-search {
     order: 10;
     flex: 1 1 100%;

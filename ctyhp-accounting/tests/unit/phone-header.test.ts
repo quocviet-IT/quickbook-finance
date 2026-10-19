@@ -25,6 +25,10 @@ describe("the header on a phone", () => {
     expect(phoneBlock).toMatch(/\.app-shell__company-select \{\s*width: 100%;\s*min-width: 0;/);
   });
 
+  it("shows the company's name alone in the closed list, not a Sample tag cut to a sliver", () => {
+    expect(phoneBlock).toMatch(/\.app-shell__company-select \.ant-tag \{\s*display: none;/);
+  });
+
   it("wraps onto two rows, with the search field across the second", () => {
     expect(phoneBlock).toMatch(/\.app-shell__header\.ant-layout-header \{\s*flex-wrap: wrap;\s*height: auto;/);
     expect(phoneBlock).toMatch(/\.app-shell__header-search \{\s*order: 10;\s*flex: 1 1 100%;/);
