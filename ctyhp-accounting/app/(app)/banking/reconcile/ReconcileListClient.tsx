@@ -8,7 +8,8 @@ import { toMinor } from "@/lib/domain/money";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
-import { chosenBankId } from "@/lib/domain/reconcile-alerts-screen";
+import { chosenBankId, reconcileTableLoading } from "@/lib/domain/reconcile-alerts-screen";
+import { EmptyState } from "@/components/ui/PageStates";
 import { RECONCILE_HISTORY, RECONCILE_HISTORY_PATH } from "@/lib/domain/reconcile-history";
 import { bankStandingAction, createReconciliationAction, listReconciliationsAction } from "./actions";
 import StandingCard from "./StandingCard";
@@ -114,6 +115,26 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
     }
   };
 
+  // A company with no bank account has nothing to reconcile, and an empty
+  // account box over a spinning table said so badly: it spun for ever.
+  if (banks.length === 0) {
+    return (
+      <EmptyState
+        title="No bank account to reconcile yet"
+        description={
+          canWrite
+            ? "Reconciling checks a bank account's books against its statements. Add the account under Bank Transactions, then reconcile it here."
+            : "Reconciling checks a bank account's books against its statements. Once someone who keeps the books adds a bank account under Bank Transactions, it can be reconciled here."
+        }
+        action={
+          <Button type={canWrite ? "primary" : "default"} href="/banking">
+            Go to Bank Transactions
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <Space wrap>
@@ -164,7 +185,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
       {isEmpty ? null : (
         <Table<StatementReconciliationRow>
           rowKey="id"
-          loading={loading || (rows.length === 0 && !standingSettled)}
+          loading={reconcileTableLoading({ bankId, loading, rowCount: rows.length, standingSettled })}
           dataSource={rows}
           columns={[
             { title: "Ending date", dataIndex: "statement_ending_date", render: (value: string) => formatDate(value) },
