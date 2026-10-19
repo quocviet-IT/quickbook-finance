@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import type { ColumnType } from "antd/es/table";
 import { dateColumn, flexColumn, statusColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -64,37 +65,44 @@ export default function StockCountListClient({
   });
 
   return (
-    <DataTable<CountListRow>
-      rowKey="id"
-      dataSource={rows}
-      emptyTitle="No stock counts yet"
-      emptyDescription="A count compares the stock you have counted, at cost, with what the inventory accounts say, and posts the difference as one entry."
-      emptyAction={canWrite ? <NewCountButton today={today} /> : undefined}
-      columns={[
-        {
-          title: "Count #",
-          dataIndex: "count_number",
-          width: LIST_FIXED_WIDTHS[0],
-          render: (n: string, row) => <Link href={`/inventory/stock-count/${row.id}`}>{n}</Link>,
-        },
-        dateColumn<CountListRow>({ title: "As of", dataIndex: "as_of", width: LIST_FIXED_WIDTHS[1] }),
-        statusColumn<CountListRow>({ title: "Status", dataIndex: "status", tones: TONES, width: LIST_FIXED_WIDTHS[2] }),
-        money("Counted", "counted_minor", LIST_FIXED_WIDTHS[3]),
-        money("Was on the books", "book_minor", LIST_FIXED_WIDTHS[4]),
-        money("Adjusted by", "difference_minor", LIST_FIXED_WIDTHS[5]),
-        {
-          title: "Lines",
-          dataIndex: "lineCount",
-          width: LIST_FIXED_WIDTHS[6],
-          align: "right",
-          render: (n: number) => n.toLocaleString("en-US"),
-        },
-        flexColumn<CountListRow>({
-          title: "Posted by",
-          dataIndex: "postedByName",
-          floor: LIST_ELASTIC_FLOOR,
-        }),
-      ]}
-    />
+    <>
+      <FilterBar
+        ariaLabel="Stock counts"
+        resultCount={rows.length}
+        actions={canWrite ? <NewCountButton today={today} /> : undefined}
+      />
+      <DataTable<CountListRow>
+        rowKey="id"
+        dataSource={rows}
+        emptyTitle="No stock counts yet"
+        emptyDescription="A count compares the stock you have counted, at cost, with what the inventory accounts say, and posts the difference as one entry."
+        emptyAction={canWrite ? <NewCountButton today={today} /> : undefined}
+        columns={[
+          {
+            title: "Count #",
+            dataIndex: "count_number",
+            width: LIST_FIXED_WIDTHS[0],
+            render: (n: string, row) => <Link href={`/inventory/stock-count/${row.id}`}>{n}</Link>,
+          },
+          dateColumn<CountListRow>({ title: "As of", dataIndex: "as_of", width: LIST_FIXED_WIDTHS[1] }),
+          statusColumn<CountListRow>({ title: "Status", dataIndex: "status", tones: TONES, width: LIST_FIXED_WIDTHS[2] }),
+          money("Counted", "counted_minor", LIST_FIXED_WIDTHS[3]),
+          money("Was on the books", "book_minor", LIST_FIXED_WIDTHS[4]),
+          money("Adjusted by", "difference_minor", LIST_FIXED_WIDTHS[5]),
+          {
+            title: "Lines",
+            dataIndex: "lineCount",
+            width: LIST_FIXED_WIDTHS[6],
+            align: "right",
+            render: (n: number) => n.toLocaleString("en-US"),
+          },
+          flexColumn<CountListRow>({
+            title: "Posted by",
+            dataIndex: "postedByName",
+            floor: LIST_ELASTIC_FLOOR,
+          }),
+        ]}
+      />
+    </>
   );
 }

@@ -902,6 +902,21 @@ body {
   white-space: nowrap;
 }
 
+/* A page form's buttons (components/ui/FormActions.tsx): under the form, primary first. */
+.accounting-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ob-border-subtle);
+}
+
+.accounting-form-actions__note {
+  color: var(--ob-text-secondary);
+}
+
 /*
  * A report bar (components/reports/ReportBar.tsx): the dates, filters and Run
  * report flow on the same lines as the exports, and the exports keep to the
@@ -2176,6 +2191,20 @@ body {
   align-items: center;
   padding-inline-end: 14px;
   border-inline-end: 1px solid var(--ob-chrome-border);
+}
+
+/*
+ * The theme button's word ("Light", "Dark", "System"), where the header has
+ * room for it. Below that the button is its icon, and the tooltip says it.
+ */
+.app-shell__theme-label {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .app-shell__theme-label {
+    display: inline;
+  }
 }
 
 .app-shell__new-button.ant-btn {

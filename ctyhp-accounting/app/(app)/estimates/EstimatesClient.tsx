@@ -1,8 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Dropdown, Input, type MenuProps, type TableColumnsType } from "antd";
-import { MoreOutlined, PlusOutlined } from "@ant-design/icons";
+import { App, Button, Input, type MenuProps, type TableColumnsType } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
 import { dateColumn, flexColumn, statusColumn } from "@/components/ui/columns";
@@ -33,6 +33,7 @@ import {
 import EstimateFormModal, { type ConversionTarget } from "./EstimateFormModal";
 import { ESTIMATE_COLUMN_WIDTH, ESTIMATE_ELASTIC_FLOOR, ESTIMATE_STATE_TONES } from "./estimate-columns";
 import styles from "./estimates.module.css";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
 
 export default function EstimatesClient({
   initialCreateOpen,
@@ -238,14 +239,12 @@ export default function EstimatesClient({
           menu.push({ key: "delete", label: "Delete", danger: true, onClick: () => confirmDelete(row) });
         }
         return (
-          <Dropdown menu={{ items: menu, style: { minWidth: 176 } }} trigger={["click"]}>
-            <Button
-              size="small"
-              icon={<MoreOutlined />}
-              loading={busyId === row.id}
-              aria-label={`Actions for ${row.estimate_number}`}
-            />
-          </Dropdown>
+          <RowActionsMenu
+            items={menu}
+            minWidth={176}
+            loading={busyId === row.id}
+            label={`Actions for ${row.estimate_number}`}
+          />
         );
       },
     },

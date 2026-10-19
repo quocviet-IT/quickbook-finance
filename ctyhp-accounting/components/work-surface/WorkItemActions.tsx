@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
-import { App, Button, DatePicker, Dropdown, Input, Modal, Select } from "antd";
+import { App, DatePicker, Input, Modal, Select } from "antd";
 import type { MenuProps } from "antd";
-import { MoreOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
   transitionProblem,
@@ -14,6 +13,7 @@ import type {
   WorkItemActionResult,
   WorkItemChange,
 } from "@/lib/services/work-surface/change-work-item";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
 
 export interface Assignee {
   id: string;
@@ -128,9 +128,7 @@ export default function WorkItemActions({
 
   return (
     <>
-      <Dropdown menu={{ items: menu, style: { minWidth: 190 } }} trigger={["click"]}>
-        <Button size="small" icon={<MoreOutlined />} aria-label={`Actions for ${item.title}`} />
-      </Dropdown>
+      <RowActionsMenu items={menu} minWidth={190} label={`Actions for ${item.title}`} />
 
       <Modal
         title="Who is doing this?"

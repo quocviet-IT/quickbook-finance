@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Card, Form, Input, InputNumber, Space, Typography } from "antd";
+import { Alert, App, Button, Card, Form, Input, InputNumber, Space } from "antd";
+import FormActions from "@/components/ui/FormActions";
 import type { WorkPolicy } from "@/lib/domain/accounting-dashboard/policy";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import { saveWorkPolicyAction } from "./actions";
@@ -129,14 +130,13 @@ export default function WorkPolicyClient({
           </Form.Item>
 
           {canManage ? (
-            <Button type="primary" loading={saving} onClick={() => void submit()}>
-              Save the policy
-            </Button>
+            <FormActions>
+              <Button type="primary" loading={saving} onClick={() => void submit()}>
+                Save the policy
+              </Button>
+            </FormActions>
           ) : (
-            <Typography.Text type="secondary">
-              Only an admin can change this. What is set here decides what every accountant in the
-              company is told is urgent.
-            </Typography.Text>
+            <FormActions note="Only an admin can change this. What is set here decides what every accountant in the company is told is urgent." />
           )}
         </Form>
       </Card>

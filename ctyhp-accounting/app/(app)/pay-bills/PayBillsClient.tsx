@@ -24,6 +24,7 @@ import { allocateAcrossBills } from "@/lib/domain/payables";
 import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
 import PayRunPanel from "@/components/payables/PayRunPanel";
+import FilterBar from "@/components/ui/FilterBar";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
@@ -179,13 +180,23 @@ export default function PayBillsClient({
         }
       />
 
-      <Space style={{ marginTop: 24, marginBottom: 16 }}>
-        {canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-            Pay bills
-          </Button>
-        )}
-      </Space>
+      <div style={{ marginTop: 24 }}>
+        {/* Two lists on one page: the pay run above, the payments made here.
+            The bar names which one it heads. */}
+        <FilterBar
+          ariaLabel="Bill payments"
+          resultCount={payments.length}
+          actions={
+            canWrite ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+                Pay bills
+              </Button>
+            ) : undefined
+          }
+        >
+          <Typography.Text strong>Payments made</Typography.Text>
+        </FilterBar>
+      </div>
       <Table<BillPaymentRow & { vendor_name: string }>
         rowKey="id"
         dataSource={payments}

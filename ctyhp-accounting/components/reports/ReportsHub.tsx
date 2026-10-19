@@ -24,7 +24,7 @@ import {
   SwapOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Input, Select, Tabs, Typography } from "antd";
+import { Button, Card, Input, Select, Tabs, Tooltip, Typography } from "antd";
 import {
   REPORT_CATALOG,
   REPORT_GROUPS,
@@ -96,16 +96,18 @@ function ReportCard({
         <span className="report-hub-card__icon" aria-hidden="true">
           {REPORT_ICONS[report.id] ?? <FileTextOutlined />}
         </span>
-        <Button
-          className="report-hub-card__favorite"
-          type="text"
-          icon={favorite ? <StarFilled /> : <StarOutlined />}
-          aria-label={`${favorite ? "Remove" : "Add"} ${report.title} ${
-            favorite ? "from" : "to"
-          } favorites`}
-          aria-pressed={favorite}
-          onClick={() => onFavorite(report.id)}
-        />
+        <Tooltip title={favorite ? "Remove from favorites" : "Add to favorites"}>
+          <Button
+            className="report-hub-card__favorite"
+            type="text"
+            icon={favorite ? <StarFilled /> : <StarOutlined />}
+            aria-label={`${favorite ? "Remove" : "Add"} ${report.title} ${
+              favorite ? "from" : "to"
+            } favorites`}
+            aria-pressed={favorite}
+            onClick={() => onFavorite(report.id)}
+          />
+        </Tooltip>
       </div>
       <Typography.Title level={4} className="report-hub-card__title">
         <Link href={report.href} onClick={() => onOpen(report.id)}>

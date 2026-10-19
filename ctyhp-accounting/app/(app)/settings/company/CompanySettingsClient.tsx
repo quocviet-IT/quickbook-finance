@@ -14,6 +14,7 @@ import {
   Typography,
 } from "antd";
 import { timeZoneLabel } from "@/lib/format";
+import FormActions from "@/components/ui/FormActions";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
 import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
@@ -205,10 +206,10 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
                 <Input.TextArea rows={5} maxLength={4000} showCount />
               </Form.Item>
             </Space>
-            <Space>
+            <FormActions>
               <Button type="primary" onClick={submit}>Save new version</Button>
               <Button onClick={() => setEditing(false)}>Cancel</Button>
-            </Space>
+            </FormActions>
           </Form>
         </Card>
       )}

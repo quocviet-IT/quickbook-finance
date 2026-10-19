@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Card, Form, InputNumber, Space, Typography } from "antd";
+import { Alert, App, Button, Card, Form, InputNumber, Space } from "antd";
+import FormActions from "@/components/ui/FormActions";
 import type { PurchasingConfigRow } from "@/lib/db/types";
 import { setPurchasingConfigAction } from "./actions";
 
@@ -69,11 +70,13 @@ export default function PurchasingConfigClient({
             <InputNumber min={0} max={100} step={0.25} precision={2} style={{ width: 200 }} />
           </Form.Item>
           {canEdit ? (
-            <Button type="primary" loading={saving} onClick={submit}>
-              Save tolerances
-            </Button>
+            <FormActions>
+              <Button type="primary" loading={saving} onClick={submit}>
+                Save tolerances
+              </Button>
+            </FormActions>
           ) : (
-            <Typography.Text type="secondary">Only an admin can change these tolerances.</Typography.Text>
+            <FormActions note="Only an admin can change these tolerances." />
           )}
         </Form>
       </Card>

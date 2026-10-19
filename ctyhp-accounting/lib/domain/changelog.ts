@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.28",
+    date: "2026-10-19",
+    headline: "The main button is in the same place on every page, and every icon button says what it does.",
+    changes: [
+      {
+        kind: "changed",
+        title: "The main button in the same place",
+        detail:
+          "On a list, the main button (New journal entry, Pay bills, New rule, New reconciliation, Record payment, New rate, New company, New count) is now at the right end of the bar above the table, where New invoice and New bill already were. It used to sit in a row of its own above the table on Journal, Pay Bills, Bank Rules, Reconcile, Sales Tax and Companies, and in the page heading on Stock Count. On a settings page, Save is under the form, first in its row, with Cancel or Discard beside it.",
+        route: "/journal",
+      },
+      {
+        kind: "changed",
+        title: "Approval Policies has one Save changes button",
+        detail:
+          "Each policy used to be saved on its own, from a floppy-disk icon at the end of its row. Change as many policies as you like; each changed row is marked Unsaved, and Save changes under the table saves them all. Discard changes puts them back. Leaving the page with changes unsaved asks first.",
+        route: "/settings/approvals",
+      },
+      {
+        kind: "changed",
+        title: "Icon buttons say what they do",
+        detail:
+          "The ⋮ button at the end of a row on Invoices, Bills, Estimates, Payments, Users and the work queues now says More actions when you point at it. The theme button shows a sun in the light theme instead of a light bulb, and on a wide screen it says Light, Dark or System beside the icon. The star on a report card, the delete button on a stock count line and the remove button on a file you attach to a report say what they do too.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "2.27",
     date: "2026-10-19",
     headline: "Every report has the same bar, opens already run, and exports the same way.",

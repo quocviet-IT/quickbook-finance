@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Alert, App, Button, Space, Table, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import StatusTag from "@/components/ui/StatusTag";
+import FilterBar from "@/components/ui/FilterBar";
 import NewCompanyModal from "./NewCompanyModal";
 import {
   getCompanyRequestAction,
@@ -102,13 +103,18 @@ export default function CompaniesClient({
 
   return (
     <div>
-      {canCreate ? (
-        <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-            New company
-          </Button>
-        </Space>
-      ) : (
+      <FilterBar
+        ariaLabel="Companies"
+        resultCount={companies.length}
+        actions={
+          canCreate ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New company
+            </Button>
+          ) : undefined
+        }
+      />
+      {canCreate ? null : (
         <Alert
           type="info"
           showIcon

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { App, Button, Space, Switch, Tag, Tooltip, Typography, type TableColumnsType } from "antd";
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -185,13 +186,20 @@ export default function RulesClient({
 
   return (
     <div>
-      {canWrite ? (
-        <Space style={{ marginBottom: 12 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing({ id: null, values: EMPTY_RULE })}>
-            New rule
-          </Button>
-        </Space>
-      ) : null}
+      <FilterBar
+        ariaLabel="Bank rules"
+        resultCount={rules.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing({ id: null, values: EMPTY_RULE })}>
+              New rule
+            </Button>
+          ) : undefined
+        }
+      >
+        {/* Named like the sections above it on the page: Pairs, Cards and loans, Related companies. */}
+        <Typography.Text strong>Rules</Typography.Text>
+      </FilterBar>
       <DataTable<RuleListRow>
         rowKey="id"
         columns={columns}

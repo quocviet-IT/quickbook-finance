@@ -5,7 +5,7 @@ import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeleteOutlined, PlusOutlined, PrinterOutlined } from "@ant-design/icons";
-import { Alert, App, Button, DatePicker, Input, InputNumber, Space } from "antd";
+import { Alert, App, Button, DatePicker, Input, InputNumber, Space, Tooltip } from "antd";
 import dayjs from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
 import ReportTable, { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
@@ -399,14 +399,16 @@ function DraftCount({
             width: EDITOR_FIXED_WIDTHS[4],
             align: "center",
             render: (_: unknown, row, index) => (
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                aria-label={`Delete line ${base(index)}`}
-                onClick={() => remove(row.key)}
-              />
+              <Tooltip title="Delete this line">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  aria-label={`Delete line ${base(index)}`}
+                  onClick={() => remove(row.key)}
+                />
+              </Tooltip>
             ),
           },
         ]}
