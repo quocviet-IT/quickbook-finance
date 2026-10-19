@@ -113,7 +113,7 @@ export default function InventoryReviewClient({
       fileName: sanitizeExportFileName(`inventory-review-${ran.asOf}`),
       companyName,
       title: "Inventory Review",
-      subtitle: `As of ${formatDate(ran.asOf)} · ${ran.windowDays}-day window`,
+      subtitle: `As of ${formatDate(ran.asOf)} Â· ${ran.windowDays}-day window`,
       currencyCode: baseCurrency,
       columns: [
         { key: "status", header: "Status", kind: "text" },
