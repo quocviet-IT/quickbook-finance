@@ -262,6 +262,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.metaPart {
+  white-space: nowrap;
+}
+
 /* --- The two-section surface -------------------------------------------- */
 /* Used by the screens whose job is "here is the work, here is what is true
    about it". The work takes eight columns and the checks take four; there is no

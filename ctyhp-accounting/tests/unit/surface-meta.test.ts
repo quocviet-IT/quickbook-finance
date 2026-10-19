@@ -79,6 +79,11 @@ describe("the four overviews", () => {
     }
   });
 
+  it("keep each fact whole on a phone, so the time never breaks before AM or PM", () => {
+    expect(read("components/work-surface/SurfaceMeta.tsx")).toContain("className={styles.metaPart}");
+    expect(read("components/work-surface/work-surface.module.css")).toMatch(/\.metaPart \{\s*white-space: nowrap;/);
+  });
+
   it("no longer draw a boxed strip of their own", () => {
     expect(existsSync(join(process.cwd(), "components/work-surface/SurfaceStatusStrip.tsx"))).toBe(false);
     const screen = read("components/work-surface/SurfaceScreen.tsx");

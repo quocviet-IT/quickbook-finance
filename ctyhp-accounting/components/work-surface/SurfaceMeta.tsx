@@ -31,7 +31,16 @@ export default function SurfaceMeta({
   const line = generatedAt ? [...facts, `Computed at ${formatTime(generatedAt, timeZone)}`] : [...facts];
   return (
     <div className={styles.meta}>
-      <span>{line.join(" · ")}</span>
+      <span>
+        {/* Each fact keeps its words together, so a phone breaks the line
+            between facts and never inside "9:27 PM". */}
+        {line.map((part, index) => (
+          <span key={part}>
+            {index > 0 ? " · " : null}
+            <span className={styles.metaPart}>{part}</span>
+          </span>
+        ))}
+      </span>
       {unavailable.length > 0 ? (
         <Tag color="warning" icon={<WarningOutlined />}>
           {unavailable.join(", ")} unavailable
