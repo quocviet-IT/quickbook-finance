@@ -2103,6 +2103,12 @@ body {
   max-width: 320px;
 }
 
+/* Measured by GlobalSearch to choose a hint that fits (components/GlobalSearch.tsx). */
+.global-search__box {
+  width: 100%;
+  min-width: 0;
+}
+
 .global-search.ant-select {
   width: 100%;
   min-height: 40px;
@@ -3843,8 +3849,17 @@ body {
 /* Which company's books are open. First thing in the header, because on a
    system holding several sets of books it is the most important fact on the
    screen. */
+/*
+ * The company list keeps its width; the search field beside it is what gives
+ * when the header is short of room. With `min-width: 0` and the default
+ * flex-shrink, this box was squeezed narrower than the 230px list inside it, the
+ * list ran out over the gap, and it sat on top of the search field at 1024,
+ * 1280 and 1440 — once the theme button started saying Light or Dark (2.28)
+ * and took the last of the slack. Phones set their own flex below.
+ */
 .app-shell__header-company {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   margin-right: 12px;
   min-width: 0;
