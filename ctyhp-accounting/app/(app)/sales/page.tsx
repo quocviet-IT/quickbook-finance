@@ -1,4 +1,6 @@
 import PageHeader from "@/components/PageHeader";
+import SurfaceMeta from "@/components/work-surface/SurfaceMeta";
+import { surfaceFacts, surfaceSections } from "@/lib/domain/work-surface/surface-meta";
 import { getSessionUser, getUserRole } from "@/lib/auth";
 import { canWrite } from "@/lib/domain/roles";
 import type { ActorRow } from "@/lib/db/types";
@@ -22,6 +24,7 @@ export default async function SalesOverviewPage() {
       <PageHeader
         title="Sales overview"
         description="Who owes money, and what is being done about it."
+        meta={<SurfaceMeta facts={surfaceFacts(data.context)} sections={surfaceSections(data)} timeZone={data.context.timeZone} />}
       />
       <SalesSurface
         data={data}

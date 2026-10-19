@@ -249,44 +249,21 @@
   width: max-content;
 }
 
-/* --- Status strip ------------------------------------------------------- */
-/* One strip, not a row of cards: this is metadata about the page, and giving it
-   card weight is what pushed the actual work below the fold before. */
-.strip {
+/* --- The facts under an overview's subtitle ----------------------------- */
+/* Part of the page header, not a box: a boxed strip with right-aligned facts
+   left its whole left half empty and repeated the time the sections print. */
+.meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 20px;
-  padding: 10px 16px;
-  border: 1px solid var(--ob-panel-lineFaint);
-  border-radius: 8px;
-  background: var(--ob-surface-card);
-}
-
-.stripLead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  font-weight: 600;
-  color: var(--ob-text-heading);
-}
-
-.stripFacts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  margin-left: auto;
+  gap: 6px 10px;
   font-size: 13px;
   color: var(--ob-text-caption);
   font-variant-numeric: tabular-nums;
 }
 
-.stripFact {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.metaPart {
+  white-space: nowrap;
 }
 
 /* --- The two-section surface -------------------------------------------- */
@@ -339,7 +316,8 @@
 }
 
 .skeletonStrip {
-  height: 44px;
+  height: 18px;
+  width: min(420px, 100%);
 }
 
 .skeletonPanel {
