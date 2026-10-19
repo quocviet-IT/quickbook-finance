@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Dropdown, Tooltip, type MenuProps } from "antd";
-import { BulbOutlined, CheckOutlined, DesktopOutlined, MoonOutlined } from "@ant-design/icons";
+import { CheckOutlined, DesktopOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
 import { useTheme } from "./ThemeProvider";
 import type { ThemeMode } from "@/lib/domain/theme";
 
@@ -19,11 +19,23 @@ import type { ThemeMode } from "@/lib/domain/theme";
  * "Match my system" is a mode rather than a third icon: when it is chosen the
  * button shows whichever theme the machine has picked, because that is what
  * the reader is looking at, and the menu is where the distinction lives.
+ *
+ * The UI review of 2026-10-19 read the light icon as a light bulb, which is
+ * what it was (BulbOutlined), and found the button had no word on it. It is a
+ * sun now, and on a screen wide enough it says which mode it is in; narrower,
+ * the word is in the tooltip.
  */
 const LABEL: Record<ThemeMode, string> = {
   light: "Light",
   dark: "Dark",
   system: "Match my system",
+};
+
+/** The word on the button itself, where there is room for one short word. */
+const SHORT_LABEL: Record<ThemeMode, string> = {
+  light: "Light",
+  dark: "Dark",
+  system: "System",
 };
 
 export default function ThemeToggle() {
@@ -34,8 +46,7 @@ export default function ThemeToggle() {
     // The tick marks the chosen *mode*, not the theme showing. Someone on
     // "system" needs to see that they are on system, even while the button
     // beside it shows a moon.
-    icon:
-      value === "light" ? <BulbOutlined /> : value === "dark" ? <MoonOutlined /> : <DesktopOutlined />,
+    icon: value === "light" ? <SunOutlined /> : value === "dark" ? <MoonOutlined /> : <DesktopOutlined />,
     label: (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 132 }}>
         <span style={{ flex: 1 }}>{LABEL[value]}</span>
@@ -47,12 +58,16 @@ export default function ThemeToggle() {
 
   return (
     <Dropdown menu={{ items, selectedKeys: [mode] }} placement="bottomRight" trigger={["click"]}>
-      <Tooltip title={`Theme: ${LABEL[mode]}`} placement="bottom">
+      <Tooltip title={`Color theme: ${LABEL[mode]}`} placement="bottom">
         <Button
           type="text"
           aria-label={`Color theme: ${LABEL[mode]}. Choose another.`}
-          icon={theme === "dark" ? <MoonOutlined /> : <BulbOutlined />}
-        />
+          icon={theme === "dark" ? <MoonOutlined /> : <SunOutlined />}
+        >
+          <span className="app-shell__theme-label" aria-hidden="true">
+            {SHORT_LABEL[mode]}
+          </span>
+        </Button>
       </Tooltip>
     </Dropdown>
   );

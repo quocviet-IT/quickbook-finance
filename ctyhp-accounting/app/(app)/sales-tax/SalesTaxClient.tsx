@@ -23,6 +23,7 @@ import RecordTaxPaymentModal from "@/components/sales-tax/RecordTaxPaymentModal"
 import { LIABILITY_REPORT_LINK_LABEL } from "@/lib/domain/sales-tax-liability";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import StatusTag from "@/components/ui/StatusTag";
+import FilterBar from "@/components/ui/FilterBar";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -138,16 +139,21 @@ export default function SalesTaxClient(props: Props) {
           label: "Liability",
           children: (
             <>
-              <Space style={{ marginBottom: 16 }} wrap>
+              <FilterBar
+                ariaLabel="Liability dates and actions"
+                actions={
+                  props.canWrite ? (
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => setPayOpen(true)}>Record payment</Button>
+                  ) : undefined
+                }
+              >
                 <DatePicker.RangePicker
+                  aria-label="Liability date range"
                   value={range}
                   onChange={(r) => { if (r && r[0] && r[1]) { const rr: [dayjs.Dayjs, dayjs.Dayjs] = [r[0], r[1]]; setRange(rr); reloadLiability(rr); } }}
                 />
-                {props.canWrite && (
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => setPayOpen(true)}>Record payment</Button>
-                )}
                 <Link href="/reports/sales-tax-liability">{LIABILITY_REPORT_LINK_LABEL}</Link>
-              </Space>
+              </FilterBar>
               {/* A return is filed per state, so the state total comes first and
                   the codes behind it stay below. */}
               <Table<StateLiabilityLine>
@@ -232,9 +238,14 @@ export default function SalesTaxClient(props: Props) {
           label: "Tax rates",
           children: (
             <>
-              <Space style={{ marginBottom: 16 }}>
-                {props.isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => openTaxCode(null)}>New rate</Button>}
-              </Space>
+              <FilterBar
+                ariaLabel="Tax rates"
+                actions={
+                  props.isAdmin ? (
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openTaxCode(null)}>New rate</Button>
+                  ) : undefined
+                }
+              />
               <Table<TaxCodeRow>
                 rowKey="id"
                 dataSource={ratesByState}

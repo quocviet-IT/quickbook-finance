@@ -11,7 +11,6 @@ import {
   Button,
   DatePicker,
   Form,
-  Dropdown,
   Input,
   InputNumber,
   Modal,
@@ -20,7 +19,7 @@ import {
   Tag,
   type MenuProps,
 } from "antd";
-import { DeleteOutlined, MoreOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
 import { PAID_LABELS } from "@/lib/domain/status-label";
@@ -47,6 +46,7 @@ import {
 import WriteOffModal from "../settlements/WriteOffModal";
 import SettlementHistory from "@/components/settlements/SettlementHistory";
 import type { SettlementEvent } from "@/lib/domain/settlement";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
 
 interface LineForm {
   description?: string;
@@ -401,13 +401,7 @@ export default function BillsClient({
                     </Button>
                   )}
                   {menu.length ? (
-                    <Dropdown menu={{ items: menu, style: { minWidth: 148 } }} trigger={["click"]}>
-                      <Button
-                        size="small"
-                        icon={<MoreOutlined />}
-                        aria-label={`Actions for ${r.bill_number ?? "draft bill"}`}
-                      />
-                    </Dropdown>
+                    <RowActionsMenu items={menu} label={`Actions for ${r.bill_number ?? "draft bill"}`} />
                   ) : null}
                 </Space>
               ) : null;

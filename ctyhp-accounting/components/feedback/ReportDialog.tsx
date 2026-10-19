@@ -3,7 +3,7 @@
 import { plural } from "@/lib/format";
 import { useCallback, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { App, Alert, Button, Input, List, Modal, Radio, Space, Spin, Typography, Upload } from "antd";
+import { App, Alert, Button, Input, List, Modal, Radio, Space, Spin, Tooltip, Typography, Upload } from "antd";
 import { BugOutlined, DeleteOutlined, PaperClipOutlined } from "@ant-design/icons";
 import {
   FEEDBACK_FREQUENCIES,
@@ -409,17 +409,18 @@ export default function ReportDialog({
               renderItem={(file, index) => (
                 <List.Item
                   actions={[
-                    <Button
-                      key="remove"
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      aria-label={`Remove ${file.name}`}
-                      onClick={() =>
-                        setFiles((current) => current.filter((_, i) => i !== index))
-                      }
-                    />,
+                    <Tooltip key="remove" title="Remove this file">
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() =>
+                          setFiles((current) => current.filter((_, i) => i !== index))
+                        }
+                      />
+                    </Tooltip>,
                   ]}
                 >
                   <Space size="small">

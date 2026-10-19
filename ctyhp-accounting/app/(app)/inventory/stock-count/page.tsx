@@ -5,7 +5,6 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { listActors } from "@/lib/services/access";
 import { reportPageContext } from "@/lib/services/report-context";
 import { listStockCountSummaries } from "@/lib/services/stock-count";
-import NewCountButton from "./NewCountButton";
 import StockCountListClient, { type CountListRow } from "./StockCountListClient";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +29,6 @@ export default async function StockCountPage() {
         meta={<ReportEntityBadge companyName={ctx.companyName} isSample={ctx.isSample} />}
         title="Stock Count"
         description="What stock is on hand and what it is carried at."
-        actions={writer ? <NewCountButton today={ctx.today} /> : undefined}
       />
       <StockCountListClient
         rows={rows}

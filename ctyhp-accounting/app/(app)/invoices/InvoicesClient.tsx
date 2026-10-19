@@ -11,7 +11,6 @@ import {
   DatePicker,
   Form,
   Input,
-  Dropdown,
   Modal,
   Select,
   Space,
@@ -22,7 +21,6 @@ import {
   type TableColumnsType,
 } from "antd";
 import {
-  MoreOutlined,
   PaperClipOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
@@ -83,6 +81,7 @@ import {
 } from "./actions";
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
 
 interface LineForm {
   description?: string;
@@ -710,13 +709,7 @@ export default function InvoicesClient({
                 Issue
               </Button>
             )}
-            <Dropdown menu={{ items: menu, style: { minWidth: 148 } }} trigger={["click"]}>
-              <Button
-                size="small"
-                icon={<MoreOutlined />}
-                aria-label={`Actions for ${r.invoice_number ?? "draft invoice"}`}
-              />
-            </Dropdown>
+            <RowActionsMenu items={menu} label={`Actions for ${r.invoice_number ?? "draft invoice"}`} />
           </Space>
         );
       },

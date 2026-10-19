@@ -4,7 +4,6 @@ import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import {
   Button,
-  Dropdown,
   Input,
   Select,
   Space,
@@ -18,7 +17,6 @@ import { APPLIED_LABELS, humanizeStatus } from "@/lib/domain/status-label";
 import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import {
   DeleteOutlined,
-  MoreOutlined,
   PaperClipOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
@@ -44,6 +42,7 @@ import VoidPaymentModal from "./VoidPaymentModal";
 import DeletePaymentModal from "./DeletePaymentModal";
 import RefundModal from "../settlements/RefundModal";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
 
 export type PaymentListRow = PaymentRow & { customer_name: string };
 
@@ -244,13 +243,7 @@ export default function PaymentsClient({
               }
             />
           ) : null}
-          <Dropdown menu={{ items: actionsFor(r) }} trigger={["click"]}>
-            <Button
-              size="small"
-              icon={<MoreOutlined />}
-              aria-label={`Actions for ${r.payment_number ?? "payment"}`}
-            />
-          </Dropdown>
+          <RowActionsMenu items={actionsFor(r)} label={`Actions for ${r.payment_number ?? "payment"}`} />
         </Space>
       ),
     },

@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import StatusTag from "@/components/ui/StatusTag";
+import FilterBar from "@/components/ui/FilterBar";
 import { toMinor } from "@/lib/domain/money";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
@@ -137,7 +139,21 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space wrap>
+      <FilterBar
+        ariaLabel="Bank account and reconciliation actions"
+        actions={
+          canWrite ? (
+            <>
+              <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
+                From statement files
+              </Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!bankId}>
+                New reconciliation
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
         <Select
           style={{ width: 320 }}
           aria-label="Bank account"
@@ -145,19 +161,9 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
           onChange={choose}
           options={banks.map((b) => ({ value: b.id, label: b.label }))}
         />
-        {canWrite && (
-          <Button type="primary" onClick={() => setOpen(true)} disabled={!bankId}>
-            New reconciliation
-          </Button>
-        )}
-        {canWrite && (
-          <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
-            From statement files
-          </Button>
-        )}
         {/* Every account's lines not yet reconciled, and bringing an account's history forward (2.03). */}
         <Link href={RECONCILE_HISTORY_PATH}>{RECONCILE_HISTORY}</Link>
-      </Space>
+      </FilterBar>
       {bank ? (
         <StatementAlertsPanel
           bankAccountId={bank.id}

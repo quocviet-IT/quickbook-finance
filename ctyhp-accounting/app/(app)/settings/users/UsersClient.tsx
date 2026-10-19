@@ -3,9 +3,9 @@ import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Dropdown, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { MenuProps } from "antd";
-import { MoreOutlined, PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
@@ -14,6 +14,7 @@ import { createUserAction, setUserRoleAction, setUserStatusAction } from "./acti
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, type StatusLook } from "@/lib/domain/status-label";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
 
 const STATUS_LOOKS: Record<string, StatusLook> = {
   invited: { tone: "neutral", label: "Pending" },
@@ -236,9 +237,7 @@ export default function UsersClient({
                 });
               }
               return menu.length ? (
-                <Dropdown menu={{ items: menu, style: { minWidth: 148 } }} trigger={["click"]}>
-                  <Button size="small" icon={<MoreOutlined />} aria-label={`Actions for ${r.email}`} />
-                </Dropdown>
+                <RowActionsMenu items={menu} label={`Actions for ${r.email}`} />
               ) : null;
             },
           },

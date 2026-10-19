@@ -9,6 +9,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import { toMinor } from "@/lib/domain/money";
 import { formatMoney, formatDate, plural } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
+import FilterBar from "@/components/ui/FilterBar";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
@@ -205,12 +206,17 @@ export default function JournalClient({
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Space wrap>
-        {canWrite && (
-          <Button type="primary" onClick={() => setOpen(true)}>
-            New journal entry
-          </Button>
-        )}
+      <FilterBar
+        ariaLabel="Journal dates and actions"
+        resultCount={entries.length}
+        actions={
+          canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New journal entry
+            </Button>
+          ) : undefined
+        }
+      >
         <DatePicker.RangePicker
           aria-label="Entry date range"
           value={range}
@@ -220,7 +226,7 @@ export default function JournalClient({
             void load(next);
           }}
         />
-      </Space>
+      </FilterBar>
       {total > entries.length && (
         <Alert
           type="warning"
