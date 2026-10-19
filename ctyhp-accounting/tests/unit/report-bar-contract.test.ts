@@ -79,4 +79,19 @@ describe("the report bar", () => {
     });
     expect(bespoke).toEqual([]);
   });
+
+  it("lets the exports share the controls' lines on every bar", () => {
+    // As a block of their own beside the controls, the five exports held their
+    // width and pushed Run report onto a row of its own.
+    const bars = [...sources, ["components/reports/ReportBar.tsx", readFileSync(join(root, "components/reports/ReportBar.tsx"), "utf8")]].filter(
+      ([, source]) => /<FilterBar\b/.test(source),
+    );
+    expect(bars.map(([file]) => file)).toEqual(expect.arrayContaining(["components/reports/ReportBar.tsx", "components/reports/ReportToolbar.tsx"]));
+    expect(bars.filter(([, source]) => !/className=\{REPORT_BAR_CLASS\}/.test(source)).map(([file]) => file)).toEqual([]);
+  });
+
+  it("opens Transaction List on This month, read as every other report reads it", () => {
+    // It ran to the month's last day, which no preset is, so it opened on Custom.
+    expect(sources.get("app/(app)/reports/transactions/page.tsx")).toMatch(/presetRange\("month"/);
+  });
 });

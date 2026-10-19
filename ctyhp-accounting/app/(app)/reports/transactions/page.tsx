@@ -5,6 +5,7 @@ import { getTransactionList } from "@/lib/services/reports";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/format";
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
+import { presetRange } from "@/lib/domain/report-presets";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { reportPageContext } from "@/lib/services/report-context";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
@@ -13,12 +14,14 @@ import TransactionListClient from "./TransactionListClient";
 
 export const dynamic = "force-dynamic";
 
-/** Default range: the month being worked on, which is what people reconcile. */
-function defaultRange(today: string): { from: string; to: string } {
-  const [year, month] = today.split("-").map(Number);
-  const from = new Date(Date.UTC(year, month - 1, 1));
-  const to = new Date(Date.UTC(year, month, 0));
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+/**
+ * Default range: the month being worked on, which is what people reconcile —
+ * read as "This month" reads on every other report, the first of the month to
+ * today. It used to run to the month's last day, so the Period picker could
+ * not name it and opened on Custom.
+ */
+function defaultRange(today: string, fiscalStartMonth: number) {
+  return presetRange("month", { today, fiscalStartMonth, firstEntryDate: null, lastEntryDate: null });
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,7 +34,7 @@ export default async function TransactionListPage({
   const params = await searchParams;
   const sb = await createSupabaseServerClient();
   const settings = await getCurrentCompanySettings(sb);
-  const fallback = defaultRange(todayInTimeZone(settings?.time_zone || DEFAULT_TIME_ZONE));
+  const fallback = defaultRange(todayInTimeZone(settings?.time_zone || DEFAULT_TIME_ZONE), settings?.fiscal_year_start_month ?? 1);
   const from = ISO_DATE.test(params.from ?? "") ? params.from! : fallback.from;
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : fallback.to;
 

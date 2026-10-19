@@ -902,6 +902,33 @@ body {
   white-space: nowrap;
 }
 
+/*
+ * A report bar (components/reports/ReportBar.tsx): the dates, filters and Run
+ * report flow on the same lines as the exports, and the exports keep to the
+ * right of whichever line they land on.
+ *
+ * As two blocks side by side, the five export buttons held their width and
+ * squeezed the controls, so Run report stood alone on a second row under a
+ * half-empty first one on Cash Flow, Inventory Review and the statements, and
+ * Transaction List broke into four short rows. Phones keep the stacked bar.
+ */
+@media (min-width: 576px) {
+  .accounting-filter-bar--report {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .accounting-filter-bar--report > .accounting-filter-bar__controls {
+    display: contents;
+  }
+
+  .accounting-filter-bar--report > .accounting-filter-bar__actions {
+    margin-left: auto;
+    padding-left: 8px;
+  }
+}
+
 .accounting-queue-filter {
   min-width: 0;
   display: flex;

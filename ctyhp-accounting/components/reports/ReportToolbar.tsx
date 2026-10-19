@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { InputNumber, Select, Space, Switch, Tooltip } from "antd";
 import FilterBar from "@/components/ui/FilterBar";
 import { ReportAudienceToggle } from "@/components/reports/ReportAudience";
-import { ReportActions, ReportDateControl, RunReportButton } from "@/components/reports/ReportBar";
+import { REPORT_BAR_CLASS, ReportActions, ReportDateControl, RunReportButton } from "@/components/reports/ReportBar";
 import { reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import type { FiscalMonth } from "@/lib/domain/fiscal";
 import type { InternalReportId } from "@/lib/domain/report-catalog";
@@ -70,6 +70,7 @@ export default function ReportToolbar(props: ReportToolbarProps) {
   return (
     <FilterBar
       ariaLabel="Report options and actions"
+      className={REPORT_BAR_CLASS}
       actions={<ReportActions sheet={sheet} loading={loading} before={props.extraActions} />}
     >
       <ReportAudienceToggle />

@@ -30,6 +30,9 @@ import { PERIOD_PRESETS, type PeriodPreset } from "@/lib/domain/report-presets";
 
 export const RUN_REPORT = "Run report";
 
+/** The FilterBar modifier that lets the exports share the controls' lines (app/globals.css). */
+export const REPORT_BAR_CLASS = "accounting-filter-bar--report";
+
 /** How a report is dated. Every page picks one of these, so a date looks the same everywhere. */
 export type ReportDates =
   | {
@@ -52,7 +55,9 @@ export type ReportDates =
   | { kind: "year"; label: string; year: number; onYear: (year: number) => void }
   | { kind: "none" };
 
-const muted = (text: string) => <span className={styles.muted}>{text}</span>;
+/** A control's own word inside it, "From", "As of", "Window": muted, as on every report. */
+export const reportFieldLabel = (text: string) => <span className={styles.muted}>{text}</span>;
+const muted = reportFieldLabel;
 
 /** The date control for a report, in one of the four shapes. */
 export function ReportDateControl({ dates }: { dates: ReportDates }) {
@@ -186,6 +191,7 @@ export default function ReportBar(props: ReportBarProps) {
   return (
     <FilterBar
       ariaLabel={props.ariaLabel ?? "Report dates, filters and exports"}
+      className={REPORT_BAR_CLASS}
       resultCount={props.resultCount}
       actions={<ReportActions sheet={props.sheet} loading={props.loading} before={props.actions} />}
     >

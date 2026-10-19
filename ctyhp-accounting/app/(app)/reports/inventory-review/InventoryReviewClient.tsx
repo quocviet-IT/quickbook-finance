@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, App, Button, Form, Input, InputNumber, Modal, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
-import ReportBar from "@/components/reports/ReportBar";
+import ReportBar, { reportFieldLabel } from "@/components/reports/ReportBar";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import { fromMinor } from "@/lib/domain/money";
 import { useCompanyClock } from "@/components/CompanyClock";
@@ -148,13 +148,13 @@ export default function InventoryReviewClient({
           <Tooltip title="How far back to measure the selling rate">
             <InputNumber
               aria-label="Window in days"
-              addonBefore="Window"
-              addonAfter="days"
+              prefix={reportFieldLabel("Window")}
+              suffix={reportFieldLabel("days")}
               min={30}
               max={365}
               value={windowDays}
               onChange={(v) => setWindowDays(Number(v ?? 90))}
-              style={{ width: 200 }}
+              style={{ width: 160 }}
             />
           </Tooltip>
         }

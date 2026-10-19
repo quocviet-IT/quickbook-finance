@@ -49,7 +49,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "One report bar on every report",
         detail:
-          "Every report now has the same bar. On the left are the dates, the report's own filters and Run report. On the right are the report's own actions, then Copy this report, CSV, PDF, Excel and Print, always in that order. The run button was called Run, Run report, Run review, Run statement or Apply depending on the page; it is Run report everywhere. Dates are chosen the same way everywhere too: a period such as This year with From and To, or a single As of date, or a tax year.",
+          "Every report now has the same bar. On the left are the dates, the report's own filters and Run report. On the right are the report's own actions, then Copy this report, CSV, PDF, Excel and Print, always in that order. The run button was called Run, Run report, Run review, Run statement or Apply depending on the page; it is Run report everywhere. Dates are chosen the same way everywhere too: a period such as This year with From and To, or a single As of date, or a tax year. Transaction List by Date now opens on This month, the first of the month to today, rather than on a Custom range to the month's last day. When the bar is too full for one line, the exports move below it rather than pushing Run report onto a line of its own.",
         route: "/reports",
       },
       {
