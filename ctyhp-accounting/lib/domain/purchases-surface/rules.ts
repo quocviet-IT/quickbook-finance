@@ -151,7 +151,9 @@ export function unappliedPaymentsControl(input: {
     title: "Payments are applied to bills",
     passCondition: "No payment to a supplier is sitting unapplied.",
     evaluatedAt: input.evaluatedAt,
-    href: "/bill-payments",
+    // Pay Bills lists every supplier payment with what is left unapplied.
+    // There is no /bill-payments page: the link answered 404.
+    href: "/pay-bills",
     blocking: false,
   };
   if (input.count === null) {
@@ -274,8 +276,10 @@ export function unappliedPaymentItem(
     severity: input.ageDays > 30 ? "high" : "medium",
     amountMinor: Math.abs(payment.unappliedMinor),
     ageDays: input.ageDays,
-    href: "/bill-payments",
-    actionLabel: "Apply",
+    // Pay Bills shows the payment and its unapplied amount. No screen applies
+    // a payment already made to a bill, so the button says Review, not Apply.
+    href: "/pay-bills",
+    actionLabel: "Review",
     confirmedAt: input.confirmedAt,
     blocking: false,
   };

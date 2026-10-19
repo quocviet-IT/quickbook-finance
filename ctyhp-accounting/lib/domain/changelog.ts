@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.26",
+    date: "2026-10-19",
+    headline: "The header fits a phone, and the Purchases overview’s payment links open a page.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The header on a phone",
+        detail:
+          "On a phone the company list was drawn over the search field, New transaction, the theme switch and Approvals. The controls now sit on one row, with the company name shortened to the room left, and search takes the whole row below.",
+        route: "/sales",
+      },
+      {
+        kind: "fixed",
+        title: "Unapplied supplier payments open Pay Bills",
+        detail:
+          "On the Purchases overview, “Payments are applied to bills” and each unapplied supplier payment linked to a page that does not exist. Both now open Pay Bills, where every supplier payment is listed with what is left unapplied, and the button says Review rather than Apply, because a payment already made cannot be applied to a bill from there.",
+        route: "/purchases",
+      },
+    ],
+  },
+  {
     version: "2.25",
     date: "2026-10-19",
     headline: "Bank Reconciliation no longer spins for a company with no bank account.",
