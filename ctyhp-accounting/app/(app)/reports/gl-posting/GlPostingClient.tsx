@@ -1,21 +1,20 @@
 "use client";
 import { sourceLabel } from "@/lib/domain/entry-detail";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, App, Button, DatePicker, Segmented, Space, Statistic, Table, Tag } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
+import { Alert, App, Segmented, Space, Statistic, Table, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
-import { statusLabel } from "@/lib/domain/status-label";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
-import { fromMinor } from "@/lib/domain/money";
-import { useCompanyClock } from "@/components/CompanyClock";
+import ReportBar from "@/components/reports/ReportBar";
+import { presetRange, type PeriodPreset, type PresetContext } from "@/lib/domain/report-presets";
 import { formatDate, formatMoney } from "@/lib/format";
 import {
   describeControlExceptions,
   describePostingExceptions,
+  controlSheet,
+  postingSheet,
   POSTING_VERDICT_LABEL,
   SOURCE_TYPE_LABEL,
   type ControlCheck,
@@ -48,17 +47,22 @@ export default function GlPostingClient({
   companyName,
   baseCurrency,
   baseDecimals,
+  presets,
 }: {
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  presets: PresetContext;
 }) {
   const { message } = App.useApp();
-  const { today } = useCompanyClock();
+  const initial = useMemo(() => presetRange("month", presets), [presets]);
   const [view, setView] = useState<"documents" | "controls">("documents");
-  const [from, setFrom] = useState<Dayjs>(dayjs(today).startOf("month"));
-  const [to, setTo] = useState<Dayjs>(dayjs(today));
-  const [asOf, setAsOf] = useState<Dayjs>(dayjs(today));
+  const [preset, setPreset] = useState<PeriodPreset>("month");
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
+  const [asOf, setAsOf] = useState(presets.today);
+  /** The dates the report on screen was run for. */
+  const [ran, setRan] = useState({ from: initial.from, to: initial.to, asOf: presets.today });
   const [report, setReport] = useState<PostingReport | null>(null);
   const [recon, setRecon] = useState<ControlReconciliation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,55 +73,84 @@ export default function GlPostingClient({
     [baseCurrency, baseDecimals],
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [posting, control] = await Promise.all([
-      postingReportAction(from.format("YYYY-MM-DD"), to.format("YYYY-MM-DD")),
-      controlReconciliationAction(asOf.format("YYYY-MM-DD")),
-    ]);
-    setLoading(false);
-    if (posting.ok && posting.data) setReport(posting.data);
-    else message.error(posting.error ?? "Failed to read the posting report");
-    if (control.ok && control.data) setRecon(control.data);
-    else message.error(control.error ?? "Failed to reconcile the control accounts");
-  }, [from, to, asOf, message]);
+  const load = useCallback(
+    async (f: string, t: string, a: string) => {
+      setLoading(true);
+      const [posting, control] = await Promise.all([postingReportAction(f, t), controlReconciliationAction(a)]);
+      setLoading(false);
+      if (posting.ok && posting.data) setReport(posting.data);
+      else message.error(posting.error ?? "Failed to read the posting report");
+      if (control.ok && control.data) setRecon(control.data);
+      else message.error(control.error ?? "Failed to reconcile the control accounts");
+      setRan({ from: f, to: t, asOf: a });
+    },
+    [message],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-    // Loads once for today; the button re-runs it after a date change.
+    void load(initial.from, initial.to, presets.today);
+    // Runs once on arrival; a period choice or Run report runs it again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const choosePreset = (key: PeriodPreset) => {
+    setPreset(key);
+    if (key === "custom") return;
+    const range = presetRange(key, presets);
+    setFrom(range.from);
+    setTo(range.to);
+    void load(range.from, range.to, asOf);
+  };
+
+  const sheet = useMemo(() => {
+    const ctx = { companyName, currencyCode: baseCurrency, decimals: baseDecimals };
+    if (view === "documents") return report ? postingSheet(report, { ...ctx, from: ran.from, to: ran.to }) : null;
+    return recon ? controlSheet(recon, ctx) : null;
+  }, [view, report, recon, ran, companyName, baseCurrency, baseDecimals]);
 
   const postingWarning = report ? describePostingExceptions(report) : null;
   const controlWarning = recon ? describeControlExceptions(recon) : null;
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-      <Space wrap>
-        <Segmented
-          value={view}
-          onChange={(value) => setView(value as "documents" | "controls")}
-          options={[
-            { label: `Documents to ledger${report ? ` (${report.summary.documents})` : ""}`, value: "documents" },
-            {
-              label: `Control accounts${recon ? ` (${recon.rows.length})` : ""}`,
-              value: "controls",
-            },
-          ]}
-        />
-        {view === "documents" ? (
-          <>
-            <DatePicker value={from} onChange={(d) => d && setFrom(d)} allowClear={false} />
-            <DatePicker value={to} onChange={(d) => d && setTo(d)} allowClear={false} />
-          </>
-        ) : (
-          <DatePicker value={asOf} onChange={(d) => d && setAsOf(d)} allowClear={false} />
-        )}
-        <Button type="primary" loading={loading} onClick={load}>
-          Run report
-        </Button>
-      </Space>
+      <ReportBar
+        leading={
+          <Segmented
+            value={view}
+            onChange={(value) => setView(value as "documents" | "controls")}
+            options={[
+              { label: `Documents to ledger${report ? ` (${report.summary.documents})` : ""}`, value: "documents" },
+              {
+                label: `Control accounts${recon ? ` (${recon.rows.length})` : ""}`,
+                value: "controls",
+              },
+            ]}
+          />
+        }
+        dates={
+          view === "documents"
+            ? {
+                kind: "range",
+                preset,
+                from,
+                to,
+                onPreset: choosePreset,
+                onFrom: (d) => {
+                  setFrom(d);
+                  setPreset("custom");
+                },
+                onTo: (d) => {
+                  setTo(d);
+                  setPreset("custom");
+                },
+              }
+            : { kind: "asOf", to: asOf, onTo: setAsOf }
+        }
+        onRun={() => void load(from, to, asOf)}
+        loading={loading}
+        sheet={sheet}
+      />
 
       {/* The two banners answer the reviewer's question without reading a row. */}
       {report ? (
@@ -126,7 +159,7 @@ export default function GlPostingClient({
           showIcon
           message={
             postingWarning ??
-            `Every document between ${formatDate(from.format("YYYY-MM-DD"))} and ${formatDate(to.format("YYYY-MM-DD"))} ` +
+            `Every document between ${formatDate(ran.from)} and ${formatDate(ran.to)} ` +
               `is accounted for: ${report.summary.posted} posted, ${report.summary.offLedger} correctly off the ledger.`
           }
         />
@@ -155,38 +188,6 @@ export default function GlPostingClient({
                 valueStyle={report.summary.exceptions ? { color: TOKENS.intent.danger } : undefined}
               />
               <Statistic title={`Live total (${baseCurrency})`} value={money(report.summary.liveTotalMinor)} />
-              <ReportExportButtons
-                disabled={report.rows.length === 0}
-                sheet={{
-                  fileName: `gl-posting-${from.format("YYYY-MM-DD")}-${to.format("YYYY-MM-DD")}`,
-                  companyName,
-                  title: "General Ledger Posting",
-                  subtitle: `${formatDate(from.format("YYYY-MM-DD"))} to ${formatDate(to.format("YYYY-MM-DD"))}`,
-                  currencyCode: baseCurrency,
-                  columns: [
-                    { key: "type", header: "Type", kind: "text" },
-                    { key: "number", header: "Document", kind: "text" },
-                    { key: "date", header: "Date", kind: "text" },
-                    { key: "party", header: "Name", kind: "text" },
-                    { key: "status", header: "Status", kind: "text" },
-                    { key: "amount", header: "Amount", kind: "money" },
-                    { key: "entry", header: "Journal entry", kind: "text" },
-                    { key: "verdict", header: "Posting", kind: "text" },
-                  ],
-                  rows: report.rows.map((row) => ({
-                    type: SOURCE_TYPE_LABEL[row.sourceType] ?? sourceLabel(row.sourceType),
-                    number: row.documentNumber ?? "(unnumbered)",
-                    date: row.documentDate,
-                    party: row.partyName,
-                    status: statusLabel(row.documentStatus),
-                    // row.amountMinor is integer minor units; the export cell
-                    // is the display edge, same as the `money` callback above.
-                    amount: fromMinor(row.amountMinor, baseDecimals),
-                    entry: row.entryNumber ?? "",
-                    verdict: POSTING_VERDICT_LABEL[row.verdict],
-                  })),
-                }}
-              />
             </Space>
           ) : null}
 

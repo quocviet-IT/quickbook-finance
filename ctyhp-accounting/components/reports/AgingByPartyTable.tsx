@@ -9,8 +9,6 @@ import {
   type PartyAgingRow,
 } from "@/lib/domain/aging";
 import { formatDate } from "@/lib/format";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
-import { exportRowsFromMinorAmounts, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { AgingReportRow } from "@/lib/services/aging";
 
 export type AgingGrouping = "grid" | "party" | "document";
@@ -35,8 +33,6 @@ export default function AgingByPartyTable({
   loading,
   companyName,
   asOf,
-  currencyCode,
-  baseDecimals,
 }: {
   rows: AgingReportRow[];
   /** "Customer" or "Vendor" — the heading of the first column. */
@@ -51,37 +47,9 @@ export default function AgingByPartyTable({
   /** Printed above the grid: a statement says whose books it is. */
   companyName: string;
   asOf: string;
-  currencyCode: string;
-  baseDecimals: number;
 }) {
   const pivot = pivotAgingByParty(rows);
   const grid = agingSummaryGrid(pivot);
-
-  const gridExport: ReportExportSheet = {
-    fileName: `${partyLabel.toLowerCase()}-aging-${asOf}`,
-    companyName,
-    title: `${partyLabel === "Vendor" ? "Accounts Payable" : "Accounts Receivable"} Aging`,
-    subtitle: `As of ${formatDate(asOf)}`,
-    currencyCode,
-    columns: [
-      { key: "label", header: "Age", kind: "text" },
-      ...grid.columns.map((column) => ({
-        key: column.entityId,
-        header: column.entityName,
-        kind: "money" as const,
-      })),
-      { key: "total", header: "Total", kind: "money" as const },
-    ],
-    // grid.rows carry integer minor units, same as row.totalMinor below; the
-    // Total column is folded in as one more entry per row so the same
-    // minor-to-major conversion covers it too, rather than being left as a
-    // raw minor-unit figure beside converted ones.
-    rows: exportRowsFromMinorAmounts(
-      grid.rows.map((row) => ({ label: row.label, amounts: [...row.amounts, row.totalMinor] })),
-      [...grid.columns.map((column) => column.entityId), "total"],
-      baseDecimals,
-    ),
-  };
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -105,7 +73,6 @@ export default function AgingByPartyTable({
               </Typography.Title>
               <Typography.Text type="secondary">As of {formatDate(asOf)}</Typography.Text>
             </div>
-            <ReportExportButtons sheet={gridExport} disabled={grid.columns.length === 0} />
           </div>
           <Table<AgingGridRow>
             rowKey="key"

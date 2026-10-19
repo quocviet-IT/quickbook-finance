@@ -8,6 +8,7 @@ import {
   listFixedAssets,
 } from "@/lib/services/fixed-assets";
 import { listCurrencies } from "@/lib/services/reference";
+import { reportPageContext } from "@/lib/services/report-context";
 import FixedAssetReportClient from "./FixedAssetReportClient";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +16,12 @@ export const dynamic = "force-dynamic";
 export default async function FixedAssetReportPage() {
   const sb = await createSupabaseServerClient();
   const entity = await resolveActiveCompany();
-  const [assets, depreciation, currencies, company] = await Promise.all([
+  const [assets, depreciation, currencies, company, context] = await Promise.all([
     listFixedAssets(sb),
     listAssetDepreciationDetail(sb),
     listCurrencies(sb),
     getCurrentCompanySettings(sb),
+    reportPageContext(sb),
   ]);
   const currency = currencies.find((row) => row.is_base) ?? currencies[0];
 
@@ -45,6 +47,7 @@ export default async function FixedAssetReportPage() {
         companyName={company?.legal_name ?? company?.dba_name ?? "Company name not set"}
         currencyCode={currency?.code ?? "USD"}
         currencyDecimals={currency?.decimal_places ?? 2}
+        presets={context.presets}
       />
     </div>
   );

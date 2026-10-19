@@ -2,18 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Alert, App, Button, DatePicker, InputNumber, Select, Space, Spin, type TablePaginationConfig } from "antd";
-import { CopyOutlined, PrinterOutlined } from "@ant-design/icons";
-import dayjs from "dayjs";
-import FilterBar from "@/components/ui/FilterBar";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import { Alert, Space, Spin, type TablePaginationConfig } from "antd";
+import ReportBar, { ReportPrompt, type ReportDates } from "@/components/reports/ReportBar";
 import { ReportPaper, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
-import { downloadTextFile } from "@/lib/client/download";
-import { printReport, watchReportPrinting } from "@/lib/client/print-report";
-import { csvFromExportSheet, tsvFromExportSheet, type ReportExportSheet } from "@/lib/domain/report-export";
+import { watchReportPrinting } from "@/lib/client/print-report";
+import type { ReportExportSheet } from "@/lib/domain/report-export";
 import {
-  PERIOD_PRESETS,
   presetRange,
   type PeriodPreset,
   type PresetContext,
@@ -25,7 +20,7 @@ import { formatDate, formatDateRange } from "@/lib/format";
 export type SimpleReportPeriod =
   | { kind: "asOf"; today: string }
   | { kind: "range"; ctx: PresetContext; preset: Exclude<PeriodPreset, "custom"> }
-  | { kind: "fiscalYear"; current: number }
+  | { kind: "fiscalYear"; current: number; /** "FY" unless the year is another kind, such as "Tax year". */ label?: string }
   | { kind: "none"; today: string; caption: string };
 
 /** What the page is being drawn for: the screen, or the printer. */
@@ -70,6 +65,17 @@ export interface SimpleReportProps<T> {
   runningText?: string;
   /** Changing this runs the report again over the dates it last ran, for a page whose own action changed its figures. */
   refreshKey?: number;
+  /** The page's own actions, before the exports: Save, Manage budget. */
+  actions?: ReactNode;
+  /**
+   * Set while the report needs a choice the page cannot make for the reader
+   * (a customer, a vendor, an account): the report waits, Run report is off,
+   * and the paper says what to choose instead of standing empty. Clearing it
+   * runs the report.
+   */
+  waitFor?: { title: string; description: string } | null;
+  /** The basis printed under the title; "Accrual basis" unless the report keeps another, such as 1099 on cash. */
+  basis?: string;
 }
 
 function initialWhen(period: SimpleReportPeriod): ReportWhen {
@@ -94,7 +100,7 @@ function caption(period: SimpleReportPeriod, when: ReportWhen): string {
     case "range":
       return formatDateRange(when.from, when.to);
     case "fiscalYear":
-      return `Fiscal year ${when.fiscalYear}`;
+      return `${period.label && period.label !== "FY" ? period.label : "Fiscal year"} ${when.fiscalYear}`;
     case "none":
       return period.caption;
   }
@@ -108,7 +114,6 @@ function caption(period: SimpleReportPeriod, when: ReportWhen): string {
  * chosen or Run is pressed. Every action hands over what the screen shows.
  */
 export default function SimpleReport<T>(props: SimpleReportProps<T>) {
-  const { message } = App.useApp();
   const { period, load, onLoaded, view, sheet: buildSheet } = props;
   const first = useMemo(() => initialWhen(period), [period]);
 
@@ -168,12 +173,18 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
     [load, onLoaded],
   );
 
+  const waiting = props.waitFor ?? null;
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void run(first);
-    // Run once on arrival; afterwards a period choice or Run runs it.
+    if (waiting) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+    void run(draft);
+    // Run on arrival, and again when a missing choice is made; afterwards a
+    // period choice or Run report runs it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [waiting === null]);
 
   const refreshKey = props.refreshKey;
   const lastRefresh = useRef(refreshKey);
@@ -197,23 +208,19 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
     void run(next);
   };
 
-  const copy = async () => {
-    if (!sheet) return;
-    try {
-      await navigator.clipboard.writeText(tsvFromExportSheet(sheet));
-      message.success("Copied. Paste it into a spreadsheet and the columns stay.");
-    } catch {
-      message.error("The browser would not let this page copy. Use CSV instead.");
-    }
-  };
-
-  const idle = !sheet || loading;
-  const label = (text: string) => <span className={styles.muted}>{text}</span>;
 
   const paper = (
     <div className="report-print-area">
-      <ReportPaper companyName={props.companyName} title={props.title} range={caption(period, ran)} currencyCode={props.currencyCode}>
-        {shown !== null ? (
+      <ReportPaper
+        companyName={props.companyName}
+        title={props.title}
+        range={caption(period, ran)}
+        currencyCode={props.currencyCode}
+        basis={props.basis}
+      >
+        {waiting && shown === null ? (
+          <ReportPrompt title={waiting.title} description={waiting.description} />
+        ) : shown !== null ? (
           props.render(shown, ran, { printing })
         ) : (
           <div style={{ textAlign: "center", padding: "48px 0" }}>
@@ -231,83 +238,45 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
     </div>
   );
 
+  const dates: ReportDates =
+    period.kind === "range"
+      ? {
+          kind: "range",
+          preset,
+          from: draft.from ?? draft.to,
+          to: draft.to,
+          onPreset: choosePreset,
+          onFrom: (from) => {
+            setDraft({ ...draft, from });
+            setPreset("custom");
+          },
+          onTo: (to) => {
+            setDraft({ ...draft, to });
+            setPreset("custom");
+          },
+        }
+      : period.kind === "asOf"
+        ? { kind: "asOf", to: draft.to, onTo: (to) => setDraft({ ...draft, to }) }
+        : period.kind === "fiscalYear"
+          ? {
+              kind: "year",
+              label: period.label ?? "FY",
+              year: draft.fiscalYear ?? period.current,
+              onYear: (fiscalYear) => setDraft({ ...draft, fiscalYear }),
+            }
+          : { kind: "none" };
+
   return (
     <div>
-      <FilterBar
-        ariaLabel="Report dates, filters and exports"
-        actions={
-          <Space wrap>
-            <Button icon={<CopyOutlined />} disabled={idle} onClick={() => void copy()}>
-              Copy this report
-            </Button>
-            <Button disabled={idle} onClick={() => sheet && downloadTextFile(`${sheet.fileName}.csv`, csvFromExportSheet(sheet))}>
-              CSV
-            </Button>
-            {sheet ? <ReportExportButtons sheet={sheet} disabled={loading} /> : null}
-            <Button icon={<PrinterOutlined />} disabled={idle} onClick={printReport}>
-              Print
-            </Button>
-          </Space>
-        }
-      >
-        {period.kind === "range" ? (
-          <>
-            <Select<PeriodPreset>
-              aria-label="Period"
-              value={preset}
-              onChange={choosePreset}
-              options={PERIOD_PRESETS.map((p) => ({ value: p.key, label: p.label }))}
-              style={{ width: 150 }}
-            />
-            <DatePicker
-              aria-label="From"
-              prefix={label("From")}
-              value={draft.from ? dayjs(draft.from) : null}
-              allowClear={false}
-              onChange={(d) => {
-                if (!d) return;
-                setDraft({ ...draft, from: d.format("YYYY-MM-DD") });
-                setPreset("custom");
-              }}
-            />
-            <DatePicker
-              aria-label="To"
-              prefix={label("To")}
-              value={dayjs(draft.to)}
-              allowClear={false}
-              onChange={(d) => {
-                if (!d) return;
-                setDraft({ ...draft, to: d.format("YYYY-MM-DD") });
-                setPreset("custom");
-              }}
-            />
-          </>
-        ) : null}
-        {period.kind === "asOf" ? (
-          <DatePicker
-            aria-label="As of"
-            prefix={label("As of")}
-            value={dayjs(draft.to)}
-            allowClear={false}
-            onChange={(d) => d && setDraft({ ...draft, to: d.format("YYYY-MM-DD") })}
-          />
-        ) : null}
-        {period.kind === "fiscalYear" ? (
-          <InputNumber
-            aria-label="Fiscal year"
-            prefix={label("FY")}
-            min={2000}
-            max={2100}
-            value={draft.fiscalYear ?? period.current}
-            onChange={(value) => setDraft({ ...draft, fiscalYear: Number(value ?? period.current) })}
-            style={{ width: 120 }}
-          />
-        ) : null}
-        {props.filters}
-        <Button type="primary" onClick={() => void run(draft)} loading={loading}>
-          Run
-        </Button>
-      </FilterBar>
+      <ReportBar
+        dates={dates}
+        filters={props.filters}
+        actions={props.actions}
+        onRun={() => void run(draft)}
+        loading={loading}
+        runDisabled={waiting !== null}
+        sheet={sheet}
+      />
 
       {error ? <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} /> : null}
 

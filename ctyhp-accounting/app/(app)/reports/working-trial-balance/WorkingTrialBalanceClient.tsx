@@ -1,19 +1,15 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, DatePicker, Select, Space, Spin, type TableColumnsType } from "antd";
-import dayjs from "dayjs";
-import FilterBar from "@/components/ui/FilterBar";
+import { Alert, Space, Spin, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import ReportBar from "@/components/reports/ReportBar";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import { ReportFoot, ReportPaper, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney, formatDateRange, formatDate } from "@/lib/format";
-import { downloadTextFile } from "@/lib/client/download";
-import { csvFromExportSheet } from "@/lib/domain/report-export";
-import { PERIOD_PRESETS, presetRange, type PeriodPreset } from "@/lib/domain/report-presets";
+import { presetRange, type PeriodPreset } from "@/lib/domain/report-presets";
 import { workingTrialBalanceSheet, type AjeRow, type WorkingTrialBalance } from "@/lib/domain/working-trial-balance";
 import { workingTrialBalanceAction } from "./actions";
 
@@ -283,53 +279,26 @@ export default function WorkingTrialBalanceClient({
 
   return (
     <div>
-      <FilterBar
-        ariaLabel="Report period and exports"
-        actions={
-          <Space wrap>
-            {sheet ? <ReportExportButtons sheet={sheet} disabled={loading} /> : null}
-            <Button
-              disabled={!sheet || loading}
-              onClick={() => sheet && downloadTextFile(`${sheet.fileName}.csv`, csvFromExportSheet(sheet))}
-            >
-              CSV
-            </Button>
-          </Space>
-        }
-      >
-        <Select<PeriodPreset>
-          aria-label="Period"
-          value={preset}
-          onChange={choosePreset}
-          options={PERIOD_PRESETS.map((p) => ({ value: p.key, label: p.label }))}
-          style={{ width: 150 }}
-        />
-        <DatePicker
-          aria-label="From"
-          prefix={<span className={styles.muted}>From</span>}
-          value={dayjs(from)}
-          allowClear={false}
-          onChange={(d) => {
-            if (!d) return;
-            setFrom(d.format("YYYY-MM-DD"));
+      <ReportBar
+        dates={{
+          kind: "range",
+          preset,
+          from,
+          to,
+          onPreset: choosePreset,
+          onFrom: (d) => {
+            setFrom(d);
             setPreset("custom");
-          }}
-        />
-        <DatePicker
-          aria-label="To"
-          prefix={<span className={styles.muted}>To</span>}
-          value={dayjs(to)}
-          allowClear={false}
-          onChange={(d) => {
-            if (!d) return;
-            setTo(d.format("YYYY-MM-DD"));
+          },
+          onTo: (d) => {
+            setTo(d);
             setPreset("custom");
-          }}
-        />
-        <Button type="primary" onClick={() => void run(from, to)} loading={loading}>
-          Run
-        </Button>
-      </FilterBar>
+          },
+        }}
+        onRun={() => void run(from, to)}
+        loading={loading}
+        sheet={sheet}
+      />
 
       {error ? <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} /> : null}
 

@@ -10,7 +10,8 @@ export default function ReportExportButtons({
   sheet,
   disabled = false,
 }: {
-  sheet: ReportExportSheet;
+  /** Null until the report has run: the buttons stay where they are, disabled, so the bar does not shift. */
+  sheet: ReportExportSheet | null;
   disabled?: boolean;
 }) {
   const { message } = App.useApp();
@@ -18,6 +19,7 @@ export default function ReportExportButtons({
   const [loading, setLoading] = useState<"pdf" | "excel" | null>(null);
 
   const run = async (kind: "pdf" | "excel") => {
+    if (!sheet) return;
     setLoading(kind);
     try {
       const { exportReportToExcel, exportReportToPdf } = await import("@/lib/client/report-export");
@@ -36,7 +38,7 @@ export default function ReportExportButtons({
       <Button
         icon={<FilePdfOutlined />}
         loading={loading === "pdf"}
-        disabled={disabled || loading !== null}
+        disabled={disabled || !sheet || loading !== null}
         onClick={() => void run("pdf")}
       >
         PDF
@@ -44,7 +46,7 @@ export default function ReportExportButtons({
       <Button
         icon={<FileExcelOutlined />}
         loading={loading === "excel"}
-        disabled={disabled || loading !== null}
+        disabled={disabled || !sheet || loading !== null}
         onClick={() => void run("excel")}
       >
         Excel

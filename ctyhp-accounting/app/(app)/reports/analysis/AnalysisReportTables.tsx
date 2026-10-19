@@ -4,8 +4,10 @@ import ReportTable from "@/components/ui/ReportTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import type { WhatIfAnalysis } from "@/lib/domain/financial-analysis";
+import { fromMinor } from "@/lib/domain/money";
+import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import type { BalanceSheet, ProfitAndLoss, ReportSection } from "@/lib/domain/reports";
-import { formatMoney } from "@/lib/format";
+import { formatDateRange, formatMoney } from "@/lib/format";
 
 /**
  * The three-column rendering — Actual | Adjustment | Adjusted — used by the
@@ -87,6 +89,40 @@ function balanceSheetRows(actual: BalanceSheet, adjusted: BalanceSheet): Analysi
       adjusted: adjusted.totalLiabilities + adjusted.totalEquity,
     },
   ];
+}
+
+/** What Copy, CSV, PDF and Excel hand over: both statements, Actual beside Adjusted, as the tables show them. */
+export function analysisSheet(
+  analysis: WhatIfAnalysis,
+  ctx: { companyName: string; currencyCode: string; decimals: number; from: string; to: string },
+): ReportExportSheet {
+  const money = (minor: number | null) => (minor === null ? null : fromMinor(minor, ctx.decimals));
+  const rowsOf = (statement: string, rows: AnalysisRow[]) =>
+    rows.map((row) => ({
+      statement,
+      account: row.label,
+      actual: row.kind === "section" ? null : money(row.actual),
+      adjustment: row.kind === "section" ? null : money((row.adjusted ?? 0) - (row.actual ?? 0)),
+      adjusted: row.kind === "section" ? null : money(row.adjusted),
+    }));
+  return {
+    fileName: sanitizeExportFileName(`what-if-analysis-${ctx.from}-to-${ctx.to}`),
+    companyName: ctx.companyName,
+    title: "What-If Analysis (not the books)",
+    subtitle: formatDateRange(ctx.from, ctx.to),
+    currencyCode: ctx.currencyCode,
+    columns: [
+      { key: "statement", header: "Statement", kind: "text" },
+      { key: "account", header: "Account", kind: "text" },
+      { key: "actual", header: "Actual", kind: "money" },
+      { key: "adjustment", header: "Adjustment", kind: "money" },
+      { key: "adjusted", header: "Adjusted", kind: "money" },
+    ],
+    rows: [
+      ...rowsOf("Profit & Loss", pnlRows(analysis.pnl.actual, analysis.pnl.adjusted)),
+      ...rowsOf("Balance Sheet", balanceSheetRows(analysis.balanceSheet.actual, analysis.balanceSheet.adjusted)),
+    ],
+  };
 }
 
 export default function AnalysisReportTables({

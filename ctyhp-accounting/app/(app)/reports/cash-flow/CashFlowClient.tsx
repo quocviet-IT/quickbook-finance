@@ -1,24 +1,24 @@
 "use client";
 
 import { sourceLabel } from "@/lib/domain/entry-detail";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   App,
   Alert,
-  Button,
-  DatePicker,
   Space,
   Spin,
   Tag,
   Typography,
 } from "antd";
-import type { Dayjs } from "dayjs";
 import { ComparisonBars, chartColors } from "@/components/charts/FinancialCharts";
 import { ReportBody } from "@/components/reports/ReportAudience";
 import DataTable from "@/components/ui/DataTable";
-import FilterBar from "@/components/ui/FilterBar";
-import { formatDate, formatMoney, plural } from "@/lib/format";
+import ReportBar from "@/components/reports/ReportBar";
+import { fromMinor } from "@/lib/domain/money";
+import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
+import { presetRange, type PeriodPreset, type PresetContext } from "@/lib/domain/report-presets";
+import { formatDate, formatDateRange, formatMoney, plural } from "@/lib/format";
 import { cashFlowAction, cashFlowDetailAction } from "./actions";
 import type { CashFlowDetail, CashFlowReport } from "@/lib/services/cashflow";
 
@@ -123,34 +123,64 @@ function reportRows(report: CashFlowReport): DisplayRow[] {
   return rows;
 }
 
+/** The statement as the screen shows it: section, line, how many journals back it, amount. */
+function cashFlowSheet(
+  report: CashFlowReport,
+  range: ReportRange,
+  companyName: string,
+  currencyCode: string,
+  decimals: number,
+): ReportExportSheet {
+  return {
+    fileName: sanitizeExportFileName(`cash-flow-${range.from}-to-${range.to}`),
+    companyName,
+    title: "Statement of Cash Flows",
+    subtitle: formatDateRange(range.from, range.to),
+    currencyCode,
+    columns: [
+      { key: "section", header: "Section", kind: "text" },
+      { key: "label", header: "Cash flow line", kind: "text" },
+      { key: "evidence", header: "Evidence (journals)", kind: "number" },
+      { key: "amount", header: "Amount", kind: "money" },
+    ],
+    rows: reportRows(report).map((row) => ({
+      section: row.section,
+      label: row.label,
+      evidence: row.detailCount ?? null,
+      amount: fromMinor(row.amount, decimals),
+    })),
+  };
+}
+
 export default function CashFlowClient({
   baseCurrency,
   baseDecimals,
   companyName,
+  presets,
 }: {
   baseCurrency: string;
   baseDecimals: number;
   /** Whose books these are. A statement that does not name its entity is one
    *  somebody will eventually file against the wrong company. */
   companyName: string;
+  /** The fiscal year and today for the period presets. */
+  presets: PresetContext;
 }) {
   const { message } = App.useApp();
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const first = useMemo(() => presetRange("year", presets), [presets]);
+  const [preset, setPreset] = useState<PeriodPreset>("year");
+  const [range, setRange] = useState<ReportRange>({ from: first.from, to: first.to });
   const [reportRange, setReportRange] = useState<ReportRange | null>(null);
   const [report, setReport] = useState<CashFlowReport | null>(null);
   const [details, setDetails] = useState<Record<string, DetailState>>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const fmt = (amount: number) => formatMoney(amount, baseCurrency, baseDecimals);
 
-  const run = async () => {
-    if (!range) {
-      message.warning("Pick a date range");
+  const run = async (selected: ReportRange = range) => {
+    if (selected.from > selected.to) {
+      message.warning("The start date is after the end date.");
       return;
     }
-    const selected = {
-      from: range[0].format("YYYY-MM-DD"),
-      to: range[1].format("YYYY-MM-DD"),
-    };
     setLoading(true);
     try {
       const result = await cashFlowAction(selected);
@@ -168,6 +198,20 @@ export default function CashFlowClient({
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    void run();
+    // Runs once on arrival, for this year; afterwards a period or Run report does it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const choosePreset = (key: PeriodPreset) => {
+    setPreset(key);
+    if (key === "custom") return;
+    const next = presetRange(key, presets);
+    setRange(next);
+    void run(next);
   };
 
   const loadDetails = async (lineCode: string) => {
@@ -197,26 +241,38 @@ export default function CashFlowClient({
   };
 
   const rows = report ? reportRows(report) : [];
+  const sheet = useMemo(
+    () => (report && reportRange ? cashFlowSheet(report, reportRange, companyName, baseCurrency, baseDecimals) : null),
+    [report, reportRange, companyName, baseCurrency, baseDecimals],
+  );
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <FilterBar
+      <ReportBar
+        dates={{
+          kind: "range",
+          preset,
+          from: range.from,
+          to: range.to,
+          onPreset: choosePreset,
+          onFrom: (from) => {
+            setRange({ ...range, from });
+            setPreset("custom");
+          },
+          onTo: (to) => {
+            setRange({ ...range, to });
+            setPreset("custom");
+          },
+        }}
+        onRun={() => void run()}
+        loading={loading}
+        sheet={sheet}
         resultCount={report ? rows.length : undefined}
-        ariaLabel="Cash Flow Statement filters"
-        actions={
-          <Button type="primary" loading={loading} onClick={run}>
-            Run report
-          </Button>
-        }
-      >
-        <DatePicker.RangePicker
-          value={range}
-          onChange={(value) => setRange(value as [Dayjs, Dayjs] | null)}
-        />
-      </FilterBar>
+      />
 
       {report && (
-        <>
+        <div className="report-print-area">
+        <Space direction="vertical" style={{ width: "100%" }} size="large">
           {/* The statement names its entity, and says which method produced
               it — both belong at the top of anything that gets filed. */}
           <div className="report-result__heading">
@@ -373,7 +429,8 @@ export default function CashFlowClient({
               />
             }
           />
-        </>
+        </Space>
+        </div>
       )}
     </Space>
   );

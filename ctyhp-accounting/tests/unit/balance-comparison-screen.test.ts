@@ -116,7 +116,8 @@ describe("the screen follows the project's rules", () => {
   it("says the words the report was specified with", () => {
     expect(client).toContain("Add an account the other system has");
     expect(client).toContain("Only differences");
-    expect(client).toContain('aria-label="As of"');
+    // The As of date is the shared report bar's own; Run report goes to it.
+    expect(client).toContain('kind: "asOf"');
     expect(client).toContain('aria-label="Compared with"');
     expect(client).toContain('aria-label="Note"');
     expect(client).toContain("Save");

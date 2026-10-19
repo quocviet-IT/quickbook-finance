@@ -714,3 +714,19 @@
 .zoomTotal strong {
   color: var(--ob-text-heading);
 }
+
+/* What a report says before it can run: what to choose, then Run report. */
+.prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 56px 16px;
+  text-align: center;
+}
+
+.promptTitle {
+  color: var(--ob-text-heading);
+  font-size: 16px;
+  font-weight: 600;
+}

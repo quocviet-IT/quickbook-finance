@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import {
   Card,
   Col,
-  DatePicker,
   Row,
   Segmented,
   Select,
@@ -15,25 +14,28 @@ import {
   Typography,
   type TableColumnsType,
 } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
-import FilterBar from "@/components/ui/FilterBar";
-import ReportExportButtons from "@/components/reports/ReportExportButtons";
+import ReportBar from "@/components/reports/ReportBar";
+import { presetRange, type PeriodPreset, type PresetContext } from "@/lib/domain/report-presets";
 import type { FixedAssetStatus } from "@/lib/db/types";
 import type {
   AssetDepreciationDetail,
   FixedAssetView,
 } from "@/lib/services/fixed-assets";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
-import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, formatMoney } from "@/lib/format";
 import { TOKENS } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 type ReportView = "register" | "depreciation";
-type DateRange = [Dayjs | null, Dayjs | null] | null;
+/** The dates the report is struck for. "All dates" is no filter at all. */
+interface Period {
+  preset: PeriodPreset;
+  from: string;
+  to: string;
+}
 
 const ASSET_STATUS: Record<FixedAssetStatus, { label: string; color: string }> = {
   in_service: { label: "In service", color: "blue" },
@@ -59,18 +61,23 @@ export default function FixedAssetReportClient({
   companyName,
   currencyCode,
   currencyDecimals,
+  presets,
 }: {
   assets: FixedAssetView[];
   depreciation: AssetDepreciationDetail[];
   companyName: string;
   currencyCode: string;
   currencyDecimals: number;
+  presets: PresetContext;
 }) {
-  const { today } = useCompanyClock();
   const [view, setView] = useState<ReportView>("register");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState<FixedAssetStatus | "all">("all");
-  const [dateRange, setDateRange] = useState<DateRange>(null);
+  // Opens on All dates, as the report always has: every asset, unfiltered.
+  const everything = useMemo<Period>(() => ({ preset: "all", ...presetRange("all", presets) }), [presets]);
+  const [draft, setDraft] = useState<Period>(everything);
+  const [applied, setApplied] = useState<Period>(everything);
+  const dateRange = applied.preset === "all" ? null : { from: applied.from, to: applied.to };
   const [assetsPageSize, setAssetsPageSize] = useState<number>(ASSET_REGISTER_DEFAULT_PAGE_SIZE);
   const [depreciationPageSize, setDepreciationPageSize] = useState<number>(
     DEPRECIATION_DEFAULT_PAGE_SIZE,
@@ -87,15 +94,12 @@ export default function FixedAssetReportClient({
       assets.filter((asset) => {
         if (category !== "all" && asset.category !== category) return false;
         if (status !== "all" && asset.status !== status) return false;
-        if (dateRange?.[0] && asset.in_service_date < dateRange[0].format("YYYY-MM-DD")) {
-          return false;
-        }
-        if (dateRange?.[1] && asset.in_service_date > dateRange[1].format("YYYY-MM-DD")) {
-          return false;
-        }
+        if (dateRange && asset.in_service_date < dateRange.from) return false;
+        if (dateRange && asset.in_service_date > dateRange.to) return false;
         return true;
       }),
-    [assets, category, dateRange, status],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets, category, applied, status],
   );
 
   const filteredDepreciation = useMemo(
@@ -103,11 +107,12 @@ export default function FixedAssetReportClient({
       depreciation.filter((row) => {
         if (category !== "all" && row.category !== category) return false;
         if (status !== "all" && row.asset_status !== status) return false;
-        if (dateRange?.[0] && row.period_end < dateRange[0].format("YYYY-MM-DD")) return false;
-        if (dateRange?.[1] && row.period_end > dateRange[1].format("YYYY-MM-DD")) return false;
+        if (dateRange && row.period_end < dateRange.from) return false;
+        if (dateRange && row.period_end > dateRange.to) return false;
         return true;
       }),
-    [category, dateRange, depreciation, status],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [category, applied, depreciation, status],
   );
 
   const registerTotals = useMemo(
@@ -146,9 +151,9 @@ export default function FixedAssetReportClient({
     [filteredDepreciation],
   );
 
-  const subtitle = `${dateRange?.[0] ? formatDate(dateRange[0].format("YYYY-MM-DD")) : "All dates"} – ${
-    dateRange?.[1] ? formatDate(dateRange[1].format("YYYY-MM-DD")) : "present"
-  } · ${category === "all" ? "All categories" : category}`;
+  const subtitle = `${dateRange ? `${formatDate(dateRange.from)} – ${formatDate(dateRange.to)}` : "All dates"} · ${
+    category === "all" ? "All categories" : category
+  }`;
 
   const exportSheet: ReportExportSheet = useMemo(
     () =>
@@ -228,6 +233,8 @@ export default function FixedAssetReportClient({
       currencyDecimals,
     ],
   );
+
+  const rowCount = view === "register" ? filteredAssets.length : filteredDepreciation.length;
 
   const assetColumns: TableColumnsType<FixedAssetView> = [
     {
@@ -357,56 +364,56 @@ export default function FixedAssetReportClient({
         ]}
       />
 
-      <FilterBar
-        resultCount={view === "register" ? filteredAssets.length : filteredDepreciation.length}
+      <ReportBar
         ariaLabel="Fixed asset report filters"
-        actions={
-          <ReportExportButtons
-            sheet={exportSheet}
-            disabled={
-              view === "register" ? filteredAssets.length === 0 : filteredDepreciation.length === 0
+        resultCount={rowCount}
+        dates={{
+          kind: "range",
+          preset: draft.preset,
+          from: draft.from,
+          to: draft.to,
+          onPreset: (key) => {
+            if (key === "custom") {
+              setDraft((previous) => ({ ...previous, preset: "custom" }));
+              return;
             }
-          />
+            const next = { preset: key, ...presetRange(key, presets) };
+            setDraft(next);
+            setApplied(next);
+          },
+          onFrom: (d) => setDraft((previous) => ({ ...previous, preset: "custom", from: d })),
+          onTo: (d) => setDraft((previous) => ({ ...previous, preset: "custom", to: d })),
+        }}
+        filters={
+          <>
+            <Select
+              aria-label="Category"
+              value={category}
+              onChange={setCategory}
+              style={{ width: 240 }}
+              options={[
+                { value: "all", label: "All categories" },
+                ...categories.map((value) => ({ value, label: value })),
+              ]}
+            />
+            <Select
+              aria-label="Asset status"
+              value={status}
+              onChange={setStatus}
+              style={{ width: 180 }}
+              options={[
+                { value: "all", label: "All asset statuses" },
+                { value: "in_service", label: "In service" },
+                { value: "fully_depreciated", label: "Fully depreciated" },
+                { value: "disposed", label: "Disposed" },
+              ]}
+            />
+          </>
         }
-      >
-        <Space wrap>
-          <DatePicker.RangePicker
-            value={dateRange}
-            onChange={(value) => setDateRange(value)}
-            format="MM/DD/YYYY"
-            presets={[
-              { label: "Year to date", value: [dayjs(today).startOf("year"), dayjs(today)] },
-              {
-                label: "Prior year",
-                value: [
-                  dayjs(today).subtract(1, "year").startOf("year"),
-                  dayjs(today).subtract(1, "year").endOf("year"),
-                ],
-              },
-            ]}
-          />
-          <Select
-            value={category}
-            onChange={setCategory}
-            style={{ width: 240 }}
-            options={[
-              { value: "all", label: "All categories" },
-              ...categories.map((value) => ({ value, label: value })),
-            ]}
-          />
-          <Select
-            value={status}
-            onChange={setStatus}
-            style={{ width: 180 }}
-            options={[
-              { value: "all", label: "All asset statuses" },
-              { value: "in_service", label: "In service" },
-              { value: "fully_depreciated", label: "Fully depreciated" },
-              { value: "disposed", label: "Disposed" },
-            ]}
-          />
-        </Space>
-      </FilterBar>
+        onRun={() => setApplied(draft)}
+        loading={false}
+        sheet={rowCount > 0 ? exportSheet : null}
+      />
 
       {view === "register" ? (
         <>

@@ -1,12 +1,12 @@
 "use client";
-import { useState } from "react";
-import { App, Button, DatePicker, Select, Space, Statistic, Typography } from "antd";
-import type { Dayjs } from "dayjs";
-import DataTable from "@/components/ui/DataTable";
-import FilterBar from "@/components/ui/FilterBar";
-import { formatDate, formatMoney } from "@/lib/format";
+import { useCallback, useState } from "react";
+import { Select } from "antd";
+import SimpleReport from "@/components/reports/SimpleReport";
+import StatementBody, { type PartyStatement } from "@/components/reports/StatementBody";
+import { partyStatementSheet } from "@/lib/domain/ledger-report-sheets";
+import type { PresetContext } from "@/lib/domain/report-presets";
+import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { customerStatementAction } from "./actions";
-import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
 interface Customer {
   id: string;
@@ -14,80 +14,70 @@ interface Customer {
 }
 interface Props {
   customers: Customer[];
+  companyName: string;
   baseCurrency: string;
   baseDecimals: number;
+  presets: PresetContext;
 }
 
-export default function CustomerStatementClient({ customers, baseCurrency, baseDecimals }: Props) {
-  const { message } = App.useApp();
+export default function CustomerStatementClient({ customers, companyName, baseCurrency, baseDecimals, presets }: Props) {
   const [customerId, setCustomerId] = useState<string>();
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
-  const [rep, setRep] = useState<StatementReport | null>(null);
-  const [loading, setLoading] = useState(false);
-  const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
+  // Choosing another customer runs the report again over the dates last run.
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const run = async () => {
-    if (!customerId || !range) {
-      message.warning("Pick a customer and date range");
-      return;
-    }
-    setLoading(true);
-    const r = await customerStatementAction(customerId, range[0].format("YYYY-MM-DD"), range[1].format("YYYY-MM-DD"));
-    setLoading(false);
-    if (r.ok && r.data) setRep(r.data);
-    else message.error(r.error ?? "Failed to load");
-  };
+  const load = useCallback(
+    async (when: ReportWhen): Promise<ReportRunResult<PartyStatement>> => {
+      const customer = customers.find((c) => c.id === customerId);
+      if (!customer) return { ok: false, error: "Choose a customer." };
+      const r = await customerStatementAction(customer.id, when.from ?? when.to, when.to);
+      if (!r.ok || !r.data) return { ok: false, error: r.error };
+      return { ok: true, data: { partyName: customer.name, report: r.data } };
+    },
+    [customers, customerId],
+  );
+  const sheet = useCallback(
+    (data: PartyStatement, when: ReportWhen) =>
+      partyStatementSheet("customer", data.partyName, data.report, when, { companyName, currencyCode: baseCurrency, baseDecimals }),
+    [companyName, baseCurrency, baseDecimals],
+  );
 
   return (
-    <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <FilterBar
-        resultCount={rep?.rows.length}
-        ariaLabel="Customer statement filters"
-        actions={
-          <Button type="primary" loading={loading} onClick={run}>
-            Run statement
-          </Button>
-        }
-      >
+    <SimpleReport<PartyStatement>
+      companyName={companyName}
+      title="Customer Statement"
+      currencyCode={baseCurrency}
+      period={{ kind: "range", ctx: presets, preset: "year" }}
+      load={load}
+      sheet={sheet}
+      runningText="Reading the customer's documents…"
+      refreshKey={refreshKey}
+      waitFor={
+        customerId
+          ? null
+          : {
+              title: "Choose a customer",
+              description:
+                "Pick the customer whose statement you want. It opens for this year; change the dates and Run report for another period.",
+            }
+      }
+      filters={
         <Select
           showSearch
-          style={{ width: 320 }}
+          style={{ width: 280 }}
           placeholder="Customer"
+          aria-label="Customer"
           optionFilterProp="label"
           value={customerId}
           options={customers.map((c) => ({ value: c.id, label: c.name }))}
-          onChange={setCustomerId}
+          onChange={(id) => {
+            if (customerId) setRefreshKey((key) => key + 1);
+            setCustomerId(id);
+          }}
         />
-        <DatePicker.RangePicker value={range} onChange={(v) => v && setRange([v[0]!, v[1]!])} />
-      </FilterBar>
-      {rep && (
-        <>
-          <Typography.Text type="secondary">Base currency {baseCurrency} · Accrual basis</Typography.Text>
-          <Typography.Text type="secondary">
-            Opening balance reflects current open items dated before the period (historical point-in-time statements
-            are a later enhancement).
-          </Typography.Text>
-          <Space size="large">
-            <Statistic title="Opening balance" value={fmt(rep.openingMinor)} />
-            <Statistic title="Closing balance" value={fmt(rep.closingMinor)} />
-          </Space>
-          <DataTable<StatementRow>
-            rowKey={(r) => `${r.docType}-${r.docNumber}-${r.txnDate}`}
-            dataSource={rep.rows}
-            pagination={false}
-            loading={loading}
-            emptyTitle="No statement activity"
-            emptyDescription="No customer transactions were found for this date range."
-            columns={[
-              { title: "Date", dataIndex: "txnDate", render: (v: string) => formatDate(v) },
-              { title: "Type", dataIndex: "docType" },
-              { title: "Number", dataIndex: "docNumber" },
-              { title: "Amount", align: "right", render: (_, r) => fmt(r.amountMinor) },
-              { title: "Running", align: "right", render: (_, r) => fmt(r.runningMinor) },
-            ]}
-          />
-        </>
+      }
+      render={(data, _when, { printing }) => (
+        <StatementBody kind="customer" data={data} currencyCode={baseCurrency} decimals={baseDecimals} printing={printing} />
       )}
-    </Space>
+    />
   );
 }

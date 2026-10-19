@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCurrencies } from "@/lib/services/reference";
 import { getInventoryPolicy } from "@/lib/services/inventory-review";
+import { getCurrentCompanySettings } from "@/lib/services/company";
 import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
@@ -11,7 +12,11 @@ export const dynamic = "force-dynamic";
 export default async function InventoryValuationPage() {
   const sb = await createSupabaseServerClient();
   const entity = await resolveActiveCompany();
-  const [currencies, policy] = await Promise.all([listCurrencies(sb), getInventoryPolicy(sb)]);
+  const [currencies, policy, company] = await Promise.all([
+    listCurrencies(sb),
+    getInventoryPolicy(sb),
+    getCurrentCompanySettings(sb),
+  ]);
   const base = currencies.find((c) => c.is_base);
   return (
     <div>
@@ -28,6 +33,7 @@ export default async function InventoryValuationPage() {
       <InventoryValuationClient
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        companyName={company?.legal_name ?? "Company name not set"}
         valuationMethod={policy.method}
         policyMemo={policy.memo}
       />

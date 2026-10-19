@@ -1,12 +1,14 @@
 "use client";
 import { sourceLabel } from "@/lib/domain/entry-detail";
-import { useCallback, useEffect, useState, type Key } from "react";
-import { App, DatePicker, Select, Space, Table, Tag, Typography } from "antd";
-import type { Dayjs } from "dayjs";
+import { useCallback, useState, type Key } from "react";
+import { Select, Table, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
-import FilterBar from "@/components/ui/FilterBar";
+import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { formatDate, formatMoney } from "@/lib/format";
+import { journalReportSheet } from "@/lib/domain/ledger-report-sheets";
+import type { PresetContext } from "@/lib/domain/report-presets";
+import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { journalReportAction } from "./actions";
 import type { JournalEntrySummary } from "@/lib/services/journal";
 
@@ -25,92 +27,103 @@ const SOURCES = [
   "cash_count",
 ];
 
+const PAGE_SIZE = 50;
+
 interface Props {
+  companyName: string;
+  presets: PresetContext;
   baseCurrency: string;
   baseDecimals: number;
   initialEntryId?: string;
 }
 
-export default function JournalReportClient({ baseCurrency, baseDecimals, initialEntryId }: Props) {
-  const { message } = App.useApp();
-  const [data, setData] = useState<JournalEntrySummary[]>([]);
-  const [loading, setLoading] = useState(false);
+export default function JournalReportClient({ companyName, presets, baseCurrency, baseDecimals, initialEntryId }: Props) {
   const [source, setSource] = useState<string>();
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+  // A new source runs the report again over the dates last run.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [expandedRowKeys, setExpandedRowKeys] = useState<Key[]>(
     initialEntryId ? [initialEntryId] : [],
   );
   const fmt = (m: number) => (m ? formatMoney(m, baseCurrency, baseDecimals) : "");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const r = await journalReportAction({
-      entryId: initialEntryId ?? null,
-      sourceType: source ?? null,
-      from: range ? range[0].format("YYYY-MM-DD") : null,
-      to: range ? range[1].format("YYYY-MM-DD") : null,
-    });
-    setLoading(false);
-    if (r.ok && r.data) setData(r.data);
-    else message.error(r.error ?? "Failed to load");
-  }, [source, range, initialEntryId, message]);
-
-  // Data-synchronization effect: reload the report whenever the source or
-  // date-range filter changes. load() flips a loading flag then fetches via a
-  // server action — an intentional load, not derived render state.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load]);
+  // An "All dates" period has no start, which the report reads as every date.
+  const load = useCallback(
+    async (when: ReportWhen): Promise<ReportRunResult<JournalEntrySummary[]>> =>
+      journalReportAction({
+        entryId: initialEntryId ?? null,
+        sourceType: source ?? null,
+        from: when.from,
+        to: when.to,
+      }),
+    [source, initialEntryId],
+  );
+  const sheet = useCallback(
+    (entries: JournalEntrySummary[], when: ReportWhen) =>
+      journalReportSheet(entries, when, { companyName, currencyCode: baseCurrency, baseDecimals }),
+    [companyName, baseCurrency, baseDecimals],
+  );
 
   return (
-    <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <FilterBar resultCount={data.length} ariaLabel="Journal report filters">
+    <SimpleReport<JournalEntrySummary[]>
+      companyName={companyName}
+      title="Journal Report"
+      currencyCode={baseCurrency}
+      period={{ kind: "range", ctx: presets, preset: "all" }}
+      load={load}
+      sheet={sheet}
+      runningText="Reading the journal…"
+      refreshKey={refreshKey}
+      filters={
         <Select
           allowClear
           style={{ width: 200 }}
           placeholder="Source"
+          aria-label="Source"
           value={source}
-          onChange={setSource}
-          options={SOURCES.map((source) => ({ value: source, label: sourceLabel(source) }))}
+          onChange={(value) => {
+            setSource(value);
+            setRefreshKey((key) => key + 1);
+          }}
+          options={SOURCES.map((s) => ({ value: s, label: sourceLabel(s) }))}
         />
-        <DatePicker.RangePicker value={range} onChange={(v) => setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)} />
-      </FilterBar>
-      <Typography.Text type="secondary">Base currency {baseCurrency}</Typography.Text>
-      <DataTable<JournalEntrySummary>
-        rowKey="id"
-        loading={loading}
-        dataSource={data}
-        emptyTitle="No journal entries"
-        emptyDescription="No entries match the selected source and date range."
-        expandable={{
-          expandedRowKeys,
-          onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys]),
-          expandedRowRender: (e) => (
-            <Table
-              size="small"
-              rowKey={(_, i) => String(i)}
-              pagination={false}
-              dataSource={e.lines}
-              columns={[
-                { title: "Account", render: (_, l) => `${l.accountCode} ${l.accountName}` },
-                { title: "Debit", align: "right", render: (_, l) => fmt(l.debitMinor) },
-                { title: "Credit", align: "right", render: (_, l) => fmt(l.creditMinor) },
-              ]}
-            />
-          ),
-        }}
-        columns={[
-          { title: "Number", dataIndex: "entryNumber" },
-          { title: "Date", dataIndex: "entryDate", render: (v: string) => formatDate(v) },
-          { title: "Source", dataIndex: "sourceType", render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
-          { title: "Description", dataIndex: "description" },
-          {
-            title: "Status",
-            render: (_, e) => (e.isReversed ? <StatusTag status="reversed" /> : <StatusTag status={e.status} />),
-          },
-        ]}
-      />
-    </Space>
+      }
+      render={(data, _when, { printing }) => (
+        <DataTable<JournalEntrySummary>
+          rowKey="id"
+          dataSource={data}
+          pagination={reportPagination(printing, pageSize, setPageSize, PAGE_SIZE)}
+          emptyTitle="No journal entries"
+          emptyDescription="No entries match the selected source and date range."
+          expandable={{
+            expandedRowKeys,
+            onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys]),
+            expandedRowRender: (e) => (
+              <Table
+                size="small"
+                rowKey={(_, i) => String(i)}
+                pagination={false}
+                dataSource={e.lines}
+                columns={[
+                  { title: "Account", render: (_, l) => `${l.accountCode} ${l.accountName}` },
+                  { title: "Debit", align: "right", render: (_, l) => fmt(l.debitMinor) },
+                  { title: "Credit", align: "right", render: (_, l) => fmt(l.creditMinor) },
+                ]}
+              />
+            ),
+          }}
+          columns={[
+            { title: "Number", dataIndex: "entryNumber" },
+            { title: "Date", dataIndex: "entryDate", render: (v: string) => formatDate(v) },
+            { title: "Source", dataIndex: "sourceType", render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
+            { title: "Description", dataIndex: "description" },
+            {
+              title: "Status",
+              render: (_, e) => (e.isReversed ? <StatusTag status="reversed" /> : <StatusTag status={e.status} />),
+            },
+          ]}
+        />
+      )}
+    />
   );
 }

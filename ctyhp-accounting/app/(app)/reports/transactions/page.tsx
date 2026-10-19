@@ -6,6 +6,7 @@ import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/format";
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import { resolveActiveCompany } from "@/lib/db/company";
+import { reportPageContext } from "@/lib/services/report-context";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import TransactionListClient from "./TransactionListClient";
@@ -35,12 +36,13 @@ export default async function TransactionListPage({
   const to = ISO_DATE.test(params.to ?? "") ? params.to! : fallback.to;
 
   const entity = await resolveActiveCompany();
-  const [rows, currencies, accounts] = await Promise.all([
+  const [rows, currencies, accounts, context] = await Promise.all([
     getTransactionList(sb, from, to),
     listCurrencies(sb),
     // Only to label the account filter. The rows decide which accounts are
     // offered; the chart decides what each one is called.
     listAccounts(sb),
+    reportPageContext(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
 
@@ -64,6 +66,7 @@ export default async function TransactionListPage({
         companyName={settings?.legal_name ?? "This company"}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
+        presets={context.presets}
         accountNames={Object.fromEntries(
           accounts.map((account) => [
             account.id,

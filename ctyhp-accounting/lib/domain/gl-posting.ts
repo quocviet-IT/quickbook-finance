@@ -9,7 +9,11 @@
  * document without an entry should be impossible. This module exists to prove
  * that continuously rather than to assume it.
  */
-import { formatDate, plural, pluralWord } from "@/lib/format";
+import { formatDate, formatDateRange, plural, pluralWord } from "@/lib/format";
+import { sourceLabel } from "./entry-detail";
+import { fromMinor } from "./money";
+import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
+import { statusLabel } from "./status-label";
 
 export interface PostingRow {
   sourceType: string;
@@ -229,4 +233,68 @@ export function describeControlExceptions(recon: ControlReconciliation): string 
     })
     .join("; ");
   return `${plural(recon.exceptions.length, "control account")} ${pluralWord(recon.exceptions.length, "does", "do")} not tie out as of ${formatDate(recon.asOf)}: ${named}.`;
+}
+
+/** What Copy, CSV, PDF and Excel hand over for the Documents to ledger view: the rows on screen. */
+export function postingSheet(
+  report: PostingReport,
+  ctx: { companyName: string; currencyCode: string; decimals: number; from: string; to: string },
+): ReportExportSheet {
+  return {
+    fileName: sanitizeExportFileName(`gl-posting-${ctx.from}-${ctx.to}`),
+    companyName: ctx.companyName,
+    title: "General Ledger Posting",
+    subtitle: formatDateRange(ctx.from, ctx.to),
+    currencyCode: ctx.currencyCode,
+    columns: [
+      { key: "type", header: "Type", kind: "text" },
+      { key: "number", header: "Document", kind: "text" },
+      { key: "date", header: "Date", kind: "text" },
+      { key: "party", header: "Name", kind: "text" },
+      { key: "status", header: "Status", kind: "text" },
+      { key: "amount", header: "Amount", kind: "money" },
+      { key: "entry", header: "Journal entry", kind: "text" },
+      { key: "verdict", header: "Posting", kind: "text" },
+    ],
+    rows: report.rows.map((row) => ({
+      type: SOURCE_TYPE_LABEL[row.sourceType] ?? sourceLabel(row.sourceType),
+      number: row.documentNumber ?? "(unnumbered)",
+      date: row.documentDate,
+      party: row.partyName,
+      status: statusLabel(row.documentStatus),
+      amount: fromMinor(row.amountMinor, ctx.decimals),
+      entry: row.entryNumber ?? "",
+      verdict: POSTING_VERDICT_LABEL[row.verdict],
+    })),
+  };
+}
+
+/** The same for the Control accounts view. */
+export function controlSheet(
+  recon: ControlReconciliation,
+  ctx: { companyName: string; currencyCode: string; decimals: number },
+): ReportExportSheet {
+  return {
+    fileName: sanitizeExportFileName(`gl-control-accounts-${recon.asOf}`),
+    companyName: ctx.companyName,
+    title: "General Ledger Posting: Control Accounts",
+    subtitle: formatDateRange(null, recon.asOf),
+    currencyCode: ctx.currencyCode,
+    columns: [
+      { key: "control", header: "Control account", kind: "text" },
+      { key: "ledger", header: "Ledger account", kind: "text" },
+      { key: "subledger", header: "Subledger", kind: "money" },
+      { key: "balance", header: "Ledger balance", kind: "money" },
+      { key: "variance", header: "Variance", kind: "money" },
+      { key: "result", header: "Result", kind: "text" },
+    ],
+    rows: recon.rows.map((row) => ({
+      control: row.label,
+      ledger: row.accountCodes ?? "not configured",
+      subledger: row.hasSubledger ? fromMinor(row.subledgerMinor, ctx.decimals) : null,
+      balance: fromMinor(row.controlMinor, ctx.decimals),
+      variance: row.hasSubledger ? fromMinor(row.varianceMinor, ctx.decimals) : null,
+      result: row.tiesOut ? "Ties out" : row.hasSubledger ? "Out" : "No subledger",
+    })),
+  };
 }

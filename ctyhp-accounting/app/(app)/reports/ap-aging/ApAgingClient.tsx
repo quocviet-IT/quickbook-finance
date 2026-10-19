@@ -1,13 +1,14 @@
 "use client";
-import { useState } from "react";
-import { App, Alert, Button, DatePicker, Space, Tag, Typography } from "antd";
-import type { Dayjs } from "dayjs";
+import { useEffect, useMemo, useState } from "react";
+import { App, Alert, Space, Tag, Typography } from "antd";
 import { AgingComparisonChart } from "@/components/charts/FinancialCharts";
 import { ReportBody } from "@/components/reports/ReportAudience";
 import AgingByPartyTable, {
   type AgingGrouping,
 } from "@/components/reports/AgingByPartyTable";
-import FilterBar from "@/components/ui/FilterBar";
+import ReportBar from "@/components/reports/ReportBar";
+import { useCompanyClock } from "@/components/CompanyClock";
+import { agingExportSheet } from "@/lib/domain/aging-export";
 import { formatDate, formatMoney } from "@/lib/format";
 import { apAgingAction } from "./actions";
 import type { AgingReport } from "@/lib/services/aging";
@@ -19,6 +20,7 @@ const BUCKETS = [
   ["d61_90", "61–90"],
   ["d90_plus", "90+"],
 ] as const;
+const PARTY = "Vendor";
 
 export default function ApAgingClient({
   baseCurrency,
@@ -31,42 +33,63 @@ export default function ApAgingClient({
 }) {
   const { message } = App.useApp();
   const [rep, setRep] = useState<AgingReport | null>(null);
-  const [asOf, setAsOf] = useState<Dayjs | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { today } = useCompanyClock();
+  const [asOf, setAsOf] = useState(today);
+  // The date the shown report was run for; the picker may have moved on since.
+  const [ranAsOf, setRanAsOf] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   // The party view first: "who is late" is the question this report is
   // opened with; the document list is one click away.
   const [grouping, setGrouping] = useState<AgingGrouping>("grid");
   const fmt = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   const run = async () => {
-    if (!asOf) {
-      message.warning("Pick an as-of date");
-      return;
-    }
     setLoading(true);
-    const r = await apAgingAction(asOf.format("YYYY-MM-DD"));
+    const r = await apAgingAction(asOf);
     setLoading(false);
-    if (r.ok && r.data) setRep(r.data);
-    else message.error(r.error ?? "Failed");
+    if (r.ok && r.data) {
+      setRep(r.data);
+      setRanAsOf(asOf);
+    } else message.error(r.error ?? "Failed");
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void run();
+    // Runs once on arrival; afterwards the date and Run report do it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sheet = useMemo(
+    () =>
+      rep && ranAsOf
+        ? agingExportSheet({
+            grouping,
+            rows: rep.rows,
+            partyLabel: PARTY,
+            companyName,
+            asOf: ranAsOf,
+            currencyCode: baseCurrency,
+            baseDecimals,
+          })
+        : null,
+    [rep, ranAsOf, grouping, companyName, baseCurrency, baseDecimals],
+  );
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <FilterBar
+      <ReportBar
+        dates={{ kind: "asOf", to: asOf, onTo: setAsOf }}
+        onRun={() => void run()}
+        loading={loading}
+        sheet={sheet}
         resultCount={rep?.rows.length}
-        ariaLabel="Accounts Payable aging filters"
-        actions={
-          <Button type="primary" loading={loading} onClick={run}>
-            Run report
-          </Button>
-        }
-      >
-        <DatePicker value={asOf} onChange={setAsOf} placeholder="As of" />
-      </FilterBar>
-      {rep && (
-        <>
+      />
+      {rep && ranAsOf && (
+        <div className="report-print-area">
+        <Space direction="vertical" style={{ width: "100%" }} size="large">
           <Typography.Text type="secondary">
-            Current open balances in {baseCurrency} · aged as of {formatDate(asOf!.format("YYYY-MM-DD"))} · Accrual basis
+            Current open balances in {baseCurrency} · aged as of {formatDate(ranAsOf!)} · Accrual basis
           </Typography.Text>
           <Alert
             type={rep.reconciled ? "success" : "warning"}
@@ -88,15 +111,13 @@ export default function ApAgingClient({
             numbers={
               <AgingByPartyTable
                 rows={rep.rows}
-                partyLabel="Vendor"
+                partyLabel={PARTY}
                 money={(minor) => fmt(minor)}
                 grouping={grouping}
                 onGroupingChange={setGrouping}
                 loading={loading}
                 companyName={companyName}
-                asOf={asOf!.format("YYYY-MM-DD")}
-                currencyCode={baseCurrency}
-                baseDecimals={baseDecimals}
+                asOf={ranAsOf!}
                 emptyTitle="No open payables"
                 emptyDescription="There are no vendor balances outstanding as of this date."
                 documentColumns={[
@@ -122,7 +143,8 @@ export default function ApAgingClient({
               />
             }
           />
-        </>
+        </Space>
+        </div>
       )}
     </Space>
   );
