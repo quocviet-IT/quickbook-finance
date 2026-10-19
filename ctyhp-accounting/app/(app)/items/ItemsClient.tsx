@@ -190,7 +190,7 @@ export default function ItemsClient({
           allowClear
           aria-label="Search items by code, name, or description"
           placeholder="Search code, name, or description"
-          style={{ width: 280 }}
+          style={{ width: 300 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />

@@ -209,7 +209,7 @@ export default function PayBillsClient({
           showSizeChanger: true,
         }}
         columns={[
-          { title: "Payment Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
+          { title: "Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
           // The elastic column: a vendor name is text somebody typed.
           flexColumn<BillPaymentRow & { vendor_name: string }>({ title: "Vendor", dataIndex: "vendor_name" }),
           { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },

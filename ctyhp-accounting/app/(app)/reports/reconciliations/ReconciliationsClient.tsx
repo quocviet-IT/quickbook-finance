@@ -104,7 +104,7 @@ export default function ReconciliationsClient({
             columns={[
               flexColumn<ReconciliationListLine>({ title: "Bank account", dataIndex: "bankAccountName" }),
               {
-                title: "Statement ending",
+                title: "Statement date",
                 dataIndex: "statementEndingDate",
                 width: COLUMN.DATE + 32,
                 render: (d: string) => formatDate(d),

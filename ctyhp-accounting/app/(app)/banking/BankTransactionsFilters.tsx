@@ -106,7 +106,7 @@ export default function BankTransactionsFilters({
         value: suggestion.value,
         label: (
           <Space style={{ width: "100%", justifyContent: "space-between" }} size={12}>
-            <Typography.Text ellipsis style={{ maxWidth: 300 }}>
+            <Typography.Text ellipsis title={suggestion.value} style={{ maxWidth: 300 }}>
               {suggestion.value}
             </Typography.Text>
             <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>

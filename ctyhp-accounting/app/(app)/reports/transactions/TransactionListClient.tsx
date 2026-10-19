@@ -165,7 +165,7 @@ export default function TransactionListClient({
             <Input.Search
               allowClear
               placeholder="Search description, number, name"
-              style={{ width: 260 }}
+              style={{ width: 290 }}
               value={filter.search}
               onChange={(event) => set("search", event.target.value)}
             />

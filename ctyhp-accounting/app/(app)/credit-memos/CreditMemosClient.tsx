@@ -187,7 +187,7 @@ export default function CreditMemosClient({
           allowClear
           aria-label="Search credit memos by number, customer, or reason"
           placeholder="Search number, customer, or reason"
-          style={{ width: 280 }}
+          style={{ width: 310 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />

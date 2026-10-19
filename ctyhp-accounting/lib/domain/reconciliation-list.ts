@@ -94,7 +94,7 @@ export function reconciliationListSheet(
     currencyCode: ctx.currencyCode,
     columns: [
       { key: "account", header: "Bank account", kind: "text", width: 30 },
-      { key: "ending", header: "Statement ending", kind: "text", width: 14 },
+      { key: "ending", header: "Statement date", kind: "text", width: 14 },
       { key: "balance", header: "Ending balance", kind: "money", width: 16 },
       { key: "by", header: "Signed off by", kind: "text", width: 28 },
       { key: "at", header: "Signed off", kind: "text", width: 20 },

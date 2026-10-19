@@ -3,7 +3,7 @@ import { useCompanyClock } from "@/components/CompanyClock";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Card, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Button, Card, Space, Table, Tooltip, Typography, type TableColumnsType } from "antd";
 import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/lib/db/types";
 import { canDecide } from "@/lib/domain/access";
 import { formatDateTime, formatMoney, plural, pluralWord } from "@/lib/format";
@@ -11,11 +11,25 @@ import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { longTextColumn } from "@/components/ui/long-text-column";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 /** Rows a page for the decided-requests table. See table-pagination.ts for
  * why this has to live in state rather than as a literal on `pagination`. */
 const DECIDED_DEFAULT_PAGE_SIZE = 20;
+
+/** "10/19/2026 10:42 AM" at 14px, with the cell's padding. */
+const DATE_TIME_WIDTH = 160;
+/** Approve, Reject and Cancel side by side. */
+const ACTIONS_WIDTH = 232;
+/**
+ * The narrowest a text column gets. The Decided table has three of them beside
+ * 436px of fixed columns, and all of it fits the 984px a table has at 1280.
+ */
+const TEXT_FLOOR = 160;
+/** A reason or a note, cut to its column, whole in a tooltip that wraps. */
+const longText = longTextColumn().render;
 
 export default function ApprovalsClient({
   initialFocusId,
@@ -114,17 +128,31 @@ export default function ApprovalsClient({
     }
   }
 
-  const commonColumns = [
-    { title: "Request", dataIndex: "title" },
-    { title: "Action", dataIndex: "action_key", render: (v: string) => <Tag>{humanizeStatus(v)}</Tag> },
+  // Every column but the text ones has a width, and the text ones share the
+  // rest. With no widths at all, the Reason column's ellipsis switched the
+  // table to a fixed layout and split what was left evenly: 67px a column at
+  // 1280, which broke "Requested" into "Requeste/d" (UI review, 2026-10-19).
+  // The action reads under the request, as a narrowed table's second line does.
+  const commonColumns: TableColumnsType<ApprovalRequestRow> = [
+    flexColumn<ApprovalRequestRow>({
+      title: "Request",
+      key: "title",
+      render: (_: unknown, r: ApprovalRequestRow) => (
+        <div style={{ minWidth: 0 }}>
+          <span title={r.title}>{r.title}</span>
+          {secondaryLine(humanizeStatus(r.action_key))}
+        </div>
+      ),
+    }),
     {
       title: "Amount",
       dataIndex: "amount_minor",
+      width: COLUMN.MONEY,
       align: "right" as const,
       render: (v: number) => (v ? money(Number(v)) : "—"),
     },
-    { title: "Reason", dataIndex: "reason", ...longTextColumn() },
-    { title: "Requested", dataIndex: "requested_at", render: (v: string) => formatDateTime(v, timeZone) },
+    flexColumn<ApprovalRequestRow>({ title: "Reason", dataIndex: "reason", floor: TEXT_FLOOR, render: longText }),
+    { title: "Requested", dataIndex: "requested_at", width: DATE_TIME_WIDTH, render: (v: string) => formatDateTime(v, timeZone) },
   ];
 
   const enabledPolicies = policies.filter((p) => p.enabled);
@@ -191,6 +219,7 @@ export default function ApprovalsClient({
             {
               title: "Actions",
               key: "actions",
+              width: ACTIONS_WIDTH,
               render: (_, r) => {
                 const d = decision(r);
                 const mine = r.requested_by === currentUserId;
@@ -240,12 +269,18 @@ export default function ApprovalsClient({
           columns={[
             ...commonColumns,
             {
+              // When it was decided reads under the decision.
               title: "Status",
               dataIndex: "status",
-              render: (v: ApprovalStatus) => <StatusTag status={v} />,
+              width: DATE_TIME_WIDTH,
+              render: (v: ApprovalStatus, r) => (
+                <div style={{ minWidth: 0 }}>
+                  <StatusTag status={v} />
+                  {r.decided_at ? secondaryLine(formatDateTime(r.decided_at, timeZone)) : null}
+                </div>
+              ),
             },
-            { title: "Decided", dataIndex: "decided_at", render: (v: string | null) => formatDateTime(v, timeZone) },
-            { title: "Note", dataIndex: "decision_note", ...longTextColumn() },
+            flexColumn<ApprovalRequestRow>({ title: "Note", dataIndex: "decision_note", floor: TEXT_FLOOR, render: longText }),
           ]}
         />
       </Card>

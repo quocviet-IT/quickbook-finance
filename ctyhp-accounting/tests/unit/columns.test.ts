@@ -260,13 +260,24 @@ describe("flexColumn", () => {
     expect(column.render!("   ", row, 0)).toBe("—");
   });
 
-  it("hands a screen its own renderer untouched", () => {
+  it("gives a screen's own renderer's words a title, since the cell cuts them", () => {
+    // It used to hand the string back untouched, so a renderer returning plain
+    // words (the Bank account on Exceptions) was cut with no way to read the
+    // rest (UI review, 2026-10-19).
     const column = flexColumn<Row>({
       title: "Description",
       key: "description",
       render: () => "whatever the screen builds",
     });
-    expect(column.render!(null, row, 0)).toBe("whatever the screen builds");
+    const cell = asElement(column.render!(null, row, 0), "own renderer");
+    expect(cell.props.title).toBe("whatever the screen builds");
+    expect(cell.props.children).toBe("whatever the screen builds");
+  });
+
+  it("hands back an element the screen built as it is", () => {
+    const built = secondaryLine("built by the screen");
+    const column = flexColumn<Row>({ title: "Vendor", key: "vendor", render: () => built });
+    expect(column.render!(null, row, 0)).toBe(built);
   });
 });
 
@@ -278,5 +289,12 @@ describe("secondaryLine", () => {
     expect(line.props.style?.textOverflow).toBe("ellipsis");
     // The muted token, never a hex value written here.
     expect(line.props.style?.color).toBe(TOKENS.text.secondary);
+  });
+
+  it("is whole on hover: plain words carry themselves, a built line carries the words it is given", () => {
+    expect(asElement(secondaryLine("Bank of America · 121"), "plain").props.title).toBe("Bank of America · 121");
+    expect(asElement(secondaryLine(42), "number").props.title).toBe("42");
+    const built = asElement(secondaryLine(asElement(secondaryLine("JE-000004"), "inner"), "Ref 7 · JE-000004"), "built");
+    expect(built.props.title).toBe("Ref 7 · JE-000004");
   });
 });

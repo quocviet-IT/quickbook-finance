@@ -41,6 +41,17 @@ export interface CategoriseCellProps {
   recode?: BankRecodeRow | null;
 }
 
+/** A suggestion's tooltip: the account, whole, since the cell cuts it; then why it is suggested. */
+function WhyTip({ account, why }: { account: string; why: string }) {
+  return (
+    <>
+      <strong>{account}</strong>
+      <br />
+      {why}
+    </>
+  );
+}
+
 /**
  * Which account the other side of this money belongs to.
  *
@@ -214,7 +225,8 @@ export default function CategoriseCell({
   const suggested = (withUse: boolean) =>
     suggestion ? (
       <>
-        <Tooltip title={suggestion.why}>
+        {/* The account is cut to the column; the tooltip names it whole, then says why. */}
+        <Tooltip title={<WhyTip account={suggestion.accountLabel} why={suggestion.why} />}>
           <Typography.Text type="secondary" style={{ ...small, display: "block", maxWidth: "100%" }} ellipsis>
             {suggestion.source === "history" ? "Usually " : "→ "}
             {suggestion.accountLabel}
@@ -236,7 +248,7 @@ export default function CategoriseCell({
   const loanSuggested = (withSplit: boolean) =>
     loan ? (
       <>
-        <Tooltip title={loan.why}>
+        <Tooltip title={<WhyTip account={loan.loanAccountLabel} why={loan.why} />}>
           <Typography.Text type="secondary" style={{ ...small, display: "block", maxWidth: "100%" }} ellipsis>
             → {loan.loanAccountLabel}
           </Typography.Text>
@@ -372,7 +384,8 @@ export default function CategoriseCell({
   return (
     <div style={{ width: "100%", minWidth: 0 }}>
       <Tooltip title="Choosing an account posts this line to the ledger">
-        {accountSelect(options, "Search accounts…", (accountId) => void post(accountId))}
+        {/* "Search accounts…" was cut to "Search accoun" in this column; the dialogs keep the long form. */}
+        {accountSelect(options, "Find account", (accountId) => void post(accountId))}
       </Tooltip>
       {suggested(true)}
       {loanSuggested(true)}

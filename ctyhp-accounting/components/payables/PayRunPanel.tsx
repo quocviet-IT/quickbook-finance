@@ -13,6 +13,11 @@ import {
 import { payRunAction } from "@/app/(app)/bills/actions";
 import { TOKENS } from "@/lib/design/tokens";
 import { statusToken } from "@/lib/design/status";
+import { COLUMN } from "@/lib/design/table-metrics";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+
+/** Vendor and Why share what the fixed columns leave: 962px in all at 1280, inside the 984 a table has. */
+const TEXT_FLOOR = 160;
 
 const PRIORITY_COLOR: Record<PayPriority, string> = {
   overdue: "red",
@@ -106,50 +111,61 @@ export default function PayRunPanel({
         dataSource={run?.rows ?? []}
         locale={{ emptyText: "No open bills — nothing to pay." }}
         rowClassName={(row) => (row.priority === "overdue" ? "report-table-row--exception" : "")}
+        // Fixed columns take the kit's widths and the two text columns share the
+        // rest. They were 870px of fixed widths, which left Vendor and Why 57px
+        // each at 1280, where "overdue" broke into "overdu/e" (UI review,
+        // 2026-10-19). Terms reads under the due date it explains.
         columns={[
           {
             title: "Priority",
             dataIndex: "priority",
-            width: 150,
+            width: COLUMN.STATUS,
             render: (value: PayPriority) => (
               <Tag color={PRIORITY_COLOR[value]}>{PRIORITY_LABEL[value]}</Tag>
             ),
           },
-          { title: "Vendor", dataIndex: "vendorName" },
+          flexColumn<RankedBill>({ title: "Vendor", dataIndex: "vendorName", floor: TEXT_FLOOR }),
           {
             title: "Bill",
             dataIndex: "billNumber",
-            width: 130,
+            width: COLUMN.CODE,
             render: (value: string | null) => value ?? <i>unnumbered</i>,
           },
           {
-            title: "Terms",
-            dataIndex: "termsLabel",
-            width: 110,
-            render: (value: string | null) => value ?? "—",
+            title: "Due",
+            dataIndex: "dueDate",
+            width: COLUMN.DATE,
+            render: (v: string | null, row) => (
+              <div style={{ minWidth: 0 }}>
+                {formatDate(v)}
+                {row.termsLabel ? secondaryLine(row.termsLabel) : null}
+              </div>
+            ),
           },
-          { title: "Due", dataIndex: "dueDate", width: 110, render: (v: string | null) => formatDate(v) },
-          {
+          flexColumn<RankedBill>({
             title: "Why",
             dataIndex: "reason",
+            floor: TEXT_FLOOR,
             render: (value: string, row) =>
               row.priority === "overdue" ? (
-                <Typography.Text type="danger">{value}</Typography.Text>
+                <Typography.Text type="danger" title={value}>
+                  {value}
+                </Typography.Text>
               ) : (
                 value
               ),
-          },
+          }),
           {
             title: "Balance",
             dataIndex: "balanceDueMinor",
-            width: 130,
+            width: COLUMN.MONEY,
             align: "right",
             render: (value: number) => money(value),
           },
           {
             title: "Pay today",
             key: "payToday",
-            width: 150,
+            width: COLUMN.MONEY_WIDE,
             align: "right",
             render: (_: unknown, row) =>
               row.discountAvailableMinor > 0 ? (
@@ -169,7 +185,7 @@ export default function PayRunPanel({
                 {
                   title: "",
                   key: "action",
-                  width: 90,
+                  width: 64,
                   render: (_: unknown, row: RankedBill) => (
                     <Button size="small" type="link" onClick={() => onPayVendor(row.vendorId)}>
                       Pay

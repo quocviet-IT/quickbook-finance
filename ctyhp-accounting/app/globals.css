@@ -1315,6 +1315,10 @@ body {
   margin: 2px 0 0;
   font-size: 12px;
   font-weight: 400;
+  /* A card's heading is one line cut with an ellipsis; the sentence under it
+     wraps, or it read "…matching, or autho" on the Dashboard (UI review,
+     2026-10-19). */
+  white-space: normal;
 }
 
 .financial-chart__legend {
@@ -2900,13 +2904,14 @@ body {
   white-space: nowrap;
 }
 
+/* The filters wrap onto a second row rather than scroll: scrolled, the last one
+   read "Apprc" at the card's edge (UI review, 2026-10-19). */
 .dashboard-work-queue__filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 8px 12px;
-  overflow-x: auto;
   border-bottom: 1px solid var(--ob-panel-borderSoft);
-  scrollbar-width: thin;
 }
 
 .dashboard-work-queue__filters button {

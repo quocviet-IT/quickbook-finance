@@ -265,7 +265,7 @@ export default function PaymentsClient({
           allowClear
           aria-label="Search payments by number, customer, or reference"
           placeholder="Search number, customer, or reference"
-          style={{ width: 280 }}
+          style={{ width: 320 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />
