@@ -85,8 +85,10 @@ export default function CompanySwitcher({
       value={value}
       loading={pending}
       onChange={choose}
+      // Its width lives in globals.css (.app-shell__company-select): 230px on a
+      // wide screen, and whatever is left on a phone, where an inline 230px
+      // pushed it over the search field and the buttons beside it.
       className="app-shell__company-select"
-      style={{ minWidth: 230 }}
       popupMatchSelectWidth={320}
       aria-label="Company"
       prefix={<BankOutlined />}

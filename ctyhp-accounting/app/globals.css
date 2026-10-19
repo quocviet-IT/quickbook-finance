@@ -3789,6 +3789,49 @@ body {
   min-width: 0;
 }
 
+.app-shell__company-select {
+  min-width: 230px;
+}
+
+/* A phone has room for the controls on one row and the search field on the
+   next. On one row, seven controls and a 230px company list shared 374px and
+   were drawn on top of each other. The company list takes what the buttons
+   leave, and the search field takes the whole second row. */
+@media (max-width: 575px) {
+  .app-shell__header.ant-layout-header {
+    flex-wrap: wrap;
+    height: auto;
+    row-gap: 8px;
+    padding-block: 8px !important;
+    line-height: normal;
+  }
+
+  .app-shell__header-company {
+    flex: 1 1 0;
+    margin-right: 0;
+  }
+
+  .app-shell__company-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .app-shell__header-search {
+    order: 10;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .app-shell__header-end {
+    margin-inline-start: 0;
+  }
+
+  .app-shell__header-preference {
+    padding-inline-end: 0;
+    border-inline-end: 0;
+  }
+}
+
 /* Printing a report prints the report (lib/client/print-report.ts). */
 @media print {
   /* Printing a report prints the report: every element that neither holds the
