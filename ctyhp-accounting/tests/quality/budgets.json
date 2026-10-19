@@ -57,19 +57,25 @@
     }
   },
   "total": {
-    "gzipBytes": 2300000,
+    "gzipBytes": 2350000,
     "measured": {
-      "date": "2026-10-17",
-      "gzipBytes": 2198824,
-      "note": "Raised from 2,200,000 (main measured 2,198,824 at 2.12, 1,176 to spare). 2.05 to 2.12 added eight releases answering an engineering review (bank standing, clearing accounts, CSV closing balances, possible duplicates, scoped work items, reopened work items, override visibility, reconciliation changes and transfer legs); each was measured as it shipped and no page budget is crossed. Two more features from the same review (OB-8 cash count, OB-9 balance comparison) are planned. This total counts every chunk, so lazy loading does not lower it; the follow-up that does is unchanged: bring the per-page copies of shared components back into a shared chunk, and load the Guide's text only when it is opened. The PDF statement reader must stay out of client screens that do not read PDFs (2.11 caught it in the Exception Report).",
+      "date": "2026-10-19",
+      "gzipBytes": 2307730,
+      "note": "Raised from 2,300,000. Main at 2.26 measured 2,281,300 (18,700 to spare), and 2.27 measured 2,307,730, which is 26,430 more. 2.27 put one report bar on every report, and gave exports to eight reports that had none (Cash Flow, both statements, General Ledger, Journal, Inventory Valuation, Inventory Review and Analysis). Turbopack copies the bar and its export buttons into each report page's own chunk rather than into one shared chunk, so it ships 15 copies. No page budget is crossed. Correction to the note below: this total counts only the entry chunks named in each page's client reference manifest. A chunk loaded with import() is not counted; the 393 KB jsPDF chunk is not in it. Loading the bar lazily would therefore lower this figure without lowering what a browser loads, so it was not done to pass the gate. The follow-up is still the one named below: bring the per-page copies of shared components back into one shared chunk.",
       "previous": {
-        "date": "2026-10-15",
-        "gzipBytes": 2165333,
-        "ceiling": 2200000,
-        "note": "Raised from 2,100,000 (main measured 2,060,084 at 2.03). With 2.04, Turbopack moved shared page components (filter bar, page header, empty state, table pagination) from a shared chunk into each page's own chunk, about 4 KB gzip on some 25 pages that 2.04 does not touch; no page budget is crossed.",
+        "date": "2026-10-17",
+        "gzipBytes": 2198824,
+        "ceiling": 2300000,
+        "note": "Raised from 2,200,000 (main measured 2,198,824 at 2.12, 1,176 to spare). 2.05 to 2.12 added eight releases answering an engineering review (bank standing, clearing accounts, CSV closing balances, possible duplicates, scoped work items, reopened work items, override visibility, reconciliation changes and transfer legs); each was measured as it shipped and no page budget is crossed. Two more features from the same review (OB-8 cash count, OB-9 balance comparison) are planned. This total counts every chunk, so lazy loading does not lower it; the follow-up that does is unchanged: bring the per-page copies of shared components back into a shared chunk, and load the Guide's text only when it is opened. The PDF statement reader must stay out of client screens that do not read PDFs (2.11 caught it in the Exception Report).",
         "previous": {
-          "date": "2026-08-22",
-          "gzipBytes": 2022225
+          "date": "2026-10-15",
+          "gzipBytes": 2165333,
+          "ceiling": 2200000,
+          "note": "Raised from 2,100,000 (main measured 2,060,084 at 2.03). With 2.04, Turbopack moved shared page components (filter bar, page header, empty state, table pagination) from a shared chunk into each page's own chunk, about 4 KB gzip on some 25 pages that 2.04 does not touch; no page budget is crossed.",
+          "previous": {
+            "date": "2026-08-22",
+            "gzipBytes": 2022225
+          }
         }
       }
     }
