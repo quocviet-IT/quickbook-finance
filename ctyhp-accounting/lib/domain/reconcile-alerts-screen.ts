@@ -38,6 +38,22 @@ export function chosenBankId(
   return banks[0]?.id;
 }
 
+/**
+ * Whether the reconcile list is still reading: its reconciliations, or its
+ * standing when it has none yet. With no account there is nothing to read, so
+ * nothing to wait for; the screen says there is no account instead. Without
+ * that, a company with no bank account spun for ever.
+ */
+export function reconcileTableLoading(input: {
+  bankId: string | undefined;
+  loading: boolean;
+  rowCount: number;
+  standingSettled: boolean;
+}): boolean {
+  if (!input.bankId) return false;
+  return input.loading || (input.rowCount === 0 && !input.standingSettled);
+}
+
 /** Where an entry opens in full. */
 export function entryHref(entryId: string): string {
   return `/journal?entry=${encodeURIComponent(entryId)}`;

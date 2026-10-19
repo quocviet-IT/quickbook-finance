@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.25",
+    date: "2026-10-19",
+    headline: "Bank Reconciliation no longer spins for a company with no bank account.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Bank Reconciliation with no bank account says so",
+        detail:
+          "For a company with no bank account yet, Bank Reconciliation showed an empty account box, two disabled buttons and a table that kept loading. It now says there is no bank account to reconcile yet and takes you to Bank Transactions, where Add bank account creates one; once there is an account, reconciling works as before.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "2.24",
     date: "2026-10-19",
     headline: "The overviews say when they were worked out once, under their subtitle.",
