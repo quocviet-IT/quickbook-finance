@@ -23,17 +23,26 @@ function sourceFiles(dir: string, root: string, out: string[] = []): string[] {
 }
 
 describe("source files", () => {
+  // Read and decoded while the suite is collected, not inside the test: the
+  // whole tree read in the test body ran past the 5s limit when the suite ran
+  // in parallel on a busy machine (2026-10-20), as plural-contract once did.
+  const root = process.cwd();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const files = ROOTS.flatMap((dir) => sourceFiles(join(root, dir), root));
+  const broken = files.filter((file) => {
+    try {
+      decoder.decode(readFileSync(join(root, file)));
+      return false;
+    } catch {
+      return true;
+    }
+  });
+
+  it("finds the files it is supposed to be guarding", () => {
+    expect(files).toContain("lib/domain/changelog.ts");
+  });
+
   it("are all valid UTF-8", () => {
-    const root = process.cwd();
-    const decoder = new TextDecoder("utf-8", { fatal: true });
-    const broken = ROOTS.flatMap((dir) => sourceFiles(join(root, dir), root)).filter((file) => {
-      try {
-        decoder.decode(readFileSync(join(root, file)));
-        return false;
-      } catch {
-        return true;
-      }
-    });
     expect(broken).toEqual([]);
   });
 });

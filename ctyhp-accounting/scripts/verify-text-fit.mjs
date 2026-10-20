@@ -16,6 +16,7 @@
  *                (an ellipsis counts: the reader still cannot see the rest)
  *   HEADING      a table column heading laid out on more than one line
  *   PLACEHOLDER  placeholder text wider than the field that shows it
+ *   OVERLAP      two of the header's controls drawn on top of each other
  *
  * Text cut on purpose with an ellipsis is fine when the whole of it is one hover
  * away: a title, or an Ant Design tooltip (found by pointing at the box and
@@ -194,6 +195,31 @@ const MEASURE = () => {
     }
   }
   // An Ant Design Select shows its placeholder in a span, cut with an ellipsis: CLIPPED catches it.
+
+  // OVERLAP: two of the header's controls drawn on top of each other. The
+  // company list ran out of a box squeezed narrower than itself and sat on the
+  // search field at 1024, 1280 and 1440 (2.30) — every word in both still fit
+  // its own box, so nothing above could see it.
+  const controls = Array.from(
+    document.querySelectorAll(".app-shell__header :is(.ant-select, .ant-btn, .app-shell__approvals, .app-shell__company)"),
+  ).filter((el) => visible(el) && !el.closest(SKIP));
+  const outermost = controls.filter((el) => !controls.some((other) => other !== el && other.contains(el)));
+  for (let i = 0; i < outermost.length; i++) {
+    for (let j = i + 1; j < outermost.length; j++) {
+      const a = outermost[i].getBoundingClientRect();
+      const b = outermost[j].getBoundingClientRect();
+      const across = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const down = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (across > 1 && down > 1) {
+        findings.push({
+          kind: "OVERLAP",
+          text: `${(outermost[i].textContent || outermost[i].getAttribute("aria-label") || "").trim().slice(0, 24)} / ${(outermost[j].textContent || outermost[j].getAttribute("aria-label") || "").trim().slice(0, 24)}`,
+          where: `${describe(outermost[i])} and ${describe(outermost[j])}`,
+          detail: `${Math.round(across)}px across`,
+        });
+      }
+    }
+  }
   return findings;
 };
 
@@ -283,7 +309,7 @@ async function measureRoute(page, route, viewport) {
 if (asJson) console.log(JSON.stringify({ findings: all, skipped }));
 else {
   const count = (kind) => all.filter((f) => f.kind === kind).length;
-  console.log(`\n${count("BROKEN")} broken words, ${count("CLIPPED")} clipped with no way to read them whole, ${count("HEADING")} stacked headings, ${count("PLACEHOLDER")} cut placeholders`);
+  console.log(`\n${count("BROKEN")} broken words, ${count("CLIPPED")} clipped with no way to read them whole, ${count("HEADING")} stacked headings, ${count("PLACEHOLDER")} cut placeholders, ${count("OVERLAP")} overlapping header controls`);
   console.log(`${readable} cut on purpose with a title or tooltip (fine)`);
   console.log(`${skipped.length} route(s) not measured${skipped.length ? `: ${skipped.join(", ")}` : ""}`);
 }

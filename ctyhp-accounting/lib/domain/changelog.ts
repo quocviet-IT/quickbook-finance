@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.30",
+    date: "2026-10-19",
+    headline: "The company list and the search field no longer run into each other.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Company list and search kept apart",
+        detail:
+          "On screens around 1024, 1280 and 1440 pixels wide, the company list at the top ran into the search field beside it: once the theme button started saying Light or Dark (2.28), the header ran short of room and the company list was squeezed until it sat on top of the search field. The company list now keeps its width and the search field gives way, with the same space between them on every screen. On a phone, where the theme button shows only its icon, it is square again, as it was before 2.28, so the company's name has its room back (PC-Test had read PC-…).",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "The search field's hint fits",
+        detail:
+          "Where the search field is narrower than its hint, it now reads Search… rather than a cut-off Search invoices, bills, co…. On a screen wide enough it still says Search invoices, bills, contacts….",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "2.29",
     date: "2026-10-19",
     headline: "No word is broken in half or cut off with no way to read the rest.",
