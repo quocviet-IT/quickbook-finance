@@ -150,12 +150,12 @@ export default function AllowanceForDoubtfulAccounts({
             showIcon
             message={
               adjustment === 0
-                ? `The allowance already stands at what this aging implies, in ${currencyCode}.`
+                ? `The allowance already matches this aging, in ${currencyCode}.`
                 : adjustment > 0
-                  ? `Posting debits 6900 Bad Debt Expense and credits 1190 Allowance for Doubtful Accounts by ${money(adjustment)}. Receivables stay on the books; what they are carried at falls.`
-                  : `Posting debits 1190 and credits 6900 by ${money(-adjustment)}, releasing reserve the aging no longer supports.`
+                  ? `Post top-up debits 6900 Bad Debt Expense and credits 1190 Allowance for Doubtful Accounts by ${money(adjustment)}.`
+                  : `Post release debits 1190 and credits 6900 by ${money(-adjustment)}, the reserve the aging no longer supports.`
             }
-            description="Rates are set per bucket by an administrator. Ages are measured from the due date, so an invoice still inside its terms is not delinquent — which is why the not-yet-due rate starts at zero."
+            description="An administrator sets each bucket's rate. Ages count from the due date."
           />
         </Space>
       ) : null}

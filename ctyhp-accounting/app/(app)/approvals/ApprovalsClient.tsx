@@ -178,9 +178,8 @@ export default function ApprovalsClient({
           message="No approval policy is enabled"
           description={
             <>
-              Nothing needs approval yet, so this queue stays empty. Turn on a policy in{" "}
-              <Link href="/settings/approvals">Settings → Approval policies</Link> to route an action
-              here for a second person to authorize.
+              This queue stays empty until you turn one on in{" "}
+              <Link href="/settings/approvals">Settings → Approval policies</Link>.
             </>
           }
         />

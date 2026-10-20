@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.35",
+    date: "2026-10-20",
+    headline: "Notices are pale again in light mode, and say what they need to in fewer words.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Pale notices in light mode",
+        detail:
+          "Info and success notices in light mode sat in a heavy grey-green box on more than twenty pages, among them Approvals, the Accounting overview, Recurring, Backups, Users, Work policy, Import and the aging reports. They now have a pale teal or pale green background with a soft border, like the warning and error notices. Dark mode is unchanged.",
+        route: "/approvals",
+      },
+      {
+        kind: "changed",
+        title: "Shorter notices",
+        detail:
+          "Long notices are cut to what you need to act on, most to one or two lines: Backups went from five lines to two, Users from four, and Approval policies, Work policy, Purchasing, Import, the 1099 Review, Inventory Review, Customer Credit and the AR aging allowance lost their explanations of why. On the Accounting overview, the checks waiting for the work policy are named by the setting they need instead of an internal code.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "2.34",
     date: "2026-10-20",
     headline: "Journal entries show their amount, and the Journal Report gives descriptions room.",

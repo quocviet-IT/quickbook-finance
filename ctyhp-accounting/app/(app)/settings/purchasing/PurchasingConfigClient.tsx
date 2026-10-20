@@ -41,7 +41,7 @@ export default function PurchasingConfigClient({
         type="info"
         showIcon
         message="How three-way matching uses these"
-        description="When a purchase order is converted to a bill, the billed quantity is checked against what was received and the billed unit cost against the ordered cost. A line outside its tolerance is rejected unless an approval reason is given, and that reason is recorded against the bill."
+        description="A bill made from a purchase order is checked against what was received and the ordered cost. A line outside tolerance needs a reason, which is recorded on the bill."
       />
       <Card title="Matching tolerances">
         <Form

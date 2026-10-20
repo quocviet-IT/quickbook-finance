@@ -70,9 +70,8 @@ export default function WorkPolicyClient({
           message="Some dashboard alerts are off"
           description={
             <>
-              This company has not set {unset.join(", ")}. The dashboard alerts that need those
-              numbers stay off until they are set. Leaving a field empty is a fine answer: it only
-              means those alerts stay quiet.
+              Not set yet: {unset.join(", ")}. The alerts that need them stay quiet until you
+              set them, and leaving one empty is fine.
             </>
           }
         />

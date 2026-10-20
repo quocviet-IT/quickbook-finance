@@ -130,7 +130,7 @@ export default function BackupsClient({
         type="info"
         showIcon
         message="What a snapshot holds"
-        description="A snapshot holds every table in this company's books, including vendor tax profiles. Attachments — document scans and other uploaded files — are not included: the snapshot lists them, but their contents are not part of it, and a restore will not bring them back. A Skipped row means the books have not changed since the previous snapshot — expected, not a failure. A missing date is different: it is not proof a snapshot was taken that night, since a failed run leaves no row at all and a routine night may not reach every company — check with an administrator if a specific date matters."
+        description="Every table in the books; attachments are not included, and a restore will not bring them back. A Skipped row means the books have not changed. A missing date is not proof a snapshot was taken: ask an administrator."
       />
       <DataTable<BackupRow>
         rowKey="id"

@@ -106,7 +106,7 @@ export default function UsersClient({
         type="info"
         showIcon
         message="Privileged access policy"
-        description="Admins, accountants and sales users are privileged users: they must enroll in multi-factor authentication with the identity provider, and the MFA column below is how that policy is checked. Sales users cannot post to the ledger, but the prices they maintain decide what a customer is billed. Suspending or offboarding a user revokes read and write access immediately across the whole application. The last remaining active admin cannot be demoted or suspended."
+        description="Admins, accountants and sales users must enroll in multi-factor authentication; the MFA column shows who has. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
       />
 
       {canManage && !canCreateUsers && (

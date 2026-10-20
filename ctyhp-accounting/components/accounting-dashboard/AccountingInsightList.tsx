@@ -1,5 +1,5 @@
 "use client";
-import { plural } from "@/lib/format";
+import { plural, pluralWord } from "@/lib/format";
 import Link from "next/link";
 import { Alert, Button, Card, Tag } from "antd";
 import type { QueueSeverity, SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
@@ -102,19 +102,14 @@ export default function AccountingInsightList({
           className={styles.insightSleeping}
           type="info"
           showIcon
-          message={`${plural(sleeping.length, "rule")} cannot run yet`}
+          message={`${plural(sleeping.length, "check")} ${pluralWord(sleeping.length, "is", "are")} off until the work policy is set`}
+          // What each one waits for, by the setting's own name. The rule keys
+          // (approval-beyond-sla.v1) meant nothing to a reader, and the reason
+          // they stay quiet ran to three lines (UI review, 2026-10-20).
           description={
             <>
-              {sleeping.map((rule) => (
-                <div key={rule.ruleKey}>
-                  <code>{rule.ruleKey}</code> is waiting on {rule.waitingOn}.
-                </div>
-              ))}
-              <div style={{ marginTop: 6 }}>
-                <Link href="/settings/work-policy">Set the work policy</Link> and they will start
-                reporting. Until then they say nothing, rather than judging by a number nobody
-                chose.
-              </div>
+              Waiting for {sleeping.map((rule) => `“${rule.waitingOn}”`).join(" and ")}.{" "}
+              <Link href="/settings/work-policy">Set the work policy</Link>
             </>
           }
         />

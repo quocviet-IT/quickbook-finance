@@ -585,7 +585,7 @@ export default function RecurringClient({
         type="info"
         showIcon
         message="Safe automation"
-        description="Invoice and bill occurrences create drafts. Expense and journal occurrences wait for a user review; journal approval policies continue to apply."
+        description="Invoices and bills are created as drafts. Expenses and journal entries wait for review, and journal approval policies still apply."
       />
 
       <section>
