@@ -154,6 +154,11 @@ export const PALETTE = {
   orange400: "#fb923c",
   violet400: "#c4b5fd",
   sky400: "#38bdf8",
+
+  // A success notice's wash and border on a dark card: the values Ant
+  // Design's dark algorithm derived, named so the token can carry them.
+  green950: "#16271d",
+  green900: "#245134",
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;

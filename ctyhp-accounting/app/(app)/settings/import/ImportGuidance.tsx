@@ -35,18 +35,18 @@ const SOURCE_HINT: Record<ImportTarget, string> = {
  */
 const BEFORE_YOU_START: Partial<Record<ImportTarget, string[]>> = {
   transactions: [
-    "Import the chart of accounts first. Every account this file names must already exist — a transaction row never creates one, because the same name means different things in two charts.",
-    "Add the bank accounts under Banking first. The bank line is what stops a second import of the same file posting the same money twice, so a file cannot be imported without one.",
-    'Where two accounts share a name, write the code in the file — "1000", or "1000 - Cash on Hand" — or set the one you do not use to Inactive. The bare name is refused: one of them may be a bank and the other may not.',
-    "Re-importing the same file is safe: rows already brought across are recognized and skipped, not doubled.",
+    "Import the chart of accounts first: a transaction row never creates an account.",
+    "Add the bank accounts under Banking first. They stop the same file posting twice.",
+    'Where two accounts share a name, write the code ("1000" or "1000 - Cash on Hand") or set one to Inactive.',
+    "Importing the same file again is safe: rows already imported are skipped.",
   ],
   general_ledger: [
     "Import the chart of accounts first. The file names accounts; it does not create them.",
-    'A name two live accounts answer to is treated as one the chart does not have. Write the code — "1000", or "1000 - Cash on Hand" — or set the one you do not use to Inactive.',
-    "Do not close a period until you have checked the import. An entry in a closed period can no longer be voided, and undo is how a mistaken import is put right.",
+    'Where two active accounts share a name, write the code ("1000" or "1000 - Cash on Hand") or set one to Inactive.',
+    "Check the import before closing the period: an entry in a closed period cannot be undone.",
   ],
   chart_of_accounts: [
-    "An account code that already exists is left exactly as it is and reported. The same number means different things in two charts, so nothing here overwrites an account you already rely on.",
+    "An account code that already exists is kept as it is and reported, never overwritten.",
   ],
   invoices: [
     "Import customers first. An invoice row names a customer; it does not create one.",
@@ -157,9 +157,8 @@ export default function ImportGuidance({
           message="Holding a report rather than a data file?"
           description={
             <>
-              A Profit and Loss, a Balance Sheet or a bank statement you only want to keep can be
-              saved under <a href="/reports/saved">Reports → Saved Reports</a>. Importing posts;
-              saving does not affect a balance at all.
+              Save it under <a href="/reports/saved">Reports → Saved Reports</a> instead. Saving
+              changes no balance; importing posts.
             </>
           }
         />

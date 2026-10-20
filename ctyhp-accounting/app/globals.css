@@ -105,6 +105,10 @@ body.print-report .report-print-area {
   --ob-feedback-warningText: #a16207;
   --ob-feedback-warningBg: #fefce8;
   --ob-feedback-warningBgAlt: #fff7ed;
+  --ob-feedback-noticeBg: #e7f6f4;
+  --ob-feedback-noticeBorder: #b8d7d3;
+  --ob-feedback-successBg: #ecfdf5;
+  --ob-feedback-successBorder: #a7f3d0;
   --ob-series-sales: #0f766e;
   --ob-series-purchases: #7c3aed;
   --ob-series-inventory: #0369a1;
@@ -233,6 +237,10 @@ body.print-report .report-print-area {
   --ob-feedback-warningText: #fbbf24;
   --ob-feedback-warningBg: #3a2f10;
   --ob-feedback-warningBgAlt: #3a2f10;
+  --ob-feedback-noticeBg: #0b2b28;
+  --ob-feedback-noticeBorder: #1e4b46;
+  --ob-feedback-successBg: #16271d;
+  --ob-feedback-successBorder: #245134;
   --ob-series-sales: #2dd4bf;
   --ob-series-purchases: #c4b5fd;
   --ob-series-inventory: #38bdf8;

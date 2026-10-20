@@ -173,9 +173,8 @@ export default function InventoryReviewClient({
           message={headline.message}
           description={
             <>
-              Inventory is measured at <b>{METHOD_LABEL[review.method] ?? review.method}</b>, at the
-              lower of cost and net realizable value. Realizable value is taken as the selling price
-              less {Math.round(SELLING_COST_RATE * 100)}% for the cost of selling.
+              Measured at <b>{METHOD_LABEL[review.method] ?? review.method}</b>, at the lower of cost
+              and selling price less {Math.round(SELLING_COST_RATE * 100)}%.
             </>
           }
         />

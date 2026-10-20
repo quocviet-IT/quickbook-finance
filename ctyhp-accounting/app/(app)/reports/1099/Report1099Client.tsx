@@ -39,7 +39,7 @@ export default function Report1099Client({
         type="warning"
         showIcon
         message="Review data, not a filing"
-        description="This dataset supports 1099 preparation and must be reviewed by a qualified professional before anything is filed. The reporting box configured on a vendor applies to every payment to that vendor in the year, so a vendor paid for both services and merchandise will be over-stated here — adjust before filing. Backup withholding is not modeled; a missing taxpayer identifier is flagged as a blocker instead."
+        description="Have a qualified professional review it before filing. A vendor's box applies to all of its payments, so one paid for both services and goods is overstated. Backup withholding is not modeled."
       />
 
       <SimpleReport<Report1099>

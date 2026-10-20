@@ -215,6 +215,19 @@ export const TOKENS = {
     warningText: PALETTE.amberText,
     warningBg: PALETTE.amber50,
     warningBgAlt: PALETTE.orange50,
+    /**
+     * An info notice (an Ant Design Alert of type info) and a success one.
+     *
+     * Left to Ant Design, both washes are derived from the intent colour, and
+     * its palette generator turns a dark teal into a grey: #a8b5b2 behind every
+     * info notice and #b4bfb6 behind every success one, a heavy grey-green
+     * box on more than ten pages (UI review, 2026-10-20). A pale wash of the
+     * same hue instead, as the warning and error notices already had.
+     */
+    noticeBg: PALETTE.teal120,
+    noticeBorder: PALETTE.teal350,
+    successBg: PALETTE.mintGreen50,
+    successBorder: PALETTE.green200,
   },
   // Chart series. Values are carried across unchanged from the two maps that
   // previously defined them by hand (DashboardClient and FinancialCharts);
@@ -408,6 +421,12 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     warningText: PALETTE.amber400,
     warningBg: PALETTE.gold900,
     warningBgAlt: PALETTE.gold900,
+    // Dark's derived washes were already deep tints of their hue; these keep
+    // them, so only light changes.
+    noticeBg: PALETTE.teal950,
+    noticeBorder: PALETTE.teal800,
+    successBg: PALETTE.green950,
+    successBorder: PALETTE.green900,
   },
   series: {
     sales: PALETTE.teal400,
@@ -509,6 +528,10 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   /** The pressed filter pill on Chart of Accounts and Estimates. */
   ["accent.strong", "accent.hover"],
   ["feedback.purpleText", "feedback.purpleBg"],
+  /** An info or success notice: its text, and the teal of a link inside it. */
+  ["text.body", "feedback.noticeBg"],
+  ["intent.primary", "feedback.noticeBg"],
+  ["text.body", "feedback.successBg"],
   /**
    * White on the solid brand fill. Not a text-on-surface pair like the rest —
    * it is text on a *block* — but it belongs here for the same reason they do:
@@ -586,7 +609,12 @@ export function antdThemeTokens(theme: ThemeName = "light") {
     token: {
       colorPrimary: t("intent.primary"),
       colorInfo: t("intent.primary"),
+      // Set rather than derived: see `feedback.noticeBg`.
+      colorInfoBg: t("feedback.noticeBg"),
+      colorInfoBorder: t("feedback.noticeBorder"),
       colorSuccess: t("intent.success"),
+      colorSuccessBg: t("feedback.successBg"),
+      colorSuccessBorder: t("feedback.successBorder"),
       colorWarning: t("intent.warning"),
       colorError: t("intent.danger"),
       colorBgLayout: t("surface.page"),

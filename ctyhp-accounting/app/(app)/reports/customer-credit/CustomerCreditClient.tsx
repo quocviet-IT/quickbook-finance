@@ -104,7 +104,7 @@ export default function CustomerCreditClient({
           type="info"
           showIcon
           message={`${noLimit} of ${plural(rows.length, "customer")} ${pluralWord(noLimit, "has", "have")} no credit limit set`}
-          description="Nothing is enforced for those accounts: an invoice of any size will issue. Set a limit on the customer record to bring them under the control."
+          description="An invoice of any size will issue for them. Set a limit on the customer record."
         />
       ) : null}
 

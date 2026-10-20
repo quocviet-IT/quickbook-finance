@@ -110,7 +110,7 @@ export default function ApprovalPoliciesClient({
         type="info"
         showIcon
         message="How a policy behaves once enabled"
-        description="At or above the threshold, the action can no longer be performed directly — it must be submitted for approval and is executed by whoever approves it. With segregation of duties on, the person who submitted a request can never be the one who approves it. Every policy starts disabled, so nothing changes until you turn one on."
+        description="At or above the threshold, the action goes for approval and runs when approved. With segregation of duties on, nobody approves their own request. Every policy starts off."
       />
       <div>
         <Table<ApprovalPolicyRow>
