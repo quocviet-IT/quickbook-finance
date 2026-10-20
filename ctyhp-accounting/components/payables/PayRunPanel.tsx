@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Alert, App, Button, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import TableEmpty from "@/components/ui/TableEmpty";
 import { formatDate, formatMoney } from "@/lib/format";
 import {
   DISCOUNT_WARNING_DAYS,
@@ -38,15 +41,22 @@ export default function PayRunPanel({
   baseCurrency,
   baseDecimals,
   onPayVendor,
+  canEnterBills = false,
 }: {
   baseCurrency: string;
   baseDecimals: number;
   /** Opens the existing payment dialog for a vendor. */
   onPayVendor?: (vendorId: string) => void;
+  /** Whether an empty run offers to enter a bill. */
+  canEnterBills?: boolean;
 }) {
   const { message } = App.useApp();
   const [run, setRun] = useState<PayRun | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Loading from the first render: the run is asked for once the page has
+  // mounted, and until it answers the table has not found nothing. Starting
+  // at false, it said "No open bills" for seconds over an overdue bill.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const money = useCallback(
     (minor: number) => formatMoney(minor, baseCurrency, baseDecimals),
@@ -57,8 +67,14 @@ export default function PayRunPanel({
     setLoading(true);
     const res = await payRunAction();
     setLoading(false);
-    if (res.ok && res.data) setRun(res.data);
-    else message.error(res.error ?? "Failed to build the pay run");
+    if (res.ok && res.data) {
+      setRun(res.data);
+      setLoadError(null);
+    } else {
+      const error = res.error ?? "Failed to build the pay run";
+      setLoadError(error);
+      message.error(error);
+    }
   }, [message]);
 
   useEffect(() => {
@@ -109,7 +125,29 @@ export default function PayRunPanel({
         loading={loading}
         pagination={false}
         dataSource={run?.rows ?? []}
-        locale={{ emptyText: "No open bills — nothing to pay." }}
+        locale={{
+          emptyText:
+            loadError && !run ? (
+              <TableEmpty
+                title="The pay run could not be built"
+                description={loadError}
+                action={<Button onClick={load}>Try again</Button>}
+              />
+            ) : (
+              <TableEmpty
+                loading={loading || !run}
+                title="No open bills"
+                description="Nothing is owed to a vendor. A bill you enter is listed here, ranked by when it is due."
+                action={
+                  canEnterBills ? (
+                    <Link href="/bills?new=1">
+                      <Button icon={<PlusOutlined />}>Enter a bill</Button>
+                    </Link>
+                  ) : null
+                }
+              />
+            ),
+        }}
         rowClassName={(row) => (row.priority === "overdue" ? "report-table-row--exception" : "")}
         // Fixed columns take the kit's widths and the two text columns share the
         // rest. They were 870px of fixed widths, which left Vendor and Why 57px

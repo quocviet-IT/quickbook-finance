@@ -6,6 +6,7 @@ import { App, Button, Checkbox, DatePicker, Input, Select, Space, Table, Tag, Ty
 import { DownloadOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
+import TableEmpty from "@/components/ui/TableEmpty";
 import type { ActorRow, AuditEntryRow } from "@/lib/db/types";
 import {
   auditTrailCsv,
@@ -74,6 +75,17 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
     setRan(true);
     if (res.ok && res.data) setRows(res.data);
     else message.error(res.error ?? "Failed to search the audit log");
+  }
+
+  /** Back to an unfiltered page, ready to search again. */
+  function clearFilters() {
+    setTable(undefined);
+    setAction(undefined);
+    setActorId(undefined);
+    setRecordId("");
+    setRange(null);
+    setRows([]);
+    setRan(false);
   }
 
   /** Exports exactly what the search returned — one row per changed field. */
@@ -162,7 +174,23 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
         dataSource={rows}
         loading={loading}
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(AUDIT_DEFAULT_PAGE_SIZE))}
-        locale={{ emptyText: ran ? "No matching audit entries" : "Set a filter and search" }}
+        locale={{
+          emptyText: ran ? (
+            <TableEmpty
+              loading={loading}
+              title="No matching changes"
+              description="Nothing in the audit log matches these filters. Clear one, or widen the dates."
+              action={<Button onClick={clearFilters}>Clear filters</Button>}
+            />
+          ) : (
+            <TableEmpty
+              loading={loading}
+              title="Search the audit history"
+              description="Narrow it by record type, user, action or dates above, or show the latest changes now."
+              action={<Button onClick={run}>Show the latest changes</Button>}
+            />
+          ),
+        }}
         expandable={{
           expandedRowRender: (r) => (
             <Space direction="vertical" style={{ width: "100%" }}>

@@ -159,6 +159,8 @@ export const PALETTE = {
   // Design's dark algorithm derived, named so the token can carry them.
   green950: "#16271d",
   green900: "#245134",
+  // A selected row under the pointer on a dark card, as Ant Design derived it.
+  teal680: "#1f6a61",
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
