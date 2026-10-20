@@ -1,6 +1,6 @@
 import type { DerivedWorkItem, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
-import { plural, formatDate } from "@/lib/format";
+import { plural, pluralWord, formatDate } from "@/lib/format";
 
 /**
  * Every work key the Inventory overview derives starts with one of these; its
@@ -70,9 +70,13 @@ export function negativeStockControl(input: {
     href: "/reports/inventory-valuation",
     blocking: false,
   };
+  // The title says what was found (UI review, 2026-10-20): the claim under test
+  // is the pass condition, and a check with nothing to test says so rather than
+  // claim a success about nothing.
   if (input.itemCount === null) {
     return {
       ...base,
+      title: "Stock levels could not be checked",
       status: "unavailable" as const,
       detail: "The inventory valuation could not be read, so nothing here is proven.",
     };
@@ -80,7 +84,9 @@ export function negativeStockControl(input: {
   if (input.itemCount === 0) {
     return {
       ...base,
+      title: "No item is tracked as inventory",
       status: "healthy" as const,
+      notApplicable: true as const,
       detail: "This company holds no stock.",
       passCondition: "Applies once an item is tracked as inventory.",
     };
@@ -94,6 +100,7 @@ export function negativeStockControl(input: {
   }
   return {
     ...base,
+    title: `${plural(input.negativeCount, "item")} ${pluralWord(input.negativeCount, "is", "are")} below zero`,
     status: "attention" as const,
     detail: `${plural(input.negativeCount, "item")} below zero: ${input.negativeNames.slice(0, 4).join(", ")}${input.negativeNames.length > 4 ? ", and others" : ""}. Something was sold that the system did not think existed, so its cost was taken at a rate nothing supports.`,
   };
@@ -126,6 +133,7 @@ export function valuationTiesOutControl(input: {
   if (input.subledgerMinor === null) {
     return {
       ...base,
+      title: "Stock against the ledger could not be checked",
       status: "unavailable" as const,
       detail: "One side of this comparison could not be read, so it cannot be reported as tying.",
     };
@@ -140,6 +148,8 @@ export function valuationTiesOutControl(input: {
   }
   return {
     ...base,
+    // The same words the queue row for this variance already uses.
+    title: "Stock does not tie to the ledger",
     status: "blocked" as const,
     detail: `The stock is worth ${money(input.subledgerMinor)} and the ledger says ${money(input.controlMinor)} — out by ${money(variance)}. Neither figure can be relied on until this is explained.`,
     differenceMinor: Math.abs(variance),
@@ -163,12 +173,14 @@ export function depreciationDueControl(input: {
     blocking: false,
   };
   if (input.assetCount === null) {
-    return { ...base, status: "unavailable" as const, detail: "The fixed assets could not be read." };
+    return { ...base, title: "Depreciation could not be checked", status: "unavailable" as const, detail: "The fixed assets could not be read." };
   }
   if (input.assetCount === 0) {
     return {
       ...base,
+      title: "No fixed asset to depreciate",
       status: "healthy" as const,
+      notApplicable: true as const,
       detail: "This company holds no fixed assets.",
       passCondition: "Applies once a fixed asset is registered.",
     };
@@ -182,9 +194,35 @@ export function depreciationDueControl(input: {
   }
   return {
     ...base,
+    title: `${plural(input.dueCount, "asset")} ${pluralWord(input.dueCount, "has", "have")} depreciation to post`,
     status: "attention" as const,
     detail: `${plural(input.dueCount, "asset")} with ${money(input.dueMinor)} of depreciation due and not posted — profit is overstated by that much until it is.`,
     differenceMinor: Math.abs(input.dueMinor),
+  };
+}
+
+/**
+ * What the empty queue says, from what the checks found.
+ *
+ * It said "Stock is straight — nothing is below zero, the stock ties to the
+ * ledger, and no depreciation is waiting" for a company that held no stock and
+ * no assets: true of nothing (UI review, 2026-10-20). What there is nothing of
+ * is named instead.
+ */
+export function inventoryQueueEmptyState(controls: readonly SurfaceControl[] | null): { title: string; evidence: string } {
+  if (!controls) {
+    return {
+      title: "Nothing to sort out",
+      evidence: "No negative stock or unposted depreciation was found — but the checks could not run, so this is not a clean bill of health.",
+    };
+  }
+  const noStock = controls.some((c) => c.key === "negative-stock" && c.notApplicable);
+  const noAssets = controls.some((c) => c.key === "depreciation-due" && c.notApplicable);
+  const stock = noStock ? "No item is tracked as inventory" : "Nothing is below zero, the stock ties to the ledger";
+  const assets = noAssets ? "no fixed asset is registered" : "no depreciation is waiting to be posted";
+  return {
+    title: noStock ? "Nothing to sort out" : "Stock is straight",
+    evidence: `${stock}, and ${assets}.`,
   };
 }
 

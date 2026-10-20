@@ -1,5 +1,5 @@
 import type { SurfaceControl } from "@/lib/domain/work-surface/types";
-import { plural } from "@/lib/format";
+import { plural, pluralWord } from "@/lib/format";
 
 /**
  * What Sales checks about itself.
@@ -11,6 +11,10 @@ import { plural } from "@/lib/format";
  *
  * Pure by design: plain numbers in, a status and a sentence out, so the rules
  * can be read and tested without a database.
+ *
+ * A check's title says what was found; its pass condition says what passing
+ * means. A failing check used to carry the claim as its title — "Nothing is
+ * past due — Needs attention" (UI review, 2026-10-20).
  */
 
 function money(minor: number): string {
@@ -49,6 +53,7 @@ export function overdueReceivablesControl(input: {
   if (input.overdueCount === null) {
     return {
       ...base,
+      title: "Receivables could not be checked",
       status: "unavailable",
       detail: "The receivables aging could not be read, so nothing here is proven.",
     };
@@ -62,6 +67,7 @@ export function overdueReceivablesControl(input: {
       : ` The oldest is ${plural(input.oldestDaysPastDue, "day")} past due.`;
   return {
     ...base,
+    title: `${plural(input.overdueCount, "invoice")} ${pluralWord(input.overdueCount, "is", "are")} past due`,
     status: "attention",
     detail: `${plural(input.overdueCount, "invoice")} overdue, ${money(input.overdueMinor)} in total.${oldest}`,
     differenceMinor: Math.abs(input.overdueMinor),
@@ -90,13 +96,14 @@ export function unappliedReceiptsControl(input: {
     blocking: false,
   };
   if (input.count === null) {
-    return { ...base, status: "unavailable", detail: "The customer payments could not be read." };
+    return { ...base, title: "Customer payments could not be checked", status: "unavailable", detail: "The customer payments could not be read." };
   }
   if (input.count === 0) {
     return { ...base, status: "healthy", detail: "Every receipt is applied." };
   }
   return {
     ...base,
+    title: `${plural(input.count, "receipt")} ${pluralWord(input.count, "is", "are")} not applied`,
     status: "attention",
     detail: `${plural(input.count, "receipt")} holding ${money(input.amountMinor)} that is not applied to any invoice — the customers concerned look like they owe money they have paid.`,
     differenceMinor: Math.abs(input.amountMinor),
@@ -120,14 +127,16 @@ export function unissuedInvoicesControl(input: {
 }): SurfaceControl {
   const base = {
     key: "unissued-invoices" as const,
-    title: "Finished work has been billed",
+    // Not "Finished work has been billed": with drafts in progress that claim
+    // is not true, though nothing has waited too long.
+    title: "No invoice has waited too long in draft",
     passCondition: `No invoice has sat in draft for more than ${plural(input.staleAfterDays, "day")}.`,
     evaluatedAt: input.evaluatedAt,
     href: "/invoices?status=draft",
     blocking: false,
   };
   if (input.draftCount === null) {
-    return { ...base, status: "unavailable", detail: "The invoices could not be read." };
+    return { ...base, title: "Draft invoices could not be checked", status: "unavailable", detail: "The invoices could not be read." };
   }
   if (input.draftCount === 0) {
     return { ...base, status: "healthy", detail: "Nothing is waiting in draft." };
@@ -141,6 +150,7 @@ export function unissuedInvoicesControl(input: {
   }
   return {
     ...base,
+    title: `${plural(input.staleCount, "invoice")} ${pluralWord(input.staleCount, "has", "have")} waited too long in draft`,
     status: "attention",
     detail: `${plural(input.staleCount, "draft")} older than ${plural(input.staleAfterDays, "day")}, ${money(input.draftMinor)} not yet billed.`,
     differenceMinor: Math.abs(input.draftMinor),

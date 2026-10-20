@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.32",
+    date: "2026-10-20",
+    headline: "Every check says what it found, not what it was hoping to find.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Checks titled by their result",
+        detail:
+          "The checks on the Banking, Purchases, Sales and Inventory overviews were titled with what they test, so a failing one contradicted itself: \"Nothing owed is late — Needs attention\", \"Imported activity is accounted for — Blocked\". A failing check now says what it found, such as 1 bill is overdue, 47 imported lines are not accounted for, 16 accounts are not reconciled or 2 receipts are not applied. A check that could not run says it could not be checked. What passing means is still under each one, after Passes when.",
+        route: "/banking/overview",
+      },
+      {
+        kind: "fixed",
+        title: "Nothing to check is not a pass",
+        detail:
+          "A check with nothing to look at no longer claims a success about nothing. Inventory Review said \"Every line of stock is moving\" over an empty table; it now says no stock is on hand on that date, and when there is stock it counts the items it looked at. The overviews say No bank feed is connected, No bank account to reconcile, No item is tracked as inventory or No fixed asset to depreciate, rather than Bank feeds are connected and the like, and mark them Nothing to check instead of Passed.",
+        route: "/reports/inventory-review",
+      },
+    ],
+  },
+  {
     version: "2.31",
     date: "2026-10-20",
     headline: "Opening Balances says where it stands, and what Post is waiting for.",

@@ -19,6 +19,11 @@ import { plural, pluralWord, formatDate } from "@/lib/format";
  *
  *   every status carries a sentence and a pass condition, so the screen never
  *   has to make a colour do the explaining.
+ *
+ * And a third (UI review, 2026-10-20): the title says what was found. It read
+ * as the claim being tested, so a failing check said "Imported activity is
+ * accounted for — Blocked" and contradicted itself. The claim lives on in the
+ * pass condition; the title is the result.
  */
 
 export type BankingControlKey =
@@ -57,6 +62,7 @@ export function unmatchedActivityControl(input: {
   if (input.unmatchedCount === null) {
     return {
       ...base,
+      title: "Imported activity could not be checked",
       status: "unavailable",
       detail: "The bank transactions could not be counted, so nothing here is proven.",
     };
@@ -78,6 +84,7 @@ export function unmatchedActivityControl(input: {
       : ` The oldest has waited ${plural(input.oldestAgeDays, "day")}.`;
   return {
     ...base,
+    title: `${plural(input.unmatchedCount, "imported line")} ${pluralWord(input.unmatchedCount, "is", "are")} not accounted for`,
     status: "blocked",
     detail: `${plural(input.unmatchedCount, "line")} still unmatched.${waited}${pendingNote}`,
   };
@@ -110,6 +117,7 @@ export function feedHealthControl(input: {
   if (input.connectionCount === null) {
     return {
       ...base,
+      title: "Bank feeds could not be checked",
       status: "unavailable",
       detail: "The bank connections could not be read.",
     };
@@ -117,7 +125,9 @@ export function feedHealthControl(input: {
   if (input.connectionCount === 0) {
     return {
       ...base,
+      title: "No bank feed is connected",
       status: "healthy",
+      notApplicable: true,
       detail: "No feed is connected — this company brings its statements in by file.",
       passCondition: "Applies only once a bank feed is connected.",
     };
@@ -131,6 +141,7 @@ export function feedHealthControl(input: {
   }
   return {
     ...base,
+    title: `${plural(input.brokenCount, "bank feed")} ${pluralWord(input.brokenCount, "is", "are")} not syncing`,
     status: "attention",
     detail: `${plural(input.brokenCount, "feed")} ${pluralWord(input.brokenCount, "needs", "need")} attention: ${input.brokenNames.join(", ")}. New activity may not be arriving.`,
   };
@@ -163,6 +174,7 @@ export function statementReconciliationControl(input: {
   if (input.accountCount === null) {
     return {
       ...base,
+      title: "Reconciliations could not be checked",
       status: "unavailable",
       detail: "The reconciliation sessions could not be read.",
     };
@@ -170,7 +182,9 @@ export function statementReconciliationControl(input: {
   if (input.accountCount === 0) {
     return {
       ...base,
+      title: "No bank account to reconcile",
       status: "healthy",
+      notApplicable: true,
       detail: "This company keeps no bank account in One Book.",
       passCondition: "Applies once a bank account exists.",
     };
@@ -182,12 +196,17 @@ export function statementReconciliationControl(input: {
   if (input.behindNames.length === 0) {
     return {
       ...base,
+      title:
+        input.inProgressCount === 0
+          ? base.title
+          : `${plural(input.inProgressCount, "reconciliation")} ${pluralWord(input.inProgressCount, "is", "are")} left open`,
       status: input.inProgressCount === 0 ? "healthy" : "attention",
       detail: `Every account is reconciled through ${formatDate(input.staleBefore)}.${openNote}`,
     };
   }
   return {
     ...base,
+    title: `${plural(input.behindNames.length, "account")} ${pluralWord(input.behindNames.length, "is", "are")} not reconciled`,
     status: "attention",
     detail: `${plural(input.behindNames.length, "account")} not reconciled through ${formatDate(input.staleBefore)}: ${input.behindNames.join(", ")}.${openNote}`,
   };

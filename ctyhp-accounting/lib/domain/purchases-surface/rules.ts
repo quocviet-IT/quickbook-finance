@@ -1,6 +1,6 @@
 import type { DerivedWorkItem, Severity, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
-import { plural, formatDate } from "@/lib/format";
+import { plural, pluralWord, formatDate } from "@/lib/format";
 
 /** Every work key the Purchases overview derives starts with one of these; its retire is scoped to them. */
 export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied:"] as const;
@@ -16,6 +16,10 @@ export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied
  * problem from a bill that is simply late.
  *
  * Pure by design: plain numbers in, a status and a sentence out.
+ *
+ * A check's title says what was found, and its pass condition says what passing
+ * means. The title used to be the claim under test, so a failing check read
+ * "Nothing owed is late — Needs attention" (UI review, 2026-10-20).
  */
 
 function money(minor: number): string {
@@ -70,7 +74,7 @@ export function billsDueControl(input: {
     blocking: false,
   };
   if (input.overdueCount === null) {
-    return { ...base, status: "unavailable" as const, detail: "The payables could not be read." };
+    return { ...base, title: "Bills could not be checked", status: "unavailable" as const, detail: "The payables could not be read." };
   }
   const soon =
     input.dueSoonCount === 0
@@ -85,6 +89,7 @@ export function billsDueControl(input: {
   }
   return {
     ...base,
+    title: `${plural(input.overdueCount, "bill")} ${pluralWord(input.overdueCount, "is", "are")} overdue`,
     status: "attention" as const,
     detail: `${plural(input.overdueCount, "bill")} overdue, ${money(input.overdueMinor)}.${soon}`,
     differenceMinor: Math.abs(input.overdueMinor),
@@ -117,6 +122,7 @@ export function receivedNotBilledControl(input: {
   if (input.lineCount === null) {
     return {
       ...base,
+      title: "Received goods could not be checked",
       status: "unavailable" as const,
       detail: "The receiving records could not be read.",
     };
@@ -134,6 +140,7 @@ export function receivedNotBilledControl(input: {
       : ` The oldest was ordered ${plural(input.oldestAgeDays, "day")} ago.`;
   return {
     ...base,
+    title: `${plural(input.lineCount, "received line")} ${pluralWord(input.lineCount, "is", "are")} not billed`,
     status: "attention" as const,
     detail: `${plural(input.lineCount, "line")} received and not billed, ${money(input.valueMinor)} the supplier has not invoiced yet.${oldest}`,
     differenceMinor: Math.abs(input.valueMinor),
@@ -159,6 +166,7 @@ export function unappliedPaymentsControl(input: {
   if (input.count === null) {
     return {
       ...base,
+      title: "Supplier payments could not be checked",
       status: "unavailable" as const,
       detail: "The supplier payments could not be read.",
     };
@@ -168,6 +176,7 @@ export function unappliedPaymentsControl(input: {
   }
   return {
     ...base,
+    title: `${plural(input.count, "supplier payment")} ${pluralWord(input.count, "is", "are")} not applied`,
     status: "attention" as const,
     detail: `${plural(input.count, "payment")} holding ${money(input.amountMinor)} not applied to any bill — those suppliers look unpaid when they have been paid.`,
     differenceMinor: Math.abs(input.amountMinor),
