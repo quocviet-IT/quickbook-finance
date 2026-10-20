@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.34",
+    date: "2026-10-20",
+    headline: "Journal entries show their amount, and the Journal Report gives descriptions room.",
+    changes: [
+      {
+        kind: "added",
+        title: "Amount on every journal entry",
+        detail:
+          "Journal Entries and the Journal Report listed each entry's number, date, source and description but not how much it moved, so an entry for $12 and one for $12,000 looked alike until you opened them. Both now have an Amount column: the entry's total debits, which a balanced entry's credits equal. The Journal Report's Copy, CSV, PDF and Excel carry it too, as Entry amount beside each line.",
+        route: "/journal",
+      },
+      {
+        kind: "fixed",
+        title: "Journal Report descriptions on one line",
+        detail:
+          "The Journal Report's columns shared the table evenly, so the description had a fifth of it and ran four and five lines tall. Number, date, source, amount and status now take only the room they need and the description takes the rest, on one line; a longer one ends in … and reads in full when you point at it.",
+        route: "/reports/journal",
+      },
+    ],
+  },
+  {
     version: "2.33",
     date: "2026-10-20",
     headline: "The Report, Ask AI and Guide buttons take less of the screen, and every page leaves room for them.",
