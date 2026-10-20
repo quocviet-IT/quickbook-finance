@@ -156,6 +156,16 @@ export const TOKENS = {
     strong: PALETTE.teal750,
     strongHover: PALETTE.teal600,
     strongActive: PALETTE.teal650,
+    /**
+     * What is chosen: the selected option in a list, menu or dropdown, and a
+     * selected table row; `selectedHover` is that row under the pointer.
+     *
+     * Ant Design derives both from the primary (`colorPrimaryBg`), and for
+     * this teal it derived #a8b5b2, a heavy grey — the same fault the notices
+     * had (see `feedback.noticeBg`), reported for them first.
+     */
+    selected: PALETTE.teal120,
+    selectedHover: PALETTE.teal130,
   },
   /**
    * The dashboard's own green-tinted greys. They are in neither the slate ramp
@@ -375,6 +385,9 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     strong: PALETTE.teal300,
     strongHover: PALETTE.teal400,
     strongActive: PALETTE.teal300,
+    // Dark's derived values were already a deep teal; these keep them.
+    selected: PALETTE.teal800,
+    selectedHover: PALETTE.teal680,
   },
   panel: {
     ink: PALETTE.mist100,
@@ -532,6 +545,9 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
   ["text.body", "feedback.noticeBg"],
   ["intent.primary", "feedback.noticeBg"],
   ["text.body", "feedback.successBg"],
+  /** A selected option or row, and the same row under the pointer. */
+  ["text.body", "accent.selected"],
+  ["text.body", "accent.selectedHover"],
   /**
    * White on the solid brand fill. Not a text-on-surface pair like the rest —
    * it is text on a *block* — but it belongs here for the same reason they do:
@@ -608,6 +624,9 @@ export function antdThemeTokens(theme: ThemeName = "light") {
   return {
     token: {
       colorPrimary: t("intent.primary"),
+      // Set rather than derived: see `accent.selected`.
+      colorPrimaryBg: t("accent.selected"),
+      colorPrimaryBgHover: t("accent.selectedHover"),
       colorInfo: t("intent.primary"),
       // Set rather than derived: see `feedback.noticeBg`.
       colorInfoBg: t("feedback.noticeBg"),

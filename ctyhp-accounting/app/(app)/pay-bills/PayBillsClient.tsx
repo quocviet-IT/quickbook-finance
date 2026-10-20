@@ -25,6 +25,7 @@ import { describeNoOpenBills } from "@/lib/domain/settlement";
 import { openBillsForVendorAction, payBillsAction, voidBillPaymentAction } from "./actions";
 import PayRunPanel from "@/components/payables/PayRunPanel";
 import FilterBar from "@/components/ui/FilterBar";
+import TableEmpty from "@/components/ui/TableEmpty";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
@@ -178,6 +179,7 @@ export default function PayBillsClient({
               }
             : undefined
         }
+        canEnterBills={canWrite}
       />
 
       <div style={{ marginTop: 24 }}>
@@ -200,6 +202,21 @@ export default function PayBillsClient({
       <Table<BillPaymentRow & { vendor_name: string }>
         rowKey="id"
         dataSource={payments}
+        locale={{
+          emptyText: (
+            <TableEmpty
+              title="No bill payments yet"
+              description="Pay one or more open bills and the payment is listed here, with anything left unapplied."
+              action={
+                canWrite ? (
+                  <Button icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+                    Pay bills
+                  </Button>
+                ) : null
+              }
+            />
+          ),
+        }}
         pagination={{
           // Explicit, unlike the rest of this sweep's default DataTable/Table
           // behaviour: this screen wants the size changer shown regardless of

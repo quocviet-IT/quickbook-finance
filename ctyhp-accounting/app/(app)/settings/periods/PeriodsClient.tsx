@@ -12,6 +12,7 @@ import {
   periodCloseBlockersAction,
 } from "./actions";
 import StatusTag from "@/components/ui/StatusTag";
+import TableEmpty from "@/components/ui/TableEmpty";
 import type { AccountingPeriodRow } from "@/lib/db/types";
 
 export default function PeriodsClient({
@@ -25,14 +26,22 @@ export default function PeriodsClient({
   const { today } = useCompanyClock();
   const [year, setYear] = useState<number>(Number(today.slice(0, 4)));
   const [rows, setRows] = useState<AccountingPeriodRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Loading from the first render: until the year's periods arrive, the table
+  // has not found none of them.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async (fy: number) => {
     setLoading(true);
     const r = await listPeriodsAction(fy);
     setLoading(false);
-    if (r.ok && r.data) setRows(r.data);
-    else message.error(r.error ?? "Failed to load");
+    if (r.ok && r.data) {
+      setRows(r.data);
+      setLoadError(null);
+    } else {
+      setLoadError(r.error ?? "Failed to load");
+      message.error(r.error ?? "Failed to load");
+    }
   };
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -179,6 +188,26 @@ export default function PeriodsClient({
         loading={loading}
         dataSource={rows}
         pagination={false}
+        locale={{
+          emptyText: loadError ? (
+            <TableEmpty
+              title={`The periods for ${year} could not be read`}
+              description={loadError}
+              action={<Button onClick={() => void load(year)}>Try again</Button>}
+            />
+          ) : (
+            <TableEmpty
+              loading={loading}
+              title={`No periods for ${year} yet`}
+              description={
+                canEdit
+                  ? "Generate the year's monthly periods. Closing one later locks its entries, so nothing posts or voids in a month you have finished."
+                  : "An administrator generates the year's monthly periods."
+              }
+              action={canEdit ? <Button onClick={generate}>Generate periods</Button> : null}
+            />
+          ),
+        }}
         columns={[
           { title: "Period", dataIndex: "label" },
           { title: "Start", dataIndex: "period_start", render: (value: string) => formatDate(value) },

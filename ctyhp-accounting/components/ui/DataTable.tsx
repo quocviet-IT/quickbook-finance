@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Empty, Table, Typography, type TableProps } from "antd";
+import { Table, type TableProps } from "antd";
+import TableEmpty from "./TableEmpty";
 import { resolveTableData, type ServerPage } from "./table-data";
 import { fallbackPagination, hideSinglePage } from "./table-pagination";
 import { DEFAULT_TABLE_STATE } from "@/lib/domain/table-url-state";
@@ -91,19 +92,9 @@ export default function DataTable<RecordType extends object>({
           // keeps the empty placeholder under its spinner, so "No bank
           // transactions" read through it for seconds while the lines were on
           // their way. While loading, the placeholder holds the space only.
-          emptyText: locale?.emptyText ?? (isLoading ? (
-            <div style={{ minHeight: 96 }} aria-hidden="true" />
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={null}>
-              <Typography.Text strong>{emptyTitle}</Typography.Text>
-              {emptyDescription && (
-                <Typography.Paragraph type="secondary" className="accounting-empty-description">
-                  {emptyDescription}
-                </Typography.Paragraph>
-              )}
-              {emptyAction && <div className="accounting-empty-action">{emptyAction}</div>}
-            </Empty>
-          )),
+          emptyText: locale?.emptyText ?? (
+            <TableEmpty title={emptyTitle} description={emptyDescription} action={emptyAction} loading={isLoading} />
+          ),
         }}
       />
     </div>

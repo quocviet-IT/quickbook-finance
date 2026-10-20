@@ -24,6 +24,7 @@ import { LIABILITY_REPORT_LINK_LABEL } from "@/lib/domain/sales-tax-liability";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
+import TableEmpty from "@/components/ui/TableEmpty";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -55,6 +56,7 @@ export default function SalesTaxClient(props: Props) {
   const [liability, setLiability] = useState<SalesTaxLiability>(props.initialLiability);
   const [loading, setLoading] = useState(false);
   const [paymentsPageSize, setPaymentsPageSize] = useState<number>(TAX_PAYMENTS_DEFAULT_PAGE_SIZE);
+  const [tab, setTab] = useState("liability");
 
   async function reloadLiability(r: [dayjs.Dayjs, dayjs.Dayjs]) {
     setLoading(true);
@@ -130,9 +132,30 @@ export default function SalesTaxClient(props: Props) {
     else message.error(res.error ?? "Failed to save rate");
   }
 
+  // Held here so an empty table can send the reader to the tab that fills it.
+  const hasRates = props.taxCodes.some((t) => t.is_active);
+  const noTaxCollected = hasRates ? (
+    <TableEmpty
+      title="No sales tax collected in this period"
+      description="Tax shows here, by state, once an invoice with a taxed line is issued between these dates."
+      action={
+        <Link href="/invoices?new=1">
+          <Button icon={<PlusOutlined />}>Create an invoice</Button>
+        </Link>
+      }
+    />
+  ) : (
+    <TableEmpty
+      title="No sales tax rates yet"
+      description="An invoice can only charge tax at a rate set up here. Add the rates you charge, by state."
+      action={<Button onClick={() => setTab("rates")}>Set up tax rates</Button>}
+    />
+  );
+
   return (
     <Tabs
-      defaultActiveKey="liability"
+      activeKey={tab}
+      onChange={setTab}
       items={[
         {
           key: "liability",
@@ -164,7 +187,7 @@ export default function SalesTaxClient(props: Props) {
                 scroll={{ x: "max-content" }}
                 style={{ marginBottom: 24 }}
                 title={() => <Typography.Text strong>Owed by state</Typography.Text>}
-                locale={{ emptyText: "No tax collected in this period" }}
+                locale={{ emptyText: loading ? <TableEmpty loading title="" /> : noTaxCollected }}
                 columns={[
                   { title: "State", dataIndex: "stateName" },
                   {
@@ -176,6 +199,9 @@ export default function SalesTaxClient(props: Props) {
                   { title: "Tax collected", dataIndex: "taxMinor", align: "right", render: (v: number) => money(v) },
                 ]}
               />
+              {/* The rates behind the state totals. With no tax at all it was
+                  a second empty table under the first, saying "No data". */}
+              {liability.lines.length > 0 ? (
               <Table<SalesTaxLiability["lines"][number]>
                 rowKey="taxCodeId"
                 loading={loading}
@@ -196,6 +222,7 @@ export default function SalesTaxClient(props: Props) {
                   { title: "Tax collected", dataIndex: "taxMinor", align: "right", render: (v: number) => money(v) },
                 ]}
               />
+              ) : null}
               <div style={{ textAlign: "right", marginTop: 12 }}>
                 <div>Tax collected (period): <b>{money(liability.totalTaxCollectedMinor)}</b></div>
                 <div>Payments (period): {money(liability.paymentsMinor)}</div>
@@ -211,6 +238,21 @@ export default function SalesTaxClient(props: Props) {
             <Table<TaxPaymentRow>
               rowKey="id"
               dataSource={props.payments}
+              locale={{
+                emptyText: (
+                  <TableEmpty
+                    title="No sales tax payments recorded"
+                    description="Record what you pay a state when you file, and Net owed on the Liability tab comes down by it."
+                    action={
+                      props.canWrite ? (
+                        <Button icon={<PlusOutlined />} onClick={() => setPayOpen(true)}>
+                          Record payment
+                        </Button>
+                      ) : null
+                    }
+                  />
+                ),
+              }}
               scroll={{ x: "max-content" }}
               pagination={clientTablePagination(
                 paymentsPageSize,
@@ -249,6 +291,25 @@ export default function SalesTaxClient(props: Props) {
               <Table<TaxCodeRow>
                 rowKey="id"
                 dataSource={ratesByState}
+                locale={{
+                  emptyText: (
+                    <TableEmpty
+                      title="No sales tax rates yet"
+                      description={
+                        props.isAdmin
+                          ? "Add each rate you charge, with its state, before you invoice a taxable sale."
+                          : "An administrator adds the rates this company charges."
+                      }
+                      action={
+                        props.isAdmin ? (
+                          <Button icon={<PlusOutlined />} onClick={() => openTaxCode(null)}>
+                            New rate
+                          </Button>
+                        ) : null
+                      }
+                    />
+                  ),
+                }}
                 scroll={{ x: "max-content" }}
                 pagination={false}
                 columns={[

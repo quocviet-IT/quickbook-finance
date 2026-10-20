@@ -65,6 +65,8 @@ body.print-report .report-print-area {
   --ob-accent-strong: #115e59;
   --ob-accent-strongHover: #0d9488;
   --ob-accent-strongActive: #0f625b;
+  --ob-accent-selected: #e7f6f4;
+  --ob-accent-selectedHover: #e2f1ee;
   --ob-panel-ink: #102a2a;
   --ob-panel-borderStrong: #dbe5e3;
   --ob-panel-soft: #f4f8f7;
@@ -197,6 +199,8 @@ body.print-report .report-print-area {
   --ob-accent-strong: #5eead4;
   --ob-accent-strongHover: #2dd4bf;
   --ob-accent-strongActive: #5eead4;
+  --ob-accent-selected: #1e4b46;
+  --ob-accent-selectedHover: #1f6a61;
   --ob-panel-ink: #f1f5f9;
   --ob-panel-borderStrong: #2a3854;
   --ob-panel-soft: #1b2740;
@@ -1164,6 +1168,20 @@ body {
 
 .accounting-empty-action {
   margin-top: 16px;
+}
+
+/*
+ * A table or list that says it is empty. Ant Design writes a plain line in
+ * its disabled grey, and "No data" and a secondary paragraph in its
+ * description grey: about 1.9:1 and 3.4:1 on a card, too pale to read (UI
+ * review, 2026-10-20). The secondary text colour instead, as every other
+ * caption. One step more specific than antd's rules, which load after this
+ * sheet.
+ */
+.ant-table-wrapper .ant-table .ant-table-tbody > tr.ant-table-placeholder,
+body .ant-empty .ant-empty-description,
+.ant-empty .accounting-empty-description.ant-typography {
+  color: var(--ob-text-secondary);
 }
 
 .accounting-icon-action-wrap {

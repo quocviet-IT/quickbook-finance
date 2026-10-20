@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.36",
+    date: "2026-10-20",
+    headline: "Empty lists say what goes in them and offer the next step, and a selected item is pale teal.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Empty lists that say what to do",
+        detail:
+          "An empty list on Pay Bills, Sales Tax, Accounting Periods, Audit History or Approvals showed \"No data\", or a line of grey too pale to read. Each now says what would appear there and offers the step that fills it: Enter a bill, Pay bills, Create an invoice or Set up tax rates, Record payment, New rate, Generate periods, Show the latest changes or Clear filters, and Set up approval policies. On Approvals, the reason the queue is empty moved into the queue itself, in place of the two notices above it.",
+        route: "/pay-bills",
+      },
+      {
+        kind: "fixed",
+        title: "No empty list while it is still loading",
+        detail:
+          "The pay run on Pay Bills said \"No open bills — nothing to pay\" for several seconds while an overdue bill was still on its way, and Accounting Periods showed \"No data\" before the year's periods arrived. Both now wait for their answer, and say so if it does not come, with a Try again button.",
+        route: "/pay-bills",
+      },
+      {
+        kind: "fixed",
+        title: "Selected items in pale teal",
+        detail:
+          "In light mode, the selected option in a list or dropdown, such as the current company in the company switcher, and a selected table row were a heavy grey. They are now a pale teal. Any remaining line of text in an empty list is in the darker grey every other caption uses. Dark mode is unchanged.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "2.35",
     date: "2026-10-20",
     headline: "Notices are pale again in light mode, and say what they need to in fewer words.",

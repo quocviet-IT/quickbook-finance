@@ -9,6 +9,7 @@ import { canDecide } from "@/lib/domain/access";
 import { formatDateTime, formatMoney, plural, pluralWord } from "@/lib/format";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
 import StatusTag from "@/components/ui/StatusTag";
+import TableEmpty from "@/components/ui/TableEmpty";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
@@ -156,7 +157,30 @@ export default function ApprovalsClient({
   ];
 
   const enabledPolicies = policies.filter((p) => p.enabled);
-  const nothingEverSubmitted = pending.length === 0 && history.length === 0;
+  // An empty queue has two very different causes, and the table says which.
+  // Two notices above it used to, over a table that only said "Nothing
+  // waiting for a decision" in a grey too pale to read (UI review, 2026-10-20).
+  const policiesLink = (label: string) => (
+    <Link href="/settings/approvals">
+      <Button>{label}</Button>
+    </Link>
+  );
+  const noPending =
+    enabledPolicies.length === 0 ? (
+      <TableEmpty
+        title="No approval policy is on"
+        description="Nothing is sent here for a second person to approve until a policy is turned on."
+        action={policiesLink("Set up approval policies")}
+      />
+    ) : (
+      <TableEmpty
+        title="Nothing waiting for a decision"
+        description={`${plural(enabledPolicies.length, "policy", "policies")} ${pluralWord(enabledPolicies.length, "is", "are")} on: ${enabledPolicies
+          .map((p) => p.label)
+          .join(", ")}. A request appears here when someone performs one of those actions.`}
+        action={policiesLink("Review approval policies")}
+      />
+    );
   const visiblePending = useMemo(
     () =>
       [...pending].sort((left, right) => {
@@ -169,32 +193,6 @@ export default function ApprovalsClient({
 
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
-      {/* An empty queue has two very different causes; say which one it is
-          instead of showing two blank grids. */}
-      {nothingEverSubmitted && enabledPolicies.length === 0 && (
-        <Alert
-          type="info"
-          showIcon
-          message="No approval policy is enabled"
-          description={
-            <>
-              This queue stays empty until you turn one on in{" "}
-              <Link href="/settings/approvals">Settings → Approval policies</Link>.
-            </>
-          }
-        />
-      )}
-      {nothingEverSubmitted && enabledPolicies.length > 0 && (
-        <Alert
-          type="info"
-          showIcon
-          message="Nothing has been submitted yet"
-          description={`${plural(enabledPolicies.length, "policy", "policies")} ${pluralWord(enabledPolicies.length, "is", "are")} enabled (${enabledPolicies
-            .map((p) => p.label)
-            .join(", ")}). A request appears here the moment someone performs one of those actions.`}
-        />
-      )}
-
       {!canDecideRequests && (
         <Alert
           type="info"
@@ -212,7 +210,7 @@ export default function ApprovalsClient({
             request.id === initialFocusId ? "accounting-data-row--focused" : ""
           }
           pagination={false}
-            locale={{ emptyText: "Nothing waiting for a decision" }}
+          locale={{ emptyText: noPending }}
           columns={[
             ...commonColumns,
             {
@@ -264,7 +262,14 @@ export default function ApprovalsClient({
             setDecidedPageSize,
             pageSizeOptionsFor(DECIDED_DEFAULT_PAGE_SIZE),
           )}
-            locale={{ emptyText: "No decisions yet" }}
+          locale={{
+            emptyText: (
+              <TableEmpty
+                title="No decisions yet"
+                description="Each approved, rejected or canceled request is kept here, with who decided it and when."
+              />
+            ),
+          }}
           columns={[
             ...commonColumns,
             {
