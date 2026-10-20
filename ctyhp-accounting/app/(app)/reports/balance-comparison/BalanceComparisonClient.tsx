@@ -528,7 +528,9 @@ export default function BalanceComparisonClient({
               maxLength={80}
               defaultValue={initial.comparedWith}
               disabled={!canSave}
-              style={{ width: 280 }}
+              // Room for "Compared with" and the whole hint after it, with the
+              // few pixels Chrome needs before it cuts a placeholder short.
+              style={{ width: 296 }}
               onBlur={(e) => setComparedWith(e.currentTarget.value)}
               onPressEnter={(e) => e.currentTarget.blur()}
             />

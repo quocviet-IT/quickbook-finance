@@ -13,17 +13,26 @@
 
 const COLLAPSED_KEY = "ctyhp.assistant-launcher.collapsed";
 
+/**
+ * A phone, where the row of help buttons spans most of the bottom of the
+ * screen. Until somebody chooses, the cluster starts collapsed there; on a
+ * wider screen it starts open, so the controls can be found at all.
+ */
+export const LAUNCHER_PHONE_QUERY = "(max-width: 575px)";
+
 const listeners = new Set<() => void>();
 
 export function isLauncherCollapsed(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem(COLLAPSED_KEY) === "true";
+    const stored = window.localStorage.getItem(COLLAPSED_KEY);
+    if (stored !== null) return stored === "true";
   } catch {
     // Private-mode browsers throw on localStorage; the launcher still works,
     // it just forgets the choice.
     return false;
   }
+  return typeof window.matchMedia === "function" && window.matchMedia(LAUNCHER_PHONE_QUERY).matches;
 }
 
 /** What the server renders: expanded, so the controls are never lost to SSR. */
