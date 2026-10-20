@@ -2217,6 +2217,19 @@ body {
   }
 }
 
+/*
+ * Where the word is hidden, the button is its icon, square, as it was before
+ * it had a word. With a label inside it, even a hidden one, Ant Design draws a
+ * text button's padding, and on a 360px phone that cost the company list its
+ * last letters: "PC-Test" read "PC-…" (2.30).
+ */
+@media (max-width: 1279px) {
+  .app-shell__theme-button.ant-btn {
+    width: 32px;
+    padding-inline: 0;
+  }
+}
+
 .app-shell__new-button.ant-btn {
   min-height: 40px;
   padding-inline: 14px;

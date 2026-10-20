@@ -49,7 +49,7 @@ export const RELEASES: Release[] = [
         kind: "fixed",
         title: "Company list and search kept apart",
         detail:
-          "On screens around 1024, 1280 and 1440 pixels wide, the company list at the top ran into the search field beside it: once the theme button started saying Light or Dark (2.28), the header ran short of room and the company list was squeezed until it sat on top of the search field. The company list now keeps its width and the search field gives way, with the same space between them on every screen.",
+          "On screens around 1024, 1280 and 1440 pixels wide, the company list at the top ran into the search field beside it: once the theme button started saying Light or Dark (2.28), the header ran short of room and the company list was squeezed until it sat on top of the search field. The company list now keeps its width and the search field gives way, with the same space between them on every screen. On a phone, where the theme button shows only its icon, it is square again, as it was before 2.28, so the company's name has its room back (PC-Test had read PC-…).",
         route: "/dashboard",
       },
       {
