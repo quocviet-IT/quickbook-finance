@@ -1,12 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
-import { App, Alert, Button, DatePicker, InputNumber, Select, Space, Table } from "antd";
+import { useMemo, useState, type ReactNode } from "react";
+import { App, Button, DatePicker, InputNumber, Select, Space, Table, Tooltip, Typography } from "antd";
+import { CheckCircleFilled, ClockCircleOutlined, InfoCircleFilled, InfoCircleOutlined } from "@ant-design/icons";
+import type { Dayjs } from "dayjs";
 import { toMinor } from "@/lib/domain/money";
 import { formatMoney } from "@/lib/format";
-import { buildOpeningBalancePosting } from "@/lib/domain/posting";
+import { reviewOpeningDraft, type OpeningDraftReview } from "@/lib/domain/opening-balances";
+import FormActions from "@/components/ui/FormActions";
 import { postOpeningBalancesAction } from "./actions";
-
-const EQUITY_SENTINEL = "__opening_balance_equity";
 
 interface Account {
   id: string;
@@ -26,37 +27,27 @@ interface Row {
   credit?: number;
 }
 
+const CONDITIONS_ID = "opening-balances-conditions";
+
 export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency, baseDecimals }: Props) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<Row[]>([{ key: 0 }, { key: 1 }]);
-  const [asOf, setAsOf] = useState<import("dayjs").Dayjs | null>(null);
+  const [asOf, setAsOf] = useState<Dayjs | null>(null);
   const [posting, setPosting] = useState(false);
 
-  const totals = useMemo(() => {
-    const d = rows.reduce((s, r) => s + toMinor(r.debit ?? 0, baseDecimals), 0);
-    const c = rows.reduce((s, r) => s + toMinor(r.credit ?? 0, baseDecimals), 0);
-    const lines = rows
-      .map((r) => ({
-        accountId: r.account_id ?? `__row${r.key}`,
-        debitMinor: toMinor(r.debit ?? 0, baseDecimals),
-        creditMinor: toMinor(r.credit ?? 0, baseDecimals),
-      }))
-      .filter((l) => l.debitMinor !== 0 || l.creditMinor !== 0);
-    let equity = 0;
-    try {
-      const posting = buildOpeningBalancePosting(lines, EQUITY_SENTINEL);
-      const equityLine = posting.find((l) => l.accountId === EQUITY_SENTINEL);
-      if (equityLine) {
-        equity = equityLine.creditMinor > 0 ? equityLine.creditMinor : -equityLine.debitMinor;
-      }
-    } catch {
-      // Posting builder rejected the draft lines (e.g. still unbalanced/invalid);
-      // treat as indeterminate here rather than re-deriving the equity amount —
-      // the posting rule lives only in lib/domain (buildOpeningBalancePosting).
-      equity = 0;
-    }
-    return { d, c, equity };
-  }, [rows, baseDecimals]);
+  const review = useMemo(
+    () =>
+      reviewOpeningDraft(
+        rows.map((r, index) => ({
+          line: index + 1,
+          accountId: r.account_id ?? null,
+          debitMinor: toMinor(r.debit ?? 0, baseDecimals),
+          creditMinor: toMinor(r.credit ?? 0, baseDecimals),
+        })),
+        asOf ? asOf.format("YYYY-MM-DD") : null,
+      ),
+    [rows, asOf, baseDecimals],
+  );
 
   const fmt = (m: number) => formatMoney(Math.abs(m), baseCurrency, baseDecimals);
 
@@ -83,21 +74,34 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
   };
 
   const update = (key: number, patch: Partial<Row>) => setRows((p) => p.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const unmet = review.conditions.filter((c) => !c.met);
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <DatePicker placeholder="As-of date" value={asOf} onChange={setAsOf} />
+      <DatePicker
+        aria-label="As of"
+        prefix={<Typography.Text type="secondary">As of</Typography.Text>}
+        placeholder="MM/DD/YYYY"
+        value={asOf}
+        onChange={setAsOf}
+        style={{ width: 220 }}
+      />
       <Table
         rowKey="key"
         pagination={false}
         dataSource={rows}
         columns={[
           {
+            title: "Line",
+            width: 64,
+            render: (_, _r, index) => <Typography.Text type="secondary">{index + 1}</Typography.Text>,
+          },
+          {
             title: "Account",
             render: (_, r) => (
               <Select
                 showSearch
-                style={{ width: 320 }}
+                style={{ width: 320, maxWidth: "100%" }}
                 placeholder="Account"
                 optionFilterProp="label"
                 value={r.account_id}
@@ -114,6 +118,7 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
                 min={0}
                 precision={baseDecimals}
                 value={r.debit}
+                aria-label="Debit"
                 onChange={(v) => update(r.key, { debit: v ?? undefined, credit: undefined })}
               />
             ),
@@ -126,6 +131,7 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
                 min={0}
                 precision={baseDecimals}
                 value={r.credit}
+                aria-label="Credit"
                 onChange={(v) => update(r.key, { credit: v ?? undefined, debit: undefined })}
               />
             ),
@@ -133,19 +139,109 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
         ]}
         footer={() => <Button onClick={() => setRows((p) => [...p, { key: (p.at(-1)?.key ?? 0) + 1 }])}>Add row</Button>}
       />
-      <Alert
-        type={totals.equity === 0 ? "success" : "info"}
-        message={
-          totals.equity === 0
-            ? `Balanced. Debit = Credit = ${fmt(totals.d)}.`
-            : `Opening Balance Equity will absorb ${fmt(totals.equity)} on the ${totals.equity > 0 ? "credit" : "debit"} side to balance.`
-        }
-      />
-      {canWrite && (
-        <Button type="primary" loading={posting} disabled={!asOf || totals.d + totals.c === 0} onClick={post}>
-          Post opening balances
-        </Button>
+      <DraftStatus review={review} fmt={fmt} />
+      {canWrite ? (
+        <FormActions>
+          {/* A disabled button takes no pointer events, so the tooltip hangs on a wrapper. */}
+          <Tooltip title={unmet.length ? `To post: ${unmet.map((c) => c.label.toLowerCase()).join("; ")}.` : undefined}>
+            <span>
+              <Button
+                type="primary"
+                loading={posting}
+                disabled={!review.canPost}
+                aria-describedby={CONDITIONS_ID}
+                onClick={post}
+              >
+                Post opening balances
+              </Button>
+            </span>
+          </Tooltip>
+          <ul id={CONDITIONS_ID} className="opening-balances__conditions" aria-label="What posting needs">
+            {review.conditions.map((condition) => (
+              <li key={condition.key} className={condition.met ? "is-met" : undefined}>
+                {condition.met ? <CheckCircleFilled aria-hidden="true" /> : <ClockCircleOutlined aria-hidden="true" />}
+                <span>
+                  {condition.label}
+                  <span className="accounting-sr-only">{condition.met ? " (done)" : " (still needed)"}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </FormActions>
+      ) : (
+        <FormActions note="Your role can enter these figures to check them, but not post them." />
       )}
     </Space>
+  );
+}
+
+/** The words and icon for each state of the draft. */
+function statusView(review: OpeningDraftReview, fmt: (minor: number) => string): { icon: ReactNode; title: string; detail: string } {
+  const side = review.equityMinor > 0 ? "credit" : "debit";
+  switch (review.status) {
+    case "empty":
+      return {
+        icon: <InfoCircleOutlined aria-hidden="true" />,
+        title: "Nothing entered yet",
+        detail:
+          "Choose the as-of date, then give each account the balance it had on that day, as a debit or a credit. Any difference between debits and credits goes to Opening Balance Equity.",
+      };
+    case "incomplete":
+      return {
+        icon: <ClockCircleOutlined aria-hidden="true" />,
+        title: review.conditions.find((c) => c.key === "accounts")?.label ?? "Choose an account for every balance",
+        detail: `Debits come to ${fmt(review.debitMinor)} and credits to ${fmt(review.creditMinor)}. A balance without an account cannot post, so these figures are not ready yet.`,
+      };
+    case "balanced":
+      return {
+        icon: <CheckCircleFilled aria-hidden="true" />,
+        title: "Balanced",
+        detail: `Debits and credits are both ${fmt(review.debitMinor)}, so nothing goes to Opening Balance Equity.`,
+      };
+    case "equity":
+      return {
+        icon: <InfoCircleFilled aria-hidden="true" />,
+        title: `Opening Balance Equity takes ${fmt(review.equityMinor)} on the ${side} side`,
+        detail: `Debits come to ${fmt(review.debitMinor)} and credits to ${fmt(review.creditMinor)}. The difference posts to Opening Balance Equity, so the entry balances.`,
+      };
+  }
+}
+
+/**
+ * Where the draft stands. Empty, and a balance still without an account, are
+ * neutral — never the green "Balanced" the empty form used to show beside a
+ * Post button that could not be pressed.
+ */
+function DraftStatus({ review, fmt }: { review: OpeningDraftReview; fmt: (minor: number) => string }) {
+  const side = review.equityMinor > 0 ? "credit" : "debit";
+  const view = statusView(review, fmt);
+  return (
+    <section
+      className={`opening-balances__status opening-balances__status--${review.status}`}
+      aria-live="polite"
+      aria-label="Where the opening balances stand"
+    >
+      <div className="opening-balances__status-title">
+        {view.icon}
+        <span>{view.title}</span>
+      </div>
+      <div className="opening-balances__status-detail">{view.detail}</div>
+      {review.status === "empty" ? null : (
+        <dl className="opening-balances__totals">
+          <div>
+            <dt>Debits</dt>
+            <dd>{fmt(review.debitMinor)}</dd>
+          </div>
+          <div>
+            <dt>Credits</dt>
+            <dd>{fmt(review.creditMinor)}</dd>
+          </div>
+          <div>
+            <dt>Opening Balance Equity</dt>
+            <dd>{review.equityMinor === 0 ? "—" : `${fmt(review.equityMinor)} ${side}`}</dd>
+          </div>
+        </dl>
+      )}
+    </section>
   );
 }
