@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Badge, Button, Space, Tooltip } from "antd";
 import {
   BookOutlined,
@@ -32,8 +32,21 @@ import {
  * They sit over the bottom-right corner, which on a long list is where the
  * totals and the pager are, so the cluster collapses to a single small button
  * and stays collapsed until it is opened again.
+ *
+ * The UI review of 2026-10-20 found them over figures and buttons on some
+ * twenty-five pages. Three changes answer it:
+ * - one row, 40px tall, where it was three rows stacked over 105px;
+ * - a Hide button you can see, where the collapse handle was a faint 24px dot;
+ * - room left below every page for whatever the cluster's height is, measured
+ *   here and handed to the content as `--assistant-launcher-clearance`, so the
+ *   last row of any page can be scrolled clear of it.
  */
+
+/** Space between the bottom of a page's content and the top of the cluster, once scrolled to the end. */
+const CLEARANCE_GAP = 12;
+
 export default function AssistantLauncher() {
+  const box = useRef<HTMLDivElement>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -54,56 +67,66 @@ export default function AssistantLauncher() {
     launcherCollapsedServerSnapshot,
   );
 
+  // The room the pages leave at their foot follows the cluster as it is drawn:
+  // open or collapsed, on a wide screen or a phone.
+  useEffect(() => {
+    const element = box.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const update = () => {
+      const inset = parseFloat(getComputedStyle(element).bottom) || 0;
+      const height = element.getBoundingClientRect().height;
+      root.style.setProperty("--assistant-launcher-clearance", `${Math.ceil(height + inset + CLEARANCE_GAP)}px`);
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    update();
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--assistant-launcher-clearance");
+    };
+  }, []);
+
   return (
     <>
-      <div className="assistant-launcher" data-feedback-chrome="true">
+      <div ref={box} className="assistant-launcher" data-feedback-chrome="true">
         {collapsed ? (
-          <Tooltip title="Show the help controls" placement="left">
-            <Button
-              type="primary"
-              shape="circle"
-              size="large"
-              icon={<QuestionCircleOutlined />}
-              onClick={() => setLauncherCollapsed(false)}
-              aria-label="Show the help controls"
-              aria-expanded={false}
-            />
+          <Tooltip title="Show Report, Ask AI and Guide" placement="left">
+            <Badge dot={hasNews} offset={[-4, 4]}>
+              <Button
+                type="primary"
+                shape="circle"
+                size="large"
+                icon={<QuestionCircleOutlined />}
+                onClick={() => setLauncherCollapsed(false)}
+                aria-label={hasNews ? "Show the help buttons, with unread release notes" : "Show the help buttons"}
+                aria-expanded={false}
+              />
+            </Badge>
           </Tooltip>
         ) : (
-          <Space direction="vertical" size="small" align="end">
-            <Tooltip title="Hide these buttons" placement="left">
+          <Space size="small" align="center" className="assistant-launcher__row">
+            <Tooltip title="Report a problem or suggest an improvement" placement="top">
               <Button
-                size="small"
-                shape="circle"
-                icon={<DownOutlined />}
-                onClick={() => setLauncherCollapsed(true)}
-                aria-label="Hide the help controls"
-                aria-expanded
-              />
+                shape="round"
+                icon={<MessageOutlined />}
+                onClick={() => setReportOpen(true)}
+                aria-label="Report a problem"
+              >
+                Report
+              </Button>
             </Tooltip>
-            <Space size="small">
-              <Tooltip title="Report a problem or suggest an improvement" placement="top">
-                <Button
-                  shape="round"
-                  icon={<MessageOutlined />}
-                  onClick={() => setReportOpen(true)}
-                  aria-label="Report a problem"
-                >
-                  Report
-                </Button>
-              </Tooltip>
-              <Tooltip title="Ask about a feature or an accounting workflow" placement="top">
-                <Button
-                  type="primary"
-                  shape="round"
-                  icon={<QuestionCircleOutlined />}
-                  onClick={() => setAskOpen(true)}
-                  aria-label="Ask AI"
-                >
-                  Ask AI
-                </Button>
-              </Tooltip>
-            </Space>
+            <Tooltip title="Ask about a feature or an accounting workflow" placement="top">
+              <Button
+                type="primary"
+                shape="round"
+                icon={<QuestionCircleOutlined />}
+                onClick={() => setAskOpen(true)}
+                aria-label="Ask AI"
+              >
+                Ask AI
+              </Button>
+            </Tooltip>
             <Tooltip
               title={
                 hasNews
@@ -122,6 +145,15 @@ export default function AssistantLauncher() {
                   Guide
                 </Button>
               </Badge>
+            </Tooltip>
+            <Tooltip title="Hide these buttons; one ? button stays to bring them back" placement="topRight">
+              <Button
+                shape="circle"
+                icon={<DownOutlined />}
+                onClick={() => setLauncherCollapsed(true)}
+                aria-label="Hide the help buttons"
+                aria-expanded
+              />
             </Tooltip>
           </Space>
         )}

@@ -17,6 +17,7 @@
  *   HEADING      a table column heading laid out on more than one line
  *   PLACEHOLDER  placeholder text wider than the field that shows it
  *   OVERLAP      two of the header's controls drawn on top of each other
+ *   UNDER-LAUNCHER  scrolled to the end, something still under the floating help buttons
  *
  * Text cut on purpose with an ellipsis is fine when the whole of it is one hover
  * away: a title, or an Ant Design tooltip (found by pointing at the box and
@@ -223,6 +224,49 @@ const MEASURE = () => {
   return findings;
 };
 
+/**
+ * UNDER-LAUNCHER: scrolled to the end of the page, words or a control left under
+ * the floating Report / Ask AI / Guide buttons. Mid-page the cluster covers
+ * whatever scrolls beneath it — that is what floating means; but every page
+ * must leave room at its foot to scroll its last row clear (UI review,
+ * 2026-10-20: totals, Issue and Restore buttons under the cluster).
+ */
+const UNDER_LAUNCHER = () => {
+  const launcher = document.querySelector(".assistant-launcher");
+  const content = document.querySelector(".app-shell__content");
+  if (!launcher || !content) return [];
+  const l = launcher.getBoundingClientRect();
+  if (l.width === 0 || l.height === 0) return [];
+  // Only the end of the page is a finding; mid-page, covering is what floating is.
+  if (window.scrollY + window.innerHeight < document.documentElement.scrollHeight - 2) {
+    return [{ kind: "UNDER-LAUNCHER", text: "(page kept growing)", where: "window", detail: "never reached the end to measure" }];
+  }
+  const hits = (r) => {
+    const across = Math.min(r.right, l.right) - Math.max(r.left, l.left);
+    const down = Math.min(r.bottom, l.bottom) - Math.max(r.top, l.top);
+    return across > 1 && down > 1;
+  };
+  const name = (el) => `${el.tagName.toLowerCase()}${typeof el.className === "string" && el.className ? "." + el.className.split(/\s+/).filter((c) => c && !c.startsWith("css-")).slice(0, 2).join(".") : ""}`;
+  const found = [];
+  const range = document.createRange();
+  const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const text = (n.textContent ?? "").trim();
+    if (!text || !n.parentElement || n.parentElement.closest("[aria-hidden='true'], .accounting-sr-only")) continue;
+    range.selectNodeContents(n);
+    if (Array.from(range.getClientRects()).some((r) => r.width > 0.5 && hits(r))) {
+      found.push({ kind: "UNDER-LAUNCHER", text: text.slice(0, 50), where: name(n.parentElement), detail: "scrolled to the end" });
+    }
+  }
+  for (const el of content.querySelectorAll("button, a[href], input, .ant-select")) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && hits(r) && !(el.textContent ?? "").trim()) {
+      found.push({ kind: "UNDER-LAUNCHER", text: el.getAttribute("aria-label") ?? "(control)", where: name(el), detail: "scrolled to the end" });
+    }
+  }
+  return found;
+};
+
 const auth = await smokeSession();
 const control = createClient(auth.supabaseUrl, auth.anonKey, {
   auth: { persistSession: false },
@@ -276,6 +320,19 @@ async function measureRoute(page, route, viewport) {
   // Settled where a redirect took it, if it took it anywhere.
   await page.waitForLoadState("networkidle", { timeout: 30_000 });
   const findings = await page.evaluate(MEASURE);
+  // Then to the end of the page, where nothing may be left under the help
+  // buttons. A page still filling in grows after the first scroll (Bank
+  // Transactions renders its rows late), and a reading taken mid-page would
+  // blame the buttons for covering what is merely scrolled beneath them; so
+  // scroll again until the end stays the end.
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(300);
+    const atEnd = await page.evaluate(() => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2);
+    if (atEnd) break;
+  }
+  findings.push(...(await page.evaluate(UNDER_LAUNCHER)));
+  await page.evaluate(() => window.scrollTo(0, 0));
   // Point at one box of each kind that is cut without a title, and see
   // whether a tooltip opens with its words. The same component answers the
   // same way on every row, so one look stands for all of them.
@@ -309,7 +366,7 @@ async function measureRoute(page, route, viewport) {
 if (asJson) console.log(JSON.stringify({ findings: all, skipped }));
 else {
   const count = (kind) => all.filter((f) => f.kind === kind).length;
-  console.log(`\n${count("BROKEN")} broken words, ${count("CLIPPED")} clipped with no way to read them whole, ${count("HEADING")} stacked headings, ${count("PLACEHOLDER")} cut placeholders, ${count("OVERLAP")} overlapping header controls`);
+  console.log(`\n${count("BROKEN")} broken words, ${count("CLIPPED")} clipped with no way to read them whole, ${count("HEADING")} stacked headings, ${count("PLACEHOLDER")} cut placeholders, ${count("OVERLAP")} overlapping header controls, ${count("UNDER-LAUNCHER")} left under the help buttons`);
   console.log(`${readable} cut on purpose with a title or tooltip (fine)`);
   console.log(`${skipped.length} route(s) not measured${skipped.length ? `: ${skipped.join(", ")}` : ""}`);
 }

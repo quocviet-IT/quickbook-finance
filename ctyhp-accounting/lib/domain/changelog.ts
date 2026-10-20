@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.33",
+    date: "2026-10-20",
+    headline: "The Report, Ask AI and Guide buttons take less of the screen, and every page leaves room for them.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Help buttons in one row",
+        detail:
+          "Report, Ask AI and Guide sat in three rows in the bottom-right corner, over figures and buttons on some twenty-five pages: totals on Sales Tax and Open Invoices, Issue on Invoices, Download and Restore on Backups, amounts on the Dashboard. They now sit in one row, a little over a third as tall, so far less of each page is underneath them.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "A Hide button you can see",
+        detail:
+          "The button that collapses the help buttons was a faint dot above them. It is now a full button at the end of the row. Hidden, they become one round ? button, which still shows the dot when there are release notes you have not read, and they stay hidden until you open them again. On a phone they start hidden.",
+        route: "/dashboard",
+      },
+      {
+        kind: "fixed",
+        title: "Room at the foot of every page",
+        detail:
+          "Every page leaves room at its foot for the help buttons, however tall they are, so the last row, a total or a button at the bottom can always be scrolled clear of them. On Sales Tax the net owed total sat under them even at the end of the page.",
+        route: "/sales-tax",
+      },
+    ],
+  },
+  {
     version: "2.32",
     date: "2026-10-20",
     headline: "Every check says what it found, not what it was hoping to find.",
