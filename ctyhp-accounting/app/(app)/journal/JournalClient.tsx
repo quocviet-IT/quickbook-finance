@@ -7,6 +7,8 @@ import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, 
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { toMinor } from "@/lib/domain/money";
+import { journalEntryAmountMinor } from "@/lib/domain/journal-entry-amount";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney, formatDate, plural } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
 import FilterBar from "@/components/ui/FilterBar";
@@ -282,6 +284,10 @@ export default function JournalClient({
         rowKey="id"
         loading={loading}
         dataSource={entries}
+        // The cell padding every DataTable has, which the COLUMN widths are
+        // measured against. At the default 16px a date in COLUMN.DATE broke
+        // in two.
+        size="small"
         // Held to the width of the page rather than of its longest description.
         // With max-content a column left to size itself is free to grow however
         // firmly the others are pinned, which is what put the actions off the
@@ -316,9 +322,10 @@ export default function JournalClient({
           ),
         }}
         columns={[
-          { title: "Number", dataIndex: "entryNumber", width: 130 },
-          { title: "Date", dataIndex: "entryDate", width: 110, render: (v: string) => formatDate(v) },
-          { title: "Source", dataIndex: "sourceType", width: 110, render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
+          { title: "Number", dataIndex: "entryNumber", width: COLUMN.CODE },
+          { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
+          // Wide enough for "Opening balance", the longest source, on one line.
+          { title: "Source", dataIndex: "sourceType", width: 132, render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
           {
             title: "Description",
             dataIndex: "description",
@@ -341,8 +348,17 @@ export default function JournalClient({
               ),
           },
           {
+            // An entry listed with no amount said nothing of its size until it
+            // was opened (UI review, 2026-10-20).
+            title: "Amount",
+            key: "amount",
+            width: COLUMN.MONEY_WIDE,
+            align: "right",
+            render: (_, e) => formatMoney(journalEntryAmountMinor(e.lines), baseCurrency, baseDecimals),
+          },
+          {
             title: "Status",
-            width: 170,
+            width: COLUMN.STATUS,
             render: (_, e) => (
               <Space size={4} wrap>
                 <StatusTag status={e.isReversed ? "reversed" : e.status} />

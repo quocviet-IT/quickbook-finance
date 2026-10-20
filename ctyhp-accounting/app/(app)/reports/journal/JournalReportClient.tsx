@@ -7,6 +7,10 @@ import StatusTag from "@/components/ui/StatusTag";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
 import { formatDate, formatMoney } from "@/lib/format";
 import { journalReportSheet } from "@/lib/domain/ledger-report-sheets";
+import { journalEntryAmountMinor } from "@/lib/domain/journal-entry-amount";
+import { flexColumn } from "@/components/ui/columns";
+import { longTextColumn } from "@/components/ui/long-text-column";
+import { COLUMN } from "@/lib/design/table-metrics";
 import type { PresetContext } from "@/lib/domain/report-presets";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { journalReportAction } from "./actions";
@@ -28,6 +32,12 @@ const SOURCES = [
 ];
 
 const PAGE_SIZE = 50;
+
+/** "Opening balance", the longest source, as a tag on one line. */
+const SOURCE_WIDTH = 132;
+
+/** A description cut to its column, whole in a tooltip that wraps. */
+const describe = longTextColumn().render;
 
 interface Props {
   companyName: string;
@@ -112,13 +122,26 @@ export default function JournalReportClient({ companyName, presets, baseCurrency
               />
             ),
           }}
+          // Every column but the description has a width, and the description
+          // takes the rest. With no widths at all, the five columns shared the
+          // table evenly and the description, a fifth of it, ran four and five
+          // lines tall (UI review, 2026-10-20). Amount is new: an entry listed
+          // with no amount said nothing of its size.
           columns={[
-            { title: "Number", dataIndex: "entryNumber" },
-            { title: "Date", dataIndex: "entryDate", render: (v: string) => formatDate(v) },
-            { title: "Source", dataIndex: "sourceType", render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
-            { title: "Description", dataIndex: "description" },
+            { title: "Number", dataIndex: "entryNumber", width: COLUMN.CODE },
+            { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
+            { title: "Source", dataIndex: "sourceType", width: SOURCE_WIDTH, render: (s: string) => <Tag>{sourceLabel(s)}</Tag> },
+            flexColumn<JournalEntrySummary>({ title: "Description", dataIndex: "description", render: describe }),
+            {
+              title: "Amount",
+              key: "amount",
+              width: COLUMN.MONEY_WIDE,
+              align: "right",
+              render: (_, e) => formatMoney(journalEntryAmountMinor(e.lines), baseCurrency, baseDecimals),
+            },
             {
               title: "Status",
+              width: COLUMN.STATUS,
               render: (_, e) => (e.isReversed ? <StatusTag status="reversed" /> : <StatusTag status={e.status} />),
             },
           ]}

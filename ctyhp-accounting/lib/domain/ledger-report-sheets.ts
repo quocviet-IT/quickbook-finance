@@ -7,6 +7,7 @@
  */
 
 import { sourceLabel } from "./entry-detail";
+import { journalEntryAmountMinor } from "./journal-entry-amount";
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { statusLabel, humanizeStatus } from "./status-label";
@@ -152,6 +153,8 @@ export function journalReportSheet(
       { key: "date", header: "Date", kind: "text", width: 12 },
       { key: "source", header: "Source", kind: "text", width: 18 },
       { key: "description", header: "Description", kind: "text", width: 40 },
+      // The entry's own amount, as the screen shows it, beside each of its lines.
+      { key: "amount", header: "Entry amount", kind: "money", width: 16 },
       { key: "status", header: "Status", kind: "text", width: 12 },
       { key: "account", header: "Account", kind: "text", width: 34 },
       { key: "debit", header: "Debit", kind: "money", width: 16 },
@@ -163,6 +166,7 @@ export function journalReportSheet(
         date: entry.entryDate,
         source: sourceLabel(entry.sourceType),
         description: entry.description ?? "",
+        amount: money(journalEntryAmountMinor(entry.lines)),
         status: statusLabel(entry.isReversed ? "reversed" : entry.status),
       };
       if (entry.lines.length === 0) return [{ ...head, account: "", debit: null, credit: null }];
