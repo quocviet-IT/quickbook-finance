@@ -20,7 +20,7 @@ export default async function OpeningBalancesPage() {
     <div>
       <PageHeader
         title="Opening Balances"
-        description="Enter each account's balance on the day you start keeping the books in One Book. Any difference goes to Opening Balance Equity, and debits must equal credits before you can post."
+        description="Enter each account's balance on the day you start keeping the books in One Book. Any difference between debits and credits goes to Opening Balance Equity, so the entry always balances."
       />
       <OpeningBalancesClient
         canWrite={canWrite(role)}

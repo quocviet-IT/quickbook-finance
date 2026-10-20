@@ -918,6 +918,99 @@ body {
 }
 
 /*
+ * Opening Balances: where the draft stands, and what Post is waiting for.
+ * Empty is neutral — the card's own surface and a muted icon — never the green
+ * "Balanced" the empty form used to announce (UI review, 2026-10-20).
+ */
+.opening-balances__status {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--ob-border-subtle);
+  border-radius: 10px;
+  background: var(--ob-surface-card);
+}
+
+.opening-balances__status-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.opening-balances__status-detail {
+  max-width: 78ch;
+  color: var(--ob-text-secondary);
+}
+
+.opening-balances__status--empty .opening-balances__status-title .anticon,
+.opening-balances__status--incomplete .opening-balances__status-title .anticon {
+  color: var(--ob-text-secondary);
+}
+
+.opening-balances__status--balanced {
+  background: var(--ob-feedback-positiveBg);
+}
+
+.opening-balances__status--balanced .opening-balances__status-title .anticon {
+  color: var(--ob-intent-success);
+}
+
+.opening-balances__status--equity {
+  border-color: var(--ob-feedback-infoBorder);
+  background: var(--ob-feedback-infoBg);
+}
+
+.opening-balances__status--equity .opening-balances__status-title .anticon {
+  color: var(--ob-intent-info);
+}
+
+.opening-balances__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  margin: 4px 0 0;
+}
+
+.opening-balances__totals dt {
+  font-size: 12px;
+  color: var(--ob-text-secondary);
+}
+
+.opening-balances__totals dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-heading);
+}
+
+/* What Post needs, beside it: a tick for what is done, a clock for what is not. */
+.opening-balances__conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ob-text-secondary);
+}
+
+.opening-balances__conditions li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.opening-balances__conditions li.is-met {
+  color: var(--ob-text-body);
+}
+
+.opening-balances__conditions li.is-met .anticon {
+  color: var(--ob-intent-success);
+}
+
+/*
  * A report bar (components/reports/ReportBar.tsx): the dates, filters and Run
  * report flow on the same lines as the exports, and the exports keep to the
  * right of whichever line they land on.

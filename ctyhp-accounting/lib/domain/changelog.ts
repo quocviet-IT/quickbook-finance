@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.31",
+    date: "2026-10-20",
+    headline: "Opening Balances says where it stands, and what Post is waiting for.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "An empty form is not Balanced",
+        detail:
+          "Before anything was typed, Opening Balances said in green \"Balanced. Debit = Credit = 0.00 USD.\" It now says, in a neutral box, that nothing has been entered yet and how to start. Once there are balances it says Balanced when debits equal credits, or how much goes to Opening Balance Equity and on which side, with the debit and credit totals beside it. While a balance still has no account it says which line needs one, never Balanced.",
+        route: "/opening-balances",
+      },
+      {
+        kind: "changed",
+        title: "Post says what it is waiting for",
+        detail:
+          "Post opening balances was disabled with no reason given. Beside it now is what posting needs, ticked off as it is done: an as-of date, at least one balance, and an account for every balance. Pointing at the disabled button says what is still missing.",
+        route: "/opening-balances",
+      },
+      {
+        kind: "fixed",
+        title: "A balance without an account is no longer dropped",
+        detail:
+          "A line with an amount but no account counted in the totals on screen and was then left out when posting, so the entry posted was not the one shown. Post now waits until every balance has an account, and names the lines that do not.",
+        route: "/opening-balances",
+      },
+    ],
+  },
+  {
     version: "2.30",
     date: "2026-10-19",
     headline: "The company list and the search field no longer run into each other.",
