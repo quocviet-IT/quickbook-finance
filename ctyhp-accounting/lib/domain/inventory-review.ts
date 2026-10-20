@@ -10,7 +10,7 @@
  * This company is on weighted average cost, so the older lower-of-cost-or-market
  * test does not apply — it survives only for LIFO and the retail method.
  */
-import { plural, pluralWord } from "@/lib/format";
+import { formatDate, plural, pluralWord } from "@/lib/format";
 
 export interface InventoryReviewRow {
   itemId: string;
@@ -196,6 +196,30 @@ export const METHOD_LABEL: Record<string, string> = {
   fifo: "First in, first out",
   specific_identification: "Specific identification",
 };
+
+/**
+ * The line at the head of the review, said as what was found.
+ *
+ * It said "Every line of stock is moving and none is carried above what it
+ * would fetch" over an empty table (UI review, 2026-10-20) — true of nothing,
+ * and read as a clean bill of health for stock that was not there. With nothing
+ * on hand it says so, in a neutral tone; otherwise it counts what it looked at.
+ */
+export function inventoryReviewHeadline(review: InventoryReview): { tone: "warning" | "success" | "info"; message: string } {
+  const warning = describeInventoryReview(review);
+  if (warning) return { tone: "warning", message: warning };
+  const held = review.rows.filter((row) => row.qtyOnHand > 0).length;
+  if (held === 0) {
+    return { tone: "info", message: `No stock is on hand at ${formatDate(review.asOf)}, so there is nothing to review.` };
+  }
+  return {
+    tone: "success",
+    message:
+      held === 1
+        ? "The one item on hand is moving and is not carried above what it would fetch."
+        : `All ${held.toLocaleString("en-US")} items on hand are moving, and none is carried above what it would fetch.`,
+  };
+}
 
 export function describeInventoryReview(review: InventoryReview): string | null {
   if (review.needsAttention.length === 0) return null;

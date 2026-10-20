@@ -7,7 +7,7 @@ import { fromMinor } from "@/lib/domain/money";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, formatMoney, pluralWord } from "@/lib/format";
 import {
-  describeInventoryReview,
+  inventoryReviewHeadline,
   METHOD_LABEL,
   SELLING_COST_RATE,
   VERDICT_LABEL,
@@ -138,7 +138,7 @@ export default function InventoryReviewClient({
     };
   }, [review, ran, companyName, baseCurrency, baseDecimals]);
 
-  const warning = review ? describeInventoryReview(review) : null;
+  const headline = review ? inventoryReviewHeadline(review) : null;
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -166,14 +166,11 @@ export default function InventoryReviewClient({
 
       <div className="report-print-area">
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-      {review ? (
+      {review && headline ? (
         <Alert
-          type={warning ? "warning" : "success"}
+          type={headline.tone}
           showIcon
-          message={
-            warning ??
-            "Every line of stock is moving and none is carried above what it would fetch."
-          }
+          message={headline.message}
           description={
             <>
               Inventory is measured at <b>{METHOD_LABEL[review.method] ?? review.method}</b>, at the

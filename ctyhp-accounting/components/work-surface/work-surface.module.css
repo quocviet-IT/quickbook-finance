@@ -118,6 +118,12 @@
   color: var(--ob-text-faint);
 }
 
+/* Nothing to check: muted, like a check that did not run, never the green of a pass. */
+.notApplicable .controlIcon,
+.notApplicable .controlDifference {
+  color: var(--ob-text-secondary);
+}
+
 /* --- The work queue ----------------------------------------------------- */
 /* Rows, not a data grid. A queue is a list of things to do: nothing here sorts,
    pages or selects, and keeping the table engine off these routes is worth

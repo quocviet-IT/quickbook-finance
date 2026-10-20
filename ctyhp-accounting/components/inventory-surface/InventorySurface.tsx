@@ -5,6 +5,7 @@ import type { InventorySurfaceData } from "@/lib/services/inventory-surface";
 import {
   INVENTORY_KIND_FILTERS,
   INVENTORY_NOUNS,
+  inventoryQueueEmptyState,
 } from "@/lib/domain/inventory-surface/rules";
 import { changeInventoryWorkItemAction } from "@/app/(app)/inventory/actions";
 
@@ -41,13 +42,7 @@ export default function InventorySurface({
         label: "blocks valuation",
         title: "Until this is explained, neither the stock figure nor the ledger can be relied on.",
       }}
-      emptyState={{
-        title: "Stock is straight",
-        evidence:
-          controls.dataState === "unavailable"
-            ? "No negative stock or unposted depreciation was found — but the checks could not run, so this is not a clean bill of health."
-            : "Nothing is below zero, the stock ties to the ledger, and no depreciation is waiting to be posted.",
-      }}
+      emptyState={inventoryQueueEmptyState(controls.dataState === "unavailable" ? null : (controls.data ?? null))}
       viewerId={viewerId}
       canManage={canManage}
       assignees={assignees}

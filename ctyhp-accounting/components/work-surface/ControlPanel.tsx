@@ -40,6 +40,9 @@ const STATUS_PRESENTATION: Record<
   unavailable: { glyph: "question", word: "Not evaluated", className: styles.unavailable },
 };
 
+/** A check with nothing to look at: neither a pass nor a failure. */
+const NOT_APPLICABLE = { glyph: "minus" as GlyphName, word: "Nothing to check", className: styles.notApplicable };
+
 /** Failures first: the rail is read top-down and the top is the alarm. */
 const STATUS_ORDER: Record<ControlStatus, number> = {
   blocked: 0,
@@ -47,6 +50,9 @@ const STATUS_ORDER: Record<ControlStatus, number> = {
   unavailable: 2,
   healthy: 3,
 };
+
+/** Checks with nothing to look at go last, below the ones that passed. */
+const orderOf = (control: SurfaceControl) => (control.notApplicable ? 4 : STATUS_ORDER[control.status]);
 
 export default function ControlPanel({
   controls,
@@ -69,9 +75,7 @@ export default function ControlPanel({
   freshness?: "always" | "when-stale";
   className?: string;
 }) {
-  const rows = [...(controls.data ?? [])].sort(
-    (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
-  );
+  const rows = [...(controls.data ?? [])].sort((a, b) => orderOf(a) - orderOf(b));
   const controlsNote = controls.data ? sectionFreshnessNote(controls, freshness) : null;
 
   return (
@@ -81,7 +85,7 @@ export default function ControlPanel({
       ) : (
         <div className={styles.controlList}>
           {rows.map((control) => {
-            const presentation = STATUS_PRESENTATION[control.status];
+            const presentation = control.notApplicable ? NOT_APPLICABLE : STATUS_PRESENTATION[control.status];
             return (
               <div
                 key={control.key}

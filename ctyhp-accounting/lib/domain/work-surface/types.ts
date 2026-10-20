@@ -67,6 +67,13 @@ export interface SurfaceControl {
    * shared ordering rule only needs to know that one exists.
    */
   blocking: boolean;
+  /**
+   * There was nothing to check: no bank feed, no bank account, no stocked item,
+   * no fixed asset. Still `healthy` — nothing is wrong, and nothing waits on it
+   * — but drawn as "Nothing to check", not "Passed": a pass about nothing read
+   * as a clean bill of health (UI review, 2026-10-20).
+   */
+  notApplicable?: true;
 }
 
 /**
