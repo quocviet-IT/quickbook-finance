@@ -11,6 +11,8 @@ import { journalEntryAmountMinor } from "@/lib/domain/journal-entry-amount";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatMoney, formatDate, plural } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
+import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
 import FilterBar from "@/components/ui/FilterBar";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
@@ -65,6 +67,7 @@ export default function JournalClient({
   scannerConfigured,
 }: Props) {
   const { message, modal } = App.useApp();
+  const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
   const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
@@ -369,7 +372,7 @@ export default function JournalClient({
           {
             title: "",
             key: "actions",
-            width: 110,
+            width: 140,
             render: (_, e) => (
               <Space size={4}>
                 {canReadDocuments ? (
@@ -393,6 +396,20 @@ export default function JournalClient({
                   <Button size="small" onClick={() => reverse(e)}>
                     Reverse
                   </Button>
+                ) : null}
+                {/* An entry written by hand can be made to recur; a document's entry recurs through its document. */}
+                {canWrite && e.status === "posted" && !e.isReversal && e.sourceType === "manual" ? (
+                  <RowActionsMenu
+                    label={`Actions for ${e.entryNumber}`}
+                    items={[
+                      {
+                        key: "recurring",
+                        label: MAKE_RECURRING,
+                        disabled: recurringId === e.id,
+                        onClick: () => void makeRecurring("journal", e.id),
+                      },
+                    ]}
+                  />
                 ) : null}
               </Space>
             ),

@@ -82,6 +82,7 @@ import {
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
+import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
 
 interface LineForm {
   description?: string;
@@ -159,6 +160,7 @@ export default function InvoicesClient({
   scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
+  const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
   const router = useRouter();
   const [form] = Form.useForm();
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
@@ -678,6 +680,14 @@ export default function InvoicesClient({
         ];
         if (canWrite && (r.status === "issued" || r.status === "partial")) {
           menu.push({ key: "writeoff", label: "Write off", onClick: () => setWriteOffFor(r) });
+        }
+        if (canWrite && r.status !== "draft" && r.status !== "void") {
+          menu.push({
+            key: "recurring",
+            label: MAKE_RECURRING,
+            disabled: recurringId === r.id,
+            onClick: () => void makeRecurring("invoice", r.id),
+          });
         }
         // Last, and separated. The divider is conditional because a menu whose
         // only item is Void would otherwise open with an orphaned line above it.

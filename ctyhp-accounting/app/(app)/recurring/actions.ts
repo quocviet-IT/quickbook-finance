@@ -1,11 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import {
+  RECURRING_DOCUMENT_TYPES,
   journalRecurringPayloadSchema,
   recurringTemplateCreateSchema,
 } from "@/lib/domain/recurring";
+import { ALREADY_RECURRING } from "@/lib/domain/recurring-from";
+import { findScheduleFrom, scheduleFromDocument } from "@/lib/services/recurring-from";
 import {
   RecurringError,
   createRecurringTemplate,
@@ -66,6 +70,32 @@ export async function createRecurringTemplateAction(
     const template = await createRecurringTemplate(sb, parsed.data);
     revalidatePath("/recurring");
     return { ok: true, data: { id: template.id } };
+  } catch (error) {
+    return { ok: false, error: message(error) };
+  }
+}
+
+const makeRecurringSchema = z.object({ type: z.enum(RECURRING_DOCUMENT_TYPES), id: z.uuid() });
+
+/**
+ * "Make it recurring" (2.41): a monthly schedule from a document that already
+ * exists, first due a month after it. A document already made to recur is not
+ * made to recur again.
+ */
+export async function makeRecurringAction(raw: unknown): Promise<ActionResult<{ id: string; startDate: string }>> {
+  if (!(await authorized())) {
+    return { ok: false, error: "You do not have permission to manage recurring transactions" };
+  }
+  const parsed = makeRecurringSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "That document was not found" };
+  try {
+    const sb = await createSupabaseServerClient();
+    if (await findScheduleFrom(sb, parsed.data.id)) return { ok: false, error: ALREADY_RECURRING };
+    const input = recurringTemplateCreateSchema.safeParse(await scheduleFromDocument(sb, parsed.data.type, parsed.data.id));
+    if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "It could not be made to recur" };
+    const template = await createRecurringTemplate(sb, input.data);
+    revalidatePath("/recurring");
+    return { ok: true, data: { id: template.id, startDate: input.data.start_date } };
   } catch (error) {
     return { ok: false, error: message(error) };
   }

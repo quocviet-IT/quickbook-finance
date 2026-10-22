@@ -20,11 +20,21 @@ const scheduleFields = {
   end_date: z.iso.date("Enter a valid end date").optional().nullable(),
 };
 
+/**
+ * The document a schedule was made from, by "Make it recurring" (2.41). Kept
+ * in the payload, which the generator reads by key and so passes over, so the
+ * same document is not made to recur twice.
+ */
+const recurringSourceSchema = z
+  .object({ type: z.enum(RECURRING_DOCUMENT_TYPES), id: z.uuid() })
+  .optional();
+
 export const invoiceRecurringPayloadSchema = z.object({
   customer_id: z.uuid("Select a customer"),
   due_days: z.number().int().min(0).max(365).default(30),
   memo: z.string().trim().max(500).optional().nullable(),
   lines: z.array(invoiceLineInputSchema).min(1, "Add at least one invoice line"),
+  source: recurringSourceSchema,
 });
 
 export const billRecurringPayloadSchema = z.object({
@@ -33,6 +43,7 @@ export const billRecurringPayloadSchema = z.object({
   due_days: z.number().int().min(0).max(365).default(30),
   memo: z.string().trim().max(500).optional().nullable(),
   lines: z.array(billLineInputSchema).min(1, "Add at least one bill line"),
+  source: recurringSourceSchema,
 });
 
 export const expenseRecurringPayloadSchema = z.object({
@@ -40,6 +51,7 @@ export const expenseRecurringPayloadSchema = z.object({
   payment_account_id: z.uuid("Select a payment account"),
   memo: z.string().trim().max(500).optional().nullable(),
   lines: z.array(expenseLineInputSchema).min(1, "Add at least one expense line"),
+  source: recurringSourceSchema,
 });
 
 export const journalRecurringPayloadSchema = z
@@ -47,6 +59,7 @@ export const journalRecurringPayloadSchema = z
     description: z.string().trim().min(1, "Description is required").max(500),
     source_ref: z.string().trim().max(120).optional().nullable(),
     lines: z.array(manualJournalLineSchema).min(2, "Add at least two journal lines"),
+    source: recurringSourceSchema,
   })
   .refine(
     (value) =>
