@@ -18,6 +18,7 @@ export interface UnresolvedAccountsTableProps {
 const COLUMN_LABEL: Record<UnresolvedRef["column"], string> = {
   bank: "Bank account",
   category: "Chart of account",
+  both: "Bank account and Chart of account",
 };
 
 /**

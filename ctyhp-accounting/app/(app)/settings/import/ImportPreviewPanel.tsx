@@ -52,7 +52,8 @@ export default function ImportPreviewPanel({
     (preview.missingAccounts?.length ?? 0) > 0 ||
     (preview.unbankedAccounts?.length ?? 0) > 0 ||
     (preview.nonBankAccounts?.length ?? 0) > 0 ||
-    (preview.ambiguousAccounts?.length ?? 0) > 0;
+    (preview.ambiguousAccounts?.length ?? 0) > 0 ||
+    (preview.bankAsCategory?.length ?? 0) > 0;
 
   /**
    * On the transactions tab this figure is the net of the transactions, not an
@@ -224,8 +225,11 @@ export default function ImportPreviewPanel({
         <Alert
           type="error"
           showIcon
-          message="Some accounts in this file are not in this company's chart of accounts"
-          description={`${preview.missingAccounts?.join(", ")}. Import the chart of accounts first, then bring the transactions across.`}
+          message="Some names in this file are not in this company's chart of accounts"
+          // "Import the chart of accounts first" was the whole of this, and it
+          // was wrong for a file that names a bank by its nickname: the chart
+          // was there, the name was not in it (2026-10-22).
+          description={`${preview.missingAccounts?.join(", ")}. Choose the account each one means under What this file needs, or create it there. If this company's chart is not set up yet, import the chart of accounts first.`}
         />
       ) : null}
 
@@ -251,6 +255,26 @@ export default function ImportPreviewPanel({
               else&apos;s and cannot be edited, set the account you do not use to{" "}
               <b>Inactive</b> in the chart of accounts — one live account of that name is no
               longer a question.
+            </>
+          }
+        />
+      ) : null}
+
+      {preview.bankAsCategory && preview.bankAsCategory.length > 0 ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Some rows name their own bank as the Chart of account"
+          description={
+            <>
+              {preview.bankAsCategory
+                .map(({ ref, rows }) => `"${ref}" on ${plural(rows, "row")}`)
+                .join("; ")}
+              . The money would leave the bank and come straight back: nothing would be
+              recorded as income or expense. The Chart of account column should say what each
+              row was for, such as Service Revenue or Operating Expenses. If the file has no
+              such column, bring it in under <b>Banking → Import statement</b> instead and
+              give each line a category there.
             </>
           }
         />

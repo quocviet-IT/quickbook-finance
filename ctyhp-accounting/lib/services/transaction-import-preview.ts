@@ -204,6 +204,8 @@ export async function previewTransactionImport(
   const unbanked = new Set<string>();
   const notBanks = new Set<string>();
   const ambiguous = new Map<string, string[]>();
+  /** Category name → rows whose category is their own bank. */
+  const bankAsCategory = new Map<string, number>();
   const previewRows: ImportPreviewRow[] = [];
   /** How many times this exact row has already been seen in this file. */
   const seenInFile = new Map<string, number>();
@@ -252,6 +254,12 @@ export async function previewTransactionImport(
       ambiguous.set(categoryRef, categoryMatch.candidateCodes);
     } else if (!categoryMatch?.accountId) {
       missing.add(categoryRef);
+    }
+    // The money would come out of the bank and go straight back in. Keyed on
+    // the name as the file wrote it, which is what the reader can find there.
+    if (bankId && categoryMatch?.accountId === bankId) {
+      const named = (record.category_account ?? "").trim() || categoryRef;
+      bankAsCategory.set(named, (bankAsCategory.get(named) ?? 0) + 1);
     }
 
     // A row identical to one earlier in the same file is a second real
@@ -318,5 +326,6 @@ export async function previewTransactionImport(
     unbankedAccounts: [...unbanked],
     nonBankAccounts: [...notBanks],
     ambiguousAccounts: [...ambiguous].map(([ref, codes]) => ({ ref, codes })),
+    bankAsCategory: [...bankAsCategory].map(([ref, rows]) => ({ ref, rows })),
   };
 }

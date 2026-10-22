@@ -27,8 +27,12 @@ export class ImportPreflightError extends Error {}
 /** A name in the file that the chart cannot turn into exactly one account. */
 export interface UnresolvedRef {
   ref: string;
-  /** Which column it came from: the two need different remedies. */
-  column: "bank" | "category";
+  /**
+   * Which column it came from: the two need different remedies. "both" is one
+   * name in both columns, listed once: it was two identical rows, counted as
+   * two names, over one choice that answers for both (2026-10-22).
+   */
+  column: "bank" | "category" | "both";
   /** How many rows use it, so the biggest problem is obvious. */
   rows: number;
   /** Codes of the accounts a name matches when it matches more than one. */
@@ -60,6 +64,12 @@ export interface ImportPreflight {
   bankRefs: number;
   /** Distinct chart-of-account names the file uses. */
   categoryRefs: number;
+  /**
+   * Category names that read as the very bank their row's money moved
+   * through, with how many rows. Such a row debits and credits one account.
+   * Named here, before any column is agreed, because the import refuses it.
+   */
+  bankAsCategory: { ref: string; rows: number }[];
 }
 
 interface RefMatchRow {
@@ -87,24 +97,39 @@ function distinctRefs(
   rows: readonly (readonly string[])[],
   mapping: Record<string, number | null>,
   overrides: Record<string, string>,
-): { bank: Map<string, number>; category: Map<string, number> } {
+): {
+  bank: Map<string, number>;
+  category: Map<string, number>;
+  /** Rows using a name in either column, each row counted once. */
+  either: Map<string, number>;
+  /** Bank name and category name as one row pairs them, with the file's own category name. */
+  pairs: Map<string, { bank: string; category: string; named: string; rows: number }>;
+} {
   const parsed = applyMapping(rows, mapping, "transactions");
   const bank = new Map<string, number>();
   const category = new Map<string, number>();
+  const either = new Map<string, number>();
+  const pairs = new Map<string, { bank: string; category: string; named: string; rows: number }>();
 
   for (const record of parsed.records) {
     const bankRef = String(record.bank_account ?? "").trim();
-    if (bankRef !== "") {
-      const use = overrides[bankRef] ?? bankRef;
-      bank.set(use, (bank.get(use) ?? 0) + 1);
-    }
+    const bankUse = bankRef === "" ? "" : (overrides[bankRef] ?? bankRef);
+    if (bankUse !== "") bank.set(bankUse, (bank.get(bankUse) ?? 0) + 1);
     const categoryRef = String(record.category_account ?? "").trim();
-    if (categoryRef !== "") {
-      const use = overrides[categoryRef] ?? categoryRef;
-      category.set(use, (category.get(use) ?? 0) + 1);
+    const categoryUse = categoryRef === "" ? "" : (overrides[categoryRef] ?? categoryRef);
+    if (categoryUse !== "") category.set(categoryUse, (category.get(categoryUse) ?? 0) + 1);
+
+    for (const use of new Set([bankUse, categoryUse])) {
+      if (use !== "") either.set(use, (either.get(use) ?? 0) + 1);
+    }
+    if (bankUse !== "" && categoryUse !== "") {
+      const key = `${bankUse}\u0000${categoryUse}`;
+      const pair = pairs.get(key) ?? { bank: bankUse, category: categoryUse, named: categoryRef, rows: 0 };
+      pair.rows += 1;
+      pairs.set(key, pair);
     }
   }
-  return { bank, category };
+  return { bank, category, either, pairs };
 }
 
 /** Ask the database what each name means, through the resolver the import uses. */
@@ -163,7 +188,7 @@ export async function importPreflight(
     throw new ImportPreflightError("Only a transactions file has accounts to check ahead of time");
   }
 
-  const { bank, category } = distinctRefs(rows, mapping, overrides);
+  const { bank, category, either, pairs } = distinctRefs(rows, mapping, overrides);
   const everyRef = [...new Set([...bank.keys(), ...category.keys()])];
 
   const [matches, accountsResult, bankedResult] = await Promise.all([
@@ -181,7 +206,7 @@ export async function importPreflight(
     ((bankedResult.data ?? []) as { account_id: string }[]).map((row) => row.account_id),
   );
 
-  const unresolved: UnresolvedRef[] = [];
+  const unresolved = new Map<string, UnresolvedRef>();
   const unbanked: UnbankedRef[] = [];
 
   for (const [column, counts] of [
@@ -191,12 +216,13 @@ export async function importPreflight(
     for (const [ref, count] of counts) {
       const match = matches.get(ref);
       if (!match?.account_id) {
-        unresolved.push({
-          ref,
-          column,
-          rows: count,
-          candidates: match?.candidate_codes ?? [],
-        });
+        const seen = unresolved.get(ref);
+        if (seen) {
+          seen.column = "both";
+          seen.rows = either.get(ref) ?? Math.max(seen.rows, count);
+        } else {
+          unresolved.set(ref, { ref, column, rows: count, candidates: match?.candidate_codes ?? [] });
+        }
         continue;
       }
       if (column !== "bank" || banked.has(match.account_id)) continue;
@@ -214,13 +240,25 @@ export async function importPreflight(
     }
   }
 
+  // A category that resolves to the account its row's bank resolves to. Two
+  // unresolved names cannot be compared yet; the preview repeats this once
+  // they are chosen, with the bank chosen above standing in for an empty one.
+  const sameAsBank = new Map<string, number>();
+  for (const pair of pairs.values()) {
+    const bankId = matches.get(pair.bank)?.account_id;
+    if (bankId && matches.get(pair.category)?.account_id === bankId) {
+      sameAsBank.set(pair.named, (sameAsBank.get(pair.named) ?? 0) + pair.rows);
+    }
+  }
+
   const byRows = <T extends { rows: number }>(a: T, b: T) => b.rows - a.rows;
   return {
     chartAccounts: accounts.size,
     bankAccounts: banked.size,
-    unresolved: unresolved.sort(byRows),
+    unresolved: [...unresolved.values()].sort(byRows),
     unbanked: unbanked.sort(byRows),
     bankRefs: bank.size,
     categoryRefs: category.size,
+    bankAsCategory: [...sameAsBank].map(([ref, rows]) => ({ ref, rows })).sort(byRows),
   };
 }
