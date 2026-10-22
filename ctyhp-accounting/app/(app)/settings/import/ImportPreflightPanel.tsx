@@ -39,7 +39,22 @@ export default function ImportPreflightPanel({
   onCreateAccount,
   onAddBankRecord,
 }: ImportPreflightPanelProps) {
-  const ready = preflight.unresolved.length === 0 && preflight.unbanked.length === 0;
+  const ready =
+    preflight.unresolved.length === 0 &&
+    preflight.unbanked.length === 0 &&
+    preflight.bankAsCategory.length === 0;
+  // One name doing both jobs. Whatever account it is pointed at answers for
+  // both columns: the bank, and every row puts its money straight back; an
+  // income or expense account, and the bank side is wrong. Only the file can
+  // say what each row was for (2026-10-22).
+  const bothColumns = [
+    ...preflight.unresolved.filter((row) => row.column === "both").map(({ ref, rows }) => ({ ref, rows })),
+    ...preflight.bankAsCategory,
+  ];
+  // A name already pointed at the bank has left the table above, which was the
+  // only place its choice could be changed. The notice that says the choice is
+  // wrong offers to take it back.
+  const chosen = bothColumns.find(({ ref }) => overrides[ref]);
 
   return (
     <Card size="small" title="What this file needs">
@@ -57,6 +72,31 @@ export default function ImportPreflightPanel({
             showIcon
             message="Every account this file names already exists"
             description="Nothing to set up first. Agree the columns below, then see what will happen."
+          />
+        ) : null}
+
+        {bothColumns.length > 0 ? (
+          <Alert
+            type="error"
+            showIcon
+            message="The Chart of account column names the bank itself"
+            action={
+              chosen ? (
+                <Button size="small" onClick={() => onOverride(chosen.ref, null)}>
+                  Undo the choice
+                </Button>
+              ) : undefined
+            }
+            description={
+              <>
+                {bothColumns.map(({ ref, rows }) => `"${ref}" on ${plural(rows, "row")}`).join("; ")}.
+                Each row&apos;s Chart of account has to say what the money was for, such as
+                Service Revenue or Operating Expenses; the bank cannot be both sides of a
+                transaction. Correct that column in the file, or, if it has no such column,
+                bring it in under <b>Banking → Import statement</b> and give each line a
+                category there.
+              </>
+            }
           />
         ) : null}
 

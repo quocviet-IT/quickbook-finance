@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -184,5 +186,100 @@ describe("an override reaches the import, not just the screen", () => {
     expect(row?.values.category_account).toBe("140");
     // And the untouched column is left exactly as the file wrote it.
     expect(row?.values.bank_account).toBe("Petty Tin");
+  });
+});
+
+/**
+ * A file that names its bank in both account columns (a real company's,
+ * 2026-10-22). One choice of account answers for both, so pointing the name at
+ * the bank would have posted every row as a debit and a credit to one account.
+ */
+describe("a Chart of account that is the row's own bank", () => {
+  const NICKNAME = "Main Street Checking (...4821)";
+  const BOTH = [
+    ["2026-01-15", "Payment from a customer", NICKNAME, NICKNAME, "1070.00"],
+    ["2026-01-16", "Payment to a server", NICKNAME, NICKNAME, "-250.00"],
+  ];
+
+  it("lists one name used in both columns once, as both, with the rows it is on", async () => {
+    const result = await importPreflight(companyClient(), "transactions", BOTH, MAPPING);
+
+    expect(result.unresolved).toHaveLength(1);
+    expect(result.unresolved[0]).toMatchObject({ ref: NICKNAME, column: "both", rows: 2 });
+  });
+
+  it("is caught before any column is agreed once the name is pointed at the bank", async () => {
+    const result = await importPreflight(companyClient(), "transactions", BOTH, MAPPING, { [NICKNAME]: "121" });
+
+    expect(result.unresolved).toEqual([]);
+    expect(result.bankAsCategory).toEqual([{ ref: NICKNAME, rows: 2 }]);
+  });
+
+  it("is caught when the file itself names the same account twice", async () => {
+    const rows = [["2026-01-15", "Deposit", "121", "PC49 BoA CK 3388", "969.00"]];
+
+    const result = await importPreflight(companyClient(), "transactions", rows, MAPPING);
+
+    expect(result.bankAsCategory).toEqual([{ ref: "PC49 BoA CK 3388", rows: 1 }]);
+  });
+
+  it("is not raised for an ordinary file", async () => {
+    const result = await importPreflight(companyClient(), "transactions", ROWS, MAPPING);
+
+    expect(result.bankAsCategory).toEqual([]);
+  });
+
+  it("blocks the preview, named as the file wrote it", async () => {
+    const preview = await previewImport(companyClient(), "transactions", BOTH, MAPPING, {
+      accountOverrides: { [NICKNAME]: "121" },
+    });
+
+    expect(preview.missingAccounts).toEqual([]);
+    expect(preview.bankAsCategory).toEqual([{ ref: NICKNAME, rows: 2 }]);
+  });
+
+  it("names the account chosen above, not the file's unknown name, when that account has no bank record", async () => {
+    // The file's bank name resolves to nothing, so its rows fall back to the
+    // account chosen above. It was that account with no record, but the
+    // notice named the nickname and sent the reader to add it under Banking.
+    const preview = await previewImport(companyClient({ bankedIds: [] }), "transactions", BOTH, MAPPING, {
+      bankAccountId: "account-0",
+    });
+
+    expect(preview.missingAccounts).toEqual([NICKNAME]);
+    expect(preview.unbankedAccounts).toEqual(["121 PC49 BoA CK 3388, chosen above"]);
+  });
+
+  it("blocks the preview against the bank chosen above when the file names none", async () => {
+    const rows = [["2026-01-15", "Deposit", "", "121", "969.00"]];
+
+    const preview = await previewImport(companyClient(), "transactions", rows, MAPPING, { bankAccountId: "account-0" });
+
+    expect(preview.bankAsCategory).toEqual([{ ref: "121", rows: 1 }]);
+  });
+});
+
+describe("where a bank-as-category row is refused", () => {
+  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("disables Import on the preview, and says so before the columns", () => {
+    expect(read("app/(app)/settings/import/ImportPreviewPanel.tsx")).toContain("(preview.bankAsCategory?.length ?? 0) > 0");
+    expect(read("app/(app)/settings/import/ImportPreflightPanel.tsx")).toContain("preflight.bankAsCategory.length === 0");
+  });
+
+  it("offers to take back a choice that pointed the name at the bank", () => {
+    // Once chosen, the name leaves the table that was the only place to change it.
+    expect(read("app/(app)/settings/import/ImportPreflightPanel.tsx")).toMatch(/onOverride\(chosen\.ref, null\)[\s\S]*Undo the choice/);
+  });
+
+  it("is refused by the import itself, in the newest definition of the function", () => {
+    const dir = join(process.cwd(), "supabase", "migrations");
+    const defining = readdirSync(dir)
+      .filter((file) => file.endsWith(".sql"))
+      .sort()
+      .filter((file) => read(`supabase/migrations/${file}`).includes("create or replace function acc_import_transactions("));
+    const newest = defining[defining.length - 1];
+    expect(newest).toBe("0157_import_refuses_bank_as_category.sql");
+    expect(read(`supabase/migrations/${newest}`)).toMatch(/if v_category = v_bank then\s+raise exception/);
   });
 });

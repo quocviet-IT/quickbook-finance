@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.37",
+    date: "2026-10-22",
+    headline: "A transactions file that names its bank as the category is stopped, with the way to bring it in.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "No transaction posted back into its own bank",
+        detail:
+          "On Import, a transactions file whose Chart of account column named the bank account itself could be imported once that name was pointed at the bank. Every row would have been posted as money leaving the bank and coming straight back, with nothing recorded as income or expense. Such a file is now stopped before the columns are agreed and again on the preview, and the import itself refuses it. The message says to correct that column, or to bring the file in under Banking → Import statement and give each line a category there.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "One name listed once",
+        detail:
+          "A name used in both the Bank account and the Chart of account columns was listed twice under What this file needs, and counted as two names. It is listed once, marked as being in both columns.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "The right bank named as having no bank record",
+        detail:
+          "When the file's bank name was not in the chart, its rows were posted to the account chosen in Post to bank account, and if that account had no bank record the notice named the file's bank name instead, sending you to Banking to add an account that does not exist. It now names the account chosen above, and says you can post to a bank that already has a record.",
+        route: "/settings/import",
+      },
+      {
+        kind: "changed",
+        title: "Clearer advice for a name the chart does not have",
+        detail:
+          "A name in the file that is not in the chart of accounts no longer only says to import the chart of accounts first. It says to choose the account the name means under What this file needs, or to create it there.",
+        route: "/settings/import",
+      },
+    ],
+  },
+  {
     version: "2.36",
     date: "2026-10-20",
     headline: "Empty lists say what goes in them and offer the next step, and a selected item is pale teal.",

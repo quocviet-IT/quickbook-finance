@@ -88,6 +88,15 @@ async function bankTypeAccountIds(sb: SupabaseClient): Promise<Set<string>> {
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
 
+/** "1010 Operating Bank Account": the account chosen above, as a reader knows it. */
+async function accountLabel(sb: SupabaseClient, id: string | null): Promise<string | null> {
+  if (!id) return null;
+  const { data, error } = await sb.from("acc_account").select("id,account_code,name").eq("id", id);
+  if (error) throw new DataImportError(error.message);
+  const row = ((data ?? []) as { id: string; account_code: string; name: string }[]).find((r) => r.id === id);
+  return row ? `${row.account_code} ${row.name}`.trim() : null;
+}
+
 /** How many rows PostgREST will return before it stops and says nothing. */
 const HASH_PAGE = 1000;
 
@@ -183,11 +192,12 @@ export async function previewTransactionImport(
     refs.push(substitute(record.bank_account), substitute(record.category_account));
   }
 
-  const [matches, hashes, banked, bankTyped] = await Promise.all([
+  const [matches, hashes, banked, bankTyped, chosenLabel] = await Promise.all([
     resolveAccountRefs(sb, refs),
     existingHashes(sb),
     bankedAccountIds(sb),
     bankTypeAccountIds(sb),
+    accountLabel(sb, options.bankAccountId ?? null),
   ]);
 
   const problems = [...parsed.problems];
@@ -204,6 +214,8 @@ export async function previewTransactionImport(
   const unbanked = new Set<string>();
   const notBanks = new Set<string>();
   const ambiguous = new Map<string, string[]>();
+  /** Category name → rows whose category is their own bank. */
+  const bankAsCategory = new Map<string, number>();
   const previewRows: ImportPreviewRow[] = [];
   /** How many times this exact row has already been seen in this file. */
   const seenInFile = new Map<string, number>();
@@ -238,12 +250,22 @@ export async function previewTransactionImport(
       missing.add(bankRef);
     }
     const bankId = bankMatch?.accountId ?? options.bankAccountId ?? null;
+    // Named for the account that is actually short of a record. A name the
+    // chart does not have falls back to the account chosen above, and that
+    // account was being reported under the file's name: the bank's nickname
+    // "has no bank record, add it under Banking", when the nickname is no
+    // account at all and the one without a record was the choice (2026-10-22).
+    const bankLabel = bankMatch?.accountId
+      ? bankRef
+      : chosenLabel
+        ? `${chosenLabel}, chosen above`
+        : "the account chosen above";
     if (bankId && !banked.has(bankId)) {
       // Two different problems with two different answers. One is fixed under
       // Banking; the other cannot be, and saying which is which saves a wasted
       // trip to a screen that will never list the account.
-      if (bankTyped.has(bankId)) unbanked.add(bankRef || "the account chosen above");
-      else notBanks.add(bankRef || "the account chosen above");
+      if (bankTyped.has(bankId)) unbanked.add(bankLabel);
+      else notBanks.add(bankLabel);
     }
 
     const categoryRef = substitute(record.category_account);
@@ -252,6 +274,12 @@ export async function previewTransactionImport(
       ambiguous.set(categoryRef, categoryMatch.candidateCodes);
     } else if (!categoryMatch?.accountId) {
       missing.add(categoryRef);
+    }
+    // The money would come out of the bank and go straight back in. Keyed on
+    // the name as the file wrote it, which is what the reader can find there.
+    if (bankId && categoryMatch?.accountId === bankId) {
+      const named = (record.category_account ?? "").trim() || categoryRef;
+      bankAsCategory.set(named, (bankAsCategory.get(named) ?? 0) + 1);
     }
 
     // A row identical to one earlier in the same file is a second real
@@ -318,5 +346,6 @@ export async function previewTransactionImport(
     unbankedAccounts: [...unbanked],
     nonBankAccounts: [...notBanks],
     ambiguousAccounts: [...ambiguous].map(([ref, codes]) => ({ ref, codes })),
+    bankAsCategory: [...bankAsCategory].map(([ref, rows]) => ({ ref, rows })),
   };
 }

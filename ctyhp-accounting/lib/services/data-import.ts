@@ -140,6 +140,17 @@ export interface ImportPreview {
    * again — which is why this blocks rather than warns.
    */
   unbankedAccounts?: string[];
+  /**
+   * Names whose Chart of account is the very bank the row's money moved
+   * through, with how many rows read that way.
+   *
+   * Such a row debits and credits one account: the bank balance never moves
+   * and no income or expense is recorded. A real company's file named its bank
+   * in both columns, and one choice of account answers for both, so pointing
+   * the name at the bank made every row this (2026-10-22). It blocks, as the
+   * import itself now refuses it (migration 0157).
+   */
+  bankAsCategory?: { ref: string; rows: number }[];
 }
 
 /** The column each target is matched on when deciding create versus update. */
