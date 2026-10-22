@@ -44,20 +44,35 @@ export function ReportAudienceToggle() {
  * A report's two halves in the order its reader wants them: figures first for
  * an accountant, charts first for management. One implementation, so no report
  * can drift into its own idea of the order.
+ *
+ * `besideNumbers` reads with the figures, so it follows them in either order.
+ * The Balance Sheet's bank and cash panel came after everything: in the
+ * Accountant view that put it under the chart, where a reviewer looking for it
+ * concluded it was only in Management (feature check, 2026-10-20).
  */
-export function ReportBody({ numbers, chart }: { numbers: ReactNode; chart: ReactNode }) {
+export function ReportBody({
+  numbers,
+  chart,
+  besideNumbers,
+}: {
+  numbers: ReactNode;
+  chart: ReactNode;
+  besideNumbers?: ReactNode;
+}) {
   const audience = useReportAudience();
   if (audience === "management") {
     return (
       <>
         {chart}
         <div style={{ marginTop: 24 }}>{numbers}</div>
+        {besideNumbers}
       </>
     );
   }
   return (
     <>
       {numbers}
+      {besideNumbers}
       <div style={{ marginTop: 24 }}>{chart}</div>
     </>
   );

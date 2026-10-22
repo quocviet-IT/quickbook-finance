@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.38",
+    date: "2026-10-22",
+    headline: "Reconcile lists only the account you chose, and the Balance Sheet's bank panel sits under the figures.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Reconcile lists only the chosen account",
+        detail:
+          "Choosing another bank account on Reconcile kept the previous account's reconciliations in the table for several seconds, under the new account's name: \"never been reconciled\" above rows marked Completed that belonged to the other account. The table now shows it is loading until the chosen account's own reconciliations arrive.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "Bank and cash accounts under the Balance Sheet's figures",
+        detail:
+          "The panel showing how far each bank account has been reconciled, and when cash was last counted, came after the chart. In the Accountant view that put it out of sight below the chart. It now sits right under the figures in both views.",
+        route: "/reports",
+      },
+    ],
+  },
+  {
     version: "2.37",
     date: "2026-10-22",
     headline: "A transactions file that names its bank as the category is stopped, with the way to bring it in.",

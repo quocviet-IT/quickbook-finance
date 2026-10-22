@@ -10,8 +10,9 @@ import { toMinor } from "@/lib/domain/money";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
-import { chosenBankId, reconcileTableLoading } from "@/lib/domain/reconcile-alerts-screen";
+import { chosenBankId, reconcileTableLoading, rowsForAccount } from "@/lib/domain/reconcile-alerts-screen";
 import { EmptyState } from "@/components/ui/PageStates";
+import TableEmpty from "@/components/ui/TableEmpty";
 import { RECONCILE_HISTORY, RECONCILE_HISTORY_PATH } from "@/lib/domain/reconcile-history";
 import { bankStandingAction, createReconciliationAction, listReconciliationsAction } from "./actions";
 import StandingCard from "./StandingCard";
@@ -99,6 +100,14 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
   // sentence without its counts flashes before the full empty state.
   const standingSettled = standingFor === bankId;
   const isEmpty = Boolean(bank) && !loading && loadedFor === bankId && rows.length === 0 && standingSettled;
+  // Only this account's reconciliations, and loading until they are here.
+  const shownRows = rowsForAccount(bankId, loadedFor, rows);
+  const tableLoading = reconcileTableLoading({
+    bankId,
+    loading: loading || loadedFor !== bankId,
+    rowCount: shownRows.length,
+    standingSettled,
+  });
 
   const submit = async () => {
     const v = await form.validateFields();
@@ -191,8 +200,9 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
       {isEmpty ? null : (
         <Table<StatementReconciliationRow>
           rowKey="id"
-          loading={reconcileTableLoading({ bankId, loading, rowCount: rows.length, standingSettled })}
-          dataSource={rows}
+          loading={tableLoading}
+          dataSource={[...shownRows]}
+          locale={{ emptyText: <TableEmpty loading={tableLoading} title="No reconciliations yet" /> }}
           columns={[
             { title: "Ending date", dataIndex: "statement_ending_date", render: (value: string) => formatDate(value) },
             { title: "Beginning", align: "right", render: (_, r) => money(r.beginning_balance_minor) },

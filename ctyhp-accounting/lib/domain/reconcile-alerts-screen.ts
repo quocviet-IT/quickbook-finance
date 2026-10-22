@@ -39,6 +39,24 @@ export function chosenBankId(
 }
 
 /**
+ * The reconciliations to list: the ones read for the account now chosen, or
+ * none while that account's read is still on its way.
+ *
+ * The list used to keep whatever it read last. Switching accounts left the
+ * previous account's reconciliations on screen for the five to ten seconds the
+ * new read took, under the new account's name: "never been reconciled" above
+ * five rows marked Completed that belonged to the other account (feature
+ * check, 2026-10-20).
+ */
+export function rowsForAccount<Row>(
+  bankId: string | undefined,
+  loadedFor: string | null,
+  rows: readonly Row[],
+): readonly Row[] {
+  return bankId !== undefined && loadedFor === bankId ? rows : [];
+}
+
+/**
  * Whether the reconcile list is still reading: its reconciliations, or its
  * standing when it has none yet. With no account there is nothing to read, so
  * nothing to wait for; the screen says there is no account instead. Without

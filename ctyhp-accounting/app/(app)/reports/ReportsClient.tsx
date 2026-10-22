@@ -476,6 +476,21 @@ export default function ReportsClient({
     </div>
   );
 
+  // Outside the printed paper and the export: a help beside the statement, not
+  // part of it. It reads with the figures, so it sits right under them in both
+  // views, not under the chart.
+  const banksPanel =
+    type === "balance" && (bankPanel || cashPanel) && !notice && shownStatement && !shownStatement.empty ? (
+      <BalanceSheetBanksPanel
+        banks={bankPanel?.banks ?? []}
+        asOf={bankPanel?.asOf ?? cashPanel?.asOf ?? to}
+        money={money}
+        cash={cashPanel?.cash ?? null}
+        cashUnavailable={cashPanel !== null && cashPanel.cash === null}
+        onCount={setCounting}
+      />
+    ) : null;
+
   return (
     <div>
       <ReportToolbar
@@ -545,22 +560,15 @@ export default function ReportsClient({
           {chart ? (
             <ReportBody
               numbers={paper}
+              besideNumbers={banksPanel}
               chart={<ComparisonBars title={chart.title} description={chart.description} formatMoney={money} data={chart.data} />}
             />
           ) : (
-            paper
+            <>
+              {paper}
+              {banksPanel}
+            </>
           )}
-          {type === "balance" && (bankPanel || cashPanel) && !notice && shownStatement && !shownStatement.empty ? (
-            // Outside the printed paper and the export: a help beside the statement, not part of it.
-            <BalanceSheetBanksPanel
-              banks={bankPanel?.banks ?? []}
-              asOf={bankPanel?.asOf ?? cashPanel?.asOf ?? to}
-              money={money}
-              cash={cashPanel?.cash ?? null}
-              cashUnavailable={cashPanel !== null && cashPanel.cash === null}
-              onCount={setCounting}
-            />
-          ) : null}
         </div>
       </Spin>
 
