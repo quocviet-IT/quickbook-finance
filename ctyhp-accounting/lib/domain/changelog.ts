@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.40",
+    date: "2026-10-22",
+    headline: "A reconciliation's report reads the way a bank reconciliation does: what the bank confirmed, what it had not seen yet, and whether it still proves out.",
+    changes: [
+      {
+        kind: "changed",
+        title: "The reconciliation report bridges the statement to the books",
+        detail:
+          "The report sets out the statement's opening balance, what cleared and the closing balance; then the deposits and payments in the books that the bank had not seen yet, coming to the balance in the books on the statement date. Each of the four lists shows its lines and total, and a line under them says whether the reconciliation still proves out, and if not, which side has moved and by how much. It prints and exports like every other report. A payment outstanding on an older statement and cleared on a later one now stays on the older statement's report, where it was outstanding.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Tick everything shown, and Clear the ticks",
+        detail:
+          "A reconciliation in progress can tick every ledger line at once, or clear every tick, as the approved design has it. Clearing asks first, and nothing is posted either way.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "added",
+        title: "Report and Adjusted in the list of reconciliations",
+        detail:
+          "Each reconciliation in the list has a Report link beside Open, and one closed with an adjusting entry says Adjusted, with the reason when you point at it.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "2.39",
     date: "2026-10-22",
     headline: "The New menu pays bills and brings in a statement, two reports can show accounts holding nothing, and the guide searches the release notes.",

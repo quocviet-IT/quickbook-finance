@@ -12,6 +12,7 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Statistic,
@@ -49,10 +50,12 @@ import {
   reconciliationLinesAction,
   reconciliationDetailAction,
   setClearedAction,
+  setClearedManyAction,
   recordAdjustmentAction,
   completeReconciliationAction,
   reopenReconciliationAction,
 } from "../actions";
+import { linesToTick } from "@/lib/domain/reconcile-ticks";
 import {
   addMissingLinesAction,
   addMissingPlanAction,
@@ -165,6 +168,7 @@ export default function ReconcileWorkspaceClient({
   const [discarding, setDiscarding] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [bulkTicking, setBulkTicking] = useState<"tick" | "clear" | null>(null);
   const [reopening, setReopening] = useState(false);
 
   const load = useCallback(async () => {
@@ -425,6 +429,27 @@ export default function ReconcileWorkspaceClient({
     const r = await setClearedAction(reconciliationId, line.journalLineId, cleared);
     if (r.ok) void load();
     else message.error(r.error ?? "Failed");
+  };
+
+  // Every line at once, as the approved design offers above its columns.
+  const toTick = linesToTick(lines, true);
+  const toClear = linesToTick(lines, false);
+  const tickMany = async (cleared: boolean) => {
+    const ids = cleared ? toTick : toClear;
+    if (ids.length === 0 || bulkTicking) return;
+    setBulkTicking(cleared ? "tick" : "clear");
+    try {
+      const r = await setClearedManyAction(reconciliationId, ids, cleared);
+      if (r.ok) {
+        const changed = r.data?.changed ?? ids.length;
+        message.success(cleared ? `${plural(changed, "line")} ticked` : `${plural(changed, "tick")} cleared`);
+        await load();
+      } else {
+        message.error(r.error ?? "The lines could not be changed");
+      }
+    } finally {
+      setBulkTicking(null);
+    }
   };
 
   const submitAdjust = async () => {
@@ -864,7 +889,38 @@ export default function ReconcileWorkspaceClient({
         />
       </div>
 
-      <Typography.Text strong>Ledger lines in this reconciliation</Typography.Text>
+      <Space wrap align="center" style={{ justifyContent: "space-between", width: "100%" }}>
+        <Typography.Text strong>Ledger lines in this reconciliation</Typography.Text>
+        {canWrite && !completed ? (
+          <Space wrap size={8}>
+            <Button
+              size="small"
+              disabled={toTick.length === 0 || (bulkTicking !== null && bulkTicking !== "tick")}
+              loading={bulkTicking === "tick"}
+              onClick={() => void tickMany(true)}
+            >
+              Tick everything shown
+            </Button>
+            <Popconfirm
+              placement="topRight"
+              title={`Clear the ticks on ${plural(toClear.length, "line")}?`}
+              description="The difference goes back to what it was before they were ticked. Nothing is posted."
+              okText="Clear the ticks"
+              cancelText="Keep them"
+              disabled={toClear.length === 0}
+              onConfirm={() => tickMany(false)}
+            >
+              <Button
+                size="small"
+                disabled={toClear.length === 0 || (bulkTicking !== null && bulkTicking !== "clear")}
+                loading={bulkTicking === "clear"}
+              >
+                Clear the ticks
+              </Button>
+            </Popconfirm>
+          </Space>
+        ) : null}
+      </Space>
       <Table
         className={styles.ledgerLines}
         rowKey="journalLineId"
