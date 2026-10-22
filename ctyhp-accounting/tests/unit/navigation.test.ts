@@ -363,24 +363,30 @@ describe("settingsHubForAccess", () => {
 });
 
 describe("NEW_MENU", () => {
-  it("targets an existing route with the new-form flag", () => {
+  it("targets an existing route, a document with the new-form flag", () => {
     for (const item of NEW_MENU) {
       const [route, query] = item.href.split("?");
       expect(ROUTES).toContain(route);
-      expect(query).toBe("new=1");
+      if (item.key === "pay-bills") expect(query).toBeUndefined();
+      else if (item.key === "bank-statement") expect(query).toBe("import=1");
+      else expect(query).toBe("new=1");
     }
   });
 
-  it("covers the documents entered daily", () => {
+  it("covers the documents entered daily, then paying bills and bringing a statement in, as the design's menu does", () => {
     expect(NEW_MENU.map((i) => i.key)).toEqual([
       "invoice",
       "estimate",
       "payment",
       "bill",
+      "pay-bills",
       "expense",
       "purchase-order",
       "journal",
+      "bank-statement",
     ]);
+    // Importing a file is set apart from writing a document.
+    expect(NEW_MENU.filter((i) => i.dividerBefore).map((i) => i.key)).toEqual(["bank-statement"]);
   });
 });
 

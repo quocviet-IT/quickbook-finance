@@ -31,13 +31,35 @@ export interface TrialBalance {
   balanced: boolean;
 }
 
-export function buildTrialBalance(rows: LedgerBalance[]): TrialBalance {
+/**
+ * How a statement treats an account that holds nothing on its date. Left out,
+ * as on paper — unless the reader asks for "Show accounts with no balance",
+ * when it stays in its section at 0.00 (the prototype's `showZero`).
+ */
+export interface ZeroBalanceOption {
+  keepZero?: boolean;
+}
+
+/**
+ * `rows`, plus every account of `used` that `rows` lacks, holding nothing.
+ *
+ * "Show accounts with no balance" means every account that has been posted to
+ * — including one first posted to after the statement's date, which the read
+ * for that date does not return at all.
+ */
+export function withAccountsUsed(rows: readonly LedgerBalance[], used: readonly LedgerBalance[]): LedgerBalance[] {
+  const present = new Set(rows.map((row) => row.accountId));
+  const missing = used.filter((row) => !present.has(row.accountId)).map((row) => ({ ...row, debitBase: 0, creditBase: 0 }));
+  return [...rows, ...missing];
+}
+
+export function buildTrialBalance(rows: LedgerBalance[], { keepZero = false }: ZeroBalanceOption = {}): TrialBalance {
   const lines: TrialBalanceLine[] = [];
   let totalDebit = 0;
   let totalCredit = 0;
   for (const r of rows) {
     const net = r.debitBase - r.creditBase;
-    if (net === 0) continue; // omit zero-balance accounts
+    if (net === 0 && !keepZero) continue; // omit zero-balance accounts
     const debit = net > 0 ? net : 0;
     const credit = net < 0 ? -net : 0;
     totalDebit += debit;
@@ -69,6 +91,7 @@ function section(
   title: string,
   rows: LedgerBalance[],
   types: AccountType[],
+  keepZero = false,
 ): ReportSection {
   const set = new Set(types);
   const lines = rows
@@ -77,9 +100,10 @@ function section(
       accountId: r.accountId,
       accountCode: r.accountCode,
       name: r.name,
-      amount: naturalBalance(r.accountType, r.debitBase, r.creditBase),
+      // `|| 0`: a credit-normal account holding nothing nets to -0, which prints as "-$0.00".
+      amount: naturalBalance(r.accountType, r.debitBase, r.creditBase) || 0,
     }))
-    .filter((l) => l.amount !== 0);
+    .filter((l) => keepZero || l.amount !== 0);
   return { key, title, lines, total: lines.reduce((s, l) => s + l.amount, 0) };
 }
 
@@ -111,20 +135,22 @@ export interface BalanceSheet {
   balanced: boolean;
 }
 
-export function buildBalanceSheet(rows: LedgerBalance[]): BalanceSheet {
-  const assets = section("assets", "Assets", rows, [
-    "bank",
-    "accounts_receivable",
-    "current_asset",
-    "fixed_asset",
-  ]);
-  const liabilities = section("liabilities", "Liabilities", rows, [
-    "accounts_payable",
-    "credit_card",
-    "current_liability",
-    "long_term_liability",
-  ]);
-  const equity = section("equity", "Equity", rows, ["equity"]);
+export function buildBalanceSheet(rows: LedgerBalance[], { keepZero = false }: ZeroBalanceOption = {}): BalanceSheet {
+  const assets = section(
+    "assets",
+    "Assets",
+    rows,
+    ["bank", "accounts_receivable", "current_asset", "fixed_asset"],
+    keepZero,
+  );
+  const liabilities = section(
+    "liabilities",
+    "Liabilities",
+    rows,
+    ["accounts_payable", "credit_card", "current_liability", "long_term_liability"],
+    keepZero,
+  );
+  const equity = section("equity", "Equity", rows, ["equity"], keepZero);
 
   // Current earnings (net income to date) is not booked to an equity account
   // until period close, so surface it explicitly to make the sheet balance.

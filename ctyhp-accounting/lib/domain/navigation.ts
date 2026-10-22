@@ -350,20 +350,26 @@ export interface NewMenuItem {
   key: string;
   label: string;
   href: string;
+  /** Set apart from the documents above it: bringing a file in is not writing one. */
+  dividerBefore?: boolean;
 }
 
 /**
  * The create forms are modals on their list pages, so the menu navigates with
- * `?new=1` and the page opens its own modal. Nothing is duplicated.
+ * `?new=1` and the page opens its own modal. Nothing is duplicated. Pay bills
+ * is a page of its own, and a statement opens Banking's import (`?import=1`).
+ * The approved design offers both from this menu.
  */
 export const NEW_MENU: NewMenuItem[] = [
   { key: "invoice", label: "Invoice", href: "/invoices?new=1" },
   { key: "estimate", label: "Estimate", href: "/estimates?new=1" },
   { key: "payment", label: "Payment received", href: "/payments?new=1" },
   { key: "bill", label: "Bill", href: "/bills?new=1" },
+  { key: "pay-bills", label: "Pay bills", href: "/pay-bills" },
   { key: "expense", label: "Expense", href: "/expenses?new=1" },
   { key: "purchase-order", label: "Purchase order", href: "/purchase-orders?new=1" },
   { key: "journal", label: "Journal entry", href: "/journal?new=1" },
+  { key: "bank-statement", label: "Import a bank statement", href: "/banking?import=1", dividerBefore: true },
 ];
 
 // --- Global search ----------------------------------------------------------
