@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.41",
+    date: "2026-10-22",
+    headline: "An invoice, a bill, an expense or a journal entry written by hand can be made to recur, straight from its list.",
+    changes: [
+      {
+        kind: "added",
+        title: "Make it recurring",
+        detail:
+          "Invoices, Bills, Expenses and Journal Entries have Make it recurring in a row's menu. It sets up a monthly schedule from that document, with the same lines, the same customer or vendor and its payment terms, on the document's day of the month. It first falls due on the next such day after today, which is a month after a recent document and never a date already past, and the message says where to change it. A document already set to recur is not set up twice. A document in a currency other than US dollars is refused, because a schedule makes its documents in dollars.",
+        route: "/recurring",
+      },
+      {
+        kind: "changed",
+        title: "An expense's Void is in its row menu",
+        detail: "An expense's actions sit behind the ⋯ menu, as a bill's do, with Void expense last.",
+        route: "/expenses",
+      },
+    ],
+  },
+  {
     version: "2.40",
     date: "2026-10-22",
     headline: "A reconciliation's report reads the way a bank reconciliation does: what the bank confirmed, what it had not seen yet, and whether it still proves out.",

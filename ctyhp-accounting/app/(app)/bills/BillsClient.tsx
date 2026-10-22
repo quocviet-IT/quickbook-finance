@@ -47,6 +47,7 @@ import WriteOffModal from "../settlements/WriteOffModal";
 import SettlementHistory from "@/components/settlements/SettlementHistory";
 import type { SettlementEvent } from "@/lib/domain/settlement";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
+import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
 
 interface LineForm {
   description?: string;
@@ -100,6 +101,7 @@ export default function BillsClient({
   scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
+  const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
   const router = useRouter();
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
@@ -370,6 +372,16 @@ export default function BillsClient({
                         key: "asset",
                         label: "Register asset",
                         onClick: () => router.push(`/fixed-assets?bill=${r.id}`),
+                      },
+                    ]
+                  : []),
+                ...(canWrite && r.status !== "draft" && r.status !== "void"
+                  ? [
+                      {
+                        key: "recurring",
+                        label: MAKE_RECURRING,
+                        disabled: recurringId === r.id,
+                        onClick: () => void makeRecurring("bill", r.id),
                       },
                     ]
                   : []),

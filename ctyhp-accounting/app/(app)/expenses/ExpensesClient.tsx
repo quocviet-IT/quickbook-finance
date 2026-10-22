@@ -9,6 +9,8 @@ import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
+import RowActionsMenu from "@/components/ui/RowActionsMenu";
+import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import type { AccountRow, CurrencyRow, ExpenseStatus, VendorRow } from "@/lib/db/types";
@@ -58,6 +60,7 @@ export default function ExpensesClient({
   scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
+  const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
@@ -196,10 +199,21 @@ export default function ExpensesClient({
                       }
                     />
                   ) : null}
+                  {/* Bills' shape: the paperclip, then everything else behind one ⋯ menu, Void last. */}
                   {canWrite && r.status !== "void" ? (
-                    <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
-                      Void
-                    </Button>
+                    <RowActionsMenu
+                      label={`Actions for ${r.expense_number ?? "expense"}`}
+                      items={[
+                        {
+                          key: "recurring",
+                          label: MAKE_RECURRING,
+                          disabled: recurringId === r.id,
+                          onClick: () => void makeRecurring("expense", r.id),
+                        },
+                        { type: "divider" as const, key: "before-void" },
+                        { key: "void", label: "Void expense", danger: true, onClick: () => confirmVoid(r.id) },
+                      ]}
+                    />
                   ) : null}
                 </Space>
               ) : null,
