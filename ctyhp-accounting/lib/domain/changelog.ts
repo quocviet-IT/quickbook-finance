@@ -60,6 +60,13 @@ export const RELEASES: Release[] = [
         route: "/settings/import",
       },
       {
+        kind: "fixed",
+        title: "The right bank named as having no bank record",
+        detail:
+          "When the file's bank name was not in the chart, its rows were posted to the account chosen in Post to bank account, and if that account had no bank record the notice named the file's bank name instead, sending you to Banking to add an account that does not exist. It now names the account chosen above, and says you can post to a bank that already has a record.",
+        route: "/settings/import",
+      },
+      {
         kind: "changed",
         title: "Clearer advice for a name the chart does not have",
         detail:

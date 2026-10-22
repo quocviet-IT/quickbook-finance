@@ -238,6 +238,18 @@ describe("a Chart of account that is the row's own bank", () => {
     expect(preview.bankAsCategory).toEqual([{ ref: NICKNAME, rows: 2 }]);
   });
 
+  it("names the account chosen above, not the file's unknown name, when that account has no bank record", async () => {
+    // The file's bank name resolves to nothing, so its rows fall back to the
+    // account chosen above. It was that account with no record, but the
+    // notice named the nickname and sent the reader to add it under Banking.
+    const preview = await previewImport(companyClient({ bankedIds: [] }), "transactions", BOTH, MAPPING, {
+      bankAccountId: "account-0",
+    });
+
+    expect(preview.missingAccounts).toEqual([NICKNAME]);
+    expect(preview.unbankedAccounts).toEqual(["121 PC49 BoA CK 3388, chosen above"]);
+  });
+
   it("blocks the preview against the bank chosen above when the file names none", async () => {
     const rows = [["2026-01-15", "Deposit", "", "121", "969.00"]];
 

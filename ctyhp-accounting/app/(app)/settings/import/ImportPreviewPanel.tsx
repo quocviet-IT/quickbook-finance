@@ -294,7 +294,7 @@ export default function ImportPreviewPanel({
           type="error"
           showIcon
           message="This bank account has no bank record yet"
-          description={`${preview.unbankedAccounts.join(", ")}. Add it under Banking first — the bank line is what stops a second import of this file posting the same money twice.`}
+          description={`${preview.unbankedAccounts.join(", ")}. Post to a bank that already has one, chosen above, or add it under Banking first — the bank line is what stops a second import of this file posting the same money twice.`}
         />
       ) : null}
 
