@@ -6,8 +6,14 @@ import {
   closeHistoryEntry,
   closeProgress,
   controlAccountStep,
+  depreciationStep,
   draftDocumentsStep,
+  duplicatesStep,
+  futureDatedStep,
+  holdingAccountsStep,
   medianDaysToClose,
+  reconciliationsAgreeStep,
+  recurringDueStep,
   trialBalanceStep,
   type CloseHistoryEntry,
   type CloseProgress,
@@ -16,6 +22,9 @@ import {
 import { buildTrialBalance } from "@/lib/domain/reports";
 import { getControlReconciliation } from "@/lib/services/gl-posting";
 import { getLedgerBalances } from "@/lib/services/reports";
+import { getExceptionReport } from "@/lib/services/exceptions";
+import type { CheckKey } from "@/lib/domain/exceptions";
+import { listFixedAssets } from "@/lib/services/fixed-assets";
 import type { AccountingDashboardContext, AccountingPeriodRow } from "./context";
 import { formatDate } from "@/lib/format";
 
@@ -71,7 +80,10 @@ export async function getCloseReadiness(
   if (!period) return null;
   const { periodStart, periodEnd } = period;
 
-  const [ledger, reconciliation, blockers, drafts, bankAccounts, lastRecon, unmatched, approvals, history] =
+  const [
+    ledger, reconciliation, blockers, drafts, bankAccounts, lastRecon, unmatched, approvals, history,
+    exceptions, assets, activeSchedules, dueSchedules,
+  ] =
     await Promise.allSettled([
       getLedgerBalances(sb, null, periodEnd),
       getControlReconciliation(sb, periodEnd),
@@ -97,6 +109,19 @@ export async function getCloseReadiness(
         .eq("status", "pending")
         .lte("requested_at", `${periodEnd}T23:59:59.999Z`),
       sb.rpc("acc_period_close_history", { p_limit: 6 }),
+      // The rest of the design's month-end list (2.42). The Exception Report's
+      // own reading of the period, so the checklist and the report cannot
+      // disagree about duplicates, holding accounts or a changed reconciliation.
+      getExceptionReport(sb, periodStart, periodEnd, context.asOf),
+      // What the register says was due by the period end, not by today.
+      listFixedAssets(sb, periodEnd),
+      sb.from("acc_recurring_template").select("id", { count: "exact", head: true }).eq("status", "active"),
+      sb
+        .from("acc_recurring_template")
+        .select("name")
+        .eq("status", "active")
+        .lte("next_run_date", periodEnd)
+        .order("next_run_date"),
     ]);
 
   const steps: CloseStep[] = [];
@@ -177,6 +202,45 @@ export async function getCloseReadiness(
           : null,
     }),
   );
+
+  // A check the Exception Report could not run is unavailable here too, never "nothing found".
+  const report = exceptions.status === "fulfilled" ? exceptions.value : null;
+  const ran = (check: CheckKey) => report !== null && !report.unavailable.includes(check);
+  steps.push(
+    holdingAccountsStep({
+      periodEnd,
+      holding: ran("holding") ? report!.holding.map((row) => ({ name: row.name, balanceMinor: row.balanceMinor })) : null,
+    }),
+  );
+  const schedulesOk =
+    activeSchedules.status === "fulfilled" && !activeSchedules.value.error &&
+    dueSchedules.status === "fulfilled" && !dueSchedules.value.error;
+  steps.push(
+    recurringDueStep({
+      periodEnd,
+      activeCount: schedulesOk ? (activeSchedules.value.count ?? 0) : null,
+      due: schedulesOk ? ((dueSchedules.value.data ?? []) as { name: string }[]) : null,
+    }),
+  );
+  const due = assets.status === "fulfilled" ? assets.value.filter((asset) => Number(asset.due_depreciation_minor) > 0) : [];
+  steps.push(
+    depreciationStep({
+      periodEnd,
+      assetCount: assets.status === "fulfilled" ? assets.value.length : null,
+      dueCount: due.length,
+      dueMinor: due.reduce((sum, asset) => sum + Number(asset.due_depreciation_minor), 0),
+    }),
+  );
+  steps.push(
+    reconciliationsAgreeStep({
+      periodEnd,
+      changed: ran("noLongerAgree")
+        ? report!.noLongerAgree.filter((row) => row.statementEndingDate <= periodEnd)
+        : null,
+    }),
+  );
+  steps.push(duplicatesStep({ periodStart, periodEnd, groups: ran("duplicates") ? report!.duplicates.length : null }));
+  steps.push(futureDatedStep({ today: context.asOf, count: ran("futureDated") ? report!.futureDated.length : null }));
 
   const entries: CloseHistoryEntry[] = [];
   if (history.status === "fulfilled" && !history.value.error) {

@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.42",
+    date: "2026-10-22",
+    headline: "Closing a month checks the rest of what the approved design checks: holding accounts, recurring entries, depreciation, changed reconciliations, duplicates and future dates.",
+    changes: [
+      {
+        kind: "added",
+        title: "Six more checks before a month is closed",
+        detail:
+          "The close checklist on Accounting now also asks: is anything left in Uncategorized, have the recurring entries due by the period end run, is depreciation posted to the period end, do past reconciliations still agree, is any entry recorded twice in the period, and is anything dated after today. Each one reads the books at the period end and says what it found, in the Exception Report's own words where they overlap. None of them stops the close; they say what is not final yet.",
+        route: "/accounting",
+      },
+    ],
+  },
+  {
     version: "2.41",
     date: "2026-10-22",
     headline: "An invoice, a bill, an expense or a journal entry written by hand can be made to recur, straight from its list.",
