@@ -1,0 +1,60 @@
+/* The reconciliation report's bridge, from the bank's balance to the books',
+ * set out as the approved design sets it: two halves, each ending on a bold
+ * balance, the books' half a step down from the bank's. */
+.summary {
+  width: 100%;
+  max-width: 560px;
+  border-collapse: collapse;
+  margin: 0 0 26px;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary td {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--ob-border-muted);
+  color: var(--ob-text-body);
+}
+
+.summary td:last-child {
+  text-align: right;
+  white-space: nowrap;
+  padding-left: 16px;
+}
+
+.summary td.indent {
+  padding-left: 22px;
+}
+
+.total td {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+  border-bottom-color: var(--ob-border-default);
+}
+
+.warning td {
+  color: var(--ob-intent-warning);
+}
+
+.gap td {
+  padding-top: 18px;
+}
+
+/* What the report rests on: the statement file, how it was brought forward. */
+.facts {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--ob-text-secondary);
+}
+
+.verdictGood {
+  color: var(--ob-intent-success);
+}
+
+.verdictBad {
+  color: var(--ob-money-negative);
+}

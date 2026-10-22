@@ -1,16 +1,17 @@
 import { statusLabel } from "@/lib/domain/status-label";
-import { sourceLabel } from "@/lib/domain/entry-detail";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { findReconciliationHeader, getReconciliationDetail, getReconciliationLines } from "@/lib/services/bankrec";
-import { listCurrencies } from "@/lib/services/reference";
-import { companyClock } from "@/lib/services/report-context";
-import { formatDate, formatDateInTimeZone, formatMoney } from "@/lib/format";
+import { findReconciliationHeader } from "@/lib/services/bankrec";
+import { listBankAccounts } from "@/lib/services/banking";
+import { reportPageContext } from "@/lib/services/report-context";
+import { formatDateInTimeZone, formatMoney } from "@/lib/format";
 import { readReconciliationOverrides } from "@/lib/services/override-notices";
 import { shortSha } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
+import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
+import ReconciliationReportClient, { type ReportFact } from "./ReconciliationReportClient";
 
 export const dynamic = "force-dynamic";
 
@@ -20,61 +21,70 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
   const sb = await createSupabaseServerClient();
   const header = await findReconciliationHeader(sb, id);
   if (!header) notFound();
-  const [detail, lines, currencies, { timeZone }] = await Promise.all([
-    getReconciliationDetail(sb, id), getReconciliationLines(sb, id), listCurrencies(sb), companyClock(sb),
-  ]);
-  const base = currencies.find((c) => c.is_base);
-  const dec = base?.decimal_places ?? 2;
-  const money = (m: number) => formatMoney(m, base?.code ?? "USD", dec);
-  const cleared = lines.filter((l) => l.cleared);
+  const [ctx, banks] = await Promise.all([reportPageContext(sb), listBankAccounts(sb)]);
+  const money = (minor: number) => formatMoney(minor, ctx.currencyCode, ctx.decimals);
   // Statements imported out of balance that this reconciliation settled (2.11).
   // Only a completed reconciliation settles anything, so a draft reads nothing. A failed read must not take the report down.
   const { settles, unavailable: overridesUnavailable } =
     header.status === "completed"
       ? await readReconciliationOverrides(sb, id, header, money)
       : { settles: [], unavailable: false };
+  const bank = banks.find((b) => b.id === header.bankAccountId);
+  const accountLabel = bank ? `${bank.bank_name || bank.account_name} · ${bank.account_code}` : "Bank account";
+
+  // What the report rests on, said above its figures.
+  const facts: ReportFact[] = [
+    ...(header.broughtForward ? [{ key: "brought-forward", text: "Brought forward: the account's earlier history was signed off in one step." }] : []),
+    ...settles.map((line) => ({ key: `settles-${line.batchId}`, text: line.text })),
+    ...(overridesUnavailable
+      ? [{ key: "settles-unavailable", text: "Could not check this period for statements imported out of balance." }]
+      : []),
+    ...(header.fileName
+      ? [
+          {
+            key: "statement",
+            text:
+              `Statement: ${header.fileName}` +
+              (header.openingMinor !== null ? ` · opens at ${money(header.openingMinor)}` : "") +
+              (header.closingMinor !== null ? ` · closes at ${money(header.closingMinor)}` : ""),
+          },
+        ]
+      : []),
+    // The kept file, named so a printed report can be matched to it (1.83).
+    header.statementFile
+      ? {
+          key: "file",
+          text: `Statement file: ${header.statementFile.fileName} · kept ${formatDateInTimeZone(header.statementFile.keptAt, ctx.timeZone)} · SHA-256 ${shortSha(header.statementFile.sha256)}`,
+          link: { href: `/banking/statement-files/${header.statementFile.id}`, label: "View" },
+        }
+      : {
+          key: "file",
+          text: header.statementFileId
+            ? "A statement file is kept with this reconciliation."
+            : "No statement file is kept with this reconciliation.",
+        },
+  ];
+
   return (
     <div>
-      <PageHeader title="Reconciliation report" description={`Base currency ${base?.code ?? "USD"} · Status ${statusLabel(detail.status)}`} />
-      <p><Link href={`/banking/reconcile/${id}`}>← Back to session</Link></p>
-      {header.broughtForward ? <p><strong>{header.note ?? "Brought forward"}</strong></p> : null}
-      {settles.map((line) => <p key={line.batchId}>{line.text}</p>)}
-      {overridesUnavailable ? (
-        <p role="alert"><strong>Could not check this period for statements imported out of balance.</strong></p>
-      ) : null}
-      {header.fileName ? (
-        <p>
-          Statement: {header.fileName}
-          {header.openingMinor !== null ? ` · opens at ${money(header.openingMinor)}` : ""}
-          {header.closingMinor !== null ? ` · closes at ${money(header.closingMinor)}` : ""}
-        </p>
-      ) : null}
-      {/* The kept file, named so a printed report can be matched to it (1.83). */}
-      {header.statementFile ? (
-        <p>
-          Statement file: {header.statementFile.fileName} · kept {formatDateInTimeZone(header.statementFile.keptAt, timeZone)} · SHA-256{" "}
-          {shortSha(header.statementFile.sha256)} · <Link href={`/banking/statement-files/${header.statementFile.id}`}>View</Link>
-        </p>
-      ) : header.statementFileId ? (
-        <p>A statement file is kept with this reconciliation.</p>
-      ) : (
-        <p>No statement file is kept with this reconciliation.</p>
-      )}
-      <table>
-        <tbody>
-          <tr><td>Beginning balance</td><td style={{ textAlign: "right" }}>{money(detail.beginningMinor)}</td></tr>
-          <tr><td>Cleared total</td><td style={{ textAlign: "right" }}>{money(detail.clearedTotalMinor)}</td></tr>
-          <tr><td>Reconciled balance</td><td style={{ textAlign: "right" }}>{money(detail.reconciledBalanceMinor)}</td></tr>
-          <tr><td>Statement ending</td><td style={{ textAlign: "right" }}>{money(detail.statementEndingMinor)}</td></tr>
-          <tr><td>Difference</td><td style={{ textAlign: "right" }}>{money(detail.differenceMinor)}</td></tr>
-        </tbody>
-      </table>
-      <h3>Cleared items ({cleared.length})</h3>
-      <ul>
-        {cleared.map((l) => (
-          <li key={l.journalLineId}>{formatDate(l.entryDate)} · {l.entryNumber} · {sourceLabel(l.sourceType)} · {money(l.signedMinor)}</li>
-        ))}
-      </ul>
+      <PageHeader
+        meta={<ReportEntityBadge companyName={ctx.companyName} isSample={ctx.isSample} />}
+        title="Reconciliation report"
+        description={`${accountLabel} · ${statusLabel(header.status)}`}
+      />
+      <p>
+        <Link href={`/banking/reconcile/${id}`}>← Back to the reconciliation</Link>
+      </p>
+      <ReconciliationReportClient
+        reconciliationId={id}
+        companyName={ctx.companyName}
+        currencyCode={ctx.currencyCode}
+        decimals={ctx.decimals}
+        today={ctx.today}
+        accountLabel={accountLabel}
+        statementDate={header.endingDate}
+        facts={facts}
+      />
     </div>
   );
 }
