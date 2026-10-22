@@ -2,11 +2,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, App, Button, Checkbox, Input, Modal, Select, Space, Spin, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
-import { parseCsv } from "@/lib/csv";
+import { guessStatementColumns, readStatementCsv, statementCsvNote } from "@/lib/domain/statement-csv";
 import {
   describeStatementParse,
   detectDateOrder,
-  detectStatementColumns,
   parseStatementRows,
   statementColumnsComplete,
   type DateOrder,
@@ -128,6 +127,8 @@ interface CsvState {
   kind: "csv";
   headers: string[];
   records: Record<string, string>[];
+  /** Rows set aside above the headings, or a file with none (2.43); null when neither. */
+  note: string | null;
 }
 type FileState =
   | { kind: "none" }
@@ -220,16 +221,19 @@ export default function ImportStatementModal({
         setFile({ kind: "file", format: "QIF", result: parseQif(text, { decimals: bankAccount.decimals }) });
         return;
       }
-      const records = parseCsv(text);
-      const headers = records.length ? Object.keys(records[0]) : [];
-      const detected = detectStatementColumns(headers);
+      // A title or summary above the headings is set aside, a file with no
+      // headings is read by what its columns hold, and a running balance is
+      // never taken for the money that moved (the approved design's reading).
+      const csv = readStatementCsv(text);
+      const { headers, records } = csv;
+      const detected = { columns: guessStatementColumns(headers, records) };
       const remembered = rememberedColumns(bankAccount.id, headers);
       const next: CsvChoice = remembered ?? {
         columns: detected.columns,
         dateOrder: detectDateOrder(records.map((r) => (detected.columns.date ? r[detected.columns.date] ?? "" : ""))),
         flipSigns: false,
       };
-      setFile({ kind: "csv", headers, records });
+      setFile({ kind: "csv", headers, records, note: statementCsvNote(csv) });
       setChoice(next);
       setShowColumns(!statementColumnsComplete(next.columns));
     };
@@ -530,6 +534,11 @@ export default function ImportStatementModal({
             <strong>{fileName}</strong>
             {file.kind === "file" ? ` (${file.format})` : " (CSV)"}: {describeStatementParse(parsed)}
           </Typography.Paragraph>
+          {file.kind === "csv" && file.note ? (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {file.note}
+            </Typography.Text>
+          ) : null}
         </div>
       ) : null}
 

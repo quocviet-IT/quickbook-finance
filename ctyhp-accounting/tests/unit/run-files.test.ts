@@ -24,10 +24,17 @@ describe("readRunFile", () => {
     expect([only.fileName, only.problem]).toEqual(["bank.ofx", RUN_MESSAGES.noBalanceFormat]);
   });
 
-  it("says a CSV's columns were not recognized", async () => {
-    const odd = new File(["When,What,How much\n07/03/2026,DEPOSIT,500.00\n"], "odd.csv");
+  it("says a CSV's columns were not recognized when nothing in it reads as a date", async () => {
+    const odd = new File(["When,What,How much\nyesterday,DEPOSIT,500.00\n"], "odd.csv");
     const [only] = await readRunFile(odd, bank);
     expect(only.problem).toBe("Its columns were not recognized — import it once on Banking to choose them");
+  });
+
+  it("reads oddly named columns by what they hold (2.43), and goes on to prove the month", async () => {
+    const odd = new File(["When,What,How much\n07/03/2026,DEPOSIT,500.00\n"], "odd.csv");
+    const [only] = await readRunFile(odd, bank);
+    // No longer "not recognized": the file is read, and stops only where it has no balance to prove with.
+    expect(only.problem).toBe(RUN_MESSAGES.noClosing);
   });
 
   it("keeps a file that cannot be read as a row that says so", async () => {

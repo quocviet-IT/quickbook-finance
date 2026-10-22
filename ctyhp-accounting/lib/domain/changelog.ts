@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.43",
+    date: "2026-10-22",
+    headline: "A bank's CSV is read whatever its layout: a title above the headings, no headings at all, other wordings, semicolons, and a running balance found by itself.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Statement CSVs in more layouts",
+        detail:
+          "Import statement and Reconcile from statement files now read a CSV the way the approved design does. A title, an account summary or a date range above the headings is set aside, and the dialog says how many rows. A file with no headings, or headings in another language, is read by what each column holds: dates, amounts, words, bare check numbers. A running balance is found from its own figures, and it is never taken for the money that moved. Files separated by semicolons or tabs are read too. Dates such as 31.07.2026, 7/31/26, 31 Jul 2026 and Jul 31, 2026 are understood. Columns the usual names already found are read exactly as before.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.42",
     date: "2026-10-22",
     headline: "Closing a month checks the rest of what the approved design checks: holding accounts, recurring entries, depreciation, changed reconciliations, duplicates and future dates.",
