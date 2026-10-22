@@ -161,7 +161,7 @@ describe("the five statements agree with the books, figure for figure", () => {
           const label = `${c.name} ${preset} ${mode}`;
           const balances = await Promise.all(plan.columns.map((col) => getLedgerBalances(c.sb, null, col.to)));
 
-          const tbs = balances.map(buildTrialBalance);
+          const tbs = balances.map((rows) => buildTrialBalance(rows));
           const tb = trialBalanceStatement({ columns: plan.columns, tbs, accounts: c.accounts });
           tbs.forEach((t, i) => {
             expect(byKey(tb, "total")?.cells[2 * i].amount, `${label} TB debit`).toBe(t.totalDebit);
@@ -175,7 +175,7 @@ describe("the five statements agree with the books, figure for figure", () => {
 
           const starts = plan.columns.map((col) => fiscalYearStartOf(col.to, c.fiscalStartMonth));
           const earlier = await Promise.all(starts.map((start) => getLedgerBalances(c.sb, null, dayBefore(start))));
-          const sheets = balances.map(buildBalanceSheet);
+          const sheets = balances.map((rows) => buildBalanceSheet(rows));
           const bs = balanceSheetStatement({
             columns: plan.columns,
             sheets,

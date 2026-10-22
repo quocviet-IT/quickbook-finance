@@ -19,6 +19,8 @@ export default async function BankingPage({
     queue?: string;
     account?: string;
     focus?: string;
+    /** `1` from the New menu: open Import statement. */
+    import?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -61,6 +63,7 @@ export default async function BankingPage({
         initialAccountId={params.account ?? null}
         initialQueueStatus={params.queue === "unmatched" ? "unmatched" : null}
         initialFocusId={params.focus ?? null}
+        initialImport={params.import === "1"}
         bankConnections={bankConnections}
         glBankAccounts={glBankAccounts}
         currencies={currencies}

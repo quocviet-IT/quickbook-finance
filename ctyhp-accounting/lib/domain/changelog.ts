@@ -41,6 +41,33 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.39",
+    date: "2026-10-22",
+    headline: "The New menu pays bills and brings in a statement, two reports can show accounts holding nothing, and the guide searches the release notes.",
+    changes: [
+      {
+        kind: "added",
+        title: "Pay bills and Import a bank statement in the New menu",
+        detail:
+          "New transaction now offers Pay bills, and, set below the documents, Import a bank statement. With one bank account, or from a link that names the account, Import statement opens straight away. With several, Banking first asks which account the statement is for, so it never goes into whichever account happens to be listed first.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Show accounts with no balance",
+        detail:
+          "The Balance Sheet and the Trial Balance can list every account that has been posted to, at 0.00, in its own section, so a bank account that has been emptied or a card that has been paid off can be seen where it belongs. On the Trial Balance the 0.00 sits on the side the account's balance normally sits.",
+        route: "/reports",
+      },
+      {
+        kind: "added",
+        title: "The guide finds the release notes",
+        detail:
+          "Searching the guide also searches what changed, release by release, so a button that moved is found in the note that says where it went. Typing a version, such as 2.38, finds that release.",
+      },
+    ],
+  },
+  {
     version: "2.38",
     date: "2026-10-22",
     headline: "Reconcile lists only the account you chose, and the Balance Sheet's bank panel sits under the figures.",

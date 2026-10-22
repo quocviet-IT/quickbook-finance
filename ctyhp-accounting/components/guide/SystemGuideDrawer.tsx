@@ -1,6 +1,5 @@
 "use client";
 
-import { plural, pluralWord } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,7 +27,7 @@ import {
   GUIDE_VERSION,
   type GuideFlow,
 } from "@/lib/domain/system-guide";
-import { screenContextFor, searchGuide } from "@/lib/domain/screen-context";
+import { screenContextFor, searchCountLine, searchGuide, searchReleases } from "@/lib/domain/screen-context";
 import { RELEASES, releasesSince } from "@/lib/domain/changelog";
 import { lastReleaseSeen, markReleasesSeen } from "@/lib/client/release-notes";
 import WhatsNewPanel from "./WhatsNewPanel";
@@ -158,6 +157,8 @@ export default function SystemGuideDrawer({
   // Searching means searching everything; nobody types a term expecting it to
   // be filtered by which page they happen to be standing on.
   const results = useMemo(() => (query.trim() ? searchGuide(query) : null), [query]);
+  // The release notes too: a control that moved is found where the move is told.
+  const releaseHits = useMemo(() => (query.trim() ? searchReleases(query, RELEASES) : []), [query]);
 
   const shown: GuideFlow[] = results
     ? results.map((match) => match.flow)
@@ -227,7 +228,7 @@ export default function SystemGuideDrawer({
           </Space>
         ) : (
           <Typography.Text type="secondary">
-            {plural(shown.length, "workflow")} {pluralWord(shown.length, "mentions", "mention")} “{query.trim()}”
+            {searchCountLine(shown.length, releaseHits.length, query.trim())}
           </Typography.Text>
         )}
 
@@ -235,7 +236,7 @@ export default function SystemGuideDrawer({
           <Alert type="info" showIcon message={screen.summary} />
         ) : null}
 
-        {shown.length === 0 ? (
+        {shown.length === 0 && releaseHits.length > 0 ? null : shown.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
@@ -266,6 +267,15 @@ export default function SystemGuideDrawer({
             }))}
           />
         )}
+
+        {releaseHits.length > 0 ? (
+          <section className="release-notes" aria-label="Release notes that mention the search">
+            <Typography.Text strong>
+              <NotificationOutlined /> Release notes
+            </Typography.Text>
+            <WhatsNewPanel releases={releaseHits} onNavigate={onClose} />
+          </section>
+        ) : null}
 
         {/* The caveats belong at the end: they matter, but they are not what
             somebody opened the guide to read. */}

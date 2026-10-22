@@ -11,7 +11,7 @@
  * are always the builders', never re-added.
  */
 
-import { ACCOUNT_TYPES, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
+import { ACCOUNT_TYPES, normalBalanceOf, statementSectionOf, type AccountType } from "@/lib/domain/accounts";
 import { percentOfBudget } from "@/lib/domain/budget-grid";
 import { dayBefore } from "@/lib/domain/fiscal";
 import { fromMinor } from "@/lib/domain/money";
@@ -570,6 +570,8 @@ export interface TrialBalanceStatementInput {
   columns: readonly StatementColumn[];
   tbs: readonly TrialBalance[];
   accounts: AccountIndex;
+  /** "Show accounts with no balance": the trial balances were built keeping them. */
+  showZero?: boolean;
 }
 
 /** Following `reportTB`: a Debit and a Credit for every date. */
@@ -610,8 +612,18 @@ export function trialBalanceStatement(input: TrialBalanceStatementInput): Statem
       amounts: input.tbs.flatMap((_, i) => [entry.debit[i], entry.credit[i]]),
       zoomIds: [id],
     });
-    // A zero side is a blank, as on any trial balance.
-    row.cells = row.cells.map((cell) => (cell.amount === 0 ? { amount: null, zoom: null } : cell));
+    // A zero side is a blank, as on any trial balance. An account that holds
+    // nothing on a date, kept by "Show accounts with no balance", reads 0.00 on
+    // the side its balance normally sits, so its line is not two blanks.
+    const type = input.accounts.get(id)?.type;
+    const creditNormal = type !== undefined && normalBalanceOf(type) === "credit";
+    row.cells = row.cells.map((cell, j) => {
+      if (cell.amount !== 0) return cell;
+      const i = Math.floor(j / 2);
+      const holdsNothing = entry.debit[i] === 0 && entry.credit[i] === 0;
+      const ownSide = (j % 2 === 1) === creditNormal;
+      return input.showZero && holdsNothing && ownSide ? cell : { amount: null, zoom: null };
+    });
     return row;
   });
 

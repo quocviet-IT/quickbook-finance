@@ -18,7 +18,10 @@ export default function NewMenu() {
       <Dropdown
         trigger={["click"]}
         menu={{
-          items: NEW_MENU.map((item) => ({ key: item.key, label: item.label })),
+          items: NEW_MENU.flatMap((item) => [
+            ...(item.dividerBefore ? [{ type: "divider" as const, key: `${item.key}-divider` }] : []),
+            { key: item.key, label: item.label },
+          ]),
           onClick: ({ key }) => {
             const target = NEW_MENU.find((i) => i.key === key);
             if (target) startTransition(() => router.push(target.href));

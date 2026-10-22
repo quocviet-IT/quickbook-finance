@@ -51,6 +51,8 @@ export interface ReportToolbarProps {
   dates: ToolbarDates;
   compare: { value: CompareMode; onChange: (mode: CompareMode) => void } | null;
   percent: { value: boolean; onChange: (show: boolean) => void } | null;
+  /** Balance Sheet and Trial Balance: "Show accounts with no balance". */
+  zeros?: { value: boolean; onChange: (show: boolean) => void } | null;
   extraActions?: ReactNode;
   onRun: () => void;
   loading: boolean;
@@ -137,6 +139,19 @@ export default function ReportToolbar(props: ReportToolbarProps) {
           <Space size={6}>
             <Switch size="small" checked={props.percent.value} onChange={props.percent.onChange} aria-label="Show % of income" />
             {label("% of income")}
+          </Space>
+        </Tooltip>
+      ) : null}
+      {props.zeros ? (
+        <Tooltip title="Also list every account that has been posted to, at 0.00, in its own section.">
+          <Space size={6}>
+            <Switch
+              size="small"
+              checked={props.zeros.value}
+              onChange={props.zeros.onChange}
+              aria-label="Show accounts with no balance"
+            />
+            {label("Show accounts with no balance")}
           </Space>
         </Tooltip>
       ) : null}

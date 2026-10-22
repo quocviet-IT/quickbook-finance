@@ -14,6 +14,7 @@
  */
 
 import { GUIDE_FLOWS, type GuideFlow, type GuideStep } from "./system-guide";
+import type { Release } from "./changelog";
 import { plural, pluralWord } from "@/lib/format";
 
 export interface ScreenContext {
@@ -116,11 +117,16 @@ const STOP_WORDS = new Set([
   "where", "which", "with",
 ]);
 
-export function searchGuide(query: string, flows: readonly GuideFlow[] = GUIDE_FLOWS): GuideMatch[] {
-  const terms = query
+/** The words of a search worth matching: lower case, no one-letter or filler words. */
+function searchTerms(query: string): string[] {
+  return query
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((term) => term.length > 1 && !STOP_WORDS.has(term));
+}
+
+export function searchGuide(query: string, flows: readonly GuideFlow[] = GUIDE_FLOWS): GuideMatch[] {
+  const terms = searchTerms(query);
   if (terms.length === 0) return [];
 
   const matches: GuideMatch[] = [];
@@ -148,6 +154,53 @@ export function searchGuide(query: string, flows: readonly GuideFlow[] = GUIDE_F
   }
 
   return matches.sort((a, b) => b.score - a.score || a.flow.title.localeCompare(b.flow.title));
+}
+
+/** The line over the guide's search results: what was found, and nothing about what was not. */
+export function searchCountLine(workflows: number, releaseNotes: number, query: string): string {
+  const quoted = `“${query}”`;
+  if (releaseNotes === 0) return `${plural(workflows, "workflow")} ${pluralWord(workflows, "mentions", "mention")} ${quoted}`;
+  if (workflows === 0) return `${plural(releaseNotes, "release note")} ${pluralWord(releaseNotes, "mentions", "mention")} ${quoted}`;
+  return `${plural(workflows, "workflow")} and ${plural(releaseNotes, "release note")} mention ${quoted}`;
+}
+
+/** The most release notes a search lists; past that the reader narrows the words. */
+export const RELEASE_SEARCH_LIMIT = 8;
+
+/**
+ * The release notes that mention a search, best first, each keeping only the
+ * changes that mention it.
+ *
+ * Somebody who types a button name into the guide may be looking for where it
+ * went, and the release that moved it says so; the guide's workflows do not.
+ * Typing a version ("2.37") finds that release whole. The releases are passed
+ * in rather than imported so the screens that only describe workflows do not
+ * carry the whole changelog.
+ */
+export function searchReleases(query: string, releases: readonly Release[]): Release[] {
+  const version = query.trim().replace(/^v(ersion)?\s*/i, "");
+  if (/^\d+\.\d+$/.test(version)) return releases.filter((release) => release.version === version);
+
+  const terms = searchTerms(query);
+  if (terms.length === 0) return [];
+  const hits = (text: string | undefined) => {
+    const haystack = (text ?? "").toLowerCase();
+    return terms.filter((term) => haystack.includes(term)).length;
+  };
+
+  const matches: { release: Release; score: number; order: number }[] = [];
+  releases.forEach((release, order) => {
+    const headline = hits(release.headline);
+    const changes = release.changes.filter((change) => hits(change.title) + hits(change.detail) > 0);
+    const score = headline * 6 + changes.reduce((sum, change) => sum + hits(change.title) * 5 + hits(change.detail) * 2, 0);
+    if (score === 0) return;
+    // A release that names the words only in its headline still shows what it changed.
+    matches.push({ release: { ...release, changes: changes.length > 0 ? changes : release.changes }, score, order });
+  });
+  return matches
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .slice(0, RELEASE_SEARCH_LIMIT)
+    .map((match) => match.release);
 }
 
 // --- Describing it to the assistant ----------------------------------------

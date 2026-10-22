@@ -25,6 +25,7 @@ import {
   buildTrialBalance,
   netIncomeOf,
   sumProfitAndLoss,
+  withAccountsUsed,
   type BalanceSheet,
   type LedgerBalance,
   type ProfitAndLoss,
@@ -165,6 +166,8 @@ export default function ReportsClient({
   // until the reader flips it; from then on it is theirs (as `nextShowPercentOfIncome` has it).
   const [showPercent, setShowPercent] = useState(true);
   const [percentTouched, setPercentTouched] = useState(false);
+  // Balance Sheet and Trial Balance: "Show accounts with no balance".
+  const [showZero, setShowZero] = useState(false);
   const changeCompare = (mode: CompareMode) => {
     setCompare(mode);
     if (!percentTouched) setShowPercent(mode === "none" || mode === "prev" || mode === "year");
@@ -312,9 +315,26 @@ export default function ReportsClient({
         setBankPanel(null);
         setCashPanel(null);
       }
-      const balances = await Promise.all(plan.columns.map((c) => read(null, c.to)));
+      // Showing accounts with no balance adds every account ever posted to, so
+      // read to the last entry as well: an account first used after the date.
+      const [onDates, everUsed] = await Promise.all([
+        Promise.all(plan.columns.map((c) => read(null, c.to))),
+        showZero ? read(null, lastEntryDate && lastEntryDate > to ? lastEntryDate : to) : Promise.resolve([]),
+      ]);
+      const balances = showZero ? onDates.map((rows) => withAccountsUsed(rows, everUsed)) : onDates;
+      const zeros = { keepZero: showZero };
       if (type === "trial") {
-        show(trialBalanceStatement({ columns: plan.columns, tbs: balances.map(buildTrialBalance), accounts: index }), null, null, { from, to });
+        show(
+          trialBalanceStatement({
+            columns: plan.columns,
+            tbs: balances.map((rows) => buildTrialBalance(rows, zeros)),
+            accounts: index,
+            showZero,
+          }),
+          null,
+          null,
+          { from, to },
+        );
         return;
       }
       const fiscalYearStarts = plan.columns.map((c) => fiscalYearStartOf(c.to, fiscalStartMonth));
@@ -323,7 +343,7 @@ export default function ReportsClient({
       const earlier = new Map(
         await Promise.all(starts.map(async (start) => [start, netIncomeOf(await read(null, dayBefore(start)))] as const)),
       );
-      const sheets = balances.map(buildBalanceSheet);
+      const sheets = balances.map((rows) => buildBalanceSheet(rows, zeros));
       // A help beside the statement, not part of it: read apart from the figures, and left out if it fails.
       void balanceSheetBanksAction(to).then(
         (result) => {
@@ -375,6 +395,8 @@ export default function ReportsClient({
     months,
     index,
     fiscalStartMonth,
+    showZero,
+    lastEntryDate,
     money,
     message,
   ]);
@@ -543,6 +565,7 @@ export default function ReportsClient({
               }
             : null
         }
+        zeros={point ? { value: showZero, onChange: setShowZero } : null}
         extraActions={
           type === "budget" && canManageBudget ? (
             <Button icon={<EditOutlined />} onClick={() => setBudgetEditorOpen(true)}>

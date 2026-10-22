@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import {
@@ -38,6 +38,8 @@ import DeleteBankLineModal, {
 } from "./DeleteBankLineModal";
 import BatchAssignAccountModal, { type BatchAssignTarget } from "./BatchAssignAccountModal";
 import { pruneSelection } from "@/lib/domain/bank-transaction-batch";
+import { importOnArrival } from "@/lib/domain/import-on-arrival";
+import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import {
   BANK_SETUP_DETAIL_TYPES,
@@ -163,6 +165,7 @@ export default function BankingClient({
   initialAccountId,
   initialQueueStatus,
   initialFocusId,
+  initialImport,
   bankConnections,
   glBankAccounts,
   currencies,
@@ -182,6 +185,8 @@ export default function BankingClient({
   initialAccountId: string | null;
   initialQueueStatus: "unmatched" | null;
   initialFocusId: string | null;
+  /** Opened from the New menu to import a statement. */
+  initialImport: boolean;
   bankConnections: BankConnectionView[];
   glBankAccounts: AccountRow[];
   currencies: CurrencyRow[];
@@ -246,8 +251,24 @@ export default function BankingClient({
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const [arrival] = useState(() =>
+    importOnArrival({
+      requested: initialImport,
+      canWrite,
+      bankAccountIds: bankAccounts.map((account) => account.id),
+      requestedAccountId: initialAccountId,
+    }),
+  );
+  const [importOpen, setImportOpen] = useInitiallyOpen(arrival === "open");
   const router = useRouter();
+
+  // Several accounts and none named: say which choice comes first rather than
+  // importing into whichever account happens to be listed first.
+  useEffect(() => {
+    if (arrival === "choose-account") {
+      void message.info("Choose the bank account the statement is for, then click Import statement.");
+    }
+  }, [arrival, message]);
 
   const [pendingLink, setPendingLink] = useState<PendingPlaidLink | null>(null);
   const [mappingSelections, setMappingSelections] = useState<Record<string, string | undefined>>({});
