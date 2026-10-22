@@ -6,6 +6,7 @@ import type { StatementLine } from "@/lib/domain/statement-import";
 import { reconciliationStandings, type BroughtForwardPreview, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import type { OpenBookLine } from "@/lib/domain/statement-run";
 import type { PriorClosing } from "@/lib/domain/statement-proof";
+import type { ReconReportLine } from "@/lib/domain/reconciliation-report";
 
 export class BankRecError extends Error {}
 
@@ -29,6 +30,8 @@ export interface ReconStatementHeader {
   bankAccountId: string; endingDate: string; status: string;
   fileName: string | null; openingMinor: number | null; closingMinor: number | null;
   note: string | null; broughtForward: boolean;
+  /** The entry that closed a difference on the day, and why (null when none was posted). */
+  adjustmentEntryId: string | null; adjustmentReason: string | null;
   /** The kept statement file (1.83), in Reports › Saved; null when none was kept. */
   statementFileId: string | null;
   /** That file as this person may read it — null when there is none, or they may not read saved files. */
@@ -155,6 +158,31 @@ export async function getReconciliationLines(sb: SupabaseClient, id: string): Pr
   }));
 }
 
+/**
+ * The report's lines (0158): those cleared on this statement, and those
+ * outstanding on it — including a line a later statement cleared, which the
+ * workspace's read leaves out but the report of a signed-off statement needs.
+ */
+export async function getReconciliationReportLines(sb: SupabaseClient, id: string): Promise<ReconReportLine[]> {
+  const data = await readAllPages<Record<string, unknown>>(
+    (from, to) =>
+      sb
+        .rpc("acc_reconciliation_report_lines", { p_reconciliation_id: id })
+        .order("entry_date")
+        .order("entry_number")
+        .order("journal_line_id")
+        .range(from, to),
+    (message) => new BankRecError(message),
+  );
+  return data.map((r) => ({
+    journalLineId: r.journal_line_id as string, entryId: r.entry_id as string,
+    entryNumber: (r.entry_number as string) ?? null, entryDate: r.entry_date as string,
+    sourceType: r.source_type as string, memo: (r.memo as string) ?? null,
+    reference: (r.reference as string) ?? null,
+    signedMinor: Number(r.signed_minor), cleared: Boolean(r.cleared),
+  }));
+}
+
 export async function getReconciliationDetail(sb: SupabaseClient, id: string): Promise<ReconDetail> {
   const { data, error } = await sb.rpc("acc_reconciliation_detail", { p_reconciliation_id: id });
   if (error) throw new BankRecError(error.message);
@@ -255,7 +283,7 @@ const optionalMinor = (v: unknown) => (v === null || v === undefined ? null : Nu
 /** A reconciliation's account, date and statement, or null when no reconciliation has this id. */
 export async function findReconciliationHeader(sb: SupabaseClient, id: string): Promise<ReconStatementHeader | null> {
   const { data, error } = await sb.from("acc_statement_reconciliation")
-    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward,statement_file_id,statement_file:acc_saved_report(id,file_name,uploaded_at,sha256,period_start,period_end)")
+    .select("bank_account_id,statement_ending_date,status,statement_ref,statement_opening_minor,statement_closing_minor,note,brought_forward,adjustment_entry_id,adjustment_reason,statement_file_id,statement_file:acc_saved_report(id,file_name,uploaded_at,sha256,period_start,period_end)")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new BankRecError(error.message);
@@ -270,6 +298,8 @@ export async function findReconciliationHeader(sb: SupabaseClient, id: string): 
     closingMinor: optionalMinor(r.statement_closing_minor),
     note: (r.note as string) ?? null,
     broughtForward: Boolean(r.brought_forward),
+    adjustmentEntryId: (r.adjustment_entry_id as string) ?? null,
+    adjustmentReason: (r.adjustment_reason as string) ?? null,
     statementFileId: (r.statement_file_id as string) ?? null,
     statementFile: keptFileRef(r.statement_file),
   };

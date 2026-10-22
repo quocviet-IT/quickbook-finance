@@ -218,10 +218,23 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
                       Brought forward
                     </Tag>
                   ) : null}
+                  {r.adjustment_entry_id ? (
+                    <Tag color="gold" title={r.adjustment_reason ?? undefined}>
+                      Adjusted
+                    </Tag>
+                  ) : null}
                 </Space>
               ),
             },
-            { title: "", render: (_, r) => <Link href={`/banking/reconcile/${r.id}`}>Open</Link> },
+            {
+              title: "",
+              render: (_, r) => (
+                <Space size={12}>
+                  <Link href={`/banking/reconcile/${r.id}`}>Open</Link>
+                  <Link href={`/banking/reconcile/${r.id}/report`}>Report</Link>
+                </Space>
+              ),
+            },
           ]}
         />
       )}

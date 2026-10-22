@@ -13,7 +13,7 @@ import {
   type BalanceEntryBlocker, type RemovedBalanceEntries,
 } from "@/lib/services/statement-alerts";
 import {
-  createReconciliation, setCleared, recordAdjustment, completeReconciliation, reopenReconciliation,
+  createReconciliation, setCleared, setClearedMany, recordAdjustment, completeReconciliation, reopenReconciliation,
   listReconciliations, getReconciliationLines, getReconciliationDetail, getDiscrepancies,
   BankRecError, type ReconLineView, type ReconDetail, type DiscrepancyRow,
 } from "@/lib/services/bankrec";
@@ -46,6 +46,32 @@ export async function createReconciliationAction(raw: unknown): Promise<ActionRe
 export async function setClearedAction(reconciliationId: string, journalLineId: string, cleared: boolean): Promise<ActionResult> {
   const denied = await guard(); if (denied) return { ok: false, error: denied };
   try { const sb = await createSupabaseServerClient(); await setCleared(sb, reconciliationId, journalLineId, cleared); return { ok: true }; }
+  catch (e) { return { ok: false, error: msg(e) }; }
+}
+
+const clearedManySchema = z.object({
+  reconciliationId: z.uuid(),
+  journalLineIds: z.array(z.uuid()).min(1).max(10_000),
+  cleared: z.boolean(),
+});
+
+/**
+ * "Tick everything shown" and "Clear the ticks": many lines in one call. Every
+ * line passes acc_set_cleared's checks, or none changes.
+ */
+export async function setClearedManyAction(
+  reconciliationId: string,
+  journalLineIds: string[],
+  cleared: boolean,
+): Promise<ActionResult<{ changed: number }>> {
+  const denied = await guard(); if (denied) return { ok: false, error: denied };
+  const parsed = clearedManySchema.safeParse({ reconciliationId, journalLineIds, cleared });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    const changed = await setClearedMany(sb, parsed.data.reconciliationId, parsed.data.journalLineIds, parsed.data.cleared);
+    return { ok: true, data: { changed } };
+  }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 
