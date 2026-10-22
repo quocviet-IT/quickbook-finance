@@ -296,6 +296,192 @@ export function approvalsStep(input: {
   };
 }
 
+// --- The rest of the approved design's month-end list (2.42) ---------------
+//
+// The design closes a month the way a bookkeeper does: is the bank agreed, is
+// everything coded, has what was promised been posted, is anything doubled.
+// These are its remaining checks. Like the five above they read the books and
+// cannot be ticked, and none of them stops `acc_period_close_blockers` from
+// closing, so none is marked as blocking: they say what is not final yet.
+
+/** The holding accounts (Uncategorized Income and Expense) are empty at the period end. */
+export function holdingAccountsStep(input: {
+  periodEnd: string;
+  /** Null when the balances could not be read. */
+  holding: readonly { name: string; balanceMinor: number }[] | null;
+}): CloseStep {
+  const base = {
+    key: "nothing-uncategorized",
+    title: "Nothing is left in Uncategorized",
+    passCondition: `The holding accounts for money not yet coded are empty at ${formatDate(input.periodEnd)}.`,
+    blocksClose: false,
+    href: "/reports/exceptions",
+    workKey: null,
+  };
+  if (input.holding === null) {
+    return { ...base, status: "unavailable", evidence: "The balances could not be read, so nothing here is proven." };
+  }
+  if (input.holding.length === 0) {
+    return { ...base, status: "complete", evidence: `Every entry up to ${formatDate(input.periodEnd)} is on a real account.` };
+  }
+  return {
+    ...base,
+    status: "outstanding",
+    evidence: `${input.holding.map((row) => `${row.name} holds ${money(row.balanceMinor)}`).join("; ")} at ${formatDate(input.periodEnd)}, money not yet coded to where it belongs.`,
+  };
+}
+
+/** Every recurring schedule that fell due by the period end has run. */
+export function recurringDueStep(input: {
+  periodEnd: string;
+  /** Active schedules; null when they could not be read. */
+  activeCount: number | null;
+  due: readonly { name: string }[] | null;
+}): CloseStep {
+  const base = {
+    key: "recurring-posted",
+    title: "Recurring entries due by the period end are posted",
+    passCondition: `No active schedule falls due on or before ${formatDate(input.periodEnd)} without having run.`,
+    blocksClose: false,
+    href: "/recurring",
+    workKey: null,
+  };
+  if (input.activeCount === null || input.due === null) {
+    return { ...base, status: "unavailable", evidence: "The recurring schedules could not be read." };
+  }
+  if (input.activeCount === 0) {
+    return { ...base, status: "not-applicable", evidence: "Nothing is set up to recur." };
+  }
+  if (input.due.length === 0) {
+    return { ...base, status: "complete", evidence: "Nothing set to recur is waiting." };
+  }
+  const named = input.due.slice(0, 3).map((row) => row.name).join(", ");
+  return {
+    ...base,
+    status: "outstanding",
+    evidence: `${plural(input.due.length, "schedule")} ${pluralWord(input.due.length, "is", "are")} still due: ${named}${input.due.length > 3 ? " and more" : ""}.`,
+  };
+}
+
+/** The ledger carries all the depreciation the register has worked out to the period end. */
+export function depreciationStep(input: {
+  periodEnd: string;
+  /** Assets on the register; null when they could not be read. */
+  assetCount: number | null;
+  /** Assets with a depreciation period ended by the period end and not posted, and how much. */
+  dueCount: number;
+  dueMinor: number;
+}): CloseStep {
+  const base = {
+    key: "depreciation-posted",
+    title: "Depreciation is posted to the period end",
+    passCondition: `Every depreciation period ending on or before ${formatDate(input.periodEnd)} is posted.`,
+    blocksClose: false,
+    href: "/fixed-assets",
+    workKey: null,
+  };
+  if (input.assetCount === null) {
+    return { ...base, status: "unavailable", evidence: "The fixed assets could not be read." };
+  }
+  if (input.assetCount === 0) {
+    return { ...base, status: "not-applicable", evidence: "No fixed asset is on the register." };
+  }
+  if (input.dueCount === 0) {
+    return { ...base, status: "complete", evidence: `The ledger carries everything the register has worked out to ${formatDate(input.periodEnd)}.` };
+  }
+  return {
+    ...base,
+    status: "outstanding",
+    evidence: `${money(input.dueMinor)} of depreciation on ${plural(input.dueCount, "asset")}, for periods ending on or before ${formatDate(input.periodEnd)}, is not in the ledger yet.`,
+  };
+}
+
+/** No reconciliation signed off for a statement ending by the period end has changed since. */
+export function reconciliationsAgreeStep(input: {
+  periodEnd: string;
+  /** Null when the reconciliations could not be checked. */
+  changed: readonly { accountName: string; statementEndingDate: string }[] | null;
+}): CloseStep {
+  const base = {
+    key: "reconciliations-agree",
+    title: "Past reconciliations still agree",
+    passCondition: `Nothing ticked on a statement ending on or before ${formatDate(input.periodEnd)} has changed since it was signed off.`,
+    blocksClose: false,
+    href: "/reports/reconciliations",
+    workKey: null,
+  };
+  if (input.changed === null) {
+    return { ...base, status: "unavailable", evidence: "The signed-off reconciliations could not be checked." };
+  }
+  if (input.changed.length === 0) {
+    return { ...base, status: "complete", evidence: "Nothing ticked on a finished statement has changed since." };
+  }
+  const named = input.changed
+    .slice(0, 3)
+    .map((row) => `${row.accountName} ${formatDate(row.statementEndingDate)}`)
+    .join(", ");
+  return {
+    ...base,
+    status: "outstanding",
+    evidence: `${plural(input.changed.length, "signed-off statement")} ${pluralWord(input.changed.length, "has", "have")} changed since: ${named}${input.changed.length > 3 ? " and more" : ""}.`,
+  };
+}
+
+/** No entry in the period is recorded twice. Two real payments can match, so this never blocks. */
+export function duplicatesStep(input: {
+  periodStart: string;
+  periodEnd: string;
+  /** Groups of matching entries; null when the entries could not be read. */
+  groups: number | null;
+}): CloseStep {
+  const base = {
+    key: "no-duplicates",
+    title: "No entry is recorded twice in the period",
+    passCondition: `No two entries between ${formatDate(input.periodStart)} and ${formatDate(input.periodEnd)} match in date, name, reference and every line.`,
+    blocksClose: false,
+    href: "/reports/exceptions",
+    workKey: null,
+  };
+  if (input.groups === null) {
+    return { ...base, status: "unavailable", evidence: "The period's entries could not be read." };
+  }
+  if (input.groups === 0) {
+    return { ...base, status: "complete", evidence: "No two entries in the period match." };
+  }
+  return {
+    ...base,
+    status: "outstanding",
+    evidence: `${plural(input.groups, "group")} of matching entries. Two real payments can match exactly, so look at them before the period is closed.`,
+  };
+}
+
+/** Nothing is dated after today, which is usually a slip in the year. */
+export function futureDatedStep(input: {
+  today: string;
+  /** Null when the entries could not be read. */
+  count: number | null;
+}): CloseStep {
+  const base = {
+    key: "no-future-dates",
+    title: "No entry is dated after today",
+    passCondition: `Nothing is dated after ${formatDate(input.today)}.`,
+    blocksClose: false,
+    href: "/reports/exceptions",
+    workKey: null,
+  };
+  if (input.count === null) {
+    return { ...base, status: "unavailable", evidence: "The entries could not be read." };
+  }
+  if (input.count === 0) {
+    return { ...base, status: "complete", evidence: `Nothing is dated after ${formatDate(input.today)}.` };
+  }
+  return {
+    ...base,
+    status: "outstanding",
+    evidence: `${plural(input.count, "entry", "entries")} ${pluralWord(input.count, "is", "are")} dated after today, usually a slip in the year.`,
+  };
+}
+
 // --- When close mode is worth recommending ---------------------------------
 
 export interface CloseRecommendation {
