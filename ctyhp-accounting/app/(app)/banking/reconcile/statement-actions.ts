@@ -20,7 +20,7 @@ import {
   listReconciliations, getReconciliationDetail, completeReconciliation,
   BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
-import { generateSuggestions, importStatement } from "@/lib/services/banking";
+import { generateSuggestions, importStatement, markLinesAlreadyHere } from "@/lib/services/banking";
 import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } from "@/lib/services/add-missing";
 import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
@@ -31,7 +31,7 @@ import {
 } from "@/lib/domain/statement-proof";
 import { tieKeptStatementFile } from "@/lib/services/statement-files";
 import { matchAfterCompletion } from "@/lib/services/statement-bank-lines";
-import type { BankLineMatchCounts } from "@/lib/domain/statement-bank-lines";
+import type { BankLineMatchCounts, RunLineCounts } from "@/lib/domain/statement-bank-lines";
 import type { ActionResult } from "./actions";
 
 async function guard(): Promise<string | null> {
@@ -227,6 +227,8 @@ export interface RunMonthResult {
   signed: boolean;
   /** What is left between the statement and the books; zero when signed. */
   differenceMinor: number;
+  /** What became of the month's statement lines in Bank Transactions (2.44); null when brought forward. */
+  lines: RunLineCounts | null;
   /** What matching the month's bank lines did once it was signed; null when it was not signed, or brought forward. */
   matched: BankLineMatchCounts | null;
   /** Why the signed month's bank lines could not be matched; the month stays signed. */
@@ -238,11 +240,18 @@ export interface RunMonthResult {
 /**
  * One step of a run, on the server: bringing the account's earlier lines
  * forward (refused by the database unless the books still agree), or one month
- * started from its statement — imported into Bank Transactions, paired and
- * ticked, then completed when `sign` is set and it reaches zero. A month that
- * no longer reaches zero (the books changed since the preview) is left in
- * progress and says by how much. The server refuses a month at or before the
- * last completed reconciliation, or not over yet.
+ * started from its statement — paired and ticked, then completed when `sign` is
+ * set and it reaches zero. A month that no longer reaches zero (the books
+ * changed since the preview) is left in progress and says by how much. The
+ * server refuses a month at or before the last completed reconciliation, or
+ * not over yet.
+ *
+ * Reconciling checks the statement against the books; it does not code a line
+ * or import one twice (2.44). Only the month's lines Bank Transactions does not
+ * hold yet go in: a line already there — from this statement, or from another
+ * source such as a CSV export — is left exactly as it is, and once the month is
+ * signed it is matched to the book line it was ticked with, when it waits for
+ * one. Nothing is posted.
  */
 export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResult<RunMonthResult>> {
   const denied = await guard();
@@ -274,7 +283,7 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
         ? await tieKeptStatementFile(sb, "reconciliation", id, input.statement_file_id)
         : null;
       revalidatePath("/banking/reconcile");
-      return { ok: true, data: { id, signed: true, differenceMinor: 0, matched: null, matchError: null, fileWarning } };
+      return { ok: true, data: { id, signed: true, differenceMinor: 0, lines: null, matched: null, matchError: null, fileWarning } };
     }
     const [{ asOf }, reconciliations] = await Promise.all([getBankingContext(sb), listReconciliations(sb, input.bank_account_id)]);
     // Newest first, as listReconciliations orders them.
@@ -284,11 +293,15 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
       reconciliations.find((r) => r.status === "completed")?.statement_ending_date ?? null,
     );
     if (refusal) return { ok: false, error: refusal };
+    // Read before anything is written: a run has no dialog to show the lines
+    // already in Bank Transactions from another source, so they are marked here.
+    const lines = await markLinesAlreadyHere(sb, input.bank_account_id, input.lines);
+    // The reconciliation keeps the statement whole, the lines already there included.
     const file = statementFile(input);
     // The proof has a closing: a statement without one was refused above.
     const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, input.proof.closing_minor as number, file);
     startedId = id;
-    const { fileWarning } = await importIntoBankTransactions(sb, input.bank_account_id, input);
+    const imported = await importIntoBankTransactions(sb, input.bank_account_id, { ...input, lines });
     await pairAndTick(sb, id);
     const { differenceMinor } = await getReconciliationDetail(sb, id);
     const signed = input.sign && differenceMinor === 0;
@@ -296,7 +309,18 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
     const { matched, matchError } = signed ? await matchAfterCompletion(sb, id) : { matched: null, matchError: null };
     revalidatePath("/banking/reconcile");
     revalidatePath("/banking");
-    return { ok: true, data: { id, signed, differenceMinor, matched, matchError, fileWarning } };
+    return {
+      ok: true,
+      data: {
+        id,
+        signed,
+        differenceMinor,
+        lines: { added: imported.inserted, alreadyHere: imported.skipped + imported.otherSource },
+        matched,
+        matchError,
+        fileWarning: imported.fileWarning,
+      },
+    };
   } catch (e) {
     revalidatePath("/banking/reconcile");
     revalidatePath("/banking");

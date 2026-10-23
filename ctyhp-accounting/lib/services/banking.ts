@@ -10,7 +10,8 @@ import type {
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { statementLineHashes } from "@/lib/domain/banking-import";
 import type { StatementProofPayload } from "@/lib/domain/statement-proof";
-import { BANK_LINE_SOURCES, type BankLineOn, type BankLineSource } from "@/lib/domain/statement-repeats";
+import { BANK_LINE_SOURCES, otherSourceLines, type BankLineOn, type BankLineSource } from "@/lib/domain/statement-repeats";
+import { statementDays } from "@/lib/domain/statement-line-keys";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -168,6 +169,27 @@ export async function importStatement(
     otherSource,
     batchId: result?.batch_id ?? null,
   };
+}
+
+/**
+ * A statement's lines with those already in Bank Transactions from another
+ * source marked skip: Import statement's rule (2.04, otherSourceLines), worked
+ * out on the server for a reconciliation made from statement files (2.44),
+ * which has no dialog to show them in. A line Bank Transactions holds on the
+ * same day for the same amount, that no line of this file accounts for, is
+ * that line: importing it again would put it there twice, to be coded twice.
+ * The skip each line was sent with is replaced by this rule's.
+ */
+export async function markLinesAlreadyHere(
+  sb: SupabaseClient,
+  bankAccountId: string,
+  rows: readonly ImportRow[],
+): Promise<ImportRow[]> {
+  const days = statementDays(rows);
+  if (!days) return [];
+  const existing = await listBankLinesOn(sb, bankAccountId, days.from, days.to);
+  const other = new Set(otherSourceLines(rows, statementLineHashes(bankAccountId, rows), existing).map((line) => line.index));
+  return rows.map((row, i) => ({ ...row, skip: other.has(i) }));
 }
 
 /**

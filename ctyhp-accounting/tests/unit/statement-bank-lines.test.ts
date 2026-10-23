@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { Standing } from "@/lib/domain/reconcile-statement";
 import {
   NO_BANK_LINE_MATCHES,
+  NO_RUN_LINES,
   addMatchCounts,
+  addRunLines,
   bankLinesToCheck,
   bankLinesMatchedSentence,
   bankLinesNotMatchedSentence,
   completedMessage,
   reconciledBankPairs,
+  runLinesSentence,
+  statementBankLines,
   statementLineKey,
   type StatementBankLine,
   type StatementLineFields,
@@ -142,6 +146,106 @@ describe("reconciledBankPairs", () => {
     expect(
       reconciledBankPairs([fee, fee], [paired("jl-1"), paired("jl-2")], [txn("t-1", fee)]),
     ).toEqual([{ bankTransactionId: "t-1", journalLineId: "jl-1" }]);
+  });
+});
+
+/**
+ * 2.44: a statement reconciled after its lines came in another way — a CSV
+ * export coded line by line — is not imported again, so the line it is in Bank
+ * Transactions as is the CSV's, worded the bank's other way.
+ */
+describe("a statement whose lines came into Bank Transactions another way", () => {
+  // The statement's words, and the CSV's for the same money on the same day.
+  const deposit = line("2026-07-14", 250000, "Zelle Payment From Example Customer 10000000001");
+  const csvDeposit = line("2026-07-14", 250000, "ZELLE FROM EXAMPLE CUSTOMER ON 07/14");
+  const fee = line("2026-07-31", -1500, "Monthly Service Fee");
+  const csvFee = line("2026-07-31", -1500, "MONTHLY SERVICE FEE");
+
+  it("finds the line of another source on the same day for the same amount, after the statement's own", () => {
+    const groups = statementBankLines([deposit, fee], [txn("csv-dep", csvDeposit), txn("own-fee", fee), txn("csv-fee", csvFee)]);
+    expect(groups.get(statementLineKey(deposit))).toEqual({ own: [], other: [txn("csv-dep", csvDeposit)] });
+    expect(groups.get(statementLineKey(fee))).toEqual({ own: [txn("own-fee", fee)], other: [txn("csv-fee", csvFee)] });
+  });
+
+  it("never takes a bank line that is another of the statement's lines as a line of another source", () => {
+    const refund = line("2026-07-14", 250000, "Reversal Example Customer");
+    const groups = statementBankLines([deposit, refund], [txn("own-refund", refund)]);
+    expect(groups.get(statementLineKey(deposit))).toEqual({ own: [], other: [] });
+  });
+
+  it("counts a CSV line already matched to the very book line ticked as already matched, not as matched elsewhere", () => {
+    expect(
+      reconciledBankPairs([deposit], [paired("jl-dep")], [txn("csv-dep", csvDeposit, { status: "matched", approvedLineId: "jl-dep" })]),
+    ).toEqual([{ bankTransactionId: "csv-dep", journalLineId: "jl-dep" }]);
+  });
+
+  it("matches a CSV line still waiting in Bank Transactions to the book line ticked, so nobody codes it twice", () => {
+    expect(reconciledBankPairs([deposit, fee], [paired("jl-dep"), paired("jl-fee")], [txn("csv-dep", csvDeposit), txn("csv-fee", csvFee)])).toEqual([
+      { bankTransactionId: "csv-dep", journalLineId: "jl-dep" },
+      { bankTransactionId: "csv-fee", journalLineId: "jl-fee" },
+    ]);
+  });
+
+  it("hands over no line of another source matched to some other entry, or ignored: it may be another payment", () => {
+    expect(
+      reconciledBankPairs(
+        [deposit, fee],
+        [paired("jl-dep"), paired("jl-fee")],
+        [txn("csv-dep", csvDeposit, { status: "matched", approvedLineId: "jl-other" }), txn("csv-fee", csvFee, { status: "ignored" })],
+      ),
+    ).toEqual([]);
+  });
+
+  it("prefers the statement's own bank line, and pairs each bank line once across lines of one day and amount", () => {
+    const second = line("2026-07-14", 250000, "Zelle Payment From Another Customer 10000000002");
+    const pairs = reconciledBankPairs(
+      [deposit, second],
+      [paired("jl-1"), paired("jl-2")],
+      [txn("own-dep", deposit), txn("csv-a", csvDeposit), txn("csv-b", { ...csvDeposit, description: "ZELLE FROM ANOTHER" })],
+    );
+    expect(pairs).toEqual([
+      { bankTransactionId: "own-dep", journalLineId: "jl-1" },
+      { bankTransactionId: "csv-a", journalLineId: "jl-2" },
+    ]);
+    expect(new Set(pairs.map((p) => p.bankTransactionId)).size).toBe(pairs.length);
+  });
+
+  it("keeps a line of another source with the book line it is matched to, whichever statement line comes first", () => {
+    const second = line("2026-07-14", 250000, "Zelle Payment From Another Customer 10000000002");
+    expect(
+      reconciledBankPairs(
+        [deposit, second],
+        [paired("jl-1"), paired("jl-2")],
+        [txn("csv-a", csvDeposit), txn("csv-b", csvDeposit, { status: "matched", approvedLineId: "jl-2" })],
+      ),
+    ).toEqual([
+      { bankTransactionId: "csv-b", journalLineId: "jl-2" },
+      { bankTransactionId: "csv-a", journalLineId: "jl-1" },
+    ]);
+  });
+});
+
+describe("what a run says about the statement lines", () => {
+  it("says the lines already in Bank Transactions were left as they were", () => {
+    expect(runLinesSentence({ added: 0, alreadyHere: 134 })).toBe(
+      "134 statement lines were already in Bank Transactions and were left as they were — not imported or categorized again.",
+    );
+    expect(runLinesSentence({ added: 0, alreadyHere: 1 })).toBe(
+      "1 statement line was already in Bank Transactions and was left as it was — not imported or categorized again.",
+    );
+  });
+
+  it("says how many lines Bank Transactions did not have went there", () => {
+    expect(runLinesSentence({ added: 2, alreadyHere: 10 })).toBe(
+      "10 statement lines were already in Bank Transactions and were left as they were — not imported or categorized again. " +
+        "2 statement lines Bank Transactions did not have were added there.",
+    );
+    expect(runLinesSentence({ added: 1, alreadyHere: 0 })).toBe("1 statement line Bank Transactions did not have was added there.");
+  });
+
+  it("says nothing when there were no lines, and adds months up", () => {
+    expect(runLinesSentence(NO_RUN_LINES)).toBe("");
+    expect(addRunLines({ added: 1, alreadyHere: 2 }, { added: 3, alreadyHere: 4 })).toEqual({ added: 4, alreadyHere: 6 });
   });
 });
 

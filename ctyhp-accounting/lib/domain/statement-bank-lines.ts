@@ -7,6 +7,11 @@
  * completed, every statement line paired with a ticked book line gives one
  * pair — that bank line and that book line — for acc_match_reconciled_bank_lines
  * to match in Bank Transactions. Pure: the service reads, this decides.
+ *
+ * 2.44: a reconciliation no longer imports a line Bank Transactions already
+ * holds from another source — a CSV export, a bank feed, the books — so the
+ * line a statement line is in Bank Transactions as can be that other line, on
+ * the same day for the same amount (statementBankLines).
  */
 import type { Standing } from "./reconcile-statement";
 import { plural, pluralWord } from "@/lib/format";
@@ -41,12 +46,57 @@ export interface BankLinePair {
   journalLineId: string;
 }
 
+const dayAndAmount = (line: Pick<StatementLineFields, "txnDate" | "amountMinor">) => `${line.txnDate}|${line.amountMinor}`;
+
+/** The bank lines one set of identical statement lines can be in Bank Transactions as. */
+export interface StatementBankLineGroup<T> {
+  /** With the statement line's own key: the line as a statement import put it there. */
+  own: T[];
+  /** On the same day for the same amount, from another source (2.44); shared by every set of that day and amount. */
+  other: T[];
+}
+
+/**
+ * The bank lines each set of a statement's identical lines (statementLineKey)
+ * can be in Bank Transactions as: its own lines first, then the account's lines
+ * of another source on the same day for the same amount — the import's rule
+ * for a line already there (otherSourceLines, statement-repeats.ts), with
+ * descriptions not compared, since a CSV export, a feed or the books word a
+ * line their own way. A bank line whose own key is any line's of this
+ * statement stands for that line alone, never for another. A line of another
+ * source can stand for any set of its day and amount, so the caller takes each
+ * bank line once. Bank lines keep the order they are given in.
+ */
+export function statementBankLines<T extends StatementLineFields>(
+  lines: readonly StatementLineFields[],
+  transactions: readonly T[],
+): Map<string, StatementBankLineGroup<T>> {
+  const keys = new Map<string, StatementLineFields>();
+  for (const line of lines) {
+    const key = statementLineKey(line);
+    if (!keys.has(key)) keys.set(key, line);
+  }
+  const own = new Map<string, T[]>();
+  const other = new Map<string, T[]>();
+  for (const txn of transactions) {
+    const key = statementLineKey(txn);
+    if (keys.has(key)) own.set(key, [...(own.get(key) ?? []), txn]);
+    else other.set(dayAndAmount(txn), [...(other.get(dayAndAmount(txn)) ?? []), txn]);
+  }
+  return new Map(
+    [...keys].map(([key, line]) => [key, { own: own.get(key) ?? [], other: other.get(dayAndAmount(line)) ?? [] }]),
+  );
+}
+
 /**
  * The pairs a completed reconciliation matches: each statement line paired
- * with a ticked book line, and the bank line it was imported as. Identical
- * lines are one group: a bank line already matched to one of the group's book
- * lines keeps it, and the rest pair in order, unmatched bank lines first. A
- * statement line with no bank line left gives no pair.
+ * with a ticked book line, and the bank line it is in Bank Transactions as.
+ * Identical lines are one group: a bank line already matched to one of the
+ * group's book lines keeps it, and the rest pair in order — the group's own
+ * bank lines, unmatched first, then (2.44) unmatched lines of another source
+ * on its day and amount. A line of another source matched elsewhere or ignored
+ * is not handed over: it may be another payment of that amount. A statement
+ * line with no bank line left gives no pair, and no bank line pairs twice.
  */
 export function reconciledBankPairs(
   lines: readonly StatementLineFields[],
@@ -62,30 +112,35 @@ export function reconciledBankPairs(
     const key = statementLineKey(line);
     bookLines.set(key, [...(bookLines.get(key) ?? []), standing.bookId]);
   });
-  const bankLines = new Map<string, StatementBankLine[]>();
-  for (const txn of transactions) {
-    const key = statementLineKey(txn);
-    if (bookLines.has(key)) bankLines.set(key, [...(bankLines.get(key) ?? []), txn]);
-  }
+  const groups = statementBankLines(lines, transactions);
 
+  const used = new Set<string>();
   const pairs: BankLinePair[] = [];
+  const pair = (txn: StatementBankLine, journalLineId: string) => {
+    used.add(txn.id);
+    pairs.push({ bankTransactionId: txn.id, journalLineId });
+  };
+  // Every bank line already matched to its book line keeps it first, so no
+  // other set of the day and amount can take it as free.
+  const open = new Map<string, string[]>();
   for (const [key, books] of bookLines) {
-    const free = [...(bankLines.get(key) ?? [])];
-    const open: string[] = [];
+    const { own, other } = groups.get(key) ?? { own: [], other: [] };
     for (const journalLineId of books) {
-      const kept = free.findIndex((txn) => txn.approvedLineId === journalLineId);
-      if (kept < 0) {
-        open.push(journalLineId);
-        continue;
-      }
-      pairs.push({ bankTransactionId: free[kept].id, journalLineId });
-      free.splice(kept, 1);
+      const kept = [...own, ...other].find((txn) => !used.has(txn.id) && txn.approvedLineId === journalLineId);
+      if (kept) pair(kept, journalLineId);
+      else open.set(key, [...(open.get(key) ?? []), journalLineId]);
     }
-    const unmatched = free.filter((txn) => txn.status === "unmatched");
-    const others = free.filter((txn) => txn.status !== "unmatched");
-    const sortedFree = [...unmatched, ...others];
-    open.forEach((journalLineId, i) => {
-      if (sortedFree[i]) pairs.push({ bankTransactionId: sortedFree[i].id, journalLineId });
+  }
+  for (const [key, books] of open) {
+    const { own, other } = groups.get(key) ?? { own: [], other: [] };
+    const free = own.filter((txn) => !used.has(txn.id));
+    const sortedFree = [
+      ...free.filter((txn) => txn.status === "unmatched"),
+      ...free.filter((txn) => txn.status !== "unmatched"),
+      ...other.filter((txn) => !used.has(txn.id) && txn.status === "unmatched"),
+    ];
+    books.forEach((journalLineId, i) => {
+      if (sortedFree[i]) pair(sortedFree[i], journalLineId);
     });
   }
   return pairs;
@@ -150,6 +205,40 @@ export function bankLinesMatchedSentence(counts: BankLineMatchCounts): string {
 export function bankLinesNotMatchedSentence(problem: string, to?: string): string {
   const which = to ? `The bank lines to ${to}` : "Its bank lines";
   return `${which} could not be matched in Bank Transactions (${problem}); approve them there.`;
+}
+
+/** What a reconciliation from statement files did with a month's lines in Bank Transactions (2.44). */
+export interface RunLineCounts {
+  /** Lines Bank Transactions did not hold, put there. */
+  added: number;
+  /** Lines it already held — from this statement or another source — left exactly as they were. */
+  alreadyHere: number;
+}
+
+export const NO_RUN_LINES: RunLineCounts = { added: 0, alreadyHere: 0 };
+
+export function addRunLines(a: RunLineCounts, b: RunLineCounts): RunLineCounts {
+  return { added: a.added + b.added, alreadyHere: a.alreadyHere + b.alreadyHere };
+}
+
+/**
+ * What a run says about the statement lines, after its summary: that the lines
+ * Bank Transactions already held were left as they were — none imported again,
+ * none coded again — and how many new ones went there. Empty when there were none.
+ */
+export function runLinesSentence(counts: RunLineCounts): string {
+  const said: string[] = [];
+  if (counts.alreadyHere > 0) {
+    said.push(
+      `${plural(counts.alreadyHere, "statement line")} ${pluralWord(counts.alreadyHere, "was", "were")} already in Bank Transactions and ${pluralWord(counts.alreadyHere, "was", "were")} left as ${pluralWord(counts.alreadyHere, "it was", "they were")} — not imported or categorized again.`,
+    );
+  }
+  if (counts.added > 0) {
+    said.push(
+      `${plural(counts.added, "statement line")} Bank Transactions did not have ${pluralWord(counts.added, "was", "were")} added there.`,
+    );
+  }
+  return said.join(" ");
 }
 
 /** What Complete says when it is done. */
