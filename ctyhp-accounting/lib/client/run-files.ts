@@ -13,12 +13,28 @@ import {
   parseStatementRows,
   statementColumnsComplete,
 } from "@/lib/domain/statement-import";
-import { RUN_MESSAGES, monthsFromCsv, statementsFromPdf, type RunSource, type RunStatement } from "@/lib/domain/statement-run";
+import {
+  RUN_MESSAGES,
+  cardRunStatement,
+  monthsFromCsv,
+  statementsFromPdf,
+  type RunSource,
+  type RunStatement,
+} from "@/lib/domain/statement-run";
+import type { BalanceSide } from "@/lib/domain/card-account";
+import { readCardStatementSummary } from "@/lib/domain/card-statement-pdf";
+import { rowsFromGlyphs } from "@/lib/domain/pdf-statement";
+import { PDF_MESSAGES } from "@/lib/domain/pdf-statement-view";
+import { formatMoney } from "@/lib/format";
 
 export interface RunBankAccount {
   id: string;
   maskedNumber: string | null;
   decimals: number;
+  /** For the sentence a card statement's summary says when it does not add up. */
+  currencyCode?: string;
+  /** A credit card (2.46): its PDFs are read for their balances only, and nothing else is taken. */
+  side?: BalanceSide;
 }
 
 const COLUMNS_NOT_RECOGNIZED = "Its columns were not recognized — import it once on Banking to choose them";
@@ -48,7 +64,28 @@ async function readPdf(file: File, bank: RunBankAccount): Promise<RunStatement[]
   return statementsFromPdf(file.name, result.statements, bank.maskedNumber);
 }
 
+/**
+ * A credit card's PDF statement (2.46): its summary — cycle, previous and new
+ * balance — and no lines. The transactions are the books' own, from the
+ * card's CSV imported under Banking.
+ */
+async function readCardPdf(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
+  if (bank.decimals !== 2) return [unreadable(file.name, "PDF", PDF_MESSAGES.cents)];
+  const { readPdfGlyphs } = await import("@/lib/client/pdf-text");
+  const result = await readPdfGlyphs(await file.arrayBuffer());
+  if ("failure" in result) return [unreadable(file.name, "PDF", PDF_MESSAGES[result.failure])];
+  if (!result.glyphs.length) return [unreadable(file.name, "PDF", PDF_MESSAGES.scanned)];
+  const summary = readCardStatementSummary(rowsFromGlyphs(result.glyphs));
+  if (!summary) return [unreadable(file.name, "PDF", RUN_MESSAGES.notACardStatement)];
+  const money = (minor: number) => formatMoney(minor, bank.currencyCode ?? "USD", bank.decimals);
+  return [cardRunStatement(file.name, summary, bank.maskedNumber, money)];
+}
+
 async function readFile(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
+  if (bank.side === "card") {
+    if (isPdfFile(file)) return readCardPdf(file, bank);
+    return [unreadable(file.name, "CSV", RUN_MESSAGES.cardNeedsPdf)];
+  }
   if (isPdfFile(file)) return readPdf(file, bank);
   const text = await file.text();
   const verdict = detectStatementFormat(file.name, text);

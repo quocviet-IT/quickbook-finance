@@ -402,9 +402,13 @@ describe("the four ways a statement comes in", () => {
   });
 
   it("a month of a run sends its proof, and no balances of its own", () => {
-    expect(fromFiles.match(/proof: runStatementPayload\(statement\),/g)?.length).toBe(2);
+    // Both steps — the months signed, and the one that needs a look — go through monthStep (2.46).
+    expect(fromFiles.match(/proof: runStatementPayload\(statement\),/g)?.length).toBe(1);
+    expect(fromFiles.match(/reconcileRunMonthAction\(\s*monthStep\(/g)?.length).toBe(2);
     expect(fromFiles).not.toContain("opening_minor: statement.openingMinor");
     expect(fromFiles).not.toContain("closing_minor: statement.closingMinor");
+    // A credit card's month sends its statement's balances as printed; the server keeps them the books' way round.
+    expect(fromFiles).toContain('kind: "card_month" as const');
   });
 });
 

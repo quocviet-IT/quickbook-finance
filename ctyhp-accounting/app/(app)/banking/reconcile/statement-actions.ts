@@ -11,17 +11,17 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import {
-  reconciliationStatementSchema, runMonthSchema, runPreviewSchema, type ReconciliationStatementInput,
+  reconciliationStatementSchema, runMonthSchema, runPreviewSchema, type ReconciliationStatementInput, type RunMonthInput,
 } from "@/lib/domain/schemas";
-import { monthRefusal, simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
+import { RUN_MESSAGES, monthRefusal, simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
 import {
   createReconciliationFromStatement, setReconciliationStatement, setStatementEnding, getBroughtForwardPreview,
   bringForward, getReconciliationHeader, getReconciliationStatement, pairAndTick, getBankOpenLines,
-  listReconciliations, getReconciliationDetail, completeReconciliation,
+  listReconciliations, getReconciliationDetail, completeReconciliation, getReconciliationLines, setClearedMany,
   BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
 import { generateSuggestions, importStatement, isCardBankAccount, markLinesAlreadyHere } from "@/lib/services/banking";
-import { CARD_FROM_FILES_NOT_READ } from "@/lib/domain/card-account";
+import { shown, stored } from "@/lib/domain/card-account";
 import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } from "@/lib/services/add-missing";
 import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
@@ -191,11 +191,17 @@ export async function previewRunAction(raw: unknown): Promise<ActionResult<RunPr
       })),
       problem: null,
       outByMinor: null,
+      balancesOnly: s.balances_only,
     }))
     .sort((a, b) => (a.to < b.to ? -1 : a.to > b.to ? 1 : 0));
   try {
     const sb = await createSupabaseServerClient();
-    if (await isCardBankAccount(sb, bankAccountId)) return { ok: false, error: CARD_FROM_FILES_NOT_READ };
+    // A credit card's run (2.46) is its statements' balances, walked as the
+    // statements print them: the books' figures are turned round to meet them.
+    const side = (await isCardBankAccount(sb, bankAccountId)) ? "card" : "bank";
+    if (statements.some((s) => Boolean(s.balancesOnly) !== (side === "card"))) {
+      return { ok: false, error: side === "card" ? RUN_MESSAGES.cardNeedsPdf : "A bank account's statements are reconciled line by line." };
+    }
     const first = statements[0];
     const through = statements[statements.length - 1].to as string;
     const [openLines, reconciliations] = await Promise.all([
@@ -203,17 +209,18 @@ export async function previewRunAction(raw: unknown): Promise<ActionResult<RunPr
       listReconciliations(sb, bankAccountId),
     ]);
     const last = reconciliations.find((r) => r.status === "completed") ?? null;
-    const broughtForward =
+    const preview =
       reconciliations.length === 0 && first.from && first.openingMinor !== null
         ? await getBroughtForwardPreview(sb, bankAccountId, dayBefore(first.from))
         : null;
+    const broughtForward = preview ? { ...preview, bookBalanceMinor: shown(preview.bookBalanceMinor, side) } : null;
     const money = (minor: number) => formatMoney(minor, USD_CURRENCY_CODE, 2);
     return {
       ok: true,
       data: simulateRun(
         statements,
-        openLines,
-        { beginningMinor: last ? Number(last.statement_ending_balance_minor) : null, broughtForward },
+        openLines.map((line) => ({ ...line, amountMinor: shown(line.amountMinor, side) })),
+        { beginningMinor: last ? shown(Number(last.statement_ending_balance_minor), side) : null, broughtForward },
         money,
       ),
     };
@@ -272,14 +279,18 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
   let startedId: string | null = null;
   try {
     const sb = await createSupabaseServerClient();
-    // A card is reconciled one statement at a time (2.45); the page says so, and a screen left open is refused here.
-    if (await isCardBankAccount(sb, input.bank_account_id)) return { ok: false, error: CARD_FROM_FILES_NOT_READ };
+    // A credit card's run (2.46) sends its balances as the statement prints them,
+    // and proves its months on them alone; a bank account's, line by line.
+    const side = (await isCardBankAccount(sb, input.bank_account_id)) ? "card" : "bank";
+    if ((input.kind === "card_month") !== (side === "card") && input.kind !== "bring_forward") {
+      return { ok: false, error: side === "card" ? RUN_MESSAGES.cardNeedsPdf : "A bank account's statements are reconciled line by line." };
+    }
     if (input.kind === "bring_forward") {
       const id = await bringForward(
         sb,
         input.bank_account_id,
         dayBefore(input.period_from),
-        input.opening_minor,
+        stored(input.opening_minor, side),
         broughtForwardNote(input.period_from, input.statement_date),
       );
       // Brought forward on the opening balance its statement prints: that file is its evidence too.
@@ -297,6 +308,10 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
       reconciliations.find((r) => r.status === "completed")?.statement_ending_date ?? null,
     );
     if (refusal) return { ok: false, error: refusal };
+    if (input.kind === "card_month") {
+      startedId = "card";
+      return { ok: true, data: await reconcileCardMonth(sb, input) };
+    }
     // Read before anything is written: a run has no dialog to show the lines
     // already in Bank Transactions from another source, so they are marked here.
     const lines = await markLinesAlreadyHere(sb, input.bank_account_id, input.lines);
@@ -328,14 +343,49 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
   } catch (e) {
     revalidatePath("/banking/reconcile");
     revalidatePath("/banking");
-    if (startedId && input.kind === "month") {
+    if (startedId && (input.kind === "month" || input.kind === "card_month")) {
       return {
         ok: false,
-        error: `The reconciliation to ${formatDate(input.statement_date)} was started with its statement but not signed off: ${msg(e)}. Open it to finish it.`,
+        error: `The reconciliation to ${formatDate(input.statement_date)} may have been started but was not signed off: ${msg(e)}. Open Bank Reconciliation to finish it.`,
       };
     }
     return { ok: false, error: msg(e) };
   }
+}
+
+/**
+ * A credit card's month (2.46), proved on its statement's balances: the
+ * reconciliation is started at its new balance with its previous balance kept,
+ * every open book line on the card to the statement date is ticked — the books'
+ * own lines, from the card's CSV, are what the statement covers — and it is
+ * completed when `sign` is set and they come to the new balance. Nothing is
+ * imported, coded or posted. The balances arrive as the statement prints them
+ * (owed positive) and are kept the books' way round.
+ */
+async function reconcileCardMonth(
+  sb: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  input: Extract<RunMonthInput, { kind: "card_month" }>,
+): Promise<RunMonthResult> {
+  const id = await createReconciliationFromStatement(sb, input.bank_account_id, input.statement_date, stored(input.new_minor, "card"), {
+    fileName: input.file_name,
+    openingMinor: stored(input.previous_minor, "card"),
+    closingMinor: stored(input.new_minor, "card"),
+    lines: [],
+    statementFileId: input.statement_file_id,
+  });
+  const book = await getReconciliationLines(sb, id);
+  await setClearedMany(
+    sb,
+    id,
+    book.filter((line) => !line.cleared && line.entryDate <= input.statement_date).map((line) => line.journalLineId),
+    true,
+  );
+  const { differenceMinor } = await getReconciliationDetail(sb, id);
+  const signed = input.sign && differenceMinor === 0;
+  if (signed) await completeReconciliation(sb, id);
+  revalidatePath("/banking/reconcile");
+  revalidatePath("/banking");
+  return { id, signed, differenceMinor, lines: null, matched: null, matchError: null, fileWarning: null };
 }
 
 /** Takes the statement's closing balance as the reconciliation's ending balance. */

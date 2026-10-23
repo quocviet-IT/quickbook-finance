@@ -160,12 +160,9 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
         actions={
           canWrite ? (
             <>
-              {/* A card is reconciled one statement at a time (2.45): its PDFs are not read yet. */}
-              {side === "bank" ? (
-                <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
-                  From statement files
-                </Button>
-              ) : null}
+              <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
+                From statement files
+              </Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!bankId}>
                 New reconciliation
               </Button>
@@ -207,7 +204,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
               New reconciliation
             </Button>
           )}
-          {canWrite && side === "bank" && (
+          {canWrite && (
             <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
               From statement files
             </Button>

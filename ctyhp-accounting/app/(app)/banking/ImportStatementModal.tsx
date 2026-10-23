@@ -49,6 +49,7 @@ import {
   BALANCE_WORDS,
   CARD_IMPORT_NOTE,
   CARD_PDF_NOT_READ,
+  cardDateColumn,
   cardFigures,
   cardStatementLines,
   flipSignsLabel,
@@ -256,6 +257,9 @@ export default function ImportStatementModal({
       const csv = readStatementCsv(text);
       const { headers, records } = csv;
       const detected = { columns: guessStatementColumns(headers, records) };
+      // A card's lines are dated as its statement counts them: by their post date (2.46).
+      const postDate = side === "card" ? cardDateColumn(headers) : null;
+      if (postDate) detected.columns = { ...detected.columns, date: postDate };
       const remembered = rememberedColumns(bankAccount.id, headers);
       const next: CsvChoice = remembered ?? {
         columns: detected.columns,

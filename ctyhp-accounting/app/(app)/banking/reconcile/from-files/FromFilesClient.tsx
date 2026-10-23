@@ -32,6 +32,7 @@ import {
   type BankLineMatchCounts,
   type RunLineCounts,
 } from "@/lib/domain/statement-bank-lines";
+import type { BalanceSide } from "@/lib/domain/card-account";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { previewRunAction, reconcileRunMonthAction } from "../statement-actions";
 import StandingTag from "../StandingTag";
@@ -45,7 +46,15 @@ import styles from "./run-table.module.css";
  */
 interface Props {
   canWrite: boolean;
-  bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
+  bankAccount: {
+    id: string;
+    label: string;
+    maskedNumber: string | null;
+    decimals: number;
+    currencyCode: string;
+    /** A credit card (2.46): its PDFs prove its months on their balances, shown as the statements print them. */
+    side?: BalanceSide;
+  };
   /** The account a kept statement file is named after: "Example Bank ****1183". */
   fileAccount: string;
   context: RunContext;
@@ -97,6 +106,7 @@ const STATE_COLOR: Record<CheckedStatement["state"], string | undefined> = {
 function outcomeTag(outcome: MonthOutcome) {
   switch (outcome.kind) {
     case "agrees":
+    case "agreesOnBalance":
       return <Tag color="green">Agrees</Tag>;
     case "balanceOnly":
       return <Tag color="gold">Needs a look</Tag>;
@@ -124,6 +134,35 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
   const [done, setDone] = useState<Done | null>(null);
   const { currencyCode, decimals } = bankAccount;
   const money = (minor: number) => formatMoney(minor, currencyCode, decimals);
+  // A credit card (2.46): its PDFs' balances, as printed, prove each month on the books' own lines.
+  const side: BalanceSide = bankAccount.side ?? "bank";
+  const card = side === "card";
+
+  /** One month of the run as the server takes it: a bank's statement with its lines and proof, a card's balances. */
+  function monthStep(statement: RunStatement, statementDate: string, statementFileId: string | null, sign: boolean) {
+    return card
+      ? {
+          kind: "card_month" as const,
+          bank_account_id: bankAccount.id,
+          file_name: statement.fileName,
+          statement_date: statementDate,
+          period_from: statement.from,
+          previous_minor: statement.openingMinor as number,
+          new_minor: statement.closingMinor as number,
+          statement_file_id: statementFileId,
+          sign,
+        }
+      : {
+          kind: "month" as const,
+          bank_account_id: bankAccount.id,
+          file_name: statement.fileName,
+          proof: runStatementPayload(statement),
+          statement_date: statementDate,
+          lines: statement.lines,
+          statement_file_id: statementFileId,
+          sign,
+        };
+  }
   const check = useMemo(
     () => checkRun(statements, context, (minor) => formatMoney(minor, currencyCode, decimals)),
     [statements, context, currencyCode, decimals],
@@ -141,7 +180,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
     setPreview(null);
     setDone(null);
     try {
-      const read: ChosenStatement[] = (await readRunFile(file, bankAccount)).map((s) => ({ ...s, file }));
+      const read: ChosenStatement[] = (await readRunFile(file, { ...bankAccount, side })).map((s) => ({ ...s, file }));
       setStatements((current) => {
         // A file chosen twice, or two files of one name, stay as rows: the
         // table says "Same month as another file" rather than one vanishing.
@@ -181,6 +220,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         opening_minor: s.openingMinor,
         closing_minor: s.closingMinor,
         lines: s.lines.map((l) => ({ txn_date: l.txn_date, amount_minor: l.amount_minor, reference: l.reference })),
+        balances_only: Boolean(s.balancesOnly),
       })),
     });
     setPreviewing(false);
@@ -282,16 +322,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
       if (!statement) break;
       step += 1;
       setProgress(`Signing ${formatDate(month.statementDate)} — ${step} of ${total}`);
-      const res = await reconcileRunMonthAction({
-        kind: "month",
-        bank_account_id: bankAccount.id,
-        file_name: statement.fileName,
-        proof: runStatementPayload(statement),
-        statement_date: month.statementDate,
-        lines: statement.lines,
-        statement_file_id: fileIdOf.get(statement.key) ?? null,
-        sign: true,
-      });
+      const res = await reconcileRunMonthAction(monthStep(statement, month.statementDate, fileIdOf.get(statement.key) ?? null, true));
       if (!res.ok || !res.data) return finish({ open: null, error: res.error ?? "A month could not be signed off" });
       if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
       if (res.data.lines) lines = addRunLines(lines, res.data.lines);
@@ -313,16 +344,9 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
     const statement = statementOfNeedsLook;
     if (needsLook && statement) {
       setProgress(`Starting ${formatDate(needsLook.statementDate)}, which needs a look`);
-      const res = await reconcileRunMonthAction({
-        kind: "month",
-        bank_account_id: bankAccount.id,
-        file_name: statement.fileName,
-        proof: runStatementPayload(statement),
-        statement_date: needsLook.statementDate,
-        lines: statement.lines,
-        statement_file_id: fileIdOf.get(statement.key) ?? null,
-        sign: false,
-      });
+      const res = await reconcileRunMonthAction(
+        monthStep(statement, needsLook.statementDate, fileIdOf.get(statement.key) ?? null, false),
+      );
       if (!res.ok || !res.data) {
         return finish({ open: null, error: res.error ?? "The month that needs a look could not be started" });
       }
@@ -335,16 +359,26 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
 
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-        Bank account <strong>{bankAccount.label}</strong>. Choose PDF statements, or a CSV export with a running balance
-        column — one file or many. Every closing balance is read out of the file itself, never taken from the books.
-        Nothing is written until you sign off; then each file is kept, once, with the reconciliations made from it.
-        Reconciling checks the statements against the books: a line already in Bank Transactions is left as it is, never
-        imported or categorized again.
-      </Typography.Paragraph>
+      {card ? (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          Credit card <strong>{bankAccount.label}</strong>. Choose the card&apos;s PDF statements — one or many. Each
+          statement&apos;s previous and new balance are read off its summary; the transactions are the books&apos; own,
+          from the card&apos;s CSV imported under Banking. A month is signed off when the books&apos; lines to its
+          closing date come to its new balance. Amounts are shown as the statements print them: what is owed is
+          positive. Nothing is written until you sign off, and nothing is imported or categorized.
+        </Typography.Paragraph>
+      ) : (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          Bank account <strong>{bankAccount.label}</strong>. Choose PDF statements, or a CSV export with a running balance
+          column — one file or many. Every closing balance is read out of the file itself, never taken from the books.
+          Nothing is written until you sign off; then each file is kept, once, with the reconciliations made from it.
+          Reconciling checks the statements against the books: a line already in Bank Transactions is left as it is, never
+          imported or categorized again.
+        </Typography.Paragraph>
+      )}
       <Upload.Dragger
         multiple
-        accept=".pdf,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf"
+        accept={card ? ".pdf,application/pdf" : ".pdf,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf"}
         beforeUpload={(file) => {
           void add(file);
           return false;
@@ -380,12 +414,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
                 { title: "File", render: (_, c) => c.statement.fileName },
                 { title: "Period", render: (_, c) => (c.statement.to ? periodLabel(c.statement.from, c.statement.to) : "—") },
                 {
-                  title: "Opening",
+                  title: card ? "Previous balance" : "Opening",
                   align: "right",
                   render: (_, c) => (c.statement.openingMinor === null ? "—" : money(c.statement.openingMinor)),
                 },
                 {
-                  title: "Closing",
+                  title: card ? "New balance" : "Closing",
                   align: "right",
                   render: (_, c) => (c.statement.closingMinor === null ? "—" : money(c.statement.closingMinor)),
                 },
@@ -477,12 +511,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
               { title: "Statement", render: (_, m) => formatDate(m.statementDate), width: 130 },
               { title: "File", render: (_, m) => previewedByKey.get(m.key)?.fileName ?? "" },
               {
-                title: "Beginning",
+                title: card ? "Beginning owed" : "Beginning",
                 align: "right",
                 // A waiting month begins wherever the month that stopped the run ends, which nobody knows yet.
                 render: (_, m) => (m.outcome.kind === "waiting" ? "—" : money(m.beginningMinor)),
               },
-              { title: "Closing", align: "right", render: (_, m) => money(m.closingMinor) },
+              { title: card ? "Balance owed" : "Closing", align: "right", render: (_, m) => money(m.closingMinor) },
               { title: "Outcome", render: (_, m) => outcomeTag(m.outcome) },
               { title: "What happened", render: (_, m) => monthSentence(m.outcome, money) },
             ]}

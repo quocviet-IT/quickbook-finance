@@ -28,6 +28,7 @@ import {
   type Standing,
 } from "./reconcile-statement";
 import type { StatementLine } from "./statement-import";
+import { cardSummaryProblem, type CardStatementSummary } from "./card-statement-pdf";
 import {
   pdfFigures,
   proveStatement,
@@ -64,6 +65,13 @@ export interface RunStatement {
    */
   openingBasis?: OpeningBasis | null;
   closingBasis?: ClosingBasis | null;
+  /**
+   * A credit card's statement (2.46): its balances only, read off the PDF's
+   * summary, as the statement prints them (owed positive). It has no lines: its
+   * month agrees when the books' own lines to its closing date come to its new
+   * balance.
+   */
+  balancesOnly?: boolean;
 }
 
 export const RUN_MESSAGES = {
@@ -73,7 +81,41 @@ export const RUN_MESSAGES = {
   notThisAccount: "Not this account",
   noBalanceFormat: "OFX, QFX, QBO and QIF files carry no running balance, so they cannot prove a month",
   noLines: "No dated amounts could be read out of this file",
+  /** A card's CSV or download has no statement balances: its PDFs prove the months. */
+  cardNeedsPdf:
+    "A credit card is reconciled here from its PDF statements; this file has no statement balances. Import it under Banking, then choose the statement PDFs here",
+  notACardStatement: "No credit card statement summary (previous and new balance) could be read in this PDF",
 } as const;
+
+/**
+ * A card statement's summary as one statement of a run (2.46): its cycle, its
+ * previous and new balance as printed, and no lines. A summary that does not
+ * add up, or a statement for another card, is kept and marked, as a bank PDF's is.
+ */
+export function cardRunStatement(
+  fileName: string,
+  summary: CardStatementSummary,
+  maskedNumber: string | null,
+  money: (minor: number) => string,
+): RunStatement {
+  const last4 = (maskedNumber ?? "").replace(/\D/g, "").slice(-4);
+  const ours = !summary.accountLast4 || last4.length < 4 || summary.accountLast4 === last4;
+  return {
+    key: `${fileName}#card`,
+    fileName,
+    source: "PDF",
+    from: summary.from,
+    to: summary.to,
+    openingMinor: summary.previousMinor,
+    closingMinor: summary.newMinor,
+    lines: [],
+    problem: ours ? cardSummaryProblem(summary, money) : RUN_MESSAGES.notThisAccount,
+    outByMinor: null,
+    openingBasis: summary.previousMinor === null ? null : "printed",
+    closingBasis: summary.newMinor === null ? null : "printed",
+    balancesOnly: true,
+  };
+}
 
 /**
  * The most statement lines one run previews. A line travels as its date, amount
@@ -353,7 +395,12 @@ export function checkRun(
     if (context.lastCompleted && statement.to < context.lastCompleted.date) return as("before", "Before the last reconciliation");
     if (kept.has(statement.to)) return as("duplicate", "Same month as another file");
     kept.add(statement.to);
-    return as("usable", plural(statement.lines.length, "line"));
+    return as(
+      "usable",
+      statement.balancesOnly
+        ? `Previous balance ${money(statement.openingMinor ?? 0)} · new balance ${money(statement.closingMinor ?? 0)}`
+        : plural(statement.lines.length, "line"),
+    );
   });
 
   // Proved oldest first: each statement follows the closing of the one before
@@ -365,6 +412,16 @@ export function checkRun(
   let stoppedAt: RunStatement | null = null;
   for (const c of checked) {
     if (c.state !== "usable") continue;
+    // A card's statement (2.46) proved its own summary when it was read; it has
+    // no lines to prove, and follows the one before it like any other.
+    if (c.statement.balancesOnly) {
+      if (stoppedAt) {
+        c.state = "waiting";
+        c.note = waitingNote(stoppedAt);
+      }
+      if (c.statement.closingMinor !== null) prior = { date: c.statement.to as string, endingMinor: c.statement.closingMinor };
+      continue;
+    }
     const proof = runStatementProof(c.statement, prior, money);
     c.proof = proof;
     c.statement = {
@@ -444,6 +501,8 @@ export interface OpenBookLine {
 
 export type MonthOutcome =
   | { kind: "agrees"; paired: number; of: number; outstanding: number }
+  /** A card's month (2.46): the books' lines to its closing date come to its new balance. */
+  | { kind: "agreesOnBalance"; lines: number }
   | { kind: "balanceOnly"; unpaired: number; of: number }
   | { kind: "outBy"; differenceMinor: number; missing: number }
   | { kind: "waiting" };
@@ -511,6 +570,24 @@ export function simulateRun(
     }
     const monthBeginning = beginning;
     const available = open.filter((line) => line.date <= to);
+    // A card's month (2.46) is proved on its balances: every open book line to its
+    // closing date is what the statement covers, and they must come to its new balance.
+    if (statement.balancesOnly) {
+      const differenceMinor = closing - (monthBeginning + available.reduce((sum, line) => sum + line.amountMinor, 0));
+      let outcome: MonthOutcome;
+      if (differenceMinor === 0) {
+        outcome = { kind: "agreesOnBalance", lines: available.length };
+        const ticked = new Set(available.map((line) => line.id));
+        open = open.filter((line) => !ticked.has(line.id));
+        beginning = closing;
+        toSign += 1;
+      } else {
+        outcome = { kind: "outBy", differenceMinor, missing: 0 };
+        stopped = true;
+      }
+      months.push({ key: statement.key, statementDate: to, beginningMinor: monthBeginning, closingMinor: closing, outcome, standings: [] });
+      continue;
+    }
     const result = statementStandings(
       statement.lines.map((line, lineNo) => ({ lineNo, date: line.txn_date, amountMinor: line.amount_minor, reference: line.reference })),
       available.map((line) => ({ ...line, cleared: false })),
@@ -544,6 +621,8 @@ export function monthSentence(outcome: MonthOutcome, money: (minor: number) => s
   switch (outcome.kind) {
     case "agrees":
       return `Agrees — ${outcome.paired} of ${plural(outcome.of, "line")} paired${outcome.outstanding ? `, ${outcome.outstanding} outstanding` : ""}`;
+    case "agreesOnBalance":
+      return `Agrees — the books' ${plural(outcome.lines, "line")} to the closing date come to the new balance`;
     case "balanceOnly":
       return `Agrees on the balance only — needs a look: ${plural(outcome.unpaired, "line")} did not pair`;
     case "outBy":
