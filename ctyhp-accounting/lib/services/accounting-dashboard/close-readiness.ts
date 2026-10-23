@@ -3,6 +3,7 @@ import {
   approvalsStep,
   bankReconciledStep,
   blockingFirst,
+  cardsReconciledStep,
   closeHistoryEntry,
   closeProgress,
   controlAccountStep,
@@ -65,6 +66,17 @@ export interface CloseReadiness {
  * Oldest first, because closing April before March is not a thing an accountant
  * does, and offering it would be offering the wrong work.
  */
+/** One row of `acc_bank_close_standing` (0160). */
+interface BankCloseStandingRow {
+  bank_account_id: string;
+  account_code: string;
+  account_name: string;
+  is_card: boolean;
+  last_completed_on: string | null;
+  /** A bigint, so it may arrive as a string. */
+  unmatched_count: number | string;
+}
+
 export function targetPeriod(context: AccountingDashboardContext): AccountingPeriodRow | null {
   if (context.overduePeriods.length > 0) {
     return [...context.overduePeriods].sort((a, b) => a.periodEnd.localeCompare(b.periodEnd))[0];
@@ -81,7 +93,7 @@ export async function getCloseReadiness(
   const { periodStart, periodEnd } = period;
 
   const [
-    ledger, reconciliation, blockers, drafts, bankAccounts, lastRecon, unmatched, approvals, history,
+    ledger, reconciliation, blockers, drafts, bankStanding, approvals, history,
     exceptions, assets, activeSchedules, dueSchedules,
   ] =
     await Promise.allSettled([
@@ -89,20 +101,11 @@ export async function getCloseReadiness(
       getControlReconciliation(sb, periodEnd),
       sb.rpc("acc_period_close_blockers", { p_period_id: period.id }),
       draftCount(sb, periodStart, periodEnd),
-      sb.from("acc_bank_account").select("id", { count: "exact", head: true }),
-      sb
-        .from("acc_statement_reconciliation")
-        .select("statement_ending_date")
-        .eq("status", "completed")
-        .order("statement_ending_date", { ascending: false })
-        .limit(1),
-      sb
-        .from("acc_bank_transaction")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "unmatched")
-        .eq("pending", false)
-        .is("provider_removed_at", null)
-        .lte("txn_date", periodEnd),
+      // Every bank account record, bank or card, with its latest completed
+      // reconciliation and its unmatched lines to the period end (0160): one
+      // read for both steps, so a card is checked as a card and never counts
+      // towards the bank.
+      sb.rpc("acc_bank_close_standing", { p_as_of: periodEnd }),
       sb
         .from("acc_approval_request")
         .select("id", { count: "exact", head: true })
@@ -176,20 +179,34 @@ export async function getCloseReadiness(
     }),
   );
 
-  const bankOk =
-    bankAccounts.status === "fulfilled" &&
-    !bankAccounts.value.error &&
-    lastRecon.status === "fulfilled" &&
-    !lastRecon.value.error;
-  const unmatchedOk = unmatched.status === "fulfilled" && !unmatched.value.error;
+  const standing =
+    bankStanding.status === "fulfilled" && !bankStanding.value.error
+      ? ((bankStanding.value.data ?? []) as BankCloseStandingRow[])
+      : null;
+  const banks = standing?.filter((r) => !r.is_card) ?? null;
+  const cards = standing?.filter((r) => r.is_card) ?? null;
+  const latestBank = banks
+    ?.map((r) => r.last_completed_on)
+    .filter((d): d is string => d !== null)
+    .sort()
+    .at(-1);
   steps.push(
     bankReconciledStep({
       periodEnd,
-      hasBankAccount: bankOk ? (bankAccounts.value.count ?? 0) > 0 : null,
-      lastCompletedOn: bankOk
-        ? ((lastRecon.value.data?.[0]?.statement_ending_date as string | undefined) ?? null)
-        : null,
-      unmatchedCount: unmatchedOk ? (unmatched.value.count ?? 0) : null,
+      hasBankAccount: banks ? banks.length > 0 : null,
+      lastCompletedOn: latestBank ?? null,
+      unmatchedCount: banks ? banks.reduce((sum, r) => sum + Number(r.unmatched_count), 0) : null,
+    }),
+  );
+  steps.push(
+    cardsReconciledStep({
+      periodEnd,
+      cards:
+        cards?.map((r) => ({
+          label: `${r.account_code} ${r.account_name}`,
+          lastCompletedOn: r.last_completed_on,
+          unmatchedCount: Number(r.unmatched_count),
+        })) ?? null,
     }),
   );
 

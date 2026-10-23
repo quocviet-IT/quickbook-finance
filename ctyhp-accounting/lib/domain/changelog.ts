@@ -41,6 +41,33 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.47",
+    date: "2026-10-23",
+    headline: "Credit cards' unreconciled activity is on the dashboard and in the month-end checklist, and a phone in dark mode no longer shows a white band below a short page.",
+    changes: [
+      {
+        kind: "added",
+        title: "Unreconciled card activity on the dashboard",
+        detail:
+          "The dashboard's Exception exposure now shows what a credit card kept under Banking has posted that no completed reconciliation holds, as its statement prints it: what is owed is positive. Until now only bank accounts were counted, so a card's unreconciled charges were missed. A company with no card under Banking sees no change.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "Credit cards in the month-end checklist",
+        detail:
+          "The period close checklist on the accounting dashboard now has its own step for credit cards: every card under Banking needs a completed reconciliation covering the period end, and no card line before it may be unmatched. Each card is checked on its own, and a card that is behind is named with the date its last statement ends. The bank's step now counts bank accounts only, so a card's reconciliation can no longer make it read reconciled.",
+        route: "/accounting",
+      },
+      {
+        kind: "fixed",
+        title: "No white band below a short page in dark mode",
+        detail:
+          "On a phone in dark mode, a page shorter than the screen showed a white band below it. The page's own background now runs the full height of the screen.",
+      },
+    ],
+  },
+  {
     version: "2.46",
     date: "2026-10-23",
     headline: "A credit card is reconciled from its PDF statements: their balances are read, and each month is signed off when the books come to them.",

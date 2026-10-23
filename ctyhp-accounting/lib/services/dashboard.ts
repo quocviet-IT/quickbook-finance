@@ -9,6 +9,7 @@ import { getDashboardWorkQueue } from "./work-queue";
 import { buildProfitAndLoss } from "@/lib/domain/reports";
 import type { DashboardWorkQueue } from "@/lib/domain/work-queue";
 import type { AuditEntryRow } from "@/lib/db/types";
+import { shown } from "@/lib/domain/card-account";
 import {
   ACTIVITY_ENTITIES,
   ACTIVITY_VERBS,
@@ -40,6 +41,13 @@ export interface DashboardMetrics {
   apAging: AgingSnapshot;
   unreconciledCount: number;
   unreconciledMinor: number;
+  /**
+   * The credit cards kept under Banking (2.47) and their lines no completed
+   * reconciliation has ticked, as a card statement says them: charges
+   * positive. Null when the read failed, so the dashboard leaves the figure
+   * out rather than showing a card as reconciled.
+   */
+  unreconciledCards: { cards: number; count: number; minor: number } | null;
   openPastPeriods: number;
   mtdNetIncomeMinor: number;
   pendingApprovals: number;
@@ -235,11 +243,12 @@ export async function getDashboardMetrics(
   asOf: string,
   ledger?: Pick<DashboardLedgerPromises, "asOf" | "monthToDate">,
 ): Promise<DashboardMetrics> {
-  const [bal, ar, ap, unrecon, periods, mtdRows, approvals] = await Promise.all([
+  const [bal, ar, ap, unrecon, unreconCards, periods, mtdRows, approvals] = await Promise.all([
     ledger?.asOf ?? getLedgerBalances(sb, null, asOf),
     getArAging(sb, asOf),
     getApAging(sb, asOf),
     sb.rpc("acc_unreconciled_bank", { p_as_of: asOf }),
+    sb.rpc("acc_unreconciled_cards", { p_as_of: asOf }),
     sb.from("acc_accounting_period").select("id", { count: "exact", head: true }).eq("status", "open").lt("period_end", asOf),
     ledger?.monthToDate ?? getLedgerBalances(sb, monthStart(asOf), asOf),
     sb.from("acc_approval_request").select("id", { count: "exact", head: true }).eq("status", "pending"),
@@ -261,6 +270,8 @@ export async function getDashboardMetrics(
   const overdue = (rep: AgingReport) =>
     Object.entries(rep.buckets).filter(([k]) => k !== "current").reduce((s, [, v]) => s + v, 0);
   const u = (unrecon.data ?? [])[0] as { item_count: number; amount_minor: number } | undefined;
+  // The cards' figure is a help beside the bank's: a failed read leaves it out, never the dashboard.
+  const c = unreconCards.error ? null : ((unreconCards.data ?? [])[0] as { card_count: number; item_count: number; amount_minor: number } | undefined);
   const pnl = buildProfitAndLoss(mtdRows);
 
   return {
@@ -277,6 +288,9 @@ export async function getDashboardMetrics(
     apAging: agingSnapshot(ap),
     unreconciledCount: Number(u?.item_count ?? 0),
     unreconciledMinor: Number(u?.amount_minor ?? 0),
+    unreconciledCards: c
+      ? { cards: Number(c.card_count ?? 0), count: Number(c.item_count ?? 0), minor: shown(Number(c.amount_minor ?? 0), "card") }
+      : null,
     openPastPeriods: periods.count ?? 0,
     mtdNetIncomeMinor: pnl.netIncome,
     pendingApprovals: approvals.count ?? 0,

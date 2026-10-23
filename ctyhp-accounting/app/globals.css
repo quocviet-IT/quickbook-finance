@@ -288,6 +288,10 @@ body {
 
 html {
   color-scheme: light;
+  /* The page's own ground, beneath everything the app shell paints. Without it
+     the browser's white showed below a short page on a phone in dark mode,
+     where no side menu runs the full height to cover it. */
+  background: var(--ob-surface-page);
 }
 
 /*

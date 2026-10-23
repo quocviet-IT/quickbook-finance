@@ -298,7 +298,7 @@ export default function DashboardClient({
           />
           <ComparisonBars
             title="Exception exposure"
-            description="Open monetary exposure requiring collection, payment, or bank review."
+            description="Open monetary exposure requiring collection, payment, or bank and card review."
             data={[
               {
                 key: "overdue-receivables",
@@ -318,6 +318,17 @@ export default function DashboardClient({
                 value: metrics.unreconciledMinor,
                 color: TOKENS.series.purchases,
               },
+              // A company with credit cards under Banking (2.47): their charges no statement has proved yet.
+              ...(metrics.unreconciledCards && metrics.unreconciledCards.cards > 0
+                ? [
+                    {
+                      key: "unreconciled-cards",
+                      label: "Unreconciled card activity",
+                      value: metrics.unreconciledCards.minor,
+                      color: TOKENS.series.banking,
+                    },
+                  ]
+                : []),
             ]}
             formatMoney={formatMoney}
             extra={
