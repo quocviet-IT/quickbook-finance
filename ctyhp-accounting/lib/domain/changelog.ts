@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.44",
+    date: "2026-10-23",
+    headline: "Reconciling from statement files checks the statements against the books, and never imports or codes a line Bank Transactions already holds.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A statement reconciled after its lines came in another way is not imported again",
+        detail:
+          "When a month's lines were already in Bank Transactions from a CSV export, a bank feed or the books, Reconcile from statement files imported the PDF statement's lines a second time, worded the bank's other way, and they waited in Bank Transactions to be coded again. Now a statement line already there on the same day for the same amount is left exactly as it is, as Import statement already leaves it: only lines Bank Transactions does not hold go in, and nothing is posted. After a run the summary says how many lines were already there and how many were added. When a month is signed off, a line waiting in Bank Transactions is matched to the entry the reconciliation cleared, so it is not coded twice, and Add all to the books codes the line already there instead of asking for the statement to be imported again.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "2.42",
     date: "2026-10-22",
     headline: "Closing a month checks the rest of what the approved design checks: holding accounts, recurring entries, depreciation, changed reconciliations, duplicates and future dates.",

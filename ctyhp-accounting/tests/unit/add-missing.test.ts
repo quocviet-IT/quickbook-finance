@@ -166,6 +166,52 @@ describe("planAddMissing", () => {
     expect(plan.cannot.map((x) => [x.lineNo, x.reason])).toEqual([[2, "not-found"]]);
   });
 
+  it("adds a line through the line of another source Bank Transactions holds for it, since the statement was not imported again (2.44)", () => {
+    // The same fee from a CSV export, worded the bank's other way, still waiting to be coded.
+    const csvFee = { ...fee, description: "MONTHLY SVC CHARGE" };
+    const plan = planAddMissing({
+      lines: [fee],
+      standings: [missing],
+      flipped: false,
+      transactions: [txn("csv-fee", csvFee)],
+      suggestions: new Map([["csv-fee", rule]]),
+      holding,
+    });
+    expect(plan.items.map((i) => [i.lineNo, i.transactionId, i.accountId])).toEqual([[3, "csv-fee", "charges"]]);
+    expect(plan.cannot).toEqual([]);
+  });
+
+  it("says a line of another source already coded is in the books, rather than to import the statement again", () => {
+    const csvFee = { ...fee, description: "MONTHLY SVC CHARGE" };
+    const plan = planAddMissing({
+      lines: [fee],
+      standings: [missing],
+      flipped: false,
+      transactions: [txn("csv-fee", csvFee, { status: "matched" })],
+      suggestions: new Map(),
+      holding,
+    });
+    expect(plan.items).toEqual([]);
+    expect(plan.cannot.map((x) => [x.lineNo, x.reason])).toEqual([[3, "coded"]]);
+  });
+
+  it("takes the statement's own bank line before one of another source, and each once", () => {
+    const one = line(1, "2026-07-30", -500, "ATM FEE");
+    const two = line(2, "2026-07-30", -500, "ATM FEE 2");
+    const plan = planAddMissing({
+      lines: [one, two],
+      standings: [missing, missing],
+      flipped: false,
+      transactions: [txn("csv", { ...one, description: "ATM WITHDRAWAL FEE" }), txn("own", one)],
+      suggestions: new Map(),
+      holding,
+    });
+    expect(plan.items.map((i) => [i.lineNo, i.transactionId])).toEqual([
+      [1, "own"],
+      [2, "csv"],
+    ]);
+  });
+
   it("adds nothing from a statement read the other way around", () => {
     const plan = planAddMissing({
       lines: [fee],

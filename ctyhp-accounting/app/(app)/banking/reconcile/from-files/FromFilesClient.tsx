@@ -22,11 +22,15 @@ import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import { keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
 import {
   NO_BANK_LINE_MATCHES,
+  NO_RUN_LINES,
   addMatchCounts,
+  addRunLines,
   bankLinesMatchedSentence,
   bankLinesNotMatchedSentence,
   bankLinesToCheck,
+  runLinesSentence,
   type BankLineMatchCounts,
+  type RunLineCounts,
 } from "@/lib/domain/statement-bank-lines";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { previewRunAction, reconcileRunMonthAction } from "../statement-actions";
@@ -57,15 +61,17 @@ interface Done {
   error: string | null;
   /** The account's earlier lines were brought forward before any month. */
   broughtForward: boolean;
+  /** What became of the months' statement lines in Bank Transactions (2.44). */
+  lines: RunLineCounts;
   /** What matching the signed months' bank lines did (1.85). */
   matched: BankLineMatchCounts;
   /** A sentence for each signed month whose bank lines could not be matched. */
   unmatched: string[];
 }
 
-/** What matching the signed months' bank lines said, after the run's own summary. */
+/** What became of the statement lines, and what matching the signed months' bank lines said, after the run's own summary. */
 function matchedSaid(done: Done): string | null {
-  return [bankLinesMatchedSentence(done.matched), ...done.unmatched].filter(Boolean).join(" ") || null;
+  return [runLinesSentence(done.lines), bankLinesMatchedSentence(done.matched), ...done.unmatched].filter(Boolean).join(" ") || null;
 }
 
 /** What was done before a run stopped on an error, said after the error. */
@@ -206,11 +212,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
     let step = 0;
     let signed = 0;
     let broughtForward = false;
+    let lines: RunLineCounts = NO_RUN_LINES;
     let matched: BankLineMatchCounts = NO_BANK_LINE_MATCHES;
     const unmatched: string[] = [];
     const finish = (result: Pick<Done, "open" | "error">) => {
       setProgress(null);
-      setDone({ ...result, signed, broughtForward, matched, unmatched });
+      setDone({ ...result, signed, broughtForward, lines, matched, unmatched });
       setPreview(null);
       if (result.error === null && result.open === null) {
         // Every month is signed: the table would only say "Already signed off".
@@ -287,6 +294,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
       });
       if (!res.ok || !res.data) return finish({ open: null, error: res.error ?? "A month could not be signed off" });
       if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
+      if (res.data.lines) lines = addRunLines(lines, res.data.lines);
       if (!res.data.signed) {
         return finish({
           open: {
@@ -319,6 +327,7 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         return finish({ open: null, error: res.error ?? "The month that needs a look could not be started" });
       }
       if (res.data.fileWarning) message.warning(res.data.fileWarning, 10);
+      if (res.data.lines) lines = addRunLines(lines, res.data.lines);
       open = { id: res.data.id, date: needsLook.statementDate, sentence: monthSentence(needsLook.outcome, money) };
     }
     finish({ open, error: null });
@@ -330,6 +339,8 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         Bank account <strong>{bankAccount.label}</strong>. Choose PDF statements, or a CSV export with a running balance
         column — one file or many. Every closing balance is read out of the file itself, never taken from the books.
         Nothing is written until you sign off; then each file is kept, once, with the reconciliations made from it.
+        Reconciling checks the statements against the books: a line already in Bank Transactions is left as it is, never
+        imported or categorized again.
       </Typography.Paragraph>
       <Upload.Dragger
         multiple

@@ -423,6 +423,71 @@ describe("a month of a statement-files run", () => {
     expect(proved()[0].args.p_proof).toEqual(PROOF);
   });
 
+  /**
+   * 2.44, from a bookkeeper's report: a CSV export imported and coded line by
+   * line, then the month's PDF statement reconciled from statement files —
+   * which imported every PDF line again, worded the bank's other way, to be
+   * coded a second time. Reconciling only checks the statement now.
+   */
+  const csvLines = [
+    { id: "csv-1", txn_date: "2026-03-05", amount_minor: -1500, raw_hash: "csv-key-1", source_kind: "import", import_batch_id: "csv-batch" },
+    { id: "csv-2", txn_date: "2026-03-09", amount_minor: -500, raw_hash: "csv-key-2", source_kind: "import", import_batch_id: "csv-batch" },
+  ];
+  const sentRows = () => proved()[0].args.p_rows as Row[];
+
+  it("leaves every line Bank Transactions already holds from another source where it is: none is imported again", async () => {
+    client = fakeClient({ imported: { inserted: 0, skipped: 0, batch_id: null }, bankLines: csvLines });
+    const result = await reconcileRunMonthAction(month(PROOF));
+    expect(result).toMatchObject({ ok: true, data: { id: REC, signed: true, lines: { added: 0, alreadyHere: 2 } } });
+    expect(client.rpcs.find((c) => c.fn === "acc_bank_lines_on")?.args).toEqual({
+      p_bank_account_id: BANK,
+      p_from: "2026-03-05",
+      p_to: "2026-03-09",
+    });
+    expect(sentRows().map((r) => r.skip)).toEqual([true, true]);
+    // Every line still counts in the proof, and the reconciliation keeps the statement whole.
+    expect(proved()[0].args.p_proof).toEqual(PROOF);
+    expect(mocks.createReconciliationFromStatement).toHaveBeenCalledWith(
+      client.sb,
+      BANK,
+      "2026-03-31",
+      98000,
+      expect.objectContaining({ lines: PLAIN }),
+    );
+    expect(mocks.generateSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("imports only the line Bank Transactions does not hold, and says how many of each", async () => {
+    client = fakeClient({ imported: { inserted: 1, skipped: 0, batch_id: "batch-1" }, bankLines: [csvLines[0]] });
+    const result = await reconcileRunMonthAction(month(PROOF));
+    expect(result).toMatchObject({ ok: true, data: { lines: { added: 1, alreadyHere: 1 } } });
+    expect(sentRows().map((r) => r.skip ?? false)).toEqual([true, false]);
+  });
+
+  it("decides on the server which lines are already there: a skip sent with a line nothing holds is not taken", async () => {
+    const result = await reconcileRunMonthAction({ ...month(PROOF), lines: [PLAIN[0], { ...PLAIN[1], skip: true }] });
+    expect(result).toMatchObject({ ok: true });
+    expect(sentRows().map((r) => r.skip ?? false)).toEqual([false, false]);
+  });
+
+  it("starts no reconciliation when Bank Transactions cannot be read", async () => {
+    mocks.createClient.mockImplementation(async () => ({
+      ...client.sb,
+      rpc: (fn: string, args: Row) =>
+        fn === "acc_bank_lines_on"
+          ? {
+              order() {
+                return this;
+              },
+              range: () => Promise.resolve({ data: null, error: { message: "connection lost" } }),
+            }
+          : client.sb.rpc(fn, args),
+    }));
+    expect(await reconcileRunMonthAction(month(PROOF))).toEqual({ ok: false, error: "connection lost" });
+    expect(mocks.createReconciliationFromStatement).not.toHaveBeenCalled();
+    expect(proved()).toEqual([]);
+  });
+
   it("leaves bringing the earlier lines forward as it was", async () => {
     mocks.createClient.mockImplementation(async () => ({
       ...client.sb,

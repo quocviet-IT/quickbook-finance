@@ -4,10 +4,12 @@
  *
  * Each line the pairing left "missing" is paired with the bank line it was
  * imported as — same date, amount, description and reference, the n-th of
- * identical lines with the n-th — and coded by that bank line's suggestion
- * (card, related company, rule, history) or, when nothing places it, to
- * Uncategorized Income or Expense by its direction, to be recoded later. A line
- * that cannot be added says why.
+ * identical lines with the n-th — or, since 2.44, with the line of another
+ * source on its day and amount that Bank Transactions holds instead (a
+ * reconciliation no longer imports a line already there) — and coded by that
+ * bank line's suggestion (card, related company, rule, history) or, when
+ * nothing places it, to Uncategorized Income or Expense by its direction, to be
+ * recoded later. A line that cannot be added says why.
  *
  * Two kinds of line are held back from "Add all N" (2.03), each with its own
  * "Add anyway": a line the statement balances without, since a line the bank
@@ -18,7 +20,7 @@
  * Pure: the service reads, this decides.
  */
 import type { Standing } from "./reconcile-statement";
-import { statementLineKey } from "./statement-bank-lines";
+import { statementBankLines, statementLineKey } from "./statement-bank-lines";
 import type { HoldingAccounts } from "./uncategorized";
 import { plural, pluralWord } from "@/lib/format";
 
@@ -231,11 +233,11 @@ export function planAddMissing(input: {
   // The lines the statement balances without are likely not transactions.
   const extra = extraStatementLines(input);
 
-  const groups = new Map<string, AddBankLine[]>();
-  for (const txn of input.transactions) {
-    const key = statementLineKey(txn);
-    groups.set(key, [...(groups.get(key) ?? []), txn]);
-  }
+  // Its own bank lines first, then those of another source on its day and
+  // amount (2.44): a reconciliation no longer imports a line already there.
+  const groups = new Map(
+    [...statementBankLines(input.lines, input.transactions)].map(([key, { own, other }]) => [key, [...own, ...other]]),
+  );
   const taken = new Set<string>();
 
   const items: AddItem[] = [];
