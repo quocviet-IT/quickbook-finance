@@ -93,59 +93,90 @@ export interface LedgerAccountLike {
 }
 
 /**
+ * What the bank setup screen asks for (2.45): the detail of a Bank-type
+ * account, or a credit card — a Credit Card-type ledger account, a liability,
+ * whose statement is imported and reconciled like a bank's.
+ */
+export type BankAccountKind = BankDetailType | "credit_card";
+
+/** The kinds the bank setup screen offers: the bank details, then a credit card. */
+export const BANK_SETUP_KINDS: BankAccountKind[] = [...BANK_SETUP_DETAIL_TYPES, "credit_card"];
+
+export function bankKindLabel(kind: BankAccountKind): string {
+  return kind === "credit_card" ? "Credit card" : bankDetailLabel(kind);
+}
+
+const postable = (account: LedgerAccountLike) => account.is_posting_account && account.status === "active";
+
+/**
  * The ledger accounts a bank account may be attached to: active, posting,
- * Bank-type, and not the cash tin. Unclassified accounts are kept — a chart
- * written before the classifications existed still has to be usable — but a
- * cash-on-hand account is never offered, whatever else it might match.
+ * Bank-type and not the cash tin, or (2.45) Credit Card-type. Unclassified
+ * Bank-type accounts are kept — a chart written before the classifications
+ * existed still has to be usable — but a cash-on-hand account is never
+ * offered, whatever else it might match. A credit card asks for card accounts
+ * only; a bank detail for bank accounts only.
  */
 export function selectableBankLedgerAccounts<T extends LedgerAccountLike>(
   accounts: readonly T[],
-  options: { detail?: BankDetailType | null } = {},
+  options: { detail?: BankAccountKind | null } = {},
 ): T[] {
-  const usable = accounts.filter(
-    (account) =>
-      account.account_type === "bank" &&
-      account.is_posting_account &&
-      account.status === "active" &&
-      holdsBankStatement(account.detail_type),
+  const banks = accounts.filter(
+    (account) => account.account_type === "bank" && postable(account) && holdsBankStatement(account.detail_type),
   );
-  if (!options.detail) return usable;
+  const cards = accounts.filter((account) => account.account_type === "credit_card" && postable(account));
+  if (!options.detail) return [...banks, ...cards];
+  if (options.detail === "credit_card") return cards;
   // The chosen kind first; unclassified accounts stay available behind them.
-  return usable.filter(
-    (account) => account.detail_type === options.detail || account.detail_type === null,
-  );
+  return banks.filter((account) => account.detail_type === options.detail || account.detail_type === null);
 }
 
 /**
  * The account to offer once a kind is chosen: the single exact match if there
  * is one, otherwise nothing. Two candidates is a choice for the person setting
- * it up, not something to guess at.
+ * it up, not something to guess at. For a credit card, the only card account.
  */
 export function suggestBankLedgerAccount<T extends LedgerAccountLike>(
   accounts: readonly T[],
-  detail: BankDetailType,
+  detail: BankAccountKind,
 ): T | null {
-  const exact = selectableBankLedgerAccounts(accounts).filter(
-    (account) => account.detail_type === detail,
-  );
+  const exact =
+    detail === "credit_card"
+      ? selectableBankLedgerAccounts(accounts, { detail })
+      : selectableBankLedgerAccounts(accounts).filter(
+          (account) => account.account_type === "bank" && account.detail_type === detail,
+        );
   return exact.length === 1 ? exact[0] : null;
+}
+
+/** A ledger account the setup screen proposes to create. */
+export interface NewLedgerAccount {
+  account_code: string;
+  name: string;
+  account_type: "bank" | "credit_card";
+  /** The Bank-type detail; null for a credit card, which has none. */
+  detail_type: BankDetailType | null;
 }
 
 /**
  * What to call a ledger account the user is about to create for this kind, and
- * the first free code in the 1000 block — the range a US chart keeps its cash
- * accounts in.
+ * the first free code in its block: 1010 up for a bank account, the range a US
+ * chart keeps its cash in; 2010 up for a credit card, among the current
+ * liabilities.
  */
 export function suggestNewLedgerAccount<T extends LedgerAccountLike>(
   accounts: readonly T[],
-  detail: BankDetailType,
+  detail: BankAccountKind,
   bankName?: string | null,
-): { account_code: string; name: string; detail_type: BankDetailType } {
+): NewLedgerAccount {
   const used = new Set(accounts.map((account) => account.account_code));
-  let code = 1010;
-  while (used.has(String(code)) && code < 1100) code += 10;
+  const card = detail === "credit_card";
+  const first = card ? 2010 : 1010;
+  let code = first;
+  while (used.has(String(code)) && code < first + 90) code += 10;
 
-  const base = LABELS[detail];
+  const base = card ? "Credit card" : LABELS[detail];
   const named = bankName?.trim() ? `${bankName.trim()} ${base.toLowerCase()}` : base;
-  return { account_code: String(code), name: named, detail_type: detail };
+  return card
+    ? { account_code: String(code), name: named, account_type: "credit_card", detail_type: null }
+    : { account_code: String(code), name: named, account_type: "bank", detail_type: detail };
 }

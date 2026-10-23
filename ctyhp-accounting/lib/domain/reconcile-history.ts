@@ -11,6 +11,7 @@
  * sentences.
  */
 import type { BankStanding } from "./bank-standing";
+import { balanceSideOf, bankAccountLabel, cardStanding, type BalanceSide } from "./card-account";
 import { entriesCount } from "./reconcile-statement";
 
 import { formatDate } from "@/lib/format";
@@ -35,6 +36,8 @@ export interface HistoryBankAccount {
   account_name: string;
   account_code: string;
   account_number_masked: string | null;
+  /** "credit_card" for a card (2.45). */
+  account_type?: string;
 }
 
 /** Never reconciled: the history can be brought forward. Reconciled: it cannot. */
@@ -47,15 +50,23 @@ export interface HistoryAccount extends ReconciliationHistoryRow {
   state: HistoryState;
   /** Where the account stands against its statements (2.05); null or absent when it could not be read. */
   standing?: BankStanding | null;
+  /** A credit card (2.45): its figures, and the balance typed, as its statement prints them. */
+  side: BalanceSide;
 }
 
-/** Joins each account's standing by its id; every row is null when the standing could not be read. */
+/**
+ * Joins each account's standing by its id; every row is null when the standing
+ * could not be read. A card's standing is turned to what is owed.
+ */
 export function withStandings(
   accounts: readonly HistoryAccount[],
   standings: readonly BankStanding[] | null,
 ): HistoryAccount[] {
   const byId = new Map((standings ?? []).map((s) => [s.bankAccountId, s]));
-  return accounts.map((account) => ({ ...account, standing: byId.get(account.bankAccountId) ?? null }));
+  return accounts.map((account) => {
+    const standing = byId.get(account.bankAccountId) ?? null;
+    return { ...account, standing: standing ? cardStanding(standing, account.side) : null };
+  });
 }
 
 /**
@@ -109,11 +120,13 @@ export function historyAccounts(rows: readonly ReconciliationHistoryRow[], banks
   const byAccount = new Map(rows.map((row) => [row.bankAccountId, row]));
   return banks.map((bank) => {
     const row = byAccount.get(bank.id) ?? noHistory(bank.id);
+    const side = balanceSideOf(bank.account_type);
     return {
       ...row,
-      label: [bank.bank_name || bank.account_name, bank.account_code].filter(Boolean).join(" · "),
+      label: bankAccountLabel([bank.bank_name || bank.account_name, bank.account_code].filter(Boolean).join(" · "), side),
       maskedNumber: bank.account_number_masked,
       state: row.lastReconciledDate ? "reconciled" : "never",
+      side,
     };
   });
 }

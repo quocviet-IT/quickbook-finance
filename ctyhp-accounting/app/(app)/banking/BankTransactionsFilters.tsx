@@ -7,12 +7,21 @@ import FilterBar from "@/components/ui/FilterBar";
 import type { BankTxnStatus } from "@/lib/db/types";
 import type { BankPostingRow } from "@/lib/services/banking";
 import { buildSearchSuggestions, type SearchableRow } from "@/lib/domain/transaction-search";
+import { balanceSideOf, bankAccountLabel } from "@/lib/domain/card-account";
 
 /** The sentinel the queue uses for "every connected account". */
 export const ALL_ACCOUNTS = "__all__";
 
 export interface BankTransactionsFiltersProps {
-  bankAccounts: { id: string; bank_name: string | null; account_name: string; account_code: string; currency_code: string }[];
+  bankAccounts: {
+    id: string;
+    bank_name: string | null;
+    account_name: string;
+    account_code: string;
+    currency_code: string;
+    /** "credit_card" for a card (2.45), named as one in the account box. */
+    account_type?: string;
+  }[];
   selectedId: string | undefined;
   onSelectedId: (id: string) => void;
 
@@ -197,7 +206,10 @@ export default function BankTransactionsFilters({
           { value: ALL_ACCOUNTS, label: `All accounts (${bankAccounts.length})` },
           ...bankAccounts.map((account) => ({
             value: account.id,
-            label: `${account.bank_name || account.account_name} · ${account.account_code} (${account.currency_code})`,
+            label: bankAccountLabel(
+              `${account.bank_name || account.account_name} · ${account.account_code} (${account.currency_code})`,
+              balanceSideOf(account.account_type),
+            ),
           })),
         ]}
       />

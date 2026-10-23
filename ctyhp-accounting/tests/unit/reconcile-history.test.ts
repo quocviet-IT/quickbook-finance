@@ -54,19 +54,26 @@ describe("historyAccounts", () => {
         label: "Example Bank · 1010",
         maskedNumber: "****1111",
         state: "never",
+        side: "bank",
       },
       {
         ...rows[0],
         label: "Example Savings · 1020",
         maskedNumber: null,
         state: "reconciled",
+        side: "bank",
       },
     ]);
   });
 
   it("gives an account the history does not name yet nothing open, and leaves out a row for an account not listed", () => {
     const accounts = historyAccounts([row("hidden", { openLines: 5 })], [bank("new", "Example Bank", "")]);
-    expect(accounts).toEqual([{ ...row("new"), label: "Example Bank", maskedNumber: null, state: "never" }]);
+    expect(accounts).toEqual([{ ...row("new"), label: "Example Bank", maskedNumber: null, state: "never", side: "bank" }]);
+  });
+
+  it("names a credit card as one, its figures to be said as its statement prints them (2.45)", () => {
+    const [card] = historyAccounts([], [{ ...bank("c1", "Example Card Issuer", "2010"), account_type: "credit_card" }]);
+    expect(card).toMatchObject({ label: "Example Card Issuer · 2010 · credit card", side: "card" });
   });
 });
 

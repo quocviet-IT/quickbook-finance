@@ -6,6 +6,8 @@ import {
   selectableBankLedgerAccounts,
   suggestBankLedgerAccount,
   suggestNewLedgerAccount,
+  BANK_SETUP_KINDS,
+  bankKindLabel,
   type LedgerAccountLike,
 } from "@/lib/domain/bank-account-detail";
 
@@ -117,6 +119,7 @@ describe("suggestNewLedgerAccount", () => {
     expect(suggestNewLedgerAccount([CASH, CHECKING], "savings", "First National Bank")).toEqual({
       account_code: "1020",
       name: "First National Bank savings account",
+      account_type: "bank",
       detail_type: "savings",
     });
   });
@@ -125,7 +128,49 @@ describe("suggestNewLedgerAccount", () => {
     expect(suggestNewLedgerAccount([CASH, CHECKING, SAVINGS], "money_market", "  ")).toEqual({
       account_code: "1030",
       name: "Money market account",
+      account_type: "bank",
       detail_type: "money_market",
     });
+  });
+});
+
+/** 2.45: a credit card's statement is imported and reconciled under Banking too. */
+describe("a credit card as a kind of bank account", () => {
+  const CARD = account({ id: "card", account_code: "2010", name: "Example Credit Card", account_type: "credit_card" });
+  const CARD_2 = account({ id: "card2", account_code: "2020", name: "Second Card", account_type: "credit_card" });
+
+  it("is offered after the bank kinds, by its own name", () => {
+    expect(BANK_SETUP_KINDS).toEqual([...BANK_SETUP_DETAIL_TYPES, "credit_card"]);
+    expect(bankKindLabel("credit_card")).toBe("Credit card");
+    expect(bankKindLabel("checking")).toBe("Checking account");
+  });
+
+  it("lists credit card accounts for a card, and only bank accounts for a bank kind", () => {
+    const all = [CASH, CHECKING, UNCLASSIFIED, CARD];
+    expect(selectableBankLedgerAccounts(all, { detail: "credit_card" }).map((a) => a.id)).toEqual(["card"]);
+    expect(selectableBankLedgerAccounts(all, { detail: "checking" }).map((a) => a.id)).toEqual(["chk", "old"]);
+    expect(selectableBankLedgerAccounts(all).map((a) => a.id)).toEqual(["chk", "old", "card"]);
+  });
+
+  it("leaves out an inactive or non-posting card", () => {
+    const closed = account({ id: "c3", account_code: "2030", account_type: "credit_card", status: "inactive" });
+    const header = account({ id: "c4", account_code: "2040", account_type: "credit_card", is_posting_account: false });
+    expect(selectableBankLedgerAccounts([closed, header], { detail: "credit_card" })).toEqual([]);
+  });
+
+  it("suggests the only card, and nothing when there are two; a bank kind never suggests a card", () => {
+    expect(suggestBankLedgerAccount([CHECKING, CARD], "credit_card")?.id).toBe("card");
+    expect(suggestBankLedgerAccount([CARD, CARD_2], "credit_card")).toBeNull();
+    expect(suggestBankLedgerAccount([CARD], "checking")).toBeNull();
+  });
+
+  it("proposes a new card account in the 2000 block, with no bank detail", () => {
+    expect(suggestNewLedgerAccount([CHECKING, CARD], "credit_card", "Chase")).toEqual({
+      account_code: "2020",
+      name: "Chase credit card",
+      account_type: "credit_card",
+      detail_type: null,
+    });
+    expect(suggestNewLedgerAccount([], "credit_card", null)).toMatchObject({ account_code: "2010", name: "Credit card" });
   });
 });

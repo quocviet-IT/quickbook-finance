@@ -330,8 +330,9 @@ export interface StatementAlerts {
   negative: NegativeWatch | null;
 }
 
-export function statementAlerts(lines: readonly BankLine[], lastCompleted: LastStatement | null): StatementAlerts {
-  return { ghosts: ghostGroups(lines), negative: negativeWatch(lines, lastCompleted) };
+/** A credit card (2.45) owes, so it is never watched for going below zero; its ghost groups are found as a bank's. */
+export function statementAlerts(lines: readonly BankLine[], lastCompleted: LastStatement | null, isCard = false): StatementAlerts {
+  return { ghosts: ghostGroups(lines), negative: isCard ? null : negativeWatch(lines, lastCompleted) };
 }
 
 /* ------------------------------------------------------------------- copy */

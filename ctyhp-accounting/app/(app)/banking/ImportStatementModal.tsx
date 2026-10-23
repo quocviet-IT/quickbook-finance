@@ -45,6 +45,17 @@ import {
   type StatementDialogPurpose,
 } from "@/lib/domain/statement-import-dialog";
 import { serverFailure } from "@/lib/domain/statement-evidence";
+import {
+  BALANCE_WORDS,
+  CARD_IMPORT_NOTE,
+  CARD_PDF_NOT_READ,
+  cardFigures,
+  cardStatementLines,
+  flipSignsLabel,
+  shown,
+  storedProof,
+  type BalanceSide,
+} from "@/lib/domain/card-account";
 import { formatMoney } from "@/lib/format";
 import { rememberColumns, rememberedColumns, type CsvColumnChoice } from "@/lib/client/statement-columns";
 import { statementLineKeyTable } from "@/lib/client/statement-line-keys";
@@ -96,7 +107,19 @@ export interface ConfirmedImport extends ConfirmedStatementLines {
 
 export interface ImportStatementModalProps {
   open: boolean;
-  bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
+  bankAccount: {
+    id: string;
+    label: string;
+    maskedNumber: string | null;
+    decimals: number;
+    currencyCode: string;
+    /**
+     * A credit card (2.45): its lines, balances and proof are shown, and its
+     * balances typed, as a card statement prints them — charges and the balance
+     * owed positive; what is sent goes the books' way round. Its PDFs are not read.
+     */
+    side?: BalanceSide;
+  };
   importing: boolean;
   onConfirm: (confirmed: ConfirmedImport) => void;
   onCancel: () => void;
@@ -165,6 +188,7 @@ export default function ImportStatementModal({
   okLabel,
 }: ImportStatementModalProps) {
   const { message, modal } = App.useApp();
+  const side: BalanceSide = bankAccount.side ?? "bank";
   const [fileName, setFileName] = useState("");
   const [chosen, setChosen] = useState<File | null>(null);
   const [file, setFile] = useState<FileState>({ kind: "none" });
@@ -177,6 +201,11 @@ export default function ImportStatementModal({
   const [token, setToken] = useState(0);
 
   async function readPdf(chosen: File, token: number) {
+    // A card statement's PDF prints charges positive beside a summary block: not read yet (2.45).
+    if (side === "card") {
+      setFile({ kind: "unsupported", message: CARD_PDF_NOT_READ });
+      return;
+    }
     setFile({ kind: "reading" });
     const { readPdfStatementFile } = await import("@/lib/client/pdf-text");
     const result = await readPdfStatementFile(chosen, bankAccount.decimals);
@@ -345,23 +374,36 @@ export default function ImportStatementModal({
   // the keys are counted over the lines sent, as the import counts them.
   const check = useMemo(() => (facts ? checkStatementLinesFrom(lines, marks.aside, facts) : null), [facts, lines, marks.aside]);
 
+  // A credit card's lines, balances and the balances typed are proved and
+  // listed as its statement prints them (2.45); the keys, the check against
+  // Bank Transactions and what is sent stay the books' way round.
+  const shownLines = useMemo(() => cardStatementLines(lines, side), [lines, side]);
+  const shownFigures = useMemo(() => cardFigures(figures, side), [figures, side]);
+  const shownPrior = useMemo(
+    () => (prior && side === "card" ? { ...prior, endingMinor: shown(prior.endingMinor, side) } : prior),
+    [prior, side],
+  );
+
   // Worked out again only when something it rests on changes: a statement can
   // hold thousands of lines, and a render for anything else — the import
   // starting, the dialog's own busy state — should not walk them again.
   const { currencyCode, decimals } = bankAccount;
   const view = useMemo(
     () =>
-      statementDialogView({ purpose, kind, lines, figures, prior, marks, check, canOverride }, (minor) =>
-        formatMoney(minor, currencyCode, decimals),
+      statementDialogView(
+        { purpose, kind, lines: shownLines, figures: shownFigures, prior: shownPrior, marks, check, canOverride },
+        (minor) => formatMoney(minor, currencyCode, decimals),
       ),
-    [purpose, kind, lines, figures, prior, marks, check, canOverride, currencyCode, decimals],
+    [purpose, kind, shownLines, shownFigures, shownPrior, marks, check, canOverride, currencyCode, decimals],
   );
   const aside = useMemo(() => new Set(marks.aside), [marks.aside]);
 
   function send(override: StatementOverride | null) {
     if (!lines.length || !chosen) return;
     if (file.kind === "csv" && choice) rememberColumns(bankAccount.id, choice);
-    onConfirm({ fileName, file: chosen, statement, lines, ...confirmStatement(lines, marks, view, override) });
+    // The rows go as read; the proof's balances, worked out as shown, go back the books' way round.
+    const confirmed = confirmStatement(lines, marks, view, override);
+    onConfirm({ fileName, file: chosen, statement, lines, ...confirmed, proof: storedProof(confirmed.proof, side) });
   }
 
   function confirm() {
@@ -436,6 +478,11 @@ export default function ImportStatementModal({
       destroyOnHidden
     >
       <Typography.Paragraph type="secondary">{intro}</Typography.Paragraph>
+      {BALANCE_WORDS[side].note ? (
+        <Typography.Paragraph type="secondary">
+          {`${BALANCE_WORDS[side].note} ${CARD_IMPORT_NOTE}`}
+        </Typography.Paragraph>
+      ) : null}
       <Upload.Dragger
         accept=".pdf,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf"
         beforeUpload={read}
@@ -497,7 +544,7 @@ export default function ImportStatementModal({
                 </div>
               </div>
               <Checkbox checked={choice.flipSigns} onChange={(e) => setChoice({ ...choice, flipSigns: e.target.checked })}>
-                Flip signs: my file shows payments as positive
+                {flipSignsLabel(side)}
               </Checkbox>
               {!statementColumnsComplete(choice.columns) ? (
                 <Typography.Text type="danger" style={{ fontSize: 12 }}>
@@ -532,7 +579,8 @@ export default function ImportStatementModal({
         <div style={{ marginTop: 12 }}>
           <Typography.Paragraph style={{ marginBottom: 4 }}>
             <strong>{fileName}</strong>
-            {file.kind === "file" ? ` (${file.format})` : " (CSV)"}: {describeStatementParse(parsed)}
+            {file.kind === "file" ? ` (${file.format})` : " (CSV)"}:{" "}
+            {describeStatementParse({ ...parsed, rows: cardStatementLines(parsed.rows, side) })}
           </Typography.Paragraph>
           {file.kind === "csv" && file.note ? (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -564,7 +612,7 @@ export default function ImportStatementModal({
             </Space>
           ) : null}
           <StatementLinesPreview
-            lines={lines}
+            lines={shownLines}
             aside={aside}
             onAside={(index, on) => mark((current) => ({ aside: toggle(current.aside, index, on) }))}
             view={view}
