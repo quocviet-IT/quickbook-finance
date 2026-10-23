@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.46",
+    date: "2026-10-23",
+    headline: "A credit card is reconciled from its PDF statements: their balances are read, and each month is signed off when the books come to them.",
+    changes: [
+      {
+        kind: "added",
+        title: "Reconcile a credit card from its PDF statements",
+        detail:
+          "Reconcile from statement files now takes a credit card's PDF statements, one or many. From each it reads the summary every card statement prints — the closing date, the previous balance and the new balance — and checks that the summary adds up before using it. The transactions are the books' own, from the card's CSV imported under Banking: a month is signed off when the card's lines to its closing date come to its new balance, and the run stops at the first month that does not, saying by how much. Nothing is imported, categorized or posted. Amounts are shown as the statements print them: what is owed is positive.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "A card's CSV is dated by its post date",
+        detail:
+          "When a card's CSV has a Post Date column, Import statement dates each line by it, because a card statement counts a charge in the cycle it posts in: a charge made on the 29th and posted on the 1st belongs to next month's statement.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.45",
     date: "2026-10-23",
     headline: "A credit card can be added under Banking: its transactions imported and coded in Bank Transactions, and its statements reconciled in Bank Reconciliation.",

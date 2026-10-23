@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BALANCE_WORDS,
-  CARD_FROM_FILES_NOT_READ,
   CARD_PDF_NOT_READ,
   balanceSideOf,
   bankAccountLabel,
   cardAddPlan,
   cardBookLines,
+  cardDateColumn,
   cardDetail,
   cardFigures,
   cardHistoryFacts,
@@ -62,8 +62,18 @@ describe("which accounts are cards, and the flip", () => {
     expect(BALANCE_WORDS.bank.note).toBeNull();
     expect(flipSignsLabel("card")).toBe("Flip signs: my file shows charges as positive");
     expect(flipSignsLabel("bank")).toBe("Flip signs: my file shows payments as positive");
+    // 2.46: a card's PDF proves its balances in Reconcile from statement files; its transactions come in by CSV.
+    expect(CARD_PDF_NOT_READ).toContain("From statement files");
     expect(CARD_PDF_NOT_READ).toContain("CSV");
-    expect(CARD_FROM_FILES_NOT_READ).toContain("New reconciliation");
+  });
+});
+
+describe("dating a card's CSV (2.46)", () => {
+  it("dates by the post date, as the statement counts a charge, when the file has one", () => {
+    expect(cardDateColumn(["Transaction Date", "Post Date", "Description", "Category", "Type", "Amount", "Memo"])).toBe("Post Date");
+    expect(cardDateColumn(["Date", "Posted Date", "Amount"])).toBe("Posted Date");
+    expect(cardDateColumn(["Posting Date", "Amount"])).toBe("Posting Date");
+    expect(cardDateColumn(["Transaction Date", "Description", "Amount"])).toBeNull();
   });
 });
 

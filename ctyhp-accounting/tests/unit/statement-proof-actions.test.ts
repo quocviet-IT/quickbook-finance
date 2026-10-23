@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   createReconciliationFromStatement: vi.fn(),
   listReconciliations: vi.fn(),
   completeReconciliation: vi.fn(),
+  getReconciliationLines: vi.fn(),
+  setClearedMany: vi.fn(),
   getBankingContext: vi.fn(),
   matchAfterCompletion: vi.fn(),
 }));
@@ -60,6 +62,8 @@ vi.mock("@/lib/services/bankrec", async (importOriginal) => ({
   createReconciliationFromStatement: mocks.createReconciliationFromStatement,
   listReconciliations: mocks.listReconciliations,
   completeReconciliation: mocks.completeReconciliation,
+  getReconciliationLines: mocks.getReconciliationLines,
+  setClearedMany: mocks.setClearedMany,
 }));
 vi.mock("@/lib/services/banking-surface/facts", () => ({ getBankingContext: mocks.getBankingContext }));
 vi.mock("@/lib/services/statement-bank-lines", () => ({ matchAfterCompletion: mocks.matchAfterCompletion }));
@@ -68,6 +72,7 @@ import { bankLinesOnAction, importStatementAction, priorClosingAction } from "@/
 import { importStatementIntoReconciliationAction, reconcileRunMonthAction } from "@/app/(app)/banking/reconcile/statement-actions";
 import { attachStatementFileAction } from "@/app/(app)/banking/statement-file-actions";
 import { PROOF_REFUSAL } from "@/lib/domain/statement-proof";
+import { RUN_MESSAGES } from "@/lib/domain/statement-run";
 
 const BANK = "11111111-1111-4111-8111-111111111111";
 const REC = "22222222-2222-4222-8222-222222222222";
@@ -171,6 +176,8 @@ beforeEach(() => {
   mocks.listReconciliations.mockResolvedValue([]);
   mocks.getReconciliationDetail.mockResolvedValue({ differenceMinor: 0, statementEndingMinor: 98000 });
   mocks.completeReconciliation.mockResolvedValue(undefined);
+  mocks.getReconciliationLines.mockResolvedValue([]);
+  mocks.setClearedMany.mockResolvedValue(0);
   mocks.getBankingContext.mockResolvedValue({ asOf: "2026-10-14" });
   mocks.matchAfterCompletion.mockResolvedValue({ matched: null, matchError: null });
 });
@@ -486,6 +493,94 @@ describe("a month of a statement-files run", () => {
     expect(await reconcileRunMonthAction(month(PROOF))).toEqual({ ok: false, error: "connection lost" });
     expect(mocks.createReconciliationFromStatement).not.toHaveBeenCalled();
     expect(proved()).toEqual([]);
+  });
+
+  /** 2.46: a credit card's month, proved on its statement's balances (owed positive, as printed). */
+  describe("for a credit card", () => {
+    const cardMonth = (sign: boolean) => ({
+      kind: "card_month",
+      bank_account_id: BANK,
+      file_name: "2026-03.pdf",
+      statement_date: "2026-03-31",
+      period_from: "2026-03-01",
+      previous_minor: 100000,
+      new_minor: 107600,
+      statement_file_id: FILE,
+      sign,
+    });
+    const asCard = () => {
+      client = fakeClient({ tables: { acc_bank_account: [{ id: BANK, acc_account: { account_type: "credit_card" } }] } });
+    };
+    const bookLine = (id: string, entryDate: string, cleared = false) => ({
+      journalLineId: id, entryId: `e-${id}`, entryNumber: null, entryDate, sourceType: "bank", memo: null, signedMinor: -1000, cleared, reference: null,
+    });
+
+    it("starts the month at the new balance owed, kept the books' way round, ticks the card's open lines to the statement date, and signs it", async () => {
+      asCard();
+      mocks.getReconciliationLines.mockResolvedValue([
+        bookLine("j1", "2026-03-04"),
+        bookLine("j2", "2026-03-31"),
+        bookLine("j3", "2026-04-02"),
+        bookLine("j4", "2026-03-10", true),
+      ]);
+      const result = await reconcileRunMonthAction(cardMonth(true));
+      expect(result).toEqual({
+        ok: true,
+        data: { id: REC, signed: true, differenceMinor: 0, lines: null, matched: null, matchError: null, fileWarning: null },
+      });
+      expect(mocks.createReconciliationFromStatement).toHaveBeenCalledWith(client.sb, BANK, "2026-03-31", -107600, {
+        fileName: "2026-03.pdf",
+        openingMinor: -100000,
+        closingMinor: -107600,
+        lines: [],
+        statementFileId: FILE,
+      });
+      expect(mocks.setClearedMany).toHaveBeenCalledWith(client.sb, REC, ["j1", "j2"], true);
+      expect(mocks.completeReconciliation).toHaveBeenCalledWith(client.sb, REC);
+      // Nothing is imported, coded or matched.
+      expect(proved()).toEqual([]);
+      expect(mocks.matchAfterCompletion).not.toHaveBeenCalled();
+    });
+
+    it("leaves a month whose books do not come to its new balance in progress", async () => {
+      asCard();
+      mocks.getReconciliationDetail.mockResolvedValue({ differenceMinor: -1500, statementEndingMinor: -107600 });
+      const result = await reconcileRunMonthAction(cardMonth(true));
+      expect(result).toMatchObject({ ok: true, data: { signed: false, differenceMinor: -1500 } });
+      expect(mocks.completeReconciliation).not.toHaveBeenCalled();
+    });
+
+    it("refuses a card's statement sent line by line, and a bank account's sent on its balances", async () => {
+      asCard();
+      expect(await reconcileRunMonthAction(month(PROOF))).toEqual({ ok: false, error: RUN_MESSAGES.cardNeedsPdf });
+      client = fakeClient();
+      expect(await reconcileRunMonthAction(cardMonth(true))).toEqual({
+        ok: false,
+        error: "A bank account's statements are reconciled line by line.",
+      });
+      expect(mocks.createReconciliationFromStatement).not.toHaveBeenCalled();
+    });
+
+    it("brings a card's earlier lines forward on its previous balance, kept the books' way round", async () => {
+      asCard();
+      const rpcs: { fn: string; args: Row }[] = [];
+      mocks.createClient.mockImplementation(async () => ({
+        ...client.sb,
+        rpc: (fn: string, args: Row) => {
+          rpcs.push({ fn, args });
+          return Promise.resolve(fn === "acc_bring_forward_reconciliation" ? { data: "rec-bf", error: null } : { data: null, error: null });
+        },
+      }));
+      const result = await reconcileRunMonthAction({
+        kind: "bring_forward",
+        bank_account_id: BANK,
+        period_from: "2026-03-01",
+        statement_date: "2026-03-31",
+        opening_minor: 100000,
+      });
+      expect(result).toMatchObject({ ok: true, data: { id: "rec-bf" } });
+      expect(rpcs.find((c) => c.fn === "acc_bring_forward_reconciliation")?.args).toMatchObject({ p_opening_minor: -100000 });
+    });
   });
 
   it("leaves bringing the earlier lines forward as it was", async () => {

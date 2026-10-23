@@ -641,6 +641,8 @@ export const runPreviewSchema = z.object({
         lines: z
           .array(z.object({ txn_date: statementDay, amount_minor: z.number().int(), reference: z.string().nullable() }))
           .max(5000, "A statement can hold at most 5,000 lines"),
+        /** A credit card's statement (2.46): its balances, as printed, and no lines. */
+        balances_only: z.boolean().optional().default(false),
       }),
     )
     .min(1, "Choose at least one statement")
@@ -671,6 +673,22 @@ export const runMonthSchema = z.discriminatedUnion("kind", [
     kind: z.literal("month"),
     bank_account_id: z.uuid("Select a bank account"),
     statement_date: statementDay,
+    sign: z.boolean(),
+  }),
+  /**
+   * A credit card's month (2.46), proved on its balances: the previous and new
+   * balance as the statement prints them (owed positive), and no lines — the
+   * books' own lines to the statement date are what it covers.
+   */
+  z.object({
+    kind: z.literal("card_month"),
+    bank_account_id: z.uuid("Select a bank account"),
+    file_name: z.string().trim().min(1, "The statement file has no name").max(255),
+    statement_date: statementDay,
+    period_from: statementDay.nullable(),
+    previous_minor: z.number().int(),
+    new_minor: z.number().int(),
+    statement_file_id: z.uuid().nullable().default(null),
     sign: z.boolean(),
   }),
 ]);

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Alert } from "antd";
-import { CARD_FROM_FILES_NOT_READ, isCardAccountType } from "@/lib/domain/card-account";
+import { balanceSideOf, bankAccountLabel, shown } from "@/lib/domain/card-account";
 import { z } from "zod";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
@@ -38,9 +37,11 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
   // Newest first, as listReconciliations orders them.
   const completed = reconciliations.filter((r) => r.status === "completed");
   const inProgress = reconciliations.find((r) => r.status === "in_progress");
+  // A credit card's run (2.46) is walked as its statements print it: what is owed.
+  const side = balanceSideOf(bank.account_type);
   const context: RunContext = {
     lastCompleted: completed[0]
-      ? { date: completed[0].statement_ending_date, endingMinor: Number(completed[0].statement_ending_balance_minor) }
+      ? { date: completed[0].statement_ending_date, endingMinor: shown(Number(completed[0].statement_ending_balance_minor), side) }
       : null,
     completedDates: completed.map((r) => r.statement_ending_date),
     inProgress: inProgress ? { id: inProgress.id, date: inProgress.statement_ending_date } : null,
@@ -55,23 +56,19 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
       <p>
         <Link href="/banking/reconcile">← Bank Reconciliation</Link>
       </p>
-      {/* A card's statements are not read from files yet (2.45); the action refuses one too. */}
-      {isCardAccountType(bank.account_type) ? (
-        <Alert type="info" showIcon title={CARD_FROM_FILES_NOT_READ} />
-      ) : (
       <FromFilesClient
         canWrite={canWrite(role)}
         bankAccount={{
           id: bank.id,
-          label: `${bank.bank_name} · ${bank.account_number_masked ?? ""}`.trim(),
+          label: bankAccountLabel(`${bank.bank_name} · ${bank.account_number_masked ?? ""}`.trim(), side),
           maskedNumber: bank.account_number_masked,
           decimals: base?.decimal_places ?? 2,
           currencyCode: bank.currency_code,
+          side,
         }}
         fileAccount={statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked)}
         context={context}
       />
-      )}
     </div>
   );
 }

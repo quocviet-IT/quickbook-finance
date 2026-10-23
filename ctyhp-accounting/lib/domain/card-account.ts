@@ -201,16 +201,29 @@ export function flipSignsLabel(side: BalanceSide): string {
     : "Flip signs: my file shows payments as positive";
 }
 
+/**
+ * The column a card's CSV is dated by (2.46): its post date, when it has one. A
+ * card statement counts a charge in the cycle it posts in, not the day it was
+ * made, so a charge made on the 29th and posted on the 1st is on next month's
+ * statement; dated by its transaction date it would sit in the wrong month, and
+ * a month proved on its balances would be out by it. Null when the file has no
+ * post date column: then the usual guess stands.
+ */
+export function cardDateColumn(headers: readonly string[]): string | null {
+  return headers.find((header) => /^\s*post(?:ed|ing)?\s*date\s*$/i.test(header)) ?? null;
+}
+
 /** Said in the import dialog for a card, after BALANCE_WORDS.card.note. */
 export const CARD_IMPORT_NOTE =
-  "Type the previous balance and the new balance as the statement prints them. A card's PDF statement is not read yet: choose its CSV, OFX or QFX.";
+  "Choose the card's CSV, OFX or QFX and type the previous balance and the new balance as the statement prints them. " +
+  "To check the card against its PDF statements, use Reconcile from statement files under Bank Reconciliation.";
 
-/** Why a card's PDF statement is not read (2.45): its layout prints charges positive beside a summary block. */
+/**
+ * Why the import dialog does not take a card's PDF (2.46): the PDF proves the
+ * card's balances in Reconcile from statement files; the transactions come from
+ * the card's CSV. A card PDF's activity pages are laid out differently card to
+ * card, and are not read.
+ */
 export const CARD_PDF_NOT_READ =
-  "PDF statements for a credit card are not read yet. Download the card's activity as a CSV (or OFX/QFX) for the statement period, " +
-  "and type the previous balance and the new balance as the statement prints them.";
-
-/** Why Reconcile from statement files does not take a card (2.45). */
-export const CARD_FROM_FILES_NOT_READ =
-  "A credit card is reconciled one statement at a time: start a New reconciliation with the statement's balance owed, " +
-  "then import the card's CSV for the period into it.";
+  "A credit card's PDF statement is used for its balances: check it in Bank Reconciliation → From statement files. " +
+  "To bring the card's transactions in, choose its CSV (or OFX/QFX) for the statement period here.";
