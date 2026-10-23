@@ -280,7 +280,7 @@ describe("the import dialog", () => {
   const modal = read("ImportStatementModal.tsx");
 
   it("works out what it shows and sends with the domain, and keeps Import N lines to one click when it adds up", () => {
-    expect(modal).toContain("statementDialogView({ purpose, kind, lines, figures, prior, marks, check, canOverride }");
+    expect(modal).toContain("{ purpose, kind, lines: shownLines, figures: shownFigures, prior: shownPrior, marks, check, canOverride }");
     expect(modal).toContain("okButtonProps={{ disabled: view.okDisabled, loading: importing }}");
     expect(modal).toContain("onOk={confirm}");
     const confirm = body(modal, "function confirm() {");

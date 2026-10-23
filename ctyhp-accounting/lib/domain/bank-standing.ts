@@ -8,6 +8,7 @@
  */
 import type { Tone } from "@/lib/design/tone";
 import { groupReconciliationChanges, type ReconciliationChange } from "@/lib/domain/reconciliation-changes";
+import { bankAccountLabel, cardStanding } from "@/lib/domain/card-account";
 
 import { formatDate, plural, pluralWord } from "@/lib/format";
 /** Days after the last agreed statement at which an account turns amber. */
@@ -216,6 +217,15 @@ export interface BalanceSheetBank {
   belowZero: boolean;
   /** Entries in the account's flagged groups; 0 when it is not below zero. */
   ghostEntries: number;
+  /** A credit card (2.45): its figures are what is owed. */
+  isCard: boolean;
+}
+
+/** The panel's heading: the kinds of account it lists. */
+export function bankPanelHeading(hasCash: boolean, hasCard: boolean): string {
+  if (hasCash && hasCard) return "Bank, card and cash accounts";
+  if (hasCard) return "Bank and card accounts";
+  return hasCash ? "Bank and cash accounts" : "Bank accounts";
 }
 
 /** What the panel says about entries that look like the account's own balance posted as payments. */
@@ -226,9 +236,10 @@ export function ghostEntriesSentence(n: number): string {
 /**
  * One item per bank account that has a standing row, ordered by account name.
  * An account the standing read does not return has nothing to say and is left out.
+ * A credit card's (2.45) figures are said as its statement says them: what is owed.
  */
 export function balanceSheetBanks(
-  banks: readonly { id: string; name: string }[],
+  banks: readonly { id: string; name: string; isCard?: boolean }[],
   standings: readonly BankStanding[],
   belowZero: readonly { bankAccountId: string; ghostEntries: number }[],
 ): BalanceSheetBank[] {
@@ -240,10 +251,11 @@ export function balanceSheetBanks(
     if (!standing) continue;
     out.push({
       bankAccountId: bank.id,
-      accountName: bank.name,
-      standing,
+      accountName: bank.isCard ? bankAccountLabel(bank.name, "card") : bank.name,
+      standing: cardStanding(standing, bank.isCard ? "card" : "bank"),
       belowZero: low.has(bank.id),
       ghostEntries: low.get(bank.id) ?? 0,
+      isCard: Boolean(bank.isCard),
     });
   }
   return out.sort(

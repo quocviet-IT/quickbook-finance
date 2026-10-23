@@ -51,6 +51,8 @@ export interface UnbankedRef {
    * form away; anything else can only be fixed in the file or in the chart.
    */
   canBeBanked: boolean;
+  /** A credit card (2.45): added under Banking as a card, with no bank detail to ask. */
+  isCard?: boolean;
 }
 
 export interface ImportPreflight {
@@ -236,6 +238,7 @@ export async function importPreflight(
         // Banking will never list anything else, so telling somebody to go
         // there is a wasted trip they cannot tell apart from a real one.
         canBeBanked: account?.account_type === "bank" || account?.account_type === "credit_card",
+        isCard: account?.account_type === "credit_card",
       });
     }
   }

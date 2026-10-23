@@ -10,6 +10,7 @@ import {
   type ReversalPair,
   type StatementAlerts,
 } from "@/lib/domain/statement-alerts";
+import { isCardAccountType } from "@/lib/domain/card-account";
 import { readAllPages, type PageResult } from "@/lib/services/paging";
 import { getLedgerBalances, getTransactionList } from "@/lib/services/reports";
 
@@ -34,19 +35,26 @@ export interface AlertBankAccount {
   id: string;
   accountId: string;
   name: string;
+  /** A credit card (2.45): it owes, so it is never "below zero". */
+  isCard: boolean;
 }
 
 type BankRow = {
   id: string;
   account_id: string;
   bank_name: string;
-  acc_account: { name?: string } | null;
+  acc_account: { name?: string; account_type?: string } | null;
 };
 
-const BANK_COLUMNS = "id,account_id,bank_name,acc_account(name)";
+const BANK_COLUMNS = "id,account_id,bank_name,acc_account(name,account_type)";
 
 function bankFromRow(r: BankRow): AlertBankAccount {
-  return { id: r.id, accountId: r.account_id, name: r.acc_account?.name || r.bank_name };
+  return {
+    id: r.id,
+    accountId: r.account_id,
+    name: r.acc_account?.name || r.bank_name,
+    isCard: isCardAccountType(r.acc_account?.account_type),
+  };
 }
 
 async function readBankAccount(sb: SupabaseClient, bankAccountId: string): Promise<AlertBankAccount> {
@@ -262,11 +270,11 @@ async function readBankLines(
 export async function getBankAccountLines(
   sb: SupabaseClient,
   bankAccountId: string,
-): Promise<{ lines: BankLine[]; last: LastStatement | null }> {
+): Promise<{ lines: BankLine[]; last: LastStatement | null; isCard: boolean }> {
   const bank = await readBankAccount(sb, bankAccountId);
   const [labels, last, pairs] = await Promise.all([readLabels(sb), readLastStatements(sb, bank.id), readReversalPairs(sb)]);
   const { lines } = await readBankLines(sb, bank, null, labels);
-  return { lines: withoutReversedPairs(lines, pairs), last: last.get(bank.id) ?? null };
+  return { lines: withoutReversedPairs(lines, pairs), last: last.get(bank.id) ?? null, isCard: bank.isCard };
 }
 
 /**
@@ -319,8 +327,8 @@ export async function getBankLinesSince(
 
 /** Both alerts for one bank account. Throws if any read fails. */
 export async function getStatementAlerts(sb: SupabaseClient, bankAccountId: string): Promise<StatementAlerts> {
-  const { lines, last } = await getBankAccountLines(sb, bankAccountId);
-  return statementAlerts(lines, last);
+  const { lines, last, isCard } = await getBankAccountLines(sb, bankAccountId);
+  return statementAlerts(lines, last, isCard);
 }
 
 /**
@@ -346,7 +354,7 @@ export async function getAllStatementAlerts(sb: SupabaseClient): Promise<BankAcc
   for (const [i, bank] of banks.entries()) {
     const cleared = await readClearedLineIds(sb, bank.id);
     const lines = withoutReversedPairs(toBankLines(allRows[i], bank.accountId, cleared, names, labels), pairs);
-    const found = statementAlerts(lines, last.get(bank.id) ?? null);
+    const found = statementAlerts(lines, last.get(bank.id) ?? null, bank.isCard);
     out.push({ bankAccountId: bank.id, accountName: bank.name, ghosts: found.ghosts, negative: found.negative });
   }
   return out;
@@ -419,7 +427,8 @@ export async function removeBalanceEntries(
 export async function getBelowZeroBankAccounts(sb: SupabaseClient, asOf: string): Promise<BelowZeroAccount[]> {
   const [banks, balances] = await Promise.all([readBankAccounts(sb), getLedgerBalances(sb, null, asOf)]);
   const byAccount = new Map(balances.map((b) => [b.accountId, b.debitBase - b.creditBase]));
-  const negative = banks.filter((b) => (byAccount.get(b.accountId) ?? 0) < 0);
+  // A credit card owes: below zero is its nature, never a warning (2.45).
+  const negative = banks.filter((b) => !b.isCard && (byAccount.get(b.accountId) ?? 0) < 0);
   return Promise.all(
     negative.map(async (bank) => {
       const found = await getStatementAlerts(sb, bank.id);

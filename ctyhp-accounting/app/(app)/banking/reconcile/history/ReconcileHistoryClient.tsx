@@ -7,6 +7,7 @@ import DataTable from "@/components/ui/DataTable";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { ToneBadge } from "@/lib/design/tone";
 import { toMinor } from "@/lib/domain/money";
+import { shown, stored } from "@/lib/domain/card-account";
 import {
   OPEN_IN_PROGRESS,
   STATEMENT_BALANCE_ON,
@@ -108,7 +109,10 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
     };
   }, [chosenId, throughIso, message]);
 
-  const shownPreview = preview && preview.key === previewKey ? preview.data : null;
+  // A credit card's books and the balance typed are as its statement prints them (2.45).
+  const side = chosen?.side ?? "bank";
+  const rawPreview = preview && preview.key === previewKey ? preview.data : null;
+  const shownPreview = rawPreview ? { ...rawPreview, bookBalanceMinor: shown(rawPreview.bookBalanceMinor, side) } : null;
   const balanceMinor = balance === null ? null : toMinor(balance, baseDecimals);
   const advice =
     chosen && chosen.state === "never" && throughIso && balanceMinor !== null && shownPreview
@@ -130,20 +134,21 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
    * click until the dialog closes, so a second click cannot send it twice, and
    * a success clears the form at once: the offer goes with it.
    */
-  function bringForward(account: HistoryAccount, date: string, statementMinor: number, shown: HistoryAdvice) {
-    if (!shown.action || bringing) return;
+  function bringForward(account: HistoryAccount, date: string, statementMinor: number, offer: HistoryAdvice) {
+    if (!offer.action || bringing) return;
     setBringing(true);
     modal.confirm({
-      title: `${shown.action}?`,
-      content: bringHistoryForwardConfirmation(shown.entries, date),
-      okText: shown.action,
+      title: `${offer.action}?`,
+      content: bringHistoryForwardConfirmation(offer.entries, date),
+      okText: offer.action,
       cancelText: "Cancel",
       afterClose: () => setBringing(false),
       onOk: async () => {
         const r = await bringHistoryForwardAction({
           bank_account_id: account.bankAccountId,
           through: date,
-          balance_minor: statementMinor,
+          // Typed as the statement prints it; the books keep a card's balance owed negative.
+          balance_minor: stored(statementMinor, account.side),
         });
         if (!r.ok || !r.data) {
           message.error(r.error ?? "The history could not be brought forward");

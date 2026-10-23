@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
+import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
 import { toMinor } from "@/lib/domain/money";
+import { BALANCE_WORDS, cardStanding, shown, stored, type BalanceSide } from "@/lib/domain/card-account";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
@@ -24,6 +25,8 @@ interface Bank {
   label: string;
   /** The ledger account's name, which the statement alerts call the account by. */
   name: string;
+  /** A credit card (2.45) is shown as its statement prints it: what is owed. */
+  side: BalanceSide;
 }
 interface Props {
   canWrite: boolean;
@@ -94,6 +97,9 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
 
   // The card is a sentence, read beside the Balance Sheet's: money with its currency, as there.
   const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
+  // A credit card's figures as its statement prints them (2.45).
+  const side: BalanceSide = bank?.side ?? "bank";
+  const words = BALANCE_WORDS[side];
 
   // Finished reading and none found: the card is the empty state. While either
   // read runs the table keeps its loading state, so neither "No data" nor a
@@ -114,7 +120,8 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
     const r = await createReconciliationAction({
       bank_account_id: bankId,
       statement_ending_date: v.ending_date.format("YYYY-MM-DD"),
-      statement_ending_balance_minor: toMinor(v.ending_balance ?? 0, baseDecimals),
+      // Typed as the statement prints it; a card's balance owed is kept negative.
+      statement_ending_balance_minor: stored(toMinor(v.ending_balance ?? 0, baseDecimals), side),
     });
     if (r.ok) {
       message.success("Reconciliation started");
@@ -153,9 +160,12 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
         actions={
           canWrite ? (
             <>
-              <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
-                From statement files
-              </Button>
+              {/* A card is reconciled one statement at a time (2.45): its PDFs are not read yet. */}
+              {side === "bank" ? (
+                <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
+                  From statement files
+                </Button>
+              ) : null}
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!bankId}>
                 New reconciliation
               </Button>
@@ -183,14 +193,21 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
           onRemoved={() => void load(bank.id)}
         />
       ) : null}
+      {bank && words.note ? <Typography.Text type="secondary">{words.note}</Typography.Text> : null}
       {bank ? (
-        <StandingCard accountName={bank.name} standing={standing?.bankAccountId === bank.id ? standing : null} today={today} money={money} empty={isEmpty}>
+        <StandingCard
+          accountName={bank.name}
+          standing={standing?.bankAccountId === bank.id ? cardStanding(standing, side) : null}
+          today={today}
+          money={money}
+          empty={isEmpty}
+        >
           {canWrite && (
             <Button type="primary" onClick={() => setOpen(true)} disabled={!bankId}>
               New reconciliation
             </Button>
           )}
-          {canWrite && (
+          {canWrite && side === "bank" && (
             <Button onClick={() => router.push(`/banking/reconcile/from-files?account=${bankId}`)} disabled={!bankId}>
               From statement files
             </Button>
@@ -205,8 +222,8 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
           locale={{ emptyText: <TableEmpty loading={tableLoading} title="No reconciliations yet" /> }}
           columns={[
             { title: "Ending date", dataIndex: "statement_ending_date", render: (value: string) => formatDate(value) },
-            { title: "Beginning", align: "right", render: (_, r) => money(r.beginning_balance_minor) },
-            { title: "Statement ending", align: "right", render: (_, r) => money(r.statement_ending_balance_minor) },
+            { title: words.beginning, align: "right", render: (_, r) => money(shown(Number(r.beginning_balance_minor), side)) },
+            { title: words.ending, align: "right", render: (_, r) => money(shown(Number(r.statement_ending_balance_minor), side)) },
             { title: "Statement", render: (_, r) => r.statement_ref ?? "—" },
             {
               title: "Status",
@@ -243,7 +260,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
           <Form.Item name="ending_date" label="Statement ending date" rules={[{ required: true }]}>
             <DatePicker />
           </Form.Item>
-          <Form.Item name="ending_balance" label="Statement ending balance" rules={[{ required: true }]}>
+          <Form.Item name="ending_balance" label={words.endingInput} rules={[{ required: true }]}>
             <InputNumber style={{ width: 200 }} precision={baseDecimals} />
           </Form.Item>
         </Form>

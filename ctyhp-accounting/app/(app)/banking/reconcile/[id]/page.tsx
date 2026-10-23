@@ -9,6 +9,7 @@ import { listCurrencies } from "@/lib/services/reference";
 import { readReconciliationOverrides } from "@/lib/services/override-notices";
 import { formatMoney } from "@/lib/format";
 import { statementFileAccount } from "@/lib/domain/statement-evidence";
+import { balanceSideOf } from "@/lib/domain/card-account";
 import PageHeader from "@/components/PageHeader";
 import ReconcileWorkspaceClient from "./ReconcileWorkspaceClient";
 
@@ -64,6 +65,8 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
           maskedNumber: bank?.account_number_masked ?? null,
           decimals: base?.decimal_places ?? 2,
           currencyCode: bank?.currency_code ?? base?.code ?? "USD",
+          // A credit card (2.45) is shown as its statement prints it.
+          side: balanceSideOf(bank?.account_type),
         }}
         fileAccount={bank ? statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked) : "Bank account"}
       />

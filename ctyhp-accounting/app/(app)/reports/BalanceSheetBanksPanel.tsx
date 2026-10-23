@@ -5,6 +5,7 @@ import { Button } from "antd";
 import { ToneBadge } from "@/lib/design/tone";
 import {
   describeStanding,
+  bankPanelHeading,
   ghostEntriesSentence,
   withBelowZero,
   type BalanceSheetBank,
@@ -50,7 +51,7 @@ export default function BalanceSheetBanksPanel({
   return (
     <section className={styles.panel} aria-labelledby="balance-sheet-banks-heading">
       <h2 id="balance-sheet-banks-heading" className={styles.heading}>
-        {cashLines.length > 0 ? "Bank and cash accounts" : "Bank accounts"}
+        {bankPanelHeading(cashLines.length > 0, banks.some((bank) => bank.isCard))}
       </h2>
       <ul className={styles.list}>
         {banks.map((bank) => {

@@ -12,6 +12,8 @@ import { statementLineHashes } from "@/lib/domain/banking-import";
 import type { StatementProofPayload } from "@/lib/domain/statement-proof";
 import { BANK_LINE_SOURCES, otherSourceLines, type BankLineOn, type BankLineSource } from "@/lib/domain/statement-repeats";
 import { statementDays } from "@/lib/domain/statement-line-keys";
+import { BANK_DETAIL_TYPES } from "@/lib/domain/bank-account-detail";
+import { isCardAccountType } from "@/lib/domain/card-account";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -37,19 +39,33 @@ export class BankingError extends Error {}
 export interface BankAccountWithGl extends BankAccountRow {
   account_code: string;
   account_name: string;
+  /** The ledger account's type: "bank", or (2.45) "credit_card" for a card. */
+  account_type: string;
 }
 
 export async function listBankAccounts(sb: SupabaseClient): Promise<BankAccountWithGl[]> {
   const { data, error } = await sb
     .from("acc_bank_account")
-    .select("id,account_id,bank_name,account_number_masked,currency_code,created_at,acc_account(account_code,name)")
+    .select("id,account_id,bank_name,account_number_masked,currency_code,created_at,acc_account(account_code,name,account_type)")
     .order("created_at");
   if (error) throw new BankingError(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     ...(r as unknown as BankAccountRow),
     account_code: (r.acc_account as { account_code?: string } | null)?.account_code ?? "",
     account_name: (r.acc_account as { name?: string } | null)?.name ?? "",
+    account_type: (r.acc_account as { account_type?: string } | null)?.account_type ?? "bank",
   }));
+}
+
+/** Whether a bank account is a credit card (2.45): its ledger account is Credit Card-type. */
+export async function isCardBankAccount(sb: SupabaseClient, bankAccountId: string): Promise<boolean> {
+  const { data, error } = await sb
+    .from("acc_bank_account")
+    .select("id,acc_account(account_type)")
+    .eq("id", bankAccountId)
+    .maybeSingle();
+  if (error) throw new BankingError(error.message);
+  return isCardAccountType((data as { acc_account?: { account_type?: string } | null } | null)?.acc_account?.account_type);
 }
 
 /**
@@ -85,7 +101,8 @@ export async function createBankAccount(
     .single();
   if (error) throw new BankingError(error.message);
 
-  if (input.detail_type) {
+  // Only a Bank-type detail classifies the ledger account: a credit card (2.45) has none to give.
+  if (input.detail_type && (BANK_DETAIL_TYPES as readonly string[]).includes(input.detail_type)) {
     const { error: classifyError } = await sb
       .from("acc_account")
       .update({ detail_type: input.detail_type })

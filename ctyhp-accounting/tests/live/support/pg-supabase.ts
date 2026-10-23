@@ -63,28 +63,41 @@ async function foreignKey(run: Run, base: string, other: string): Promise<{ many
   return { manyToOne: Boolean(rows[0].base_holds), column: rows[0].col as string, refColumn: rows[0].ref as string };
 }
 
-async function selectList(run: Run, table: string, columns: string): Promise<string> {
+/** An embedded relation: how its rows meet the base row, and whether `!inner` asks that one exists. */
+interface Relation {
+  table: string;
+  join: string;
+  inner: boolean;
+}
+
+async function selectList(run: Run, table: string, columns: string): Promise<{ list: string; relations: Map<string, Relation> }> {
   const out: string[] = [];
+  const relations = new Map<string, Relation>();
   for (const part of selectParts(columns)) {
     if (part === "*") {
       out.push("t.*");
       continue;
     }
-    const embed = /^(?:([a-z_][a-z0-9_]*):)?([a-z_][a-z0-9_]*)\(([^()]*)\)$/.exec(part);
+    const embed = /^(?:([a-z_][a-z0-9_]*):)?([a-z_][a-z0-9_]*)(?:!([a-z_]+))?\(([^()]*)\)$/.exec(part);
     if (!embed) {
       out.push(`t.${name(part)}`);
       continue;
     }
-    const [, alias, other, inner] = embed;
+    const [, alias, other, hint, inner] = embed;
+    if (hint && hint !== "inner") throw new Error(`pg-supabase: the embed hint !${hint} is not answered`);
     const fields = inner.split(",").map((c) => `'${c.trim()}', e.${name(c)}`).join(", ");
     const key = await foreignKey(run, table, other);
+    const join = key.manyToOne
+      ? `e.${name(key.refColumn)} = t.${name(key.column)}`
+      : `e.${name(key.column)} = t.${name(key.refColumn)}`;
+    relations.set(alias ?? other, { table: other, join, inner: hint === "inner" });
     out.push(
       key.manyToOne
-        ? `(select json_build_object(${fields}) from ${name(other)} e where e.${name(key.refColumn)} = t.${name(key.column)}) as ${name(alias ?? other)}`
-        : `(select coalesce(json_agg(json_build_object(${fields})), '[]'::json) from ${name(other)} e where e.${name(key.column)} = t.${name(key.refColumn)}) as ${name(alias ?? other)}`,
+        ? `(select json_build_object(${fields}) from ${name(other)} e where ${join}) as ${name(alias ?? other)}`
+        : `(select coalesce(json_agg(json_build_object(${fields})), '[]'::json) from ${name(other)} e where ${join}) as ${name(alias ?? other)}`,
     );
   }
-  return out.join(", ");
+  return { list: out.join(", "), relations };
 }
 
 /** A value as an argument of the type the function declares: json goes as text, cast. */
@@ -96,6 +109,8 @@ function argument(value: unknown, type: string, params: unknown[]): string {
 
 class Query implements PromiseLike<Answer> {
   private filters: string[] = [];
+  /** Filters on an embedded relation's column ("acc_journal_entry.status"): they keep only the rows it has a match for. */
+  private embedFilters: { relation: string; condition: string }[] = [];
   private params: unknown[] = [];
   private orders: string[] = [];
   private window: { offset: number; limit: number | null } = { offset: 0, limit: null };
@@ -107,13 +122,31 @@ class Query implements PromiseLike<Answer> {
     private readonly source: { table: string } | { rpc: string; args: Record<string, unknown> },
   ) {}
 
+  /** A write: the row(s) to insert, or the columns to set on the rows the filters keep. */
+  private write: { kind: "insert"; rows: Record<string, unknown>[] } | { kind: "update"; values: Record<string, unknown> } | null = null;
+
   select(columns = "*") {
     this.columns = columns;
     return this;
   }
+  insert(rows: Record<string, unknown> | Record<string, unknown>[]) {
+    this.write = { kind: "insert", rows: Array.isArray(rows) ? rows : [rows] };
+    return this;
+  }
+  update(values: Record<string, unknown>) {
+    this.write = { kind: "update", values };
+    return this;
+  }
   private filter(column: string, op: string, value: unknown) {
     this.params.push(value);
-    this.filters.push(`t.${name(column)} ${op} $${this.params.length}`);
+    const [relation, field] = column.includes(".") ? column.split(".") : [null, column];
+    if (relation) this.embedFilters.push({ relation, condition: `e.${name(field)} ${op} $${this.params.length}` });
+    else this.filters.push(`t.${name(column)} ${op} $${this.params.length}`);
+    return this;
+  }
+  not(column: string, op: string, value: unknown) {
+    if (op !== "is" || value !== null) throw new Error(`pg-supabase: not(${column}, ${op}) is not answered`);
+    this.filters.push(`t.${name(column)} is not null`);
     return this;
   }
   eq(column: string, value: unknown) {
@@ -158,10 +191,21 @@ class Query implements PromiseLike<Answer> {
   private async answer(): Promise<Answer> {
     try {
       if ("rpc" in this.source) return await this.callRpc(this.source.rpc, this.source.args);
+      if (this.write) return await this.answerWrite(this.source.table, this.write);
       const from = `${name(this.source.table)} t`;
+      const { list, relations } = await selectList(this.run, this.source.table, this.columns);
+      // An `!inner` embed, or one a filter names, keeps only the rows it has a match for.
+      const exists = [...relations].flatMap(([key, relation]) => {
+        const conditions = this.embedFilters.filter((f) => f.relation === key).map((f) => f.condition);
+        if (!relation.inner && conditions.length === 0) return [];
+        return [`exists (select 1 from ${name(relation.table)} e where ${[relation.join, ...conditions].join(" and ")})`];
+      });
+      const unknown = this.embedFilters.find((f) => !relations.has(f.relation));
+      if (unknown) throw new Error(`pg-supabase: a filter names ${unknown.relation}, which is not embedded`);
+      const where = [...this.filters, ...exists];
       const sql =
-        `select ${await selectList(this.run, this.source.table, this.columns)} from ${from}` +
-        (this.filters.length ? ` where ${this.filters.join(" and ")}` : "") +
+        `select ${list} from ${from}` +
+        (where.length ? ` where ${where.join(" and ")}` : "") +
         (this.orders.length ? ` order by ${this.orders.join(", ")}` : "") +
         (this.window.limit !== null ? ` limit ${this.window.limit}` : "") +
         (this.window.offset ? ` offset ${this.window.offset}` : "");
@@ -170,6 +214,32 @@ class Query implements PromiseLike<Answer> {
     } catch (e) {
       return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
     }
+  }
+
+  /** An insert of plain columns, or an update of the rows the plain filters keep; returns what `select` named. */
+  private async answerWrite(
+    table: string,
+    write: { kind: "insert"; rows: Record<string, unknown>[] } | { kind: "update"; values: Record<string, unknown> },
+  ): Promise<Answer> {
+    if (this.embedFilters.length) throw new Error("pg-supabase: a write cannot filter on an embedded relation");
+    const returning = this.columns === "*" ? "*" : selectParts(this.columns).map(name).join(", ");
+    const params = [...this.params];
+    const value = (v: unknown) => {
+      params.push(v !== null && typeof v === "object" && !(v instanceof Date) ? JSON.stringify(v) : v);
+      return `$${params.length}`;
+    };
+    let sql: string;
+    if (write.kind === "insert") {
+      const columns = Object.keys(write.rows[0] ?? {});
+      if (!columns.length) throw new Error("pg-supabase: nothing to insert");
+      const tuples = write.rows.map((row) => `(${columns.map((c) => value(row[c] ?? null)).join(", ")})`).join(", ");
+      sql = `insert into ${name(table)} (${columns.map(name).join(", ")}) values ${tuples} returning ${returning}`;
+    } else {
+      const sets = Object.entries(write.values).map(([c, v]) => `${name(c)} = ${value(v)}`).join(", ");
+      sql = `update ${name(table)} as t set ${sets}${this.filters.length ? ` where ${this.filters.join(" and ")}` : ""} returning ${returning}`;
+    }
+    const { rows } = await this.run(sql, params);
+    return this.shaped(rows);
   }
 
   private shaped(rows: unknown[]): Answer {

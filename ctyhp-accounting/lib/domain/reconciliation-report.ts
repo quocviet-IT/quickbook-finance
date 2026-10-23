@@ -13,6 +13,7 @@ import { fromMinor } from "./money";
 import { sourceLabel } from "./entry-detail";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { formatDate, plural } from "@/lib/format";
+import type { BalanceSide } from "./card-account";
 
 export interface ReconReportLine {
   journalLineId: string;
@@ -41,7 +42,68 @@ export interface ReconReportInput {
   adjustmentReason: string | null;
   /** How it was signed off, when the reconciliation says (brought forward, a run of statements). */
   note: string | null;
+  /**
+   * A credit card (2.45): every figure above already as its statement prints it
+   * — charges and the balance owed positive — and the report worded for a card.
+   */
+  side?: BalanceSide;
 }
+
+/** What the report calls each half's lines and balances, for a bank account or a card. */
+interface ReportWords {
+  in: string;
+  out: string;
+  outstandingIn: string;
+  outstandingOut: string;
+  clearedInNote: string;
+  outstandingInNote: (date: string) => string;
+  outstandingOutNote: (date: string) => string;
+  clearedInRow: string;
+  clearedOutRow: string;
+  outstandingInRow: string;
+  outstandingOutRow: string;
+  opening: string;
+  closing: string;
+  books: (date: string) => string;
+  unseen: string;
+}
+
+const REPORT_WORDS: Record<BalanceSide, ReportWords> = {
+  bank: {
+    in: "Cleared deposits and other credits",
+    out: "Cleared payments and checks",
+    outstandingIn: "Deposits in the books, not yet on the statement",
+    outstandingOut: "Payments in the books, not yet on the statement",
+    clearedInNote: "On the statement and confirmed by the bank.",
+    outstandingInNote: (date) => `Money paid in that the bank had not credited by ${date}.`,
+    outstandingOutNote: (date) => `Checks written and payments made that had not been presented by ${date}.`,
+    clearedInRow: "Deposits and other credits cleared",
+    clearedOutRow: "Payments and checks cleared",
+    outstandingInRow: "Deposits not yet on the statement",
+    outstandingOutRow: "Payments not yet on the statement",
+    opening: "Statement opening balance",
+    closing: "Statement closing balance",
+    books: (date) => `Balance in the books at ${date}`,
+    unseen: "plus the deposits and less the payments the bank had not yet seen",
+  },
+  card: {
+    in: "Cleared charges",
+    out: "Cleared payments and credits",
+    outstandingIn: "Charges in the books, not yet on the statement",
+    outstandingOut: "Payments and credits in the books, not yet on the statement",
+    clearedInNote: "On the statement and confirmed by the card issuer.",
+    outstandingInNote: (date) => `Charges in the books that the card issuer had not posted by ${date}.`,
+    outstandingOutNote: (date) => `Payments and credits in the books that the card issuer had not posted by ${date}.`,
+    clearedInRow: "Charges cleared",
+    clearedOutRow: "Payments and credits cleared",
+    outstandingInRow: "Charges not yet on the statement",
+    outstandingOutRow: "Payments and credits not yet on the statement",
+    opening: "Previous balance owed",
+    closing: "New balance owed",
+    books: (date) => `Balance owed in the books at ${date}`,
+    unseen: "plus the charges and less the payments and credits the card issuer had not yet posted",
+  },
+};
 
 export type ReconReportSectionKey = "cleared-in" | "cleared-out" | "outstanding-in" | "outstanding-out";
 
@@ -80,21 +142,12 @@ export function buildReconciliationReport(input: ReconReportInput): ReconReport 
     lines,
     totalMinor: sum(lines),
   });
+  const words = REPORT_WORDS[input.side ?? "bank"];
   const sections = [
-    section("cleared-in", "Cleared deposits and other credits", "On the statement and confirmed by the bank.", pick(true, true)),
-    section("cleared-out", "Cleared payments and checks", null, pick(true, false)),
-    section(
-      "outstanding-in",
-      "Deposits in the books, not yet on the statement",
-      `Money paid in that the bank had not credited by ${date}.`,
-      pick(false, true),
-    ),
-    section(
-      "outstanding-out",
-      "Payments in the books, not yet on the statement",
-      `Checks written and payments made that had not been presented by ${date}.`,
-      pick(false, false),
-    ),
+    section("cleared-in", words.in, words.clearedInNote, pick(true, true)),
+    section("cleared-out", words.out, null, pick(true, false)),
+    section("outstanding-in", words.outstandingIn, words.outstandingInNote(date), pick(false, true)),
+    section("outstanding-out", words.outstandingOut, words.outstandingOutNote(date), pick(false, false)),
   ];
   const [clearedIn, clearedOut, outstandingIn, outstandingOut] = sections;
   const clearedBalanceMinor = input.beginningMinor + clearedIn.totalMinor + clearedOut.totalMinor;
@@ -127,6 +180,7 @@ export interface ReconSummaryRow {
 /** The bridge, top to bottom: the bank's side, then the books'. */
 export function reconciliationSummaryRows(report: ReconReport, input: ReconReportInput): ReconSummaryRow[] {
   const [clearedIn, clearedOut, outstandingIn, outstandingOut] = report.sections;
+  const words = REPORT_WORDS[input.side ?? "bank"];
   const row = (key: string, label: string, amountMinor: number, kind: ReconSummaryRow["kind"], indent: boolean, gapBefore = false): ReconSummaryRow => ({
     key,
     label,
@@ -136,10 +190,10 @@ export function reconciliationSummaryRows(report: ReconReport, input: ReconRepor
     gapBefore,
   });
   return [
-    row("opening", "Statement opening balance", input.beginningMinor, "line", false),
-    row("cleared-in", `Deposits and other credits cleared (${clearedIn.lines.length})`, clearedIn.totalMinor, "line", true),
-    row("cleared-out", `Payments and checks cleared (${clearedOut.lines.length})`, clearedOut.totalMinor, "line", true),
-    row("closing", "Statement closing balance", input.statementEndingMinor, "total", false),
+    row("opening", words.opening, input.beginningMinor, "line", false),
+    row("cleared-in", `${words.clearedInRow} (${clearedIn.lines.length})`, clearedIn.totalMinor, "line", true),
+    row("cleared-out", `${words.clearedOutRow} (${clearedOut.lines.length})`, clearedOut.totalMinor, "line", true),
+    row("closing", words.closing, input.statementEndingMinor, "total", false),
     ...(report.statementAgrees
       ? []
       : [
@@ -151,9 +205,9 @@ export function reconciliationSummaryRows(report: ReconReport, input: ReconRepor
             true,
           ),
         ]),
-    row("outstanding-in", `Deposits not yet on the statement (${outstandingIn.lines.length})`, outstandingIn.totalMinor, "line", true, true),
-    row("outstanding-out", `Payments not yet on the statement (${outstandingOut.lines.length})`, outstandingOut.totalMinor, "line", true),
-    row("books", `Balance in the books at ${formatDate(input.statementDate)}`, report.bridgedBookMinor, "total", false),
+    row("outstanding-in", `${words.outstandingInRow} (${outstandingIn.lines.length})`, outstandingIn.totalMinor, "line", true, true),
+    row("outstanding-out", `${words.outstandingOutRow} (${outstandingOut.lines.length})`, outstandingOut.totalMinor, "line", true),
+    row("books", words.books(formatDate(input.statementDate)), report.bridgedBookMinor, "total", false),
     // The bridge says what the books should hold; when they hold something else, say what.
     ...(report.booksAgree
       ? []
@@ -179,7 +233,7 @@ export function reconciliationProof(
     };
   }
   const parts = [
-    `The statement closing balance of ${money(input.statementEndingMinor)}, plus the deposits and less the payments the bank had not yet seen, comes to ${money(report.bridgedBookMinor)}` +
+    `The statement closing balance of ${money(input.statementEndingMinor)}, ${REPORT_WORDS[input.side ?? "bank"].unseen}, comes to ${money(report.bridgedBookMinor)}` +
       (report.provesOut
         ? `, which is exactly the balance in the books on ${date}.`
         : !report.statementAgrees

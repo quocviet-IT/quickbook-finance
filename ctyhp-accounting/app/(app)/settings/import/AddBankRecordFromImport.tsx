@@ -48,7 +48,8 @@ export default function AddBankRecordFromImport({
         ? String(values.account_number_masked).trim()
         : null,
       currency_code: "USD",
-      detail_type: values.detail_type,
+      // A credit card (2.45) has no bank detail.
+      detail_type: target.isCard ? null : values.detail_type,
     });
     setBusy(false);
     if (!result.ok) {
@@ -63,7 +64,7 @@ export default function AddBankRecordFromImport({
   return (
     <Modal
       open={target !== null}
-      title="Add this bank account"
+      title={target?.isCard ? "Add this credit card" : "Add this bank account"}
       okText="Add"
       okButtonProps={{ loading: busy }}
       onOk={submit}
@@ -87,19 +88,21 @@ export default function AddBankRecordFromImport({
           description="Each row also writes a bank line, and the unique hash on that line is the only thing that stops a second import of the same file posting the same money twice."
         />
         <Form form={form} layout="vertical" initialValues={{ detail_type: "checking" }}>
-          <Form.Item
-            name="detail_type"
-            label="What kind of account is this?"
-            rules={[{ required: true, message: "Choose the kind of account" }]}
-            extra="Cash on hand is not offered: physical cash has no bank statement to import."
-          >
-            <Select
-              options={BANK_SETUP_DETAIL_TYPES.map((detail: BankDetailType) => ({
-                value: detail,
-                label: bankDetailLabel(detail),
-              }))}
-            />
-          </Form.Item>
+          {target?.isCard ? null : (
+            <Form.Item
+              name="detail_type"
+              label="What kind of account is this?"
+              rules={[{ required: true, message: "Choose the kind of account" }]}
+              extra="Cash on hand is not offered: physical cash has no bank statement to import."
+            >
+              <Select
+                options={BANK_SETUP_DETAIL_TYPES.map((detail: BankDetailType) => ({
+                  value: detail,
+                  label: bankDetailLabel(detail),
+                }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item
             name="bank_name"
             label="Bank name"

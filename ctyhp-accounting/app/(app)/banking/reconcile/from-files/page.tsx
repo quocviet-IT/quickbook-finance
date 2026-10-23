@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Alert } from "antd";
+import { CARD_FROM_FILES_NOT_READ, isCardAccountType } from "@/lib/domain/card-account";
 import { z } from "zod";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
@@ -53,6 +55,10 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
       <p>
         <Link href="/banking/reconcile">← Bank Reconciliation</Link>
       </p>
+      {/* A card's statements are not read from files yet (2.45); the action refuses one too. */}
+      {isCardAccountType(bank.account_type) ? (
+        <Alert type="info" showIcon title={CARD_FROM_FILES_NOT_READ} />
+      ) : (
       <FromFilesClient
         canWrite={canWrite(role)}
         bankAccount={{
@@ -65,6 +71,7 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
         fileAccount={statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked)}
         context={context}
       />
+      )}
     </div>
   );
 }

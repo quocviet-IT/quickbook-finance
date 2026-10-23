@@ -78,6 +78,16 @@ import {
   type HeldLine,
 } from "@/lib/domain/add-missing";
 import { bankLinesToCheck, completedMessage } from "@/lib/domain/statement-bank-lines";
+import {
+  BALANCE_WORDS,
+  cardAddPlan,
+  cardBookLines,
+  cardDetail,
+  cardHistoryFacts,
+  cardStatement,
+  stored,
+  type BalanceSide,
+} from "@/lib/domain/card-account";
 import AddMissingBox from "./AddMissingBox";
 import DifferenceAlert from "./DifferenceAlert";
 import { STATEMENT_LINE_WIDTH as SW } from "./statement-line-columns";
@@ -116,7 +126,15 @@ interface Props {
   offsetAccounts: Offset[];
   baseCurrency: string;
   baseDecimals: number;
-  bankAccount: { id: string; label: string; maskedNumber: string | null; decimals: number; currencyCode: string };
+  bankAccount: {
+    id: string;
+    label: string;
+    maskedNumber: string | null;
+    decimals: number;
+    currencyCode: string;
+    /** A credit card (2.45): every amount here is shown as its statement prints it. */
+    side?: BalanceSide;
+  };
   /** The account a kept statement file is named after: "Example Bank ****1183". */
   fileAccount: string;
 }
@@ -136,9 +154,18 @@ export default function ReconcileWorkspaceClient({
 }: Props) {
   const { message, modal } = App.useApp();
   const router = useRouter();
-  const [lines, setLines] = useState<ReconLineView[]>([]);
-  const [detail, setDetail] = useState<ReconDetail | null>(null);
-  const [statement, setStatement] = useState<ReconStatement | null>(null);
+  // What the server sends, the books' way round. A credit card (2.45) is shown
+  // as its statement prints it: the figures below are turned round once, here,
+  // so every helper that pairs, advises or explains works on figures that
+  // agree; whatever goes back to the server is turned back with `stored`.
+  const side: BalanceSide = bankAccount.side ?? "bank";
+  const words = BALANCE_WORDS[side];
+  const [rawLines, setLines] = useState<ReconLineView[]>([]);
+  const [rawDetail, setDetail] = useState<ReconDetail | null>(null);
+  const [rawStatement, setStatement] = useState<ReconStatement | null>(null);
+  const lines = useMemo(() => cardBookLines(rawLines, side), [rawLines, side]);
+  const detail = useMemo(() => (rawDetail ? cardDetail(rawDetail, side) : null), [rawDetail, side]);
+  const statement = useMemo(() => (rawStatement ? cardStatement(rawStatement, side) : null), [rawStatement, side]);
   const [loading, setLoading] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -159,7 +186,11 @@ export default function ReconcileWorkspaceClient({
   const [addingLine, setAddingLine] = useState<number | null>(null);
   const [asideLine, setAsideLine] = useState<number | null>(null);
   // What an offer to bring the account's history forward rests on (2.03); null when there is none.
-  const [historyFacts, setHistoryFacts] = useState<SessionHistoryFacts | null>(null);
+  const [rawHistoryFacts, setHistoryFacts] = useState<SessionHistoryFacts | null>(null);
+  const historyFacts = useMemo(
+    () => (rawHistoryFacts ? cardHistoryFacts(rawHistoryFacts, side) : null),
+    [rawHistoryFacts, side],
+  );
   // A button that writes is busy from its click until the screen has caught
   // up, so a second click cannot send it twice: bringing the history forward,
   // discarding and reopening while their dialog is open or their request runs,
@@ -251,7 +282,9 @@ export default function ReconcileWorkspaceClient({
   // Shown only for the lines it was worked out for: while the next plan is on
   // its way, the box waits rather than offering the last one.
   const shownPlan =
-    missingKey && working && addPlan && addPlan.key === missingKey && addPlan.plan.missing > 0 ? addPlan.plan : null;
+    missingKey && working && addPlan && addPlan.key === missingKey && addPlan.plan.missing > 0
+      ? cardAddPlan(addPlan.plan, side)
+      : null;
   // The lines the plan holds back as extra are marked in the statement lines table too.
   const extraLines = useMemo(() => extraLineNos(shownPlan), [shownPlan]);
 
@@ -586,6 +619,9 @@ export default function ReconcileWorkspaceClient({
    * differs.
    */
   async function attachStatement({ file, statement: pdf, lines: rows, aside, proof }: ConfirmedImport) {
+    // The file's lines come the books' way round: compared with the reconciliation as the server keeps it.
+    const statement = rawStatement;
+    const detail = rawDetail;
     if (!statement || !detail) return;
     const read = {
       to: pdf?.to ?? null,
@@ -661,8 +697,9 @@ export default function ReconcileWorkspaceClient({
     void load();
   }
 
+  /** `closingMinor` as shown; the server keeps it the books' way round. */
   async function takeClosing(closingMinor: number) {
-    const res = await setStatementEndingAction(reconciliationId, closingMinor);
+    const res = await setStatementEndingAction(reconciliationId, stored(closingMinor, side));
     if (res.ok) void load();
     else message.error(res.error ?? "Failed");
   }
@@ -671,15 +708,16 @@ export default function ReconcileWorkspaceClient({
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       {detail && (
         <Space size="large" wrap>
-          <Statistic title="Beginning" value={money(detail.beginningMinor)} />
+          <Statistic title={words.beginning} value={money(detail.beginningMinor)} />
           <Statistic title="Cleared" value={money(detail.clearedTotalMinor)} />
           <Statistic title="Reconciled balance" value={money(detail.reconciledBalanceMinor)} />
-          <Statistic title="Statement ending" value={money(detail.statementEndingMinor)} />
+          <Statistic title={words.ending} value={money(detail.statementEndingMinor)} />
           <Statistic title="Difference" value={money(detail.differenceMinor)} />
           <StatusTag status={detail.status} />
           {statement?.broughtForward ? <Tag color="purple">Brought forward</Tag> : null}
         </Space>
       )}
+      {words.note ? <Typography.Text type="secondary">{words.note}</Typography.Text> : null}
       <p><Link href={`/banking/reconcile/${reconciliationId}/report`}>View report</Link></p>
       {statement?.broughtForward && statement.note ? <Alert type="info" showIcon title={statement.note} /> : null}
       {!completed

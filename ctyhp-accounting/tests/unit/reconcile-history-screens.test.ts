@@ -558,7 +558,7 @@ describe("the Reconcile history page", () => {
 
   it("cannot send Bring forward twice, and clears the form at once when it is done", () => {
     const bring = body(client, "function bringForward(", "\n  }\n");
-    expect(bring).toContain("if (!shown.action || bringing) return;\n    setBringing(true);");
+    expect(bring).toContain("if (!offer.action || bringing) return;\n    setBringing(true);");
     expect(bring).toContain("afterClose: () => setBringing(false),");
     expect(bring.indexOf("setThrough(null);")).toBeGreaterThan(bring.indexOf("throw new Error(r.error);"));
     expect(bring.indexOf("setThrough(null);")).toBeLessThan(bring.indexOf("void load();"));
@@ -591,8 +591,10 @@ describe("the Reconcile history page", () => {
   it("offers Bring forward N entries only to a writer, on a match, after asking", () => {
     expect(client).toMatch(/advice\.action && canWrite && throughIso && balanceMinor !== null \? \(\s*<Button/);
     const bring = body(client, "function bringForward(", "\n  }\n");
-    expect(bring).toContain("content: bringHistoryForwardConfirmation(shown.entries, date)");
+    expect(bring).toContain("content: bringHistoryForwardConfirmation(offer.entries, date)");
     expect(bring).toContain("bringHistoryForwardAction({");
+    // A credit card's balance is typed as its statement prints it, and sent the books' way round (2.45).
+    expect(bring).toContain("balance_minor: stored(statementMinor, account.side),");
     expect(bring).toContain("historyBroughtForwardMessage(r.data.lines, date, rebased, money)");
   });
 

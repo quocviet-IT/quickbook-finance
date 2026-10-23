@@ -46,8 +46,13 @@ export default async function BankingPage({
   ]);
 
   const linkedIds = new Set(bankAccounts.map((b) => b.account_id));
+  // Bank-type accounts and (2.45) credit cards: a card's statement is imported and reconciled here too.
   const glBankAccounts = accounts.filter(
-    (a) => a.account_type === "bank" && a.is_posting_account && a.status === "active" && !linkedIds.has(a.id),
+    (a) =>
+      (a.account_type === "bank" || a.account_type === "credit_card") &&
+      a.is_posting_account &&
+      a.status === "active" &&
+      !linkedIds.has(a.id),
   );
   const plaid = plaidConfiguration();
 

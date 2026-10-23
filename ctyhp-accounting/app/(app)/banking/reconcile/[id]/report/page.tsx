@@ -9,6 +9,7 @@ import { reportPageContext } from "@/lib/services/report-context";
 import { formatDateInTimeZone, formatMoney } from "@/lib/format";
 import { readReconciliationOverrides } from "@/lib/services/override-notices";
 import { shortSha } from "@/lib/domain/statement-evidence";
+import { balanceSideOf, bankAccountLabel, shown } from "@/lib/domain/card-account";
 import PageHeader from "@/components/PageHeader";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import ReconciliationReportClient, { type ReportFact } from "./ReconciliationReportClient";
@@ -30,7 +31,11 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
       ? await readReconciliationOverrides(sb, id, header, money)
       : { settles: [], unavailable: false };
   const bank = banks.find((b) => b.id === header.bankAccountId);
-  const accountLabel = bank ? `${bank.bank_name || bank.account_name} · ${bank.account_code}` : "Bank account";
+  // A credit card (2.45) is reported as its statement prints it: what is owed.
+  const side = balanceSideOf(bank?.account_type);
+  const accountLabel = bank
+    ? bankAccountLabel(`${bank.bank_name || bank.account_name} · ${bank.account_code}`, side)
+    : "Bank account";
 
   // What the report rests on, said above its figures.
   const facts: ReportFact[] = [
@@ -45,8 +50,8 @@ export default async function ReconciliationReportPage({ params }: { params: Pro
             key: "statement",
             text:
               `Statement: ${header.fileName}` +
-              (header.openingMinor !== null ? ` · opens at ${money(header.openingMinor)}` : "") +
-              (header.closingMinor !== null ? ` · closes at ${money(header.closingMinor)}` : ""),
+              (header.openingMinor !== null ? ` · opens at ${money(shown(header.openingMinor, side))}` : "") +
+              (header.closingMinor !== null ? ` · closes at ${money(shown(header.closingMinor, side))}` : ""),
           },
         ]
       : []),

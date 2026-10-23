@@ -20,7 +20,8 @@ import {
   listReconciliations, getReconciliationDetail, completeReconciliation,
   BankRecError, type ReconStatement, type StatementFileInput,
 } from "@/lib/services/bankrec";
-import { generateSuggestions, importStatement, markLinesAlreadyHere } from "@/lib/services/banking";
+import { generateSuggestions, importStatement, isCardBankAccount, markLinesAlreadyHere } from "@/lib/services/banking";
+import { CARD_FROM_FILES_NOT_READ } from "@/lib/domain/card-account";
 import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } from "@/lib/services/add-missing";
 import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
@@ -194,6 +195,7 @@ export async function previewRunAction(raw: unknown): Promise<ActionResult<RunPr
     .sort((a, b) => (a.to < b.to ? -1 : a.to > b.to ? 1 : 0));
   try {
     const sb = await createSupabaseServerClient();
+    if (await isCardBankAccount(sb, bankAccountId)) return { ok: false, error: CARD_FROM_FILES_NOT_READ };
     const first = statements[0];
     const through = statements[statements.length - 1].to as string;
     const [openLines, reconciliations] = await Promise.all([
@@ -270,6 +272,8 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
   let startedId: string | null = null;
   try {
     const sb = await createSupabaseServerClient();
+    // A card is reconciled one statement at a time (2.45); the page says so, and a screen left open is refused here.
+    if (await isCardBankAccount(sb, input.bank_account_id)) return { ok: false, error: CARD_FROM_FILES_NOT_READ };
     if (input.kind === "bring_forward") {
       const id = await bringForward(
         sb,

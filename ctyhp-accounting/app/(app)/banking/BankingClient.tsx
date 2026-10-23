@@ -38,16 +38,17 @@ import DeleteBankLineModal, {
 } from "./DeleteBankLineModal";
 import BatchAssignAccountModal, { type BatchAssignTarget } from "./BatchAssignAccountModal";
 import { pruneSelection } from "@/lib/domain/bank-transaction-batch";
+import { balanceSideOf } from "@/lib/domain/card-account";
 import { importOnArrival } from "@/lib/domain/import-on-arrival";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import {
-  BANK_SETUP_DETAIL_TYPES,
-  bankDetailLabel,
+  BANK_SETUP_KINDS,
+  bankKindLabel,
   selectableBankLedgerAccounts,
   suggestBankLedgerAccount,
   suggestNewLedgerAccount,
-  type BankDetailType,
+  type BankAccountKind,
 } from "@/lib/domain/bank-account-detail";
 import { createAccountAction } from "@/app/(app)/accounts/actions";
 import type {
@@ -607,7 +608,7 @@ export default function BankingClient({
           description={
             glBankAccounts.length
               ? "Create the ledger bank account record before connecting a financial institution."
-              : "Create a Bank-type account in the Chart of Accounts first."
+              : "Create a Bank or Credit Card account in the Chart of Accounts first."
           }
           action={
             canWrite ? (
@@ -1011,6 +1012,7 @@ export default function BankingClient({
             maskedNumber: selected.account_number_masked,
             decimals: decimalPlaces,
             currencyCode: selected.currency_code,
+            side: balanceSideOf(selected.account_type),
           }}
           importing={busy === "import"}
           canOverride={canOverride}
@@ -1091,7 +1093,7 @@ function CreateAccountModal({
   currencies: CurrencyRow[];
 }) {
   const { message } = App.useApp();
-  const chosenDetail: BankDetailType | undefined = Form.useWatch("detail_type", form);
+  const chosenDetail: BankAccountKind | undefined = Form.useWatch("detail_type", form);
   const bankName: string | undefined = Form.useWatch("bank_name", form);
   const [created, setCreated] = useState<AccountRow[]>([]);
   const [creating, setCreating] = useState(false);
@@ -1119,7 +1121,7 @@ function CreateAccountModal({
     const res = await createAccountAction({
       account_code: proposal.account_code,
       name: proposal.name,
-      account_type: "bank",
+      account_type: proposal.account_type,
       detail_type: proposal.detail_type,
       currency_code: "USD",
       is_posting_account: true,
@@ -1134,7 +1136,7 @@ function CreateAccountModal({
       id: res.data.id,
       account_code: res.data.account_code,
       name: res.data.name,
-      account_type: "bank",
+      account_type: proposal.account_type,
       detail_type: proposal.detail_type,
       is_posting_account: true,
       status: "active",
@@ -1159,18 +1161,22 @@ function CreateAccountModal({
           name="detail_type"
           label="What kind of account is this?"
           rules={[{ required: true, message: "Choose the kind of account" }]}
-          extra="Cash on hand is not offered: physical cash has no bank statement to import."
+          extra={
+            chosenDetail === "credit_card"
+              ? "A credit card's transactions are imported, coded and reconciled here like a bank's; its balance owed stays a liability."
+              : "Cash on hand is not offered: physical cash has no bank statement to import."
+          }
         >
           <Select
-            placeholder="Checking, savings, money market…"
-            onChange={(value: BankDetailType) => {
+            placeholder="Checking, savings, money market, credit card…"
+            onChange={(value: BankAccountKind) => {
               // Suggest the ledger account that matches, when exactly one does.
               const suggestion = suggestBankLedgerAccount(glBankAccounts, value);
               form.setFieldValue("account_id", suggestion?.id);
             }}
-            options={BANK_SETUP_DETAIL_TYPES.map((detail) => ({
-              value: detail,
-              label: bankDetailLabel(detail),
+            options={BANK_SETUP_KINDS.map((kind) => ({
+              value: kind,
+              label: bankKindLabel(kind),
             }))}
           />
         </Form.Item>
@@ -1185,12 +1191,12 @@ function CreateAccountModal({
           }
         >
           <Select
-            placeholder="Select a Bank-type account"
+            placeholder={chosenDetail === "credit_card" ? "Select a Credit Card account" : "Select a Bank-type account"}
             notFoundContent="No matching ledger account"
             options={selectableAccounts.map((account) => ({
               value: account.id,
               label: `${account.account_code} — ${account.name}${
-                account.detail_type ? "" : " (unclassified)"
+                account.account_type === "bank" && !account.detail_type ? " (unclassified)" : ""
               }`,
             }))}
           />
@@ -1202,11 +1208,15 @@ function CreateAccountModal({
             style={{ marginBottom: 16 }}
             onClick={createLedgerAccount}
           >
-            + New ledger account for a {bankDetailLabel(chosenDetail).toLowerCase()}
+            + New ledger account for a {bankKindLabel(chosenDetail).toLowerCase()}
           </Button>
         ) : null}
-        <Form.Item name="bank_name" label="Bank name" rules={[{ required: true, message: "Enter the bank name" }]}>
-          <Input placeholder="e.g. First National Bank" />
+        <Form.Item
+          name="bank_name"
+          label={chosenDetail === "credit_card" ? "Card issuer" : "Bank name"}
+          rules={[{ required: true, message: chosenDetail === "credit_card" ? "Enter the card issuer" : "Enter the bank name" }]}
+        >
+          <Input placeholder={chosenDetail === "credit_card" ? "e.g. Chase" : "e.g. First National Bank"} />
         </Form.Item>
         <Form.Item name="account_number_masked" label="Account number (masked)">
           <Input placeholder="e.g. ****1234" />

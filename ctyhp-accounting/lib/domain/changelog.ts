@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.45",
+    date: "2026-10-23",
+    headline: "A credit card can be added under Banking: its transactions imported and coded in Bank Transactions, and its statements reconciled in Bank Reconciliation.",
+    changes: [
+      {
+        kind: "added",
+        title: "Credit cards in Bank Transactions and Bank Reconciliation",
+        detail:
+          "Add account under Banking now offers Credit card as a kind of account, attached to a Credit Card ledger account, or a new one created there. Its CSV, OFX or QFX statement is imported into Bank Transactions like a bank's, and each charge is coded to an expense, as the card's file signs it: a charge negative, a payment positive. A payment line on the card is matched to the entry the checking account already posted, so it is never coded twice. In Bank Reconciliation a card is shown the way its statement prints it: the balance owed and charges positive, payments and credits negative; the statement balance owed is typed as printed, and the reconciliation report reads in charges and payments. A card is never flagged as below zero, it stays out of the cash figures, and its purchases teach the coding suggestions.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "A card's PDF statements are not read yet",
+        detail:
+          "A card statement's PDF prints charges positive beside a summary block, so for a credit card the import dialog asks for the card's CSV (or OFX/QFX) with the previous and new balances typed, and Reconcile from statement files is not offered; a card is reconciled one statement at a time.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "2.44",
     date: "2026-10-23",
     headline: "Reconciling from statement files checks the statements against the books, and never imports or codes a line Bank Transactions already holds.",
