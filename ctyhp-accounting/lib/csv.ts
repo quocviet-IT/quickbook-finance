@@ -4,7 +4,7 @@
  * Column order, blank headers and repeated headers all survive, which keying by
  * header name cannot do — a report exported by another product has all three.
  */
-export function parseCsvGrid(text: string): string[][] {
+export function parseCsvGrid(text: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let field = "";
   let row: string[] = [];
@@ -25,7 +25,7 @@ export function parseCsvGrid(text: string): string[][] {
       }
     } else if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ",") {
+    } else if (ch === delimiter) {
       row.push(field);
       field = "";
     } else if (ch === "\n" || ch === "\r") {

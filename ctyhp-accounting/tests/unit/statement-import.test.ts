@@ -24,10 +24,21 @@ describe("normalizeStatementDate", () => {
     expect(normalizeStatementDate("31/07/2026")).toBe("2026-07-31");
   });
 
+  it("reads the design's other shapes: a month in words, dots, a two-digit year, an ISO stamp", () => {
+    expect(normalizeStatementDate("31 July 2026")).toBe("2026-07-31");
+    expect(normalizeStatementDate("31-Jul-26")).toBe("2026-07-31");
+    expect(normalizeStatementDate("Jul 31, 2026")).toBe("2026-07-31");
+    expect(normalizeStatementDate("31.07.2026", "dmy")).toBe("2026-07-31");
+    expect(normalizeStatementDate("7/31/26")).toBe("2026-07-31");
+    expect(normalizeStatementDate("2026-07-31T00:00:00")).toBe("2026-07-31");
+  });
+
   it("refuses what it cannot read rather than guessing", () => {
-    expect(normalizeStatementDate("31 July 2026")).toBeNull();
     expect(normalizeStatementDate("")).toBeNull();
     expect(normalizeStatementDate("13/13/2026")).toBeNull();
+    expect(normalizeStatementDate("July")).toBeNull();
+    expect(normalizeStatementDate("31 Smarch 2026")).toBeNull();
+    expect(normalizeStatementDate("2026-13-01")).toBeNull();
   });
 });
 
