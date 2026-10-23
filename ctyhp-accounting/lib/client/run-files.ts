@@ -5,12 +5,11 @@
  * read at all — comes back as one statement saying why, so the person sees
  * every file they chose.
  */
-import { parseCsv } from "@/lib/csv";
 import { rememberedColumns } from "@/lib/client/statement-columns";
 import { detectStatementFormat } from "@/lib/domain/statement-files";
+import { guessStatementColumns, readStatementCsv } from "@/lib/domain/statement-csv";
 import {
   detectDateOrder,
-  detectStatementColumns,
   parseStatementRows,
   statementColumnsComplete,
 } from "@/lib/domain/statement-import";
@@ -57,10 +56,10 @@ async function readFile(file: File, bank: RunBankAccount): Promise<RunStatement[
   if (verdict.format === "pdf") return readPdf(file, bank);
   if (verdict.format !== "csv") return [unreadable(file.name, "CSV", RUN_MESSAGES.noBalanceFormat)];
 
-  const records = parseCsv(text);
-  const headers = records.length ? Object.keys(records[0]) : [];
+  // Read as the import dialog reads it: a preamble set aside, a headless file read by its columns.
+  const { headers, records } = readStatementCsv(text);
   const remembered = rememberedColumns(bank.id, headers);
-  const columns = remembered?.columns ?? detectStatementColumns(headers).columns;
+  const columns = remembered?.columns ?? guessStatementColumns(headers, records);
   if (!statementColumnsComplete(columns)) return [unreadable(file.name, "CSV", COLUMNS_NOT_RECOGNIZED)];
   const dateOrder = remembered?.dateOrder ?? detectDateOrder(records.map((r) => (columns.date ? r[columns.date] ?? "" : "")));
   const { rows } = parseStatementRows(records, {

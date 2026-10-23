@@ -28,22 +28,48 @@ export interface StatementParseResult {
   skipped: number;
 }
 
-/** `2026-07-31`, `7/31/2026` and `31/07/2026` all reach the same day. */
+const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** A two-digit year as the approved design reads one: over 70 is the 1900s. */
+function fullYear(year: string): string {
+  if (year.length === 4) return year;
+  return Number(year) > 70 ? `19${year}` : `20${year}`;
+}
+
+function isoDay(year: string, month: number, day: number): string | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${fullYear(year)}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function monthOf(name: string): number {
+  return MONTH_NAMES.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+}
+
+/**
+ * `2026-07-31`, `7/31/2026`, `31/07/2026`, `31.07.26`, `31 Jul 2026` and
+ * `Jul 31, 2026` all reach the same day — the six shapes the approved design
+ * reads. A month written as a word is never in doubt; only all-number dates
+ * need the file's order.
+ */
 export function normalizeStatementDate(raw: string, order: "mdy" | "dmy" = "mdy"): string | null {
   const value = (raw ?? "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const iso = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T ])/);
+  if (iso) return isoDay(iso[1], Number(iso[2]), Number(iso[3]));
 
-  const slash = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (slash) {
-    const [, first, second, year] = slash;
+  const numeric = value.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+  if (numeric) {
+    const [, first, second, year] = numeric;
     // A value over 12 in the first position can only be a day, whatever the
     // chosen order says — that is the one case worth overriding.
     const dayFirst = order === "dmy" || Number(first) > 12;
-    const month = dayFirst ? second : first;
-    const day = dayFirst ? first : second;
-    if (Number(month) < 1 || Number(month) > 12 || Number(day) < 1 || Number(day) > 31) return null;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    return dayFirst ? isoDay(year, Number(second), Number(first)) : isoDay(year, Number(first), Number(second));
   }
+
+  const dayMonth = value.match(/^(\d{1,2})[ -]([A-Za-z]{3,})\.?,?[ -](\d{2}|\d{4})$/);
+  if (dayMonth && monthOf(dayMonth[2]) > 0) return isoDay(dayMonth[3], monthOf(dayMonth[2]), Number(dayMonth[1]));
+
+  const monthDay = value.match(/^([A-Za-z]{3,})\.?[ -](\d{1,2}),?[ -](\d{2}|\d{4})$/);
+  if (monthDay && monthOf(monthDay[1]) > 0) return isoDay(monthDay[3], monthOf(monthDay[1]), Number(monthDay[2]));
   return null;
 }
 
@@ -140,13 +166,17 @@ export function detectStatementColumns(headers: readonly string[]): { columns: S
  * With nothing to tell, month first — the US form, and the prototype's.
  */
 export function detectDateOrder(values: readonly string[]): DateOrder {
+  let dotted = false;
   for (const value of values) {
-    const parts = (value ?? "").trim().match(/^(\d{1,2})[/-](\d{1,2})[/-]\d{4}$/);
+    const parts = (value ?? "").trim().match(/^(\d{1,2})([/.-])(\d{1,2})[/.-](?:\d{2}|\d{4})$/);
     if (!parts) continue;
     if (Number(parts[1]) > 12) return "dmy";
-    if (Number(parts[2]) > 12) return "mdy";
+    if (Number(parts[3]) > 12) return "mdy";
+    if (parts[2] === ".") dotted = true;
   }
-  return "mdy";
+  // Dates written with dots (31.07.2026) are day first wherever they are
+  // written, so a file of them that never shows a day over 12 is still dmy.
+  return dotted ? "dmy" : "mdy";
 }
 
 /**
