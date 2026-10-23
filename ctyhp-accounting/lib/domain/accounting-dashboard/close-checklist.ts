@@ -271,6 +271,79 @@ export function bankReconciledStep(input: {
   return { ...base, status: "outstanding", evidence: parts.join(" ") };
 }
 
+/** One credit card kept under Banking, as the close reads it (2.47). */
+export interface CardCloseStanding {
+  /** "2010 Chase Ink" — the ledger account's code and name. */
+  label: string;
+  /** The statement ending date of its latest completed reconciliation. */
+  lastCompletedOn: string | null;
+  /** Its bank lines dated on or before the period end still unmatched. */
+  unmatchedCount: number;
+}
+
+/**
+ * The credit cards' own step (2.47). Checked card by card, because a card has
+ * its own statement: one card reconciled through the month says nothing about
+ * another. A card is a liability, not the bank, so it never passes or fails the
+ * bank's step — before 2.47 a card's reconciliation could make that step read
+ * reconciled while the checking account was not.
+ */
+export function cardsReconciledStep(input: {
+  periodEnd: string;
+  /** Null when the banking tables did not answer; empty when there is no card. */
+  cards: CardCloseStanding[] | null;
+}): CloseStep {
+  const base = {
+    key: "cards-reconciled",
+    title: "Credit cards are reconciled through the period end",
+    passCondition: `Every credit card has a completed reconciliation covering ${formatDate(input.periodEnd)}, and no card line before it is unmatched.`,
+    blocksClose: false,
+    href: "/banking/reconcile",
+    workKey: null,
+  };
+  if (input.cards === null) {
+    return { ...base, status: "unavailable", evidence: "The banking tables did not answer." };
+  }
+  if (input.cards.length === 0) {
+    return {
+      ...base,
+      status: "not-applicable",
+      evidence: "This company keeps no credit card under Banking.",
+    };
+  }
+  const behind = input.cards.filter(
+    (c) => c.lastCompletedOn === null || c.lastCompletedOn < input.periodEnd,
+  );
+  const unmatched = input.cards.reduce((sum, c) => sum + c.unmatchedCount, 0);
+  if (behind.length === 0 && unmatched === 0) {
+    return {
+      ...base,
+      status: "complete",
+      evidence:
+        input.cards.length === 1
+          ? `${input.cards[0].label} is reconciled through ${formatDate(input.cards[0].lastCompletedOn)}, with nothing unmatched on or before ${formatDate(input.periodEnd)}.`
+          : `All ${input.cards.length} cards are reconciled through ${formatDate(input.periodEnd)} or later, with nothing unmatched on or before it.`,
+    };
+  }
+  const parts: string[] = [];
+  if (behind.length > 0) {
+    const named = behind.map((c) =>
+      c.lastCompletedOn === null
+        ? `${c.label} (never reconciled)`
+        : `${c.label} (last statement ends ${formatDate(c.lastCompletedOn)})`,
+    );
+    parts.push(`Not reconciled through ${formatDate(input.periodEnd)}: ${named.join(", ")}.`);
+  } else {
+    parts.push(`Every card is reconciled through ${formatDate(input.periodEnd)}.`);
+  }
+  parts.push(
+    unmatched === 0
+      ? "Nothing is unmatched."
+      : `${plural(unmatched, "card line")} dated on or before ${formatDate(input.periodEnd)} ${pluralWord(unmatched, "is", "are")} still unmatched.`,
+  );
+  return { ...base, status: "outstanding", evidence: parts.join(" ") };
+}
+
 export function approvalsStep(input: {
   periodEnd: string;
   pendingCount: number | null;
