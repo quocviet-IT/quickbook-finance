@@ -56,25 +56,27 @@ describe("early payment discount over HTTPS", () => {
         .limit(1)
         .single();
 
-      const { data: bill, error: billError } = await sb
-        .from("acc_bill")
-        .insert({
-          vendor_id: vendorId,
-          bill_date: today,
-          currency_code: "USD",
-          memo: `${marker} discount test`,
-        })
-        .select("id")
-        .single();
-      expect(billError, billError?.message).toBeNull();
-      billId = (bill as { id: string }).id;
-
-      await sb.from("acc_bill_line").insert({
-        bill_id: billId,
-        description: `${marker} line`,
-        amount_minor: 100_000,
-        expense_account_id: (expenseAccount as { id: string }).id,
+      // Drafted through the function the Bills screen uses; since 0165 a
+      // session cannot write the bill tables directly.
+      const { data: drafted, error: billError } = await sb.rpc("acc_create_draft_bill", {
+        p_vendor_id: vendorId,
+        p_vendor_ref: null,
+        p_bill_date: today,
+        p_due_date: null,
+        p_currency: "USD",
+        p_memo: `${marker} discount test`,
+        p_lines: [
+          {
+            description: `${marker} line`,
+            amount_minor: 100_000,
+            expense_account_id: (expenseAccount as { id: string }).id,
+            item_id: null,
+          },
+        ],
+        p_recurring_run_id: null,
       });
+      expect(billError, billError?.message).toBeNull();
+      billId = String(drafted);
 
       const { error: postError } = await sb.rpc("acc_post_bill", { p_bill_id: billId });
       expect(postError, postError?.message).toBeNull();

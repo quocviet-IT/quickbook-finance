@@ -32,13 +32,17 @@ async function main() {
   const sub = round(2 * 15000) + round(1 * 5000); // 35000
   const taxAmt = round((30000 * Number(tax.rate_percent)) / 100) + round((5000 * Number(tax.rate_percent)) / 100);
   const total = sub + taxAmt;
-  const { data: inv } = await authed.from("acc_invoice").insert({
-    customer_id: cust.id, currency_code: "USD", subtotal_minor: sub, tax_total_minor: taxAmt, total_minor: total, balance_due_minor: total,
-  }).select("id").single();
-  await authed.from("acc_invoice_line").insert([
-    { invoice_id: inv.id, line_order: 0, description: "A", quantity: 2, unit_price_minor: 15000, income_account_id: sales, tax_code_id: tax.id, line_subtotal_minor: 30000, line_tax_minor: round(30000 * Number(tax.rate_percent) / 100), line_total_minor: 30000 + round(30000 * Number(tax.rate_percent) / 100) },
-    { invoice_id: inv.id, line_order: 1, description: "B", quantity: 1, unit_price_minor: 5000, income_account_id: sales, tax_code_id: tax.id, line_subtotal_minor: 5000, line_tax_minor: round(5000 * Number(tax.rate_percent) / 100), line_total_minor: 5000 + round(5000 * Number(tax.rate_percent) / 100) },
-  ]);
+  // Through the function the screen uses; the tables are read-only to a session since 0165.
+  const { data: invId, error: eInv } = await authed.rpc("acc_create_draft_invoice", {
+    p_customer_id: cust.id, p_issue_date: null, p_due_date: null, p_currency: "USD", p_memo: null,
+    p_lines: [
+      { description: "A", quantity: 2, unit_price_minor: 15000, income_account_id: sales, tax_code_id: tax.id, item_id: null },
+      { description: "B", quantity: 1, unit_price_minor: 5000, income_account_id: sales, tax_code_id: tax.id, item_id: null },
+    ],
+    p_recurring_run_id: null,
+  });
+  if (eInv) throw new Error("invoice: " + eInv.message);
+  const inv = { id: invId };
   await authed.rpc("acc_issue_invoice", { p_invoice_id: inv.id });
   await authed.rpc("acc_record_payment", {
     p_customer_id: cust.id, p_payment_date: "2026-07-15", p_currency: "USD", p_amount_minor: total,

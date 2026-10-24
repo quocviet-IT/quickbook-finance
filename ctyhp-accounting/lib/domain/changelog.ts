@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.54",
+    date: "2026-10-24",
+    headline: "Invoices, bills, payments, expenses and credits can be changed only by the steps that post them.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Sales and purchase documents can no longer be written around the books",
+        detail:
+          "A signed-in staff member could change an invoice, bill, payment, expense, credit memo, vendor credit, refund or write-off, or its lines, directly through the data interface, without going through Issue, Post, Pay or Void. The screens never did this, but such a change would not reach the journal, so Accounts Receivable or Payable could stop agreeing with the ledger. These documents are now read-only except through the steps that post them; everything on the screens works as before.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "2.53",
     date: "2026-10-24",
     headline: "Sales Receipts: a sale the customer pays for on the spot is recorded, and posted, in one step.",

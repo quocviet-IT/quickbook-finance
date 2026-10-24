@@ -48,16 +48,14 @@ async function main() {
   // Issue a taxed invoice
   const { data: cust, error: ec } = await authed.from("acc_customer").insert({ name: "E2E Tax Cust", currency_code: "USD" }).select("id").single();
   if (ec) throw new Error("customer: " + ec.message);
-  const { data: inv, error: e2 } = await authed.from("acc_invoice").insert({
-    customer_id: cust.id, currency_code: "USD",
-    subtotal_minor: sub, tax_total_minor: taxMinor, total_minor: sub + taxMinor, balance_due_minor: sub + taxMinor,
-  }).select("id,issue_date").single();
-  if (e2) throw new Error("invoice: " + e2.message);
-  const { error: e3 } = await authed.from("acc_invoice_line").insert({
-    invoice_id: inv.id, line_order: 0, description: "E2E", quantity: 1, unit_price_minor: sub,
-    income_account_id: income, tax_code_id: tax.id, line_subtotal_minor: sub, line_tax_minor: taxMinor, line_total_minor: sub + taxMinor,
+  // Through the function the screen uses; the tables are read-only to a session since 0165.
+  const { data: invId, error: e2 } = await authed.rpc("acc_create_draft_invoice", {
+    p_customer_id: cust.id, p_issue_date: null, p_due_date: null, p_currency: "USD", p_memo: null,
+    p_lines: [{ description: "E2E", quantity: 1, unit_price_minor: sub, income_account_id: income, tax_code_id: tax.id, item_id: null }],
+    p_recurring_run_id: null,
   });
-  if (e3) throw new Error("line: " + e3.message);
+  if (e2) throw new Error("invoice: " + e2.message);
+  const inv = (await db.query("select id, issue_date::text as issue_date from acc_invoice where id=$1", [invId])).rows[0];
   const { error: e4 } = await authed.rpc("acc_issue_invoice", { p_invoice_id: inv.id });
   if (e4) throw new Error("issue: " + e4.message);
 

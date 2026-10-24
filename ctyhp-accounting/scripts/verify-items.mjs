@@ -45,19 +45,17 @@ async function main() {
     .insert({ name: "E2E Item Customer", currency_code: "USD" }).select("id").single();
   if (ec) throw new Error("customer: " + ec.message);
 
-  const { data: inv, error: e3 } = await authed.from("acc_invoice").insert({
-    customer_id: cust.id, currency_code: "USD",
-    subtotal_minor: 12345, tax_total_minor: 0, total_minor: 12345, balance_due_minor: 12345,
-  }).select("id").single();
-  if (e3) throw new Error("invoice: " + e3.message);
-
-  const { error: e4 } = await authed.from("acc_invoice_line").insert({
-    invoice_id: inv.id, line_order: 0, description: "E2E item desc",
-    quantity: 1, unit_price_minor: 12345, income_account_id: income,
-    line_subtotal_minor: 12345, line_tax_minor: 0, line_total_minor: 12345,
-    item_id: item.id,
+  // Through the function the screen uses; the tables are read-only to a session since 0165.
+  const { data: invId, error: e3 } = await authed.rpc("acc_create_draft_invoice", {
+    p_customer_id: cust.id, p_issue_date: null, p_due_date: null, p_currency: "USD", p_memo: null,
+    p_lines: [{
+      description: "E2E item desc", quantity: 1, unit_price_minor: 12345,
+      income_account_id: income, tax_code_id: null, item_id: item.id,
+    }],
+    p_recurring_run_id: null,
   });
-  if (e4) throw new Error("line: " + e4.message);
+  if (e3) throw new Error("invoice: " + e3.message);
+  const inv = { id: invId };
 
   const line = (await db.query(
     "select item_id, unit_price_minor, description from acc_invoice_line where invoice_id=$1", [inv.id])).rows[0];

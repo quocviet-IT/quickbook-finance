@@ -52,13 +52,15 @@ describe("invoice numbering integrity over HTTPS", () => {
         ],
       });
 
-      // 1. A draft has no number, and a client cannot give it one.
-      const { error: assignError } = await sb
-        .from("acc_invoice")
-        .update({ invoice_number: "INV-999999" })
-        .eq("id", draft.id);
-      expect(assignError, "assigning a number by hand must be refused").not.toBeNull();
-      expect(assignError!.message).toMatch(/assigned by the system/i);
+      // 1. A draft has no number, and a client cannot give it one. Since 0165
+      //    the write never reaches the number guard: a session writes no
+      //    invoice directly. What matters is that the number did not change.
+      const numberOf = async () =>
+        ((await sb.from("acc_invoice").select("invoice_number").eq("id", draft.id).single()).data as {
+          invoice_number: string | null;
+        }).invoice_number;
+      await sb.from("acc_invoice").update({ invoice_number: "INV-999999" }).eq("id", draft.id);
+      expect(await numberOf(), "assigning a number by hand must be refused").toBeNull();
 
       // 2. Issuing takes the next number from the sequence.
       await issueInvoice(sb, draft.id);
@@ -71,16 +73,11 @@ describe("invoice numbering integrity over HTTPS", () => {
       expect(number).toMatch(/^INV-\d{6}$/);
 
       // 3. That number is now write-once.
-      const { error: rewriteError } = await sb
-        .from("acc_invoice")
-        .update({ invoice_number: "INV-000001" })
-        .eq("id", draft.id);
-      expect(rewriteError, "rewriting a number must be refused").not.toBeNull();
+      await sb.from("acc_invoice").update({ invoice_number: "INV-000001" }).eq("id", draft.id);
+      expect(await numberOf(), "rewriting a number must be refused").toBe(number);
 
       // 4. And the numbered document cannot be removed from the application.
-      const { error: deleteError } = await sb.from("acc_invoice").delete().eq("id", draft.id);
-      expect(deleteError, "deleting a numbered invoice must be refused").not.toBeNull();
-      expect(deleteError!.message).toMatch(/cannot be deleted/i);
+      await sb.from("acc_invoice").delete().eq("id", draft.id);
 
       const { data: stillThere } = await sb
         .from("acc_invoice")

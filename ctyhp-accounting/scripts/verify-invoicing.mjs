@@ -73,21 +73,20 @@ async function main() {
   const taxTotal = lines.reduce((s, l) => s + l.tax, 0);
   const total = subtotal + taxTotal;
 
-  // --- Create draft invoice + lines ---
-  const { data: inv, error: e3 } = await authed.from("acc_invoice").insert({
-    customer_id: cust.id, currency_code: "USD",
-    subtotal_minor: subtotal, tax_total_minor: taxTotal, total_minor: total,
-  }).select("id").single();
-  if (e3) throw new Error("invoice: " + e3.message);
-
-  const { error: e4 } = await authed.from("acc_invoice_line").insert(
-    lines.map((l, i) => ({
-      invoice_id: inv.id, line_order: i, description: "Item " + (i + 1),
-      quantity: l.qty, unit_price_minor: l.unit, income_account_id: l.acc,
-      tax_code_id: taxCode.id, line_subtotal_minor: l.sub, line_tax_minor: l.tax, line_total_minor: l.total,
+  // --- Create draft invoice + lines (through the function the screen uses;
+  //     the tables are read-only to a session since 0165) ---
+  const { data: invId, error: e3 } = await authed.rpc("acc_create_draft_invoice", {
+    p_customer_id: cust.id, p_issue_date: null, p_due_date: null, p_currency: "USD", p_memo: null,
+    p_lines: lines.map((l, i) => ({
+      description: "Item " + (i + 1), quantity: l.qty, unit_price_minor: l.unit,
+      income_account_id: l.acc, tax_code_id: taxCode.id, item_id: null,
     })),
-  );
-  if (e4) throw new Error("lines: " + e4.message);
+    p_recurring_run_id: null,
+  });
+  if (e3) throw new Error("invoice: " + e3.message);
+  const inv = { id: invId };
+  const drafted = (await db.query("select total_minor from acc_invoice where id=$1", [inv.id])).rows[0];
+  check("the draft's total is worked out as the lines add up", Number(drafted.total_minor) === total);
 
   // --- Issue invoice (posts the journal entry) ---
   const { error: e5 } = await authed.rpc("acc_issue_invoice", { p_invoice_id: inv.id });
