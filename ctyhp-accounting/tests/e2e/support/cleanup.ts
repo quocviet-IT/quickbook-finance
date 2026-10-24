@@ -7,7 +7,8 @@ const POSTED_STATUSES = new Set(["issued", "partial", "paid"]);
 /**
  * The maintenance channel. Since migration 0066 an application session cannot
  * delete a numbered document — that is the control the accountant asked for —
- * so removing test residue is a service-role act, outside the application, and
+ * and since 0165 it cannot write the invoice tables at all, drafts included.
+ * So removing test residue is a service-role act, outside the application, and
  * it leaves a documented note behind for the number it frees.
  */
 function adminClient(): SupabaseClient | null {
@@ -47,14 +48,14 @@ export async function sweepMarker(
 
   if (invoices?.length) {
     const numbered = invoices.filter((row) => row.invoice_number !== null);
-    const admin = numbered.length > 0 ? adminClient() : null;
-    if (numbered.length > 0 && !admin) {
+    const admin = adminClient();
+    if (!admin) {
       throw new Error(
-        "SUPABASE_SERVICE_ROLE_KEY is required to remove a numbered test invoice — " +
-          "an application session may not delete one.",
+        "SUPABASE_SERVICE_ROLE_KEY is required to remove a test invoice — " +
+          "an application session may not delete one (0165).",
       );
     }
-    const remover = admin ?? sb;
+    const remover = admin;
 
     const ids = invoices.map((row) => row.id);
     const { error: lineError } = await remover
@@ -68,7 +69,7 @@ export async function sweepMarker(
     if (headerError) {
       throw new Error(`deleting marked invoices failed: ${headerError.message}`);
     }
-    if (admin) await noteFreedNumbers(admin, numbered, marker);
+    await noteFreedNumbers(admin, numbered, marker);
   }
 
   const { data: customers, error: customerError } = await sb

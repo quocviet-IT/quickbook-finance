@@ -60,22 +60,20 @@ describe("invoice audit trail over HTTPS", () => {
       expect(created.updated_by).toBe(userId);
       expect(Date.now() - Date.parse(created.created_at)).toBeLessThan(5 * 60 * 1000);
 
-      // 2. The creation stamp is immutable: a direct update that tries to
-      //    reassign authorship is accepted as a statement and ignored as a fact.
+      // 2. The stamps cannot be rewritten from the application: since 0165 a
+      //    session writes no invoice directly — refused outright where the
+      //    grant is revoked, reaching no row where row-level security alone
+      //    stands — so an attempt to reassign authorship changes nothing.
       const spoofDate = "2000-01-01T00:00:00+00:00";
-      const { error: spoofError } = await sb
+      await sb
         .from("acc_invoice")
-        .update({ created_by: null, created_at: spoofDate, memo: marker })
+        .update({ created_by: null, created_at: spoofDate })
         .eq("id", draft.id);
-      expect(spoofError).toBeNull();
 
       const afterSpoof = await readStamps(sb, draft.id);
       expect(afterSpoof.created_by, "created_by must survive an overwrite attempt").toBe(userId);
       expect(afterSpoof.created_at).toBe(created.created_at);
-      expect(
-        Date.parse(afterSpoof.updated_at),
-        "an update must move the modification stamp",
-      ).toBeGreaterThanOrEqual(Date.parse(created.updated_at));
+      expect(afterSpoof.updated_at, "nothing was written").toBe(created.updated_at);
 
       // 3. Issuing posts to the ledger and is recorded as its own action.
       await issueInvoice(sb, draft.id);
@@ -95,8 +93,8 @@ describe("invoice audit trail over HTTPS", () => {
         limit: 200,
       });
       const actions = entries.map((entry) => entry.action);
-      expect(actions, "insert, update and post must all be logged").toEqual(
-        expect.arrayContaining(["insert", "update", "post"]),
+      expect(actions, "insert and post must both be logged").toEqual(
+        expect.arrayContaining(["insert", "post"]),
       );
       for (const entry of entries) {
         expect(entry.actor_id, "every entry names its actor").toBe(userId);

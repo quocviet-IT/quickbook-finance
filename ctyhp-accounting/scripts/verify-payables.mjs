@@ -75,18 +75,14 @@ async function main() {
   ];
   const billTotal = billLines.reduce((s, l) => s + l.amount, 0); // 14000
 
-  const { data: bill, error: e3 } = await authed.from("acc_bill").insert({
-    vendor_id: vend.id, currency_code: "USD", total_minor: billTotal, balance_due_minor: billTotal,
-  }).select("id").single();
+  // Through the function the screen uses; the tables are read-only to a session since 0165.
+  const { data: billId, error: e3 } = await authed.rpc("acc_create_draft_bill", {
+    p_vendor_id: vend.id, p_vendor_ref: null, p_bill_date: null, p_due_date: null, p_currency: "USD", p_memo: null,
+    p_lines: billLines.map((l) => ({ description: l.desc, expense_account_id: l.acc, amount_minor: l.amount, item_id: null })),
+    p_recurring_run_id: null,
+  });
   if (e3) throw new Error("bill: " + e3.message);
-
-  const { error: e4 } = await authed.from("acc_bill_line").insert(
-    billLines.map((l, i) => ({
-      bill_id: bill.id, line_order: i, description: l.desc,
-      expense_account_id: l.acc, amount_minor: l.amount,
-    })),
-  );
-  if (e4) throw new Error("bill lines: " + e4.message);
+  const bill = { id: billId };
 
   // --- Post the bill (posts DR expense / CR AP) ---
   const { error: e5 } = await authed.rpc("acc_post_bill", { p_bill_id: bill.id });
