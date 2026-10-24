@@ -306,6 +306,54 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: "record-a-paid-sale",
+    area: "sales",
+    title: "Record a sale paid on the spot",
+    purpose:
+      "A sale the customer pays for there and then, by cash, check, card or transfer: one sales receipt " +
+      "records the sale and the money together. Nothing is owed, so Accounts Receivable is never touched. " +
+      "A sale paid later is an invoice instead.",
+    route: "/sales-receipts",
+    steps: [
+      {
+        action: "Write the receipt",
+        control: "New sales receipt",
+        route: "/sales-receipts",
+        note:
+          "Choose the customer; for walk-in sales, add one customer such as Cash Customer once and use it for " +
+          "all of them. The lines work as on an invoice: an item fills in its price, income account and tax code.",
+      },
+      {
+        action: "Say where the money went",
+        control: "Deposit to",
+        note:
+          "It starts on the first bank account, so the deposit the bank later shows is matched to this receipt " +
+          "in Bank Transactions. Choose 1210 Undeposited Funds only for takings that will be banked together " +
+          "later. Payment method and Reference (a check number, say) are printed on the receipt.",
+      },
+      {
+        action: "Post it",
+        control: "Save and post",
+        note:
+          "Gives it its number, SR-000001 onwards, and posts at once: the deposit account up by the total, " +
+          "income by the subtotal and Sales Tax Payable by the tax. An item kept in stock also takes its cost " +
+          "off the shelf, as an invoice does. A date in a closed period is refused.",
+      },
+      {
+        action: "Give the customer a copy",
+        control: "Download PDF",
+        note: "Printed on the invoice's layout as a Sales Receipt, sold to the customer, ending Paid in full.",
+      },
+      {
+        action: "Correct a mistake",
+        control: "Void",
+        note:
+          "A saved receipt is never edited. Void it with the reason, which is kept with it; its entries stop " +
+          "counting and any goods go back on the shelf. Then enter the sale again as a new receipt.",
+      },
+    ],
+  },
+  {
     id: "correct-a-sale",
     area: "sales",
     title: "Correct or cancel a sale",

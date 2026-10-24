@@ -4,12 +4,14 @@ import type { jsPDF } from "jspdf";
 import type { InvoiceDocument, PrintedDocument } from "@/lib/domain/invoice-document";
 import { invoiceDocumentFileName } from "@/lib/domain/invoice-document";
 import type { EstimateDocument } from "@/lib/domain/estimate-document";
+import type { SalesReceiptDocument } from "@/lib/domain/sales-receipts";
 
 /**
  * What this renderer draws: an invoice, or an estimate, which adds a closing
- * line under its note (lib/domain/estimate-document).
+ * line under its note (lib/domain/estimate-document), or a sales receipt,
+ * which also names its customer "Sold to" (lib/domain/sales-receipts).
  */
-export type RenderableDocument = PrintedDocument & { footer?: string | null };
+export type RenderableDocument = PrintedDocument & { footer?: string | null; partyHeading?: string };
 
 const INK: [number, number, number] = [15, 23, 42];
 const MUTED: [number, number, number] = [100, 116, 139];
@@ -83,7 +85,7 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(9);
   pdf.setTextColor(...MUTED);
-  pdf.text("BILL TO", MARGIN, billToTop);
+  pdf.text(doc.partyHeading ?? "BILL TO", MARGIN, billToTop);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(11);
   pdf.setTextColor(...INK);
@@ -188,6 +190,12 @@ export async function downloadInvoicePdf(
 
 /** Saves an estimate under the name its model gives it: `Estimate EST-000001 <customer>.pdf`. */
 export async function downloadEstimatePdf(doc: EstimateDocument): Promise<void> {
+  const pdf = await renderInvoicePdf(doc);
+  pdf.save(doc.fileName);
+}
+
+/** Saves a sales receipt under the name its model gives it: `Sales receipt SR-000001 <customer>.pdf`. */
+export async function downloadSalesReceiptPdf(doc: SalesReceiptDocument): Promise<void> {
   const pdf = await renderInvoicePdf(doc);
   pdf.save(doc.fileName);
 }

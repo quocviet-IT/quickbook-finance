@@ -37,6 +37,10 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_estimate_line",
   "acc_invoice",
   "acc_invoice_line",
+  // Sales receipts (0164): a customer, items, income accounts, tax codes and
+  // a deposit account, and the journal entry each posted.
+  "acc_sales_receipt",
+  "acc_sales_receipt_line",
   "acc_payment",
   "acc_payment_allocation",
   "acc_credit_memo",

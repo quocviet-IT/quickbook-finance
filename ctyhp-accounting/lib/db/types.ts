@@ -9,6 +9,7 @@ export type AccountStatus = "draft" | "active" | "inactive" | "archived";
 export type TaxDirection = "sales" | "purchase" | "none";
 export type JournalSource =
   | "invoice"
+  | "sales_receipt"
   | "payment"
   | "manual"
   | "bank"

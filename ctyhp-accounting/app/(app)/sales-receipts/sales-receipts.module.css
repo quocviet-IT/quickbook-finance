@@ -1,0 +1,59 @@
+/*
+ * The Sales Receipts list and its dialog. Drawn as the Estimates list is, so
+ * the sales documents read as one family. Every colour is a token, so the
+ * dark theme follows.
+ */
+
+/* ---------- the list ---------- */
+
+/* The number opens the receipt; a link button without the button's padding. */
+.number {
+  padding: 0;
+  height: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A void receipt's amount no longer counts; struck through, as the ledger shows a void entry. */
+.moneyVoid {
+  font-variant-numeric: tabular-nums;
+  color: var(--ob-text-secondary);
+  text-decoration: line-through;
+}
+
+/* ---------- the dialogs ---------- */
+
+.formTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.formTitleState {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.notice {
+  margin-bottom: 16px;
+}
+
+.totals {
+  margin-top: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.totals > div {
+  line-height: 1.7;
+}
+
+.voidLead {
+  margin: 0 0 16px;
+  color: var(--ob-text-secondary);
+  line-height: 1.55;
+}

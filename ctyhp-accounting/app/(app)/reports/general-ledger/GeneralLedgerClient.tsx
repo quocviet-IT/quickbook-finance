@@ -61,6 +61,7 @@ function sourceHref(sourceType: string, sourceId: string | null): string | null 
   if (own) return own;
   const map: Record<string, string> = {
     invoice: "/invoices",
+    sales_receipt: "/sales-receipts",
     payment: "/payments",
     bill: "/bills",
     expense: "/expenses",

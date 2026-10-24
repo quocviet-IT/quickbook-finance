@@ -182,6 +182,31 @@ export const estimateSaveSchema = z
   });
 export type EstimateSaveInput = z.infer<typeof estimateSaveSchema>;
 
+// --- Sales receipts (2.53) ---
+/** A receipt line is an invoice line: the same item, quantity, price, income account and tax code. */
+export const salesReceiptLineInputSchema = invoiceLineInputSchema;
+
+/**
+ * Record a sale paid on the spot. The number is the database's, and every
+ * amount is worked out there (0164); saving posts it.
+ */
+export const salesReceiptCreateSchema = z.object({
+  customer_id: z.uuid("Select a customer"),
+  receipt_date: z.iso.date("Choose the receipt date."),
+  deposit_account_id: z.uuid("Choose where the money was deposited"),
+  payment_method: z.enum(["cash", "check", "card", "bank_transfer"]).optional().nullable(),
+  reference: z.string().trim().max(80, "Keep the reference to 80 characters").optional().nullable(),
+  memo: z.string().trim().max(500).optional().nullable(),
+  lines: z.array(salesReceiptLineInputSchema).min(1, "Add at least one line item"),
+});
+export type SalesReceiptCreateInput = z.infer<typeof salesReceiptCreateSchema>;
+
+/** Void a receipt: it keeps its number, its entry stops counting, and the reason is kept. */
+export const salesReceiptVoidSchema = z.object({
+  id: z.uuid("Sales receipt not found"),
+  reason: z.string().trim().min(3, "Say why this sales receipt is being voided").max(500),
+});
+
 // --- Payments ---
 export const paymentAllocationSchema = z.object({
   invoice_id: z.uuid(),

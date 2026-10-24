@@ -13,6 +13,7 @@
 /** What each kind of entry is called on screen, in a tag beside its number. */
 const SOURCE_LABEL: Record<string, string> = {
   invoice: "Invoice",
+  sales_receipt: "Sales receipt",
   payment: "Payment",
   manual: "Journal",
   bank: "Bank",
@@ -54,7 +55,7 @@ export function sourceHref(sourceType: string, sourceId: string | null): string 
 export type SourceTone = "sales" | "purchases" | "cash" | "ledger";
 
 export function sourceTone(sourceType: string): SourceTone {
-  if (sourceType === "invoice" || sourceType === "payment") return "sales";
+  if (sourceType === "invoice" || sourceType === "sales_receipt" || sourceType === "payment") return "sales";
   if (sourceType === "bill" || sourceType === "bill_payment" || sourceType === "expense" || sourceType === "goods_receipt") {
     return "purchases";
   }

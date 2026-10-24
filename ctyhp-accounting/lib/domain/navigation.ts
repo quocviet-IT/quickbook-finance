@@ -48,6 +48,7 @@ export const NAV: NavItem[] = [
       // stock it happens to also describe.
       { key: "/items", label: "Products & Services" },
       { key: "/invoices", label: "Invoices" },
+      { key: "/sales-receipts", label: "Sales Receipts" },
       { key: "/estimates", label: "Estimates" },
       { key: "/payments", label: "Payments" },
       { key: "/credit-memos", label: "Credit Memos" },
@@ -363,6 +364,7 @@ export interface NewMenuItem {
 export const NEW_MENU: NewMenuItem[] = [
   { key: "invoice", label: "Invoice", href: "/invoices?new=1" },
   { key: "estimate", label: "Estimate", href: "/estimates?new=1" },
+  { key: "sales-receipt", label: "Sales receipt", href: "/sales-receipts?new=1" },
   { key: "payment", label: "Payment received", href: "/payments?new=1" },
   { key: "bill", label: "Bill", href: "/bills?new=1" },
   { key: "pay-bills", label: "Pay bills", href: "/pay-bills" },
@@ -376,6 +378,7 @@ export const NEW_MENU: NewMenuItem[] = [
 
 const SEARCH_KIND_LABELS: Record<string, string> = {
   invoice: "Invoice",
+  sales_receipt: "Sales receipt",
   bill: "Bill",
   purchase_order: "Purchase order",
   expense: "Expense",

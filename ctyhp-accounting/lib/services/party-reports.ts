@@ -244,22 +244,25 @@ function accountsOfType(balances: readonly LedgerBalance[], types: readonly stri
 
 /**
  * Sales by Customer: the income accounts' postings for the period, by the
- * customer on the invoice, credit memo or payment each came from. Its total is
+ * customer on the invoice, sales receipt, credit memo or payment each came from. Its total is
  * the Profit and Loss's Income for the same period.
  */
 export async function getSalesByCustomer(sb: SupabaseClient, from: string, to: string): Promise<PartyActivityResult> {
   const balances = await getLedgerBalances(sb, from, to);
   const incomeIds = accountsOfType(balances, ["income"]);
-  const [lines, invoices, creditMemos, payments, names] = await Promise.all([
+  const [lines, invoices, receipts, creditMemos, payments, names] = await Promise.all([
     postedLines(sb, incomeIds, from, to),
     partyOfDocuments(sb, "acc_invoice", "customer_id"),
+    partyOfDocuments(sb, "acc_sales_receipt", "customer_id"),
     partyOfDocuments(sb, "acc_credit_memo", "customer_id"),
     partyOfDocuments(sb, "acc_payment", "customer_id"),
     partyNames(sb, "acc_customer"),
   ]);
   const ledger: PartyLedgerLine[] = lines.map((line) => {
     const source = line.sourceId;
-    const ref = source ? (invoices.get(source) ?? creditMemos.get(source) ?? payments.get(source)) : undefined;
+    const ref = source
+      ? (invoices.get(source) ?? receipts.get(source) ?? creditMemos.get(source) ?? payments.get(source))
+      : undefined;
     const partyId = ref?.partyId ?? null;
     return {
       entryId: line.entryId,
