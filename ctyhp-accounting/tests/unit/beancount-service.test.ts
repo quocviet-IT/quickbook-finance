@@ -165,6 +165,28 @@ describe("readBeancountInput", () => {
     expect(JSON.stringify(input.company)).not.toContain("00-0000000");
   });
 
+  it("titles a company whose settings were never saved with its name in the company list (2.49)", async () => {
+    const tables = baseTables(entryRows(1));
+    tables.acc_company_setting_version.rows = [];
+    const { sb } = fakeClient(tables);
+    const input = await readBeancountInput(sb, "2026-09-26T08:00:00.000Z", "Example Hall Inc.");
+    expect(input.company).toEqual({ legalName: "Example Hall Inc.", fiscalYearStartMonth: 1, accountingBasis: "accrual" });
+  });
+
+  it("still refuses a file with no title at all", async () => {
+    const tables = baseTables(entryRows(1));
+    tables.acc_company_setting_version.rows = [];
+    const { sb } = fakeClient(tables);
+    await expect(readBeancountInput(sb, "2026-09-26T08:00:00.000Z")).rejects.toThrow(/Company settings are not set/);
+    await expect(readBeancountInput(sb, "2026-09-26T08:00:00.000Z", "  ")).rejects.toThrow(/Company settings are not set/);
+  });
+
+  it("prefers the saved settings to the company list's name", async () => {
+    const { sb } = fakeClient(baseTables(entryRows(1)));
+    const input = await readBeancountInput(sb, "2026-09-26T08:00:00.000Z", "Some Other Name");
+    expect(input.company.legalName).toBe("Riverbend Trading LLC");
+  });
+
   it("reads every currency record, not only the ones the app offers today", async () => {
     // listCurrencies returns USD only. An entry left in another currency must
     // still format, or the whole export fails.

@@ -32,12 +32,15 @@ export default function BeancountClient({
   summary,
   summaryError,
   canExport,
+  settingsSaved,
 }: {
   companyName: string;
   fileName: string;
   summary: BeancountSummary | null;
   summaryError: string | null;
   canExport: boolean;
+  /** False when Settings › Company was never saved for this company (2.49): the file is titled from the company list. */
+  settingsSaved: boolean;
 }) {
   const { message } = App.useApp();
   const [lines, setLines] = useState<BeancountTextLine[] | null>(null);
@@ -229,6 +232,22 @@ export default function BeancountClient({
             { label: "Currencies", value: summary.currencies.length > 0 ? summary.currencies.join(", ") : "—" },
             { label: "Reconciled statements", value: summary.reconciledStatements.toLocaleString("en-US") },
           ]}
+        />
+      ) : null}
+
+      {!settingsSaved ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="Company settings have never been saved"
+          description={
+            <>
+              The file takes its title from the company list ({companyName}) and assumes a fiscal year starting in
+              January, on the accrual basis. Save <Link href="/settings/company">Settings › Company</Link> so the file,
+              and the rest of OneBook, use the company&apos;s own legal name, time zone and fiscal year.
+            </>
+          }
         />
       ) : null}
 

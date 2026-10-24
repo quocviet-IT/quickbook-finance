@@ -99,6 +99,16 @@ try {
     `${result.policyCount} vs ${reference.policies}`,
   );
 
+  // 2.49: a company has its settings from the moment it exists.
+  const settings = await one(
+    `select count(*)::int as n, max(legal_name) as legal_name from co_${SLUG}.acc_company_setting_version`,
+  );
+  check(
+    "it has its company settings, named as it was created",
+    settings.n === 1 && settings.legal_name === "Verify Probe Inc.",
+    `${settings.n} row(s), ${settings.legal_name ?? "no name"}`,
+  );
+
   const registered = await one(
     `select slug, schema_name, status from onebook.company where slug = $1`,
     [SLUG],

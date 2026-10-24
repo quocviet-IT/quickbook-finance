@@ -185,6 +185,17 @@ export async function provisionCompany(
     await client.query(statement.sql, statement.params);
   }
 
+  // The company's settings, version 1, from the name it was created under
+  // (2.49). Without them a company had no settings at all until somebody saved
+  // Settings › Company: the Beancount export refused to run, and every screen
+  // that reads the time zone or the fiscal year fell back to a default nobody
+  // chose. The rest takes the table's own defaults, which Settings › Company
+  // shows and can change.
+  await client.query(
+    `insert into ${schema}.acc_company_setting_version (version, legal_name) values (1, $1)`,
+    [input.legalName],
+  );
+
   // The application connects as `authenticated`; row-level security decides
   // what it may see once it is in.
   await client.query(`grant usage on schema ${schema} to authenticated, service_role`);

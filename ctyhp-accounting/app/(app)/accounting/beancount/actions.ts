@@ -1,6 +1,7 @@
 "use server";
 import { createHash } from "node:crypto";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { resolveActiveCompany } from "@/lib/db/company";
 import { beancountFileName, buildBeancountFile, buildBeancountLines, type BeancountTextLine } from "@/lib/domain/beancount";
 import { BEANCOUNT_SOURCES, readBeancountInput } from "@/lib/services/beancount";
 import { readSchemaVersion } from "@/lib/services/company-export";
@@ -23,6 +24,12 @@ export interface BeancountPreviewResult {
 }
 
 type Session = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/** The open company's legal name in the company list: the file's title when its settings were never saved (2.49). */
+async function registerName(): Promise<string | null> {
+  const entity = await resolveActiveCompany();
+  return entity.active?.legalName ?? null;
+}
 
 /** Signed in and allowed to export company data, or the reason not. */
 async function exportAllowed(sb: Session): Promise<string | null> {
@@ -48,7 +55,7 @@ export async function beancountPreviewAction(): Promise<ActionResult<BeancountPr
   const refused = await exportAllowed(sb);
   if (refused) return { ok: false, error: refused };
   try {
-    const input = await readBeancountInput(sb, new Date().toISOString());
+    const input = await readBeancountInput(sb, new Date().toISOString(), await registerName());
     return { ok: true, data: { fileName: beancountFileName(input.company.legalName), lines: buildBeancountLines(input) } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "An unexpected error occurred" };
@@ -70,7 +77,10 @@ export async function beancountExportAction(): Promise<ActionResult<BeancountExp
 
   try {
     const generatedAt = new Date().toISOString();
-    const [input, schemaVersion] = await Promise.all([readBeancountInput(sb, generatedAt), readSchemaVersion(sb)]);
+    const [input, schemaVersion] = await Promise.all([
+      readBeancountInput(sb, generatedAt, await registerName()),
+      readSchemaVersion(sb),
+    ]);
     const text = buildBeancountFile(input);
     const lineCount = input.entries.reduce((n, e) => n + e.lines.length, 0);
 
