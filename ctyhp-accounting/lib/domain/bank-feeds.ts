@@ -63,6 +63,8 @@ export interface BankFeedSyncView {
   isNewest: boolean;
   /** Lines it added that a person has matched, coded or ignored since. */
   lockedLines: number;
+  /** Lines it did not bring in: already in OneBook, or dated before the feed's start (2.48). */
+  skipped: number;
 }
 
 /** Whether Undo is offered on a sync, and when not, the tooltip that says why. */

@@ -29,6 +29,7 @@ import {
   type SuggestionView,
   BankingError,
   connectPlaidBank,
+  getBankFeedStartDefaults,
   syncBankConnection,
   listSettlementCandidates,
   settleFromBankTransaction,
@@ -57,6 +58,7 @@ import { loanSuggestions, postLoanPayment } from "@/lib/services/loan-payments";
 import { tieKeptStatementFile } from "@/lib/services/statement-files";
 import { disconnectBankConnection, listBankFeedSyncs, undoBankFeedSync, type DisconnectOutcome } from "@/lib/services/bank-feeds";
 import type { BankFeedSyncView } from "@/lib/domain/bank-feeds";
+import type { FeedSkips } from "@/lib/domain/bank-feed-start";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -479,7 +481,7 @@ export async function connectPlaidBankAction(input: {
   institutionId: string | null;
   institutionName: string;
   mappings: PlaidAccountMappingInput[];
-}): Promise<ActionResult<{ connectionId: string; added: number; suggestions: number }>> {
+}): Promise<ActionResult<{ connectionId: string; added: number; suggestions: number } & FeedSkips>> {
   const denied = await guardPermission("bank_feed.manage");
   if (denied) return { ok: false, error: denied };
   try {
@@ -492,6 +494,8 @@ export async function connectPlaidBankAction(input: {
         connectionId: result.connectionId,
         added: result.sync.added,
         suggestions: result.sync.suggestions,
+        beforeStart: result.sync.beforeStart,
+        alreadyHere: result.sync.alreadyHere,
       },
     };
   } catch (err) {
@@ -499,9 +503,21 @@ export async function connectPlaidBankAction(input: {
   }
 }
 
+/** Each bank account's last line in OneBook, for the date Connect bank offers its feed to start on (2.48). Reads only. */
+export async function bankFeedStartDefaultsAction(): Promise<ActionResult<Record<string, string>>> {
+  const denied = await guardPermission("bank_feed.manage");
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getBankFeedStartDefaults(sb) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
 export async function syncBankConnectionAction(
   connectionId: string,
-): Promise<ActionResult<{ added: number; modified: number; removed: number; suggestions: number }>> {
+): Promise<ActionResult<{ added: number; modified: number; removed: number; suggestions: number } & FeedSkips>> {
   const denied = await guardPermission("bank_feed.manage");
   if (denied) return { ok: false, error: denied };
   try {

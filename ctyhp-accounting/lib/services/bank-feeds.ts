@@ -47,6 +47,7 @@ export async function listBankFeedSyncs(sb: SupabaseClient, bankAccountId: strin
     changes: Number(r.changes ?? 0),
     isNewest: Boolean(r.is_newest),
     lockedLines: Number(r.locked_lines ?? 0),
+    skipped: Number(r.skipped_count ?? 0),
   }));
 }
 
