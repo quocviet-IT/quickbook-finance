@@ -16,6 +16,11 @@ export interface WhatsNewPanelProps {
   releases: Release[];
   /** Closes the drawer when a change links somewhere. */
   onNavigate: () => void;
+  /**
+   * The version, date and headline above the changes. Off where they are
+   * already the label the release is opened by (2.51), so they are not said twice.
+   */
+  showHeading?: boolean;
 }
 
 /**
@@ -25,18 +30,22 @@ export interface WhatsNewPanelProps {
  * history behind "Show every release". One renderer, so the two can never drift
  * into describing the same release differently.
  */
-export default function WhatsNewPanel({ releases, onNavigate }: WhatsNewPanelProps) {
+export default function WhatsNewPanel({ releases, onNavigate, showHeading = true }: WhatsNewPanelProps) {
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
       {releases.map((release) => (
         <section key={release.version} className="release-notes__release">
-          <div className="release-notes__head">
-            <Typography.Text strong>Version {release.version}</Typography.Text>
-            <Typography.Text type="secondary">{formatDate(release.date)}</Typography.Text>
-          </div>
-          <Typography.Paragraph type="secondary" className="release-notes__headline">
-            {release.headline}
-          </Typography.Paragraph>
+          {showHeading ? (
+            <>
+              <div className="release-notes__head">
+                <Typography.Text strong>Version {release.version}</Typography.Text>
+                <Typography.Text type="secondary">{formatDate(release.date)}</Typography.Text>
+              </div>
+              <Typography.Paragraph type="secondary" className="release-notes__headline">
+                {release.headline}
+              </Typography.Paragraph>
+            </>
+          ) : null}
           <ul className="release-notes__changes">
             {release.changes.map((change, index) => (
               <li key={`${release.version}-${index}`}>

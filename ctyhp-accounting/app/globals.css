@@ -3853,24 +3853,339 @@ body .ant-empty .ant-empty-description,
   .assistant-launcher { display: none; }
 }
 
-/* System guide steps: numbered, with the control name beside each step. */
-.system-guide__steps {
-  margin: 0;
-  padding-left: 20px;
+/* ---- System guide (redesigned in 2.51) -------------------------------------
+   A drawer of four tabs. Workflows are grouped as the sidebar groups the
+   screens; each opens to numbered steps joined by a line, naming the control
+   and the page it is on. Everything is drawn from the theme's tokens, so dark
+   mode follows without a rule of its own. */
+
+/* The floating Report / Ask AI / Guide cluster, while the guide or Ask AI is
+   open: out of sight and out of reach, but still taking its room. */
+.assistant-launcher--behind-panel {
+  visibility: hidden;
+  pointer-events: none;
 }
-.system-guide__steps > li + li {
-  margin-top: 14px;
+
+.guide-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.25;
 }
-.system-guide__control {
+.guide-title__name {
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--ob-text-heading);
+}
+.guide-title__version {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ob-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+/* Which books are open: a sample company to play in, or live books. */
+.guide-company {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ob-feedback-infoBorder);
+  background: var(--ob-feedback-infoBg);
+  color: var(--ob-text-body);
+  font-size: 13px;
 }
-.system-guide__note {
-  margin: 6px 0 0;
+.guide-company--sample {
+  border-color: var(--ob-feedback-cautionBorder);
+  background: var(--ob-feedback-cautionBg);
+}
+.guide-company--live {
+  border-color: var(--ob-feedback-successBorder);
+  background: var(--ob-feedback-successBg);
+}
+.guide-company__more {
+  margin-left: auto;
   font-size: 12px;
+}
+
+.guide-tabs .ant-tabs-nav {
+  margin-bottom: 12px;
+}
+.guide-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.guide-tab__short {
+  display: none;
+}
+/* A phone: the four tabs on one row, in short words and without icons, rather
+   than two of them hidden behind the tab bar's "…". */
+@media (max-width: 480px) {
+  .guide-tabs .guide-tab > .anticon {
+    display: none;
+  }
+  .guide-tabs .guide-tab__text--long {
+    display: none;
+  }
+  .guide-tabs .guide-tab__short {
+    display: inline;
+  }
+  .guide-tabs .ant-tabs-tab + .ant-tabs-tab {
+    margin-left: 18px !important;
+  }
+}
+.guide-tab__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ob-surface-muted);
+  color: var(--ob-text-secondary);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.guide-pane__intro {
+  margin: 0;
+  font-size: 13px;
+}
+.guide-pane__more {
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+/* "You are on": the screen the reader opened the guide from. */
+.guide-here {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--ob-accent-lineSoft);
+  background: var(--ob-accent-wash);
+}
+.guide-here__kicker {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ob-text-caption);
+}
+.guide-here__route {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--ob-surface-card);
+  border: 1px solid var(--ob-border-subtle);
+  font-size: 13px;
+  color: var(--ob-text-strong);
+}
+.guide-here__summary {
+  margin: 8px 0 0 !important;
+  color: var(--ob-text-body);
+}
+
+/* An area: Sales, Purchases, Banking… */
+.guide-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.guide-area + .guide-area {
+  margin-top: 6px;
+}
+.guide-area__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ob-border-subtle);
+}
+.guide-area__title {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ob-text-heading);
+}
+.guide-area__count {
+  font-size: 12px;
+  color: var(--ob-text-caption);
+}
+.guide-area__blurb {
+  font-size: 12px;
+}
+
+/* A workflow, closed: title, what it is for, how long it is. */
+.guide-flows.ant-collapse {
+  background: var(--ob-surface-card);
+}
+.guide-flow__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.guide-flow__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.guide-flow__purpose {
+  font-size: 13px;
+}
+.guide-flow__meta {
+  font-size: 12px;
+  color: var(--ob-text-caption);
+}
+
+/* A workflow, open: numbered steps joined by a line. */
+.guide-flow__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.guide-steps__step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 12px;
+  padding-bottom: 16px;
+}
+.guide-steps__step:last-child {
+  padding-bottom: 0;
+}
+/* The line from one number down to the next. */
+.guide-steps__step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: var(--ob-accent-lineSoft);
+}
+.guide-steps__number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ob-accent-iconBg);
+  color: var(--ob-accent-strong);
+  border: 1px solid var(--ob-accent-line);
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.guide-steps__content {
+  min-width: 0;
+  padding-top: 3px;
+}
+.guide-steps__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+/* The control's own label, as it reads on the button. */
+.guide-control {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--ob-border-default);
+  background: var(--ob-surface-subtle);
+  color: var(--ob-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+.guide-route {
+  font-size: 12px;
+}
+.guide-steps__note {
+  margin: 6px 0 0 !important;
+  font-size: 12px;
+}
+
+/* What's new: a release per row, opened by its version, date and headline. */
+.guide-release {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.guide-release__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.guide-release__version {
+  font-weight: 650;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+.guide-release__headline {
+  font-size: 13px;
+  color: var(--ob-text-body);
+}
+
+/* About OneBook. */
+.guide-about__card {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--ob-border-subtle);
+  background: var(--ob-surface-card);
+}
+.guide-about__card > .anticon {
+  align-self: start;
+  margin-top: 3px;
+  color: var(--ob-intent-info);
+  font-size: 16px;
+}
+.guide-about__card .ant-typography {
+  margin-bottom: 0;
+}
+.guide-about__card p.ant-typography {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.guide-about__card--sample {
+  border-color: var(--ob-feedback-cautionBorder);
+  background: var(--ob-feedback-cautionBg);
+}
+.guide-about__card--sample > .anticon {
+  color: var(--ob-intent-warning);
+}
+.guide-about__card--live {
+  border-color: var(--ob-feedback-successBorder);
+  background: var(--ob-feedback-successBg);
+}
+.guide-about__card--live > .anticon {
+  color: var(--ob-intent-success);
 }
 
 /* Release notes, at the top of the guide drawer. Bordered so they read as a

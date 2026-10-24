@@ -2,9 +2,11 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  GUIDE_AREAS,
   GUIDE_FLOWS,
   GUIDE_NOTICES,
   GUIDE_VERSION,
+  companyNotice,
   guideRoutes,
 } from "@/lib/domain/system-guide";
 import { APP_VERSION } from "@/lib/domain/changelog";
@@ -77,16 +79,21 @@ describe("guide flows", () => {
 });
 
 describe("guide notices", () => {
-  it("states the version, the test data, and where the design came from", () => {
+  it("states the version, where the design came from, and where to look when something breaks", () => {
     // Pinned to the changelog rather than to a number, so a release does not
     // have to remember to edit this line.
     expect(GUIDE_VERSION).toBe(APP_VERSION);
-    expect(GUIDE_NOTICES.map((notice) => notice.id)).toEqual([
-      "version",
-      "test-data",
-      "provenance",
-      "status",
-    ]);
+    expect(GUIDE_NOTICES.map((notice) => notice.id)).toEqual(["version", "provenance", "status"]);
+  });
+
+  it("names the version the browser is running, never a first release (2.51)", () => {
+    const version = GUIDE_NOTICES.find((notice) => notice.id === "version");
+    expect(version?.title).toBe(`You are on OneBook ${APP_VERSION}`);
+    const said = GUIDE_NOTICES.map((notice) => `${notice.title} ${notice.body}`).join(" ").toLowerCase();
+    expect(said).not.toContain("version 1");
+    expect(said).not.toContain("first release");
+    expect(said).not.toContain("test round");
+    expect(said).not.toContain("test data");
   });
 
   it("points at the status page only while that page is really there", () => {
@@ -101,16 +108,31 @@ describe("guide notices", () => {
     expect(existsSync(join(process.cwd(), "app", "status", "page.tsx"))).toBe(true);
   });
 
-  it("says plainly that the figures on screen are not real", () => {
-    const testData = GUIDE_NOTICES.find((notice) => notice.id === "test-data");
-    expect(testData?.body.toLowerCase()).toContain("test");
-    expect(testData?.body.toLowerCase()).toMatch(/not .*(real|actual)/);
+  it("says what the figures are for the company that is open: invented in a sample, real in live books", () => {
+    const sample = companyNotice({ name: "PC-Test", isSample: true });
+    expect(sample).toMatchObject({ tone: "sample", title: "PC-Test is a sample company" });
+    expect(sample?.body).toContain("no figure here belongs to a real business");
+    const live = companyNotice({ name: "Example Hall", isSample: false });
+    expect(live).toMatchObject({ tone: "live", title: "These are Example Hall's live books" });
+    expect(live?.body).toContain("change real records");
+    expect(live?.body).toContain("switch to a sample company");
+    expect(companyNotice(null)).toBeNull();
   });
 
-  it("promises the workflows will be tuned after this round", () => {
+  it("says where the workflows come from and how to ask for a change", () => {
     const provenance = GUIDE_NOTICES.find((notice) => notice.id === "provenance");
     expect(provenance?.body.toLowerCase()).toContain("quickbooks");
-    expect(provenance?.body.toLowerCase()).toContain("after this test round");
+    expect(provenance?.body).toContain("Report button");
+  });
+});
+
+describe("guide areas (2.51)", () => {
+  it("place every workflow under a heading the guide lists, and leave no heading empty", () => {
+    const areas = new Set(GUIDE_AREAS.map((area) => area.id));
+    for (const flow of GUIDE_FLOWS) expect(areas.has(flow.area), `${flow.id} → ${flow.area}`).toBe(true);
+    for (const area of GUIDE_AREAS) {
+      expect(GUIDE_FLOWS.some((flow) => flow.area === area.id), `${area.id} has a workflow`).toBe(true);
+    }
   });
 });
 
