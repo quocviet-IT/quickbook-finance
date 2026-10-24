@@ -7,7 +7,6 @@ import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
 import { getReceivedNotBilled, listPurchaseOrders } from "@/lib/services/purchasing";
 import { billablePurchaseOrders } from "@/lib/domain/purchasing";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import BillsClient from "./BillsClient";
 
@@ -103,7 +102,6 @@ export default async function BillsPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
-        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

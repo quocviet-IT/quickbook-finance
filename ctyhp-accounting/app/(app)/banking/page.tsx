@@ -6,7 +6,6 @@ import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { bankFeedEncryptionConfigured } from "@/lib/services/bank-token-crypto";
 import { plaidConfiguration } from "@/lib/services/plaid";
 import { hasPermission } from "@/lib/services/access";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import BankingClient from "./BankingClient";
 
@@ -79,7 +78,6 @@ export default async function BankingPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
-        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

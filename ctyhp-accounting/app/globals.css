@@ -1357,12 +1357,17 @@ body .ant-empty .ant-empty-description,
   margin-bottom: 8px;
 }
 
+/* The file first, its buttons under it (2.52). Side by side, four buttons left
+   the name about one letter wide, so it ran down the drawer a letter a line;
+   nobody saw it while uploads were switched off. */
 .document-list-item {
-  align-items: flex-start !important;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 8px;
 }
 
 .document-list-item .ant-list-item-meta {
+  width: 100%;
   min-width: 0;
 }
 
@@ -1374,8 +1379,8 @@ body .ant-empty .ant-empty-description,
 .document-list-item .ant-list-item-action {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  margin-inline-start: 8px;
+  justify-content: flex-start;
+  margin-inline-start: 40px;
 }
 
 .document-list-item .ant-list-item-action .ant-btn {
@@ -3862,6 +3867,12 @@ body .ant-empty .ant-empty-description,
 /* The floating Report / Ask AI / Guide cluster, while the guide or Ask AI is
    open: out of sight and out of reach, but still taking its room. */
 .assistant-launcher--behind-panel {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Any drawer, too (2.52): the attachments drawer's last row sat under the
+   cluster the same way. */
+body:has(.ant-drawer-open) .assistant-launcher {
   visibility: hidden;
   pointer-events: none;
 }

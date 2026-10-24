@@ -123,7 +123,6 @@ export default function InvoicesClient({
   canOverrideCredit,
   defaultTermsDays,
   sequenceWarning,
-  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -157,7 +156,6 @@ export default function InvoicesClient({
   defaultTermsDays: number;
   /** Set when the invoice sequence has a break nobody has accounted for. */
   sequenceWarning: string | null;
-  scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
@@ -832,7 +830,6 @@ export default function InvoicesClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

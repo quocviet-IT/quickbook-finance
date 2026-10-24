@@ -7,7 +7,6 @@ vi.mock("server-only", () => ({}));
 
 import {
   runBankFeedAutomationJob,
-  runDocumentScanAutomationJob,
   runRecurringAutomationJob,
 } from "@/lib/services/automation-jobs";
 import type { AutomationCompany } from "@/lib/domain/company-automation";
@@ -111,57 +110,6 @@ describe("runBankFeedAutomationJob", () => {
     expect(job.companies[1].ok).toBe(true);
     expect(job.connectionCount).toBe(1);
     expect(job.failedCompanyCount).toBe(1);
-  });
-});
-
-describe("runDocumentScanAutomationJob", () => {
-  it("gives every company its own attachment quota", async () => {
-    const createClient = vi.fn((schema: string) => clientFor(schema));
-    const scanned: string[] = [];
-
-    const job = await runDocumentScanAutomationJob({
-      listCompanies: async () => COMPANIES,
-      createClient,
-      listAwaitingScan: async (sb, limit) =>
-        rows(schemaOf(sb), 25, "doc")
-          .slice(0, limit)
-          .map((row) => ({ ...row, file_name: `${row.id}.pdf` })),
-      scanAttachment: async (_sb, attachmentId) => {
-        scanned.push(attachmentId);
-        return { scan_status: "clean", scan_error: null };
-      },
-    });
-
-    expect(createClient.mock.calls.map((call) => call[0])).toEqual(["public", "co_aurora"]);
-    expect(scanned.filter((id) => id.startsWith("public-")).length).toBe(20);
-    expect(scanned.filter((id) => id.startsWith("co_aurora-")).length).toBe(20);
-    expect(job.companyCount).toBe(2);
-    expect(job.attachmentCount).toBe(40);
-  });
-
-  it("reports a blocked scan as handled and a thrown scan as failed", async () => {
-    const job = await runDocumentScanAutomationJob({
-      listCompanies: async () => [COMPANIES[1]],
-      createClient: (schema) => clientFor(schema),
-      listAwaitingScan: async () => [
-        { id: "a", file_name: "invoice.pdf" },
-        { id: "b", file_name: "virus.pdf" },
-        { id: "c", file_name: "broken.pdf" },
-      ],
-      scanAttachment: async (_sb, attachmentId) => {
-        if (attachmentId === "b") return { scan_status: "blocked", scan_error: "EICAR-Test" };
-        if (attachmentId === "c") throw new Error("scanner unreachable");
-        return { scan_status: "clean", scan_error: null };
-      },
-    });
-
-    const company = job.companies[0];
-    if (!company.ok) throw new Error("company should not have failed");
-    expect(company.result.results).toEqual([
-      { attachmentId: "a", fileName: "invoice.pdf", status: "clean", ok: true, error: undefined },
-      { attachmentId: "b", fileName: "virus.pdf", status: "blocked", ok: true, error: "EICAR-Test" },
-      { attachmentId: "c", fileName: "broken.pdf", ok: false, error: "scanner unreachable" },
-    ]);
   });
 });
 
@@ -273,7 +221,6 @@ describe("cron route contracts", () => {
   const ROUTES = [
     { file: "app/api/bank-feeds/sync/route.ts", job: "runBankFeedAutomationJob" },
     { file: "app/api/recurring/run/route.ts", job: "runRecurringAutomationJob" },
-    { file: "app/api/documents/scan/route.ts", job: "runDocumentScanAutomationJob" },
   ];
 
   it.each(ROUTES)("$file delegates its work to $job", ({ file, job }) => {

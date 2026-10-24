@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.52",
+    date: "2026-10-24",
+    headline: "Attachments can be uploaded and opened: they no longer wait for a virus scanner that was never set up.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Attachments work without a virus scanner",
+        detail:
+          "The paperclip on invoices, bills, expenses, journal entries, fixed assets, purchase orders, payments and bank transactions now uploads a file straight away. Uploading used to be switched off until a malware scanner was set up, and none ever was; that requirement is gone, with the Scan button and the nightly scan. The files stay private: only PDF, image, CSV, Excel and Word files up to 10 MB are taken, only people allowed to read documents can open them, each link lasts one minute, a download is saved rather than opened in the browser, and every preview and download is logged.",
+        route: "/invoices",
+      },
+      {
+        kind: "fixed",
+        title: "An attached file's name reads across the drawer",
+        detail:
+          "In the attachments drawer, a file's Preview, Download, Controls and Archive buttons sat beside its name and left it so narrow that the name ran down the drawer a letter at a line. The buttons now sit under the name, the count reads 1 file rather than 1 files, and the help buttons step out of sight while any drawer is open.",
+      },
+    ],
+  },
+  {
     version: "2.51",
     date: "2026-10-24",
     headline: "The System guide is redesigned: four tabs, workflows grouped by area with numbered steps, and notes that match the version you are on.",

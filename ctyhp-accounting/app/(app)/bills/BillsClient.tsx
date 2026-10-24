@@ -78,7 +78,6 @@ export default function BillsClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
-  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -98,7 +97,6 @@ export default function BillsClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
-  scannerConfigured: boolean;
 }) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
@@ -430,7 +428,6 @@ export default function BillsClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

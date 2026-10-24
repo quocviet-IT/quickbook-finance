@@ -372,8 +372,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         action: "Attach the supporting document",
         control: "Attachments",
         note:
-          "The file, its checksum and the malware-scan result are recorded with the " +
-          "transaction, so the evidence stays with the entry.",
+          "The file and its checksum are kept with the transaction, privately, so the " +
+          "evidence stays with the entry and every look at it is logged.",
       },
       {
         action: "Pay one or many bills",

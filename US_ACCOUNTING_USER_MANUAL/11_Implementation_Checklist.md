@@ -26,7 +26,7 @@
 - [ ] User onboarding, suspension, offboarding, and session revocation are tested.
 - [ ] Maker-checker approval is configured for high-risk actions.
 - [ ] Audit history is immutable, searchable, and complete.
-- [ ] Attachments are private, scanned, hashed, and retained.
+- [ ] Attachments are private, type- and size-restricted, hashed, and retained.
 - [ ] Sensitive taxpayer and bank information is masked and excluded from logs.
 
 ## Reliability

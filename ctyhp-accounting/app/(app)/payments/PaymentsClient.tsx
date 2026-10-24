@@ -69,7 +69,6 @@ export default function PaymentsClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
-  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -85,7 +84,6 @@ export default function PaymentsClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
-  scannerConfigured: boolean;
 }) {
   const router = useRouter();
   const [receiveOpen, setReceiveOpen] = useInitiallyOpen(initialCreateOpen);
@@ -303,7 +301,6 @@ export default function PaymentsClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

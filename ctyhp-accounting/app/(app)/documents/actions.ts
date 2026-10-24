@@ -1,8 +1,6 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { createSupabaseAutomationClient } from "@/lib/db/automation";
-import { activeSchema } from "@/lib/db/company";
 import type { DocumentAttachmentRow } from "@/lib/db/types";
 import {
   documentAccessSchema,
@@ -10,21 +8,15 @@ import {
   documentAttachmentCreateSchema,
   documentAttachmentQuerySchema,
   documentGovernanceSchema,
-  documentRescanSchema,
 } from "@/lib/domain/documents";
 import {
   archiveDocumentAttachment,
   createDocumentAccessUrl,
   DocumentsError,
   listDocumentAttachments,
-  queueDocumentScan,
   registerDocumentAttachment,
   updateDocumentGovernance,
 } from "@/lib/services/documents";
-import {
-  isDocumentScannerConfigured,
-  scanDocumentAttachment,
-} from "@/lib/services/document-scanner";
 
 export interface DocumentActionResult<T = undefined> {
   ok: boolean;
@@ -96,33 +88,12 @@ export async function registerDocumentAttachmentAction(
 
   const context = await authorize("documents.manage");
   if ("error" in context) return { ok: false, error: context.error };
-  if (!isDocumentScannerConfigured()) {
-    return {
-      ok: false,
-      error:
-        "Document upload is disabled until DOCUMENT_SCANNER_URL and DOCUMENT_SCANNER_TOKEN are configured.",
-    };
-  }
   try {
-    const attachment = await registerDocumentAttachment(
-      context.sb,
-      parsed.data,
-      context.user.id,
-    );
-
-    try {
-      return {
-        ok: true,
-        data: await scanDocumentAttachment(
-          createSupabaseAutomationClient(await activeSchema()),
-          attachment.id,
-        ),
-      };
-    } catch {
-      // The upload remains safely pending. The cron and retry action can resume
-      // scanning without losing the accounting evidence.
-      return { ok: true, data: attachment };
-    }
+    // No malware scan (2.52): the file is usable as soon as it is registered.
+    return {
+      ok: true,
+      data: await registerDocumentAttachment(context.sb, parsed.data, context.user.id),
+    };
   } catch (error) {
     return { ok: false, error: message(error) };
   }
@@ -162,34 +133,6 @@ export async function createDocumentAccessUrlAction(
           parsed.data.action,
         ),
       },
-    };
-  } catch (error) {
-    return { ok: false, error: message(error) };
-  }
-}
-
-export async function rescanDocumentAttachmentAction(
-  raw: unknown,
-): Promise<DocumentActionResult<DocumentAttachmentRow>> {
-  const parsed = documentRescanSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: "Invalid scan request." };
-  if (!isDocumentScannerConfigured()) {
-    return {
-      ok: false,
-      error: "Set DOCUMENT_SCANNER_URL and DOCUMENT_SCANNER_TOKEN to scan documents.",
-    };
-  }
-
-  const context = await authorize("documents.manage");
-  if ("error" in context) return { ok: false, error: context.error };
-  try {
-    await queueDocumentScan(context.sb, parsed.data.attachment_id);
-    return {
-      ok: true,
-      data: await scanDocumentAttachment(
-        createSupabaseAutomationClient(await activeSchema()),
-        parsed.data.attachment_id,
-      ),
     };
   } catch (error) {
     return { ok: false, error: message(error) };

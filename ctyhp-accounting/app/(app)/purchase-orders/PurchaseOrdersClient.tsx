@@ -47,7 +47,6 @@ export default function PurchaseOrdersClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
-  scannerConfigured,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -60,7 +59,6 @@ export default function PurchaseOrdersClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
-  scannerConfigured: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<PoStatus | "all">("all");
@@ -169,7 +167,6 @@ export default function PurchaseOrdersClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

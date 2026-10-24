@@ -3,7 +3,6 @@ import { getUserRole, canWrite } from "@/lib/auth";
 import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { hasPermission } from "@/lib/services/access";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import JournalClient from "./JournalClient";
 
@@ -51,7 +50,6 @@ export default async function JournalPage({
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
         canMarkAdjusting={canMarkAdjusting}
-        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );
