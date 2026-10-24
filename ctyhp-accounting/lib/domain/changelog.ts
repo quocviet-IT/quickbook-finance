@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.50",
+    date: "2026-10-24",
+    headline: "Bank feed syncs keeps the bank's name on one line.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The bank's name no longer breaks over three lines in Bank feed syncs",
+        detail:
+          "The Skipped column added in 2.48 left the Bank column so narrow that a name like First Platypus Bank broke over three lines beside its Disconnected tag. The count columns are narrower now, and the tag moves under the name when the two do not fit side by side.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.49",
     date: "2026-10-24",
     headline: "A new company has its company settings from the start, and the Beancount export no longer stops when they were never saved.",

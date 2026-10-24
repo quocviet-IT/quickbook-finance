@@ -24,6 +24,9 @@ export interface BankFeedSyncListProps {
   onChanged: () => void;
 }
 
+/** A count column: room for "Removed" or "Skipped" in the header and five digits below (2.50). */
+const COUNT_WIDTH = 80;
+
 const STATUS_COLOR: Record<BankFeedSyncStatus, string | undefined> = {
   running: "blue",
   succeeded: "green",
@@ -124,12 +127,16 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
         dataSource={rows}
         loading={!loaded}
         columns={[
-          { title: "Started", dataIndex: "startedAt", width: 190, render: (value: string) => when(value) },
+          { title: "Started", dataIndex: "startedAt", width: 170, render: (value: string) => when(value) },
           {
+            // The one elastic column (2.50). Four counts and Undo left it about
+            // 200px once Skipped arrived, and "First Platypus Bank" broke over
+            // three lines beside its Disconnected tag; now the tag wraps under
+            // the name when the two do not fit side by side.
             title: "Bank",
             dataIndex: "institutionName",
             render: (name: string, row) => (
-              <Space size={6}>
+              <Space size={[6, 4]} wrap>
                 <span>{name}</span>
                 {row.connectionStatus === "disconnected" ? <StatusTag status="disconnected" /> : null}
               </Space>
@@ -145,14 +152,14 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
               return note ? <Tooltip title={note}>{tag}</Tooltip> : tag;
             },
           },
-          { title: "Added", dataIndex: "added", width: 90, align: "right" },
-          { title: "Changed", dataIndex: "modified", width: 90, align: "right" },
-          { title: "Removed", dataIndex: "removed", width: 90, align: "right" },
+          { title: "Added", dataIndex: "added", width: COUNT_WIDTH, align: "right" },
+          { title: "Changed", dataIndex: "modified", width: COUNT_WIDTH, align: "right" },
+          { title: "Removed", dataIndex: "removed", width: COUNT_WIDTH, align: "right" },
           {
             // Lines not brought in: already in OneBook, or dated before the feed's start (2.48).
             title: "Skipped",
             dataIndex: "skipped",
-            width: 90,
+            width: COUNT_WIDTH,
             align: "right",
             render: (skipped: number) =>
               skipped > 0 ? (
@@ -166,7 +173,7 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
           {
             title: "",
             key: "undo",
-            width: 100,
+            width: 88,
             align: "right",
             render: (_, row) => {
               if (!canWrite || row.status === "undone") return null;
