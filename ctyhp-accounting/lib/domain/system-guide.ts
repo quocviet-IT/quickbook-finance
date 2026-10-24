@@ -47,8 +47,35 @@ export interface GuideCaution {
   body: string;
 }
 
+/**
+ * Where a workflow belongs, as the sidebar groups the screens (2.51). The guide
+ * lists its workflows under these headings, so a reader looking for "paying a
+ * supplier" scans one short group rather than one long list.
+ */
+export type GuideAreaId = "sales" | "purchases" | "inventory" | "banking" | "accounting" | "data" | "controls";
+
+export interface GuideArea {
+  id: GuideAreaId;
+  title: string;
+  /** One line under the heading: what the group covers. */
+  blurb: string;
+}
+
+/** In the order the sidebar shows them, then what sits under Settings. */
+export const GUIDE_AREAS: readonly GuideArea[] = [
+  { id: "sales", title: "Sales", blurb: "Quotes, invoices and the money customers pay." },
+  { id: "purchases", title: "Purchases", blurb: "Purchase orders, bills and paying suppliers." },
+  { id: "inventory", title: "Inventory", blurb: "What is on the shelf and what it is worth." },
+  { id: "banking", title: "Banking", blurb: "Bank lines in, matched to the books, reconciled." },
+  { id: "accounting", title: "Accounting & close", blurb: "Budgets, sales tax, month-end and year-end." },
+  { id: "data", title: "Data & setup", blurb: "Bringing books in, and getting them back from a backup." },
+  { id: "controls", title: "Controls & support", blurb: "Who may do what, and how to tell us something is wrong." },
+];
+
 export interface GuideFlow {
   id: string;
+  /** The heading it is listed under (2.51). */
+  area: GuideAreaId;
   title: string;
   /** Why the flow exists, in one sentence a non-accountant can follow. */
   purpose: string;
@@ -59,59 +86,96 @@ export interface GuideFlow {
   steps: GuideStep[];
 }
 
+import { APP_VERSION } from "./changelog";
+
 /**
  * The product's version, not the guide's. A person saying "I am on 1.1" means
  * the whole application, so there is one number and the changelog owns it.
  */
 export { APP_VERSION as GUIDE_VERSION } from "./changelog";
 
-/** Shown before any workflow: what this build is and is not. */
+/**
+ * About OneBook (2.51): what this build is, what it is built on, and where to
+ * look when something seems wrong. Until 2.51 these said "This is version 1",
+ * a first release in a test round, and that every figure was test data, which
+ * stopped being true when companies began keeping their real books here. What
+ * the open company's figures are is now said per company: `companyNotice`.
+ */
 export const GUIDE_NOTICES = [
   {
     id: "version",
-    title: "This is version 1",
+    title: `You are on OneBook ${APP_VERSION}`,
     body:
-      "Every accounting module is in place and covered by automated tests, but this " +
-      "is a first release. Expect rough edges in wording and layout rather than in " +
-      "the numbers: the ledger, the reports and the period controls are verified " +
-      "against the double-entry rules on every change.",
-  },
-  {
-    id: "test-data",
-    title: "The data you see is test data",
-    body:
-      "Customers, vendors, invoices, bills and balances in this environment were " +
-      "created for testing. Nothing here is a real transaction, so explore freely — " +
-      "post, void, reconcile, close a period. Do not treat any figure on screen as " +
-      "an actual company balance.",
+      "OneBook is in day-to-day use. Every release is listed under What's new with " +
+      "the date it went live and the screens it changed, and the number above is " +
+      "the version this browser is running. The ledger, the reports and the period " +
+      "controls are checked against the double-entry rules by automated tests on " +
+      "every change, before it reaches you.",
   },
   {
     id: "provenance",
-    title: "Built from standard accounting practice, to be tuned to yours",
+    title: "Built on standard accounting practice",
     body:
-      "The workflows follow established US accounting software practice — the same " +
+      "The workflows follow established US accounting software practice, the same " +
       "ground QuickBooks covers: a double-entry ledger as the single source of " +
       "truth, documents that post to it, control accounts that reconcile, and " +
-      "periods that close. Where your way of working differs, that is a change we " +
-      "make after this test round: tell us through the Report button and it becomes " +
-      "a tracked item.",
+      "periods that close. Where your way of working differs, tell us through the " +
+      "Report button and it becomes a tracked item.",
   },
   {
     id: "status",
-    title: "If something looks broken, One Book will tell you whether it is",
+    title: "If something looks broken, OneBook will tell you whether it is",
     body:
-      "Open /status and it says whether One Book itself is answering: the database, " +
+      "Open /status and it says whether OneBook itself is answering: the database, " +
       "the sign-in service and the configuration, each on its own line, with a Check " +
-      "again button. It works while you are signed out and while One Book is in " +
+      "again button. It works while you are signed out and while OneBook is in " +
       "trouble, because those are the two moments you would go looking. If it says " +
-      "One Book is working and a screen still misbehaves, the problem is not with " +
-      "One Book — worth knowing before anybody telephones.",
+      "OneBook is working and a screen still misbehaves, the problem is not with " +
+      "OneBook, which is worth knowing before anybody telephones.",
   },
 ] as const;
+
+/** The company whose books are open, as the guide needs it. */
+export interface GuideCompany {
+  name: string;
+  isSample: boolean;
+}
+
+/**
+ * What the figures on screen are, for the company that is open (2.51). A sample
+ * company's are invented and safe to experiment on; a live company's are its
+ * real books, where posting, voiding and closing change records.
+ */
+export function companyNotice(company: GuideCompany | null): {
+  tone: "sample" | "live";
+  title: string;
+  body: string;
+} | null {
+  if (!company) return null;
+  if (company.isSample) {
+    return {
+      tone: "sample",
+      title: `${company.name} is a sample company`,
+      body:
+        "Its customers, vendors, invoices and balances were made up for trying " +
+        "OneBook out. Post, void, reconcile or close a period freely: no figure " +
+        "here belongs to a real business.",
+    };
+  }
+  return {
+    tone: "live",
+    title: `These are ${company.name}'s live books`,
+    body:
+      "Posting, voiding, reconciling and closing a period here change real records, " +
+      "and each is kept in the audit log. To try something out first, switch to a " +
+      "sample company in the company list at the top of the screen.",
+  };
+}
 
 export const GUIDE_FLOWS: GuideFlow[] = [
   {
     id: "get-paid",
+    area: "sales",
     title: "Invoice a customer and get paid",
     purpose:
       "Bill a customer for work, then record the money when it arrives, so the " +
@@ -176,6 +240,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "quote-a-price",
+    area: "sales",
     title: "Give a customer an estimate and turn it into an invoice",
     purpose:
       "Promise a customer a price before the sale, then make the invoice from it when they accept. " +
@@ -242,6 +307,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "correct-a-sale",
+    area: "sales",
     title: "Correct or cancel a sale",
     purpose: "Undo or reduce something already issued, without editing history.",
     route: "/invoices",
@@ -281,6 +347,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "pay-suppliers",
+    area: "purchases",
     title: "Record what you owe and pay it",
     purpose: "Capture supplier bills and expenses, then settle them.",
     route: "/bills",
@@ -334,6 +401,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "purchasing",
+    area: "purchases",
     title: "Order stock and receive it",
     purpose:
       "Commit to a purchase, receive what arrives, and let the bill match both.",
@@ -383,6 +451,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "budget",
+    area: "accounting",
     title: "Set a budget and compare it with the books",
     purpose: "Plan the year's income and spending, then see how the actual figures are tracking.",
     route: "/reports",
@@ -421,6 +490,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "count-stock",
+    area: "inventory",
     title: "Count stock",
     purpose: "Count what is on the shelves and correct the inventory on the books to it.",
     route: "/inventory/stock-count",
@@ -459,6 +529,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "banking",
+    area: "banking",
     title: "Match the bank and reconcile",
     purpose:
       "Prove that what the ledger says about cash agrees with what the bank says.",
@@ -792,6 +863,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "period-close",
+    area: "accounting",
     title: "Close an accounting period",
     purpose: "Freeze a month so its reports stop moving.",
     route: "/settings/periods",
@@ -865,6 +937,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "sales-tax",
+    area: "accounting",
     title: "Handle US sales tax",
     purpose: "Collect the right tax, then report and remit it.",
     route: "/sales-tax",
@@ -900,6 +973,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "year-end",
+    area: "accounting",
     title: "Prepare vendor 1099 information",
     purpose: "Gather what a 1099 filing needs, for review by a tax professional.",
     route: "/reports/1099",
@@ -924,6 +998,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "governance",
+    area: "controls",
     title: "Control who can do what",
     purpose: "Give people the access their job needs, and no more.",
     route: "/settings/users",
@@ -960,6 +1035,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "restore-a-backup",
+    area: "data",
     title: "Find a backup, and open it as a second company to compare against",
     purpose:
       "Your books are copied on a schedule. When a figure looks wrong, open the copy from before "
@@ -1036,6 +1112,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "import-transactions",
+    area: "data",
     title: "Bring across a list of transactions you have already categorized",
     purpose:
       "Load an export where every row already says which bank the money moved through and which "
@@ -1196,6 +1273,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "import-a-ledger",
+    area: "data",
     title: "Bring a company's books across from QuickBooks or Wave",
     purpose:
       "Load a general ledger exported from another product so its accounts, its " +
@@ -1344,6 +1422,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
   },
   {
     id: "feedback",
+    area: "controls",
     title: "Tell us what is wrong or missing",
     purpose:
       "During this test round, this is the channel that turns what you notice into a " +

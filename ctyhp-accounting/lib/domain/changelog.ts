@@ -41,6 +41,31 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.51",
+    date: "2026-10-24",
+    headline: "The System guide is redesigned: four tabs, workflows grouped by area with numbered steps, and notes that match the version you are on.",
+    changes: [
+      {
+        kind: "changed",
+        title: "A redesigned System guide",
+        detail:
+          "The Guide button opens a wider guide in four tabs. This screen shows where you are and the workflows that start or pass through it. Workflows groups all 16 by area, from Sales to Controls & support; each says what it is for and how many steps it has, and opens to numbered steps naming the button and the page it is on. What's new lists every release on one line, newest first and newly released ones marked New, to open for the details. About OneBook holds the notes that used to sit at the bottom. The search still looks through the workflows and the release notes at once.",
+      },
+      {
+        kind: "fixed",
+        title: "The guide says which version you are on and what the figures are",
+        detail:
+          "The guide no longer calls this version 1, a first release in a test round, or says every figure is test data. It names the version this browser is running, and says per company whether its figures are invented, in a sample company, or real records, in live books.",
+      },
+      {
+        kind: "fixed",
+        title: "The help buttons no longer cover the guide",
+        detail:
+          "Report, Ask AI and Guide stay out of sight while the guide or Ask AI is open, instead of sitting on its last lines with a tooltip over the text.",
+      },
+    ],
+  },
+  {
     version: "2.50",
     date: "2026-10-24",
     headline: "Bank feed syncs keeps the bank's name on one line.",

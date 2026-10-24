@@ -11,6 +11,7 @@ import {
 import AskAiPanel from "@/components/ai/AskAiPanel";
 import ReportDialog from "@/components/feedback/ReportDialog";
 import SystemGuideDrawer from "@/components/guide/SystemGuideDrawer";
+import type { GuideCompany } from "@/lib/domain/system-guide";
 import { releasesSince } from "@/lib/domain/changelog";
 import {
   lastReleaseSeen,
@@ -45,7 +46,7 @@ import {
 /** Space between the bottom of a page's content and the top of the cluster, once scrolled to the end. */
 const CLEARANCE_GAP = 12;
 
-export default function AssistantLauncher() {
+export default function AssistantLauncher({ company = null }: { company?: GuideCompany | null } = {}) {
   const box = useRef<HTMLDivElement>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -89,7 +90,14 @@ export default function AssistantLauncher() {
 
   return (
     <>
-      <div ref={box} className="assistant-launcher" data-feedback-chrome="true">
+      {/* Out of sight while the guide or Ask AI is open (2.51): the cluster sat on
+          the drawer's last lines, its tooltip over the text. Hidden, not removed,
+          so the room it reserves at the foot of the page does not jump. */}
+      <div
+        ref={box}
+        className={`assistant-launcher${guideOpen || askOpen ? " assistant-launcher--behind-panel" : ""}`}
+        data-feedback-chrome="true"
+      >
         {collapsed ? (
           <Tooltip title="Show Report, Ask AI and Guide" placement="left">
             <Badge dot={hasNews} offset={[-4, 4]}>
@@ -170,7 +178,7 @@ export default function AssistantLauncher() {
         }}
       />
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
-      <SystemGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
+      <SystemGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} company={company} />
     </>
   );
 }

@@ -476,7 +476,13 @@ export default function AppShell({
           <div className="app-shell__content-inner">{children}</div>
         </Content>
       </Layout>
-      <AssistantLauncher />
+      <AssistantLauncher
+        company={
+          activeCompany
+            ? { name: activeCompany.dbaName || activeCompany.legalName, isSample: activeCompany.isSample }
+            : null
+        }
+      />
     </Layout>
   );
 }
