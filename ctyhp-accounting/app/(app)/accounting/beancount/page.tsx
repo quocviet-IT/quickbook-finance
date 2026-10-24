@@ -25,7 +25,8 @@ export default async function BeancountPage() {
 
   const displayName = entity.active?.dbaName || entity.active?.legalName || company?.legal_name || "Company name not set";
   // Named as the file itself will be: after the legal name in company settings.
-  const fileName = beancountFileName(company?.legal_name ?? displayName);
+  // Settings never saved (2.49): the export titles the file with the company list's legal name, so the page does too.
+  const fileName = beancountFileName(company?.legal_name ?? entity.active?.legalName ?? displayName);
 
   return (
     <div>
@@ -40,6 +41,7 @@ export default async function BeancountPage() {
         summary={summary}
         summaryError={summaryError}
         canExport={canExport}
+        settingsSaved={company !== null}
       />
     </div>
   );

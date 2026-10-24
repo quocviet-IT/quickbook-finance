@@ -194,8 +194,19 @@ export async function readBalanceAssertionRows(sb: SupabaseClient): Promise<Bala
   };
 }
 
-/** Everything `buildBeancountFile` needs. Throws if any read fails. */
-export async function readBeancountInput(sb: SupabaseClient, generatedAt: string): Promise<BeancountInput> {
+/**
+ * Everything `buildBeancountFile` needs. Throws if any read fails.
+ *
+ * `registerName` is the company's name in the company list. A company whose
+ * settings were never saved (provisioning did not write them before 2.49) is
+ * titled with it, on the settings' own defaults: January and accrual. Without
+ * it, missing settings still refuse the file, which would have no title.
+ */
+export async function readBeancountInput(
+  sb: SupabaseClient,
+  generatedAt: string,
+  registerName: string | null = null,
+): Promise<BeancountInput> {
   const [
     accounts,
     entries,
@@ -268,7 +279,9 @@ export async function readBeancountInput(sb: SupabaseClient, generatedAt: string
     readBalanceAssertionRows(sb),
   ]);
 
-  if (!company) throw new BeancountExportError("Company settings are not set, so the file would have no title");
+  if (!company && !registerName?.trim()) {
+    throw new BeancountExportError("Company settings are not set, so the file would have no title");
+  }
 
   const partyByEntryId = new Map<string, string>();
   for (const t of transactions) if (t.partyName) partyByEntryId.set(t.entryId, t.partyName);
@@ -284,11 +297,13 @@ export async function readBeancountInput(sb: SupabaseClient, generatedAt: string
   return {
     // Only the three fields the file names. `ein_ref` — the TIN — is never
     // copied out of the settings row, so it cannot reach the file.
-    company: {
-      legalName: company.legal_name,
-      fiscalYearStartMonth: company.fiscal_year_start_month,
-      accountingBasis: company.accounting_basis,
-    },
+    company: company
+      ? {
+          legalName: company.legal_name,
+          fiscalYearStartMonth: company.fiscal_year_start_month,
+          accountingBasis: company.accounting_basis,
+        }
+      : { legalName: (registerName as string).trim(), fiscalYearStartMonth: 1, accountingBasis: "accrual" },
     generatedAt,
     accounts: accounts.map(toBeancountAccount),
     entries: entries.map<BeancountEntry>((e) => ({

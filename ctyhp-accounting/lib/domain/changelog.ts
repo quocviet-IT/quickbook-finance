@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.49",
+    date: "2026-10-24",
+    headline: "A new company has its company settings from the start, and the Beancount export no longer stops when they were never saved.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A new company starts with its company settings",
+        detail:
+          "Creating a company now also saves its company settings, under the name it was created with, on the defaults Settings › Company shows: US dollars, January, the accrual basis and the default time zone. Until now a company had no settings at all until someone saved Settings › Company, so the Beancount export refused to run and every screen that reads the time zone or the fiscal year used a default nobody had chosen.",
+        route: "/settings/company",
+      },
+      {
+        kind: "fixed",
+        title: "The Beancount export works before company settings are saved",
+        detail:
+          "When a company's settings have never been saved, Beancount Export no longer says the ledger could not be read. The file takes its title from the company list, and the page says so, with a link to Settings › Company to set the company's own legal name, time zone and fiscal year.",
+        route: "/accounting/beancount",
+      },
+    ],
+  },
+  {
     version: "2.48",
     date: "2026-10-24",
     headline: "Connecting a bank no longer brings in a second copy of the transactions already imported from its statements.",
