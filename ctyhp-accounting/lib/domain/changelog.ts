@@ -62,6 +62,27 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.48",
+    date: "2026-10-24",
+    headline: "Connecting a bank no longer brings in a second copy of the transactions already imported from its statements.",
+    changes: [
+      {
+        kind: "changed",
+        title: "A bank feed skips lines already in OneBook",
+        detail:
+          "Connecting a bank brings in about the last 6 months of its transactions, so an account whose statements were already imported would have had those lines twice in Bank Transactions. Connect bank now starts each account's feed on the date of its last line already in OneBook, and the date can be changed or cleared; lines dated before it are skipped. From that date on, a transaction is skipped when the account already holds a line of the same amount dated within 2 days of it, from a statement import or from an earlier connection to the same bank. Each line already here stands for one transaction only, so two identical charges are still two lines. A pending transaction is brought in, and the posted one that replaces it is checked when it arrives. Nothing from a bank feed is ever posted to the books without someone coding or matching it.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Bank feed syncs show what was skipped",
+        detail:
+          "Bank feed syncs has a Skipped column, and the message after Connect and synchronize or Sync now says how many lines were skipped as already in OneBook or dated before the feed's start. A sync that only skipped lines is listed too.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.47",
     date: "2026-10-23",
     headline: "Credit cards' unreconciled activity is on the dashboard and in the month-end checklist, and a phone in dark mode no longer shows a white band below a short page.",

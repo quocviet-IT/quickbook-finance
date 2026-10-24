@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
+import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import {
   Alert,
   App,
   Button,
   Card,
+  DatePicker,
   Form,
   Input,
   Modal,
@@ -98,12 +100,14 @@ import { formatDate, formatDateTime, formatMoney, plural } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { codableAccount, codingAccountOf, type CodingSuggestionView } from "@/lib/domain/coding";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
+import { connectedMessage, defaultFeedStart, feedStartNote, syncedMessage } from "@/lib/domain/bank-feed-start";
 import { directionOf } from "@/lib/domain/coding-names";
 import CodingSuggestionsBar from "./CodingSuggestionsBar";
 import CodeAllModal, { type CodeAllRow } from "./CodeAllModal";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "./rules/RuleFormModal";
 import {
   approveReconciliationAction,
+  bankFeedStartDefaultsAction,
   connectPlaidBankAction,
   createBankAccountAction,
   createPlaidLinkTokenAction,
@@ -273,6 +277,11 @@ export default function BankingClient({
 
   const [pendingLink, setPendingLink] = useState<PendingPlaidLink | null>(null);
   const [mappingSelections, setMappingSelections] = useState<Record<string, string | undefined>>({});
+  // Where each mapped account's feed starts (2.48): offered as the date of its
+  // last line already in OneBook, so the bank's six months of history do not
+  // bring in a second copy of what the statements already did.
+  const [mappingStarts, setMappingStarts] = useState<Record<string, string | null>>({});
+  const [lastLines, setLastLines] = useState<Record<string, string> | null>(null);
   const oauthResumeStarted = useRef(false);
 
   // Anywhere money may actually land. A heading cannot carry a balance, and an
@@ -403,6 +412,22 @@ export default function BankingClient({
           initialSelections[providerAccount.id] = maskMatch?.id;
         }
         setMappingSelections(initialSelections);
+        setMappingStarts({});
+        setLastLines(null);
+        void bankFeedStartDefaultsAction()
+          .then((result) => {
+            const defaults = result.ok && result.data ? result.data : {};
+            setLastLines(defaults);
+            setMappingStarts(
+              Object.fromEntries(
+                Object.entries(initialSelections).map(([providerId, bookId]) => [
+                  providerId,
+                  bookId ? defaultFeedStart(defaults[bookId]) : null,
+                ]),
+              ),
+            );
+          })
+          .catch(() => setLastLines({}));
         setPendingLink({
           publicToken,
           institutionId: metadata.institution.institution_id,
@@ -453,9 +478,11 @@ export default function BankingClient({
       .map((account) => ({
         provider_account_id: account.id,
         bank_account_id: mappingSelections[account.id],
+        feed_starts_on: mappingStarts[account.id] ?? null,
       }))
-      .filter((mapping): mapping is { provider_account_id: string; bank_account_id: string } =>
-        Boolean(mapping.bank_account_id),
+      .filter(
+        (mapping): mapping is { provider_account_id: string; bank_account_id: string; feed_starts_on: string | null } =>
+          Boolean(mapping.bank_account_id),
       );
     if (!mappings.length) {
       message.error("Map at least one connected account to a ledger bank account");
@@ -478,9 +505,7 @@ export default function BankingClient({
       message.error(result.error ?? "Unable to save the bank connection");
       return;
     }
-    message.success(
-      `Bank connected. Imported ${plural(result.data.added, "transaction")} and created ${plural(result.data.suggestions, "match suggestion")}.`,
-    );
+    message.success(connectedMessage(result.data), 8);
     setPendingLink(null);
     window.location.reload();
   }
@@ -496,10 +521,7 @@ export default function BankingClient({
       setImportsKey((count) => count + 1);
       return;
     }
-    message.success(
-      `Synchronized: ${result.data.added} new, ${result.data.modified} updated, ` +
-        `${result.data.removed} removed, ${plural(result.data.suggestions, "match suggestion")}.`,
-    );
+    message.success(syncedMessage(result.data), 8);
     window.location.reload();
   }
 
@@ -1027,7 +1049,9 @@ export default function BankingClient({
         onOk={confirmPlaidMapping}
         onCancel={() => setPendingLink(null)}
         okText="Connect and synchronize"
-        okButtonProps={{ loading: busy === "plaid-save" }}
+        // Shut until each account's last line in OneBook is known: connecting
+        // before then would start every feed with no date at all.
+        okButtonProps={{ loading: busy === "plaid-save", disabled: lastLines === null }}
         width={700}
         destroyOnHidden
       >
@@ -1035,7 +1059,7 @@ export default function BankingClient({
           type="info"
           showIcon
           message="Map each external account to its matching General Ledger bank account."
-          description="Unmapped accounts will not be imported. Currency must agree between the provider and the ledger."
+          description="Unmapped accounts will not be imported. Currency must agree between the provider and the ledger. Nothing already in OneBook is brought in twice: each account's feed starts on the date of its last line here, and a line already here is skipped."
           style={{ marginBottom: 16 }}
         />
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -1050,9 +1074,14 @@ export default function BankingClient({
                 placeholder="Select General Ledger bank account"
                 style={{ width: "100%", marginTop: 6 }}
                 value={mappingSelections[account.id]}
-                onChange={(value) =>
-                  setMappingSelections((current) => ({ ...current, [account.id]: value }))
-                }
+                onChange={(value) => {
+                  setMappingSelections((current) => ({ ...current, [account.id]: value }));
+                  // Another account in the books: its own last line decides where the feed starts.
+                  setMappingStarts((current) => ({
+                    ...current,
+                    [account.id]: value ? defaultFeedStart(lastLines?.[value]) : null,
+                  }));
+                }}
                 options={bankAccounts
                   .filter((bookAccount) => !connectedBookAccountIds.has(bookAccount.id))
                   .map((bookAccount) => ({
@@ -1060,6 +1089,34 @@ export default function BankingClient({
                     label: `${bookAccount.account_code} — ${bookAccount.account_name} (${bookAccount.currency_code})`,
                   }))}
               />
+              {mappingSelections[account.id] ? (
+                <div style={{ marginTop: 8 }}>
+                  <Space wrap size={8} align="center">
+                    <Typography.Text>Start the feed on</Typography.Text>
+                    <DatePicker
+                      aria-label={`Start the feed for ${account.name} on`}
+                      allowClear
+                      placeholder="All history"
+                      disabled={lastLines === null}
+                      value={mappingStarts[account.id] ? dayjs(mappingStarts[account.id]) : null}
+                      onChange={(day) =>
+                        setMappingStarts((current) => ({
+                          ...current,
+                          [account.id]: day ? day.format("YYYY-MM-DD") : null,
+                        }))
+                      }
+                    />
+                  </Space>
+                  <Typography.Paragraph type="secondary" style={{ margin: "4px 0 0", fontSize: 12 }}>
+                    {lastLines === null
+                      ? "Reading this account's last line in OneBook…"
+                      : feedStartNote(
+                          mappingStarts[account.id] ?? null,
+                          lastLines[mappingSelections[account.id] as string] ?? null,
+                        )}
+                  </Typography.Paragraph>
+                </div>
+              ) : null}
             </div>
           ))}
         </Space>

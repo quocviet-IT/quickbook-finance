@@ -27,6 +27,7 @@ const sync = (extra: Partial<BankFeedSyncView> = {}): BankFeedSyncView => ({
   changes: 3,
   isNewest: true,
   lockedLines: 0,
+  skipped: 0,
   ...extra,
 });
 
