@@ -18,6 +18,7 @@ import type { JournalEntrySummary } from "@/lib/services/journal";
 
 const SOURCES = [
   "invoice",
+  "sales_receipt",
   "payment",
   "manual",
   "bank",

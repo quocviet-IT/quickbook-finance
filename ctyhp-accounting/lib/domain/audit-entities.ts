@@ -20,6 +20,7 @@ export const ACTIVITY_ENTITIES: Record<
 > = {
   acc_invoice: { entity: "Invoice", href: "/invoices", category: "sales" },
   acc_estimate: { entity: "Estimate", href: "/estimates", category: "sales" },
+  acc_sales_receipt: { entity: "Sales receipt", href: "/sales-receipts", category: "sales" },
   acc_payment: { entity: "Customer payment", href: "/payments", category: "sales" },
   acc_credit_memo: { entity: "Credit memo", href: "/credit-memos", category: "sales" },
   acc_bill: { entity: "Bill", href: "/bills", category: "purchases" },

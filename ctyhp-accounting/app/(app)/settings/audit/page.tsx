@@ -30,6 +30,7 @@ const AUDITED_TABLES = [
   "acc_purchase_order",
   "acc_purchasing_config",
   "acc_role_permission",
+  "acc_sales_receipt",
   "acc_statement_reconciliation",
   "acc_stock_count",
   "acc_tax_code",

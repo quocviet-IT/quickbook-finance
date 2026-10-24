@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.53",
+    date: "2026-10-24",
+    headline: "Sales Receipts: a sale the customer pays for on the spot is recorded, and posted, in one step.",
+    changes: [
+      {
+        kind: "added",
+        title: "Sales Receipts",
+        detail:
+          "Sales › Sales Receipts, and Sales receipt in the New menu, record a sale paid there and then by cash, check, card or transfer. Choose the customer and the lines as on an invoice and where the money went; Save and post numbers it SR-000001 onwards and posts the sale and the money together, so nothing goes to Accounts Receivable. The money goes to the first bank account unless you choose another, or 1210 Undeposited Funds for takings banked later. Its tax is collected tax on Sales Tax, its income is the customer's on Sales by Customer, an item kept in stock comes off the shelf, and Download PDF prints a Sales Receipt that ends Paid in full. A saved receipt is not edited: Void it with a reason and enter the sale again.",
+        route: "/sales-receipts",
+      },
+    ],
+  },
+  {
     version: "2.52",
     date: "2026-10-24",
     headline: "Attachments can be uploaded and opened: they no longer wait for a virus scanner that was never set up.",

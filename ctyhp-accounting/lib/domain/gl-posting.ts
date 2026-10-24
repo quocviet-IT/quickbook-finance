@@ -155,6 +155,7 @@ export const POSTING_VERDICT_LABEL: Record<PostingVerdict, string> = {
 
 export const SOURCE_TYPE_LABEL: Record<string, string> = {
   invoice: "Invoice",
+  sales_receipt: "Sales receipt",
   bill: "Bill",
   customer_payment: "Customer payment",
   vendor_payment: "Vendor payment",

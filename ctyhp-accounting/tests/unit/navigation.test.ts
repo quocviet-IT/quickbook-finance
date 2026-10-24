@@ -125,6 +125,7 @@ describe("NAV tree", () => {
       "/customers",
       "/items",
       "/invoices",
+      "/sales-receipts",
       "/estimates",
       "/payments",
       "/credit-memos",
@@ -377,6 +378,7 @@ describe("NEW_MENU", () => {
     expect(NEW_MENU.map((i) => i.key)).toEqual([
       "invoice",
       "estimate",
+      "sales-receipt",
       "payment",
       "bill",
       "pay-bills",
@@ -393,6 +395,7 @@ describe("NEW_MENU", () => {
 describe("searchKindLabel", () => {
   it("labels every kind the search returns", () => {
     expect(searchKindLabel("invoice")).toBe("Invoice");
+    expect(searchKindLabel("sales_receipt")).toBe("Sales receipt");
     expect(searchKindLabel("bill_payment")).toBe("Bill payment");
     expect(searchKindLabel("purchase_order")).toBe("Purchase order");
     expect(searchKindLabel("customer")).toBe("Customer");
