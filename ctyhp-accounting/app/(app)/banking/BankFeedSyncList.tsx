@@ -149,6 +149,21 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
           { title: "Changed", dataIndex: "modified", width: 90, align: "right" },
           { title: "Removed", dataIndex: "removed", width: 90, align: "right" },
           {
+            // Lines not brought in: already in OneBook, or dated before the feed's start (2.48).
+            title: "Skipped",
+            dataIndex: "skipped",
+            width: 90,
+            align: "right",
+            render: (skipped: number) =>
+              skipped > 0 ? (
+                <Tooltip title="Not brought in: already in OneBook from a statement or another connection, or dated before the feed's start">
+                  <span>{skipped}</span>
+                </Tooltip>
+              ) : (
+                skipped
+              ),
+          },
+          {
             title: "",
             key: "undo",
             width: 100,

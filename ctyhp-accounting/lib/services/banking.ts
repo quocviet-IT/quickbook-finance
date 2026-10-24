@@ -14,6 +14,7 @@ import { BANK_LINE_SOURCES, otherSourceLines, type BankLineOn, type BankLineSour
 import { statementDays } from "@/lib/domain/statement-line-keys";
 import { BANK_DETAIL_TYPES } from "@/lib/domain/bank-account-detail";
 import { isCardAccountType } from "@/lib/domain/card-account";
+import { validFeedStart, type FeedSkips } from "@/lib/domain/bank-feed-start";
 import {
   matchLedgerTransactions,
   type BankTxnLite,
@@ -538,6 +539,22 @@ export async function listBankConnections(sb: SupabaseClient): Promise<BankConne
 export interface PlaidAccountMappingInput {
   provider_account_id: string;
   bank_account_id: string;
+  /** Lines dated before it are not brought in (2.48); none brings in all the bank sends. */
+  feed_starts_on?: string | null;
+}
+
+/**
+ * Each bank account's last line in OneBook (0161): what Connect bank offers as
+ * the date its feed starts. Reads only; one row per account that holds a line.
+ */
+export async function getBankFeedStartDefaults(sb: SupabaseClient): Promise<Record<string, string>> {
+  const { data, error } = await sb.rpc("acc_bank_feed_start_defaults");
+  if (error) throw new BankingError(error.message);
+  const out: Record<string, string> = {};
+  for (const row of (data ?? []) as { bank_account_id: string; last_line_on: string | null }[]) {
+    if (row.last_line_on) out[row.bank_account_id] = row.last_line_on;
+  }
+  return out;
 }
 
 export interface ConnectedPlaidResult {
@@ -584,7 +601,14 @@ export async function connectPlaidBank(
     const mapping = mappingByProvider.get(account.account_id);
     if (!mapping) throw new BankingError(`Ledger mapping is missing for ${account.name}`);
     const current = account.balances.current;
+    let feedStartsOn: string | null;
+    try {
+      feedStartsOn = validFeedStart(mapping.feed_starts_on);
+    } catch (error) {
+      throw new BankingError(`${account.name}: ${(error as Error).message}`);
+    }
     return {
+      feed_starts_on: feedStartsOn,
       bank_account_id: mapping.bank_account_id,
       provider_account_id: account.account_id,
       account_name: account.official_name || account.name,
@@ -626,7 +650,7 @@ interface NormalizedFeedTransaction {
   raw_hash: string;
 }
 
-export interface BankFeedSyncResult {
+export interface BankFeedSyncResult extends FeedSkips {
   added: number;
   modified: number;
   removed: number;
@@ -721,7 +745,7 @@ export async function syncBankConnection(
   });
   if (beginError) throw new BankingError(beginError.message);
 
-  const totals = { added: 0, modified: 0, removed: 0, suggestions: 0 };
+  const totals = { added: 0, modified: 0, removed: 0, suggestions: 0, beforeStart: 0, alreadyHere: 0 };
   let nextCursor = (connection as { sync_cursor: string | null }).sync_cursor;
   try {
     const [{ data: encryptedToken, error: tokenError }, { data: mappings, error: mappingError }] = await Promise.all([
@@ -775,10 +799,19 @@ export async function syncBankConnection(
         p_removed: removedChunks[index] ?? [],
       });
       if (applyError) throw new BankingError(applyError.message);
-      const counts = applied as { added?: number; modified?: number; removed?: number };
+      const counts = applied as {
+        added?: number;
+        modified?: number;
+        removed?: number;
+        skipped_before_start?: number;
+        skipped_already_here?: number;
+      };
       totals.added += Number(counts.added ?? 0);
       totals.modified += Number(counts.modified ?? 0);
       totals.removed += Number(counts.removed ?? 0);
+      // Lines already in OneBook, and lines dated before the feed starts (2.48, 0161).
+      totals.beforeStart += Number(counts.skipped_before_start ?? 0);
+      totals.alreadyHere += Number(counts.skipped_already_here ?? 0);
     }
 
     for (const bankAccountId of new Set((mappings ?? []).map((row) => row.bank_account_id as string))) {

@@ -71,10 +71,18 @@ describe("syncBankConnection", () => {
     const { sb, calls } = fakeClient({
       acc_begin_bank_feed_sync: "run-example-1",
       acc_get_bank_connection_token: "sealed-token",
-      acc_apply_bank_feed_page: { added: 1, modified: 1, removed: 1 },
+      acc_apply_bank_feed_page: { added: 1, modified: 1, removed: 1, skipped_before_start: 2, skipped_already_here: 3 },
     });
 
-    expect(await syncBankConnection(sb, "conn-1")).toEqual({ added: 1, modified: 1, removed: 1, suggestions: 0 });
+    // The page's skips (0161) are added up with the rest.
+    expect(await syncBankConnection(sb, "conn-1")).toEqual({
+      added: 1,
+      modified: 1,
+      removed: 1,
+      suggestions: 0,
+      beforeStart: 2,
+      alreadyHere: 3,
+    });
 
     const applies = calls.filter((call) => call.fn === "acc_apply_bank_feed_page");
     expect(applies).toHaveLength(1);

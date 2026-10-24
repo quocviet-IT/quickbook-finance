@@ -189,6 +189,7 @@ describe("the syncs of a bank account", () => {
       changes: 5,
       isNewest: true,
       lockedLines: 0,
+      skipped: 0,
     });
   });
 });
