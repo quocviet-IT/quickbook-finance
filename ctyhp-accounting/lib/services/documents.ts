@@ -42,7 +42,9 @@ export async function registerDocumentAttachment(
       description: input.description || null,
       storage_bucket: DOCUMENT_BUCKET,
       uploaded_by: userId,
-      scan_status: "pending",
+      // No malware scanner (2.52, migration 0162): a new file is "not scanned",
+      // the status every access check lets through.
+      scan_status: "not_configured",
     })
     .select(ATTACHMENT_COLUMNS)
     .single();
@@ -83,16 +85,6 @@ export async function updateDocumentGovernance(
   if (error) throw new DocumentsError(error.message);
 }
 
-export async function queueDocumentScan(
-  sb: SupabaseClient,
-  attachmentId: string,
-): Promise<void> {
-  const { error } = await sb.rpc("acc_queue_document_scan", {
-    p_attachment_id: attachmentId,
-  });
-  if (error) throw new DocumentsError(error.message);
-}
-
 export async function createDocumentAccessUrl(
   sb: SupabaseClient,
   attachmentId: string,
@@ -107,10 +99,11 @@ export async function createDocumentAccessUrl(
   if (attachmentError) throw new DocumentsError(attachmentError.message);
   if (!attachment) throw new DocumentsError("Attachment not found.");
   if (!documentCanBeAccessed(attachment.scan_status)) {
+    // Only a row from the scanner's time can be held back now.
     throw new DocumentsError(
       attachment.scan_status === "blocked"
-        ? "This attachment was quarantined after a security scan."
-        : "This attachment is unavailable until it passes security scanning.",
+        ? "This attachment was blocked and cannot be opened."
+        : "This attachment cannot be opened.",
     );
   }
 

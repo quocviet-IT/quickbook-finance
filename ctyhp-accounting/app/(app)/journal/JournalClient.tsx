@@ -40,7 +40,6 @@ interface Props {
   canGovernDocuments: boolean;
   /** May tick "Adjusting entry": the `journal.post` permission. */
   canMarkAdjusting: boolean;
-  scannerConfigured: boolean;
 }
 interface LineForm {
   account_id?: string;
@@ -64,7 +63,6 @@ export default function JournalClient({
   canManageDocuments,
   canGovernDocuments,
   canMarkAdjusting,
-  scannerConfigured,
 }: Props) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
@@ -424,7 +422,6 @@ export default function JournalClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

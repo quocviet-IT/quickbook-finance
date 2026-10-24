@@ -5,7 +5,6 @@ import {
   documentAttachmentCreateSchema,
   documentCanBeAccessed,
   documentGovernanceSchema,
-  documentScannerResponseSchema,
   fileExtensionForMime,
   formatDocumentFileSize,
   validateDocumentFile,
@@ -80,24 +79,12 @@ describe("document presentation helpers", () => {
     expect(() => fileExtensionForMime("application/x-msdownload")).toThrow(/unsupported/i);
   });
 
-  it("fails closed while a file is pending, blocked, or errored", () => {
+  it("opens a new, unscanned file at once and keeps a row from the scanner's time shut unless it passed (2.52)", () => {
     expect(documentCanBeAccessed("clean")).toBe(true);
     expect(documentCanBeAccessed("not_configured")).toBe(true);
     expect(documentCanBeAccessed("pending")).toBe(false);
     expect(documentCanBeAccessed("blocked")).toBe(false);
     expect(documentCanBeAccessed("error")).toBe(false);
-  });
-
-  it("requires a threat name when a scanner blocks a file", () => {
-    expect(documentScannerResponseSchema.safeParse({ verdict: "clean" }).success).toBe(true);
-    expect(documentScannerResponseSchema.safeParse({ verdict: "blocked" }).success).toBe(false);
-    expect(
-      documentScannerResponseSchema.safeParse({
-        verdict: "blocked",
-        engine: "ClamAV",
-        threat: "Eicar-Test-Signature",
-      }).success,
-    ).toBe(true);
   });
 
   it("validates retention and legal-hold governance changes", () => {

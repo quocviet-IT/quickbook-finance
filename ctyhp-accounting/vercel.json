@@ -9,10 +9,6 @@
       "schedule": "15 11 * * *"
     },
     {
-      "path": "/api/documents/scan",
-      "schedule": "30 11 * * *"
-    },
-    {
       "path": "/api/companies/provision",
       "schedule": "45 11 * * *"
     },

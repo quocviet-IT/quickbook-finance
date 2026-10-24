@@ -181,7 +181,6 @@ export default function BankingClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
-  scannerConfigured,
 }: {
   bankAccounts: BankAccountWithGl[];
   /** The labels a bank line may carry; a new one is appended as it is created. */
@@ -203,7 +202,6 @@ export default function BankingClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
-  scannerConfigured: boolean;
 }) {
   const { message } = App.useApp();
   const { timeZone } = useCompanyClock();
@@ -1004,7 +1002,6 @@ export default function BankingClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

@@ -6,7 +6,6 @@ import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import PurchaseOrdersClient from "./PurchaseOrdersClient";
 
@@ -69,7 +68,6 @@ export default async function PurchaseOrdersPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
-        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

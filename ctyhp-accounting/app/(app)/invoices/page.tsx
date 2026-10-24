@@ -10,7 +10,6 @@ import { listCustomerCredit } from "@/lib/services/credit";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { auditSequence, describeSequenceIntegrity } from "@/lib/domain/sequence";
 import { salesRevenueAccounts } from "@/lib/domain/accounts";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import { getEstimateInvoicePrefill } from "@/lib/services/estimates";
 import { estimateIdSchema } from "@/lib/domain/schemas";
 import type { EstimateInvoicePrefill } from "@/lib/domain/estimates";
@@ -172,7 +171,6 @@ export default async function InvoicesPage({
         canOverrideCredit={canOverrideCredit}
         defaultTermsDays={companySettings?.default_payment_terms_days ?? 30}
         sequenceWarning={sequenceWarning}
-        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

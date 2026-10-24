@@ -12,14 +12,10 @@ import {
 import { nextRecurringDate } from "@/lib/domain/recurring";
 import { listBankConnections, syncBankConnection } from "@/lib/services/banking";
 import { companyToday } from "@/lib/services/company";
-import {
-  listDocumentsAwaitingScan,
-  scanDocumentAttachment,
-} from "@/lib/services/document-scanner";
 import { generateRecurringTemplate, listDueRecurringTemplates } from "@/lib/services/recurring";
 
 /**
- * The three background jobs, run once per company.
+ * The two background jobs, run once per company (the document scan went in 2.52).
  *
  * Every quota below is *per company*. A busy company must not spend the budget
  * of the company after it in the register, so each worker starts from a fresh
@@ -37,8 +33,6 @@ const RECURRING_TEMPLATE_LIMIT = 50;
 const RECURRING_OCCURRENCE_LIMIT = 100;
 /** No single template may run away with a company's whole budget. */
 const RECURRING_TEMPLATE_OCCURRENCE_LIMIT = 12;
-/** At most this many attachments awaiting a scan per company, per run. */
-const DOCUMENT_ATTACHMENT_LIMIT = 20;
 
 interface CompanyDependencies {
   listCompanies?: () => Promise<AutomationCompany[]>;
@@ -266,78 +260,5 @@ export async function runRecurringAutomationJob(
     asOf: asOf ?? null,
     ...run,
     scheduleCount: sumOverCompanies(run.companies, (result) => result.scheduleCount),
-  };
-}
-
-// ----------------------------------------------------------- document scanning
-
-export interface DocumentScanItemResult {
-  attachmentId: string;
-  fileName: string;
-  status?: string;
-  ok: boolean;
-  error?: string;
-}
-
-export interface DocumentScanCompanyResult {
-  attachmentCount: number;
-  results: DocumentScanItemResult[];
-}
-
-export interface DocumentScanJobResult {
-  companyCount: number;
-  failedCompanyCount: number;
-  attachmentCount: number;
-  companies: CompanyRunResult<DocumentScanCompanyResult>[];
-}
-
-export interface DocumentScanJobDependencies extends CompanyDependencies {
-  listAwaitingScan?: (
-    sb: SupabaseClient,
-    limit: number,
-  ) => Promise<Array<{ id: string; file_name: string }>>;
-  scanAttachment?: (
-    sb: SupabaseClient,
-    attachmentId: string,
-  ) => Promise<{ scan_status: string; scan_error: string | null }>;
-}
-
-export async function runDocumentScanAutomationJob(
-  deps: DocumentScanJobDependencies = {},
-): Promise<DocumentScanJobResult> {
-  const listAwaitingScan = deps.listAwaitingScan ?? listDocumentsAwaitingScan;
-  const scanAttachment = deps.scanAttachment ?? scanDocumentAttachment;
-
-  const run = await runPerCompany<DocumentScanCompanyResult>(deps, async (_company, sb) => {
-    const attachments = await listAwaitingScan(sb, DOCUMENT_ATTACHMENT_LIMIT);
-    const results: DocumentScanItemResult[] = [];
-
-    // Sequential by design: one company must not flood the scanner either.
-    for (const attachment of attachments) {
-      try {
-        const scanned = await scanAttachment(sb, attachment.id);
-        results.push({
-          attachmentId: attachment.id,
-          fileName: attachment.file_name,
-          status: scanned.scan_status,
-          ok: scanned.scan_status === "clean" || scanned.scan_status === "blocked",
-          error: scanned.scan_error ?? undefined,
-        });
-      } catch (error) {
-        results.push({
-          attachmentId: attachment.id,
-          fileName: attachment.file_name,
-          ok: false,
-          error: error instanceof Error ? error.message : "Document scan failed",
-        });
-      }
-    }
-
-    return { attachmentCount: attachments.length, results };
-  });
-
-  return {
-    ...run,
-    attachmentCount: sumOverCompanies(run.companies, (result) => result.attachmentCount),
   };
 }

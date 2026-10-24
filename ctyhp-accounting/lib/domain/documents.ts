@@ -87,10 +87,6 @@ export const documentGovernanceSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 
-export const documentRescanSchema = z.object({
-  attachment_id: z.string().uuid(),
-});
-
 export const documentArchiveSchema = z.object({
   attachment_id: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
@@ -103,14 +99,12 @@ export const documentAccessSchema = z.object({
 
 export type DocumentAttachmentCreateInput = z.infer<typeof documentAttachmentCreateSchema>;
 
-export const documentScannerResponseSchema = z.object({
-  verdict: z.enum(["clean", "blocked"]),
-  engine: z.string().trim().min(1).max(100).optional(),
-  threat: z.string().trim().min(1).max(255).optional(),
-}).refine((value) => value.verdict !== "blocked" || Boolean(value.threat), {
-  message: "Blocked scanner responses require a threat name",
-});
-
+/**
+ * Whether a file may be opened. Since 2.52 there is no malware scanner: a new
+ * file is `not_configured` ("not scanned") and opens at once. `clean` and
+ * `blocked` can only be on a row from the scanner's time; a blocked one stays
+ * shut, as the storage policy (0122) and acc_log_document_access (0056) agree.
+ */
 export function documentCanBeAccessed(
   scanStatus: "not_configured" | "pending" | "clean" | "blocked" | "error",
 ): boolean {

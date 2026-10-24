@@ -148,7 +148,6 @@ interface FixedAssetsClientProps {
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
-  scannerConfigured: boolean;
   proceedsAccounts: AccountRow[];
   gainAccounts: AccountRow[];
   lossAccounts: AccountRow[];
@@ -238,7 +237,6 @@ export default function FixedAssetsClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
-  scannerConfigured,
   proceedsAccounts,
   gainAccounts,
   lossAccounts,
@@ -978,7 +976,6 @@ export default function FixedAssetsClient({
           target={attachmentTarget}
           canManage={canManageDocuments}
           canGovern={canGovernDocuments}
-          scannerConfigured={scannerConfigured}
           onClose={() => setAttachmentTarget(null)}
         />
       ) : null}

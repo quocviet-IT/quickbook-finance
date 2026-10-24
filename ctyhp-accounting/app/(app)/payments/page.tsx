@@ -4,7 +4,6 @@ import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import PageHeader from "@/components/PageHeader";
 import PaymentsClient from "./PaymentsClient";
 
@@ -61,7 +60,6 @@ export default async function PaymentsPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
-        scannerConfigured={isDocumentScannerConfigured()}
       />
     </div>
   );

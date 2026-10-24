@@ -32,7 +32,6 @@ import {
   FileTextOutlined,
   LockOutlined,
   PaperClipOutlined,
-  ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
@@ -48,6 +47,7 @@ import {
   type DocumentEntityType,
   type DocumentKind,
 } from "@/lib/domain/documents";
+import { plural } from "@/lib/format";
 import {
   calculateFileSha256,
   createDocumentStoragePath,
@@ -57,7 +57,6 @@ import {
   createDocumentAccessUrlAction,
   listDocumentAttachmentsAction,
   registerDocumentAttachmentAction,
-  rescanDocumentAttachmentAction,
   updateDocumentGovernanceAction,
 } from "@/app/(app)/documents/actions";
 
@@ -71,13 +70,11 @@ export default function AttachmentDrawer({
   target,
   canManage,
   canGovern,
-  scannerConfigured,
   onClose,
 }: {
   target: AttachmentTarget | null;
   canManage: boolean;
   canGovern: boolean;
-  scannerConfigured: boolean;
   onClose: () => void;
 }) {
   const { message } = App.useApp();
@@ -93,7 +90,6 @@ export default function AttachmentDrawer({
   const [archiveReason, setArchiveReason] = useState("");
   const [archiving, setArchiving] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [scanningId, setScanningId] = useState<string | null>(null);
   const [governanceTarget, setGovernanceTarget] =
     useState<DocumentAttachmentRow | null>(null);
   const [retentionUntil, setRetentionUntil] = useState<Dayjs | null>(null);
@@ -209,14 +205,7 @@ export default function AttachmentDrawer({
         throw new Error(result.error ?? "Could not register the uploaded file.");
       }
 
-      const scanStatus = result.data?.scan_status;
-      message.success(
-        scanStatus === "clean"
-          ? "Attachment uploaded and passed security scanning."
-          : scanStatus === "blocked"
-            ? "Attachment uploaded but quarantined by security scanning."
-            : "Attachment uploaded.",
-      );
+      message.success("Attachment uploaded.");
       setFileList([]);
       setDescription("");
       await refresh();
@@ -276,26 +265,6 @@ export default function AttachmentDrawer({
     message.success("Attachment archived. The stored evidence was retained.");
     setArchiveTarget(null);
     setArchiveReason("");
-    await refresh();
-  }
-
-  async function rescanAttachment(attachment: DocumentAttachmentRow) {
-    setScanningId(attachment.id);
-    const result = await rescanDocumentAttachmentAction({
-      attachment_id: attachment.id,
-    });
-    setScanningId(null);
-    if (!result.ok) {
-      message.error(result.error ?? "Could not scan the attachment.");
-      return;
-    }
-    if (result.data?.scan_status === "clean") {
-      message.success("Attachment passed security scanning.");
-    } else if (result.data?.scan_status === "blocked") {
-      message.error("Attachment was quarantined by security scanning.");
-    } else {
-      message.warning("The scanner could not verify this attachment.");
-    }
     await refresh();
   }
 
@@ -398,14 +367,10 @@ export default function AttachmentDrawer({
         className="document-attachment-drawer"
       >
         <Alert
-          type={scannerConfigured ? "success" : "warning"}
+          type="info"
           showIcon
           message="Private accounting evidence"
-          description={
-            scannerConfigured
-              ? "New files are scanned before access. Pending, failed, and unsafe files remain quarantined; every preview and download is logged."
-              : "Files are private and access is logged. Configure the malware scanner to quarantine unsafe uploads automatically."
-          }
+          description="Only people allowed to read documents can open these files, each link lasts one minute, and every preview and download is logged. PDF, image, CSV, Excel and Word files up to 10 MB."
         />
 
         {canManage ? (
@@ -423,7 +388,7 @@ export default function AttachmentDrawer({
                 setFileList([]);
                 return true;
               }}
-              disabled={uploading || !scannerConfigured}
+              disabled={uploading}
             >
               <p className="ant-upload-drag-icon">
                 <CloudUploadOutlined />
@@ -455,7 +420,7 @@ export default function AttachmentDrawer({
               type="primary"
               icon={<CloudUploadOutlined />}
               loading={uploading}
-              disabled={!selectedFile || !scannerConfigured}
+              disabled={!selectedFile}
               onClick={uploadAttachment}
             >
               Upload attachment
@@ -468,7 +433,7 @@ export default function AttachmentDrawer({
             <Typography.Title level={5} id="document-list-title">
               Attached files
             </Typography.Title>
-            <Typography.Text type="secondary">{attachments.length} files</Typography.Text>
+            <Typography.Text type="secondary">{plural(attachments.length, "file")}</Typography.Text>
           </div>
           <List
             loading={Boolean(targetKey) && attachmentState?.targetKey !== targetKey}
@@ -517,21 +482,6 @@ export default function AttachmentDrawer({
                     >
                       Download
                     </Button>,
-                    canManage &&
-                    scannerConfigured &&
-                    attachment.scan_status !== "clean" &&
-                    attachment.scan_status !== "pending" ? (
-                      <Tooltip title="Run the private malware scanner again" key="rescan">
-                        <Button
-                          type="text"
-                          icon={<ReloadOutlined />}
-                          loading={scanningId === attachment.id}
-                          onClick={() => rescanAttachment(attachment)}
-                        >
-                          Scan
-                        </Button>
-                      </Tooltip>
-                    ) : null,
                     canGovern ? (
                       <Button
                         key="governance"
@@ -574,22 +524,12 @@ export default function AttachmentDrawer({
                         ) : null}
                         <Space wrap>
                           <Tag>{kindLabel(attachment.document_kind)}</Tag>
-                          <ScanStatusTag status={attachment.scan_status} />
+                          {attachment.scan_status === "blocked" ? <Tag color="red">Blocked</Tag> : null}
                           {attachment.legal_hold ? <Tag color="purple">Legal hold</Tag> : null}
                           {attachment.retention_until ? (
                             <Tag color="blue">Retain until {attachment.retention_until}</Tag>
                           ) : null}
                         </Space>
-                        {attachment.threat_name ? (
-                          <Typography.Text type="danger">
-                            Threat: {attachment.threat_name}
-                          </Typography.Text>
-                        ) : null}
-                        {attachment.scan_error ? (
-                          <Typography.Text type="danger">
-                            Scan error: {attachment.scan_error}
-                          </Typography.Text>
-                        ) : null}
                       </Space>
                     }
                   />
@@ -688,18 +628,4 @@ function FileTypeIcon({ mimeType }: { mimeType: string }) {
     return <FileExcelOutlined className="document-file-icon document-file-icon--sheet" />;
   }
   return <FileTextOutlined className="document-file-icon" />;
-}
-
-function ScanStatusTag({ status }: { status: DocumentAttachmentRow["scan_status"] }) {
-  const config: Record<
-    DocumentAttachmentRow["scan_status"],
-    { color?: string; label: string }
-  > = {
-    not_configured: { color: "gold", label: "Not scanned" },
-    pending: { color: "processing", label: "Scan pending" },
-    clean: { color: "green", label: "Scan clean" },
-    blocked: { color: "red", label: "Blocked" },
-    error: { color: "red", label: "Scan error" },
-  };
-  return <Tag color={config[status].color}>{config[status].label}</Tag>;
 }

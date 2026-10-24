@@ -5,7 +5,6 @@ import { listFixedAssets } from "@/lib/services/fixed-assets";
 import { listBills, listVendors } from "@/lib/services/payables";
 import { listCurrencies } from "@/lib/services/reference";
 import { hasPermission } from "@/lib/services/access";
-import { isDocumentScannerConfigured } from "@/lib/services/document-scanner";
 import FixedAssetsClient from "./FixedAssetsClient";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +75,6 @@ export default async function FixedAssetsPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
-        scannerConfigured={isDocumentScannerConfigured()}
         proceedsAccounts={accounts.filter(
           (account) =>
             (account.account_type === "bank" ||

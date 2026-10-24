@@ -14,7 +14,7 @@ The dashboard emphasizes actionable exceptions: overdue receivables, bills due, 
 
 ## Documents
 
-Attachments use private object storage, file-type and size restrictions, collision-resistant hashes, malware-scan status, access logs, retention rules, and legal hold when configured. Issued documents preserve the template version used.
+Attachments use private object storage, file-type and size restrictions, collision-resistant hashes, access logs, retention rules, and legal hold when configured. Issued documents preserve the template version used.
 
 ## Imports
 
