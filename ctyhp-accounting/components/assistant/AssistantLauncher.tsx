@@ -10,8 +10,15 @@ import {
 } from "@ant-design/icons";
 import AskAiPanel from "@/components/ai/AskAiPanel";
 import ReportDialog from "@/components/feedback/ReportDialog";
-import SystemGuideDrawer from "@/components/guide/SystemGuideDrawer";
+import dynamic from "next/dynamic";
 import type { GuideCompany } from "@/lib/domain/system-guide";
+
+/**
+ * The guide's code arrives on the first press of Guide (2.51), not with every
+ * page: the 16 workflows, the tabs and the release notes are read by someone
+ * who asked for them, and every other page load no longer carries them.
+ */
+const SystemGuideDrawer = dynamic(() => import("@/components/guide/SystemGuideDrawer"), { ssr: false });
 import { releasesSince } from "@/lib/domain/changelog";
 import {
   lastReleaseSeen,
@@ -51,6 +58,12 @@ export default function AssistantLauncher({ company = null }: { company?: GuideC
   const [askOpen, setAskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  // Mounted from the first open on, so its close animation still plays.
+  const [guideMounted, setGuideMounted] = useState(false);
+  const openGuide = () => {
+    setGuideMounted(true);
+    setGuideOpen(true);
+  };
   // Nothing is rendered as unread on the server: it cannot know what this
   // browser has read, and a dot that appears then vanishes on every page load
   // is how people learn to ignore a dot.
@@ -147,7 +160,7 @@ export default function AssistantLauncher({ company = null }: { company?: GuideC
                 <Button
                   shape="round"
                   icon={<BookOutlined />}
-                  onClick={() => setGuideOpen(true)}
+                  onClick={openGuide}
                   aria-label={hasNews ? "System guide, with unread release notes" : "System guide"}
                 >
                   Guide
@@ -178,7 +191,9 @@ export default function AssistantLauncher({ company = null }: { company?: GuideC
         }}
       />
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
-      <SystemGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} company={company} />
+      {guideOpen || guideMounted ? (
+        <SystemGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} company={company} />
+      ) : null}
     </>
   );
 }

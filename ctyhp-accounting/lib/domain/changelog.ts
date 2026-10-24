@@ -49,7 +49,7 @@ export const RELEASES: Release[] = [
         kind: "changed",
         title: "A redesigned System guide",
         detail:
-          "The Guide button opens a wider guide in four tabs. This screen shows where you are and the workflows that start or pass through it. Workflows groups all 16 by area, from Sales to Controls & support; each says what it is for and how many steps it has, and opens to numbered steps naming the button and the page it is on. What's new lists every release on one line, newest first and newly released ones marked New, to open for the details. About OneBook holds the notes that used to sit at the bottom. The search still looks through the workflows and the release notes at once.",
+          "The Guide button opens a wider guide in four tabs. This screen shows where you are and the workflows that start or pass through it. Workflows groups all 16 by area, from Sales to Controls & support; each says what it is for and how many steps it has, and opens to numbered steps naming the button and the page it is on. What's new lists every release on one line, newest first and newly released ones marked New, to open for the details. About OneBook holds the notes that used to sit at the bottom. The search still looks through the workflows and the release notes at once. The guide now loads the first time Guide is pressed, so every other page loads a little less.",
       },
       {
         kind: "fixed",

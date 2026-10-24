@@ -35,6 +35,15 @@ describe("the System guide drawer (2.51)", () => {
   });
 });
 
+describe("the guide's code", () => {
+  it("arrives on the first press of Guide, not with every page", () => {
+    const launcher = read("components/assistant/AssistantLauncher.tsx");
+    expect(launcher).toContain('dynamic(() => import("@/components/guide/SystemGuideDrawer"), { ssr: false })');
+    expect(launcher).not.toMatch(/^import SystemGuideDrawer from/m);
+    expect(launcher).toMatch(/\{guideOpen \|\| guideMounted \? \(\s*<SystemGuideDrawer/);
+  });
+});
+
 describe("the help buttons while a panel is open", () => {
   it("step out of sight but keep their room", () => {
     const launcher = read("components/assistant/AssistantLauncher.tsx");
