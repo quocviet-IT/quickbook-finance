@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.58",
+    date: "2026-10-26",
+    headline: "Bank lines, reconciliations, purchase orders and sales tax payments change only through the steps that post them.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Banking and purchasing records can no longer be changed around the books",
+        detail:
+          "A staff member could change imported bank lines, completed reconciliations, purchase orders, goods receipts, sales tax payments, reversal links, currencies and the purchasing tolerances directly through the data interface, without the period check, the posting and the matching the screens always go through. These records are now read-only except through those steps. Nothing changes on the screens: importing, coding, reconciling, ordering, receiving, paying sales tax and reversing entries work as before.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.57",
     date: "2026-10-26",
     headline: "Add someone who already signs in to OneBook to another company, and every access change now goes through the screens that record it.",
