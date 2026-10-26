@@ -23,6 +23,8 @@ interface Props {
   config: PurchasingConfigRow;
   currencyCode: string;
   decimals: number;
+  /** Holds `po.variance_approve`: may bill past the tolerance, with a reason. */
+  canApproveVariance: boolean;
 }
 
 /**
@@ -46,6 +48,7 @@ function BillFromPoModalBody({
   config,
   currencyCode,
   decimals,
+  canApproveVariance,
 }: Props) {
   const { message } = App.useApp();
   const { today } = useCompanyClock();
@@ -91,6 +94,8 @@ function BillFromPoModalBody({
   }, [billable, state, config, decimals]);
 
   const needsReason = Object.values(matches).some((m) => m.requiresApproval);
+  // Past the tolerance, only someone holding po.variance_approve may bill it.
+  const varianceBlocked = needsReason && !canApproveVariance;
 
   async function submit() {
     const values = await form.validateFields();
@@ -131,6 +136,7 @@ function BillFromPoModalBody({
       onCancel={onClose}
       confirmLoading={saving}
       okText="Create draft bill"
+      okButtonProps={{ disabled: varianceBlocked }}
       width={860}
     >
       <Form form={form} layout="vertical" initialValues={{ bill_date: dayjs(today) }}>
@@ -214,7 +220,11 @@ function BillFromPoModalBody({
             showIcon
             style={{ marginTop: 12 }}
             message="Outside the matching tolerance"
-            description={`Tolerances in force: price ${(config.price_tolerance_bps / 100).toFixed(2)}%, quantity ${(config.qty_tolerance_bps / 100).toFixed(2)}%. An approval reason is required and will be recorded against this bill.`}
+            description={`Tolerances in force: price ${(config.price_tolerance_bps / 100).toFixed(2)}%, quantity ${(config.qty_tolerance_bps / 100).toFixed(2)}%. ${
+              varianceBlocked
+                ? "Billing past them needs the Approve match variances permission. Bill within them, or ask someone who holds it."
+                : "An approval reason is required and will be recorded against this bill."
+            }`}
           />
         )}
 

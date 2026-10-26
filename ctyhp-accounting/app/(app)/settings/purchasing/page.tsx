@@ -1,7 +1,7 @@
 import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getPurchasingConfig } from "@/lib/services/purchasing";
-import { getUserRole, isAdmin } from "@/lib/auth";
+import { holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import PurchasingConfigClient from "./PurchasingConfigClient";
 
@@ -10,7 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function PurchasingSettingsPage() {
   await requireSettingsAccess("/settings/purchasing");
   const sb = await createSupabaseServerClient();
-  const [config, role] = await Promise.all([getPurchasingConfig(sb), getUserRole()]);
+  const [config, canEdit] = await Promise.all([
+    getPurchasingConfig(sb),
+    holdsPermission("settings.manage"),
+  ]);
 
   return (
     <div>
@@ -18,7 +21,7 @@ export default async function PurchasingSettingsPage() {
         title="Purchasing Tolerances"
         description="Configure the three-way matching tolerances applied when a purchase order becomes a bill."
       />
-      <PurchasingConfigClient config={config} canEdit={isAdmin(role)} />
+      <PurchasingConfigClient config={config} canEdit={canEdit} />
     </div>
   );
 }

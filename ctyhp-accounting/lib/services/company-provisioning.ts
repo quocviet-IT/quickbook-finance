@@ -100,6 +100,26 @@ export async function refreshExposedSchemas(client: PgLike): Promise<string> {
   return schemas;
 }
 
+/**
+ * The write grants a new company's tables get: INSERT on a table with an insert
+ * (or all) policy, and the same for UPDATE and DELETE. One statement per kind
+ * of write, naming every table that kind applies to.
+ */
+export async function writeGrants(client: PgLike, schema: string): Promise<string[]> {
+  const { rows } = await client.query(
+    `select p.cmd, string_agg(distinct format('%I.%I', p.schemaname, p.tablename), ', ') as tables
+       from (select schemaname, tablename, unnest(case when cmd = 'ALL'
+                                                       then array['INSERT', 'UPDATE', 'DELETE']
+                                                       else array[cmd] end) as cmd
+               from pg_policies
+              where schemaname = $1 and cmd <> 'SELECT') p
+      group by p.cmd
+      order by p.cmd`,
+    [schema],
+  );
+  return rows.map((r) => `grant ${String(r.cmd).toLowerCase()} on ${String(r.tables)} to authenticated`);
+}
+
 /** Run a batch, and if it fails, find out which statement did it. */
 async function runBatch(client: PgLike, batch: string[], from: number, total: number) {
   try {
@@ -197,11 +217,14 @@ export async function provisionCompany(
   );
 
   // The application connects as `authenticated`; row-level security decides
-  // what it may see once it is in.
+  // what it may see once it is in. It may read every table, and write only
+  // where a migration gave the table a policy for that write. Granting every
+  // write here, after the migrations ran, undid in each new company every
+  // revoke those migrations made, so a new company differed from the ones
+  // migrated in place (2.59). Migration 0169 holds those to the same rule.
   await client.query(`grant usage on schema ${schema} to authenticated, service_role`);
-  await client.query(
-    `grant select, insert, update, delete on all tables in schema ${schema} to authenticated`,
-  );
+  await client.query(`grant select on all tables in schema ${schema} to authenticated`);
+  for (const grant of await writeGrants(client, schema)) await client.query(grant);
   await client.query(`grant all on all tables in schema ${schema} to service_role`);
   await client.query(
     `grant usage, select on all sequences in schema ${schema} to authenticated, service_role`,

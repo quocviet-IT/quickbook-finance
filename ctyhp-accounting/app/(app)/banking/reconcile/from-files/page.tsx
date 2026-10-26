@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { balanceSideOf, bankAccountLabel, shown } from "@/lib/domain/card-account";
 import { z } from "zod";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listBankAccounts } from "@/lib/services/banking";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
@@ -24,11 +24,12 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
   if (!account || !z.uuid().safeParse(account).success) redirect("/banking/reconcile");
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const [banks, currencies, reconciliations, { asOf }] = await Promise.all([
+  const [banks, currencies, reconciliations, { asOf }, holdsComplete] = await Promise.all([
     listBankAccounts(sb),
     listCurrencies(sb),
     listReconciliations(sb, account),
     getBankingContext(sb),
+    holdsPermission("reconciliation.complete"),
   ]);
   const bank = banks.find((b) => b.id === account);
   // An account that is gone, or not this company's: choose again.
@@ -58,6 +59,7 @@ export default async function FromFilesPage({ searchParams }: { searchParams: Pr
       </p>
       <FromFilesClient
         canWrite={canWrite(role)}
+        canComplete={canWrite(role) && holdsComplete}
         bankAccount={{
           id: bank.id,
           label: bankAccountLabel(`${bank.bank_name} · ${bank.account_number_masked ?? ""}`.trim(), side),

@@ -2,7 +2,7 @@ import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getApproverCount, listApprovalPolicies } from "@/lib/services/access";
 import { listCurrencies } from "@/lib/services/reference";
-import { getUserRole, isAdmin } from "@/lib/auth";
+import { holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import ApprovalPoliciesClient from "./ApprovalPoliciesClient";
 
@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function ApprovalPoliciesPage() {
   await requireSettingsAccess("/settings/approvals");
   const sb = await createSupabaseServerClient();
-  const [policies, currencies, approverCount, role] = await Promise.all([
+  const [policies, currencies, approverCount, canManage] = await Promise.all([
     listApprovalPolicies(sb),
     listCurrencies(sb),
     getApproverCount(sb),
-    getUserRole(),
+    holdsPermission("settings.manage"),
   ]);
   const base = currencies.find((c) => c.is_base);
 
@@ -30,7 +30,7 @@ export default async function ApprovalPoliciesPage() {
         approverCount={approverCount}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
-        canManage={isAdmin(role)}
+        canManage={canManage}
       />
     </div>
   );

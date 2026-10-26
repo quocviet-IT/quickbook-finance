@@ -40,19 +40,20 @@ const historyDateCell = (iso: string | null) => (iso ? <time dateTime={iso}>{for
  * completed reconciliation holds, and, for the account chosen, bringing its
  * history forward. The form reads "Statement balance on {date} = {amount}";
  * the books through that date are read as the date is chosen, and the
- * sentences and the button come from historyAdvice. A viewer sees the table
- * and the preview but no button; the database refuses anything that does not
- * match exactly.
+ * sentences and the button come from historyAdvice. Someone who may not
+ * complete reconciliations sees the table and the preview but no button; the
+ * database refuses anything that does not match exactly.
  */
 interface Props {
-  canWrite: boolean;
+  /** Staff holding `reconciliation.complete`: bringing history forward records a completed reconciliation. */
+  canBringForward: boolean;
   /** The company's today, in its own time zone: no later date can be chosen. */
   today: string;
   baseCurrency: string;
   baseDecimals: number;
 }
 
-export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, baseDecimals }: Props) {
+export default function ReconcileHistoryClient({ canBringForward, today, baseCurrency, baseDecimals }: Props) {
   const { message, modal } = App.useApp();
   const [rows, setRows] = useState<HistoryAccount[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -295,7 +296,7 @@ export default function ReconcileHistoryClient({ canWrite, today, baseCurrency, 
                   showIcon
                   title={advice.text}
                   description={
-                    advice.action && canWrite && throughIso && balanceMinor !== null ? (
+                    advice.action && canBringForward && throughIso && balanceMinor !== null ? (
                       <Button
                         type="primary"
                         size="small"

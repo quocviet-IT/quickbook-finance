@@ -74,6 +74,8 @@ export default function BillsClient({
   billableOrders,
   canManageItems,
   canWrite,
+  canPost,
+  canVoid,
   canRegisterAsset,
   canReadDocuments,
   canManageDocuments,
@@ -93,6 +95,10 @@ export default function BillsClient({
   /** Holds `items.manage`, so the empty-catalog hint can link to the catalog. */
   canManageItems: boolean;
   canWrite: boolean;
+  /** Holds `bill.post`; the RPC checks it again. */
+  canPost: boolean;
+  /** Holds `bill.void`; the RPC checks it again. */
+  canVoid: boolean;
   canRegisterAsset: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
@@ -387,7 +393,7 @@ export default function BillsClient({
               // Last, and separated — but only separated when there is
               // something to separate from: a draft's menu holds Void alone,
               // and a divider above a menu's only item is an orphaned line.
-              if (canWrite && r.status !== "void" && r.status !== "paid") {
+              if (canVoid && r.status !== "void" && r.status !== "paid") {
                 if (menu.length) menu.push({ type: "divider" as const, key: "before-void" });
                 menu.push({ key: "void", label: "Void bill", danger: true, onClick: () => confirmVoid(r.id) });
               }
@@ -406,7 +412,7 @@ export default function BillsClient({
                       }
                     />
                   ) : null}
-                  {canWrite && r.status === "draft" && (
+                  {canPost && r.status === "draft" && (
                     <Button size="small" onClick={() => post(r.id)}>
                       Post
                     </Button>

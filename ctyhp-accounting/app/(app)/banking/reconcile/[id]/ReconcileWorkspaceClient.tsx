@@ -24,6 +24,7 @@ import { PaperClipOutlined, UploadOutlined } from "@ant-design/icons";
 import { importedSummary } from "@/lib/domain/statement-repeats";
 import {
   BRING_HISTORY_FORWARD,
+  COMPLETE_NEEDS_PERMISSION,
   DISCARD_CONFIRMATION,
   DISCARD_RECONCILIATION,
   SET_ASIDE_MESSAGE,
@@ -116,6 +117,9 @@ interface Offset {
 interface Props {
   reconciliationId: string;
   canWrite: boolean;
+  /** Holds `reconciliation.complete`; the RPC checks it again. */
+  canComplete: boolean;
+  /** An administrator holding `reconciliation.reopen`; the RPC checks both again. */
   canReopen: boolean;
   /** An administrator: offered "Import anyway…" for a statement that does not add up. The database decides again. */
   canOverride: boolean;
@@ -142,6 +146,7 @@ interface Props {
 export default function ReconcileWorkspaceClient({
   reconciliationId,
   canWrite,
+  canComplete,
   canReopen,
   canOverride,
   overrideNotices,
@@ -732,7 +737,7 @@ export default function ReconcileWorkspaceClient({
           showIcon
           title={historyAdvice.text}
           description={
-            historyAdvice.canBringForward && writing ? (
+            historyAdvice.canBringForward && writing && canComplete ? (
               <Button
                 type="primary"
                 size="small"
@@ -777,14 +782,18 @@ export default function ReconcileWorkspaceClient({
               Match again
             </Button>
           ) : null}
-          <Button
-            type="primary"
-            loading={completing}
-            disabled={!detail || detail.differenceMinor !== 0}
-            onClick={() => void complete()}
-          >
-            Complete
-          </Button>
+          {canComplete ? (
+            <Button
+              type="primary"
+              loading={completing}
+              disabled={!detail || detail.differenceMinor !== 0}
+              onClick={() => void complete()}
+            >
+              Complete
+            </Button>
+          ) : (
+            <Typography.Text type="secondary">{COMPLETE_NEEDS_PERMISSION}</Typography.Text>
+          )}
           <Button disabled={!detail || detail.differenceMinor === 0 || adjusting} onClick={() => setAdjOpen(true)}>
             Record adjustment
           </Button>

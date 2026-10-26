@@ -224,18 +224,18 @@ export const SETTINGS_HUB: SettingsHubGroup[] = [
         title: "Work policy",
         description:
           "Say what this company means by urgent and by late. The accounting dashboard reads it; where a number is unset, the rule that needs it stays quiet.",
-        // Admin only, because acc_save_work_policy is admin only. A gate must
-        // name what the server actually enforces.
-        roles: ["admin"],
+        // What acc_save_work_policy checks (2.59). A gate must name what the
+        // server actually enforces.
+        anyPermissions: ["settings.manage"],
       },
       {
         href: "/settings/periods",
         title: "Accounting periods",
         description: "Open and close monthly periods, and reopen one with a reason.",
-        // Not `period.close`, which an accountant holds: every action on this
-        // screen calls adminGuard() and the client gets canEdit={isAdmin(role)},
-        // so that gate would open a door onto controls that all refuse.
-        roles: ["admin"],
+        // Any of the three things this screen does, each checked by its own
+        // function (2.59): setting up the calendar (settings.manage), closing
+        // (period.close) and reopening (period.reopen, admins only).
+        anyPermissions: ["settings.manage", "period.close", "period.reopen"],
       },
       {
         href: "/settings/import",

@@ -375,9 +375,12 @@ describe("the workspace's bring forward and discard", () => {
     expect(workspace).toContain("const historyAdvice = inProgress ? sessionHistoryAdvice(historyFacts, money) : null;");
   });
 
-  it("shows the button only to a writer, only when the books agree with the opening", () => {
+  it("shows the button only to a writer who may complete reconciliations, only when the books agree with the opening", () => {
     expect(workspace).toContain('type={historyAdvice.canBringForward ? "info" : "warning"}');
-    expect(workspace).toMatch(/historyAdvice\.canBringForward && writing \? \(\s*<Button[^>]*onClick=\{\(\) => bringHistoryForward\(/);
+    // Bringing history forward records a completed reconciliation (2.59).
+    expect(workspace).toMatch(
+      /historyAdvice\.canBringForward && writing && canComplete \? \(\s*<Button[^>]*onClick=\{\(\) => bringHistoryForward\(/,
+    );
   });
 
   it("asks first, counting the entries, then says how many and any file warning", () => {
@@ -588,8 +591,8 @@ describe("the Reconcile history page", () => {
     expect(client).toContain("failedKey !== previewKey");
   });
 
-  it("offers Bring forward N entries only to a writer, on a match, after asking", () => {
-    expect(client).toMatch(/advice\.action && canWrite && throughIso && balanceMinor !== null \? \(\s*<Button/);
+  it("offers Bring forward N entries only to someone who may complete reconciliations, on a match, after asking", () => {
+    expect(client).toMatch(/advice\.action && canBringForward && throughIso && balanceMinor !== null \? \(\s*<Button/);
     const bring = body(client, "function bringForward(", "\n  }\n");
     expect(bring).toContain("content: bringHistoryForwardConfirmation(offer.entries, date)");
     expect(bring).toContain("bringHistoryForwardAction({");

@@ -41,6 +41,41 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.59",
+    date: "2026-10-26",
+    headline: "Every switch in Settings › Permissions now decides what a role may do.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Nine permissions that were for show now take effect",
+        detail:
+          "Issuing and voiding invoices, posting and voiding bills, reversing journal entries, completing reconciliations, closing periods, and approving purchase orders and match variances were marked Advisory: turning one off for a role changed nothing. Each is now checked before the action runs, and the button is hidden from anyone without it. Nobody's access changes today, because no company had changed these switches.",
+        route: "/settings/permissions",
+      },
+      {
+        kind: "changed",
+        title: "Closing a period follows its permission",
+        detail:
+          "Closing was for admins only, while the matrix showed accountants holding Close accounting periods. Accountants no longer hold it by default, so nothing changes for them; an admin can now give it to an accountant, and they can then close from Settings › Accounting periods or the accounting dashboard. Reopening stays with admins.",
+        route: "/settings/periods",
+      },
+      {
+        kind: "fixed",
+        title: "Settings save for whoever their card opens for",
+        detail:
+          "Company profile, Work policy, Accounting periods, Purchasing tolerances, Users, Permissions and Approval policies opened for a permission but saved only for admins. Each now saves for the same permission its card opens for. Admins hold all of them, so nothing changes for anyone today.",
+        route: "/settings",
+      },
+      {
+        kind: "fixed",
+        title: "New companies start with the same locks as the others",
+        detail:
+          "A company created from Settings › Companies was given more database access than the existing ones: the table rules still refused the writes the last releases locked, but a new company did not match the others. New companies now get exactly the access the existing ones have, and the existing ones were brought into line with each other.",
+        route: "/settings/companies",
+      },
+    ],
+  },
+  {
     version: "2.58",
     date: "2026-10-26",
     headline: "Bank lines, reconciliations, purchase orders and sales tax payments change only through the steps that post them.",

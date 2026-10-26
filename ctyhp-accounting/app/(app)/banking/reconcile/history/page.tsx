@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { listCurrencies } from "@/lib/services/reference";
@@ -17,7 +17,11 @@ export const dynamic = "force-dynamic";
 export default async function ReconcileHistoryPage() {
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const [currencies, { asOf }] = await Promise.all([listCurrencies(sb), getBankingContext(sb)]);
+  const [currencies, { asOf }, holdsComplete] = await Promise.all([
+    listCurrencies(sb),
+    getBankingContext(sb),
+    holdsPermission("reconciliation.complete"),
+  ]);
   const base = currencies.find((c) => c.is_base);
   return (
     <div>
@@ -29,7 +33,7 @@ export default async function ReconcileHistoryPage() {
         <Link href="/banking/reconcile">← Bank Reconciliation</Link>
       </p>
       <ReconcileHistoryClient
-        canWrite={canWrite(role)}
+        canBringForward={canWrite(role) && holdsComplete}
         today={asOf}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}

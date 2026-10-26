@@ -3,7 +3,7 @@ import { listInvoices, listCustomers } from "@/lib/services/invoicing";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies, listTaxCodes, listUsStates } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
 import { listGapNotes, listSequenceCatalog, listSequenceDocuments } from "@/lib/services/sequence";
 import { listCustomerCredit } from "@/lib/services/credit";
@@ -85,6 +85,8 @@ export default async function InvoicesPage({
     companySettings,
     canManageItems,
     fromEstimate,
+    holdsIssue,
+    holdsVoid,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -107,6 +109,8 @@ export default async function InvoicesPage({
     getCurrentCompanySettings(sb),
     hasPermission(sb, "items.manage"),
     estimateLink(sb, params.estimate),
+    holdsPermission("invoice.issue"),
+    holdsPermission("invoice.void"),
   ]);
 
   // An estimate that cannot be turned into an invoice now says so instead of
@@ -161,6 +165,8 @@ export default async function InvoicesPage({
         items={salesItems}
         canManageItems={canManageItems}
         canWrite={canWrite(role)}
+        canIssue={canWrite(role) && holdsIssue}
+        canVoid={canWrite(role) && holdsVoid}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}

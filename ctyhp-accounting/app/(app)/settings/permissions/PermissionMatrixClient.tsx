@@ -52,13 +52,22 @@ export default function PermissionMatrixClient({
     }
   }
 
+  // Since 2.59 every permission is checked before its action runs. A permission
+  // added later without that check is marked, rather than looking like one
+  // that works.
+  const advisory = permissions.some((p) => !p.is_enforced);
+
   return (
     <Space direction="vertical" size="large" style={{ display: "flex" }}>
       <Alert
-        type="warning"
+        type={advisory ? "warning" : "info"}
         showIcon
-        message="Enforced and advisory permissions"
-        description="Enforced permissions are checked before the action runs. Advisory ones are listed for reference: the app does not block them yet."
+        message={advisory ? "Some permissions are not enforced yet" : "Every permission is enforced"}
+        description={
+          advisory
+            ? "Those marked Not enforced are listed for reference: the app does not block them yet. Every other permission is checked before its action runs."
+            : "Each permission is checked before its action runs. Bookkeeping actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin."
+        }
       />
       <Table<Row>
         rowKey="key"
@@ -83,12 +92,16 @@ export default function PermissionMatrixClient({
             ),
           },
           { title: "Area", dataIndex: "category" },
-          {
-            title: "Control",
-            dataIndex: "is_enforced",
-            render: (v: boolean) =>
-              v ? <Tag color="green">Enforced</Tag> : <Tag color="default">Advisory</Tag>,
-          },
+          ...(advisory
+            ? [
+                {
+                  title: "Control",
+                  dataIndex: "is_enforced",
+                  render: (v: boolean) =>
+                    v ? <Tag color="green">Enforced</Tag> : <Tag color="default">Not enforced</Tag>,
+                },
+              ]
+            : []),
           ...ROLES.map((role) => ({
             title: role.charAt(0).toUpperCase() + role.slice(1),
             key: role,
