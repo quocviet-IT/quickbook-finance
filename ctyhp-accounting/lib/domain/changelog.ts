@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.56",
+    date: "2026-10-26",
+    headline: "A company's reports answer only the people who belong to it.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Reports answer only the company's own people",
+        detail:
+          "Some report and lookup functions answered any signed-in OneBook user who called them directly, outside the screens, even someone with no place in that company or someone who had been suspended. Each now checks first that the person holds a role in the company and refuses everyone else. Nothing changes for the people in a company: every screen and report reads as before, and suspending someone now stops their reports too.",
+        route: "/reports",
+      },
+    ],
+  },
+  {
     version: "2.55",
     date: "2026-10-26",
     headline: "On a phone, lists keep every column: the name column no longer disappears.",
