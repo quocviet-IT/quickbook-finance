@@ -1111,6 +1111,58 @@ body {
 }
 
 /*
+ * …and never so narrow that a column vanishes. Under the fixed layout an
+ * elastic column (no width) gets only what the declared widths leave, which
+ * on a phone is nothing: 46 columns on 40 tables were drawn zero wide at
+ * 390px — Customer on Invoices, Vendor on Bills — with no sign they existed.
+ *
+ * DataTable sets two widths (lib/design/table-metrics.ts). On a computer,
+ * --table-min-width: each elastic column keeps at least a few letters, and a
+ * row a little wider than its box at 1280 still fits by narrowing them, as it
+ * always has (sixteen tables do). On a phone, --table-floor-width: each
+ * elastic column keeps its readable floor and the frame scrolls the row.
+ * The header and body tables of a sticky table both take it, so they align.
+ *
+ * `!important` because rc-table writes `min-width: 100%` inline on a fixed
+ * header's own table: without it the body grew and the heading did not, and
+ * Asset read zero wide over a 204px column on Fixed Assets. The max() keeps
+ * that 100% for every frame wider than the minimum.
+ */
+.accounting-table--fit .ant-table-content > table,
+.accounting-table--fit .ant-table-header > table,
+.accounting-table--fit .ant-table-body > table {
+  min-width: max(100%, var(--table-min-width, 0px)) !important;
+}
+
+@media (max-width: 767px) {
+  .accounting-table--fit .ant-table-content > table,
+  .accounting-table--fit .ant-table-header > table,
+  .accounting-table--fit .ant-table-body > table {
+    min-width: max(100%, var(--table-floor-width, 0px)) !important;
+  }
+
+  /*
+   * An empty table is wider than the phone too, and its empty state — the
+   * words and the button that start the list — was centred across all of it,
+   * half off the screen ("Register e…" on Fixed Assets). Held to the frame
+   * the reader actually sees: the frame is a container, and the empty state
+   * takes its width and stays at its left edge.
+   */
+  .accounting-table--fit .ant-table-empty .ant-table-content,
+  .accounting-table--fit .ant-table-empty .ant-table-body {
+    container-type: inline-size;
+  }
+
+  .accounting-table--fit .ant-table-empty .ant-table-placeholder > .ant-table-cell > * {
+    position: sticky;
+    left: 8px;
+    width: calc(100cqw - 16px);
+    /* Table cells keep to one line; a sentence of guidance wraps. */
+    white-space: normal;
+  }
+}
+
+/*
  * Tables whose column widths the reader drags for themselves.
  *
  * rc-table writes `min-width: 100%` inline on the table element whenever

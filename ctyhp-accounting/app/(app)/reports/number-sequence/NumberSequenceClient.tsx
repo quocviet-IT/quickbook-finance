@@ -34,6 +34,7 @@ import {
   sequenceOverviewAction,
 } from "./actions";
 import { TOKENS } from "@/lib/design/tokens";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate, plural, pluralWord } from "@/lib/format";
 
 type View = "breaks" | "all";
@@ -304,6 +305,8 @@ export default function NumberSequenceClient({
           {
             title: "Documented reason",
             key: "note",
+            // The elastic column. Without a floor a phone drew it zero wide.
+            minWidth: COLUMN.TEXT_MIN,
             render: (_: unknown, row) =>
               row.note ? (
                 <Typography.Text>{row.note.reason}</Typography.Text>
