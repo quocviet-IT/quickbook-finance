@@ -38,13 +38,21 @@ function definitions(text: string): { name: string; statement: string; body: str
   return out;
 }
 
-/** The last definition of a function in the migrations before 0166. */
+/**
+ * The last definition of every function in the migrations before 0166, read
+ * once: reading all of them again for each function took over 5 seconds under
+ * a loaded test run.
+ */
+let earlier: Map<string, string> | null = null;
 function previous(name: string): string {
-  let last: string | null = null;
-  for (const file of readdirSync(DIR).filter((f) => f.endsWith(".sql") && f < FILE).sort()) {
-    for (const d of definitions(read(file).replace(/^\s*--[^\n]*$/gm, ""))) if (d.name === name) last = d.body;
+  if (!earlier) {
+    earlier = new Map();
+    for (const file of readdirSync(DIR).filter((f) => f.endsWith(".sql") && f < FILE).sort()) {
+      for (const d of definitions(read(file).replace(/^\s*--[^\n]*$/gm, ""))) earlier.set(d.name, d.body);
+    }
   }
-  if (last === null) throw new Error(`${name} has no earlier definition`);
+  const last = earlier.get(name);
+  if (last === undefined) throw new Error(`${name} has no earlier definition`);
   return last;
 }
 
