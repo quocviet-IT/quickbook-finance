@@ -70,6 +70,10 @@ describe("0166_report_functions_need_membership", () => {
     expect(code).toMatch(/revoke execute on function acc_apply_vendor_terms\(uuid\) from public, anon, authenticated;/);
   });
 
+  it("closes the bank feed's skip check in `public` too, where default privileges had granted it", () => {
+    expect(code).toMatch(/revoke execute on function acc_bank_feed_try_skip\(uuid, uuid, uuid, date, jsonb\) from authenticated;/);
+  });
+
   it("guards exactly the 26 functions, each once, with the check as its first statement", () => {
     expect(defs.filter((d) => d.name !== "acc_assert_member").map((d) => d.name).sort()).toEqual([...GUARDED].sort());
     for (const d of defs.filter((x) => x.name !== "acc_assert_member")) {

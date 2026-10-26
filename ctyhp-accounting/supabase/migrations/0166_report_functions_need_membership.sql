@@ -21,7 +21,8 @@
 --                         has not taken on a request role (migrations, restore).
 --
 -- A member of the company sees no difference. acc_apply_vendor_terms is only
--- ever called by other functions, so the API may no longer call it at all.
+-- ever called by other functions, so the API may no longer call it at all;
+-- nor acc_bank_feed_try_skip, which `public` alone still let it call.
 --
 -- Left as they are, each for its reason (the live test lists them):
 --   acc_bank_feed_sync_cut_off, acc_document_storage_path_allowed,
@@ -56,6 +57,12 @@ $$;
 revoke all on function acc_assert_member() from public, anon, authenticated;
 
 revoke execute on function acc_apply_vendor_terms(uuid) from public, anon, authenticated;
+
+-- The bank feed's skip check (0161) is for the feed's own functions and the
+-- service role. 0161 revoked it from public and anon only, which closed it in
+-- every company schema (their default privileges grant nothing) but not in
+-- `public`, whose default privileges grant every new function to authenticated.
+revoke execute on function acc_bank_feed_try_skip(uuid, uuid, uuid, date, jsonb) from authenticated;
 
 -- ----------------------------------------------------------------------------
 -- acc_account_ref_matches (as 0110_inactive_breaks_the_tie, plus the membership check)
