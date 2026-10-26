@@ -7,9 +7,11 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   restore: vi.fn(),
   revalidatePath: vi.fn(),
+  isPlatformAdmin: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClient }));
+vi.mock("@/lib/db/company", () => ({ isPlatformAdmin: mocks.isPlatformAdmin }));
 vi.mock("@/lib/services/backup-restore", () => ({
   restoreBackupIntoNewCompany: mocks.restore,
 }));
@@ -33,6 +35,18 @@ describe("restoreBackupAction checks both permissions the restore actually needs
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.restore.mockResolvedValue({ companyId: "c1" });
+    mocks.isPlatformAdmin.mockResolvedValue(true);
+  });
+
+  it("refuses anyone who is not a platform admin, whatever their permissions, before the service is called (2.57)", async () => {
+    // A restore provisions a new company, which onebook.request_company keeps
+    // for platform admins. Production edit that makes this fail: removing the
+    // isPlatformAdmin check, which let any company admin create a company.
+    mocks.isPlatformAdmin.mockResolvedValue(false);
+    mocks.createClient.mockResolvedValue(clientWith({ "company.restore": true, "company.export": true }));
+    const result = await restoreBackupAction(id, "Copy");
+    expect(result).toEqual({ ok: false, error: "Only a platform administrator can restore a backup into a new company" });
+    expect(mocks.restore).not.toHaveBeenCalled();
   });
 
   it("refuses without company.restore, before the service is ever called", async () => {

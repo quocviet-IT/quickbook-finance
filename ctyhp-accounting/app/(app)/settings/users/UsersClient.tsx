@@ -5,12 +5,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { MenuProps } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, UserAddOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
 import { passwordPolicyProblems } from "@/lib/domain/password-policy";
-import { createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
+import { addExistingUserAction, createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, type StatusLook } from "@/lib/domain/status-label";
@@ -45,6 +45,7 @@ export default function UsersClient({
   const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  const [addExistingOpen, setAddExistingOpen] = useState(false);
 
   /** Ask for the reason every access change is required to carry. */
   function promptReason(title: string, content: string, onReason: (reason: string) => Promise<void>) {
@@ -122,16 +123,23 @@ export default function UsersClient({
         resultCount={users.length}
         actions={
           canManage ? (
-            <Tooltip title={canCreateUsers ? "" : "Set SUPABASE_SERVICE_ROLE_KEY to create users"}>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                disabled={!canCreateUsers}
-                onClick={() => setCreateOpen(true)}
-              >
-                Add user
+            <Space wrap>
+              {/* Someone who already signs in for another company: no new
+                  account, no password, just a place in this one. */}
+              <Button icon={<UserAddOutlined />} onClick={() => setAddExistingOpen(true)}>
+                Add existing account
               </Button>
-            </Tooltip>
+              <Tooltip title={canCreateUsers ? "" : "Set SUPABASE_SERVICE_ROLE_KEY to create users"}>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  disabled={!canCreateUsers}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Add user
+                </Button>
+              </Tooltip>
+            </Space>
           ) : null
         }
       />
@@ -244,6 +252,16 @@ export default function UsersClient({
         ]}
       />
 
+      {addExistingOpen && (
+        <AddExistingUserModal
+          onClose={() => setAddExistingOpen(false)}
+          onDone={() => {
+            setAddExistingOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
+
       {createOpen && (
         <CreateUserModal
           onClose={() => setCreateOpen(false)}
@@ -254,6 +272,57 @@ export default function UsersClient({
         />
       )}
     </Space>
+  );
+}
+
+/**
+ * A person who already signs in to OneBook, for another company, given a
+ * place in this one. Add user would refuse their email: it always creates a
+ * new sign-in. Their name and password stay as they are.
+ */
+function AddExistingUserModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const v = await form.validateFields();
+    setSaving(true);
+    setError(null);
+    const res = await addExistingUserAction({ email: v.email, role: v.role });
+    setSaving(false);
+    if (res.ok) {
+      message.success(`${v.email} can now open this company`);
+      onDone();
+    } else {
+      setError(res.error ?? "Failed to add the account");
+    }
+  }
+
+  return (
+    <Modal title="Add an existing account" open onOk={submit} onCancel={onClose} confirmLoading={saving} okText="Add to this company">
+      <Typography.Paragraph type="secondary">
+        For someone who already signs in to OneBook for another company. They keep their password; this gives them a
+        place in this company with the role you choose. It takes effect at once and is recorded in the audit log.
+      </Typography.Paragraph>
+      <Form form={form} layout="vertical" initialValues={{ role: "viewer" }}>
+        <Form.Item
+          name="email"
+          label="Email they sign in with"
+          rules={[
+            { required: true, message: "Enter the email address" },
+            { type: "email", message: "Enter a valid email" },
+          ]}
+        >
+          <Input type="email" placeholder="person@ctyhp.vn" autoComplete="off" />
+        </Form.Item>
+        <Form.Item name="role" label="Role in this company" rules={[{ required: true, message: "Select a role" }]}>
+          <Select options={ROLE_OPTIONS} />
+        </Form.Item>
+      </Form>
+      {error ? <Alert type="error" showIcon message={error} /> : null}
+    </Modal>
   );
 }
 

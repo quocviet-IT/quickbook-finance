@@ -923,6 +923,13 @@ export const userCreateSchema = z
   });
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 
+/** A person who already signs in to OneBook, given a place in this company (2.57). */
+export const userAddExistingSchema = z.object({
+  email: z.email("Enter the email address the person signs in with"),
+  role: z.enum(APP_ROLES),
+});
+export type UserAddExistingInput = z.infer<typeof userAddExistingSchema>;
+
 export const userRoleSchema = z.object({
   role: z.enum(APP_ROLES),
   reason: z.string().trim().min(1, "A reason is required").max(300),

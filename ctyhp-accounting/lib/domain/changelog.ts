@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.57",
+    date: "2026-10-26",
+    headline: "Add someone who already signs in to OneBook to another company, and every access change now goes through the screens that record it.",
+    changes: [
+      {
+        kind: "added",
+        title: "Add existing account",
+        detail:
+          "Settings › Users has a new Add existing account button for someone who already signs in to OneBook for another company. Enter the email they sign in with and choose their role here; they keep their password and can open this company at once. Until now this could not be done on screen, because Add user always creates a new sign-in and refused an email that already had one.",
+        route: "/settings/users",
+      },
+      {
+        kind: "fixed",
+        title: "Users, permissions, periods and the audit log change only through the screens",
+        detail:
+          "An administrator could change users, the permission matrix, approval policies, accounting periods and the company settings history directly through the data interface, without the reason, the approval or the audit entry the screens require, and staff could add rows to the audit log. These are now read-only except through the screens that check and record each change. Nothing changes on the screens themselves.",
+        route: "/settings/users",
+      },
+      {
+        kind: "changed",
+        title: "Restoring a backup is for platform administrators",
+        detail:
+          "Restoring a backup creates a new company, and creating a company has always been reserved for platform administrators. The restore screen did not ask, so any company administrator could do it. Now only a platform administrator sees Restore on Settings › Backups; anyone else who opens a restore link is told to ask one.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "2.56",
     date: "2026-10-26",
     headline: "A company's reports answer only the people who belong to it.",

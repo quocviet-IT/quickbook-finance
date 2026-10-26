@@ -1,6 +1,8 @@
 import PageHeader from "@/components/PageHeader";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { requireSettingsPermission } from "@/lib/db/settings-access";
+import { isPlatformAdmin } from "@/lib/db/company";
+import { Alert } from "antd";
 import RestoreClient, { type RestoreSnapshot } from "./RestoreClient";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +26,22 @@ export default async function RestoreBackupPage({
   // not exist, the wrong explanation for a permission refusal.
   await requireSettingsPermission(["company.restore"], "/settings/backups");
   await requireSettingsPermission(["company.export"], "/settings/backups");
+  // A restore creates a new company, and creating a company is a platform
+  // admin's act (onebook.request_company). Before 2.57 this page let any
+  // company admin do it, round that gate.
+  if (!(await isPlatformAdmin())) {
+    return (
+      <div>
+        <PageHeader title="Restore as new company" />
+        <Alert
+          type="info"
+          showIcon
+          message="Only a platform administrator can restore a backup"
+          description="Restoring creates a new company beside the running books, and creating a company is reserved for platform administrators. Ask one to restore this snapshot."
+        />
+      </div>
+    );
+  }
   const { id } = await params;
 
   const sb = await createSupabaseServerClient();
