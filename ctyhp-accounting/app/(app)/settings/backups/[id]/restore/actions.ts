@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { isPlatformAdmin } from "@/lib/db/company";
 import { restoreBackupIntoNewCompany, type RestoreOutcome } from "@/lib/services/backup-restore";
 
 export interface ActionResult<T = undefined> {
@@ -28,6 +29,13 @@ export async function restoreBackupAction(
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Your session has expired. Sign in again." };
+
+  // A restore provisions a new company, which onebook.request_company keeps
+  // for platform admins. This action reaches provisioning directly, so it
+  // must ask the same question itself (2.57; before, any company admin could).
+  if (!(await isPlatformAdmin())) {
+    return { ok: false, error: "Only a platform administrator can restore a backup into a new company" };
+  }
 
   const [restoreAllowed, exportAllowed] = await Promise.all([
     sb.rpc("acc_has_permission", { p_key: "company.restore" }),

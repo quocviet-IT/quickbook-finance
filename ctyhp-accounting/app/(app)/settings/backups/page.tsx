@@ -1,5 +1,6 @@
 import PageHeader from "@/components/PageHeader";
 import { requireSettingsAccess, currentAccess } from "@/lib/db/settings-access";
+import { isPlatformAdmin } from "@/lib/db/company";
 import { listBackupsAction } from "./actions";
 import BackupsClient from "./BackupsClient";
 
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BackupsPage() {
   await requireSettingsAccess("/settings/backups");
-  const [result, access] = await Promise.all([listBackupsAction(), currentAccess()]);
+  const [result, access, platformAdmin] = await Promise.all([listBackupsAction(), currentAccess(), isPlatformAdmin()]);
   return (
     <div>
       <PageHeader
@@ -17,7 +18,8 @@ export default async function BackupsPage() {
       <BackupsClient
         backups={result.ok ? (result.data ?? []) : []}
         loadError={result.ok ? null : (result.error ?? "Could not read the backups")}
-        canRestore={(access.permissionKeys ?? []).includes("company.restore")}
+        // A restore creates a company, which only a platform admin may do (2.57).
+        canRestore={platformAdmin && (access.permissionKeys ?? []).includes("company.restore")}
       />
     </div>
   );

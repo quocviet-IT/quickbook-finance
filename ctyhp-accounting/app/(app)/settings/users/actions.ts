@@ -3,8 +3,8 @@ import { revalidatePath } from "next/cache";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, isAdmin } from "@/lib/auth";
-import { userCreateSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
-import { AccessError, createUser, setUserRole, setUserStatus } from "@/lib/services/access";
+import { userAddExistingSchema, userCreateSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
+import { AccessError, addExistingUser, createUser, setUserRole, setUserStatus } from "@/lib/services/access";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
@@ -32,6 +32,24 @@ export async function createUserAction(raw: unknown): Promise<ActionResult<{ id:
     // The company id names where the new user's register membership goes —
     // the same company this admin is signed into and creating them in.
     const id = await createUser(sb, company.active.id, parsed.data);
+    revalidatePath("/settings/users");
+    return { ok: true, data: { id } };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
+}
+
+/** A person who already has a OneBook sign-in, added to this company by email (2.57). */
+export async function addExistingUserAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = userAddExistingSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const company = await resolveActiveCompany();
+    if (!company.active) return { ok: false, error: "No company is selected" };
+    const sb = await createSupabaseServerClient();
+    const id = await addExistingUser(sb, company.active.id, parsed.data);
     revalidatePath("/settings/users");
     return { ok: true, data: { id } };
   } catch (e) {

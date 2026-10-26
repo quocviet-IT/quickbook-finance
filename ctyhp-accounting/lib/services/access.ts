@@ -13,6 +13,7 @@ import type {
   ApprovalSubmitInput,
   AuditFilterInput,
   RolePermissionInput,
+  UserAddExistingInput,
   UserCreateInput,
   UserRoleInput,
   UserStatusInput,
@@ -92,16 +93,13 @@ export async function createUser(
   const userId = data.user?.id;
   if (!userId) throw new AccessError("The identity provider did not return a user id");
 
-  const { error: eRow } = await sb.from("acc_app_user").upsert(
-    {
-      id: userId,
-      full_name: input.full_name || "",
-      role: input.role,
-      status: "active",
-      invited_at: null,
-    },
-    { onConflict: "id" },
-  );
+  // The company's user table takes no direct write (0167): the function
+  // checks users.manage again and the table's own trigger writes the audit row.
+  const { error: eRow } = await sb.rpc("acc_add_company_user", {
+    p_user_id: userId,
+    p_full_name: input.full_name || "",
+    p_role: input.role,
+  });
   if (eRow) {
     await admin.auth.admin.deleteUser(userId);
     throw new AccessError(eRow.message);
@@ -128,6 +126,41 @@ export async function createUser(
     );
   }
 
+  return userId;
+}
+
+/**
+ * Give a person who already signs in to OneBook a place in this company, by
+ * the email address they sign in with. Until 2.57 this could not be done on
+ * screen: Add user always creates a new sign-in, and an email that already
+ * has one was refused.
+ *
+ * The database finds the account, refuses one already in this company, and
+ * checks users.manage; the register note that follows is best-effort, as in
+ * createUser.
+ */
+export async function addExistingUser(
+  sb: SupabaseClient,
+  companyId: string,
+  input: UserAddExistingInput,
+): Promise<string> {
+  const { data, error } = await sb.rpc("acc_add_existing_user", {
+    p_email: input.email,
+    p_role: input.role,
+  });
+  if (error) throw new AccessError(error.message);
+  const userId = String(data);
+  try {
+    const register = createSupabaseAdminClient("onebook");
+    const { error: eMember } = await register
+      .from("company_member")
+      .upsert({ company_id: companyId, user_id: userId }, { ignoreDuplicates: true });
+    if (eMember) throw eMember;
+  } catch (e) {
+    console.error(
+      `user ${userId} was added to company ${companyId}, but the register note failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
   return userId;
 }
 
