@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { hasPermission } from "@/lib/services/access";
@@ -25,6 +25,7 @@ export default async function JournalPage({
     canManageDocuments,
     canGovernDocuments,
     canMarkAdjusting,
+    holdsReverse,
   ] = await Promise.all([
     listCurrencies(sb),
     listAccounts(sb),
@@ -33,6 +34,7 @@ export default async function JournalPage({
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
     hasPermission(sb, "journal.post"),
+    holdsPermission("journal.void"),
   ]);
   const base = currencies.find((c) => c.is_base);
   const postingAccounts = accounts.filter((a) => a.is_posting_account && a.status === "active");
@@ -42,6 +44,7 @@ export default async function JournalPage({
       <JournalClient
         initialCreateOpen={initialCreateOpen}
         canWrite={canWrite(role)}
+        canReverse={canWrite(role) && holdsReverse}
         accounts={postingAccounts.map((a) => ({ id: a.id, account_code: a.account_code, name: a.name }))}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}

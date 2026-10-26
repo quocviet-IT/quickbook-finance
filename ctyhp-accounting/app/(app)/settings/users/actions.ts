@@ -2,19 +2,18 @@
 import { revalidatePath } from "next/cache";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, isAdmin } from "@/lib/auth";
+import { holdsPermission } from "@/lib/auth";
 import { userAddExistingSchema, userCreateSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
 import { AccessError, addExistingUser, createUser, setUserRole, setUserStatus } from "@/lib/services/access";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
 /**
- * The role check here is the outer gate; the RPCs re-check `users.manage`, so an
- * admin who removed that permission from their own role is still stopped.
+ * The outer gate, on the permission the Users card opens for; the RPCs check
+ * `users.manage` again (2.59).
  */
 async function guard(): Promise<string | null> {
-  const role = await getUserRole();
-  return isAdmin(role) ? null : "Only an admin can manage users";
+  return (await holdsPermission("users.manage")) ? null : "You do not have permission to manage users";
 }
 function msg(e: unknown): string {
   return e instanceof AccessError || e instanceof Error ? e.message : "An unexpected error occurred";

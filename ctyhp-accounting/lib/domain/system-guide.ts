@@ -949,7 +949,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         control: "Close period",
         route: "/settings/periods",
         note:
-          "After closing, the database itself refuses to post or void into that " +
+          "Needs the Close accounting periods permission, which admins hold; an admin can give it to an accountant " +
+          "in Settings › Permissions. After closing, the database itself refuses to post or void into that " +
           "period — the block is not just in the interface.",
       },
       {
@@ -1056,6 +1057,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         action: "Set what each role may do",
         control: "Permissions",
         route: "/settings/permissions",
+        note:
+          "Each switch is checked before its action runs, so turning one off takes effect at once. Bookkeeping " +
+          "actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin.",
       },
       {
         action: "Require a second pair of eyes",

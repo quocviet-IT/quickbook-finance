@@ -290,11 +290,20 @@ describe("settingsHubForAccess", () => {
   });
 
   it("shows an accountant the import, the audit history and their own reports", () => {
-    // Not Accounting periods: every control on that screen refuses anyone but an
-    // admin, so it is gated on the role rather than on period.close.
-    expect(
-      titles({ role: "accountant", permissionKeys: ["period.close", "audit.read"] }).sort(),
-    ).toEqual(["Audit history", "Import from QuickBooks or Wave", "My reports"]);
+    // The default matrix gives an accountant neither period.close nor
+    // settings.manage (2.59), so Accounting periods stays out of the hub.
+    expect(titles({ role: "accountant", permissionKeys: ["audit.read"] }).sort()).toEqual([
+      "Audit history",
+      "Import from QuickBooks or Wave",
+      "My reports",
+    ]);
+  });
+
+  it("opens Accounting periods to an accountant an admin has given period.close", () => {
+    // Closing is enforced by permission now (2.59), so the card follows it.
+    expect(titles({ role: "accountant", permissionKeys: ["period.close", "audit.read"] })).toContain(
+      "Accounting periods",
+    );
   });
 
   it("swaps the title and description rather than dropping a card with a fallback", () => {
@@ -334,7 +343,7 @@ describe("settingsHubForAccess", () => {
     // Accounting periods shows. The admin-only Companies card is gated by
     // `roles` and is still gone — that is the half that must not fail open.
     expect(shown.some((i) => i.href === "/settings/companies")).toBe(false);
-    expect(shown.some((i) => i.href === "/settings/periods")).toBe(false);
+    expect(shown.some((i) => i.href === "/settings/periods")).toBe(true);
     expect(shown.some((i) => i.href === "/settings/users")).toBe(true);
     expect(shown.some((i) => i.href === "/settings/audit")).toBe(true);
   });
@@ -346,6 +355,7 @@ describe("settingsHubForAccess", () => {
       "permissions.manage",
       "audit.read",
       "period.close",
+      "period.reopen",
       "feedback.read",
       "company.export",
     ]);

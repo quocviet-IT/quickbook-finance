@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getUserRole } from "@/lib/auth";
+import { canWrite, getUserRole, holdsPermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { ACCOUNTING_NOUNS } from "@/lib/domain/accounting-dashboard/lifecycle";
 import { closePeriod, PeriodsError, reopenPeriod } from "@/lib/services/periods";
@@ -69,12 +69,13 @@ export interface PeriodActionResult {
 /**
  * Close a period from the cockpit.
  *
- * Every rule about whether it may be closed stays in `acc_close_period`: admin
- * only, a reason required, and a refusal when a control account does not tie
- * out at the period end unless the difference is explained in writing. None of
- * that is repeated here, and the role check below is a courtesy that produces a
- * readable message — not the guard. The guard is the database, because this
- * screen will not be its only caller forever.
+ * Every rule about whether it may be closed stays in `acc_close_period`: staff
+ * holding `period.close`, a reason required, and a refusal when a control
+ * account does not tie out at the period end unless the difference is
+ * explained in writing. None of that is repeated here, and the permission check
+ * below is a courtesy that produces a readable message — not the guard. The
+ * guard is the database, because this screen will not be its only caller
+ * forever.
  */
 export async function closePeriodAction(input: {
   periodId: string;
@@ -82,8 +83,8 @@ export async function closePeriodAction(input: {
   varianceNote: string | null;
 }): Promise<PeriodActionResult> {
   const role = await getUserRole();
-  if (role !== "admin") {
-    return { ok: false, error: "Only an admin can close a period" };
+  if (!canWrite(role) || !(await holdsPermission("period.close"))) {
+    return { ok: false, error: "You do not have permission to close a period" };
   }
   if (input.reason.trim().length === 0) {
     return { ok: false, error: "A close reason is required" };
@@ -106,6 +107,9 @@ export async function reopenPeriodAction(input: {
   const role = await getUserRole();
   if (role !== "admin") {
     return { ok: false, error: "Only an admin can reopen a period" };
+  }
+  if (!(await holdsPermission("period.reopen"))) {
+    return { ok: false, error: "You do not have permission to reopen a period" };
   }
   if (input.reason.trim().length === 0) {
     return { ok: false, error: "A reason is required" };

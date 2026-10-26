@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission, isAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listAccounts } from "@/lib/services/accounts";
 import { listBankAccounts } from "@/lib/services/banking";
@@ -25,7 +25,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
   const header = await findReconciliationHeader(sb, id);
   if (!header) notFound();
   const currenciesRead = listCurrencies(sb);
-  const [accounts, currencies, banks, overrides] = await Promise.all([
+  const [accounts, currencies, banks, overrides, holdsComplete, holdsReopen] = await Promise.all([
     listAccounts(sb),
     currenciesRead,
     listBankAccounts(sb),
@@ -36,6 +36,8 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
         formatMoney(minor, b?.code ?? "USD", b?.decimal_places ?? 2),
       );
     }),
+    holdsPermission("reconciliation.complete"),
+    holdsPermission("reconciliation.reopen"),
   ]);
   const base = currencies.find((c) => c.is_base);
   const { notices, unavailable: overridesUnavailable } = overrides;
@@ -52,7 +54,8 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
       <ReconcileWorkspaceClient
         reconciliationId={id}
         canWrite={canWrite(role)}
-        canReopen={isAdmin(role)}
+        canComplete={canWrite(role) && holdsComplete}
+        canReopen={isAdmin(role) && holdsReopen}
         canOverride={isAdmin(role)}
         overrideNotices={notices}
         overridesUnavailable={overridesUnavailable}

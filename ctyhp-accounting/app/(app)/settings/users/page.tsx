@@ -2,7 +2,7 @@ import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { isAdminClientConfigured } from "@/lib/db/admin";
 import { listUsers } from "@/lib/services/access";
-import { getSessionUser, getUserRole, isAdmin } from "@/lib/auth";
+import { getSessionUser, holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import { Alert } from "antd";
 import UsersClient from "./UsersClient";
@@ -11,8 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
   await requireSettingsAccess("/settings/users");
-  const [role, user] = await Promise.all([getUserRole(), getSessionUser()]);
-  const canManage = isAdmin(role);
+  const [canManage, user] = await Promise.all([holdsPermission("users.manage"), getSessionUser()]);
 
   if (!canManage) {
     return (
@@ -21,8 +20,8 @@ export default async function UsersPage() {
         <Alert
           type="warning"
           showIcon
-          message="Admin only"
-          description="Only an admin can view and manage users."
+          message="Needs the Manage users permission"
+          description="Only someone who holds Manage users can view and manage users."
         />
       </div>
     );

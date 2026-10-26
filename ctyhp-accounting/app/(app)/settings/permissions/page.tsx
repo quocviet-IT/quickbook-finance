@@ -1,7 +1,7 @@
 import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getPermissionMatrix } from "@/lib/services/access";
-import { getUserRole, isAdmin } from "@/lib/auth";
+import { holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import PermissionMatrixClient from "./PermissionMatrixClient";
 
@@ -10,7 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function PermissionsPage() {
   await requireSettingsAccess("/settings/permissions");
   const sb = await createSupabaseServerClient();
-  const [matrix, role] = await Promise.all([getPermissionMatrix(sb), getUserRole()]);
+  const [matrix, canManage] = await Promise.all([
+    getPermissionMatrix(sb),
+    holdsPermission("permissions.manage"),
+  ]);
 
   return (
     <div>
@@ -21,7 +24,7 @@ export default async function PermissionsPage() {
       <PermissionMatrixClient
         permissions={matrix.permissions}
         assignments={matrix.assignments}
-        canManage={isAdmin(role)}
+        canManage={canManage}
       />
     </div>
   );

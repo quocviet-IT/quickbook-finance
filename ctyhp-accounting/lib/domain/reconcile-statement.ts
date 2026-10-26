@@ -189,6 +189,14 @@ export function bringHistoryForwardConfirmation(entries: number, through: string
   return `${entriesCount(entries)} up to ${formatDate(through)} will be marked reconciled. Nothing is posted to the books.`;
 }
 
+/**
+ * Shown where Complete, Sign off or Bring forward would be, to someone without
+ * `reconciliation.complete` (2.59): they may clear items, and someone who holds
+ * it signs the reconciliation off.
+ */
+export const COMPLETE_NEEDS_PERMISSION =
+  "Completing a reconciliation needs the Complete reconciliations permission.";
+
 // --- Discarding a reconciliation in progress (2.03) --------------------------
 
 export const DISCARD_RECONCILIATION = "Discard this reconciliation";

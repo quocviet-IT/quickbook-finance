@@ -28,6 +28,8 @@ interface Account {
 }
 interface Props {
   canWrite: boolean;
+  /** Holds `journal.void`, which reversing an entry needs; the RPC checks it again. */
+  canReverse: boolean;
   accounts: Account[];
   baseCurrency: string;
   baseDecimals: number;
@@ -54,6 +56,7 @@ const AttachmentDrawer = dynamic(() => import("@/components/documents/Attachment
 
 export default function JournalClient({
   canWrite,
+  canReverse,
   accounts,
   baseCurrency,
   baseDecimals,
@@ -386,7 +389,7 @@ export default function JournalClient({
                     }
                   />
                 ) : null}
-                {canWrite &&
+                {canReverse &&
                 e.status === "posted" &&
                 !e.isReversed &&
                 !e.isReversal &&

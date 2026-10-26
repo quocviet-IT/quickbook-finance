@@ -42,6 +42,7 @@ export default function AccountingDashboard({
   viewerId,
   canManage,
   canClose,
+  canReopen,
   assignees,
 }: {
   data: AccountingDashboardData;
@@ -49,8 +50,10 @@ export default function AccountingDashboard({
   viewerId: string | null;
   /** A viewer reads the queue and changes nothing. */
   canManage: boolean;
-  /** Only an admin may close or reopen; the database enforces it regardless. */
+  /** Staff holding `period.close`; the database enforces it regardless. */
   canClose: boolean;
+  /** An admin holding `period.reopen`; the database enforces both regardless. */
+  canReopen: boolean;
   assignees: Assignee[];
 }) {
   const { context, controls, queue, insights, secondary, close, recommendation, mode } = data;
@@ -158,7 +161,13 @@ export default function AccountingDashboard({
       </div>
 
       {mode === "close" && close ? (
-        <ClosePanel close={close} canClose={canClose} owners={owners} timeZone={context.timeZone} />
+        <ClosePanel
+          close={close}
+          canClose={canClose}
+          canReopen={canReopen}
+          owners={owners}
+          timeZone={context.timeZone}
+        />
       ) : null}
 
       <div className={styles.body}>

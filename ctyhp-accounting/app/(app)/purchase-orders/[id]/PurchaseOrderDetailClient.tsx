@@ -34,6 +34,8 @@ export default function PurchaseOrderDetailClient({
   currencies,
   items,
   canWrite,
+  canApprove,
+  canApproveVariance,
 }: {
   /**
    * Seeded by `?bill=1`. The New bill form sends people here when the vendor
@@ -48,6 +50,10 @@ export default function PurchaseOrderDetailClient({
   currencies: CurrencyRow[];
   items: ItemRow[];
   canWrite: boolean;
+  /** Holds `po.approve`; the RPC checks it again. */
+  canApprove: boolean;
+  /** Holds `po.variance_approve`, which billing beyond tolerance needs; the RPC checks it again. */
+  canApproveVariance: boolean;
 }) {
   const { message, modal } = App.useApp();
   const { timeZone } = useCompanyClock();
@@ -122,18 +128,20 @@ export default function PurchaseOrderDetailClient({
               {order.status === "draft" && (
                 <>
                   <Button onClick={() => setEditOpen(true)}>Edit draft</Button>
-                  <Button
-                    type="primary"
-                    loading={busy}
-                    onClick={() =>
-                      run("Purchase order approved", async () => {
-                        const res = await approvePurchaseOrderAction(order.id);
-                        return res;
-                      })
-                    }
-                  >
-                    Approve
-                  </Button>
+                  {canApprove ? (
+                    <Button
+                      type="primary"
+                      loading={busy}
+                      onClick={() =>
+                        run("Purchase order approved", async () => {
+                          const res = await approvePurchaseOrderAction(order.id);
+                          return res;
+                        })
+                      }
+                    >
+                      Approve
+                    </Button>
+                  ) : null}
                 </>
               )}
               {canReceive && (
@@ -377,6 +385,7 @@ export default function PurchaseOrderDetailClient({
         config={config}
         currencyCode={order.currency_code}
         decimals={decimals}
+        canApproveVariance={canApproveVariance}
       />
     </Space>
   );

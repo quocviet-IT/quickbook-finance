@@ -113,6 +113,8 @@ export default function InvoicesClient({
   items,
   canManageItems,
   canWrite,
+  canIssue,
+  canVoid,
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
@@ -141,6 +143,10 @@ export default function InvoicesClient({
   /** Holds `items.manage`, so the empty-catalog hint can link to the catalog. */
   canManageItems: boolean;
   canWrite: boolean;
+  /** Holds `invoice.issue`; the RPC checks it again. */
+  canIssue: boolean;
+  /** Holds `invoice.void`; the RPC checks it again. */
+  canVoid: boolean;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
@@ -689,7 +695,7 @@ export default function InvoicesClient({
         }
         // Last, and separated. The divider is conditional because a menu whose
         // only item is Void would otherwise open with an orphaned line above it.
-        if (canWrite && r.status !== "void" && r.status !== "paid") {
+        if (canVoid && r.status !== "void" && r.status !== "paid") {
           if (menu.length) menu.push({ type: "divider" as const, key: "before-void" });
           menu.push({
             key: "void",
@@ -713,7 +719,7 @@ export default function InvoicesClient({
                 }
               />
             ) : null}
-            {canWrite && r.status === "draft" && (
+            {canIssue && r.status === "draft" && (
               <Button size="small" loading={busyId === r.id} onClick={() => startIssue(r)}>
                 Issue
               </Button>

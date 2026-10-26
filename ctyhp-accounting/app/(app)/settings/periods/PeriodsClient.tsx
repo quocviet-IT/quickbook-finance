@@ -16,10 +16,17 @@ import TableEmpty from "@/components/ui/TableEmpty";
 import type { AccountingPeriodRow } from "@/lib/db/types";
 
 export default function PeriodsClient({
-  canEdit,
+  canGenerate,
+  canClose,
+  canReopen,
   fiscalStartMonth,
 }: {
-  canEdit: boolean;
+  /** Holds `settings.manage`: may set up the year's periods. */
+  canGenerate: boolean;
+  /** Staff holding `period.close`. */
+  canClose: boolean;
+  /** An admin holding `period.reopen`. */
+  canReopen: boolean;
   fiscalStartMonth: number;
 }) {
   const { message, modal } = App.useApp();
@@ -177,7 +184,7 @@ export default function PeriodsClient({
         <span>Fiscal year:</span>
         <InputNumber value={year} onChange={(v) => setYear((v as number) ?? year)} />
         <Tag>Fiscal year starts month {fiscalStartMonth}</Tag>
-        {canEdit && (
+        {canGenerate && (
           <Button type="primary" onClick={generate}>
             Generate periods
           </Button>
@@ -200,11 +207,11 @@ export default function PeriodsClient({
               loading={loading}
               title={`No periods for ${year} yet`}
               description={
-                canEdit
+                canGenerate
                   ? "Generate the year's monthly periods. Closing one later locks its entries, so nothing posts or voids in a month you have finished."
-                  : "An administrator generates the year's monthly periods."
+                  : "Someone who manages company settings generates the year's monthly periods."
               }
-              action={canEdit ? <Button onClick={generate}>Generate periods</Button> : null}
+              action={canGenerate ? <Button onClick={generate}>Generate periods</Button> : null}
             />
           ),
         }}
@@ -220,16 +227,16 @@ export default function PeriodsClient({
           {
             title: "",
             render: (_, r) =>
-              canEdit ? (
-                r.status === "open" ? (
+              r.status === "open" ? (
+                canClose ? (
                   <Button size="small" onClick={() => act(r, "close")}>
                     Close
                   </Button>
-                ) : (
-                  <Button size="small" onClick={() => act(r, "reopen")}>
-                    Reopen
-                  </Button>
-                )
+                ) : null
+              ) : canReopen ? (
+                <Button size="small" onClick={() => act(r, "reopen")}>
+                  Reopen
+                </Button>
               ) : null,
           },
         ]}

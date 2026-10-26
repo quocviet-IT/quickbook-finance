@@ -158,6 +158,26 @@ try {
   );
   check("anon was given nothing", anonGrants.n === 0, String(anonGrants.n));
 
+  // A session writes only where a policy allows that write (2.59). Every table
+  // is still readable, so a grant that went missing shows here too.
+  const grants = await one(
+    `select count(distinct t.tablename) filter (where not has_table_privilege('authenticated', format('%I.%I', t.schemaname, t.tablename), 'SELECT'))::int as unreadable,
+            count(*) filter (where (has_table_privilege('authenticated', format('%I.%I', t.schemaname, t.tablename), w.cmd))
+                               <> exists (select 1 from pg_policies p
+                                           where p.schemaname = t.schemaname and p.tablename = t.tablename
+                                             and p.cmd in (w.cmd, 'ALL')))::int as wrong
+       from pg_tables t
+      cross join (values ('INSERT'), ('UPDATE'), ('DELETE')) w(cmd)
+      where t.schemaname = $1 and t.tablename like 'acc\\_%'`,
+    [`co_${SLUG}`],
+  );
+  check("every table is readable", grants.unreadable === 0, String(grants.unreadable));
+  check(
+    "each write is granted exactly where a policy allows it",
+    grants.wrong === 0,
+    String(grants.wrong),
+  );
+
   // --- A company built from the Retail & Jewelry chart ------------------------
   const RETAIL = "verify_retail_probe";
   await provisionCompany(

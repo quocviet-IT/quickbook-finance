@@ -24,6 +24,16 @@ export async function getUserRole(): Promise<AppRole | null> {
   return (await currentAccess()).role;
 }
 
+/**
+ * Whether the signed-in person holds a permission in the open company, from
+ * the same once-per-request lookup as their role. A lookup that failed answers
+ * no: this decides what a screen offers and whether an action runs, and the
+ * database function behind the action checks the same permission again.
+ */
+export async function holdsPermission(key: string): Promise<boolean> {
+  return (await currentAccess()).permissionKeys?.includes(key) ?? false;
+}
+
 /** Redirect to /login unless authenticated; returns the user otherwise. */
 export async function requireUser(): Promise<User> {
   const user = await getSessionUser();

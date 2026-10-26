@@ -20,6 +20,7 @@ import {
 } from "@/lib/domain/statement-run";
 import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import { keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
+import { COMPLETE_NEEDS_PERMISSION } from "@/lib/domain/reconcile-statement";
 import {
   NO_BANK_LINE_MATCHES,
   NO_RUN_LINES,
@@ -46,6 +47,8 @@ import styles from "./run-table.module.css";
  */
 interface Props {
   canWrite: boolean;
+  /** Holds `reconciliation.complete`, which signing a month off needs; the RPC checks it again. */
+  canComplete: boolean;
   bankAccount: {
     id: string;
     label: string;
@@ -117,7 +120,7 @@ function outcomeTag(outcome: MonthOutcome) {
   }
 }
 
-export default function FromFilesClient({ canWrite, bankAccount, fileAccount, context }: Props) {
+export default function FromFilesClient({ canWrite, canComplete, bankAccount, fileAccount, context }: Props) {
   const { message } = App.useApp();
   const router = useRouter();
   const [statements, setStatements] = useState<ChosenStatement[]>([]);
@@ -242,6 +245,10 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
         ? "Bring the earlier lines forward and start the month that needs a look"
         : "Start the month that needs a look"
       : null;
+  // Signing a month off completes its reconciliation, and bringing lines forward
+  // records one completed: both need `reconciliation.complete`. Starting the
+  // month that needs a look does not.
+  const signBlocked = !canComplete && (Boolean(preview?.toSign) || Boolean(needsLook && bringForward));
 
   async function signOff() {
     if (!preview || previewing || check.stops.length > 0) return;
@@ -522,11 +529,12 @@ export default function FromFilesClient({ canWrite, bankAccount, fileAccount, co
             ]}
           />
           <Space style={{ marginTop: 12 }} wrap>
-            {signLabel ? (
+            {signLabel && !signBlocked ? (
               <Button type="primary" loading={busy} disabled={previewing} onClick={() => void signOff()}>
                 {signLabel}
               </Button>
             ) : null}
+            {signBlocked ? <Typography.Text type="secondary">{COMPLETE_NEEDS_PERMISSION}</Typography.Text> : null}
             {progress ? (
               <Typography.Text role="status" aria-live="polite">
                 {progress}

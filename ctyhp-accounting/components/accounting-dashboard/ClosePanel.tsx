@@ -48,12 +48,15 @@ const STATUS_LABEL: Record<CloseStepStatus, string> = {
 export default function ClosePanel({
   close,
   canClose,
+  canReopen,
   owners,
   timeZone,
 }: {
   close: SectionEnvelope<CloseReadiness | null>;
-  /** Only an admin may close or reopen; the database enforces it either way. */
+  /** Staff holding `period.close`; the database enforces it either way. */
   canClose: boolean;
+  /** An admin holding `period.reopen`; the database enforces both either way. */
+  canReopen: boolean;
   /** Who holds each blocking step, by the step's work key. */
   owners: Record<string, string>;
   timeZone: string;
@@ -216,21 +219,25 @@ export default function ClosePanel({
       ) : null}
 
       <div className={styles.closeActions}>
-        {canClose ? (
-          isClosed ? (
+        {isClosed ? (
+          canReopen ? (
             <Button onClick={() => setAction("reopen")}>Reopen this period</Button>
           ) : (
-            <Button
-              type="primary"
-              danger={blockers.length > 0}
-              onClick={() => setAction("close")}
-            >
-              {blockers.length > 0 ? "Close anyway…" : "Close this period"}
-            </Button>
+            <Typography.Text type="secondary">
+              Reopening a period needs an admin with the Reopen accounting periods permission.
+            </Typography.Text>
           )
+        ) : canClose ? (
+          <Button
+            type="primary"
+            danger={blockers.length > 0}
+            onClick={() => setAction("close")}
+          >
+            {blockers.length > 0 ? "Close anyway…" : "Close this period"}
+          </Button>
         ) : (
           <Typography.Text type="secondary">
-            Only an admin can close or reopen a period.
+            Closing a period needs the Close accounting periods permission.
           </Typography.Text>
         )}
         <Link href="/settings/periods">

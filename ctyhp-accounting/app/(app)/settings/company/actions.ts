@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, isAdmin } from "@/lib/auth";
+import { holdsPermission } from "@/lib/auth";
 import { companySettingsSchema } from "@/lib/domain/schemas";
 import {
   saveCompanySettings,
@@ -28,8 +28,9 @@ function msg(e: unknown): string { return e instanceof CompanyError || e instanc
 export async function saveCompanySettingsAction(
   raw: unknown,
 ): Promise<ActionResult<{ id: string; registerProblem?: string }>> {
-  const role = await getUserRole();
-  if (!isAdmin(role)) return { ok: false, error: "Only an admin can change company settings" };
+  if (!(await holdsPermission("settings.manage"))) {
+    return { ok: false, error: "You do not have permission to change company settings" };
+  }
   const parsed = companySettingsSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   try {
@@ -39,7 +40,8 @@ export async function saveCompanySettingsAction(
     // The switcher and the Companies list read the register, not these
     // settings, so a name corrected here has to be carried across or the two
     // disagree on screen. The register admits no application session, hence the
-    // service-role client; the admin check above is what authorises it.
+    // service-role client; the save above, which acc_save_company_settings
+    // allows only to someone holding settings.manage, is what authorises it.
     let registerProblem: string | undefined;
     try {
       await syncCompanyRegisterName(

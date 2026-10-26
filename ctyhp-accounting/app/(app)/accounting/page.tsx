@@ -1,6 +1,6 @@
 import PageHeader from "@/components/PageHeader";
-import { getSessionUser, getUserRole } from "@/lib/auth";
-import { canWrite } from "@/lib/domain/roles";
+import { getSessionUser, getUserRole, holdsPermission } from "@/lib/auth";
+import { canWrite, isAdmin } from "@/lib/domain/roles";
 import type { ActorRow } from "@/lib/db/types";
 import { listActors } from "@/lib/services/access";
 import AccountingDashboard from "@/components/accounting-dashboard/AccountingDashboard";
@@ -24,11 +24,13 @@ export default async function AccountingOverviewPage({
   // The queue and the people who can hold it are read together: "Mine" and
   // "Assign to" are useless without both, and neither is worth a round trip
   // of its own.
-  const [data, role, viewer, actors] = await Promise.all([
+  const [data, role, viewer, actors, holdsClose, holdsReopen] = await Promise.all([
     getAccountingDashboard(sb, mode),
     getUserRole(),
     getSessionUser(),
     listActors(sb).catch(() => []),
+    holdsPermission("period.close"),
+    holdsPermission("period.reopen"),
   ]);
   return (
     <div>
@@ -40,7 +42,8 @@ export default async function AccountingOverviewPage({
         data={data}
         viewerId={viewer?.id ?? null}
         canManage={canWrite(role)}
-        canClose={role === "admin"}
+        canClose={canWrite(role) && holdsClose}
+        canReopen={isAdmin(role) && holdsReopen}
         assignees={actors.map((actor: ActorRow) => ({
           id: actor.id,
           name: actor.full_name?.trim() || actor.email,

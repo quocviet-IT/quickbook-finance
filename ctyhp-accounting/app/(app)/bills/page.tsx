@@ -3,7 +3,7 @@ import { listBills, listVendors } from "@/lib/services/payables";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
 import { getReceivedNotBilled, listPurchaseOrders } from "@/lib/services/purchasing";
 import { billablePurchaseOrders } from "@/lib/domain/purchasing";
@@ -43,6 +43,8 @@ export default async function BillsPage({
     canManageItems,
     receivedNotBilled,
     purchaseOrders,
+    holdsPost,
+    holdsVoid,
   ] = await Promise.all([
     listBills(sb),
     listVendors(sb),
@@ -57,6 +59,8 @@ export default async function BillsPage({
     hasPermission(sb, "items.manage"),
     getReceivedNotBilled(sb),
     listPurchaseOrders(sb),
+    holdsPermission("bill.post"),
+    holdsPermission("bill.void"),
   ]);
 
   // A bill raised against a purchase order has to go through three-way matching,
@@ -98,6 +102,8 @@ export default async function BillsPage({
         billableOrders={billableOrders}
         canManageItems={canManageItems}
         canWrite={canWrite(role)}
+        canPost={canWrite(role) && holdsPost}
+        canVoid={canWrite(role) && holdsVoid}
         canRegisterAsset={!fixedAssetPermission.error && fixedAssetPermission.data === true}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}

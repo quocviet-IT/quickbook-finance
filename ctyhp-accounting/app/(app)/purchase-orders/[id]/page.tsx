@@ -5,7 +5,7 @@ import { listVendors } from "@/lib/services/payables";
 import { listAccounts } from "@/lib/services/accounts";
 import { listCurrencies } from "@/lib/services/reference";
 import { listItems } from "@/lib/services/items";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import PurchaseOrderDetailClient from "./PurchaseOrderDetailClient";
 
@@ -22,15 +22,18 @@ export default async function PurchaseOrderDetailPage({
   const { id } = await params;
   const initialBillOpen = (await searchParams).bill === "1";
   const sb = await createSupabaseServerClient();
-  const [detail, config, vendors, accounts, currencies, items, role] = await Promise.all([
-    getPurchaseOrder(sb, id),
-    getPurchasingConfig(sb),
-    listVendors(sb),
-    listAccounts(sb),
-    listCurrencies(sb),
-    listItems(sb),
-    getUserRole(),
-  ]);
+  const [detail, config, vendors, accounts, currencies, items, role, holdsApprove, holdsVariance] =
+    await Promise.all([
+      getPurchaseOrder(sb, id),
+      getPurchasingConfig(sb),
+      listVendors(sb),
+      listAccounts(sb),
+      listCurrencies(sb),
+      listItems(sb),
+      getUserRole(),
+      holdsPermission("po.approve"),
+      holdsPermission("po.variance_approve"),
+    ]);
 
   const expenseAccounts = accounts.filter(
     (a) =>
@@ -62,6 +65,8 @@ export default async function PurchaseOrderDetailPage({
         currencies={currencies}
         items={items.filter((i) => i.is_purchased && i.is_active)}
         canWrite={canWrite(role)}
+        canApprove={canWrite(role) && holdsApprove}
+        canApproveVariance={canWrite(role) && holdsVariance}
       />
     </div>
   );
