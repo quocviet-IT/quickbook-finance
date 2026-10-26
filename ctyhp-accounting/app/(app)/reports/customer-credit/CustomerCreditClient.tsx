@@ -145,6 +145,10 @@ export default function CustomerCreditClient({
           {
             title: "Customer",
             dataIndex: "name",
+            // The elastic column. Without a floor a phone drew it zero wide.
+            // The seven measured columns take 880px, so at 1280 (a 984px box)
+            // it has 104px; a floor of 100 keeps that, and holds on a phone.
+            minWidth: 100,
             render: (name: string, row) => (
               <Space size="small">
                 {name}

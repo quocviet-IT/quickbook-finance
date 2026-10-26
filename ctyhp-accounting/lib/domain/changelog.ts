@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.55",
+    date: "2026-10-26",
+    headline: "On a phone, lists keep every column: the name column no longer disappears.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Lists on a phone show every column",
+        detail:
+          "On a phone, 40 lists across the app drew one or two columns zero wide, and nothing showed they were there: Customer on Invoices, Estimates and Sales Receipts, Vendor on Bills and Expenses, Description on Banking, Name on Products & Services, and the main column of many reports. Each list now keeps every column at least wide enough to read and scrolls sideways inside its own frame, with the headings moving with the rows. On a computer screen nothing changes.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "2.54",
     date: "2026-10-24",
     headline: "Invoices, bills, payments, expenses and credits can be changed only by the steps that post them.",

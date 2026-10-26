@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Table, type TableProps } from "antd";
+import { tableFloorWidth, tableMinimumWidth, type FloorColumn } from "@/lib/design/table-metrics";
 import TableEmpty from "./TableEmpty";
 import { resolveTableData, type ServerPage } from "./table-data";
 import { fallbackPagination, hideSinglePage } from "./table-pagination";
@@ -61,9 +62,23 @@ export default function DataTable<RecordType extends object>({
   const [openedPageSize] = useState(resolved.pagination === false ? undefined : resolved.pagination.pageSize);
   const isLoading =
     typeof props.loading === "object" ? Boolean(props.loading?.spinning) : Boolean(props.loading);
+  // How narrow this table may be drawn. On a phone, every elastic column at
+  // its floor, the frame scrolling past that; elsewhere, every elastic column
+  // at least a few letters wide, so none is ever drawn to nothing (globals.css).
+  const extras = {
+    selection: Boolean(props.rowSelection),
+    expandable: Boolean(props.expandable?.expandedRowRender),
+  };
+  const columns = props.columns as readonly FloorColumn[] | undefined;
+  const widthVars: CSSProperties | undefined = fit
+    ? ({
+        "--table-floor-width": `${tableFloorWidth(columns, extras)}px`,
+        "--table-min-width": `${tableMinimumWidth(columns, extras)}px`,
+      } as CSSProperties)
+    : undefined;
 
   return (
-    <div className={`accounting-data-table${fit ? " accounting-table--fit" : ""}`}>
+    <div className={`accounting-data-table${fit ? " accounting-table--fit" : ""}`} style={widthVars}>
       <Table<RecordType>
         {...props}
         size={size}

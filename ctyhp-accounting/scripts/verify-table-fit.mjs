@@ -10,6 +10,8 @@
  * Three verdicts, because there are three kinds of table on these screens:
  *
  *   PASS/FAIL  a fitted table — DataTable with `fit`, which is the default.
+ *              At 1470 and 1280 it may not scroll sideways; at every width,
+ *              phone included, no column may be drawn zero wide.
  *   MATRIX     a table that opted out on purpose (fit={false}); it is allowed
  *              to scroll, and is reported so the exemption stays visible.
  *   RAW        Ant Design's Table reached for directly, on a screen not yet
@@ -53,6 +55,11 @@ const only = (args.find((a) => a.startsWith("--only="))?.split("=")[1] ?? "")
 const VIEWPORTS = [
   { width: 1470, height: 801 },
   { width: 1280, height: 800 },
+  // A phone. A fitted table may scroll inside its own frame here — its
+  // columns cannot fit 358px — but no column may vanish and the page itself
+  // may not scroll sideways. Before 2.55, 40 tables on 83 routes drew 46
+  // columns zero wide at this width: Customer on Invoices, Vendor on Bills.
+  { width: 390, height: 844, phone: true },
 ];
 
 const routes = only.length ? only : discoverStaticRoutes(join(here, "..", "app", "(app)"));
@@ -105,8 +112,17 @@ const MEASURE = () => {
       });
     }
 
+    // A heading with words in it drawn narrower than a letter: the column is
+    // there in the markup and gone from the screen.
+    const collapsed = Array.from(wrapper.querySelectorAll("thead tr:last-child > th"))
+      .filter((th) => !th.classList.contains("ant-table-cell-scrollbar"))
+      .filter((th) => (th.textContent || "").trim() && th.getBoundingClientRect().width < 12)
+      .map((th) => (th.textContent || "").trim().slice(0, 24));
+
     return {
       kind,
+      collapsed,
+      pageScrolls: document.documentElement.scrollWidth > window.innerWidth + 1,
       overflow: scroller.scrollWidth - scroller.clientWidth,
       width: scroller.clientWidth,
       heading: heading.slice(0, 44),
@@ -122,7 +138,7 @@ let fitted = 0;
 const rawOverflow = new Map();
 
 for (const viewport of VIEWPORTS) {
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
   await context.addCookies(
     playwrightSessionCookies({ session, user, supabaseUrl, appBaseUrl: base }),
   );
@@ -167,8 +183,17 @@ for (const viewport of VIEWPORTS) {
         return;
       }
       fitted++;
-      // 1px of slack: a scaled display rounds a sub-pixel column boundary up.
-      if (table.overflow > 1) {
+      if (table.collapsed.length > 0) {
+        failed++;
+        console.log(`  FAIL  ${where} — column drawn zero wide: ${table.collapsed.join(", ")}`);
+      } else if (viewport.phone && table.pageScrolls) {
+        failed++;
+        console.log(`  FAIL  ${where} — the page scrolls sideways`);
+      } else if (viewport.phone) {
+        // Scrolling inside its own frame is what a phone is allowed.
+        console.log(`  PASS  ${where}`);
+      } else if (table.overflow > 1) {
+        // 1px of slack: a scaled display rounds a sub-pixel column boundary up.
         failed++;
         console.log(`  FAIL  ${where} — overflows by ${table.overflow}px`);
       } else if (table.spills.length > 0) {

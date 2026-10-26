@@ -77,3 +77,80 @@ export function fitsBox(
 ): boolean {
   return measured + elasticFloor <= box;
 }
+
+/** The little of a column `tableFloorWidth` reads; an Ant Design column has all of it. */
+export interface FloorColumn {
+  width?: unknown;
+  /** Carried by `flexColumn` (components/ui/columns.tsx): the elastic column's floor. */
+  minWidth?: unknown;
+  hidden?: boolean;
+  children?: readonly FloorColumn[];
+}
+
+/**
+ * The narrowest a held-to-its-box table can be drawn without losing a column:
+ * every declared width, plus every elastic column's floor, plus the selection
+ * checkbox and the expand button when the table has them.
+ *
+ * Under `table-layout: fixed` a column with no width gets only what the
+ * declared ones leave. On a phone they leave nothing — Sales Receipts declares
+ * 614px for a 358px frame — and Customer was drawn zero wide, gone from the
+ * table with no sign it was ever there (system check, 2026-10-24: 46 columns
+ * on 40 tables). DataTable sets this as the table's minimum width below 768px,
+ * so a phone's frame scrolls instead; wider, tableMinimumWidth applies.
+ */
+export function tableFloorWidth(
+  columns: readonly FloorColumn[] | undefined,
+  extras: { selection?: boolean; expandable?: boolean } = {},
+): number {
+  const leaves = (list: readonly FloorColumn[]): number =>
+    list.reduce((sum, column) => {
+      if (column.hidden) return sum;
+      if (column.children?.length) return sum + leaves(column.children);
+      if (typeof column.width === "number") return sum + column.width;
+      return sum + (typeof column.minWidth === "number" ? column.minWidth : 0);
+    }, 0);
+  return (
+    leaves(columns ?? []) +
+    (extras.selection ? COLUMN.SELECTION : 0) +
+    (extras.expandable ? EXPAND_COLUMN_WIDTH : 0)
+  );
+}
+
+/** Ant Design's expand-row button column at size="small". */
+export const EXPAND_COLUMN_WIDTH = 48;
+
+/**
+ * The least an elastic column is ever drawn, at any width: a few letters and
+ * an ellipsis, with the whole value in its tooltip. Enough to show the column
+ * is there; not enough to read it, which is what the floor is for.
+ */
+export const ELASTIC_COLUMN_MIN = 48;
+
+/**
+ * The narrowest a fitted table is ever drawn on a computer: every declared
+ * width, and ELASTIC_COLUMN_MIN for each column that declares none (with or
+ * without a floor).
+ *
+ * The floor itself (tableFloorWidth) holds only on a phone. At 1280 sixteen
+ * tables are a little wider than their box at their elastic floors — the page
+ * scrollbar takes 15px of the 984 the arithmetic assumes — and there the
+ * elastic column has always given way rather than the row scrolling. This
+ * keeps that, and stops it giving way to nothing.
+ */
+export function tableMinimumWidth(
+  columns: readonly FloorColumn[] | undefined,
+  extras: { selection?: boolean; expandable?: boolean } = {},
+): number {
+  const leaves = (list: readonly FloorColumn[]): number =>
+    list.reduce((sum, column) => {
+      if (column.hidden) return sum;
+      if (column.children?.length) return sum + leaves(column.children);
+      return sum + (typeof column.width === "number" ? column.width : ELASTIC_COLUMN_MIN);
+    }, 0);
+  return (
+    leaves(columns ?? []) +
+    (extras.selection ? COLUMN.SELECTION : 0) +
+    (extras.expandable ? EXPAND_COLUMN_WIDTH : 0)
+  );
+}
