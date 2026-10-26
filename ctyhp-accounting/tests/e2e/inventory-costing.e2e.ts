@@ -49,9 +49,10 @@ describe("inventory costing over HTTPS", () => {
         ((accounts ?? []) as { id: string; account_code: string }[]).map((a) => [a.account_code, a.id]),
       );
 
-      const { data: item, error: itemError } = await sb
-        .from("acc_item")
-        .insert({
+      // Through the function the Products screen uses (2.60).
+      const { data: item, error: itemError } = await sb.rpc("acc_save_item", {
+        p_id: null,
+        p_values: {
           item_code: `${marker}-WAC`,
           name: `${marker} costing probe`,
           is_inventory: true,
@@ -61,9 +62,8 @@ describe("inventory costing over HTTPS", () => {
           inventory_account_id: byCode.get("1200"),
           cogs_account_id: byCode.get("5000"),
           income_account_id: byCode.get("4000"),
-        })
-        .select("id")
-        .single();
+        },
+      });
       expect(itemError, itemError?.message).toBeNull();
       itemId = (item as { id: string }).id;
 

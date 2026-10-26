@@ -28,8 +28,10 @@ describe("early payment discount over HTTPS", () => {
     let vendorId: string | null = null;
 
     try {
-      // A vendor on 2/10 net 30 — pay within ten days, keep 2%.
-      const { data: vendor, error: vendorError } = await sb
+      // A vendor on 2/10 net 30 — pay within ten days, keep 2%. No screen sets
+      // these terms, and since 2.60 a session adds vendors only through
+      // acc_save_vendor, so the fixture is the service role's to write.
+      const { data: vendor, error: vendorError } = await admin
         .from("acc_vendor")
         .insert({
           name: `${marker} Discount Vendor`,

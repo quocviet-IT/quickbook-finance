@@ -19,11 +19,10 @@ describe("customer credit control over HTTPS", () => {
     try {
       await sweepMarker(sb, marker);
 
-      const { data: customer, error: customerError } = await sb
-        .from("acc_customer")
-        .insert({ name: marker, currency_code: "USD", credit_limit_minor: LIMIT_MINOR })
-        .select("id")
-        .single();
+      const { data: customer, error: customerError } = await sb.rpc("acc_save_customer", {
+        p_id: null,
+        p_values: { name: marker, currency_code: "USD", credit_limit_minor: LIMIT_MINOR },
+      });
       expect(customerError).toBeNull();
 
       const { data: account } = await sb
@@ -95,10 +94,10 @@ describe("customer credit control over HTTPS", () => {
       expect(row.status.availableMinor).toBe(-70_00);
 
       // 6. Credit hold blocks the next invoice on its own, whatever the size.
-      const { error: holdError } = await sb
-        .from("acc_customer")
-        .update({ credit_hold: true })
-        .eq("id", (customer as { id: string }).id);
+      const { error: holdError } = await sb.rpc("acc_save_customer", {
+        p_id: (customer as { id: string }).id,
+        p_values: { credit_hold: true },
+      });
       expect(holdError).toBeNull();
 
       const tiny = await draft(1_00);

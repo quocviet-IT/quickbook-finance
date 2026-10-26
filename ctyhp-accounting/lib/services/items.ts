@@ -33,27 +33,20 @@ function toRow(input: ItemCreateInput | ItemUpdateInput) {
   };
 }
 
+// Saved through acc_save_item (2.60): it checks items.manage and writes only these columns.
 export async function createItem(sb: SupabaseClient, input: ItemCreateInput): Promise<ItemRow> {
-  const { data, error } = await sb.from("acc_item").insert(toRow(input)).select(COLS).single();
+  const { data, error } = await sb.rpc("acc_save_item", { p_id: null, p_values: toRow(input) });
   if (error) throw new ItemsError(error.message);
   return data as unknown as ItemRow;
 }
 
 export async function updateItem(sb: SupabaseClient, id: string, input: ItemUpdateInput): Promise<ItemRow> {
-  const { data, error } = await sb
-    .from("acc_item")
-    .update({ ...toRow(input), updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(COLS)
-    .single();
+  const { data, error } = await sb.rpc("acc_save_item", { p_id: id, p_values: toRow(input) });
   if (error) throw new ItemsError(error.message);
   return data as unknown as ItemRow;
 }
 
 export async function setItemActive(sb: SupabaseClient, id: string, active: boolean): Promise<void> {
-  const { error } = await sb
-    .from("acc_item")
-    .update({ is_active: active, updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const { error } = await sb.rpc("acc_save_item", { p_id: id, p_values: { is_active: active } });
   if (error) throw new ItemsError(error.message);
 }

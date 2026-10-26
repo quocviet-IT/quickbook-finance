@@ -6,9 +6,10 @@ describe("marker sweep", () => {
   it("removes a marked customer and reports what it deleted", async () => {
     const { sb, marker } = await openE2eSession();
     try {
-      const { error } = await sb
-        .from("acc_customer")
-        .insert({ name: marker, currency_code: "USD" });
+      const { error } = await sb.rpc("acc_save_customer", {
+        p_id: null,
+        p_values: { name: marker, currency_code: "USD" },
+      });
       expect(error).toBeNull();
 
       const first = await sweepMarker(sb, marker);

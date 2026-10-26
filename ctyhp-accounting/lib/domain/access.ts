@@ -8,7 +8,7 @@
  * logic server-side, because the UI may only *explain* an access decision — it
  * may never be the one making it.
  */
-import type { AppRole, UserStatus } from "@/lib/db/types";
+import type { AppRole, PermissionMinRole, UserStatus } from "@/lib/db/types";
 import type { Minor } from "./money";
 import { statusLabel } from "./status-label";
 import { APP_ROLES } from "./schemas";
@@ -22,6 +22,24 @@ import { APP_ROLES } from "./schemas";
  */
 export function emptyGrants(): Record<AppRole, boolean> {
   return Object.fromEntries(APP_ROLES.map((role) => [role, false])) as Record<AppRole, boolean>;
+}
+
+/**
+ * Whether a role is at or above a permission's least role — the same rule as
+ * `acc_role_meets` (migration 0170). Below it, holding the permission changes
+ * nothing, because the functions that use it also ask for the role.
+ */
+export function roleMeets(role: AppRole, minRole: PermissionMinRole): boolean {
+  if (minRole === "admin") return role === "admin";
+  if (minRole === "staff") return role === "admin" || role === "accountant";
+  return true;
+}
+
+/** Why a switch is greyed out, in the matrix's words. */
+export function minRoleNote(minRole: PermissionMinRole): string | null {
+  if (minRole === "admin") return "Only admins can use this";
+  if (minRole === "staff") return "Only admins and accountants can use this";
+  return null;
 }
 
 export interface ApprovalPolicyLike {

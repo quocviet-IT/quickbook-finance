@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
+import { createE2eServiceClient } from "./support/session";
 
 /**
  * The claim the whole multi-company design rests on: one company cannot see
@@ -25,9 +26,10 @@ function anonKey() {
 /**
  * A signed-in client bound to one schema, exactly as the application makes one.
  *
- * Deliberately no service-role client anywhere in this file: a test that proves
- * isolation by bypassing row-level security proves nothing. Everything here
- * runs as a real user with real permissions.
+ * Deliberately no service-role client in the proof: a test that proves
+ * isolation by bypassing row-level security proves nothing. Everything it
+ * checks runs as a real user with real permissions; only removing the probe
+ * afterwards is the service role's.
  */
 async function signedInTo(schema: string) {
   const sb = createClient(url(), anonKey(), {
@@ -130,7 +132,8 @@ describe("company isolation over HTTPS", () => {
 
     try {
       const writer = await signedInTo(first.schema_name);
-      const { error: writeError } = await writer.from("acc_customer").insert({ name: marker });
+      // Through the function the Customers screen uses (2.60).
+      const { error: writeError } = await writer.rpc("acc_save_customer", { p_id: null, p_values: { name: marker } });
       expect(writeError, writeError?.message).toBeNull();
 
       // The company it was written to can see it.
@@ -144,8 +147,9 @@ describe("company isolation over HTTPS", () => {
         expect(leaked ?? [], `${marker} leaked into ${other}`).toHaveLength(0);
       }
     } finally {
-      const cleaner = await signedInTo(first.schema_name);
-      await cleaner.from("acc_customer").delete().eq("name", marker);
+      // Clean-up only, after the proof: no screen deletes a customer, so since
+      // 2.60 removing the probe is the service role's job.
+      await createE2eServiceClient().schema(first.schema_name).from("acc_customer").delete().eq("name", marker);
     }
   });
 

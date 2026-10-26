@@ -91,7 +91,7 @@ export async function createRecurringTemplate(
   sb: SupabaseClient,
   input: RecurringTemplateCreateInput,
 ): Promise<RecurringTemplateRow> {
-  const { data: authData } = await sb.auth.getUser();
+  // acc_save_recurring_template stamps who made it (2.60).
   const row = {
     name: input.name,
     document_type: input.document_type,
@@ -102,10 +102,8 @@ export async function createRecurringTemplate(
     end_date: input.end_date || null,
     payload: input.payload,
     total_minor: recurringAmountMinor(input),
-    created_by: authData.user?.id ?? null,
-    updated_by: authData.user?.id ?? null,
   };
-  const { data, error } = await sb.from("acc_recurring_template").insert(row).select("*").single();
+  const { data, error } = await sb.rpc("acc_save_recurring_template", { p_values: row });
   if (error) throw new RecurringError(error.message);
   return data as unknown as RecurringTemplateRow;
 }
@@ -115,26 +113,9 @@ export async function setRecurringTemplateStatus(
   templateId: string,
   status: Exclude<RecurringTemplateStatus, "ended">,
 ): Promise<void> {
-  const { data: authData } = await sb.auth.getUser();
-  const { data: before, error: readError } = await sb
-    .from("acc_recurring_template")
-    .select("*")
-    .eq("id", templateId)
-    .single();
-  if (readError) throw new RecurringError(readError.message);
-  if ((before as { status: RecurringTemplateStatus }).status === "ended") {
-    throw new RecurringError("An ended schedule cannot be resumed");
-  }
-  const { error } = await sb
-    .from("acc_recurring_template")
-    .update({
-      status,
-      updated_by: authData.user?.id ?? null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", templateId)
-    .select("*")
-    .single();
+  // acc_set_recurring_template_status keeps an ended schedule ended and stamps
+  // who changed it (2.60).
+  const { error } = await sb.rpc("acc_set_recurring_template_status", { p_id: templateId, p_status: status });
   if (error) throw new RecurringError(error.message);
 }
 

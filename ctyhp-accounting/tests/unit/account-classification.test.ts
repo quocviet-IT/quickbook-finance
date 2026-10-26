@@ -56,7 +56,16 @@ function chartClient(rows = IMPORTED) {
     };
     return chain;
   };
-  return { client: { from } as unknown as SupabaseClient, updates };
+  // Since 2.60 the writes go through acc_classify_accounts: one call per answer.
+  const rpc = (fn: string, args: { p_ids: string[]; p_cash_flow_role: string | null; p_detail_type: string | null }) => {
+    if (fn !== "acc_classify_accounts") throw new Error(`unexpected rpc ${fn}`);
+    const patch: Record<string, unknown> = {};
+    if (args.p_cash_flow_role !== null) patch.cash_flow_role = args.p_cash_flow_role;
+    if (args.p_detail_type !== null) patch.detail_type = args.p_detail_type;
+    updates.push({ patch, ids: args.p_ids });
+    return Promise.resolve({ data: args.p_ids.length, error: null });
+  };
+  return { client: { from, rpc } as unknown as SupabaseClient, updates };
 }
 
 describe("planAccountClassification", () => {

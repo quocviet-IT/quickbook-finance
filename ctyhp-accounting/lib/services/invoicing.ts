@@ -63,33 +63,26 @@ export async function createCustomer(
   sb: SupabaseClient,
   input: CustomerCreateInput,
 ): Promise<CustomerRow> {
-  const { data, error } = await sb
-    .from("acc_customer")
-    .insert({
-      ...contactFields(input),
-      currency_code: input.currency_code || null,
-    })
-    .select(CUSTOMER_COLS)
-    .single();
+  // Saved through acc_save_customer (2.60), which writes only these columns.
+  const { data, error } = await sb.rpc("acc_save_customer", {
+    p_id: null,
+    p_values: { ...contactFields(input), currency_code: input.currency_code || null },
+  });
   if (error) throw new InvoicingError(error.message);
   return data as unknown as CustomerRow;
 }
 
 /**
  * Update contact details. The currency is deliberately not updatable: it is
- * baked into every document already issued to this customer.
+ * baked into every document already issued to this customer, and
+ * acc_save_customer refuses it on an update.
  */
 export async function updateCustomer(
   sb: SupabaseClient,
   input: CustomerUpdateInput,
 ): Promise<CustomerRow> {
   const { id, ...fields } = input;
-  const { data, error } = await sb
-    .from("acc_customer")
-    .update({ ...contactFields(fields), updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(CUSTOMER_COLS)
-    .single();
+  const { data, error } = await sb.rpc("acc_save_customer", { p_id: id, p_values: contactFields(fields) });
   if (error) throw new InvoicingError(error.message);
   return data as unknown as CustomerRow;
 }

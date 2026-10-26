@@ -34,15 +34,17 @@ async function main() {
 
   const income = await acctId("4000");
 
-  const { data: item, error: e2 } = await authed.from("acc_item").insert({
-    name: "E2E Item", description: "E2E item desc", is_sold: true,
-    sales_price_minor: 12345, income_account_id: income,
-  }).select("id").single();
+  // Through the functions the screens use; a session writes these no other way (2.60).
+  const { data: item, error: e2 } = await authed.rpc("acc_save_item", {
+    p_id: null,
+    p_values: { name: "E2E Item", description: "E2E item desc", is_sold: true, sales_price_minor: 12345, income_account_id: income },
+  });
   if (e2) throw new Error("item: " + e2.message);
   check("item created", !!item.id);
 
-  const { data: cust, error: ec } = await authed.from("acc_customer")
-    .insert({ name: "E2E Item Customer", currency_code: "USD" }).select("id").single();
+  const { data: cust, error: ec } = await authed.rpc("acc_save_customer", {
+    p_id: null, p_values: { name: "E2E Item Customer", currency_code: "USD" },
+  });
   if (ec) throw new Error("customer: " + ec.message);
 
   // Through the function the screen uses; the tables are read-only to a session since 0165.

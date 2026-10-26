@@ -19,11 +19,10 @@ describe("invoice audit trail over HTTPS", () => {
     try {
       await sweepMarker(sb, marker);
 
-      const { data: customer, error: customerError } = await sb
-        .from("acc_customer")
-        .insert({ name: marker, currency_code: "USD" })
-        .select("id")
-        .single();
+      const { data: customer, error: customerError } = await sb.rpc("acc_save_customer", {
+        p_id: null,
+        p_values: { name: marker, currency_code: "USD" },
+      });
       expect(customerError).toBeNull();
 
       const { data: account, error: accountError } = await sb

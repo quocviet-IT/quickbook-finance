@@ -49,7 +49,9 @@ export async function createAccount(
   input: AccountCreateInput,
 ): Promise<AccountRow> {
   const parsed = accountCreateSchema.parse(input);
-  const { data, error } = await sb.from(TABLE).insert(parsed).select(COLUMNS).single();
+  // Saved through acc_save_account (2.60): it checks the role and writes only
+  // the columns this form has.
+  const { data, error } = await sb.rpc("acc_save_account", { p_id: null, p_values: parsed });
   if (error) mapWriteError(error.message);
   return data as unknown as AccountRow;
 }
@@ -62,12 +64,7 @@ export async function updateAccount(
   const parsed = accountUpdateSchema.parse(input);
   const before = await getAccount(sb, id);
   if (!before) throw new AccountServiceError("Account not found");
-  const { data, error } = await sb
-    .from(TABLE)
-    .update({ ...parsed, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(COLUMNS)
-    .single();
+  const { data, error } = await sb.rpc("acc_save_account", { p_id: id, p_values: parsed });
   if (error) mapWriteError(error.message);
   return data as unknown as AccountRow;
 }
@@ -83,12 +80,7 @@ export async function setAccountStatus(
 ): Promise<AccountRow> {
   const before = await getAccount(sb, id);
   if (!before) throw new AccountServiceError("Account not found");
-  const { data, error } = await sb
-    .from(TABLE)
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(COLUMNS)
-    .single();
+  const { data, error } = await sb.rpc("acc_save_account", { p_id: id, p_values: { status } });
   if (error) throw new AccountServiceError(error.message);
   return data as unknown as AccountRow;
 }

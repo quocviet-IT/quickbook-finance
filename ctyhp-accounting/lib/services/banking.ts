@@ -90,25 +90,23 @@ export async function createBankAccount(
     detail_type?: string | null;
   },
 ): Promise<BankAccountRow> {
-  const { data, error } = await sb
-    .from("acc_bank_account")
-    .insert({
+  const { data, error } = await sb.rpc("acc_save_bank_account", {
+    p_values: {
       account_id: input.account_id,
       bank_name: input.bank_name,
       account_number_masked: input.account_number_masked || null,
       currency_code: input.currency_code,
-    })
-    .select("*")
-    .single();
+    },
+  });
   if (error) throw new BankingError(error.message);
 
   // Only a Bank-type detail classifies the ledger account: a credit card (2.45) has none to give.
   if (input.detail_type && (BANK_DETAIL_TYPES as readonly string[]).includes(input.detail_type)) {
-    const { error: classifyError } = await sb
-      .from("acc_account")
-      .update({ detail_type: input.detail_type })
-      .eq("id", input.account_id)
-      .is("detail_type", null);
+    const { error: classifyError } = await sb.rpc("acc_classify_accounts", {
+      p_ids: [input.account_id],
+      p_cash_flow_role: null,
+      p_detail_type: input.detail_type,
+    });
     // A failure here costs the classification, not the bank account.
     if (classifyError) console.warn("classifying the ledger account failed:", classifyError.message);
   }

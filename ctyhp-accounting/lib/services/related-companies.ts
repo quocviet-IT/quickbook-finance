@@ -147,18 +147,17 @@ export async function saveRelatedCompany(sb: SupabaseClient, id: string | null, 
     match_words: phrasesOf(input.matchWords).join(", "),
     is_active: input.isActive,
   };
-  const result = id
-    ? await sb.from("acc_related_company").update(fields).eq("id", id).select("id").single()
-    : await sb.from("acc_related_company").insert(fields).select("id").single();
+  // acc_save_related_company (2.60): a row that is gone answers P0002.
+  const result = await sb.rpc("acc_save_related_company", { p_id: id, p_values: fields });
   if (result.error) {
     if (result.error.code === "23505") throw fail(relatedDuplicateMessage(result.error.message));
-    if (result.error.code === "PGRST116") throw fail("This related company is no longer in the list");
+    if (result.error.code === "P0002") throw fail("This related company is no longer in the list");
     throw fail(result.error.message);
   }
-  return (result.data as { id: string }).id;
+  return result.data as string;
 }
 
 export async function deleteRelatedCompany(sb: SupabaseClient, id: string): Promise<void> {
-  const { error } = await sb.from("acc_related_company").delete().eq("id", id);
+  const { error } = await sb.rpc("acc_delete_related_company", { p_id: id });
   if (error) throw fail(error.message);
 }

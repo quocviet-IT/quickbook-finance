@@ -152,6 +152,10 @@ class Query implements PromiseLike<Answer> {
   eq(column: string, value: unknown) {
     return this.filter(column, "=", value);
   }
+  /** PostgREST's `neq`: a null never matches, as in SQL. */
+  neq(column: string, value: unknown) {
+    return this.filter(column, "<>", value);
+  }
   gte(column: string, value: unknown) {
     return this.filter(column, ">=", value);
   }
@@ -212,7 +216,13 @@ class Query implements PromiseLike<Answer> {
       const { rows } = await this.run(sql, this.params);
       return this.shaped(rows);
     } catch (e) {
-      return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+      // PostgREST hands the SQLSTATE on as `code` (23505, P0002, 42501), and
+      // services branch on it, so the shim does too.
+      const code = (e as { code?: unknown }).code;
+      return {
+        data: null,
+        error: { message: e instanceof Error ? e.message : String(e), ...(typeof code === "string" ? { code } : {}) },
+      };
     }
   }
 

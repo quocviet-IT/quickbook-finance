@@ -199,7 +199,7 @@ export interface PermissionMatrix {
 
 export async function getPermissionMatrix(sb: SupabaseClient): Promise<PermissionMatrix> {
   const [perms, assigns] = await Promise.all([
-    sb.from("acc_permission").select("key,label,category,description,is_enforced").order("category").order("key"),
+    sb.from("acc_permission").select("key,label,category,description,is_enforced,min_role").order("category").order("key"),
     sb.from("acc_role_permission").select("role,permission_key,allowed"),
   ]);
   if (perms.error) throw new AccessError(perms.error.message);
