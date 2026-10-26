@@ -30,9 +30,9 @@ export async function listVendors(sb: SupabaseClient): Promise<VendorRow[]> {
 }
 
 export async function createVendor(sb: SupabaseClient, input: VendorCreateInput): Promise<VendorRow> {
-  const { data, error } = await sb
-    .from("acc_vendor")
-    .insert({
+  // Saved through acc_save_vendor (2.60), which writes only these columns.
+  const { data, error } = await sb.rpc("acc_save_vendor", {
+    p_values: {
       name: input.name,
       email: input.email || null,
       phone: input.phone || null,
@@ -40,12 +40,8 @@ export async function createVendor(sb: SupabaseClient, input: VendorCreateInput)
       ap_account_id: input.ap_account_id || null,
       default_expense_account_id: input.default_expense_account_id || null,
       payment_terms: input.payment_terms || null,
-    })
-    .select(
-      "id,name,email,phone,currency_code,ap_account_id,default_expense_account_id," +
-        "payment_terms,is_active,created_at,updated_at",
-    )
-    .single();
+    },
+  });
   if (error) throw new PayablesError(error.message);
   return data as unknown as VendorRow;
 }

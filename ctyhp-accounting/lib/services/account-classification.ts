@@ -92,12 +92,10 @@ export async function classifyAccounts(sb: SupabaseClient): Promise<Classificati
     const role = defaultCashFlowRole(account.account_type);
     byRole.set(role, [...(byRole.get(role) ?? []), account.id]);
   }
+  // acc_classify_accounts fills only what is still blank, as these writes
+  // always did, and checks the role (2.60).
   for (const [role, ids] of byRole) {
-    const { error } = await sb
-      .from("acc_account")
-      .update({ cash_flow_role: role })
-      .in("id", ids)
-      .eq("cash_flow_role", "unclassified");
+    const { error } = await sb.rpc("acc_classify_accounts", { p_ids: ids, p_cash_flow_role: role, p_detail_type: null });
     if (error) throw new AccountClassificationError(error.message);
   }
 
@@ -108,11 +106,7 @@ export async function classifyAccounts(sb: SupabaseClient): Promise<Classificati
     byDetail.set(detail, [...(byDetail.get(detail) ?? []), account.id]);
   }
   for (const [detail, ids] of byDetail) {
-    const { error } = await sb
-      .from("acc_account")
-      .update({ detail_type: detail })
-      .in("id", ids)
-      .is("detail_type", null);
+    const { error } = await sb.rpc("acc_classify_accounts", { p_ids: ids, p_cash_flow_role: null, p_detail_type: detail });
     if (error) throw new AccountClassificationError(error.message);
   }
 

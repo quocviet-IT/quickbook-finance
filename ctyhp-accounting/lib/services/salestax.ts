@@ -64,8 +64,6 @@ export async function voidTaxPayment(sb: SupabaseClient, id: string): Promise<vo
   if (error) throw new SalesTaxError(error.message);
 }
 
-const TC_COLS = "id,code,name,rate_percent,direction,tax_account_id,is_active,state_code";
-
 function taxCodeRow(input: TaxCodeCreateInput | TaxCodeUpdateInput) {
   return {
     code: input.code,
@@ -78,26 +76,21 @@ function taxCodeRow(input: TaxCodeCreateInput | TaxCodeUpdateInput) {
   };
 }
 
+// Saved through acc_save_tax_code (2.60): admins only, as the table's rule was,
+// and a refusal or a missing row is an error rather than a silent no-op.
 export async function createTaxCode(sb: SupabaseClient, input: TaxCodeCreateInput): Promise<TaxCodeRow> {
-  const { data, error } = await sb.from("acc_tax_code").insert(taxCodeRow(input)).select(TC_COLS).single();
+  const { data, error } = await sb.rpc("acc_save_tax_code", { p_id: null, p_values: taxCodeRow(input) });
   if (error) throw new SalesTaxError(error.message);
   return data as unknown as TaxCodeRow;
 }
 
 export async function updateTaxCode(sb: SupabaseClient, id: string, input: TaxCodeUpdateInput): Promise<TaxCodeRow> {
-  const { data, error } = await sb.from("acc_tax_code").update(taxCodeRow(input)).eq("id", id).select(TC_COLS).single();
+  const { data, error } = await sb.rpc("acc_save_tax_code", { p_id: id, p_values: taxCodeRow(input) });
   if (error) throw new SalesTaxError(error.message);
   return data as unknown as TaxCodeRow;
 }
 
 export async function setTaxCodeActive(sb: SupabaseClient, id: string, active: boolean): Promise<void> {
-  // .select().single() so an RLS-blocked update surfaces as an error (0 rows)
-  // rather than a silent, misleading success.
-  const { error } = await sb
-    .from("acc_tax_code")
-    .update({ is_active: active })
-    .eq("id", id)
-    .select("id")
-    .single();
+  const { error } = await sb.rpc("acc_save_tax_code", { p_id: id, p_values: { is_active: active } });
   if (error) throw new SalesTaxError(error.message);
 }

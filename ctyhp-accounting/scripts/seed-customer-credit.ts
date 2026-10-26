@@ -147,7 +147,8 @@ for (const customer of customers ?? []) {
   );
   if (dryRun) continue;
 
-  const { error } = await sb.from("acc_customer").update(update).eq("id", customer.id);
+  // Through the function the Customers screen uses; a session writes customers no other way (2.60).
+  const { error } = await sb.rpc("acc_save_customer", { p_id: customer.id, p_values: update });
   if (error) {
     console.error(`  update failed: ${error.message}`);
     process.exitCode = 1;

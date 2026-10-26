@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildInvoiceDocument, formatPostalAddress } from "@/lib/domain/invoice-document";
 import { getInvoiceDocumentSource, updateCustomer } from "@/lib/services/invoicing";
-import { closeE2eSession, openE2eSession } from "./support/session";
+import { closeE2eSession, createE2eServiceClient, openE2eSession } from "./support/session";
 
 describe("printable invoice over HTTPS", () => {
   it("builds a document for a real issued invoice that agrees with the ledger", async () => {
@@ -47,11 +47,10 @@ describe("printable invoice over HTTPS", () => {
     const { sb, marker } = await openE2eSession();
 
     try {
-      const { data: created, error: createError } = await sb
-        .from("acc_customer")
-        .insert({ name: marker, currency_code: "USD" })
-        .select("id")
-        .single();
+      const { data: created, error: createError } = await sb.rpc("acc_save_customer", {
+        p_id: null,
+        p_values: { name: marker, currency_code: "USD" },
+      });
       expect(createError).toBeNull();
 
       const updated = await updateCustomer(sb, {
@@ -84,7 +83,8 @@ describe("printable invoice over HTTPS", () => {
         .eq("action", "update");
       expect(count, "the address change must be audited").toBeGreaterThan(0);
 
-      const { error: deleteError } = await sb
+      // No screen deletes a customer; since 2.60 the probe is the service role's to remove.
+      const { error: deleteError } = await createE2eServiceClient()
         .from("acc_customer")
         .delete()
         .eq("id", created!.id);

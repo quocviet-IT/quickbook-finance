@@ -277,25 +277,14 @@ export async function saveBankRule(sb: SupabaseClient, id: string | null, input:
     account_id: input.accountId,
     is_active: input.isActive,
   };
-  if (id) {
-    const { data, error } = await sb.from("acc_bank_rule").update(fields).eq("id", id).select("id").single();
-    if (error) throw new CodingError(error.message);
-    return (data as { id: string }).id;
-  }
-  const { data: last, error: lastError } = await sb
-    .from("acc_bank_rule")
-    .select("position")
-    .order("position", { ascending: false })
-    .limit(1);
-  if (lastError) throw new CodingError(lastError.message);
-  const position = (last?.[0] ? Number((last[0] as { position: number }).position) : 0) + 1;
-  const { data, error } = await sb.from("acc_bank_rule").insert({ ...fields, position }).select("id").single();
+  // A new rule goes last: acc_save_bank_rule numbers it (2.60).
+  const { data, error } = await sb.rpc("acc_save_bank_rule", { p_id: id, p_values: fields });
   if (error) throw new CodingError(error.message);
-  return (data as { id: string }).id;
+  return data as string;
 }
 
 export async function deleteBankRule(sb: SupabaseClient, id: string): Promise<void> {
-  const { error } = await sb.from("acc_bank_rule").delete().eq("id", id);
+  const { error } = await sb.rpc("acc_delete_bank_rule", { p_id: id });
   if (error) throw new CodingError(error.message);
 }
 

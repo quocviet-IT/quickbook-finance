@@ -148,17 +148,17 @@ export async function saveRepayment(sb: SupabaseClient, id: string | null, input
     fixed_interest_minor: input.kind === "loan" && input.interestMethod === "fixed" ? input.fixedInterestMinor : null,
     is_active: input.isActive,
   };
-  const result = id
-    ? await sb.from("acc_repayment_account").update(fields).eq("id", id).select("id").single()
-    : await sb.from("acc_repayment_account").insert(fields).select("id").single();
+  // acc_save_repayment_account (2.60).
+  const result = await sb.rpc("acc_save_repayment_account", { p_id: id, p_values: fields });
   if (result.error) {
     if (result.error.code === "23505") throw new RepaymentError("This account is already in Cards and loans");
+    if (result.error.code === "P0002") throw new RepaymentError("This entry is no longer in Cards and loans");
     throw new RepaymentError(result.error.message);
   }
-  return (result.data as { id: string }).id;
+  return result.data as string;
 }
 
 export async function deleteRepayment(sb: SupabaseClient, id: string): Promise<void> {
-  const { error } = await sb.from("acc_repayment_account").delete().eq("id", id);
+  const { error } = await sb.rpc("acc_delete_repayment_account", { p_id: id });
   if (error) throw new RepaymentError(error.message);
 }

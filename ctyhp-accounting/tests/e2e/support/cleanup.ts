@@ -72,10 +72,22 @@ export async function sweepMarker(
     await noteFreedNumbers(admin, numbered, marker);
   }
 
-  const { data: customers, error: customerError } = await sb
+  // Customers go the same way: since 2.60 the application saves them only
+  // through acc_save_customer, and no screen deletes one.
+  const { data: marked, error: markedError } = await sb.from("acc_customer").select("id").eq("name", marker);
+  if (markedError) throw new Error(`finding marked customers failed: ${markedError.message}`);
+  if (!marked?.length) return { invoices: invoices?.length ?? 0, customers: 0 };
+  const customerRemover = adminClient();
+  if (!customerRemover) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is required to remove a test customer — " +
+        "an application session may not delete one (2.60).",
+    );
+  }
+  const { data: customers, error: customerError } = await customerRemover
     .from("acc_customer")
     .delete()
-    .eq("name", marker)
+    .in("id", marked.map((row) => row.id))
     .select("id");
   if (customerError) {
     throw new Error(`deleting marked customers failed: ${customerError.message}`);

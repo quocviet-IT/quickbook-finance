@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.60",
+    date: "2026-10-26",
+    headline: "Accounts, customers, vendors, products and the rest of the master data are saved only the way their screens save them.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Master data is saved through the database's own checks",
+        detail:
+          "The chart of accounts, customers, vendors, products and services, tax codes, bank accounts, bank rules, cards and loans, related companies, the banking preferences and recurring schedules are now saved through functions that ask for the same role or permission as before and save only what their screen edits. An account's code and a customer's currency stay as they were set, and a schedule's status and run history change only by pausing, resuming or running it. Nothing changes on the screens.",
+        route: "/accounts",
+      },
+      {
+        kind: "changed",
+        title: "Permissions shows which switches a role can use",
+        detail:
+          "Posting bills, issuing invoices, closing periods and the other bookkeeping actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin, so turning one of those on for another role changed nothing. Those switches are now greyed out, with a note saying who can use them, and such a grant is refused.",
+        route: "/settings/permissions",
+      },
+    ],
+  },
+  {
     version: "2.59",
     date: "2026-10-26",
     headline: "Every switch in Settings › Permissions now decides what a role may do.",

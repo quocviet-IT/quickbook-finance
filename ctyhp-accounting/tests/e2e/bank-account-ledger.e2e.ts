@@ -21,10 +21,10 @@ describe("bank account ledger classification over HTTPS", () => {
         .maybeSingle();
       expect(cash, "the seeded chart must classify its cash-on-hand account").toBeTruthy();
 
-      const attempt = await sb.from("acc_bank_account").insert({
-        account_id: (cash as { id: string }).id,
-        bank_name: marker,
-        currency_code: "USD",
+      // Through the function the Banking screen uses; since 2.60 a session
+      // writes bank accounts no other way.
+      const attempt = await sb.rpc("acc_save_bank_account", {
+        p_values: { account_id: (cash as { id: string }).id, bank_name: marker, currency_code: "USD" },
       });
       expect(attempt.error, "cash on hand must not accept a bank account").not.toBeNull();
       expect(attempt.error!.message).toMatch(/physical cash/i);
@@ -52,10 +52,8 @@ describe("bank account ledger classification over HTTPS", () => {
         .limit(1)
         .single();
 
-      const attempt = await sb.from("acc_bank_account").insert({
-        account_id: (expense as { id: string }).id,
-        bank_name: marker,
-        currency_code: "USD",
+      const attempt = await sb.rpc("acc_save_bank_account", {
+        p_values: { account_id: (expense as { id: string }).id, bank_name: marker, currency_code: "USD" },
       });
       expect(attempt.error).not.toBeNull();
       expect(attempt.error!.message).toMatch(/Bank-type ledger account/i);

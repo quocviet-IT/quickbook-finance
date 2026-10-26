@@ -55,8 +55,10 @@ async function main() {
   const bankBefore = await ledgerByCode("1010");
 
   // --- Create customer ---
-  const { data: cust, error: e2 } = await authed.from("acc_customer")
-    .insert({ name: "E2E Test Customer", currency_code: "USD" }).select("id").single();
+  // Through the function the screen uses; a session writes customers no other way (2.60).
+  const { data: cust, error: e2 } = await authed.rpc("acc_save_customer", {
+    p_id: null, p_values: { name: "E2E Test Customer", currency_code: "USD" },
+  });
   if (e2) throw new Error("customer: " + e2.message);
 
   // --- Compute lines (2.5% ... use TAX rate) ---

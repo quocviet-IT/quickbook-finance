@@ -64,8 +64,10 @@ async function main() {
   const bankBefore = await ledgerByCode("1010");
 
   // --- Create vendor ---
-  const { data: vend, error: e2 } = await authed.from("acc_vendor")
-    .insert({ name: "E2E Test Vendor", currency_code: "USD" }).select("id").single();
+  // Through the function the screen uses; a session writes vendors no other way (2.60).
+  const { data: vend, error: e2 } = await authed.rpc("acc_save_vendor", {
+    p_values: { name: "E2E Test Vendor", currency_code: "USD" },
+  });
   if (e2) throw new Error("vendor: " + e2.message);
 
   // --- Create draft bill + lines (tax-inclusive amounts; US model) ---

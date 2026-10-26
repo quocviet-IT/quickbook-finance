@@ -22,11 +22,10 @@ describe("settlement history and forecast over HTTPS", () => {
     try {
       await sweepMarker(sb, marker);
 
-      const { data: customer } = await sb
-        .from("acc_customer")
-        .insert({ name: marker, currency_code: "USD" })
-        .select("id")
-        .single();
+      const { data: customer } = await sb.rpc("acc_save_customer", {
+        p_id: null,
+        p_values: { name: marker, currency_code: "USD" },
+      });
       const { data: income } = await sb
         .from("acc_account")
         .select("id")

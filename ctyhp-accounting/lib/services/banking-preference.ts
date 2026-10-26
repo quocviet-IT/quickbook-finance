@@ -29,8 +29,9 @@ export async function saveBankingPreference(
       throw new BankingPreferenceError("Funding pairs post only to an active posting liability account");
     }
   }
-  const { error } = await sb
-    .from("acc_banking_preference")
-    .upsert({ singleton: true, funding_account_id: input.fundingAccountId, pair_window_days: input.pairWindowDays }, { onConflict: "singleton" });
+  const { error } = await sb.rpc("acc_save_banking_preference", {
+    p_funding_account_id: input.fundingAccountId,
+    p_pair_window_days: input.pairWindowDays,
+  });
   if (error) throw new BankingPreferenceError(error.message);
 }

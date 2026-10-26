@@ -996,7 +996,11 @@ export interface PermissionRow {
   category: string;
   description: string;
   is_enforced: boolean;
+  /** The least role whose holding it has an effect (2.60): any role, staff (admin or accountant), or admin. */
+  min_role: PermissionMinRole;
 }
+
+export type PermissionMinRole = "any" | "staff" | "admin";
 
 export interface RolePermissionRow {
   role: AppRole;

@@ -34,11 +34,10 @@ describe("document → journal → ledger → report over HTTPS", () => {
         .single();
       expect(incomeError, "an active posting income account is required").toBeNull();
 
-      const { data: customer, error: customerError } = await sb
-        .from("acc_customer")
-        .insert({ name: marker, currency_code: "USD" })
-        .select("id")
-        .single();
+      const { data: customer, error: customerError } = await sb.rpc("acc_save_customer", {
+        p_id: null,
+        p_values: { name: marker, currency_code: "USD" },
+      });
       expect(customerError).toBeNull();
 
       // Draft creation and its audit row are one atomic RPC (migration 0058).

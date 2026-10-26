@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import type { AppRole, PermissionRow, RolePermissionRow } from "@/lib/db/types";
-import { emptyGrants } from "@/lib/domain/access";
+import { emptyGrants, minRoleNote, roleMeets } from "@/lib/domain/access";
 import { APP_ROLES } from "@/lib/domain/schemas";
 import { setRolePermissionAction } from "./actions";
 
@@ -66,7 +66,7 @@ export default function PermissionMatrixClient({
         description={
           advisory
             ? "Those marked Not enforced are listed for reference: the app does not block them yet. Every other permission is checked before its action runs."
-            : "Each permission is checked before its action runs. Bookkeeping actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin."
+            : "Each permission is checked before its action runs. A greyed-out switch is one that role cannot use: bookkeeping actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin."
         }
       />
       <Table<Row>
@@ -106,14 +106,21 @@ export default function PermissionMatrixClient({
             title: role.charAt(0).toUpperCase() + role.slice(1),
             key: role,
             align: "center" as const,
-            render: (_: unknown, r: Row) => (
-              <Switch
-                checked={r.allowed[role]}
-                disabled={!canManage || saving === `${role}:${r.key}`}
-                aria-label={`${r.label} for ${role}`}
-                onChange={(checked) => toggle(r.key, role, checked)}
-              />
-            ),
+            render: (_: unknown, r: Row) => {
+              // Below the permission's least role a grant would change nothing,
+              // and the database refuses it (2.60). One already on can still be
+              // switched off.
+              const unusable = !roleMeets(role, r.min_role) && !r.allowed[role];
+              const control = (
+                <Switch
+                  checked={r.allowed[role]}
+                  disabled={!canManage || unusable || saving === `${role}:${r.key}`}
+                  aria-label={`${r.label} for ${role}`}
+                  onChange={(checked) => toggle(r.key, role, checked)}
+                />
+              );
+              return unusable ? <Tooltip title={minRoleNote(r.min_role)}>{control}</Tooltip> : control;
+            },
           })),
         ]}
       />
