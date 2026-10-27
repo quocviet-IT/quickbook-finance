@@ -60,6 +60,13 @@ describe("the Invoices screen", () => {
     expect(client).toMatch(/\{canWrite \? \(\s+<Form\.Item label=" ">\s+<Button onClick=\{\(\) => setCustOpen\(true\)\}/);
   });
 
+  it("keeps the Line items heading on its own line, however short the row above it is", () => {
+    // The row above is an inline Space; without New customer (sales) it is short,
+    // and an inline heading rose beside it, broken in two (2.64).
+    const lines = read("components", "SalesLineItems.tsx");
+    expect(lines).toMatch(/<Typography\.Text strong style=\{\{ display: "block" \}\}>\s+Line items\s+<\/Typography\.Text>/);
+  });
+
   it("checks invoice.create on the server for a draft, and the role for one made from an estimate", () => {
     expect(actions).toMatch(
       /const denied = estimateId\s+\? await guard\(\)\s+: \(await holdsPermission\("invoice\.create"\)\)\s+\? null\s+: "You do not have permission to create invoices";/,

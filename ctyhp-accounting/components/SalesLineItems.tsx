@@ -43,7 +43,12 @@ export default function SalesLineItems({
   const form = Form.useFormInstance();
   return (
     <>
-      <Typography.Text strong>Line items</Typography.Text>
+      {/* A block of its own: the header row above is an inline Space, and when
+          it is short (a sales user has no New customer button) an inline
+          heading rose beside it and broke over two lines. */}
+      <Typography.Text strong style={{ display: "block" }}>
+        Line items
+      </Typography.Text>
       <Form.List name="lines">
         {(fields, { add, remove }) => (
           <div style={{ marginTop: 8 }}>
