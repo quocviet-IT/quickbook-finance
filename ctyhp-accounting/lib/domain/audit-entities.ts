@@ -92,6 +92,7 @@ export const ACTIVITY_VERBS: Record<string, string> = {
   match_from_reconciliation: "Matched by reconciliation",
   "company.backup": "Backed up",
   mfa_reset: "Two-step sign-in reset",
+  mfa_off: "Two-step sign-in turned off",
 };
 
 /**
