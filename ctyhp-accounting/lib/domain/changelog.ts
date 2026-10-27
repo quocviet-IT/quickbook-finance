@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.66",
+    date: "2026-10-27",
+    headline: "Two-step sign-in is required for admins and accountants, with seven days to set it up.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Admins and accountants need two-step sign-in",
+        detail:
+          "Each company gives its admins and accountants seven days from this release to set up two-step sign-in. Until then a bar at the top counts the days down with a link to set it up. After that, an admin or accountant without it is taken straight to set it up when they sign in, and the database gives a session without the code nothing. Sales and viewers are not affected; for them it stays recommended.",
+        route: "/account/two-step",
+      },
+      {
+        kind: "changed",
+        title: "Creating and restoring companies needs two-step sign-in too",
+        detail:
+          "Platform administrators, who create companies and restore backups, need a session that has passed the second step from the same deadline.",
+        route: "/settings/companies",
+      },
+    ],
+  },
+  {
     version: "2.65",
     date: "2026-10-27",
     headline: "Two-step sign-in: a code from an app on your phone after the password, and once it is on, a password alone opens nothing.",

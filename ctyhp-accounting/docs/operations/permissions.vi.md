@@ -216,7 +216,12 @@ xác thực trên điện thoại, như Google Authenticator, Microsoft Authenti
   dòng của người đó, chọn **Reset two-step sign-in** và ghi lý do. Người đó đăng
   nhập bằng mật khẩu rồi cài lại. Không ai tự reset cho mình được. Việc reset áp
   dụng cho tài khoản đăng nhập, nên có tác dụng ở mọi công ty người đó thuộc về.
-- Hiện là khuyến nghị cho mọi người; bản 2.66 bắt buộc cho admin và accountant.
+- **Bắt buộc cho admin và accountant từ bản 2.66.** Mỗi công ty cho họ bảy ngày
+  kể từ lúc phát hành; công ty tạo sau đó được bảy ngày kể từ lúc tạo. Trước hạn,
+  một thanh ở đầu trang đếm ngược số ngày. Sau hạn, admin hoặc accountant chưa
+  cài sẽ được đưa thẳng tới màn cài đặt khi đăng nhập, và database không cho
+  phiên chưa nhập mã làm gì. Platform admin cũng cần từ cùng mốc đó để tạo hoặc
+  khôi phục công ty. Với sales và viewer, vẫn chỉ là khuyến nghị.
 
 ### Rà soát quyền truy cập mỗi quý
 
@@ -255,6 +260,5 @@ kiểm toán viên làm, mà không cần mật khẩu của ai. Trên công ty 
   kiểm tra phân quyền tháng 10/2026, chủ doanh nghiệp giữ nguyên điều này, và cho
   sales lập hoá đơn nháp, xem tệp đính kèm (2.63). Thu hẹp phần được xem vẫn còn
   để ngỏ.
-- **Đăng nhập hai lớp (MFA).** Ai cũng cài được từ bản 2.65 (xem mục *Đăng nhập
-  hai lớp* ở trên). Bản 2.66 bắt buộc cho admin và accountant, có bảy ngày để cài
-  đặt. Settings › Users cho biết ai đã bật.
+- **Đăng nhập hai lớp (MFA).** Đã quyết và đã áp dụng: xem mục *Đăng nhập hai
+  lớp* ở trên. Còn mở: sales và viewer có cần bắt buộc luôn không.

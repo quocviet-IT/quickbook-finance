@@ -43,6 +43,53 @@ export function sessionRedirect(path: string, step: string | null, signedIn: boo
   return null;
 }
 
+/** Where an admin or accountant past the deadline sets it up before anything else (2.66). */
+export const REQUIRED_PATH = "/two-step-required";
+
+export interface TwoStepPolicy {
+  roles: readonly string[];
+  /** ISO timestamp. */
+  required_from: string;
+}
+
+export interface TwoStepRequirement {
+  /** This role must have a second step (it may still be before the deadline). */
+  required: boolean;
+  /** Required, not set up, and the deadline has passed: set it up before anything else. */
+  overdue: boolean;
+  /** Required, not set up, deadline still ahead: remind. */
+  remind: boolean;
+  requiredFrom: string | null;
+}
+
+/**
+ * What 2.66 asks of this person in this company. Mirrors 0175's rule in
+ * acc_current_role(); the database decides, this only chooses the screen. No
+ * policy row means nothing is required, as in the database.
+ */
+export function twoStepRequirement(
+  role: string | null,
+  policy: TwoStepPolicy | null,
+  enrolled: boolean,
+  now: Date = new Date(),
+): TwoStepRequirement {
+  const required = Boolean(role && policy && policy.roles.includes(role));
+  const requiredFrom = required ? policy!.required_from : null;
+  const due = requiredFrom !== null && now.getTime() >= new Date(requiredFrom).getTime();
+  return {
+    required,
+    overdue: required && !enrolled && due,
+    remind: required && !enrolled && !due,
+    requiredFrom,
+  };
+}
+
+/** Whole days left before the deadline, rounded up; 0 once it has passed. */
+export function daysLeft(requiredFrom: string, now: Date = new Date()): number {
+  const ms = new Date(requiredFrom).getTime() - now.getTime();
+  return ms <= 0 ? 0 : Math.ceil(ms / 86_400_000);
+}
+
 /** A code as typed, spaces dropped; null unless it is six digits. */
 export function readCode(raw: string): string | null {
   const digits = raw.replace(/\s+/g, "");
