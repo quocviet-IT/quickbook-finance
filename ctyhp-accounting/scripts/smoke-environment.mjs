@@ -14,8 +14,15 @@
  * one-time link is minted for an existing user and exchanged for a session,
  * which is what a password would have bought anyway. SMOKE_EMAIL and
  * SMOKE_PASSWORD still work when someone would rather be explicit.
+ *
+ * Two-step sign-in (2.65, required for admins and accountants in 2.66): either
+ * way the session has passed only the first step, and the database gives it
+ * nothing once its account has a second one, or is an admin or accountant past
+ * the deadline. SMOKE_TOTP_SECRET, the account's authenticator key, lets the
+ * sweep pass the second step as the app would.
  */
 import { createClient } from "@supabase/supabase-js";
+import { freshCode } from "./quality/totp.mjs";
 
 function required(env, name) {
   const value = env[name]?.trim();
@@ -36,9 +43,9 @@ export async function smokeSession(env = process.env) {
   const password = env.SMOKE_PASSWORD?.trim() || env.E2E_PASSWORD?.trim();
 
   if (email && password) {
-    const { data, error } = await anon.auth.signInWithPassword({ email, password });
+    const { error } = await anon.auth.signInWithPassword({ email, password });
     if (error) throw new Error(`smoke sign-in failed: ${error.message}`);
-    return { supabaseUrl, anonKey, session: data.session, user: data.user };
+    return { supabaseUrl, anonKey, ...(await passSecondStep(anon, env)) };
   }
 
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -61,9 +68,31 @@ export async function smokeSession(env = process.env) {
   const tokenHash = link?.properties?.hashed_token;
   if (!tokenHash) throw new Error("smoke sign-in link carried no token");
 
-  const { data, error } = await anon.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash });
+  const { error } = await anon.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash });
   if (error) throw new Error(`smoke sign-in failed: ${error.message}`);
-  return { supabaseUrl, anonKey, session: data.session, user: data.user };
+  return { supabaseUrl, anonKey, ...(await passSecondStep(anon, env)) };
+}
+
+/**
+ * The signed-in client's session, through the second step when its account has
+ * one: with SMOKE_TOTP_SECRET the code is computed; without it the session
+ * stays at the first step and says so, rather than reading empty pages.
+ */
+async function passSecondStep(client, env) {
+  const { data: factors } = await client.auth.mfa.listFactors();
+  const factor = (factors?.all ?? []).find((f) => f.factor_type === "totp" && f.status === "verified");
+  const secret = env.SMOKE_TOTP_SECRET?.trim();
+  if (factor && secret) {
+    const { error } = await client.auth.mfa.challengeAndVerify({ factorId: factor.id, code: await freshCode(secret) });
+    if (error) throw new Error(`smoke second step failed: ${error.message}`);
+  } else if (factor) {
+    console.warn("smoke: this account has two-step sign-in and SMOKE_TOTP_SECRET is not set; the database will give the session nothing");
+  }
+  const {
+    data: { session },
+  } = await client.auth.getSession();
+  if (!session) throw new Error("smoke sign-in left no session");
+  return { session, user: session.user };
 }
 
 /**

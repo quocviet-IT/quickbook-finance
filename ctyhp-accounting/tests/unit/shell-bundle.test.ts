@@ -93,7 +93,12 @@ describe("the signed-in layout's client imports", () => {
   it("are found and followed", () => {
     // Without this, a walker that found nothing would pass every check below.
     expect(layoutClients.map((file) => relative(ROOT, file).replaceAll("\\", "/")).sort()).toEqual(
-      ["components/AppShell.tsx", "components/CompanyClock.tsx", "components/NoCompanyNotice.tsx"],
+      [
+        "components/AppShell.tsx",
+        "components/CompanyClock.tsx",
+        "components/NoCompanyNotice.tsx",
+        "components/TwoStepReminder.tsx",
+      ],
     );
     expect(graph.has(join(ROOT, "components", "assistant", "AssistantLauncher.tsx"))).toBe(true);
   });

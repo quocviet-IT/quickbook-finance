@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { currentUser, isPlatformAdmin, owesSecondStepNow, resolveActiveCompany } from "@/lib/db/company";
-import { CODE_STEP_PATH } from "@/lib/domain/two-step";
+import { CODE_STEP_PATH, REQUIRED_PATH } from "@/lib/domain/two-step";
+import { twoStepStanding } from "@/lib/db/two-step";
+import TwoStepReminder from "@/components/TwoStepReminder";
 import { countPendingApprovals } from "@/lib/services/access";
 import { currentAccess } from "@/lib/db/settings-access";
 import AppShell from "@/components/AppShell";
@@ -53,11 +55,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The company's time zone rides along in the same round trip, so client
   // screens name the company's today rather than the browser's or UTC's. A
   // failed read falls back to the default zone; it never blocks the shell.
-  const [pendingApprovals, { role, permissionKeys }, settings] = await Promise.all([
+  const [pendingApprovals, { role, permissionKeys }, settings, twoStep] = await Promise.all([
     countPendingApprovals(sb).catch(() => 0),
     currentAccess(),
     getCurrentCompanySettings(sb).catch(() => null),
+    twoStepStanding(),
   ]);
+  // An admin or accountant past the deadline without a second step: the
+  // database refuses them everything (0175), so they set it up first (2.66).
+  if (twoStep.overdue) redirect(REQUIRED_PATH);
   const timeZone = settings?.time_zone || DEFAULT_TIME_ZONE;
 
   return (
@@ -81,6 +87,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         permissionKeys={permissionKeys}
         pendingApprovals={pendingApprovals}
       >
+        {twoStep.remind && twoStep.requiredFrom ? <TwoStepReminder requiredFrom={twoStep.requiredFrom} /> : null}
         {children}
       </AppShell>
     </CompanyClockProvider>

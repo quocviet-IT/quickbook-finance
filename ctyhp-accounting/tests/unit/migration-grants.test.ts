@@ -247,6 +247,14 @@ const EXEMPT_TABLES: Readonly<Record<string, Exemption>> = {
       "acc_afda_rate_write) are consequently unreachable through PostgREST too, which is a " +
       "separate, smaller finding — not one this test is scoped to fix.",
   },
+  "onebook.two_step_policy": {
+    kind: "security-definer-only",
+    reason:
+      "The platform administrators' two-step deadline (0175, 2.66). Read only inside " +
+      "onebook.is_platform_admin, which is `security definer`, created in the same migration; " +
+      "no screen or client reads it, and it is written only by migrations. Its anon and " +
+      "authenticated privileges are revoked there on purpose.",
+  },
 };
 
 describe("a table-creating migration carries its own grants", () => {

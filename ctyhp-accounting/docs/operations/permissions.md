@@ -215,8 +215,13 @@ Authenticator or 1Password.
   person signs in with their password and sets it up again. Nobody can reset
   their own. The reset applies to the person's sign-in, so it covers every
   company they belong to.
-- It is recommended for everyone now and becomes required for admins and
-  accountants in 2.66.
+- **Required for admins and accountants since 2.66.** Each company gave them
+  seven days from the release; a company created later gives seven days from
+  its creation. Until the deadline a bar at the top counts the days down. After
+  it, an admin or accountant without a second step is taken straight to set it
+  up when they sign in, and the database gives a session without the code
+  nothing. Platform administrators need it from the same deadline to create or
+  restore companies. For sales and viewers it stays recommended.
 
 ### Review access every quarter
 
@@ -253,6 +258,5 @@ auditor would, without anyone's existing credentials. On the sample company:
 - **What sales and viewer may read.** Both read the whole ledger. After the access
   audit of October 2026 the owner kept that, and gave sales draft invoices and
   attachments (2.63). Limiting what either reads is still open.
-- **A second sign-in factor (MFA).** Anyone can set it up since 2.65 (see
-  *Two-step sign-in* above). 2.66 requires it for admins and accountants, with
-  seven days to set it up. Settings › Users shows who has.
+- **A second sign-in factor (MFA).** Decided and in place: see *Two-step
+  sign-in* above. Whether sales and viewers should need it too is still open.

@@ -17,7 +17,19 @@ interface Pending {
 
 const APPS = "Google Authenticator, Microsoft Authenticator or 1Password";
 
-export default function TwoStepClient({ email, onSince }: { email: string; onSince: string | null }) {
+export default function TwoStepClient({
+  email,
+  onSince,
+  required = false,
+}: {
+  email: string;
+  onSince: string | null;
+  /**
+   * On /two-step-required (2.66): the person cannot go on without it, so the
+   * page says so and, once it is on, goes on to the dashboard.
+   */
+  required?: boolean;
+}) {
   const { message } = App.useApp();
   const { timeZone } = useCompanyClock();
   const router = useRouter();
@@ -77,18 +89,28 @@ export default function TwoStepClient({ email, onSince }: { email: string; onSin
     message.success("Two-step sign-in is on");
     setPending(null);
     router.refresh();
+    if (required) router.push("/dashboard");
   }
 
   if (!pending) {
     return (
       <Card>
         <Space direction="vertical" size="middle" style={{ display: "flex", maxWidth: 640 }}>
-          <Alert
-            type="info"
-            showIcon
-            message="Two-step sign-in is off"
-            description="With it on, a password alone no longer opens your books: OneBook also asks for a six-digit code from an app on your phone. It is recommended for everyone and will be required for admins and accountants."
-          />
+          {required ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="Set up two-step sign-in to continue"
+              description="Admins and accountants need a six-digit code from an app on their phone after the password. Until it is set up, your books stay closed to this account."
+            />
+          ) : (
+            <Alert
+              type="info"
+              showIcon
+              message="Two-step sign-in is off"
+              description="With it on, a password alone no longer opens your books: OneBook also asks for a six-digit code from an app on your phone. Admins and accountants must have it; for everyone else it is recommended."
+            />
+          )}
           <Typography.Paragraph style={{ marginBottom: 0 }}>
             You need an authenticator app on your phone, such as {APPS}. Setting it up takes about a minute.
           </Typography.Paragraph>
