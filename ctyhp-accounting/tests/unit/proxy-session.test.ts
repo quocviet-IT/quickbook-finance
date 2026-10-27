@@ -10,11 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *
  * Who the user really is, for data, is still settled by the layout (one
  * `getUser` per render) and by RLS reading the same token; the proxy only
- * routes and refreshes.
+ * routes and refreshes. The one exception is /login (2.67): there it asks, so a
+ * session revoked elsewhere is cleared instead of looping to the dashboard.
  */
 const mocks = vi.hoisted(() => ({
   getClaims: vi.fn(),
   getUser: vi.fn(),
+  signOut: vi.fn(),
   refresh: null as null | {
     cookies: { name: string; value: string; options: Record<string, unknown> }[];
     headers: Record<string, string>;
@@ -41,6 +43,7 @@ vi.mock("@supabase/ssr", () => ({
         return mocks.getClaims();
       },
       getUser: mocks.getUser,
+      signOut: mocks.signOut,
     },
   }),
 }));
@@ -52,10 +55,12 @@ const request = (path: string) => new NextRequest(new URL(`http://localhost:3000
 const signedIn = { data: { claims: { sub: "u1", email: "someone@example.com" } }, error: null };
 const signedOut = { data: null, error: { message: "Auth session missing!" } };
 
-describe("the proxy routes on verified claims, without asking the auth server", () => {
+describe("the proxy routes on verified claims, asking the auth server only on /login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.refresh = null;
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    mocks.signOut.mockResolvedValue({ error: null });
   });
 
   it("lets a signed-in request through, and never calls getUser", async () => {
@@ -73,11 +78,31 @@ describe("the proxy routes on verified claims, without asking the auth server", 
     expect(new URL(response.headers.get("location")!).pathname).toBe("/login");
   });
 
-  it("keeps a signed-in visitor off /login", async () => {
+  it("keeps a signed-in visitor off /login, once the auth server confirms the session", async () => {
     mocks.getClaims.mockResolvedValue(signedIn);
     const response = await proxy(request("/login"));
     expect(response.status).toBe(307);
     expect(new URL(response.headers.get("location")!).pathname).toBe("/dashboard");
+    expect(mocks.getUser).toHaveBeenCalledTimes(1);
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("shows /login, clearing its cookies, for a session revoked elsewhere that still verifies locally", async () => {
+    // 27 October 2026: bounced to /dashboard, whose layout sent it back, it
+    // looped until the browser gave up.
+    mocks.getClaims.mockResolvedValue(signedIn);
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: { message: "Session from session_id claim in JWT does not exist" } });
+    const response = await proxy(request("/login"));
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it("lets a signed-in visitor stay on /login for the code step", async () => {
+    mocks.getClaims.mockResolvedValue(signedIn);
+    const response = await proxy(request("/login?step=code"));
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
   it("puts the library's no-store headers on a response that sets refreshed auth cookies", async () => {
