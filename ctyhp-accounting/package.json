@@ -21,6 +21,7 @@
     "verify:delete-payment": "node --env-file=.env.local scripts/verify-delete-payment.mjs",
     "verify:payment-correction": "node --env-file=.env.local scripts/verify-payment-correction.mjs",
     "verify:company-provisioning": "node --env-file=.env.local scripts/verify-company-provisioning.mjs",
+    "verify:access-denials": "node --env-file=.env.local scripts/verify-access-denials.mjs",
     "verify:bank-categories": "node --env-file=.env.local scripts/verify-bank-categories.mjs",
     "verify:import-transactions": "node --env-file=.env.local scripts/verify-import-transactions.mjs",
     "verify:saved-reports": "node --env-file=.env.local scripts/verify-saved-reports.mjs",

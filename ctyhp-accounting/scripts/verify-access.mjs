@@ -345,4 +345,17 @@ main().catch((e) => {
   const parts = [e.code, e.message].filter(Boolean).join(" ");
   console.error("verify error:", parts || "(no message)");
   process.exitCode = 1;
-}).finally(() => db.end());
+}).finally(async () => {
+  // However the run ended, the test user is left offboarded with the lowest
+  // role. A run that stopped half way used to leave it active, and one left it
+  // offboarded as an admin, which returns as an admin if anyone reactivates it
+  // (access audit, 27 Oct 2026).
+  await db
+    .query(
+      `update acc_app_user set role = 'viewer', status = 'offboarded', status_reason = 'E2E fixture — no access'
+        where id = (select id from auth.users where email = $1)`,
+      [CLERK_EMAIL],
+    )
+    .catch((e) => console.error("could not park the test user:", e.message));
+  await db.end();
+});

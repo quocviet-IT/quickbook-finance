@@ -208,6 +208,21 @@ Once a quarter, for each company, an admin:
    what changed since the last review.
 5. Writes down the date and who reviewed.
 
+### Check it yourself
+
+The claim that the database decides can be tested from outside, the way an
+auditor would, without anyone's existing credentials. On the sample company:
+
+1. Settings › Users, **Add user** with the **Sales** role, for this test only.
+2. Put its sign-in in `ACCESS_PROBE_EMAIL` and `ACCESS_PROBE_PASSWORD`, and run
+   `npm run verify:access-denials` in `ctyhp-accounting/`. It signs in as that
+   user and, through the same API the browser uses, tries nine actions the role
+   may not take, writes straight to the tables, and another company's books.
+   Every line must say PASS (refused), and nothing may change.
+3. **Suspend** the account, then run it again with `-- --after-suspend` within
+   the hour: the same signed-in session must read nothing at once.
+4. **Offboard** the account.
+
 ---
 
 ## Still to decide

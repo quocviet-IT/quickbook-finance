@@ -107,7 +107,7 @@ export default function UsersClient({
         type="info"
         showIcon
         message="Privileged access policy"
-        description="Admins, accountants and sales users must enroll in multi-factor authentication; the MFA column shows who has. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
+        description="Multi-factor sign-in is recommended for admins, accountants and sales users, not yet required; the MFA column shows who has it. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
       />
 
       {canManage && !canCreateUsers && (
