@@ -41,6 +41,19 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.67",
+    date: "2026-10-27",
+    headline: "The sign-in page no longer loops after a sign-out on another device.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Sign-in works again after being signed out elsewhere",
+        detail:
+          "When a session was ended from somewhere else, such as a sign-out of every device, the browser could bounce between the sign-in page and the dashboard until it gave up with \"redirected you too many times\". The sign-in page now checks the session with the server and, when it has ended, shows the sign-in form.",
+      },
+    ],
+  },
+  {
     version: "2.66",
     date: "2026-10-27",
     headline: "Two-step sign-in is required for admins and accountants, with seven days to set it up.",

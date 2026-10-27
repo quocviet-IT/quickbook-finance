@@ -34,6 +34,26 @@ describe("paths that skip the session", () => {
   });
 });
 
+describe("a session the auth server has revoked does not loop", () => {
+  it("is checked with the auth server on /login, and its cookies cleared", () => {
+    // 27 October 2026: a sign-out of every device left a token that still
+    // verified locally. The proxy sent it from /login to /dashboard, the layout
+    // (which asks the server) sent it back, and the browser gave up.
+    const source = readFileSync(join(process.cwd(), "proxy.ts"), "utf8");
+    expect(source).toMatch(
+      /if \(signedIn && request\.nextUrl\.pathname === "\/login"\) \{\s+const \{ data: confirmed \} = await supabase\.auth\.getUser\(\);\s+if \(!confirmed\.user\) \{\s+await supabase\.auth\.signOut\(\{ scope: "local" \}\);\s+signedIn = false;/,
+    );
+  });
+
+  it("is not caused by our own scripts: they sign out their own session only", () => {
+    for (const file of [join("scripts", "seed-customer-credit.ts"), join("tests", "e2e", "support", "session.ts")]) {
+      const source = readFileSync(join(process.cwd(), file), "utf8");
+      expect(source, file).not.toMatch(/auth\.signOut\(\s*\)/);
+      expect(source, file).toMatch(/auth\.signOut\(\{ scope: "local" \}\)/);
+    }
+  });
+});
+
 describe("the proxy still bounces a signed-in visitor off /login alone", () => {
   it("does not share the public-path set with the redirect branch", () => {
     // The obvious edit is to collect /login and /status into one set and use it
