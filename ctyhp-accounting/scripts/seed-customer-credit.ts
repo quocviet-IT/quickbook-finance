@@ -162,4 +162,6 @@ for (const customer of customers ?? []) {
 console.log(
   `\n${changed} of ${customers?.length ?? 0} customers ${dryRun ? "would be" : "were"} updated.`,
 );
-await sb.auth.signOut();
+// This session only: the default scope signs the account out on every device,
+// a person's open browser included.
+await sb.auth.signOut({ scope: "local" });

@@ -49,7 +49,22 @@ export async function proxy(request: NextRequest) {
   // layout still confirms the user with the auth server once per render, and
   // RLS reads the same token for every query.
   const { data } = await supabase.auth.getClaims();
-  const signedIn = Boolean(data?.claims?.sub);
+  let signedIn = Boolean(data?.claims?.sub);
+
+  // On /login alone, ask the auth server as well. A session revoked elsewhere
+  // (a sign-out of every device, say) still verifies locally until its token
+  // expires; bounced from here to the dashboard, whose layout does ask the
+  // server and sends it back here, it looped until the browser gave up
+  // (ERR_TOO_MANY_REDIRECTS, 27 October 2026). Its cookies are cleared
+  // instead and the sign-in form shows. /login is rare enough to pay for one
+  // round trip.
+  if (signedIn && request.nextUrl.pathname === "/login") {
+    const { data: confirmed } = await supabase.auth.getUser();
+    if (!confirmed.user) {
+      await supabase.auth.signOut({ scope: "local" });
+      signedIn = false;
+    }
+  }
 
   // Whether the session still owes its second sign-in step is not decided
   // here: that needs the person's factors, which the token does not carry. The

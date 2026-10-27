@@ -54,5 +54,7 @@ export function createE2eServiceClient(): SupabaseClient {
 }
 
 export async function closeE2eSession(sb: SupabaseClient): Promise<void> {
-  await sb.auth.signOut();
+  // This session only: the default scope signs the account out on every
+  // device, a person's open browser included.
+  await sb.auth.signOut({ scope: "local" });
 }
