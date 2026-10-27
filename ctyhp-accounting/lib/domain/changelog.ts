@@ -43,8 +43,15 @@ export const RELEASES: Release[] = [
   {
     version: "2.62",
     date: "2026-10-27",
-    headline: "Follow-ups from the independent access audit: a truthful MFA note, reasons a screen reader can hear, and a check anyone can run.",
+    headline: "Follow-ups from the independent access audit: at most two admins, a truthful MFA note, reasons a screen reader can hear, and a check anyone can run.",
     changes: [
+      {
+        kind: "changed",
+        title: "A company has at most two admins",
+        detail:
+          "Admin is the role with every permission on, and one company had six. A company now has at most two admins holding access, and a third is refused however it would arrive: a new user, an existing account, a role change or a suspended admin coming back. Settings › Users greys out Admin once there are two; to change who they are, make one of them an accountant first. At most two people can create or restore companies.",
+        route: "/settings/users",
+      },
       {
         kind: "fixed",
         title: "Users no longer says multi-factor sign-in is required",

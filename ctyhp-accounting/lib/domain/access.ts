@@ -91,6 +91,20 @@ export function isLastActiveAdmin(users: UserLike[], userId: string): boolean {
   return users.filter((u) => u.role === "admin" && HOLDS_ACCESS.includes(u.status)).length <= 1;
 }
 
+/**
+ * A company has at most two admins holding access (2.62, after the access
+ * audit found six on one company). The same rule as `acc_enforce_admin_cap`
+ * (migration 0172), which refuses the third whichever way it arrives.
+ */
+export const ADMIN_CAP = 2;
+
+/** May this user be made an admin without making a third? Already being one counts as yes. */
+export function canBecomeAdmin(users: UserLike[], userId: string | null): boolean {
+  const target = userId ? users.find((u) => u.id === userId) : undefined;
+  if (target && target.role === "admin" && HOLDS_ACCESS.includes(target.status)) return true;
+  return users.filter((u) => u.role === "admin" && HOLDS_ACCESS.includes(u.status)).length < ADMIN_CAP;
+}
+
 /** One wording for a status change, used in confirmations and audit reasons. */
 export function describeStatusChange(from: UserStatus, to: UserStatus): string {
   if (to === "suspended") return "Suspend this user — access is revoked immediately";
