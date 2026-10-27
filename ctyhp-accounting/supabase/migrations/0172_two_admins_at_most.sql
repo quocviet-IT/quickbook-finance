@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0172  At most two admins in a company, and at most two platform admins (2.62)
+-- 0172  At most two admins in a company, and at most two platform admins (2.63)
 --
 -- The access audit of 27 October 2026 found six admin accounts on one company:
 -- the role for which every permission is on, held by people whose work needs

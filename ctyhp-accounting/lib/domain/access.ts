@@ -92,7 +92,7 @@ export function isLastActiveAdmin(users: UserLike[], userId: string): boolean {
 }
 
 /**
- * A company has at most two admins holding access (2.62, after the access
+ * A company has at most two admins holding access (2.63, after the access
  * audit found six on one company). The same rule as `acc_enforce_admin_cap`
  * (migration 0172), which refuses the third whichever way it arrives.
  */

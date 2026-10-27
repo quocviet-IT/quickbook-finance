@@ -24,7 +24,7 @@ const STATUS_LOOKS: Record<string, StatusLook> = {
 
 /**
  * The roles a person can be given. Admin is offered only while the company has
- * room for one more: at most two admins hold access (2.62), and the database
+ * room for one more: at most two admins hold access (2.63), and the database
  * refuses a third however it arrives.
  */
 function roleOptions(adminAllowed: boolean): { value: AppRole; label: string; disabled?: boolean }[] {

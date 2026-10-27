@@ -1,5 +1,5 @@
 /**
- * 2.62: a company has at most two admins holding access (migration 0172).
+ * 2.63: a company has at most two admins holding access (migration 0172).
  *
  * In a throwaway company built from this tree inside ONE transaction that is
  * always rolled back; nothing survives. Every way a third admin could arrive is
