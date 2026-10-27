@@ -1052,7 +1052,22 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     purpose: "Give people the access their job needs, and no more.",
     route: "/settings/users",
     steps: [
-      { action: "Add or suspend a person", control: "Add user", route: "/settings/users" },
+      {
+        action: "Give someone access",
+        control: "Add user",
+        route: "/settings/users",
+        note:
+          "Add user creates a new sign-in; Add existing account gives this company to someone who already signs in " +
+          "for another. Give the least role that does the job.",
+      },
+      {
+        action: "Stop someone who has left",
+        control: "Suspend or Offboard",
+        route: "/settings/users",
+        note:
+          "It takes effect at once on every screen, report and export. If they approved requests, check that two " +
+          "people still hold Approve or reject requests; if they belonged to other companies, repeat it in each.",
+      },
       {
         action: "Set what each role may do",
         control: "Permissions",
@@ -1082,6 +1097,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "The Change Log reads the audit log and needs the same permission. Voided and Reversed Entries lists " +
           "every entry voided or reversed in a period; nothing in OneBook is deleted.",
+      },
+      {
+        action: "Review access every quarter",
+        control: "Users",
+        route: "/settings/users",
+        note:
+          "Confirm each active person still needs their role, suspend anyone who has left, check any change to " +
+          "Permissions is still wanted, read Audit history for users and permissions since the last review, and " +
+          "note the date and who reviewed.",
       },
     ],
   },

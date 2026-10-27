@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.61",
+    date: "2026-10-26",
+    headline: "Master data can no longer be changed around its screens, and the permission guide is in the repository.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Accounts, customers, vendors and the rest of the master data are read-only except through their screens",
+        detail:
+          "Since 2.60 every screen saves master data through the database's own checks. Now nothing else can write it: the chart of accounts, customers, vendors, products and services, tax codes, bank accounts and rules, cards and loans, related companies, the banking preferences and recurring schedules change only that way. Nothing changes on the screens.",
+        route: "/accounts",
+      },
+      {
+        kind: "added",
+        title: "A guide to who can do what",
+        detail:
+          "Settings › Permissions and Settings › Users now come with a written guide, in English and Vietnamese: the four roles, every permission and who can use it, two-person approval, how a departing person is removed, and a quarterly access review. The System guide's Control who can do what workflow carries the same steps.",
+        route: "/settings/permissions",
+      },
+    ],
+  },
+  {
     version: "2.60",
     date: "2026-10-26",
     headline: "Accounts, customers, vendors, products and the rest of the master data are saved only the way their screens save them.",
