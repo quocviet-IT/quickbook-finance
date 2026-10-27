@@ -100,13 +100,10 @@ describe("the permission matrix", () => {
           order by 1`,
         [schema],
       );
-      // The tables the screens still write directly, and the two the app files into.
+      // Since 2.61 only the three tables a session files into, each by a rule
+      // that pins the row to its writer.
       expect(writable.map((r) => r.tablename).sort()).toEqual(
-        [
-          "acc_account", "acc_bank_account", "acc_bank_rule", "acc_banking_preference", "acc_customer",
-          "acc_document_attachment", "acc_feedback_attachment", "acc_feedback_report", "acc_item",
-          "acc_recurring_template", "acc_related_company", "acc_repayment_account", "acc_tax_code", "acc_vendor",
-        ].sort(),
+        ["acc_document_attachment", "acc_feedback_attachment", "acc_feedback_report"],
       );
       expect((await q<{ n: number }>("select count(*)::int as n from acc_permission where not is_enforced"))[0].n).toBe(0);
       expect((await q<{ allowed: boolean }>("select allowed from acc_role_permission where role = 'accountant' and permission_key = 'period.close'"))[0].allowed).toBe(false);
