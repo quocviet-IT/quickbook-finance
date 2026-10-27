@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import {
   createDraftInvoice,
   issueInvoice,
@@ -61,13 +61,21 @@ export async function createCustomerAction(raw: unknown): Promise<ActionResult<{
  * to that estimate in one transaction (acc_create_invoice_from_estimate),
  * which makes the estimate Converted. The invoice fields are validated the
  * same way either way.
+ *
+ * A draft of its own needs `invoice.create`, which sales holds too; turning an
+ * estimate into one stays with admins and accountants, as estimates do. The
+ * database checks both again.
  */
 export async function createInvoiceAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
-  const denied = await guard();
-  if (denied) return { ok: false, error: denied };
   const parsed = invoiceCreateWithEstimateSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
   const { estimateId, ...input } = parsed.data;
+  const denied = estimateId
+    ? await guard()
+    : (await holdsPermission("invoice.create"))
+      ? null
+      : "You do not have permission to create invoices";
+  if (denied) return { ok: false, error: denied };
   try {
     const sb = await createSupabaseServerClient();
     if (estimateId) {

@@ -10,7 +10,7 @@ như trên ứng dụng.
 
 - Mỗi người trong một công ty có **một vai trò**: admin, accountant, sales hoặc
   viewer.
-- Trên vai trò là **38 quyền**, bật hoặc tắt theo từng vai trò ở
+- Trên vai trò là **39 quyền**, bật hoặc tắt theo từng vai trò ở
   **Settings › Permissions**. Mọi quyền đều được kiểm tra trước khi thao tác chạy.
 - **Database là nơi quyết định.** Màn hình ẩn những gì bạn không được làm, nhưng
   chốt chặn thật là hàm database đứng sau mỗi thao tác. Lần nào hàm cũng hỏi bạn
@@ -27,7 +27,7 @@ như trên ứng dụng.
 | --- | --- | --- |
 | **admin** | Chủ doanh nghiệp, kế toán trưởng | Làm được mọi việc, gồm người dùng, phân quyền và cài đặt công ty. |
 | **accountant** | Kế toán hằng ngày | Nhập, ghi sổ, đối chiếu, huỷ chứng từ. Không quản lý người dùng, phân quyền, cài đặt, không mở lại kỳ. |
-| **sales** | Nhân viên bán hàng | Xem sổ sách và quản lý danh mục sản phẩm, dịch vụ. Không ghi sổ. |
+| **sales** | Nhân viên bán hàng | Xem sổ sách và tệp đính kèm, quản lý danh mục sản phẩm, dịch vụ, và lập hoá đơn nháp để accountant phát hành. Không ghi sổ. |
 | **viewer** | Kiểm toán, chủ chỉ cần xem | Xem sổ sách, nhật ký và tệp đính kèm. Không thay đổi gì. |
 
 Mỗi công ty luôn giữ ít nhất một admin đang hoạt động, và **nhiều nhất hai**.
@@ -89,7 +89,7 @@ công tắc đó bị làm mờ, kèm ghi chú:
 | Banking | Reopen reconciliations | Mở lại bảng đối chiếu đã hoàn tất | ✓ | | | | Admin |
 | Close | Close accounting periods | Đóng kỳ kế toán tháng | ✓ | | | | Admin hoặc accountant |
 | Close | Reopen accounting periods | Mở lại kỳ đã đóng | ✓ | | | | Admin |
-| Documents | Read supporting documents | Xem và mở tệp đính kèm | ✓ | ✓ | | ✓ | Mọi vai trò |
+| Documents | Read supporting documents | Xem và mở tệp đính kèm | ✓ | ✓ | ✓ | ✓ | Mọi vai trò |
 | Documents | Manage supporting documents | Tải lên và lưu trữ tệp đính kèm | ✓ | ✓ | | | Mọi vai trò |
 | Documents | Govern document retention | Đặt thời hạn lưu trữ và giữ hồ sơ | ✓ | | | | Mọi vai trò |
 | Governance | Read the audit log | Tra cứu nhật ký thay đổi | ✓ | ✓ | | ✓ | Mọi vai trò |
@@ -111,6 +111,7 @@ công tắc đó bị làm mờ, kèm ghi chú:
 | Receivables | Write off balances | Xoá số dư hoá đơn bán hoặc mua | ✓ | ✓ | | | Admin hoặc accountant |
 | Receivables | Override a credit limit | Phát hành hoá đơn vượt hạn mức hoặc khi khách đang bị giữ tín dụng | ✓ | | | | Admin hoặc accountant |
 | Reporting | Manage budgets | Lập và sửa ngân sách tháng | ✓ | ✓ | | | Mọi vai trò |
+| Sales | Create draft invoices | Lập hoá đơn nháp cho khách; phát hành là quyền riêng | ✓ | ✓ | ✓ | | Mọi vai trò |
 | Sales | Issue invoices | Phát hành hoá đơn nháp cho khách | ✓ | ✓ | | | Admin hoặc accountant |
 | Sales | Void invoices | Huỷ hoá đơn, nháp hoặc đã phát hành | ✓ | ✓ | | | Admin hoặc accountant |
 | Sales | Manage products and services | Tạo, sửa, bật, tắt sản phẩm và dịch vụ | ✓ | ✓ | ✓ | | Mọi vai trò |
@@ -233,7 +234,10 @@ kiểm toán viên làm, mà không cần mật khẩu của ai. Trên công ty 
 
 ## Còn chờ quyết định
 
-- **Sales và viewer được xem những gì.** Hiện cả hai xem được toàn bộ sổ cái.
-  Thu hẹp lại là quyết định sản phẩm, chưa được đưa ra.
-- **Đăng nhập hai lớp (MFA).** Có bắt buộc không, và cho vai trò nào, chưa được
-  quyết định. Settings › Users cho biết ai đã bật.
+- **Sales và viewer được xem những gì.** Cả hai xem được toàn bộ sổ cái. Sau đợt
+  kiểm tra phân quyền tháng 10/2026, chủ doanh nghiệp giữ nguyên điều này, và cho
+  sales lập hoá đơn nháp, xem tệp đính kèm (2.63). Thu hẹp phần được xem vẫn còn
+  để ngỏ.
+- **Đăng nhập hai lớp (MFA).** Sẽ bắt buộc cho admin và accountant, có bảy ngày
+  để cài đặt. Cho tới khi bản đó ra, MFA chỉ là khuyến nghị, và Settings › Users
+  cho biết ai đã bật.

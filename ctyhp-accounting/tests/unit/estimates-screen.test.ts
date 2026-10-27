@@ -257,7 +257,10 @@ describe("the Invoices screen opened from an estimate", () => {
     expect(page).toContain("} catch (err) {");
     expect(page).toContain("return { prefill: null, notice: `The estimate could not be read${reason}` };");
     // A blocked estimate says so instead of opening a form.
-    expect(page).toContain('const initialCreateOpen = params.new === "1" && fromEstimate.notice === null;');
+    // An estimate link opens the form only with its prefill, which only writers get.
+    expect(page).toMatch(
+      /const initialCreateOpen =\s+params\.new === "1" &&\s+fromEstimate\.notice === null &&\s+\(params\.estimate \? fromEstimate\.prefill !== null : holdsCreate\);/,
+    );
   });
 
   it("fills the form through invoiceFormFromEstimate, not by picking the customer", () => {

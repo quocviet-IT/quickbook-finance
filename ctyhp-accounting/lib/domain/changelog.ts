@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.63",
+    date: "2026-10-27",
+    headline: "Sales prepares invoices and an accountant issues them, and sales sees attached documents.",
+    changes: [
+      {
+        kind: "added",
+        title: "Sales can create draft invoices",
+        detail:
+          "A sales user now has New invoice on Invoices and fills in the draft for an existing customer; an admin or accountant checks it and issues it to the ledger. Sales still cannot issue, void or write off an invoice, or add a customer. It is a new permission, Create draft invoices, which Settings › Permissions can switch off per role.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "Sales sees the documents attached to what it reads",
+        detail:
+          "Read supporting documents is now on for sales, as it is for viewers, so a sales user can open the receipt or contract behind an invoice. Uploading and archiving stay with admins and accountants.",
+        route: "/settings/permissions",
+      },
+    ],
+  },
+  {
     version: "2.62",
     date: "2026-10-27",
     headline: "Follow-ups from the independent access audit: at most two admins, a truthful MFA note, reasons a screen reader can hear, and a check anyone can run.",

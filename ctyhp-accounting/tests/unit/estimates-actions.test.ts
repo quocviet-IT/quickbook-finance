@@ -21,6 +21,9 @@ vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClie
 vi.mock("@/lib/auth", () => ({
   getUserRole: mocks.getUserRole,
   canWrite: (role: string | null) => role === "admin" || role === "accountant",
+  // The starting matrix: invoice.create is on for admin, accountant and sales (0173).
+  holdsPermission: async (key: string) =>
+    key === "invoice.create" && ["admin", "accountant", "sales"].includes((await mocks.getUserRole()) ?? ""),
 }));
 vi.mock("@/lib/services/report-context", () => ({ companyClock: mocks.companyClock }));
 vi.mock("@/lib/services/access", () => ({ searchAudit: vi.fn() }));
@@ -388,8 +391,19 @@ describe("createInvoiceAction routes by the estimate it carries", () => {
   it("is refused to a read-only role either way", async () => {
     mocks.getUserRole.mockResolvedValue("viewer");
     expect(await createInvoiceAction({ ...invoiceInput, estimateId: EST })).toEqual({ ok: false, error: DENIED });
-    expect(await createInvoiceAction(invoiceInput)).toEqual({ ok: false, error: DENIED });
+    expect(await createInvoiceAction(invoiceInput)).toEqual({
+      ok: false,
+      error: "You do not have permission to create invoices",
+    });
     expect(mocks.createInvoiceFromEstimate).not.toHaveBeenCalled();
     expect(mocks.createDraftInvoice).not.toHaveBeenCalled();
+  });
+
+  it("lets sales make a draft of its own, but not turn an estimate into one", async () => {
+    mocks.getUserRole.mockResolvedValue("sales");
+    mocks.createDraftInvoice.mockResolvedValue({ id: "inv-3" });
+    expect(await createInvoiceAction(invoiceInput)).toEqual({ ok: true, data: { id: "inv-3" } });
+    expect(await createInvoiceAction({ ...invoiceInput, estimateId: EST })).toEqual({ ok: false, error: DENIED });
+    expect(mocks.createInvoiceFromEstimate).not.toHaveBeenCalled();
   });
 });
