@@ -16,12 +16,16 @@ import { suggestCreditLimitMinor } from "../lib/domain/credit.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const email = process.env.SEED_EMAIL ?? process.env.SMOKE_EMAIL ?? "admin@ctyhp.vn";
-const password = process.env.SEED_PASSWORD ?? process.env.SMOKE_PASSWORD ?? "Ctyhp@Ketoan2026";
+const email = process.env.SEED_EMAIL ?? process.env.SMOKE_EMAIL;
+const password = process.env.SEED_PASSWORD ?? process.env.SMOKE_PASSWORD;
 const dryRun = process.argv.includes("--dry-run");
 
 if (!url || !anonKey) {
   console.error("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required.");
+  process.exit(1);
+}
+if (!email || !password) {
+  console.error("SEED_EMAIL and SEED_PASSWORD (or SMOKE_EMAIL and SMOKE_PASSWORD) are required.");
   process.exit(1);
 }
 

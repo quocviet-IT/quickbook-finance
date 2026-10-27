@@ -1022,7 +1022,7 @@ async function acctId(code) {
 async function main() {
   await db.connect();
   const { data: auth, error: e1 } = await sb.auth.signInWithPassword({
-    email: "admin@ctyhp.vn", password: "Ctyhp@Ketoan2026",
+    email: "admin@ctyhp.vn", password: process.env.E2E_PASSWORD,
   });
   if (e1) throw new Error("login: " + e1.message);
   const authed = createClient(url, key, {
