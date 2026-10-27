@@ -215,13 +215,13 @@ Authenticator or 1Password.
   person signs in with their password and sets it up again. Nobody can reset
   their own. The reset applies to the person's sign-in, so it covers every
   company they belong to.
-- **Required for admins and accountants since 2.66.** Each company gave them
-  seven days from the release; a company created later gives seven days from
-  its creation. Until the deadline a bar at the top counts the days down. After
-  it, an admin or accountant without a second step is taken straight to set it
-  up when they sign in, and the database gives a session without the code
-  nothing. Platform administrators need it from the same deadline to create or
-  restore companies. For sales and viewers it stays recommended.
+- **Optional, for everyone (since 2.68).** 2.66 required it for admins and
+  accountants by a deadline; the owner made it optional again the same day.
+  The rule is still in the database (`acc_two_step_policy`, one row per
+  company, empty since 0176): a row with the roles and a date makes it required
+  again, with the reminder bar and the set-up page 2.66 built.
+- **Turn it off:** your name › Two-step sign-in › **Turn off two-step sign-in**.
+  The audit log records it.
 
 ### Review access every quarter
 
@@ -258,5 +258,6 @@ auditor would, without anyone's existing credentials. On the sample company:
 - **What sales and viewer may read.** Both read the whole ledger. After the access
   audit of October 2026 the owner kept that, and gave sales draft invoices and
   attachments (2.63). Limiting what either reads is still open.
-- **A second sign-in factor (MFA).** Decided and in place: see *Two-step
-  sign-in* above. Whether sales and viewers should need it too is still open.
+- **A second sign-in factor (MFA).** Available to everyone and recommended,
+  not required (see *Two-step sign-in* above). Whether to require it, and for
+  whom, is open again.

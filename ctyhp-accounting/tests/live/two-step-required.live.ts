@@ -1,10 +1,12 @@
 /**
  * 2.66: from its company's deadline, an admin or accountant counts only in a
- * session that has passed the second step (migration 0175).
+ * session that has passed the second step (migration 0175). 2.68 (0176) left
+ * every company without a deadline, so nothing is required; the rule is
+ * checked here by putting one back.
  *
  * In a throwaway company built from this tree inside ONE transaction that is
- * always rolled back; nothing survives. The deadline is moved into the past
- * inside that company only. The platform-administrator half acts on the one
+ * always rolled back; nothing survives. The deadline is written and moved into
+ * the past inside that company only. The platform-administrator half acts on the one
  * register every company shares and is checked on the live database.
  *
  * Run: node --env-file=.env.local ./node_modules/vitest/vitest.mjs run --config vitest.live.config.ts
@@ -72,7 +74,12 @@ describe("two-step sign-in required", () => {
         expect((await q<{ n: number }>("select count(*)::int as n from auth.mfa_factors where user_id = $1 and status = 'verified'", [id]))[0].n).toBe(0);
       }
 
-      // A new company: seven days from its creation, for admins and accountants.
+      // Since 0176 (2.68) a new company requires nothing: the policy is empty.
+      // The rule is still there; a row makes it required, as 2.66 had it.
+      expect((await q<{ n: number }>("select count(*)::int as n from acc_two_step_policy"))[0].n).toBe(0);
+      expect(await roleOf(admin.id, "aal1")).toBe("admin");
+      await client.query("reset role");
+      await client.query("insert into acc_two_step_policy (required_from) values (now() + interval '7 days')");
       const [policy] = await q<{ roles: string; days: number }>(
         "select roles::text as roles, round(extract(epoch from required_from - now()) / 86400)::int as days from acc_two_step_policy",
       );

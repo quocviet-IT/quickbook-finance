@@ -132,7 +132,7 @@ export default function UsersClient({
         type="info"
         showIcon
         message="Privileged access policy"
-        description="Two-step sign-in is required for admins and accountants and recommended for everyone else: set it up from your name, top right. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
+        description="Two-step sign-in is recommended, not required: anyone sets it up from their name, top right; the MFA column shows who has. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
       />
 
       {canManage && !canCreateUsers && (

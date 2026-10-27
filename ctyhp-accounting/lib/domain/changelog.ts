@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.68",
+    date: "2026-10-27",
+    headline: "Two-step sign-in is optional again, and you can turn your own off.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Two-step sign-in is no longer required",
+        detail:
+          "At the owner's decision, admins and accountants no longer need two-step sign-in by a deadline, and the bar counting the days down is gone. Anyone can still set it up from their name, top right; once it is on, every sign-in asks for the code and a password alone opens nothing.",
+        route: "/account/two-step",
+      },
+      {
+        kind: "added",
+        title: "Turn off your own two-step sign-in",
+        detail:
+          "Your name › Two-step sign-in has Turn off two-step sign-in once it is on. Your password alone opens your books again, and the audit log records it.",
+        route: "/account/two-step",
+      },
+    ],
+  },
+  {
     version: "2.67",
     date: "2026-10-27",
     headline: "The sign-in page no longer loops after a sign-out on another device.",

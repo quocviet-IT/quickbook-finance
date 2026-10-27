@@ -7,6 +7,7 @@ import { PALETTE } from "@/lib/design/palette";
 import { formatDateInTimeZone } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { readCode } from "@/lib/domain/two-step";
+import { recordTwoStepOffAction } from "./actions";
 
 /** An enrollment under way: the factor exists but is not verified until a code is accepted. */
 interface Pending {
@@ -21,6 +22,7 @@ export default function TwoStepClient({
   email,
   onSince,
   required = false,
+  canTurnOff = false,
 }: {
   email: string;
   onSince: string | null;
@@ -29,22 +31,60 @@ export default function TwoStepClient({
    * page says so and, once it is on, goes on to the dashboard.
    */
   required?: boolean;
+  /** Not required for this person's role (2.68), so they may turn it off themselves. */
+  canTurnOff?: boolean;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function turnOff() {
+    modal.confirm({
+      title: "Turn off two-step sign-in?",
+      content: "Your password alone will open your books again. You can set it up again here at any time.",
+      okText: "Turn off",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        // Removing a factor that has been used needs a session that passed it,
+        // which this one has: a session that owes the code never reaches here.
+        const sb = createSupabaseBrowserClient();
+        const { data } = await sb.auth.mfa.listFactors();
+        const factors = data?.all ?? [];
+        for (const factor of factors) {
+          const { error } = await sb.auth.mfa.unenroll({ factorId: factor.id });
+          if (error) {
+            message.error(error.message);
+            throw error;
+          }
+        }
+        const recorded = await recordTwoStepOffAction(factors.length);
+        if (!recorded.ok) message.warning(`Turned off, but the audit log entry failed: ${recorded.error}`);
+        else message.success("Two-step sign-in is off");
+        router.refresh();
+      },
+    });
+  }
+
   if (onSince) {
     return (
       <Card>
-        <Alert
-          type="success"
-          showIcon
-          message="Two-step sign-in is on"
-          description={`Since ${formatDateInTimeZone(onSince, timeZone)}. Each time ${email} signs in, OneBook asks for the code your app shows after the password. Lost or replaced your phone? Ask an admin of your company to reset it in Settings › Users, then set it up again here.`}
-        />
+        <Space direction="vertical" size="middle" style={{ display: "flex" }}>
+          <Alert
+            type="success"
+            showIcon
+            message="Two-step sign-in is on"
+            description={`Since ${formatDateInTimeZone(onSince, timeZone)}. Each time ${email} signs in, OneBook asks for the code your app shows after the password. Lost or replaced your phone? Ask an admin of your company to reset it in Settings › Users, then set it up again here.`}
+          />
+          {canTurnOff ? (
+            <div>
+              <Button danger onClick={turnOff}>
+                Turn off two-step sign-in
+              </Button>
+            </div>
+          ) : null}
+        </Space>
       </Card>
     );
   }
@@ -108,7 +148,7 @@ export default function TwoStepClient({
               type="info"
               showIcon
               message="Two-step sign-in is off"
-              description="With it on, a password alone no longer opens your books: OneBook also asks for a six-digit code from an app on your phone. Admins and accountants must have it; for everyone else it is recommended."
+              description="With it on, a password alone no longer opens your books: OneBook also asks for a six-digit code from an app on your phone. It is recommended for everyone, admins and accountants above all."
             />
           )}
           <Typography.Paragraph style={{ marginBottom: 0 }}>
