@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Form, Input, Space, Typography } from "antd";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
 import { PALETTE } from "@/lib/design/palette";
-import { formatDate } from "@/lib/format";
+import { formatDateInTimeZone } from "@/lib/format";
+import { useCompanyClock } from "@/components/CompanyClock";
 import { readCode } from "@/lib/domain/two-step";
 
 /** An enrollment under way: the factor exists but is not verified until a code is accepted. */
@@ -18,6 +19,7 @@ const APPS = "Google Authenticator, Microsoft Authenticator or 1Password";
 
 export default function TwoStepClient({ email, onSince }: { email: string; onSince: string | null }) {
   const { message } = App.useApp();
+  const { timeZone } = useCompanyClock();
   const router = useRouter();
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,7 +31,7 @@ export default function TwoStepClient({ email, onSince }: { email: string; onSin
           type="success"
           showIcon
           message="Two-step sign-in is on"
-          description={`Since ${formatDate(onSince)}. Each time ${email} signs in, OneBook asks for the code your app shows after the password. Lost or replaced your phone? Ask an admin of your company to reset it in Settings › Users, then set it up again here.`}
+          description={`Since ${formatDateInTimeZone(onSince, timeZone)}. Each time ${email} signs in, OneBook asks for the code your app shows after the password. Lost or replaced your phone? Ask an admin of your company to reset it in Settings › Users, then set it up again here.`}
         />
       </Card>
     );
