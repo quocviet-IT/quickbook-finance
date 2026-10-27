@@ -113,6 +113,7 @@ export default function InvoicesClient({
   items,
   canManageItems,
   canWrite,
+  canCreate,
   canIssue,
   canVoid,
   canReadDocuments,
@@ -143,6 +144,11 @@ export default function InvoicesClient({
   /** Holds `items.manage`, so the empty-catalog hint can link to the catalog. */
   canManageItems: boolean;
   canWrite: boolean;
+  /**
+   * Holds `invoice.create`, which sales holds too: a sales user prepares the
+   * draft and an admin or accountant issues it. The RPC checks it again.
+   */
+  canCreate: boolean;
   /** Holds `invoice.issue`; the RPC checks it again. */
   canIssue: boolean;
   /** Holds `invoice.void`; the RPC checks it again. */
@@ -767,7 +773,7 @@ export default function InvoicesClient({
       <FilterBar
         resultCount={filteredInvoices.length}
         actions={
-          canWrite ? (
+          canCreate ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               New invoice
             </Button>
@@ -880,11 +886,14 @@ export default function InvoicesClient({
                 disabled={Boolean(fromEstimate)}
               />
             </Form.Item>
-            <Form.Item label=" ">
-              <Button onClick={() => setCustOpen(true)} disabled={Boolean(fromEstimate)}>
-                + New customer
-              </Button>
-            </Form.Item>
+            {/* Customers stay with admins and accountants; sales picks one that exists. */}
+            {canWrite ? (
+              <Form.Item label=" ">
+                <Button onClick={() => setCustOpen(true)} disabled={Boolean(fromEstimate)}>
+                  + New customer
+                </Button>
+              </Form.Item>
+            ) : null}
             <Form.Item name="currency_code" label="Currency" rules={[{ required: true }]} style={{ width: 150 }}>
               <Select disabled options={currencies.map((c) => ({ value: c.code, label: c.code }))} />
             </Form.Item>

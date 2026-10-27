@@ -8,7 +8,7 @@ A Vietnamese version is in [permissions.vi.md](permissions.vi.md).
 ## The short version
 
 - Everyone in a company has **one role**: admin, accountant, sales or viewer.
-- On top of the role sit **38 permissions**, switched on or off per role in
+- On top of the role sit **39 permissions**, switched on or off per role in
   **Settings › Permissions**. Every switch is checked before its action runs.
 - **The database decides.** A screen hides what you may not do, but the guard is
   the database function behind the action: it asks who you are, what your role is
@@ -24,7 +24,7 @@ A Vietnamese version is in [permissions.vi.md](permissions.vi.md).
 | --- | --- | --- |
 | **admin** | The owner or the controller | Everything, including users, permissions and company settings. |
 | **accountant** | Day-to-day bookkeeping | Enters, posts, reconciles and voids. No users, permissions, settings or reopening. |
-| **sales** | Staff who sell | Reads the books and keeps the product and service list. Posts nothing. |
+| **sales** | Staff who sell | Reads the books and their attachments, keeps the product and service list, and prepares draft invoices for an accountant to issue. Posts nothing. |
 | **viewer** | Auditors, owners who only look | Reads the books, the audit log and attachments. Changes nothing. |
 
 A company always keeps at least one active admin, and has **at most two**.
@@ -86,7 +86,7 @@ greyed out on the screen, with a note:
 | Banking | Reopen reconciliations | Reopen a completed reconciliation | ✓ | | | | Admin |
 | Close | Close accounting periods | Close a monthly accounting period | ✓ | | | | Admin or accountant |
 | Close | Reopen accounting periods | Reopen a closed accounting period | ✓ | | | | Admin |
-| Documents | Read supporting documents | List and open attachments | ✓ | ✓ | | ✓ | Any role |
+| Documents | Read supporting documents | List and open attachments | ✓ | ✓ | ✓ | ✓ | Any role |
 | Documents | Manage supporting documents | Upload and archive attachments | ✓ | ✓ | | | Any role |
 | Documents | Govern document retention | Set retention dates and legal holds | ✓ | | | | Any role |
 | Governance | Read the audit log | Search the audit history | ✓ | ✓ | | ✓ | Any role |
@@ -108,6 +108,7 @@ greyed out on the screen, with a note:
 | Receivables | Write off balances | Write off an invoice or bill balance | ✓ | ✓ | | | Admin or accountant |
 | Receivables | Override a credit limit | Issue an invoice over a credit limit or on credit hold | ✓ | | | | Admin or accountant |
 | Reporting | Manage budgets | Create and update monthly budgets | ✓ | ✓ | | | Any role |
+| Sales | Create draft invoices | Create a draft invoice for a customer; issuing it is separate | ✓ | ✓ | ✓ | | Any role |
 | Sales | Issue invoices | Issue a draft invoice to a customer | ✓ | ✓ | | | Admin or accountant |
 | Sales | Void invoices | Void an invoice, draft or issued | ✓ | ✓ | | | Admin or accountant |
 | Sales | Manage products and services | Create, edit, activate and deactivate products and services | ✓ | ✓ | ✓ | | Any role |
@@ -230,7 +231,9 @@ auditor would, without anyone's existing credentials. On the sample company:
 
 ## Still to decide
 
-- **What sales and viewer may read.** Today both read the whole ledger. Limiting
-  that is a product decision not yet taken.
-- **A second sign-in factor (MFA).** Whether it is required, and for which roles,
-  is not yet decided. Settings › Users shows who has set one up.
+- **What sales and viewer may read.** Both read the whole ledger. After the access
+  audit of October 2026 the owner kept that, and gave sales draft invoices and
+  attachments (2.63). Limiting what either reads is still open.
+- **A second sign-in factor (MFA).** It is to be required for admins and
+  accountants, with seven days to set it up. Until that ships, it is recommended,
+  and Settings › Users shows who has set one up.

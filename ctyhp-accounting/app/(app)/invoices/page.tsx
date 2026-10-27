@@ -85,6 +85,7 @@ export default async function InvoicesPage({
     companySettings,
     canManageItems,
     fromEstimate,
+    holdsCreate,
     holdsIssue,
     holdsVoid,
   ] = await Promise.all([
@@ -109,13 +110,19 @@ export default async function InvoicesPage({
     getCurrentCompanySettings(sb),
     hasPermission(sb, "items.manage"),
     estimateLink(sb, params.estimate),
+    holdsPermission("invoice.create"),
     holdsPermission("invoice.issue"),
     holdsPermission("invoice.void"),
   ]);
 
   // An estimate that cannot be turned into an invoice now says so instead of
-  // opening a form the database would refuse.
-  const initialCreateOpen = params.new === "1" && fromEstimate.notice === null;
+  // opening a form the database would refuse. Turning one into an invoice is
+  // for admins and accountants, as estimates are; anyone else holding
+  // invoice.create (sales) opens the plain form, from the page's own link.
+  const initialCreateOpen =
+    params.new === "1" &&
+    fromEstimate.notice === null &&
+    (params.estimate ? fromEstimate.prefill !== null : holdsCreate);
 
   // A number the sequence issued that no invoice holds is the sign of a removed
   // sale, so the warning belongs where invoices are worked on — not only in the
@@ -165,6 +172,7 @@ export default async function InvoicesPage({
         items={salesItems}
         canManageItems={canManageItems}
         canWrite={canWrite(role)}
+        canCreate={holdsCreate}
         canIssue={canWrite(role) && holdsIssue}
         canVoid={canWrite(role) && holdsVoid}
         canReadDocuments={canReadDocuments}
