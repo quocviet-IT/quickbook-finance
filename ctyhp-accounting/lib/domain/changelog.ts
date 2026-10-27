@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.62",
+    date: "2026-10-27",
+    headline: "Follow-ups from the independent access audit: a truthful MFA note, reasons a screen reader can hear, and a check anyone can run.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Users no longer says multi-factor sign-in is required",
+        detail:
+          "Settings › Users said admins, accountants and sales users must enroll in multi-factor authentication, while nothing required it and nobody had. It now says it is recommended and not yet required; the MFA column still shows who has it.",
+        route: "/settings/users",
+      },
+      {
+        kind: "fixed",
+        title: "A greyed-out permission switch says why, to a screen reader too",
+        detail:
+          "The note on a switch a role cannot use, such as Only admins and accountants can use this, appeared only on hover, which a keyboard or screen-reader user never reaches. It is now part of the switch's spoken name.",
+        route: "/settings/permissions",
+      },
+      {
+        kind: "added",
+        title: "A check from outside that the database refuses what the screens hide",
+        detail:
+          "With a Sales account made for the purpose on the sample company, npm run verify:access-denials signs in as that user and tries, through the same API the browser uses, nine actions the role may not take, direct writes to the tables and another company's books, then the same session after the account is suspended. The permission guide explains how to run it.",
+        route: "/settings/users",
+      },
+    ],
+  },
+  {
     version: "2.61",
     date: "2026-10-26",
     headline: "Master data can no longer be changed around its screens, and the permission guide is in the repository.",

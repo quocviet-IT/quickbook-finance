@@ -210,6 +210,22 @@ Mỗi quý, ở từng công ty, một admin:
    đã đổi từ lần rà soát trước.
 5. Ghi lại ngày rà soát và người rà soát.
 
+### Tự kiểm chứng
+
+Có thể kiểm chứng "database là nơi quyết định" từ bên ngoài, đúng cách một
+kiểm toán viên làm, mà không cần mật khẩu của ai. Trên công ty mẫu:
+
+1. Settings › Users, **Add user** với vai trò **Sales**, chỉ dùng cho việc thử
+   này.
+2. Ghi thông tin đăng nhập vào `ACCESS_PROBE_EMAIL` và `ACCESS_PROBE_PASSWORD`,
+   rồi chạy `npm run verify:access-denials` trong `ctyhp-accounting/`. Script
+   đăng nhập bằng tài khoản đó và, qua đúng API trình duyệt dùng, thử chín thao
+   tác vai trò này không được làm, ghi thẳng vào bảng, và đọc sổ công ty khác.
+   Dòng nào cũng phải là PASS (bị từ chối), và không gì được thay đổi.
+3. **Suspend** tài khoản, rồi chạy lại với `-- --after-suspend` trong vòng một
+   giờ: chính phiên đang đăng nhập đó phải không đọc được gì nữa, ngay lập tức.
+4. **Offboard** tài khoản.
+
 ---
 
 ## Còn chờ quyết định

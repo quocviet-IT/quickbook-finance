@@ -111,11 +111,18 @@ export default function PermissionMatrixClient({
               // and the database refuses it (2.60). One already on can still be
               // switched off.
               const unusable = !roleMeets(role, r.min_role) && !r.allowed[role];
+              // The reason is in the accessible name too: a disabled switch takes
+              // no focus, so the hover note never reaches a keyboard or
+              // screen-reader user (access audit, 27 Oct 2026).
               const control = (
                 <Switch
                   checked={r.allowed[role]}
                   disabled={!canManage || unusable || saving === `${role}:${r.key}`}
-                  aria-label={`${r.label} for ${role}`}
+                  aria-label={
+                    unusable
+                      ? `${r.label} for ${role}: ${minRoleNote(r.min_role)?.toLowerCase()}`
+                      : `${r.label} for ${role}`
+                  }
                   onChange={(checked) => toggle(r.key, role, checked)}
                 />
               );
