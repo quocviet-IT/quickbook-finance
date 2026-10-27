@@ -38,3 +38,16 @@ data/
 
 # Windows shell leftovers.
 desktop.ini
+
+# Loose HTML and Markdown at the repo root: the client's prototypes, review
+# notes and side-by-side comparisons land here and carry real ledgers, customer
+# names and sign-in addresses. They belong in data/, which is ignored above.
+# One slipped past the /Accounting-System*.html rule by being saved with a
+# space in its name, so match by extension. The coding guidebook is tracked and
+# stays; tracked files are not affected by ignore rules.
+/*.html
+/*.md
+
+# An environment file at the repo root would hold the same keys as the app's,
+# which ctyhp-accounting/ already ignores for itself.
+/.env*
