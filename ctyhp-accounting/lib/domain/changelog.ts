@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.64",
+    date: "2026-10-27",
+    headline: "The Line items heading keeps its own line on New invoice.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Line items no longer splits beside the dates on New invoice",
+        detail:
+          "A sales user's New invoice form has no New customer button, and the Line items heading rose beside Due date, broken over two lines. It now always starts a line of its own, on invoices, estimates and sales receipts.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "2.63",
     date: "2026-10-27",
     headline: "Sales prepares invoices and an accountant issues them, and sales sees attached documents.",
