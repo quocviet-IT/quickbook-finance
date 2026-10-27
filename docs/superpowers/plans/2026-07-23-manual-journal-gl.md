@@ -1683,7 +1683,7 @@ const acctId = async (code) => (await db.query("select id from acc_account where
 
 async function main() {
   await db.connect();
-  const { data: auth, error: e1 } = await sb.auth.signInWithPassword({ email: "admin@ctyhp.vn", password: "Ctyhp@Ketoan2026" });
+  const { data: auth, error: e1 } = await sb.auth.signInWithPassword({ email: "admin@ctyhp.vn", password: process.env.E2E_PASSWORD });
   if (e1) throw new Error("login: " + e1.message);
   const authed = createClient(url, key, { global: { headers: { Authorization: "Bearer " + auth.session.access_token } }, auth: { persistSession: false } });
 

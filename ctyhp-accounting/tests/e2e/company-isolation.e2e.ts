@@ -36,10 +36,10 @@ async function signedInTo(schema: string) {
     auth: { persistSession: false },
     db: { schema },
   });
-  const { error } = await sb.auth.signInWithPassword({
-    email: process.env.E2E_EMAIL ?? "admin@ctyhp.vn",
-    password: process.env.E2E_PASSWORD ?? "Ctyhp@Ketoan2026",
-  });
+  const email = process.env.E2E_EMAIL;
+  const password = process.env.E2E_PASSWORD;
+  if (!email || !password) throw new Error("E2E_EMAIL and E2E_PASSWORD are required; put them in .env.local");
+  const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`sign-in failed: ${error.message}`);
   return sb;
 }
