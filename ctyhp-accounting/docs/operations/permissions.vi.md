@@ -30,9 +30,12 @@ như trên ứng dụng.
 | **sales** | Nhân viên bán hàng | Xem sổ sách và quản lý danh mục sản phẩm, dịch vụ. Không ghi sổ. |
 | **viewer** | Kiểm toán, chủ chỉ cần xem | Xem sổ sách, nhật ký và tệp đính kèm. Không thay đổi gì. |
 
-Mỗi công ty luôn giữ ít nhất một admin đang hoạt động. OneBook từ chối tạm khoá,
-cho nghỉ hoặc hạ vai trò của admin cuối cùng, và admin không tự làm việc đó với
-chính mình được.
+Mỗi công ty luôn giữ ít nhất một admin đang hoạt động, và **nhiều nhất hai**.
+OneBook từ chối tạm khoá, cho nghỉ hoặc hạ vai trò của admin cuối cùng, admin
+không tự làm việc đó với chính mình được, và admin thứ ba bị từ chối dù đến bằng
+đường nào: thêm người mới, thêm tài khoản có sẵn, đổi vai trò hay mở lại một
+admin đang bị khoá. Muốn đổi hai người làm admin, hạ một người xuống accountant
+trước.
 
 ## Trạng thái người dùng
 
@@ -51,7 +54,7 @@ Mỗi lần đổi trạng thái đều phải ghi lý do, và lý do được l
   công ty một vai trò.
 - Ô chọn công ty chỉ hiện những công ty người đó thuộc về. Mỗi lần chuyển công ty
   đều được server kiểm tra lại.
-- **Platform admin** là một danh sách riêng gồm vài người. Chỉ họ mới tạo được
+- **Platform admin** là một danh sách riêng, nhiều nhất hai người. Chỉ họ mới tạo được
   công ty mới (**Settings › Companies**) hoặc khôi phục bản sao lưu thành một
   công ty mới (**Settings › Backups**). Là admin trong một công ty không bao gồm
   hai việc này.

@@ -8,7 +8,7 @@ import type { MenuProps } from "antd";
 import { PlusOutlined, UserAddOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
-import { describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
+import { ADMIN_CAP, canBecomeAdmin, describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
 import { passwordPolicyProblems } from "@/lib/domain/password-policy";
 import { addExistingUserAction, createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
@@ -22,12 +22,21 @@ const STATUS_LOOKS: Record<string, StatusLook> = {
   offboarded: { tone: "danger", label: "Offboarded" },
 };
 
-const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
-  { value: "admin", label: "Admin" },
-  { value: "accountant", label: "Accountant" },
-  { value: "sales", label: "Sales" },
-  { value: "viewer", label: "Viewer" },
-];
+/**
+ * The roles a person can be given. Admin is offered only while the company has
+ * room for one more: at most two admins hold access (2.62), and the database
+ * refuses a third however it arrives.
+ */
+function roleOptions(adminAllowed: boolean): { value: AppRole; label: string; disabled?: boolean }[] {
+  return [
+    adminAllowed
+      ? { value: "admin", label: "Admin" }
+      : { value: "admin", label: `Admin (${ADMIN_CAP} already)`, disabled: true },
+    { value: "accountant", label: "Accountant" },
+    { value: "sales", label: "Sales" },
+    { value: "viewer", label: "Viewer" },
+  ];
+}
 
 export default function UsersClient({
   users,
@@ -180,7 +189,7 @@ export default function UsersClient({
                   // one; the dropdown stays readable on its own.
                   style={{ width: "100%" }}
                   popupMatchSelectWidth={200}
-                  options={ROLE_OPTIONS}
+                  options={roleOptions(canBecomeAdmin(users, r.id))}
                   aria-label={`Role for ${r.email}`}
                   onChange={(role) => changeRole(r, role)}
                 />
@@ -254,6 +263,7 @@ export default function UsersClient({
 
       {addExistingOpen && (
         <AddExistingUserModal
+          adminAllowed={canBecomeAdmin(users, null)}
           onClose={() => setAddExistingOpen(false)}
           onDone={() => {
             setAddExistingOpen(false);
@@ -264,6 +274,7 @@ export default function UsersClient({
 
       {createOpen && (
         <CreateUserModal
+          adminAllowed={canBecomeAdmin(users, null)}
           onClose={() => setCreateOpen(false)}
           onDone={() => {
             setCreateOpen(false);
@@ -280,7 +291,15 @@ export default function UsersClient({
  * place in this one. Add user would refuse their email: it always creates a
  * new sign-in. Their name and password stay as they are.
  */
-function AddExistingUserModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function AddExistingUserModal({
+  adminAllowed,
+  onClose,
+  onDone,
+}: {
+  adminAllowed: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -318,7 +337,7 @@ function AddExistingUserModal({ onClose, onDone }: { onClose: () => void; onDone
           <Input type="email" placeholder="person@ctyhp.vn" autoComplete="off" />
         </Form.Item>
         <Form.Item name="role" label="Role in this company" rules={[{ required: true, message: "Select a role" }]}>
-          <Select options={ROLE_OPTIONS} />
+          <Select options={roleOptions(adminAllowed)} />
         </Form.Item>
       </Form>
       {error ? <Alert type="error" showIcon message={error} /> : null}
@@ -326,7 +345,15 @@ function AddExistingUserModal({ onClose, onDone }: { onClose: () => void; onDone
   );
 }
 
-function CreateUserModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function CreateUserModal({
+  adminAllowed,
+  onClose,
+  onDone,
+}: {
+  adminAllowed: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -362,7 +389,7 @@ function CreateUserModal({ onClose, onDone }: { onClose: () => void; onDone: () 
           <Input />
         </Form.Item>
         <Form.Item name="role" label="Role" rules={[{ required: true, message: "Select a role" }]}>
-          <Select options={ROLE_OPTIONS} />
+          <Select options={roleOptions(adminAllowed)} />
         </Form.Item>
         <Form.Item
           name="password"

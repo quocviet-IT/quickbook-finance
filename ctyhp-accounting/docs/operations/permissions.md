@@ -27,8 +27,11 @@ A Vietnamese version is in [permissions.vi.md](permissions.vi.md).
 | **sales** | Staff who sell | Reads the books and keeps the product and service list. Posts nothing. |
 | **viewer** | Auditors, owners who only look | Reads the books, the audit log and attachments. Changes nothing. |
 
-A company always keeps at least one active admin. OneBook refuses to suspend,
-offboard or demote the last one, and an admin cannot do it to themselves.
+A company always keeps at least one active admin, and has **at most two**.
+OneBook refuses to suspend, offboard or demote the last one, an admin cannot do
+it to themselves, and a third admin is refused however it would arrive: a new
+user, an existing account, a role change or a suspended admin coming back. To
+change who the two are, make one of them an accountant first.
 
 ## User status
 
@@ -47,8 +50,8 @@ Every status change asks for a reason, and the reason goes into the audit log.
   different role in each.
 - The company switcher shows only the companies a person belongs to. Each switch
   is checked again on the server.
-- **Platform administrators**, a separate list of a few people, are the only ones
-  who can create a new company (**Settings › Companies**) or restore a backup
+- **Platform administrators**, a separate list of at most two people, are the
+  only ones who can create a new company (**Settings › Companies**) or restore a backup
   into a new one (**Settings › Backups**). Being an admin inside a company does
   not include either.
 
