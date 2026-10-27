@@ -91,6 +91,7 @@ export const ACTIVITY_VERBS: Record<string, string> = {
   keep_statement_file: "Statement file kept",
   match_from_reconciliation: "Matched by reconciliation",
   "company.backup": "Backed up",
+  mfa_reset: "Two-step sign-in reset",
 };
 
 /**

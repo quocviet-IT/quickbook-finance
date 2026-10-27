@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { skipsSession } from "@/lib/domain/public-routes";
+import { sessionRedirect } from "@/lib/domain/two-step";
 
 /**
  * Runs before every matched request: refreshes the Supabase auth session
@@ -50,17 +51,19 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims?.sub);
 
-  const path = request.nextUrl.pathname;
-  const isAuthRoute = path === "/login";
-
-  if (!signedIn && !isAuthRoute) {
+  // Whether the session still owes its second sign-in step is not decided
+  // here: that needs the person's factors, which the token does not carry. The
+  // app layout asks the auth server for them anyway, and sends such a session
+  // to /login?step=code, which this lets through (2.65).
+  const target = sessionRedirect(
+    request.nextUrl.pathname,
+    request.nextUrl.searchParams.get("step"),
+    signedIn,
+  );
+  if (target) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-  if (signedIn && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = target;
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

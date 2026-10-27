@@ -41,6 +41,33 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.65",
+    date: "2026-10-27",
+    headline: "Two-step sign-in: a code from an app on your phone after the password, and once it is on, a password alone opens nothing.",
+    changes: [
+      {
+        kind: "added",
+        title: "Two-step sign-in",
+        detail:
+          "Anyone can add a second step to their sign-in from their name, top right › Two-step sign-in: scan a code with an authenticator app such as Google Authenticator, Microsoft Authenticator or 1Password, then enter the six digits it shows. From then on every sign-in asks for the code, and the database refuses a session that has not given it, even outside the screens. It is recommended now; 2.66 requires it for admins and accountants.",
+        route: "/account/two-step",
+      },
+      {
+        kind: "added",
+        title: "Reset two-step sign-in for a lost phone",
+        detail:
+          "Settings › Users, the person's row, Reset two-step sign-in: someone who holds Manage users removes another member's second step, with a reason kept in the audit log. They sign in with their password and set it up again.",
+        route: "/settings/users",
+      },
+      {
+        kind: "changed",
+        title: "Long lists check access once, not once per row",
+        detail:
+          "Every list asked whether the reader belonged to the company once for each row it returned, so twenty thousand journal lines meant twenty thousand checks. It now asks once per list, which is what made adding the second-step check free.",
+      },
+    ],
+  },
+  {
     version: "2.64",
     date: "2026-10-27",
     headline: "The Line items heading keeps its own line on New invoice.",

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { skipsSession } from "@/lib/domain/public-routes";
+import { sessionRedirect } from "@/lib/domain/two-step";
 
 describe("paths that skip the session", () => {
   it("lets every route handler through", () => {
@@ -40,9 +41,12 @@ describe("the proxy still bounces a signed-in visitor off /login alone", () => {
     // signed-in visitor from /login to /dashboard, so a shared set would send
     // them off /status too — meaning every member of staff actually at work
     // could not open it.
-    const source = readFileSync(join(process.cwd(), "proxy.ts"), "utf8");
-    expect(source).toMatch(/isAuthRoute\s*=\s*path === "\/login"/);
-    expect(source).not.toMatch(/isAuthRoute\s*=\s*skipsSession/);
+    // Since 2.65 the branches live in sessionRedirect (lib/domain/two-step.ts).
+    const rules = readFileSync(join(process.cwd(), "lib", "domain", "two-step.ts"), "utf8");
+    expect(rules).toMatch(/onLogin\s*=\s*path === "\/login"/);
+    expect(rules).not.toMatch(/skipsSession/);
+    expect(sessionRedirect("/status", null, true)).toBeNull();
+    expect(sessionRedirect("/login", null, true)).toBe("/dashboard");
   });
 
   it("actually calls skipsSession, rather than testing a predicate nothing uses", () => {

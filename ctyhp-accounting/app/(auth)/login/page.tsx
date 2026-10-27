@@ -1,73 +1,10 @@
-"use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { App, Button, Card, Form, Input, Typography } from "antd";
-import { createSupabaseBrowserClient } from "@/lib/db/client";
-import { TOKENS } from "@/lib/design/tokens";
+import LoginClient from "./LoginClient";
 
-interface LoginValues {
-  email: string;
-  password: string;
-}
-
-export default function LoginPage() {
-  const router = useRouter();
-  const { message } = App.useApp();
-  const [loading, setLoading] = useState(false);
-
-  async function onFinish(values: LoginValues) {
-    setLoading(true);
-    const sb = createSupabaseBrowserClient();
-    const { error } = await sb.auth.signInWithPassword({
-      email: values.email,
-      password: values.password,
-    });
-    setLoading(false);
-    if (error) {
-      message.error(error.message);
-      return;
-    }
-    router.refresh();
-    router.push("/dashboard");
-  }
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: TOKENS.surface.muted,
-      }}
-    >
-      <Card style={{ width: 380 }}>
-        <Typography.Title level={3} style={{ textAlign: "center", marginBottom: 4 }}>
-          One Book
-        </Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ textAlign: "center" }}>
-          Sign in to continue
-        </Typography.Paragraph>
-        <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
-          <Form.Item
-            name="email"
-            label="Email"
-            rules={[{ required: true, type: "email", message: "Enter a valid email" }]}
-          >
-            <Input autoComplete="email" placeholder="you@company.com" />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label="Password"
-            rules={[{ required: true, message: "Enter your password" }]}
-          >
-            <Input.Password autoComplete="current-password" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block loading={loading}>
-            Sign in
-          </Button>
-        </Form>
-      </Card>
-    </div>
-  );
+/**
+ * Sign in. `?step=code` is where the app layout sends a session that owes its
+ * second step (2.65); the proxy lets a signed-in visitor through only for that.
+ */
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ step?: string }> }) {
+  const { step } = await searchParams;
+  return <LoginClient initialStep={step === "code" ? "code" : "password"} />;
 }

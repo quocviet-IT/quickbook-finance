@@ -3,6 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClientForSchema } from "./server";
+import { owesSecondStep } from "@/lib/domain/two-step";
 
 /**
  * Which company this request is working in.
@@ -132,6 +133,19 @@ export async function activeSchema(): Promise<string> {
  * question: not "whose books may I open" but "may I make new ones". A refusal
  * here only hides a button; `onebook.request_company` refuses again regardless.
  */
+/**
+ * Does this session still owe its second sign-in step (2.65)? The person's
+ * factors come from the auth server through `currentUser`, which the layout
+ * asks anyway; the session's level from its own verified token.
+ */
+export const owesSecondStepNow = cache(async (): Promise<boolean> => {
+  const user = await currentUser();
+  if (!user) return false;
+  const control = await createSupabaseServerClientForSchema("onebook");
+  const { data } = await control.auth.getClaims();
+  return owesSecondStep(user.factors, (data?.claims?.aal as string | undefined) ?? null);
+});
+
 export const isPlatformAdmin = cache(async (): Promise<boolean> => {
   const control = await createSupabaseServerClientForSchema("onebook");
   const { data, error } = await control.rpc("is_platform_admin");
