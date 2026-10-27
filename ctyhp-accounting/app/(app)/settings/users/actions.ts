@@ -3,8 +3,14 @@ import { revalidatePath } from "next/cache";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { holdsPermission } from "@/lib/auth";
-import { userAddExistingSchema, userCreateSchema, userRoleSchema, userStatusSchema } from "@/lib/domain/schemas";
-import { AccessError, addExistingUser, createUser, setUserRole, setUserStatus } from "@/lib/services/access";
+import {
+  userAddExistingSchema,
+  userCreateSchema,
+  userRoleSchema,
+  userStatusSchema,
+  userTwoStepResetSchema,
+} from "@/lib/domain/schemas";
+import { AccessError, addExistingUser, createUser, resetTwoStep, setUserRole, setUserStatus } from "@/lib/services/access";
 
 export interface ActionResult<T = undefined> { ok: boolean; error?: string; data?: T; }
 
@@ -79,6 +85,22 @@ export async function setUserStatusAction(userId: string, raw: unknown): Promise
   try {
     const sb = await createSupabaseServerClient();
     await setUserStatus(sb, userId, parsed.data);
+    revalidatePath("/settings/users");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
+}
+
+/** Remove someone's second sign-in step, for a lost or replaced phone (2.65). */
+export async function resetTwoStepAction(userId: string, raw: unknown): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const parsed = userTwoStepResetSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    await resetTwoStep(sb, userId, parsed.data.reason);
     revalidatePath("/settings/users");
     return { ok: true };
   } catch (e) {

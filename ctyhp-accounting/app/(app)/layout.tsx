@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { currentUser, isPlatformAdmin, resolveActiveCompany } from "@/lib/db/company";
+import { currentUser, isPlatformAdmin, owesSecondStepNow, resolveActiveCompany } from "@/lib/db/company";
+import { CODE_STEP_PATH } from "@/lib/domain/two-step";
 import { countPendingApprovals } from "@/lib/services/access";
 import { currentAccess } from "@/lib/db/settings-access";
 import AppShell from "@/components/AppShell";
@@ -31,6 +32,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     isPlatformAdmin(),
   ]);
   if (!user) redirect("/login");
+  // Someone who has set up a second sign-in step and has not passed it in this
+  // session: the database already refuses them everything (0174), so the page
+  // asks for the code instead of showing an empty company.
+  if (await owesSecondStepNow()) redirect(CODE_STEP_PATH);
 
   if (!active) {
     // Entitled to nothing. Say so — the alternative was reading the first

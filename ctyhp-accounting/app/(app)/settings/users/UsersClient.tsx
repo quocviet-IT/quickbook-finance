@@ -10,7 +10,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import type { AppRole, AppUserRow, UserStatus } from "@/lib/db/types";
 import { ADMIN_CAP, canBecomeAdmin, describeStatusChange, isLastActiveAdmin } from "@/lib/domain/access";
 import { passwordPolicyProblems } from "@/lib/domain/password-policy";
-import { addExistingUserAction, createUserAction, setUserRoleAction, setUserStatusAction } from "./actions";
+import { addExistingUserAction, createUserAction, resetTwoStepAction, setUserRoleAction, setUserStatusAction } from "./actions";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, type StatusLook } from "@/lib/domain/status-label";
@@ -97,6 +97,22 @@ export default function UsersClient({
     });
   }
 
+  async function resetTwoStep(user: AppUserRow) {
+    promptReason(
+      `Reset two-step sign-in for ${user.email}?`,
+      "Their authenticator app stops working for OneBook, and they can set it up again after signing in with their password. This is recorded in the audit log.",
+      async (reason) => {
+        const res = await resetTwoStepAction(user.id, { reason });
+        if (!res.ok) {
+          message.error(res.error ?? "Failed to reset two-step sign-in");
+          throw new Error(res.error);
+        }
+        message.success("Two-step sign-in reset");
+        router.refresh();
+      },
+    );
+  }
+
   async function changeRole(user: AppUserRow, role: AppRole) {
     if (role === user.role) return;
     promptReason(`Change ${user.email} to ${role}?`, "Role changes take effect immediately and are recorded in the audit log.", async (reason) => {
@@ -116,7 +132,7 @@ export default function UsersClient({
         type="info"
         showIcon
         message="Privileged access policy"
-        description="Multi-factor sign-in is recommended for admins, accountants and sales users, not yet required; the MFA column shows who has it. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
+        description="Two-step sign-in is recommended, not yet required: anyone sets it up from their name, top right; the MFA column shows who has. Suspending a user ends their access at once. The last active admin cannot be demoted or suspended."
       />
 
       {canManage && !canCreateUsers && (
@@ -240,6 +256,11 @@ export default function UsersClient({
               }
               if (r.status === "suspended" || r.status === "offboarded") {
                 menu.push({ key: "reactivate", label: "Reactivate", onClick: () => changeStatus(r, "active") });
+              }
+              // Someone else's lost or replaced phone; the factors are removed
+              // with the service role, so only where that key is configured.
+              if (r.mfa_enrolled && r.id !== currentUserId && canCreateUsers) {
+                menu.push({ key: "reset-two-step", label: "Reset two-step sign-in", onClick: () => resetTwoStep(r) });
               }
               // Last, and separated — but only separated when there is
               // something to separate from: an offboarded user's menu holds

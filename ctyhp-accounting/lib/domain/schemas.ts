@@ -942,6 +942,11 @@ export const userStatusSchema = z.object({
 });
 export type UserStatusInput = z.infer<typeof userStatusSchema>;
 
+/** Settings › Users › Reset two-step sign-in (2.65). */
+export const userTwoStepResetSchema = z.object({
+  reason: z.string().trim().min(1, "A reason is required").max(300),
+});
+
 export const rolePermissionSchema = z.object({
   role: z.enum(APP_ROLES),
   permission_key: z.string().trim().min(1),

@@ -201,6 +201,23 @@ Chỉ platform admin. Settings › Companies để tạo; Settings › Backups, 
 để khôi phục bản sao lưu thành một công ty mới bên cạnh sổ đang chạy. Khôi phục
 không bao giờ ghi đè lên một công ty.
 
+### Đăng nhập hai lớp
+
+Từ bản 2.65, ai cũng có thể thêm bước thứ hai khi đăng nhập: mã 6 số từ một app
+xác thực trên điện thoại, như Google Authenticator, Microsoft Authenticator hoặc
+1Password.
+
+- **Cài đặt:** bấm tên của bạn ở góc phải trên › **Two-step sign-in**. Quét mã
+  bằng app, rồi nhập 6 số app đang hiện.
+- **Từ đó về sau**, mỗi lần đăng nhập đều hỏi mã sau mật khẩu. Database từ chối
+  phiên chưa nhập mã, nên chỉ có mật khẩu, kể cả mật khẩu đã bị người khác biết,
+  cũng không mở được gì.
+- **Mất hoặc đổi điện thoại:** người có quyền Manage users vào Settings › Users,
+  dòng của người đó, chọn **Reset two-step sign-in** và ghi lý do. Người đó đăng
+  nhập bằng mật khẩu rồi cài lại. Không ai tự reset cho mình được. Việc reset áp
+  dụng cho tài khoản đăng nhập, nên có tác dụng ở mọi công ty người đó thuộc về.
+- Hiện là khuyến nghị cho mọi người; bản 2.66 bắt buộc cho admin và accountant.
+
 ### Rà soát quyền truy cập mỗi quý
 
 Mỗi quý, ở từng công ty, một admin:
@@ -238,6 +255,6 @@ kiểm toán viên làm, mà không cần mật khẩu của ai. Trên công ty 
   kiểm tra phân quyền tháng 10/2026, chủ doanh nghiệp giữ nguyên điều này, và cho
   sales lập hoá đơn nháp, xem tệp đính kèm (2.63). Thu hẹp phần được xem vẫn còn
   để ngỏ.
-- **Đăng nhập hai lớp (MFA).** Sẽ bắt buộc cho admin và accountant, có bảy ngày
-  để cài đặt. Cho tới khi bản đó ra, MFA chỉ là khuyến nghị, và Settings › Users
-  cho biết ai đã bật.
+- **Đăng nhập hai lớp (MFA).** Ai cũng cài được từ bản 2.65 (xem mục *Đăng nhập
+  hai lớp* ở trên). Bản 2.66 bắt buộc cho admin và accountant, có bảy ngày để cài
+  đặt. Settings › Users cho biết ai đã bật.

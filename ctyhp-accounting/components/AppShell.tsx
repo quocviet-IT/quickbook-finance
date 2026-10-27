@@ -299,6 +299,12 @@ export default function AppShell({
       },
       { type: "divider" as const },
       {
+        key: "two-step",
+        icon: <SafetyCertificateOutlined />,
+        label: "Two-step sign-in",
+        onClick: () => router.push("/account/two-step"),
+      },
+      {
         key: "sign-out",
         icon: <LogoutOutlined />,
         label: "Sign out",

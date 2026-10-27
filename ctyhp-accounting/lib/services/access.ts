@@ -190,6 +190,30 @@ export async function setUserStatus(
   if (error) throw new AccessError(error.message);
 }
 
+/**
+ * Remove another member's second sign-in step, for a lost or replaced phone
+ * (2.65). The database decides who may (Manage users, not oneself, a member of
+ * this company, with a reason) before anything is removed; the factors go
+ * through the Auth admin API, the supported way to delete them; the audit entry
+ * says how many went. Returns that number.
+ */
+export async function resetTwoStep(sb: SupabaseClient, userId: string, reason: string): Promise<number> {
+  const { error: refused } = await sb.rpc("acc_mfa_reset_check", { p_user_id: userId, p_reason: reason });
+  if (refused) throw new AccessError(refused.message);
+  const auth = createSupabaseAdminClient().auth.admin.mfa;
+  const { data, error } = await auth.listFactors({ userId });
+  if (error) throw new AccessError(error.message);
+  let removed = 0;
+  for (const factor of data?.factors ?? []) {
+    const { error: deleteError } = await auth.deleteFactor({ id: factor.id, userId });
+    if (deleteError) throw new AccessError(deleteError.message);
+    removed++;
+  }
+  const { error: unrecorded } = await sb.rpc("acc_record_mfa_reset", { p_user_id: userId, p_reason: reason, p_removed: removed });
+  if (unrecorded) throw new AccessError(unrecorded.message);
+  return removed;
+}
+
 // --- Permissions ---
 
 export interface PermissionMatrix {

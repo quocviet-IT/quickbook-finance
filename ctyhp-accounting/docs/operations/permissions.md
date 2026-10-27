@@ -199,6 +199,25 @@ Platform administrators only. Settings › Companies to create one; Settings ›
 Backups, **Restore**, to restore a backup into a new company beside the running
 books. Restoring never overwrites a company.
 
+### Two-step sign-in
+
+Since 2.65 anyone can add a second step to their sign-in: a six-digit code from
+an authenticator app on their phone, such as Google Authenticator, Microsoft
+Authenticator or 1Password.
+
+- **Set it up:** your name, top right › **Two-step sign-in**. Scan the code with
+  the app, then enter the six digits it shows.
+- **From then on** every sign-in asks for the code after the password. The
+  database refuses a session that has not given it, so a password alone, even
+  one somebody else has learned, opens nothing.
+- **A lost or replaced phone:** someone holding Manage users opens Settings ›
+  Users, the person's row, **Reset two-step sign-in**, and gives the reason. The
+  person signs in with their password and sets it up again. Nobody can reset
+  their own. The reset applies to the person's sign-in, so it covers every
+  company they belong to.
+- It is recommended for everyone now and becomes required for admins and
+  accountants in 2.66.
+
 ### Review access every quarter
 
 Once a quarter, for each company, an admin:
@@ -234,6 +253,6 @@ auditor would, without anyone's existing credentials. On the sample company:
 - **What sales and viewer may read.** Both read the whole ledger. After the access
   audit of October 2026 the owner kept that, and gave sales draft invoices and
   attachments (2.63). Limiting what either reads is still open.
-- **A second sign-in factor (MFA).** It is to be required for admins and
-  accountants, with seven days to set it up. Until that ships, it is recommended,
-  and Settings › Users shows who has set one up.
+- **A second sign-in factor (MFA).** Anyone can set it up since 2.65 (see
+  *Two-step sign-in* above). 2.66 requires it for admins and accountants, with
+  seven days to set it up. Settings › Users shows who has.
