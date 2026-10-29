@@ -21,7 +21,10 @@ export const STATUS_KEYS = ["posted", "void", "draft", "overdue", "pending"] as 
 export type StatusKey = (typeof STATUS_KEYS)[number];
 
 export interface StatusToken {
+  /** The light theme's value, for a canvas or a chart that cannot read a CSS variable. */
   color: string;
+  /** The same colour as the theme's CSS variable, which follows dark mode. Draw with this. */
+  variable: string;
   icon: ReactNode;
   label: string;
 }
@@ -45,7 +48,7 @@ const STATUS: Record<StatusKey, StatusToken> = Object.fromEntries(
   (Object.entries(STATUS_TONE) as [StatusKey, { tone: Tone; label: string; icon?: ReactNode }][])
     .map(([key, { tone, label, icon }]) => {
       const base = toneToken(tone);
-      return [key, { color: base.color, icon: icon ?? base.icon, label }];
+      return [key, { color: base.color, variable: base.variable, icon: icon ?? base.icon, label }];
     }),
 ) as Record<StatusKey, StatusToken>;
 
@@ -67,7 +70,8 @@ export function statusToken(key: StatusKey): StatusToken {
  * dependency on the icon set.
  */
 export function StatusBadge({ status }: { status: StatusKey }) {
-  const { color, icon, label } = statusToken(status);
+  // The variable, as ToneBadge does: the light red on a dark card was 2.72's gap.
+  const { variable: color, icon, label } = statusToken(status);
   return (
     <span style={{ color, display: "inline-flex", alignItems: "center", gap: 6 }}>
       {icon}

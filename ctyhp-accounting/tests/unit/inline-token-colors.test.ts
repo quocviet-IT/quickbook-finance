@@ -40,6 +40,15 @@ describe("colours on screens", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("draws a status or a tone with its variable, never its light-only colour", () => {
+    // `.color` is kept for a canvas that cannot read var(); on a screen it is
+    // the same light-only value TOKENS is.
+    const offenders = files
+      .filter(({ source }) => /\b(statusToken|toneToken)\([^)]*\)\.color\b/.test(source))
+      .map(({ path }) => path);
+    expect(offenders).toEqual([]);
+  });
+
   it("puts a token colour on an SVG shape through its style, which resolves var() in every browser", () => {
     const offenders = files
       .filter(({ source }) => /\b(fill|stroke)=\{(tokenVar|PALETTE)\b/.test(source))

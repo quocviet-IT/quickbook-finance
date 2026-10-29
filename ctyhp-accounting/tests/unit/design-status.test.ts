@@ -1,7 +1,7 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
 import { STATUS_KEYS, StatusBadge, statusToken } from "@/lib/design/status";
-import { TOKENS } from "@/lib/design/tokens";
+import { TOKENS, tokenVar } from "@/lib/design/tokens";
 
 describe("status tokens", () => {
   it("returns a colour, an icon and a label for every status", () => {
@@ -35,6 +35,13 @@ describe("status tokens", () => {
     expect(statusToken("pending").color).toBe(TOKENS.intent.warning);
   });
 
+  it("carries the same colour as the theme's variable, which follows dark mode", () => {
+    expect(statusToken("overdue").variable).toBe(tokenVar("intent.danger"));
+    expect(statusToken("void").variable).toBe(tokenVar("text.secondary"));
+    expect(statusToken("posted").variable).toBe(tokenVar("intent.success"));
+    expect(statusToken("pending").variable).toBe(tokenVar("intent.warning"));
+  });
+
   it("gives each status a distinct label so colour is never the only signal", () => {
     const labels = STATUS_KEYS.map((key) => statusToken(key).label);
     expect(new Set(labels).size).toBe(STATUS_KEYS.length);
@@ -48,7 +55,8 @@ describe("StatusBadge", () => {
       const [icon, label] = badge.props.children as [unknown, string];
       expect(isValidElement(icon)).toBe(true);
       expect(label).toBe(statusToken(key).label);
-      expect(badge.props.style.color).toBe(statusToken(key).color);
+      // The variable, not the light value, so the badge follows dark mode.
+      expect(badge.props.style.color).toBe(statusToken(key).variable);
     }
   });
 

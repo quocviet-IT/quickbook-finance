@@ -55,6 +55,27 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.73",
+    date: "2026-10-29",
+    headline: "Approvals fits a phone, and Overdue figures follow dark mode.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Approvals on a phone",
+        detail:
+          "The Pending and Decided lists on Approvals ran wider than a phone's screen, with the request's title squeezed out. They now keep to the screen like every other list: each request's title is in view, and the table scrolls sideways to the amount, reason and the Approve and Reject buttons.",
+        route: "/approvals",
+      },
+      {
+        kind: "fixed",
+        title: "Overdue figures in dark mode",
+        detail:
+          "The red Overdue total on Customer Credit and on Pay Bills' pay run was still drawn in light mode's deep red on a dark page. It now uses dark mode's brighter red, like the rest of 2.72.",
+        route: "/reports/customer-credit",
+      },
+    ],
+  },
+  {
     version: "2.72",
     date: "2026-10-29",
     headline: "Dark mode draws every color in its dark shade.",
