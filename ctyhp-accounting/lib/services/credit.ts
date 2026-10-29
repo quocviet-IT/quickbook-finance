@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { creditStatus, type CreditStatus } from "@/lib/domain/credit";
+import { CREDIT_SALES_WINDOW_DAYS, creditStatus, type CreditStatus } from "@/lib/domain/credit";
 
 export class CreditError extends Error {}
 
@@ -19,7 +19,7 @@ export interface CustomerCreditRow {
   status: CreditStatus;
 }
 
-export const CREDIT_SALES_WINDOW_DAYS = 90;
+export { CREDIT_SALES_WINDOW_DAYS };
 
 /**
  * Every customer with what they owe today. The balances come from the open

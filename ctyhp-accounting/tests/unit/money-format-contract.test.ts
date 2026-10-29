@@ -70,6 +70,23 @@ describe("money on screen goes through formatMoney", () => {
     });
   }
 
+  it("no sentence, on a screen or built for one in lib/, prints minor units divided by 100", () => {
+    // `${(totals.overdueMinor / 100).toFixed(2)} in total` → "12345.00 in
+    // total" over a figure of $12,345.00 (follow-up review, 2026-10-29). The
+    // rules above only read app/ and components/, and this sentence was built
+    // in lib/domain/payment-terms.ts.
+    const pattern = /\(\s*[\w.]*Minor\s*\/\s*100\s*\)\.toFixed\(\s*2\s*\)/;
+    const offenders: string[] = [];
+    for (const file of [...files, ...sourceFiles(join(root, "lib"), root)]) {
+      readFileSync(join(root, file), "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          if (pattern.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("the shared formatter writes the one shape", async () => {
     const { formatMoney } = await import("@/lib/format");
     expect(formatMoney(123456, "USD", 2)).toBe("$1,234.56");

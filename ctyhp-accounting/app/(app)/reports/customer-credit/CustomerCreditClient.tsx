@@ -13,7 +13,7 @@ import {
 import DataTable from "@/components/ui/DataTable";
 import ReportBar from "@/components/reports/ReportBar";
 import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
-import { creditStateColor, sortByCreditRisk } from "@/lib/domain/credit";
+import { creditStateColor, daysSalesOutstanding, describeDso, sortByCreditRisk } from "@/lib/domain/credit";
 import type { CustomerCreditRow } from "@/lib/services/credit";
 import { tokenVar } from "@/lib/design/tokens";
 import { statusToken } from "@/lib/design/status";
@@ -61,10 +61,7 @@ export default function CustomerCreditClient({
   // window. Averaging each customer's own DSO would weight a $50 account the
   // same as a $50,000 one.
   const windowSales = rows.reduce((sum, row) => sum + row.salesWindowMinor, 0);
-  const portfolioDso =
-    windowSales > 0
-      ? Math.round((totalOwed / windowSales) * salesWindowDays)
-      : null;
+  const portfolioDso = daysSalesOutstanding(totalOwed, windowSales, salesWindowDays);
 
   const sheet = useMemo(
     () => (shown.length > 0 ? customerCreditSheet(shown, { companyName, salesWindowDays }) : null),
@@ -95,7 +92,7 @@ export default function CustomerCreditClient({
         <Statistic title="On credit hold" value={onHold} />
         <Statistic
           title={`Days sales outstanding (last ${plural(salesWindowDays, "day")})`}
-          value={portfolioDso === null ? "—" : `${portfolioDso} ${pluralWord(portfolioDso, "day")}`}
+          value={describeDso(portfolioDso, salesWindowDays)}
         />
       </Space>
 
@@ -236,17 +233,16 @@ export default function CustomerCreditClient({
           },
           {
             title: (
-              <Tooltip title="Days sales outstanding: how many days, on average, customers take to pay">
+              <Tooltip
+                title={`Days sales outstanding: how many days, on average, customers take to pay. "Over ${salesWindowDays} d" means more is owed than was invoiced in the last ${salesWindowDays} days.`}
+              >
                 <span>DSO</span>
               </Tooltip>
             ),
             key: "dso",
             width: 100,
             align: "right",
-            render: (_: unknown, row) =>
-              row.status.daysSalesOutstanding === null
-                ? "—"
-                : `${row.status.daysSalesOutstanding} d`,
+            render: (_: unknown, row) => describeDso(row.status.daysSalesOutstanding, salesWindowDays, "short"),
           },
           {
             title: "Terms",

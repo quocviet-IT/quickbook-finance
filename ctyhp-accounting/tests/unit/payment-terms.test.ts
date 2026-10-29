@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatMoney } from "@/lib/format";
 import {
   buildPayRun,
   describePayRun,
@@ -143,7 +144,7 @@ describe("rankPayable", () => {
     expect(row.daysToDiscount).toBe(4);
     expect(row.discountAvailableMinor).toBe(1_000);
     expect(row.payTodayMinor).toBe(99_000);
-    expect(row.reason).toContain("Discount of 10.00 until 08/05/2026");
+    expect(row.reason).toContain("Discount of $10.00 until 08/05/2026");
   });
 
   it("leaves a distant discount scheduled rather than shouting about it", () => {
@@ -237,22 +238,31 @@ describe("buildPayRun", () => {
     });
   });
 
+  const usd = (minor: number) => formatMoney(minor, "USD", 2);
+
   it("leads with the worst thing on the list", () => {
-    const message = describePayRun(run())!;
+    const message = describePayRun(run(), usd)!;
     expect(message).toContain("2 bills overdue");
     expect(message).toContain("the oldest is Aurora Gemstone Supply Inc. at 171 days");
-    expect(message).toContain("10.00 of early payment discount lapses");
+  });
+
+  it("prints its money the way the figures under it do", () => {
+    // It read "12345.00 in total" over an Overdue figure of $12,345.00
+    // (follow-up review, 2026-10-29): no currency, no thousands separator.
+    const message = describePayRun(run(), usd)!;
+    expect(message).toContain("$15,460.00 in total");
+    expect(message).toContain("$10.00 of early payment discount lapses");
   });
 
   it("says nothing when nothing is pressing", () => {
     const calm = buildPayRun([bill({ dueDate: "2026-12-01" })], "2026-08-01");
-    expect(describePayRun(calm)).toBeNull();
+    expect(describePayRun(calm, usd)).toBeNull();
   });
 
   it("reads an empty payables ledger as nothing to do", () => {
     const empty = buildPayRun([], "2026-08-01");
     expect(empty.rows).toEqual([]);
     expect(empty.totals.totalMinor).toBe(0);
-    expect(describePayRun(empty)).toBeNull();
+    expect(describePayRun(empty, usd)).toBeNull();
   });
 });

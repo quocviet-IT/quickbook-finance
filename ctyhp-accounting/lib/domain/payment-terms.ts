@@ -8,7 +8,7 @@
  * 2. Ranking open bills, because a list sorted by date does not say *why* one
  *    bill should be paid before another, and that is the whole question.
  */
-import { formatDate, plural } from "@/lib/format";
+import { formatDate, formatMoney, plural } from "@/lib/format";
 
 export interface PaymentTerms {
   /** Days from the bill date until the full amount is due. */
@@ -160,6 +160,21 @@ export interface RankedBill extends PayableBill {
   reason: string;
 }
 
+/**
+ * A bill's amount as every screen prints money, "$1,234.56", in the bill's own
+ * currency at that currency's usual decimals.
+ */
+function billMoney(minor: number, currencyCode: string): string {
+  let decimals = 2;
+  try {
+    decimals = new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode }).resolvedOptions()
+      .maximumFractionDigits ?? 2;
+  } catch {
+    // An unknown code: formatMoney prints it after the number, at two places.
+  }
+  return formatMoney(minor, currencyCode, decimals);
+}
+
 export function rankPayable(bill: PayableBill, today: string): RankedBill {
   const daysOverdue = bill.dueDate ? daysBetween(bill.dueDate, today) : null;
 
@@ -178,7 +193,7 @@ export function rankPayable(bill: PayableBill, today: string): RankedBill {
   } else if (discountLive) {
     priority = daysToDiscount! <= DISCOUNT_WARNING_DAYS ? "discount_expiring" : "scheduled";
     reason =
-      `Discount of ${(discountAvailableMinor / 100).toFixed(2)} ` +
+      `Discount of ${billMoney(discountAvailableMinor, bill.currencyCode)} ` +
       `until ${formatDate(bill.discountDueDate)}${daysToDiscount === 0 ? " — today" : ` (${plural(daysToDiscount!, "day")})`}`;
   } else if (daysOverdue !== null && daysOverdue >= -DUE_SOON_DAYS) {
     priority = "due_soon";
@@ -258,8 +273,15 @@ export function buildPayRun(bills: readonly PayableBill[], today: string): PayRu
   };
 }
 
-/** The line that goes above the pay run. Null when there is nothing pressing. */
-export function describePayRun(run: PayRun): string | null {
+/**
+ * The line that goes above the pay run. Null when there is nothing pressing.
+ *
+ * `money` is the formatter the figures under it use, so the sentence and the
+ * Overdue figure print the same amount the same way. It printed the total as
+ * `(minor / 100).toFixed(2)`, "12345.00 in total" over a figure of $12,345.00
+ * (follow-up review, 2026-10-29).
+ */
+export function describePayRun(run: PayRun, money: (minor: number) => string): string | null {
   const overdue = run.rows.filter((row) => row.priority === "overdue");
   const expiring = run.rows.filter((row) => row.priority === "discount_expiring");
   if (overdue.length === 0 && expiring.length === 0) return null;
@@ -268,13 +290,13 @@ export function describePayRun(run: PayRun): string | null {
   if (overdue.length > 0) {
     const worst = overdue[0];
     parts.push(
-      `${plural(overdue.length, "bill")} overdue, ${(run.totals.overdueMinor / 100).toFixed(2)} in total — ` +
+      `${plural(overdue.length, "bill")} overdue, ${money(run.totals.overdueMinor)} in total — ` +
         `the oldest is ${worst.vendorName} at ${plural(worst.daysOverdue ?? 0, "day")}`,
     );
   }
   if (expiring.length > 0) {
     parts.push(
-      `${(run.totals.discountAvailableMinor / 100).toFixed(2)} of early payment discount lapses within ` +
+      `${money(run.totals.discountAvailableMinor)} of early payment discount lapses within ` +
         `${DISCOUNT_WARNING_DAYS} days`,
     );
   }
