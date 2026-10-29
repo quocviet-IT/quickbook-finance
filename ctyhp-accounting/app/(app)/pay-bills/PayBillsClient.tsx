@@ -11,12 +11,12 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Typography,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
 import { flexColumn } from "@/components/ui/columns";
+import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
 import { APPLIED_LABELS, humanizeStatus } from "@/lib/domain/status-label";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -33,6 +33,25 @@ import { useCompanyClock } from "@/components/CompanyClock";
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const PAYMENTS_DEFAULT_PAGE_SIZE = 20;
+
+/** Number, Date, Amount, Unapplied, Status, Actions. Vendor takes what is left. */
+export const PAY_BILLS_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+  COLUMN.ACTION * 2,
+] as const;
+
+/** The Pay bills dialog, whose body is the open-bills table's box. */
+export const PAY_BILLS_MODAL_WIDTH = 720;
+
+/**
+ * Bill Number, Date, Balance, Payment. Discount takes what is left. These
+ * columns had no widths at all, so each took an equal share whatever it held.
+ */
+export const OPEN_BILLS_FIXED_WIDTHS = [COLUMN.CODE, COLUMN.DATE, COLUMN.MONEY, COLUMN.MONEY_WIDE] as const;
 
 export default function PayBillsClient({
   payments,
@@ -199,9 +218,9 @@ export default function PayBillsClient({
           <Typography.Text strong>Payments made</Typography.Text>
         </FilterBar>
       </div>
-      <Table<BillPaymentRow & { vendor_name: string }>
+      <DataTable<BillPaymentRow & { vendor_name: string }>
         rowKey="id"
-        dataSource={payments}
+        rows={payments}
         locale={{
           emptyText: (
             <TableEmpty
@@ -226,16 +245,18 @@ export default function PayBillsClient({
           showSizeChanger: true,
         }}
         columns={[
-          { title: "Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (v) => v ?? "—" },
+          { title: "Number", dataIndex: "payment_number", width: PAY_BILLS_FIXED_WIDTHS[0], render: (v) => v ?? "—" },
           // The elastic column: a vendor name is text somebody typed.
           flexColumn<BillPaymentRow & { vendor_name: string }>({ title: "Vendor", dataIndex: "vendor_name" }),
-          { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
-          { title: "Amount", dataIndex: "amount_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
-          { title: "Unapplied", dataIndex: "unapplied_minor", width: COLUMN.MONEY, align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
-          { title: "Status", dataIndex: "status", width: COLUMN.STATUS, render: (s: string) => <StatusTag status={s} labels={APPLIED_LABELS} /> },
+          { title: "Date", dataIndex: "payment_date", width: PAY_BILLS_FIXED_WIDTHS[1], render: (v: string) => formatDate(v) },
+          { title: "Amount", dataIndex: "amount_minor", width: PAY_BILLS_FIXED_WIDTHS[2], align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
+          { title: "Unapplied", dataIndex: "unapplied_minor", width: PAY_BILLS_FIXED_WIDTHS[3], align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
+          { title: "Status", dataIndex: "status", width: PAY_BILLS_FIXED_WIDTHS[4], render: (s: string) => <StatusTag status={s} labels={APPLIED_LABELS} /> },
           {
             title: "Actions",
             key: "actions",
+            // It had no width, so it shared what was left with Vendor.
+            width: PAY_BILLS_FIXED_WIDTHS[5],
             render: (_, r) =>
               canWrite && r.status !== "void" ? (
                 <Button size="small" type="link" danger onClick={() => confirmVoid(r.id)}>
@@ -252,7 +273,7 @@ export default function PayBillsClient({
         onCancel={() => setOpen(false)}
         confirmLoading={saving}
         okText="Record payment"
-        width={720}
+        width={PAY_BILLS_MODAL_WIDTH}
       >
         <Form form={form} layout="vertical">
           <Space size="middle" style={{ display: "flex" }}>
@@ -317,18 +338,18 @@ export default function PayBillsClient({
               Auto apply
             </Button>
           </Space>
-          <Table<BillRow>
+          <DataTable<BillRow>
             rowKey="id"
-            dataSource={openBills}
+            rows={openBills}
             locale={{ emptyText: describeNoOpenBills(selectedVendorId ? (selectedVendorName ?? "This vendor") : null) }}
             size="small"
             pagination={false}
                 style={{ marginTop: 8 }}
             columns={[
-              { title: "Bill Number", dataIndex: "bill_number", render: (v) => v ?? "—" },
-              { title: "Date", dataIndex: "bill_date", render: (v: string) => formatDate(v) },
-              { title: "Balance", dataIndex: "balance_due_minor", align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
-              {
+              { title: "Bill Number", dataIndex: "bill_number", width: OPEN_BILLS_FIXED_WIDTHS[0], render: (v) => v ?? "—" },
+              { title: "Date", dataIndex: "bill_date", width: OPEN_BILLS_FIXED_WIDTHS[1], render: (v: string) => formatDate(v) },
+              { title: "Balance", dataIndex: "balance_due_minor", width: OPEN_BILLS_FIXED_WIDTHS[2], align: "right", render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)) },
+              flexColumn<BillRow>({
                 title: "Discount",
                 key: "discount",
                 render: (_, r) => {
@@ -353,10 +374,11 @@ export default function PayBillsClient({
                     </Checkbox>
                   );
                 },
-              },
+              }),
               {
                 title: "Payment",
                 key: "pay",
+                width: OPEN_BILLS_FIXED_WIDTHS[3],
                 render: (_, r) => (
                   <InputNumber
                     min={0}

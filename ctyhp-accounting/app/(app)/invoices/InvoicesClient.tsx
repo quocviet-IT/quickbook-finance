@@ -14,7 +14,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   type MenuProps,
@@ -98,6 +97,16 @@ interface LineForm {
 const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
   ssr: false,
 });
+
+/** The dialog an invoice's lines open in, whose body is the lines table's box. */
+export const VIEW_INVOICE_MODAL_WIDTH = 820;
+
+/**
+ * Quantity, Unit price, Subtotal, Tax. Description takes what is left. They
+ * were 90, 110, 110 and 100, this dialog's own numbers; the amounts now take
+ * the width every other money column has.
+ */
+export const INVOICE_LINES_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.MONEY, COLUMN.MONEY, COLUMN.MONEY] as const;
 
 export default function InvoicesClient({
   initialCreateOpen,
@@ -1013,7 +1022,7 @@ export default function InvoicesClient({
         open={linesOpen}
         onCancel={() => setLinesOpen(false)}
         footer={null}
-        width={820}
+        width={VIEW_INVOICE_MODAL_WIDTH}
       >
         {viewEstimate ? (
           <Typography.Paragraph>
@@ -1045,18 +1054,17 @@ export default function InvoicesClient({
           </div>
         ) : null}
 
-        <Table<InvoiceLineRow>
+        <DataTable<InvoiceLineRow>
           rowKey="id"
-          size="small"
           pagination={false}
-          dataSource={viewLines}
+          rows={viewLines}
           columns={[
-            { title: "Description", dataIndex: "description" },
-            { title: "Quantity", dataIndex: "quantity", width: 90, align: "right" },
+            flexColumn<InvoiceLineRow>({ title: "Description", dataIndex: "description" }),
+            { title: "Quantity", dataIndex: "quantity", width: INVOICE_LINES_FIXED_WIDTHS[0], align: "right" },
             {
               title: "Unit price",
               dataIndex: "unit_price_minor",
-              width: 110,
+              width: INVOICE_LINES_FIXED_WIDTHS[1],
               align: "right",
               render: (v: number) =>
                 viewInvoice ? formatMoney(v, viewInvoice.currency_code, decimalsOf(viewInvoice.currency_code)) : v,
@@ -1064,7 +1072,7 @@ export default function InvoicesClient({
             {
               title: "Subtotal",
               dataIndex: "line_subtotal_minor",
-              width: 110,
+              width: INVOICE_LINES_FIXED_WIDTHS[2],
               align: "right",
               render: (v: number) =>
                 viewInvoice ? formatMoney(v, viewInvoice.currency_code, decimalsOf(viewInvoice.currency_code)) : v,
@@ -1072,7 +1080,7 @@ export default function InvoicesClient({
             {
               title: "Tax",
               dataIndex: "line_tax_minor",
-              width: 100,
+              width: INVOICE_LINES_FIXED_WIDTHS[3],
               align: "right",
               render: (v: number) =>
                 viewInvoice ? formatMoney(v, viewInvoice.currency_code, decimalsOf(viewInvoice.currency_code)) : v,

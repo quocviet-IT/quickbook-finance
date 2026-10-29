@@ -3,12 +3,14 @@ import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useEffect, useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import StatusTag from "@/components/ui/StatusTag";
-import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip } from "antd";
+import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag, Tooltip } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { toMinor } from "@/lib/domain/money";
 import { journalEntryAmountMinor } from "@/lib/domain/journal-entry-amount";
 import { COLUMN } from "@/lib/design/table-metrics";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
 import { formatMoney, formatDate, plural } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
@@ -53,6 +55,28 @@ interface LineForm {
 const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
   ssr: false,
 });
+
+/** Wide enough for "Opening balance", the longest source, on one line. */
+const SOURCE_WIDTH = 132;
+/** The paperclip, Reverse and the ⋯ menu side by side. */
+const JOURNAL_ACTIONS_WIDTH = 140;
+
+/**
+ * Number, Date, Source, Amount, Status, actions. Description takes what is
+ * left, at least COLUMN.TEXT_MIN. With the expand button's 48px the row is
+ * 982px at its floor, inside the 984px box at 1280.
+ */
+export const JOURNAL_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.DATE,
+  SOURCE_WIDTH,
+  COLUMN.MONEY_WIDE,
+  COLUMN.STATUS,
+  JOURNAL_ACTIONS_WIDTH,
+] as const;
+
+/** An opened entry's lines: Debit and Credit. Account and Memo take what is left. */
+export const JOURNAL_LINES_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.MONEY] as const;
 
 export default function JournalClient({
   canWrite,
@@ -284,34 +308,28 @@ export default function JournalClient({
           description="Adjusting marks on entries in a closed period can be changed until you leave this page. Each change is recorded in the audit log with the period marked closed."
         />
       ) : null}
-      <Table<JournalEntrySummary>
+      <DataTable<JournalEntrySummary>
         rowKey="id"
         loading={loading}
-        dataSource={entries}
-        // The cell padding every DataTable has, which the COLUMN widths are
-        // measured against. At the default 16px a date in COLUMN.DATE broke
-        // in two.
-        size="small"
-        // Held to the width of the page rather than of its longest description.
-        // With max-content a column left to size itself is free to grow however
-        // firmly the others are pinned, which is what put the actions off the
-        // side of the screen.
-        scroll={undefined}
+        rows={entries}
         expandable={{
           expandedRowKeys,
           onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys].map(String)),
           expandedRowRender: (e) => (
             <div>
-              <Table
-                size="small"
+              <DataTable<JournalEntrySummary["lines"][number]>
                 rowKey={(_, i) => String(i)}
                 pagination={false}
-                dataSource={e.lines}
+                rows={e.lines}
                 columns={[
-                  { title: "Account", render: (_, l) => `${l.accountCode} ${l.accountName}` },
-                  { title: "Memo", dataIndex: "memo" },
-                  { title: "Debit", align: "right", render: (_, l) => fmt(l.debitMinor) },
-                  { title: "Credit", align: "right", render: (_, l) => fmt(l.creditMinor) },
+                  flexColumn<JournalEntrySummary["lines"][number]>({
+                    title: "Account",
+                    key: "account",
+                    render: (_, l) => `${l.accountCode} ${l.accountName}`,
+                  }),
+                  flexColumn<JournalEntrySummary["lines"][number]>({ title: "Memo", dataIndex: "memo" }),
+                  { title: "Debit", key: "debit", width: JOURNAL_LINES_FIXED_WIDTHS[0], align: "right", render: (_, l) => fmt(l.debitMinor) },
+                  { title: "Credit", key: "credit", width: JOURNAL_LINES_FIXED_WIDTHS[1], align: "right", render: (_, l) => fmt(l.creditMinor) },
                 ]}
               />
               <AdjustingEntryControl
@@ -326,11 +344,10 @@ export default function JournalClient({
           ),
         }}
         columns={[
-          { title: "Number", dataIndex: "entryNumber", width: COLUMN.CODE },
-          { title: "Date", dataIndex: "entryDate", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
-          // Wide enough for "Opening balance", the longest source, on one line.
-          { title: "Source", dataIndex: "sourceType", width: 132, render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
-          {
+          { title: "Number", dataIndex: "entryNumber", width: JOURNAL_FIXED_WIDTHS[0] },
+          { title: "Date", dataIndex: "entryDate", width: JOURNAL_FIXED_WIDTHS[1], render: (v: string) => formatDate(v) },
+          { title: "Source", dataIndex: "sourceType", width: JOURNAL_FIXED_WIDTHS[2], render: (source: string) => <Tag>{sourceLabel(source)}</Tag> },
+          flexColumn<JournalEntrySummary>({
             title: "Description",
             dataIndex: "description",
             // An import writes the whole file name in here, and it was setting
@@ -338,10 +355,9 @@ export default function JournalClient({
             // actions off the right-hand edge, where the Reverse button could
             // not be reached without scrolling sideways.
             //
-            // `showTitle: false` turns off the browser's own tooltip, which is
-            // slow and renders a long line without wrapping; the Ant Design one
-            // opens at once and wraps.
-            ellipsis: { showTitle: false },
+            // flexColumn turns off the browser's own tooltip, which is slow and
+            // renders a long line without wrapping; the Ant Design one opens at
+            // once and wraps.
             render: (description: string | null) =>
               description ? (
                 <Tooltip title={description} placement="topLeft" styles={{ root: { maxWidth: 640 } }}>
@@ -350,19 +366,19 @@ export default function JournalClient({
               ) : (
                 ""
               ),
-          },
+          }),
           {
             // An entry listed with no amount said nothing of its size until it
             // was opened (UI review, 2026-10-20).
             title: "Amount",
             key: "amount",
-            width: COLUMN.MONEY_WIDE,
+            width: JOURNAL_FIXED_WIDTHS[3],
             align: "right",
             render: (_, e) => formatMoney(journalEntryAmountMinor(e.lines), baseCurrency, baseDecimals),
           },
           {
             title: "Status",
-            width: COLUMN.STATUS,
+            width: JOURNAL_FIXED_WIDTHS[4],
             render: (_, e) => (
               <Space size={4} wrap>
                 <StatusTag status={e.isReversed ? "reversed" : e.status} />
@@ -373,7 +389,7 @@ export default function JournalClient({
           {
             title: "",
             key: "actions",
-            width: 140,
+            width: JOURNAL_FIXED_WIDTHS[5],
             render: (_, e) => (
               <Space size={4}>
                 {canReadDocuments ? (
