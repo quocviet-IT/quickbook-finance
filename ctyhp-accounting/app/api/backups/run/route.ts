@@ -14,9 +14,11 @@ function authorized(request: Request): boolean {
 /**
  * Tonight's snapshots.
  *
- * Covers a batch of the companies waiting longest rather than all of them: one
- * company already takes 18.6 seconds to read, and a run that sweeps everybody
- * is a run that eventually covers nobody.
+ * Covers every company, longest waiting first, until a time budget inside this
+ * route's 300 seconds is spent: one company already takes 18.6 seconds to read,
+ * and a run that never stops is a run that eventually covers nobody. A night
+ * that runs out of time leaves the rest first in line tomorrow (see
+ * BACKUP_TIME_BUDGET_MS).
  */
 export async function POST(request: Request) {
   if (!authorized(request)) {

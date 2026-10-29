@@ -62,6 +62,20 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.74",
+    date: "2026-10-29",
+    headline: "Every company gets a snapshot every night.",
+    changes: [
+      {
+        kind: "changed",
+        title: "A snapshot of every company, every night",
+        detail:
+          "The nightly snapshot used to cover three companies, the ones waiting longest, so with seven companies each one went two or three days between snapshots. It now covers every company each night, longest waiting first. If a night ever runs short of time, the companies it did not reach go first the next night. Settings › Backups lists one row per night from now on, Skipped where the books did not change.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "2.73",
     date: "2026-10-29",
     headline: "Approvals fits a phone, and Overdue figures follow dark mode.",

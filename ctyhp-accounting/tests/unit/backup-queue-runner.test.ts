@@ -16,7 +16,7 @@ const automationMocks = vi.hoisted(() => ({
 vi.mock("@/lib/db/automation", () => automationMocks);
 
 import type { AutomationCompany } from "@/lib/domain/company-automation";
-import { BACKUP_BATCH_LIMIT } from "@/lib/services/backup-queue";
+import { BACKUP_TIME_BUDGET_MS } from "@/lib/services/backup-queue";
 import { runDueCompanyBackups } from "@/lib/services/backup-queue-runner";
 
 /**
@@ -66,12 +66,13 @@ describe("runDueCompanyBackups", () => {
         return { status: "stored", hash: `hash-${companyId}`, path: `p/${companyId}.zip`, sizeBytes: 10 };
       },
       today: "2026-08-15",
+      now: () => 0,
     });
 
-    // "d" (never backed up) and "b" (oldest date) must be covered; the batch
-    // limit is 3, so the third slot goes to "c" and "a" (most recent) waits.
-    expect(attempted).toEqual(["4", "2", "3"]);
-    expect(run.attempted).toBe(BACKUP_BATCH_LIMIT);
+    // "d" (never backed up) first, then oldest date to newest. All four fit
+    // tonight, so "a" (most recent) is covered too, last.
+    expect(attempted).toEqual(["4", "2", "3", "1"]);
+    expect(run.attempted).toBe(4);
   });
 
   it("counts a stored night with a stuck retention pass as stored, not failed", async () => {
@@ -155,7 +156,9 @@ describe("runDueCompanyBackups", () => {
     expect(run.attempted).toBe(2);
   });
 
-  it("never attempts more than BACKUP_BATCH_LIMIT even when every company is due", async () => {
+  it("covers every company in one night while they fit the time budget", async () => {
+    // Three a night left each of seven companies two or three days between
+    // snapshots (follow-up review, 2026-10-28). Ten small companies all fit.
     const companies = Array.from({ length: 10 }, (_, i) => company(`${i}`, `c${i}`, `co_${i}`));
     const attempted: string[] = [];
     const run = await runDueCompanyBackups({
@@ -167,10 +170,53 @@ describe("runDueCompanyBackups", () => {
         return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
       },
       today: "2026-08-15",
+      now: () => 0,
     });
 
-    expect(attempted).toHaveLength(BACKUP_BATCH_LIMIT);
-    expect(run.attempted).toBe(BACKUP_BATCH_LIMIT);
+    expect(attempted).toHaveLength(10);
+    expect(run.attempted).toBe(10);
+    expect(run.deferred).toEqual([]);
+  });
+
+  it("stops starting snapshots once the budget is spent, and leaves the rest for tomorrow without calling them failed", async () => {
+    const companies = [
+      company("1", "a", "co_a"),
+      company("2", "b", "co_b"),
+      company("3", "c", "co_c"),
+      company("4", "d", "co_d"),
+    ];
+    const lastBackupBySchema: Record<string, string | null> = {
+      co_a: "2026-08-14",
+      co_b: "2026-08-10",
+      co_c: "2026-08-12",
+      co_d: "2026-08-11",
+    };
+    // Each snapshot takes most of the budget: the first two start in time,
+    // the third would start after it has run out.
+    let clock = 0;
+    const attempted: string[] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const run = await runDueCompanyBackups({
+      listCompanies: async () => companies,
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async (sb) => lastBackupBySchema[schemaOf(sb)],
+      takeBackup: async (_sb, companyId) => {
+        attempted.push(companyId);
+        clock += BACKUP_TIME_BUDGET_MS * 0.6;
+        return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-08-15",
+      now: () => clock,
+    });
+
+    // Longest waiting first: b (08-10), then d (08-11); c and a wait for tomorrow,
+    // where they will be the longest waiting and go first.
+    expect(attempted).toEqual(["2", "4"]);
+    expect(run.attempted).toBe(2);
+    expect(run.deferred).toEqual(["c", "a"]);
+    expect(run.failed).toBe(0);
+    expect(warn.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(/c, a/);
+    warn.mockRestore();
   });
 
   it("fails the whole run when the company register itself cannot be read", async () => {
