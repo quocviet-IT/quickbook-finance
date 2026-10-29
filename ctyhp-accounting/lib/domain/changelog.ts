@@ -41,6 +41,19 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.78",
+    date: "2026-10-29",
+    headline: "Pages with a table download about 49 KB less.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Less to download on most pages",
+        detail:
+          "The page header, the table, its pager, status tags and empty states were sent again with every page that used them. They now come once, with the app itself, and each page reuses them. Pages with a table, such as Pay Bills, Reconcile, Reports, Fixed Assets and Estimates, download about 49 KB less the first time they open; the few pages without a table carry a few kilobytes more. Nothing on screen changes.",
+      },
+    ],
+  },
+  {
     version: "2.77",
     date: "2026-10-29",
     headline: "Every sentence the app writes about money prints it as $1,234.56.",
