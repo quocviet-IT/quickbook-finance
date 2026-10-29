@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, InputNumber, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Button, InputNumber, Space, Switch, Tag, Tooltip, Typography } from "antd";
 import type { ApprovalPolicyRow } from "@/lib/db/types";
 import { CONTROLLED_ACTIONS } from "@/lib/domain/access";
+import { COLUMN } from "@/lib/design/table-metrics";
 import {
   approvalPolicyDraft,
   approvalPolicyStatus,
@@ -14,11 +15,24 @@ import {
 import { plural } from "@/lib/format";
 import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
 import FormActions from "@/components/ui/FormActions";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { setApprovalPolicyAction } from "../permissions/actions";
 
 function usesThreshold(actionKey: string): boolean {
   return CONTROLLED_ACTIONS.find((a) => a.key === actionKey)?.usesThreshold ?? true;
 }
+
+/**
+ * Approval required, Threshold, Segregation of duties. The controlled action
+ * takes what is left, at least COLUMN.TEXT_MIN.
+ *
+ * The table was Ant Design's own, as wide as its longest description, so on a
+ * phone the first column filled the screen and every switch sat off its edge.
+ * Held to its box, a phone shows the action and its Approval required switch,
+ * and the frame scrolls to the rest.
+ */
+export const APPROVAL_POLICY_FIXED_WIDTHS = [COLUMN.SWITCH, COLUMN.PICKER, COLUMN.SWITCH] as const;
 
 /**
  * The approval policies, edited as one form: change any rows, then Save
@@ -114,30 +128,28 @@ export default function ApprovalPoliciesClient({
         description="At or above the threshold, the action goes for approval and runs when approved. With segregation of duties on, nobody approves their own request. A new company starts with every policy off."
       />
       <div>
-        <Table<ApprovalPolicyRow>
+        <DataTable<ApprovalPolicyRow>
           rowKey="action_key"
-          dataSource={policies}
+          rows={policies}
           pagination={false}
-          scroll={{ x: "max-content" }}
           columns={[
-            {
+            flexColumn<ApprovalPolicyRow>({
               title: "Controlled action",
               dataIndex: "label",
               render: (v: string, r) => (
-                <Space direction="vertical" size={0}>
+                <>
                   <Space size={8}>
                     <Typography.Text strong>{v}</Typography.Text>
                     {changedKeys.has(r.action_key) ? <Tag color="gold">Unsaved</Tag> : null}
                   </Space>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {r.description}
-                  </Typography.Text>
-                </Space>
+                  {secondaryLine(r.description)}
+                </>
               ),
-            },
+            }),
             {
               title: "Approval required",
               key: "enabled",
+              width: APPROVAL_POLICY_FIXED_WIDTHS[0],
               render: (_, r) => (
                 <Switch
                   checked={drafts[r.action_key]?.enabled}
@@ -150,6 +162,7 @@ export default function ApprovalPoliciesClient({
             {
               title: `Threshold (${baseCurrency})`,
               key: "threshold",
+              width: APPROVAL_POLICY_FIXED_WIDTHS[1],
               align: "right",
               render: (_, r) =>
                 usesThreshold(r.action_key) ? (
@@ -170,6 +183,7 @@ export default function ApprovalPoliciesClient({
             {
               title: "Segregation of duties",
               key: "segregation",
+              width: APPROVAL_POLICY_FIXED_WIDTHS[2],
               render: (_, r) => (
                 <Switch
                   checked={drafts[r.action_key]?.requireSegregation}

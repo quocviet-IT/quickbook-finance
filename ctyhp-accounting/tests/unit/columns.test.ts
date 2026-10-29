@@ -10,7 +10,7 @@ import {
   textColumn,
 } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { TOKENS } from "@/lib/design/tokens";
+import { TOKENS, cssVariableBlock, resolveToken } from "@/lib/design/tokens";
 import { type Tone } from "@/lib/design/tone";
 import StatusTag from "@/components/ui/StatusTag";
 
@@ -287,8 +287,12 @@ describe("secondaryLine", () => {
     expect(line.props.style?.fontSize).toBe(12);
     expect(line.props.style?.whiteSpace).toBe("nowrap");
     expect(line.props.style?.textOverflow).toBe("ellipsis");
-    // The muted token, never a hex value written here.
-    expect(line.props.style?.color).toBe(TOKENS.text.secondary);
+    // The muted token's variable, never a hex value: the light hex alone read
+    // at 2.2:1 on a dark row, and the variable is redefined for dark.
+    expect(line.props.style?.color).toBe("var(--ob-text-secondary)");
+    const [light, dark] = cssVariableBlock().split(':root[data-theme="dark"]');
+    expect(light).toContain(`--ob-text-secondary: ${resolveToken("text.secondary", "light")};`);
+    expect(dark).toContain(`--ob-text-secondary: ${resolveToken("text.secondary", "dark")};`);
   });
 
   it("is whole on hover: plain words carry themselves, a built line carries the words it is given", () => {

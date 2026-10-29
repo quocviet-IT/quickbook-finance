@@ -61,7 +61,6 @@ const RAW_TABLE = new Set<string>([
   "app/(app)/reports/number-sequence/NumberSequenceClient.tsx",
   "app/(app)/reports/saved/SavedReportsClient.tsx",
   "app/(app)/sales-tax/SalesTaxClient.tsx",
-  "app/(app)/settings/approvals/ApprovalPoliciesClient.tsx",
   "app/(app)/settings/audit/AuditClient.tsx",
   "app/(app)/settings/companies/CompaniesClient.tsx",
   "app/(app)/settings/company/CompanySettingsClient.tsx",
@@ -129,7 +128,7 @@ describe("table adoption", () => {
     // The allowlist is the outstanding work. Adding to it is how a guard
     // quietly stops guarding, and it reads in a diff exactly like a migration.
     // Lowering this number is the migration; raising it has to be argued for.
-    expect(RAW_TABLE.size).toBeLessThanOrEqual(47);
+    expect(RAW_TABLE.size).toBeLessThanOrEqual(44);
   });
 
   it("lists no file that has already been migrated", () => {

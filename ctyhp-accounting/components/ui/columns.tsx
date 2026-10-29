@@ -269,7 +269,9 @@ export function secondaryLine(text: ReactNode, title?: string): ReactElement {
       style={{
         display: "block",
         fontSize: 12,
-        color: TOKENS.text.secondary,
+        // The token's variable, which dark mode redefines. TOKENS.text.secondary
+        // is the light value only: on a dark row it read at 2.2:1.
+        color: "var(--ob-text-secondary)",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
