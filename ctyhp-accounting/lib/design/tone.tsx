@@ -6,7 +6,7 @@ import {
   InfoCircleFilled,
   MinusCircleFilled,
 } from "@ant-design/icons";
-import { TOKENS } from "./tokens";
+import { TOKENS, tokenVar } from "./tokens";
 
 /**
  * The whole visual vocabulary for "how is this thing doing".
@@ -39,11 +39,11 @@ export interface ToneToken {
 }
 
 const TONE: Record<Tone, ToneToken> = {
-  positive: { color: TOKENS.intent.success, variable: "var(--ob-intent-success)", icon: <CheckCircleFilled />, label: "Good" },
-  neutral: { color: TOKENS.intent.info, variable: "var(--ob-intent-info)", icon: <InfoCircleFilled />, label: "In progress" },
-  warning: { color: TOKENS.intent.warning, variable: "var(--ob-intent-warning)", icon: <ClockCircleFilled />, label: "Needs attention" },
-  danger: { color: TOKENS.intent.danger, variable: "var(--ob-intent-danger)", icon: <ExclamationCircleFilled />, label: "Problem" },
-  muted: { color: TOKENS.text.secondary, variable: "var(--ob-text-secondary)", icon: <MinusCircleFilled />, label: "Inactive" },
+  positive: { color: TOKENS.intent.success, variable: tokenVar("intent.success"), icon: <CheckCircleFilled />, label: "Good" },
+  neutral: { color: TOKENS.intent.info, variable: tokenVar("intent.info"), icon: <InfoCircleFilled />, label: "In progress" },
+  warning: { color: TOKENS.intent.warning, variable: tokenVar("intent.warning"), icon: <ClockCircleFilled />, label: "Needs attention" },
+  danger: { color: TOKENS.intent.danger, variable: tokenVar("intent.danger"), icon: <ExclamationCircleFilled />, label: "Problem" },
+  muted: { color: TOKENS.text.secondary, variable: tokenVar("text.secondary"), icon: <MinusCircleFilled />, label: "Inactive" },
 };
 
 export function toneToken(tone: Tone): ToneToken {
