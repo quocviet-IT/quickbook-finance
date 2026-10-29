@@ -83,7 +83,7 @@ export default function PayRunPanel({
     void load();
   }, [load]);
 
-  const warning = run ? describePayRun(run) : null;
+  const warning = run ? describePayRun(run, money) : null;
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>

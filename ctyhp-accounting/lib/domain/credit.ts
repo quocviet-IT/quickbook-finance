@@ -9,6 +9,10 @@
  * No balance is stored anywhere: `openBalanceMinor` always arrives from the
  * open invoices, so a credit decision can never be made against a stale copy.
  */
+import { pluralWord } from "@/lib/format";
+
+/** The days of invoicing DSO is measured against, everywhere it is shown. */
+export const CREDIT_SALES_WINDOW_DAYS = 90;
 
 export interface CustomerCreditInput {
   /** Null means no limit has been set for this customer; nothing is enforced. */
@@ -85,6 +89,23 @@ export function daysSalesOutstanding(
   return Math.round((openBalanceMinor / salesWindowMinor) * windowDays);
 }
 
+/**
+ * DSO as a reader should see it, "30 days" or "30 d" in a table.
+ *
+ * The figure measures what is owed against what was invoiced in the window, so
+ * it can only say how long invoices take while it stays inside that window.
+ * Past it the ratio stops being a wait anyone has: $5,000.00 owed against
+ * $50.00 invoiced in 90 days computes to 9,000 days, and Customer Credit
+ * showed figures of that kind (follow-up review, 2026-10-29). What is true then is that more is owed than
+ * the whole window invoiced, and that is what it says.
+ */
+export function describeDso(days: number | null, windowDays: number, style: "long" | "short" = "long"): string {
+  if (days === null) return "—";
+  const unit = (n: number) => (style === "short" ? "d" : pluralWord(n, "day"));
+  if (days > windowDays) return `Over ${windowDays} ${unit(windowDays)}`;
+  return `${days} ${unit(days)}`;
+}
+
 export function creditStatus(input: CustomerCreditInput): CreditStatus {
   const {
     creditLimitMinor,
@@ -92,7 +113,7 @@ export function creditStatus(input: CustomerCreditInput): CreditStatus {
     openBalanceMinor,
     overdueMinor,
     salesWindowMinor = 0,
-    salesWindowDays = 90,
+    salesWindowDays = CREDIT_SALES_WINDOW_DAYS,
   } = input;
 
   const available = creditLimitMinor === null ? null : creditLimitMinor - openBalanceMinor;

@@ -4,6 +4,7 @@ import {
   creditStateColor,
   creditStatus,
   daysSalesOutstanding,
+  describeDso,
   sortByCreditRisk,
   suggestCreditLimitMinor,
   type CreditStatus,
@@ -110,6 +111,28 @@ describe("daysSalesOutstanding", () => {
   it("has no answer when nothing was invoiced", () => {
     expect(daysSalesOutstanding(1_000_00, 0, 90)).toBeNull();
     expect(daysSalesOutstanding(0, 0, 90)).toBeNull();
+  });
+
+  it("reads as a number of days while it is inside the window", () => {
+    expect(describeDso(30, 90)).toBe("30 days");
+    expect(describeDso(1, 90)).toBe("1 day");
+    expect(describeDso(90, 90)).toBe("90 days");
+    expect(describeDso(30, 90, "short")).toBe("30 d");
+  });
+
+  it("says only that it is past the window once it is, never a figure in the thousands of days", () => {
+    // $5,000.00 owed against $50.00 invoiced in 90 days computes to 9,000.
+    // Figures of that kind were on screen (follow-up review, 2026-10-29). Past
+    // the window the ratio stops being a number of days anyone waits; what is
+    // true is that more is owed than the whole window invoiced.
+    expect(daysSalesOutstanding(5_000_00, 50_00, 90)).toBe(9000);
+    expect(describeDso(9000, 90)).toBe("Over 90 days");
+    expect(describeDso(91, 90, "short")).toBe("Over 90 d");
+  });
+
+  it("shows a dash when nothing was invoiced in the window", () => {
+    expect(describeDso(null, 90)).toBe("—");
+    expect(describeDso(null, 90, "short")).toBe("—");
   });
 
   it("is reported by creditStatus when the window is supplied", () => {

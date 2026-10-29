@@ -57,8 +57,10 @@ import {
 } from "@/lib/domain/estimates";
 import { documentAttribution } from "@/lib/domain/audit";
 import {
+  CREDIT_SALES_WINDOW_DAYS,
   checkInvoiceAgainstCredit,
   creditStateColor,
+  describeDso,
   type InvoiceCreditCheck,
 } from "@/lib/domain/credit";
 import {
@@ -958,7 +960,7 @@ export default function InvoicesClient({
                   ) : null}
                   {draftCredit.row.status.daysSalesOutstanding !== null ? (
                     <span>
-                      DSO <b>{draftCredit.row.status.daysSalesOutstanding} days</b>
+                      DSO <b>{describeDso(draftCredit.row.status.daysSalesOutstanding, CREDIT_SALES_WINDOW_DAYS)}</b>
                     </span>
                   ) : null}
                 </Space>

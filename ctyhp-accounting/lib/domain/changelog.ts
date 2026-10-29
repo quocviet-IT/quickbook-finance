@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.76",
+    date: "2026-10-29",
+    headline: "Pay Bills prints its warning in dollars, and DSO stops reading in thousands of days.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Money in the Pay Bills warning",
+        detail:
+          "The line above the pay run printed its total as a bare number, such as 12345.00 in total, with no dollar sign or thousands separator, over an Overdue figure of $12,345.00. It now prints $12,345.00, the same as the figures under it, and so does the early payment discount it mentions and the discount reason on each bill.",
+        route: "/pay-bills",
+      },
+      {
+        kind: "fixed",
+        title: "DSO when little was invoiced",
+        detail:
+          "Days sales outstanding measures what is owed against what was invoiced in the last 90 days. When more is owed than those 90 days invoiced, it came out in the thousands of days. Customer Credit, the credit check on a new invoice, and the export now say Over 90 days instead; the export leaves that cell blank and says why under its title. Figures inside 90 days are unchanged.",
+        route: "/reports/customer-credit",
+      },
+    ],
+  },
+  {
     version: "2.75",
     date: "2026-10-29",
     headline: "Payments, Pay Bills, Journal and an invoice's lines keep to the screen.",

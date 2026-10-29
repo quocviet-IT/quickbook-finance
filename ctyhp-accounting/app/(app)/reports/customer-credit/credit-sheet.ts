@@ -11,7 +11,9 @@ export function customerCreditSheet(
     fileName: sanitizeExportFileName("customer-credit-exposure"),
     companyName: ctx.companyName,
     title: "Customer Credit Exposure",
-    subtitle: `Sales window ${plural(ctx.salesWindowDays, "day")}`,
+    // A spreadsheet takes the number, so past the window the cell is blank
+    // rather than a figure in the thousands (see describeDso), and the subtitle says why.
+    subtitle: `Sales window ${plural(ctx.salesWindowDays, "day")}. DSO is blank where more is owed than was invoiced in the window.`,
     currencyCode: "USD",
     columns: [
       { key: "customer", header: "Customer", kind: "text" },
@@ -32,7 +34,10 @@ export function customerCreditSheet(
       available: row.status.availableMinor === null ? null : row.status.availableMinor / 100,
       overdue: row.overdueMinor / 100,
       oldest_due: row.oldestDueDate ?? "",
-      dso: row.status.daysSalesOutstanding,
+      dso:
+        row.status.daysSalesOutstanding === null || row.status.daysSalesOutstanding > ctx.salesWindowDays
+          ? null
+          : row.status.daysSalesOutstanding,
       state: row.status.label,
       terms_days: row.creditTermsDays,
       billing_address: row.hasBillingAddress ? "yes" : "no",
