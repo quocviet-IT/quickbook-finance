@@ -18,6 +18,8 @@
 export const COLUMN = {
   /** A date as this app prints it: 2026-07-13. */
   DATE: 88,
+  /** A date and a time, "10/19/2026 10:42 AM" at 14px, with the cell's padding. */
+  DATE_TIME: 160,
   /** An amount with tabular figures, up to -327,089.13 — the largest on file. */
   MONEY: 116,
   /** A running balance, which carries one more digit than the amounts do. */

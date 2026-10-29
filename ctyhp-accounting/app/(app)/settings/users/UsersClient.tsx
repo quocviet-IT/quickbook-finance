@@ -3,7 +3,7 @@ import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Button, Form, Input, Modal, Select, Space, Tag, Tooltip, Typography } from "antd";
 import type { MenuProps } from "antd";
 import { PlusOutlined, UserAddOutlined } from "@ant-design/icons";
 import FilterBar from "@/components/ui/FilterBar";
@@ -12,6 +12,8 @@ import { ADMIN_CAP, canBecomeAdmin, describeStatusChange, isLastActiveAdmin } fr
 import { passwordPolicyProblems } from "@/lib/domain/password-policy";
 import { addExistingUserAction, createUserAction, resetTwoStepAction, setUserRoleAction, setUserStatusAction } from "./actions";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import DataTable from "@/components/ui/DataTable";
+import { COLUMN } from "@/lib/design/table-metrics";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, type StatusLook } from "@/lib/domain/status-label";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
@@ -21,6 +23,16 @@ const STATUS_LOOKS: Record<string, StatusLook> = {
   suspended: { tone: "warning", label: "Suspended" },
   offboarded: { tone: "danger", label: "Offboarded" },
 };
+
+/**
+ * Role, Status, MFA, Last sign-in, Actions. Email takes what is left, at least
+ * COLUMN.TEXT_MIN.
+ *
+ * The table was Ant Design's own with these widths and no box to keep to, so
+ * on a phone the declared columns took the whole screen and Email, the one
+ * that names the person, was drawn zero wide.
+ */
+export const USERS_FIXED_WIDTHS = [COLUMN.PICKER, COLUMN.STATUS, COLUMN.STATUS, COLUMN.DATE_TIME, COLUMN.ACTION * 2] as const;
 
 /**
  * The roles a person can be given. Admin is offered only while the company has
@@ -169,11 +181,11 @@ export default function UsersClient({
         }
       />
 
-      <Table<AppUserRow>
+      <DataTable<AppUserRow>
         rowKey="id"
-        dataSource={users}
+        rows={users}
         pagination={false}
-        locale={{ emptyText: "No users yet" }}
+        emptyTitle="No users yet"
         columns={[
           {
             // The elastic column: an email address is as long as it is, and
@@ -196,7 +208,7 @@ export default function UsersClient({
           {
             title: "Role",
             dataIndex: "role",
-            width: 160,
+            width: USERS_FIXED_WIDTHS[0],
             render: (v: AppRole, r) =>
               canManage ? (
                 <Select
@@ -216,7 +228,7 @@ export default function UsersClient({
           {
             title: "Status",
             dataIndex: "status",
-            width: 150,
+            width: USERS_FIXED_WIDTHS[1],
             render: (v: UserStatus, r) => (
               <Space size={4} wrap>
                 <StatusTag status={v} looks={STATUS_LOOKS} />
@@ -227,7 +239,7 @@ export default function UsersClient({
           {
             title: "MFA",
             dataIndex: "mfa_enrolled",
-            width: 130,
+            width: USERS_FIXED_WIDTHS[2],
             render: (v: boolean, r) =>
               v ? (
                 <StatusTag status="enrolled" />
@@ -240,13 +252,13 @@ export default function UsersClient({
           {
             title: "Last sign-in",
             dataIndex: "last_sign_in",
-            width: 170,
+            width: USERS_FIXED_WIDTHS[3],
             render: (v: string | null) => (v ? formatDateTime(v, timeZone) : "never"),
           },
           {
             title: "Actions",
             key: "actions",
-            width: 90,
+            width: USERS_FIXED_WIDTHS[4],
             align: "right" as const,
             render: (_, r) => {
               if (!canManage) return null;
