@@ -45,6 +45,8 @@ import { humanizeStatus } from "@/lib/domain/status-label";
 import GlobalSearch from "./GlobalSearch";
 import NewMenu from "./NewMenu";
 import AssistantLauncher from "./assistant/AssistantLauncher";
+// One copy of the furniture every page renders; see shared-page-ui.ts.
+import "./shared-page-ui";
 
 const { Header, Sider, Content } = Layout;
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "ctyhp-accounting:sidebar-collapsed";
