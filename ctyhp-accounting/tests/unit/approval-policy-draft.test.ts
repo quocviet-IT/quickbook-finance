@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   approvalPolicyDraft,
+  approvalPolicyStatus,
   changedApprovalPolicies,
   thresholdMinor,
   type SavedApprovalPolicy,
@@ -38,5 +41,28 @@ describe("which approval policies changed", () => {
     const d = drafts();
     d["period.reopen"] = { ...d["period.reopen"], thresholdMajor: 50 };
     expect(changedApprovalPolicies(policies, d, 2, usesThreshold)).toEqual([]);
+  });
+});
+
+/** A reviewer read "Every policy starts off." as the state of books that had five of seven on. */
+describe("what the notice says about the policies in force", () => {
+  const seven = (on: number) => Array.from({ length: 7 }, (_, i) => ({ enabled: i < on }));
+
+  it("counts the actions that need approval, out of all of them", () => {
+    expect(approvalPolicyStatus(seven(5))).toBe("Approval is on for 5 of 7 controlled actions");
+    expect(approvalPolicyStatus(seven(1))).toBe("Approval is on for 1 of 7 controlled actions");
+  });
+
+  it("says plainly when none or all are on", () => {
+    expect(approvalPolicyStatus(seven(0))).toBe("Approval is off for all 7 controlled actions");
+    expect(approvalPolicyStatus(seven(7))).toBe("Approval is on for all 7 controlled actions");
+    expect(approvalPolicyStatus([])).toBe("No controlled actions are set up");
+  });
+
+  it("leads the screen's notice, and the default is said about new companies only", () => {
+    const client = readFileSync(join(process.cwd(), "app", "(app)", "settings", "approvals", "ApprovalPoliciesClient.tsx"), "utf8");
+    expect(client).toContain("message={approvalPolicyStatus(policies)}");
+    expect(client).not.toContain("Every policy starts off.");
+    expect(client).toContain("A new company starts with every policy off.");
   });
 });

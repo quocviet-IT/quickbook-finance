@@ -37,6 +37,24 @@ export function thresholdMinor(draft: ApprovalPolicyDraft, decimals: number): nu
 }
 
 /**
+ * The notice's first line: how many controlled actions need approval today,
+ * counted from what is saved, not from switches still being edited.
+ *
+ * The notice used to end "Every policy starts off.", and the follow-up review
+ * of 2026-10-28 read that as the state of the books while five of seven were
+ * on. The count says what is true now; the default is a sentence about new
+ * companies.
+ */
+export function approvalPolicyStatus(policies: readonly Pick<SavedApprovalPolicy, "enabled">[]): string {
+  const total = policies.length;
+  const on = policies.filter((p) => p.enabled).length;
+  if (total === 0) return "No controlled actions are set up";
+  if (on === 0) return `Approval is off for all ${total} controlled actions`;
+  if (on === total) return `Approval is on for all ${total} controlled actions`;
+  return `Approval is on for ${on} of ${total} controlled actions`;
+}
+
+/**
  * The policies whose draft differs from what is saved. A threshold is compared
  * in minor units, so 100 and 100.00 are the same, and a threshold on an action
  * that has no amount is not compared at all.

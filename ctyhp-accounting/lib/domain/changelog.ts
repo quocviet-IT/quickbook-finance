@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.69",
+    date: "2026-10-29",
+    headline: "Approval Policies opens with how many actions need approval today.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Approval Policies says how many policies are on",
+        detail:
+          "The notice at the top now leads with the count from what is saved, for example Approval is on for 5 of 7 controlled actions. It used to end with Every policy starts off, which read like the state of your books even with policies on; it now says a new company starts with every policy off.",
+        route: "/settings/approvals",
+      },
+    ],
+  },
+  {
     version: "2.68",
     date: "2026-10-27",
     headline: "Two-step sign-in is optional again, and you can turn your own off.",

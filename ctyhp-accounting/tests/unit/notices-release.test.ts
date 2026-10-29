@@ -70,7 +70,7 @@ describe("the notices that were cut", () => {
     const descriptions: [string, RegExp][] = [
       ["app/(app)/settings/backups/BackupsClient.tsx", /message="What a snapshot holds"[\s\S]*?description="([^"]*)"/],
       ["app/(app)/settings/users/UsersClient.tsx", /message="Privileged access policy"[\s\S]*?description="([^"]*)"/],
-      ["app/(app)/settings/approvals/ApprovalPoliciesClient.tsx", /message="How a policy behaves once enabled"[\s\S]*?description="([^"]*)"/],
+      ["app/(app)/settings/approvals/ApprovalPoliciesClient.tsx", /message=\{approvalPolicyStatus\(policies\)\}[\s\S]*?description="([^"]*)"/],
       ["app/(app)/settings/purchasing/PurchasingConfigClient.tsx", /message="How three-way matching uses these"[\s\S]*?description="([^"]*)"/],
       ["app/(app)/reports/1099/Report1099Client.tsx", /message="Review data, not a filing"[\s\S]*?description="([^"]*)"/],
     ];
