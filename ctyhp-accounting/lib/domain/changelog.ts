@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.75",
+    date: "2026-10-29",
+    headline: "Payments, Pay Bills, Journal and an invoice's lines keep to the screen.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Four more lists keep to the screen",
+        detail:
+          "Payments, Pay Bills, Journal and the lines of an invoice now keep to the screen like every other list. On a phone each row's name stays in view and the table scrolls sideways to the rest, where before a column could be squeezed to nothing. The amounts take the same width as every other money column.",
+        route: "/payments",
+      },
+      {
+        kind: "changed",
+        title: "Pay bills dialog and Journal",
+        detail:
+          "In the Pay bills dialog the open bills' columns are sized to what they hold, so the discount and the payment box get the room they need. Journal shows 20 entries a page instead of 10, with the page-size picker every other list has, and an opened entry's lines are sized the same way.",
+        route: "/journal",
+      },
+    ],
+  },
+  {
     version: "2.73",
     date: "2026-10-29",
     headline: "Approvals fits a phone, and Overdue figures follow dark mode.",

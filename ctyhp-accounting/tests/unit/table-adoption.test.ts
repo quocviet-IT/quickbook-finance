@@ -42,13 +42,9 @@ const RAW_TABLE = new Set<string>([
   "app/(app)/banking/reconcile/ReconcileListClient.tsx",
   "app/(app)/banking/reconcile/[id]/ReconcileWorkspaceClient.tsx",
   "app/(app)/credit-memos/CreditMemosClient.tsx",
-  "app/(app)/invoices/InvoicesClient.tsx",
   "app/(app)/items/ItemMovementsModal.tsx",
-  "app/(app)/journal/JournalClient.tsx",
   "app/(app)/opening-balances/OpeningBalancesClient.tsx",
-  "app/(app)/pay-bills/PayBillsClient.tsx",
   "app/(app)/payments/PaymentDetailDrawer.tsx",
-  "app/(app)/payments/PaymentsClient.tsx",
   "app/(app)/payments/ReceivePaymentModal.tsx",
   "app/(app)/purchase-orders/[id]/BillFromPoModal.tsx",
   "app/(app)/purchase-orders/[id]/PurchaseOrderDetailClient.tsx",
@@ -76,7 +72,6 @@ const RAW_TABLE = new Set<string>([
   "app/(app)/vendors/VendorTaxDrawer.tsx",
   "components/audit/DocumentAuditTrail.tsx",
   "components/banking/SettleFromBankModal.tsx",
-  "components/payables/PayRunPanel.tsx",
   "components/reports/AgingByPartyTable.tsx",
   "components/reports/AllowanceForDoubtfulAccounts.tsx",
   "components/settlements/SettlementHistory.tsx",
@@ -126,7 +121,7 @@ describe("table adoption", () => {
     // The allowlist is the outstanding work. Adding to it is how a guard
     // quietly stops guarding, and it reads in a diff exactly like a migration.
     // Lowering this number is the migration; raising it has to be argued for.
-    expect(RAW_TABLE.size).toBeLessThanOrEqual(42);
+    expect(RAW_TABLE.size).toBeLessThanOrEqual(37);
   });
 
   it("lists no file that has already been migrated", () => {

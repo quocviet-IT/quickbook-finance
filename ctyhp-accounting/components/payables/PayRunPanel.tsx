@@ -1,9 +1,10 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, App, Button, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Button, Space, Statistic, Tag, Tooltip, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import TableEmpty from "@/components/ui/TableEmpty";
+import DataTable from "@/components/ui/DataTable";
 import { formatDate, formatMoney } from "@/lib/format";
 import {
   DISCOUNT_WARNING_DAYS,
@@ -119,12 +120,11 @@ export default function PayRunPanel({
         </Space>
       ) : null}
 
-      <Table<RankedBill>
+      <DataTable<RankedBill>
         rowKey="billId"
-        size="small"
         loading={loading}
         pagination={false}
-        dataSource={run?.rows ?? []}
+        rows={run?.rows ?? []}
         locale={{
           emptyText:
             loadError && !run ? (

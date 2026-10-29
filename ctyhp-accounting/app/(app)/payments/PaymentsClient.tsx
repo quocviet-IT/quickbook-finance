@@ -7,7 +7,6 @@ import {
   Input,
   Select,
   Space,
-  Table,
   type MenuProps,
   type TableColumnsType,
 } from "antd";
@@ -24,6 +23,7 @@ import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import IconActionButton from "@/components/ui/IconActionButton";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import DataTable from "@/components/ui/DataTable";
 import { COLUMN } from "@/lib/design/table-metrics";
 import type {
   AccountRow,
@@ -49,6 +49,20 @@ export type PaymentListRow = PaymentRow & { customer_name: string };
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const PAYMENTS_DEFAULT_PAGE_SIZE = 20;
+
+/**
+ * Number, Date, Amount, Unapplied, Status, Actions. Customer takes what is
+ * left, at least COLUMN.TEXT_MIN. Amount and Unapplied were 130px each and
+ * Status 150, numbers of this screen's own; they are the shared tokens now.
+ */
+export const PAYMENTS_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+  COLUMN.ACTION * 2,
+] as const;
 
 
 /** Loaded on demand — see tests/unit/attachment-drawer-lazy.test.ts. */
@@ -180,7 +194,7 @@ export default function PaymentsClient({
   }
 
   const columns: TableColumnsType<PaymentListRow> = [
-    { title: "Number", dataIndex: "payment_number", width: COLUMN.CODE, render: (n) => n ?? "—" },
+    { title: "Number", dataIndex: "payment_number", width: PAYMENTS_FIXED_WIDTHS[0], render: (n) => n ?? "—" },
     {
       // The elastic column. Method and Reference were 270px between them and
       // are facts about this payment rather than columns anybody scans, so
@@ -199,25 +213,25 @@ export default function PaymentsClient({
         ),
       }),
     },
-    { title: "Date", dataIndex: "payment_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
+    { title: "Date", dataIndex: "payment_date", width: PAYMENTS_FIXED_WIDTHS[1], render: (v: string) => formatDate(v) },
     {
       title: "Amount",
       dataIndex: "amount_minor",
-      width: 130,
+      width: PAYMENTS_FIXED_WIDTHS[2],
       align: "right",
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
       title: "Unapplied",
       dataIndex: "unapplied_minor",
-      width: 130,
+      width: PAYMENTS_FIXED_WIDTHS[3],
       align: "right",
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
       title: "Status",
       dataIndex: "status",
-      width: 150,
+      width: PAYMENTS_FIXED_WIDTHS[4],
       render: (s: PaymentStatus, r) => (
         <StatusTag status={s} labels={APPLIED_LABELS} title={describeVoid(r) ?? undefined} />
       ),
@@ -225,7 +239,7 @@ export default function PaymentsClient({
     {
       title: "Actions",
       key: "actions",
-      width: 120,
+      width: PAYMENTS_FIXED_WIDTHS[5],
       render: (_: unknown, r) => (
         <Space size={4}>
           {canReadDocuments ? (
@@ -284,11 +298,10 @@ export default function PaymentsClient({
         />
       </FilterBar>
 
-      <Table
+      <DataTable<PaymentListRow>
         rowKey="id"
         columns={columns}
-        dataSource={visiblePayments}
-        size="small"
+        rows={visiblePayments}
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PAYMENTS_DEFAULT_PAGE_SIZE))}
         sticky
       />
