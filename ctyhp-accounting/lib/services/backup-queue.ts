@@ -1,13 +1,18 @@
 import "server-only";
 
 /**
- * How many companies one run covers.
+ * How long one run keeps starting snapshots, in milliseconds.
  *
- * Measured: the largest company takes 18.6 seconds to read. Three fits inside
- * the 300-second ceiling the other cron routes already ask for, with room for a
- * company several times the size of today's largest.
+ * It was a count, three companies a night, which left each of seven companies
+ * two or three days between snapshots (follow-up review, 2026-10-28). A time
+ * budget covers every company each night while they fit, and only when they
+ * stop fitting does the night end early, with the rest first in line tomorrow.
+ *
+ * Measured: the largest company takes 18.6 seconds to read. The route's ceiling
+ * is 300 seconds, so a snapshot started just inside 200 has a hundred seconds,
+ * five times the largest, to finish.
  */
-export const BACKUP_BATCH_LIMIT = 3;
+export const BACKUP_TIME_BUDGET_MS = 200_000;
 
 export interface BackupCandidate {
   slug: string;
@@ -16,15 +21,13 @@ export interface BackupCandidate {
 }
 
 /**
- * The companies this run should cover, longest-waiting first.
+ * Every company, in the order a run covers them: never backed up first, then
+ * longest waiting.
  *
- * A company gets a snapshot within the cycle rather than every night. Snapshots
- * are skipped anyway when nothing changed, and this exists to recover from a
- * mistake days old rather than minutes — so covering everyone eventually beats
- * a run that grows until it times out and covers nobody.
+ * The run decides how many it reaches (BACKUP_TIME_BUDGET_MS). The order is what
+ * keeps a short night fair: whoever it leaves out is the longest waiting
+ * tomorrow, so no company is passed over twice while others go every night.
  */
 export function companiesDueForBackup<T extends BackupCandidate>(companies: readonly T[]): T[] {
-  return [...companies]
-    .sort((a, b) => (a.lastBackup ?? "").localeCompare(b.lastBackup ?? ""))
-    .slice(0, BACKUP_BATCH_LIMIT);
+  return [...companies].sort((a, b) => (a.lastBackup ?? "").localeCompare(b.lastBackup ?? ""));
 }

@@ -6,15 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 // already do for their own server-only imports.
 vi.mock("server-only", () => ({}));
 
-import { companiesDueForBackup, BACKUP_BATCH_LIMIT } from "@/lib/services/backup-queue";
+import { companiesDueForBackup, BACKUP_TIME_BUDGET_MS } from "@/lib/services/backup-queue";
 
 const company = (slug: string, lastBackup: string | null) => ({ slug, lastBackup });
 
 describe("choosing which companies tonight covers", () => {
   it("takes the ones waiting longest first", () => {
-    // 18.6 seconds for the largest company today. A run that sweeps every
-    // company stops fitting as they grow, so each run takes a batch and the
-    // rest wait — the shape the provisioning queue already uses.
+    // The order matters on a night that runs out of time: whoever is left
+    // over is the longest waiting tomorrow, so nobody is skipped twice.
     const due = companiesDueForBackup([
       company("a", "2026-08-14"),
       company("b", "2026-08-10"),
@@ -28,8 +27,14 @@ describe("choosing which companies tonight covers", () => {
     expect(due[0].slug).toBe("new");
   });
 
-  it("stops at the batch limit even with more waiting", () => {
+  it("keeps every company: the time budget, not a count, decides how many a night covers", () => {
     const many = Array.from({ length: 10 }, (_, i) => company(`c${i}`, `2026-08-0${i % 9}`));
-    expect(companiesDueForBackup(many)).toHaveLength(BACKUP_BATCH_LIMIT);
+    expect(companiesDueForBackup(many)).toHaveLength(10);
+  });
+
+  it("leaves a snapshot under way room to finish inside the route's 300 seconds", () => {
+    // 18.6 seconds for the largest company when measured; the last snapshot
+    // started inside the budget has the rest of the ceiling to finish.
+    expect(BACKUP_TIME_BUDGET_MS).toBeLessThanOrEqual(300_000 - 5 * 18_600);
   });
 });
