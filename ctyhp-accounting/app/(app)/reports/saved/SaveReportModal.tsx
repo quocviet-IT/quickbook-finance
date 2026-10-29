@@ -15,7 +15,7 @@ import {
   type SavedReportSource,
 } from "@/lib/domain/saved-reports";
 import { createSavedReportUploadTicketAction, registerSavedReportAction } from "./actions";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 
 export interface SaveReportModalProps {
   open: boolean;
@@ -140,7 +140,7 @@ export default function SaveReportModal({ open, onClose, onSaved }: SaveReportMo
             <p>
               <UploadOutlined /> CSV, PDF, XLSX, PNG or JPG, up to 10 MB
             </p>
-            <p style={{ color: TOKENS.text.secondary }}>
+            <p style={{ color: tokenVar("text.secondary") }}>
               The file is kept exactly as it is. Nothing in it is posted to the ledger.
             </p>
           </Upload.Dragger>

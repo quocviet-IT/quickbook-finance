@@ -63,7 +63,7 @@ import { calculateAssetDisposal } from "@/lib/domain/fixed-assets";
 import { parseCsv } from "@/lib/csv";
 import { formatDate, formatMoney, plural, toMinorUnits } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import {
   disposeFixedAssetAction,
@@ -883,7 +883,7 @@ export default function FixedAssetsClient({
               title="Depreciation due"
               value={money(totals.due)}
               prefix={<CalendarOutlined />}
-              valueStyle={{ color: totals.due > 0 ? TOKENS.intent.warning : undefined }}
+              valueStyle={{ color: totals.due > 0 ? tokenVar("intent.warning") : undefined }}
             />
           </Card>
         </Col>
@@ -1534,7 +1534,7 @@ export default function FixedAssetsClient({
                   title={disposalPreview.gainLossMinor >= 0 ? "Estimated gain" : "Estimated loss"}
                   value={money(Math.abs(disposalPreview.gainLossMinor))}
                   valueStyle={{
-                    color: disposalPreview.gainLossMinor >= 0 ? TOKENS.money.positive : TOKENS.money.negative,
+                    color: disposalPreview.gainLossMinor >= 0 ? tokenVar("money.positive") : tokenVar("money.negative"),
                   }}
                 />
               </Col>

@@ -31,7 +31,7 @@ import DeleteRowAction from "./DeleteRowAction";
 import type { AccountRow } from "@/lib/db/types";
 import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
 import type { BankTransactionDeleteEligibility } from "@/lib/domain/bank-transaction-delete";
 
@@ -170,7 +170,7 @@ export default function BankTransactionsTable({
       width: widths.amount ?? COLUMN.MONEY,
       align: "right",
       render: (_value: unknown, row: BankReviewTableRow) => (
-        <span style={{ color: row.transaction.amount_minor < 0 ? TOKENS.money.negative : TOKENS.money.positive }}>
+        <span style={{ color: row.transaction.amount_minor < 0 ? tokenVar("money.negative") : tokenVar("money.positive") }}>
           {formatRowMoney(row)}
         </span>
       ),

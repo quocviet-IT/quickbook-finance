@@ -9,7 +9,7 @@ import type { SavedReportRow } from "@/lib/services/saved-reports";
 import { archiveSavedReportAction } from "./actions";
 import SaveReportModal from "./SaveReportModal";
 import SavedReportViewer from "./SavedReportViewer";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, formatDateInTimeZone } from "@/lib/format";
 
@@ -89,7 +89,7 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
             render: (title: string, row: SavedReportRow) => (
               <Space direction="vertical" size={0}>
                 <a onClick={() => setViewing(row)}>{title}</a>
-                <span style={{ color: TOKENS.text.secondary, fontSize: 12 }}>
+                <span style={{ color: tokenVar("text.secondary"), fontSize: 12 }}>
                   {row.file_name} · {formatBytes(row.size_bytes)}
                 </span>
               </Space>

@@ -91,7 +91,7 @@ import {
   parseAmountFilterInput,
   type AmountFilter,
 } from "@/lib/domain/transaction-filter";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import { importedSummary } from "@/lib/domain/statement-repeats";
 import { keepFailureMessage, linesSpan, serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
@@ -731,7 +731,7 @@ export default function BankingClient({
 
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space wrap size="middle">
-          <BankOutlined style={{ fontSize: 20, color: TOKENS.intent.primary }} />
+          <BankOutlined style={{ fontSize: 20, color: tokenVar("intent.primary") }} />
           <div>
             <Typography.Text strong>
               {selectedConnection ? selectedConnection.institution_name : "No direct feed for this account"}

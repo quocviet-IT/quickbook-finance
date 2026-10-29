@@ -16,7 +16,7 @@ import {
   type StockVerdict,
 } from "@/lib/domain/inventory-review";
 import { inventoryReviewAction, writeDownInventoryAction } from "./actions";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 
 const VERDICT_COLOR: Record<StockVerdict, string> = {
   above_nrv: "red",
@@ -186,12 +186,12 @@ export default function InventoryReviewClient({
           <Statistic
             title="Slow moving or stale"
             value={money(review.totals.slowMovingMinor)}
-            valueStyle={review.totals.slowMovingMinor > 0 ? { color: TOKENS.intent.warning } : undefined}
+            valueStyle={review.totals.slowMovingMinor > 0 ? { color: tokenVar("intent.warning") } : undefined}
           />
           <Statistic
             title="Write-down due"
             value={money(review.totals.shortfallMinor)}
-            valueStyle={review.totals.shortfallMinor > 0 ? { color: TOKENS.intent.danger } : undefined}
+            valueStyle={review.totals.shortfallMinor > 0 ? { color: tokenVar("intent.danger") } : undefined}
           />
           <Statistic title="Written down to date" value={money(review.totals.writtenDownMinor)} />
         </Space>

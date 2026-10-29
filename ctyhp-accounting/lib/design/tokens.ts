@@ -481,6 +481,29 @@ export type ThemeName = "light" | "dark";
  */
 export type TokenPath = string;
 
+/** Every token's dotted name, such as `"money.negative"`, checked by the compiler. */
+export type TokenName = {
+  [G in keyof Tokens]: `${G & string}.${keyof Tokens[G] & string}`;
+}[keyof Tokens];
+
+/** The CSS custom property a token is declared as: `--ob-money-negative`. */
+export function tokenVariable(path: TokenPath): string {
+  return `--ob-${path.replace(".", "-")}`;
+}
+
+/**
+ * A token as a colour the page resolves, for an inline style or an SVG style.
+ *
+ * `TOKENS.money.negative` is the light value and nothing else: written into a
+ * style, it stays light in dark mode. The muted line under list rows read at
+ * 2.2:1 on a dark row that way (2.70). The variable is redefined by the dark
+ * block, so the same style is right in both themes, and a printed report still
+ * takes the light values.
+ */
+export function tokenVar(name: TokenName): string {
+  return `var(${tokenVariable(name)})`;
+}
+
 /** Every token as a `["group.name", value]` pair, in declaration order. */
 export function flattenTokens(tokens: Tokens = TOKENS): [string, string][] {
   const out: [string, string][] = [];
@@ -602,7 +625,7 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
 export function cssVariableBlock(): string {
   const declare = (theme: ThemeName) =>
     flattenTheme(theme)
-      .map(([path, value]) => `  --ob-${path.replace(".", "-")}: ${value};`)
+      .map(([path, value]) => `  ${tokenVariable(path)}: ${value};`)
       .join("\n");
   // The light values are declared a second time, on the report being printed
   // (body.print-report .report-print-area). A dark reader's pale text would

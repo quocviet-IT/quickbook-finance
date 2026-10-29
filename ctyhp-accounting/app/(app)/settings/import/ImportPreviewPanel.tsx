@@ -6,7 +6,7 @@ import type { Dayjs } from "dayjs";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
 import type { ImportPreview } from "@/lib/services/data-import";
 import { DownloadOutlined } from "@ant-design/icons";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 // See table-pagination.ts for why this has to live in state rather than as a
@@ -87,7 +87,7 @@ export default function ImportPreviewPanel({
         <Statistic
           title="Rows with problems"
           value={preview.problems.length}
-          valueStyle={preview.problems.length ? { color: TOKENS.intent.danger } : undefined}
+          valueStyle={preview.problems.length ? { color: tokenVar("intent.danger") } : undefined}
         />
         {preview.emptyRows ? (
           <Statistic title="Rows carrying no money" value={preview.emptyRows} />

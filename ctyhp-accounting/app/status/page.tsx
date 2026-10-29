@@ -4,7 +4,7 @@ import { formatTime } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, List, Space, Typography } from "antd";
 import { CheckCircleFilled, CloseCircleFilled, ReloadOutlined } from "@ant-design/icons";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { HealthPayload } from "@/lib/domain/health";
 
@@ -178,11 +178,11 @@ export default function StatusPage() {
               <List.Item
                 actions={[
                   check.status === "ok" ? (
-                    <Typography.Text style={{ color: TOKENS.intent.success }}>
+                    <Typography.Text style={{ color: tokenVar("intent.success") }}>
                       <CheckCircleFilled /> Working
                     </Typography.Text>
                   ) : (
-                    <Typography.Text style={{ color: TOKENS.intent.danger }}>
+                    <Typography.Text style={{ color: tokenVar("intent.danger") }}>
                       <CloseCircleFilled /> Not working
                     </Typography.Text>
                   ),

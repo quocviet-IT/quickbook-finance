@@ -14,7 +14,7 @@ import {
   type RankedBill,
 } from "@/lib/domain/payment-terms";
 import { payRunAction } from "@/app/(app)/bills/actions";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { statusToken } from "@/lib/design/status";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
@@ -110,7 +110,7 @@ export default function PayRunPanel({
           <Statistic
             title="Discount still available"
             value={money(run.totals.discountAvailableMinor)}
-            valueStyle={run.totals.discountAvailableMinor > 0 ? { color: TOKENS.intent.success } : undefined}
+            valueStyle={run.totals.discountAvailableMinor > 0 ? { color: tokenVar("intent.success") } : undefined}
           />
           <Statistic title="Total owed" value={money(run.totals.totalMinor)} />
           <Button onClick={load} loading={loading}>
@@ -212,7 +212,7 @@ export default function PayRunPanel({
                     row.discountAvailableMinor,
                   )} discount, if paid by ${formatDate(row.discountDueDate)}`}
                 >
-                  <b style={{ color: TOKENS.intent.success }}>{money(row.payTodayMinor)}</b>
+                  <b style={{ color: tokenVar("intent.success") }}>{money(row.payTodayMinor)}</b>
                 </Tooltip>
               ) : (
                 money(row.payTodayMinor)

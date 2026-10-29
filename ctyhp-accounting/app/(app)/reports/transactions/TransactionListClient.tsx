@@ -18,7 +18,7 @@ import {
   type TransactionListRow,
 } from "@/lib/domain/transaction-list";
 import { formatDate, formatMoney } from "@/lib/format";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 // See table-pagination.ts for why this has to live in state rather than as a
@@ -127,10 +127,10 @@ export default function TransactionListClient({
           <Statistic title="Transactions" value={totals.count} />
         </Card>
         <Card size="small">
-          <Statistic title="Money in" value={money(totals.inMinor)} valueStyle={{ color: TOKENS.money.positive }} />
+          <Statistic title="Money in" value={money(totals.inMinor)} valueStyle={{ color: tokenVar("money.positive") }} />
         </Card>
         <Card size="small">
-          <Statistic title="Money out" value={money(totals.outMinor)} valueStyle={{ color: TOKENS.money.negative }} />
+          <Statistic title="Money out" value={money(totals.outMinor)} valueStyle={{ color: tokenVar("money.negative") }} />
         </Card>
         <Card size="small">
           <Statistic title="Net" value={money(totals.netMinor)} />
@@ -283,7 +283,7 @@ export default function TransactionListClient({
             width: COLUMN.MONEY,
             align: "right",
             render: (amount: number) => (
-              <span style={{ color: amount < 0 ? TOKENS.money.negative : TOKENS.money.positive }}>{money(amount)}</span>
+              <span style={{ color: amount < 0 ? tokenVar("money.negative") : tokenVar("money.positive") }}>{money(amount)}</span>
             ),
           },
           {

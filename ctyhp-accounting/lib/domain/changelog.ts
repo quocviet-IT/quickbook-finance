@@ -41,6 +41,31 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.72",
+    date: "2026-10-29",
+    headline: "Dark mode draws every color in its dark shade.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Red and green amounts, warnings and charts in dark mode",
+        detail:
+          "About sixty colors were drawn in their light-mode shade on a dark page, so deep reds, greens and blues sat on dark navy and were hard to read. They now use dark mode's brighter shades: red and green amounts in lists, Transaction List and bank lines; the red and amber figures on summary cards such as Recurring, GL Posting, Inventory Review and Customer Credit; the Dashboard's bars and activity dots; and the bars, lines and grid of the financial and cash forecast charts. Light mode is unchanged.",
+      },
+      {
+        kind: "fixed",
+        title: "Sign-in page in dark mode",
+        detail:
+          "The page behind the sign-in and two-step boxes was light gray in dark mode. It is now dark, like the rest of the app.",
+      },
+      {
+        kind: "fixed",
+        title: "Screenshots attached to a report in dark mode",
+        detail:
+          "Report a problem captures the page behind it. In dark mode it was captured on a white ground, which turned pale text unreadable; it now takes the dark card color.",
+      },
+    ],
+  },
+  {
     version: "2.71",
     date: "2026-10-29",
     headline: "Settings › Users shows each person's email on a phone.",

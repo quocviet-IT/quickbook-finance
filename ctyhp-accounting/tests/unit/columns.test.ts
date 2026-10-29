@@ -10,7 +10,7 @@ import {
   textColumn,
 } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { TOKENS, cssVariableBlock, resolveToken } from "@/lib/design/tokens";
+import { cssVariableBlock, resolveToken, tokenVar } from "@/lib/design/tokens";
 import { type Tone } from "@/lib/design/tone";
 import StatusTag from "@/components/ui/StatusTag";
 
@@ -91,7 +91,7 @@ describe("moneyColumn", () => {
       "moneyColumn",
     );
     expect(cell.props.children).toBe("¥123,456");
-    expect(cell.props.style?.color).toBe(TOKENS.money.positive);
+    expect(cell.props.style?.color).toBe(tokenVar("money.positive"));
   });
 
   it("accepts a fixed currency and fixed places where the screen has only one", () => {
@@ -110,7 +110,7 @@ describe("moneyColumn", () => {
     // reader; the colour and the spoken label reinforce it.
     const column = moneyColumn<Row>({ ...perRow });
     const cell = asElement(column.render!(row.total_minor, row, 0), "moneyColumn");
-    expect(cell.props.style?.color).toBe(TOKENS.money.negative);
+    expect(cell.props.style?.color).toBe(tokenVar("money.negative"));
     expect(cell.props["aria-label"]).toBe("negative $1,234.56");
     expect(cell.props.children).toContain("-");
   });

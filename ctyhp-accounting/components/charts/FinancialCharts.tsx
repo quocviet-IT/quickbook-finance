@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Card, Empty, Typography } from "antd";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { axisTicks } from "@/lib/domain/chart-axis";
 import type {
   AgingSnapshot,
@@ -11,14 +11,14 @@ import type {
 } from "@/lib/services/dashboard";
 
 const PALETTE = {
-  income: TOKENS.series.income,
-  expense: TOKENS.series.expense,
-  net: TOKENS.series.net,
-  receivable: TOKENS.series.receivable,
-  payable: TOKENS.series.payable,
-  positive: TOKENS.money.positive,
-  negative: TOKENS.money.negative,
-  neutral: TOKENS.text.secondary,
+  income: tokenVar("series.income"),
+  expense: tokenVar("series.expense"),
+  net: tokenVar("series.net"),
+  receivable: tokenVar("series.receivable"),
+  payable: tokenVar("series.payable"),
+  positive: tokenVar("money.positive"),
+  negative: tokenVar("money.negative"),
+  neutral: tokenVar("text.secondary"),
 };
 
 function ChartCard({
@@ -124,7 +124,7 @@ export function PerformanceChart({
                     x2={width - plot.right}
                     y1={y(tick)}
                     y2={y(tick)}
-                    stroke={TOKENS.series.grid}
+                    style={{ stroke: tokenVar("series.grid") }}
                     strokeDasharray="4 4"
                   />
                   <text x={plot.left - 10} y={y(tick) + 4} textAnchor="end" className="financial-chart__axis">
@@ -137,7 +137,7 @@ export function PerformanceChart({
                 x2={width - plot.right}
                 y1={baselineY}
                 y2={baselineY}
-                stroke={TOKENS.series.axis}
+                style={{ stroke: tokenVar("series.axis") }}
               />
               {data.map((point, index) => {
                 const center = plot.left + groupWidth * index + groupWidth / 2;
@@ -151,7 +151,7 @@ export function PerformanceChart({
                       width={barWidth}
                       height={Math.max(1, Math.abs(baselineY - incomeY))}
                       rx={4}
-                      fill={PALETTE.income}
+                      style={{ fill: PALETTE.income }}
                     >
                       <title>{`${point.label} income: ${formatCompact(point.incomeMinor)}`}</title>
                     </rect>
@@ -161,7 +161,7 @@ export function PerformanceChart({
                       width={barWidth}
                       height={Math.max(1, Math.abs(baselineY - expenseY))}
                       rx={4}
-                      fill={PALETTE.expense}
+                      style={{ fill: PALETTE.expense }}
                     >
                       <title>{`${point.label} expenses: ${formatCompact(point.expenseMinor)}`}</title>
                     </rect>
@@ -174,7 +174,7 @@ export function PerformanceChart({
               <polyline
                 points={netPoints}
                 fill="none"
-                stroke={PALETTE.net}
+                style={{ stroke: PALETTE.net }}
                 strokeWidth={3}
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -187,8 +187,7 @@ export function PerformanceChart({
                     cx={center}
                     cy={y(point.netIncomeMinor)}
                     r={4.5}
-                    fill={TOKENS.text.onDark}
-                    stroke={PALETTE.net}
+                    style={{ fill: tokenVar("text.onDark"), stroke: PALETTE.net }}
                     strokeWidth={3}
                   >
                     <title>{`${point.label} net income: ${formatCompact(point.netIncomeMinor)}`}</title>
