@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.70",
+    date: "2026-10-29",
+    headline: "Approval Policies fits a phone, and grey second lines are readable in dark mode.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Approval Policies on a phone",
+        detail:
+          "On a phone the action names filled the screen and every switch sat off its edge. The table now keeps to the screen like every other list: each action and its Approval required switch are in view, and the table scrolls sideways to Threshold and Segregation of duties. A long description ends in an ellipsis; hold or hover over it to read the rest.",
+        route: "/settings/approvals",
+      },
+      {
+        kind: "fixed",
+        title: "Grey second lines in dark mode",
+        detail:
+          "In dark mode, the small grey line under a row's main text, in lists such as Invoices, Bills, Customers and General Ledger, was nearly the color of the row behind it. It is now the lighter grey dark mode uses for secondary text everywhere else. Light mode is unchanged.",
+      },
+    ],
+  },
+  {
     version: "2.69",
     date: "2026-10-29",
     headline: "Approval Policies opens with how many actions need approval today.",

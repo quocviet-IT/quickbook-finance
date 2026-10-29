@@ -34,6 +34,11 @@ export const COLUMN = {
   QTY: 88,
   /** A select rendered inside the cell, which needs room for its arrow. */
   PICKER: 150,
+  /**
+   * A switch under a heading up to "Segregation of duties": a 137px heading
+   * and 8px either side, measured on Approval Policies. The switch is 44.
+   */
+  SWITCH: 160,
   /** One icon button. A group of three is 120. */
   ACTION: 40,
   /** Ant Design's row-selection checkbox column. */
