@@ -6,6 +6,7 @@ import type { ApprovalPolicyRow } from "@/lib/db/types";
 import { CONTROLLED_ACTIONS } from "@/lib/domain/access";
 import {
   approvalPolicyDraft,
+  approvalPolicyStatus,
   changedApprovalPolicies,
   thresholdMinor,
   type ApprovalPolicyDraft,
@@ -109,8 +110,8 @@ export default function ApprovalPoliciesClient({
       <Alert
         type="info"
         showIcon
-        message="How a policy behaves once enabled"
-        description="At or above the threshold, the action goes for approval and runs when approved. With segregation of duties on, nobody approves their own request. Every policy starts off."
+        message={approvalPolicyStatus(policies)}
+        description="At or above the threshold, the action goes for approval and runs when approved. With segregation of duties on, nobody approves their own request. A new company starts with every policy off."
       />
       <div>
         <Table<ApprovalPolicyRow>
