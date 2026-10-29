@@ -10,7 +10,7 @@
  * This company is on weighted average cost, so the older lower-of-cost-or-market
  * test does not apply — it survives only for LIFO and the retail method.
  */
-import { formatDate, plural, pluralWord } from "@/lib/format";
+import { formatDate, plural, pluralWord, formatBaseMoney } from "@/lib/format";
 
 export interface InventoryReviewRow {
   itemId: string;
@@ -64,7 +64,7 @@ export interface ReviewedStock extends InventoryReviewRow {
 
 /** Money as a reader expects it, with separators. */
 function money(minor: number): string {
-  return (minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(minor);
 }
 
 function daysBetween(from: string, to: string): number {

@@ -30,7 +30,7 @@ describe("the rest of the design's month-end list (2.42)", () => {
   it("names what still sits in a holding account, and how much", () => {
     const step = holdingAccountsStep({ periodEnd: end, holding: [{ name: "Uncategorized Expense", balanceMinor: 123_400 }] });
     expect(step.status).toBe("outstanding");
-    expect(step.evidence).toBe("Uncategorized Expense holds 1,234.00 at 09/30/2026, money not yet coded to where it belongs.");
+    expect(step.evidence).toBe("Uncategorized Expense holds $1,234.00 at 09/30/2026, money not yet coded to where it belongs.");
   });
 
   it("names the schedules still due, three at most, and is not applicable when nothing recurs", () => {
@@ -47,7 +47,7 @@ describe("the rest of the design's month-end list (2.42)", () => {
   it("says how much depreciation the register worked out that the ledger lacks", () => {
     const step = depreciationStep({ periodEnd: end, assetCount: 3, dueCount: 2, dueMinor: 45_000 });
     expect(step.status).toBe("outstanding");
-    expect(step.evidence).toBe("450.00 of depreciation on 2 assets, for periods ending on or before 09/30/2026, is not in the ledger yet.");
+    expect(step.evidence).toBe("$450.00 of depreciation on 2 assets, for periods ending on or before 09/30/2026, is not in the ledger yet.");
     expect(depreciationStep({ periodEnd: end, assetCount: 0, dueCount: 0, dueMinor: 0 }).status).toBe("not-applicable");
   });
 

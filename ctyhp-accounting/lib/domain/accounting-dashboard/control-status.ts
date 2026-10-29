@@ -1,5 +1,5 @@
 import type { AccountingControl, ControlKey } from "./types";
-import { formatDate, plural } from "@/lib/format";
+import { formatDate, plural, formatBaseMoney } from "@/lib/format";
 
 /**
  * What each accounting control means, and when it has passed.
@@ -15,9 +15,9 @@ import { formatDate, plural } from "@/lib/format";
  *   has to make a colour do the explaining.
  */
 
-/** Minor units as a plain decimal string: the detail lines read as English. */
+/** Minor units as money without its sign: the detail lines say the direction in words. */
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 export function trialBalanceControl(input: {

@@ -72,7 +72,7 @@ describe("estimateInterest", () => {
   it("estimates from the rate and says how", () => {
     expect(estimateInterest({ method: "rate", annualRate: 4, fixedInterestMinor: null, owedMinor: 12_000_000, paymentMinor: 200_000 })).toEqual({
       interestMinor: 40_000,
-      basis: "estimated at 4.000% a year on 120,000.00 owed, ÷ 12. Check it against the lender's statement.",
+      basis: "estimated at 4.000% a year on $120,000.00 owed, ÷ 12. Check it against the lender's statement.",
     });
   });
   it("never proposes more than the payment", () => {
@@ -138,7 +138,7 @@ describe("loanWhy", () => {
   it("names the split, then how the interest was reached", () => {
     const [plan] = [...planLoanLines([{ id: "a", date: "2026-08-15", paymentMinor: 200_000, entry: loan() }], borrowed).values()];
     expect(loanWhy(plan, "2500 Example Loan", "8100 Interest Expense")).toBe(
-      "Principal 1,600.00 to 2500 Example Loan, interest 400.00 to 8100 Interest Expense — estimated at 4.000% a year on 120,000.00 owed, ÷ 12. Check it against the lender's statement.",
+      "Principal $1,600.00 to 2500 Example Loan, interest $400.00 to 8100 Interest Expense — estimated at 4.000% a year on $120,000.00 owed, ÷ 12. Check it against the lender's statement.",
     );
   });
   it("says only what to do while the interest is still to be typed", () => {
@@ -188,11 +188,11 @@ describe("loanSuggestionsFrom", () => {
         transactionId: "t1",
         repaymentId: "rp-loan",
         label: "Loan payment · 2500 — Example Loan",
-        why: "Principal 1,600.00 to 2500 Example Loan, interest 400.00 to 8100 Interest Expense — estimated at 4.000% a year on 120,000.00 owed, ÷ 12. Check it against the lender's statement.",
+        why: "Principal $1,600.00 to 2500 Example Loan, interest $400.00 to 8100 Interest Expense — estimated at 4.000% a year on $120,000.00 owed, ÷ 12. Check it against the lender's statement.",
         paymentMinor: 200_000,
         interestMinor: 40_000,
         principalMinor: 160_000,
-        basis: "estimated at 4.000% a year on 120,000.00 owed, ÷ 12. Check it against the lender's statement.",
+        basis: "estimated at 4.000% a year on $120,000.00 owed, ÷ 12. Check it against the lender's statement.",
         loanAccountLabel: "2500 Example Loan",
         interestAccountLabel: "8100 Interest Expense",
       },

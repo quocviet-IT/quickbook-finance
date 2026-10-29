@@ -14,6 +14,7 @@ import type { CodingAccount } from "./coding.ts";
 import { registerClaim } from "./register-claim.ts";
 import type { RelatedCompany } from "./related-companies.ts";
 import type { InterestMethod, RepaymentAccount } from "./repayments.ts";
+import { formatBaseMoney } from "../format.ts";
 
 /** One posted line on a loan account. */
 export interface LoanMovement {
@@ -43,8 +44,8 @@ export function monthlyInterest(owedMinor: number, annualRate: number): number {
   return Number((owed * thousandths * BigInt(2) + BigInt(1_200_000)) / BigInt(2_400_000));
 }
 
-const amount = (minor: number) =>
-  (minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// A repayment is only proposed for a base-currency bank line (repayments.ts).
+const amount = (minor: number) => formatBaseMoney(minor);
 
 export interface InterestEstimate {
   /** Null while the interest is to be typed from the lender's statement. */

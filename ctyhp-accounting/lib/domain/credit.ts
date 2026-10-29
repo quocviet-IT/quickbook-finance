@@ -9,7 +9,7 @@
  * No balance is stored anywhere: `openBalanceMinor` always arrives from the
  * open invoices, so a credit decision can never be made against a stale copy.
  */
-import { pluralWord } from "@/lib/format";
+import { formatBaseMoney, pluralWord } from "@/lib/format";
 
 /** The days of invoicing DSO is measured against, everywhere it is shown. */
 export const CREDIT_SALES_WINDOW_DAYS = 90;
@@ -72,7 +72,8 @@ export function creditStateColor(state: CreditState): string {
 }
 
 function money(minor: number): string {
-  return `$${(minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  // It wrote "$" by hand, so a negative read "$-5.00".
+  return formatBaseMoney(minor);
 }
 
 /**

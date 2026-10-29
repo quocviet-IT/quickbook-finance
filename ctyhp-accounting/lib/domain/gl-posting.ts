@@ -9,7 +9,7 @@
  * document without an entry should be impossible. This module exists to prove
  * that continuously rather than to assume it.
  */
-import { formatDate, formatDateRange, plural, pluralWord } from "@/lib/format";
+import { formatBaseMoney, formatDate, formatDateRange, plural, pluralWord } from "@/lib/format";
 import { sourceLabel } from "./entry-detail";
 import { fromMinor } from "./money";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
@@ -225,9 +225,8 @@ export function describeControlExceptions(recon: ControlReconciliation): string 
   if (recon.allTieOut) return null;
   const named = recon.exceptions
     .map((row) => {
-      const amount = (Math.abs(row.varianceMinor) / 100).toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-      });
+      // Without its sign: "out by" already says it is a difference.
+      const amount = formatBaseMoney(Math.abs(row.varianceMinor));
       return row.hasSubledger
         ? `${row.label} is out by ${amount}`
         : `${row.label} holds ${amount} with no subledger behind it`;

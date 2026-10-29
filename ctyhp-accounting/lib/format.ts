@@ -13,6 +13,24 @@ export function formatMoney(minor: number, currencyCode: string, decimals: numbe
   }
 }
 
+/**
+ * The base currency a sentence built in lib/domain is written in, where the
+ * module has no currency to hand.
+ *
+ * Thirteen modules built sentences like "out by 1,234.56" from base-currency
+ * minor units, each with a `money()` of its own that divided by 100 and printed
+ * the number bare (2.77). Dividing by 100 already assumed a two-decimal base
+ * currency, and every company's is USD at two decimals (all seven read on
+ * 2026-10-29). This names that assumption once. A company with another base
+ * currency means threading its code to these sentences instead.
+ */
+export const SENTENCE_BASE_CURRENCY = { code: "USD", decimals: 2 } as const;
+
+/** Base-currency money in a sentence: "$1,234.56", and "-$1,234.56" below zero. */
+export function formatBaseMoney(minor: number): string {
+  return formatMoney(minor, SENTENCE_BASE_CURRENCY.code, SENTENCE_BASE_CURRENCY.decimals);
+}
+
 /** Convert a major-unit decimal (e.g. dollars) to integer minor units. */
 export function toMinorUnits(amount: number, decimals: number): number {
   return Math.round(amount * 10 ** decimals);
