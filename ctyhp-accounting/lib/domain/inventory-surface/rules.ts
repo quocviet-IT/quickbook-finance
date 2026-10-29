@@ -1,6 +1,6 @@
 import type { DerivedWorkItem, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
-import { plural, pluralWord, formatDate } from "@/lib/format";
+import { plural, pluralWord, formatDate, formatBaseMoney } from "@/lib/format";
 
 /**
  * Every work key the Inventory overview derives starts with one of these; its
@@ -31,7 +31,7 @@ export const INVENTORY_WORK_KEY_PREFIXES = [
  */
 
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 export const INVENTORY_NOUNS: SurfaceNouns = {

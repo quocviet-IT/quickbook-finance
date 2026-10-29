@@ -1,5 +1,5 @@
 import type { SurfaceControl } from "@/lib/domain/work-surface/types";
-import { plural, pluralWord } from "@/lib/format";
+import { plural, pluralWord, formatBaseMoney } from "@/lib/format";
 
 /**
  * What Sales checks about itself.
@@ -18,7 +18,7 @@ import { plural, pluralWord } from "@/lib/format";
  */
 
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 export type SalesControlKey =

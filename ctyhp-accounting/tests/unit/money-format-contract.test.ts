@@ -85,7 +85,34 @@ describe("money on screen goes through formatMoney", () => {
         });
     }
     expect(offenders).toEqual([]);
-  });
+  }, 20_000); // It reads every file in lib/, and a loaded machine passes 5 s.
+
+  it("no module in lib/ writes its own money formatter for a sentence", () => {
+    // Thirteen modules each had a `money()` of their own: "out by 1,234.56",
+    // "short by 1,200.00", with no "$" and, behind Math.abs, sometimes no sign
+    // either (2.77). They print through formatBaseMoney now. A plain figure
+    // written back into an input box is the one deliberate exception.
+    const allowed = new Set([
+      "lib/format.ts",
+      // formatFigureText: the number typed back into a box, no symbol by design.
+      "lib/domain/balance-comparison.ts",
+      // Parity tooling, not the app: it reproduces the prototype's own markup.
+      "lib/parity/report-html.ts",
+    ]);
+    const patterns = [
+      /toLocaleString\(\s*"en-US"\s*,\s*\{\s*minimumFractionDigits/,
+      /\$\$\{\s*\(?\s*[\w.]*(minor|Minor|money|amount)/,
+    ];
+    const offenders: string[] = [];
+    for (const file of sourceFiles(join(root, "lib"), root).filter((f) => !allowed.has(f))) {
+      readFileSync(join(root, file), "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          if (patterns.some((p) => p.test(line))) offenders.push(`${file}:${index + 1}  ${line.trim()}`);
+        });
+    }
+    expect(offenders).toEqual([]);
+  }, 20_000);
 
   it("the shared formatter writes the one shape", async () => {
     const { formatMoney } = await import("@/lib/format");

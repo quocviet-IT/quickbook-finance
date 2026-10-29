@@ -20,7 +20,7 @@
  * so. The spec asks for that as a prohibition (Phase 4, work item 6); it is
  * enforced by there being nothing to store.
  */
-import { plural, pluralWord, formatDate } from "@/lib/format";
+import { plural, pluralWord, formatDate, formatBaseMoney } from "@/lib/format";
 
 export type CloseStepStatus = "complete" | "outstanding" | "not-applicable" | "unavailable";
 
@@ -105,7 +105,7 @@ export function blockingFirst(steps: readonly CloseStep[]): CloseStep[] {
 // makes the rules above testable without a database.
 
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 export function trialBalanceStep(input: {

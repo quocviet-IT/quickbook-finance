@@ -212,7 +212,7 @@ describe("buildControlReconciliation", () => {
     expect(out.allTieOut).toBe(false);
     const message = describeControlExceptions(out)!;
     expect(message).toContain("2 control accounts do not tie out as of 08/01/2026");
-    expect(message).toContain("Accounts Receivable is out by 162.38");
-    expect(message).toContain("Undeposited Funds holds 450.00 with no subledger behind it");
+    expect(message).toContain("Accounts Receivable is out by $162.38");
+    expect(message).toContain("Undeposited Funds holds $450.00 with no subledger behind it");
   });
 });

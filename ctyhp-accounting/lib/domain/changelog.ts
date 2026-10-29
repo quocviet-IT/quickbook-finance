@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.77",
+    date: "2026-10-29",
+    headline: "Every sentence the app writes about money prints it as $1,234.56.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Dollar signs in alerts, checks and explanations",
+        detail:
+          "Sentences the app writes for you printed amounts as bare numbers, like out by 1,234.56. They now print $1,234.56, the same as every figure beside them: the Dashboard's alerts and month-end checklist, control account checks on GL Posting, the Sales, Purchases and Inventory overview checks, Inventory Review, an unbalanced adjustment on Analysis, the principal and interest split proposed for a loan payment, credit limit messages, and the summary after a statement import. The amounts themselves are unchanged.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "2.76",
     date: "2026-10-29",
     headline: "Pay Bills prints its warning in dollars, and DSO stops reading in thousands of days.",

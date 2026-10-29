@@ -10,7 +10,8 @@
 import { z } from "zod";
 import type { AccountType } from "@/lib/domain/accounts";
 import type { BalanceSheet, LedgerBalance, ProfitAndLoss } from "@/lib/domain/reports";
-import { buildBalanceSheet, buildProfitAndLoss } from "@/lib/domain/reports";
+import { buildBalanceSheet, buildProfitAndLoss } from "@/lib/domain/reports";
+import { formatBaseMoney } from "@/lib/format";
 
 export interface AdjustmentLine {
   accountId: string;
@@ -26,7 +27,7 @@ export interface AnalysisAdjustment {
 }
 
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 /** Null when the adjustment could be a real journal entry; a reason otherwise. */

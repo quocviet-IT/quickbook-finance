@@ -1,6 +1,6 @@
 import type { DerivedWorkItem, Severity, SurfaceControl } from "@/lib/domain/work-surface/types";
 import type { KindFilter, SurfaceNouns } from "@/lib/domain/work-surface/lifecycle";
-import { plural, pluralWord, formatDate } from "@/lib/format";
+import { plural, pluralWord, formatDate, formatBaseMoney } from "@/lib/format";
 
 /** Every work key the Purchases overview derives starts with one of these; its retire is scoped to them. */
 export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied:"] as const;
@@ -23,7 +23,7 @@ export const PURCHASES_WORK_KEY_PREFIXES = ["ap-bill:", "ap-rnb:", "ap-unapplied
  */
 
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 export const PURCHASES_NOUNS: SurfaceNouns = {

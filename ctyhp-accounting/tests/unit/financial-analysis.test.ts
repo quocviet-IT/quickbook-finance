@@ -29,7 +29,7 @@ describe("validateAdjustment", () => {
         { accountId: "acc-sales", deltaMinor: -90_000 },
       ],
     });
-    expect(msg).toMatch(/debits 1,000\.00 vs credits 900\.00/);
+    expect(msg).toMatch(/debits \$1,000\.00 vs credits \$900\.00/);
   });
 
   it("rejects fewer than two lines — one leg cannot balance", () => {

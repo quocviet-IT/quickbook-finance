@@ -1,6 +1,6 @@
 import type { AccountingControl, QueueSeverity } from "./types";
 import { isConfigured, type WorkPolicy } from "./policy";
-import { plural, pluralWord } from "@/lib/format";
+import { plural, pluralWord, formatBaseMoney } from "@/lib/format";
 
 /**
  * What changed, why it matters, and where it is concentrated.
@@ -92,7 +92,7 @@ const SEVERITY_RANK: Record<QueueSeverity, number> = {
 };
 
 function money(minor: number): string {
-  return (Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  return formatBaseMoney(Math.abs(minor));
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
