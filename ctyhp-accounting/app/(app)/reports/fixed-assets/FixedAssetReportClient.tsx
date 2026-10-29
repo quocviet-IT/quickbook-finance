@@ -26,7 +26,7 @@ import type {
 } from "@/lib/services/fixed-assets";
 import type { ReportExportSheet } from "@/lib/domain/report-export";
 import { formatDate, formatMoney } from "@/lib/format";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 type ReportView = "register" | "depreciation";
@@ -472,7 +472,7 @@ export default function FixedAssetReportClient({
                 <Statistic
                   title="Remaining scheduled"
                   value={money(depreciationTotals.unposted)}
-                  valueStyle={{ color: depreciationTotals.unposted > 0 ? TOKENS.intent.warning : undefined }}
+                  valueStyle={{ color: depreciationTotals.unposted > 0 ? tokenVar("intent.warning") : undefined }}
                 />
               </Card>
             </Col>

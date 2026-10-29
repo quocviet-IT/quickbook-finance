@@ -1,7 +1,7 @@
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { ColumnHeaderCell, type ColumnHeaderCellProps } from "@/components/ui/ColumnHeaderCell";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 
 /**
  * ColumnHeaderCell carries no Ant Design import — it is a plain `<th>`
@@ -69,11 +69,12 @@ describe("ColumnHeaderCell — dragging to reorder", () => {
 
   it("marks the drop target with the design system's own colour token, not a literal", () => {
     const cell = asThElement(ColumnHeaderCell({ "data-drop-target": true }));
-    // Reads the live token rather than hard-coding a hex string in the test:
-    // fails if the component is ever changed to draw the indicator in any
-    // colour that is not TOKENS.intent.primary — including a hard-coded hex,
-    // which would also fail the separate no-hard-coded-colour guard.
-    expect(cell.props.style?.boxShadow).toBe(`inset 3px 0 0 ${TOKENS.intent.primary}`);
+    // Reads the token's variable rather than hard-coding a hex string in the
+    // test: fails if the component is ever changed to draw the indicator in any
+    // colour that is not intent.primary — including a hard-coded hex, which
+    // would also fail the separate no-hard-coded-colour guard — or in its
+    // light value alone, which stays light in dark mode.
+    expect(cell.props.style?.boxShadow).toBe(`inset 3px 0 0 ${tokenVar("intent.primary")}`);
   });
 
   it("merges the drag styling into the caller's own style instead of replacing it", () => {

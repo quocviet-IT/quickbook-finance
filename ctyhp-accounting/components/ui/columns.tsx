@@ -4,7 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { ColumnType } from "antd/es/table";
 import { moneyDisplay } from "@/lib/domain/money-display";
 import { COLUMN } from "@/lib/design/table-metrics";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { formatDate } from "@/lib/format";
 import { type Tone } from "@/lib/design/tone";
 import StatusTag from "@/components/ui/StatusTag";
@@ -95,9 +95,9 @@ export function moneyColumn<T>(spec: MoneyColumnSpec<T>): ColumnType<T> {
             fontVariantNumeric: "tabular-nums",
             color:
               sign === "negative"
-                ? TOKENS.money.negative
+                ? tokenVar("money.negative")
                 : sign === "positive"
-                  ? TOKENS.money.positive
+                  ? tokenVar("money.positive")
                   : undefined,
           }}
         >
@@ -269,9 +269,9 @@ export function secondaryLine(text: ReactNode, title?: string): ReactElement {
       style={{
         display: "block",
         fontSize: 12,
-        // The token's variable, which dark mode redefines. TOKENS.text.secondary
-        // is the light value only: on a dark row it read at 2.2:1.
-        color: "var(--ob-text-secondary)",
+        // The token's variable, which dark mode redefines. The light value
+        // alone read at 2.2:1 on a dark row (2.70).
+        color: tokenVar("text.secondary"),
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",

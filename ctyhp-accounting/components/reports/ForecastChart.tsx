@@ -1,6 +1,6 @@
 "use client";
 
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { axisTicks } from "@/lib/domain/chart-axis";
 import type { CashForecast } from "@/lib/domain/forecast";
 import { chartPoints } from "@/lib/domain/forecast";
@@ -40,15 +40,15 @@ export default function ForecastChart({
     <div>
       <div className={styles.legend} aria-hidden="true">
         <span className={styles.legendItem}>
-          <span className={styles.line} style={{ backgroundColor: TOKENS.series.net }} />
+          <span className={styles.line} style={{ backgroundColor: tokenVar("series.net") }} />
           Cash at week end
         </span>
         <span className={styles.legendItem}>
-          <span className={styles.swatch} style={{ backgroundColor: TOKENS.series.income }} />
+          <span className={styles.swatch} style={{ backgroundColor: tokenVar("series.income") }} />
           Money in
         </span>
         <span className={styles.legendItem}>
-          <span className={styles.swatch} style={{ backgroundColor: TOKENS.series.expense }} />
+          <span className={styles.swatch} style={{ backgroundColor: tokenVar("series.expense") }} />
           Money out
         </span>
       </div>
@@ -60,13 +60,13 @@ export default function ForecastChart({
       >
         {axisTicks(domainMax, span).map((tick, i) => (
           <g key={i}>
-            <line x1={plot.left} x2={width - plot.right} y1={y(tick)} y2={y(tick)} stroke={TOKENS.series.grid} strokeDasharray="4 4" />
+            <line x1={plot.left} x2={width - plot.right} y1={y(tick)} y2={y(tick)} style={{ stroke: tokenVar("series.grid") }} strokeDasharray="4 4" />
             <text x={plot.left - 10} y={y(tick) + 4} textAnchor="end" className={styles.axis}>
               {formatCompact(tick)}
             </text>
           </g>
         ))}
-        <line x1={plot.left} x2={width - plot.right} y1={y(0)} y2={y(0)} stroke={TOKENS.series.axis} />
+        <line x1={plot.left} x2={width - plot.right} y1={y(0)} y2={y(0)} style={{ stroke: tokenVar("series.axis") }} />
         {points.map((p, index) => (
           <g key={index}>
             <rect
@@ -75,7 +75,7 @@ export default function ForecastChart({
               width={barWidth}
               height={Math.max(1, Math.abs(y(0) - y(p.inMinor)))}
               rx={3}
-              fill={TOKENS.series.income}
+              style={{ fill: tokenVar("series.income") }}
             >
               <title>{`${p.label} money in: ${formatMoney(p.inMinor)}`}</title>
             </rect>
@@ -85,7 +85,7 @@ export default function ForecastChart({
               width={barWidth}
               height={Math.max(1, Math.abs(y(0) - y(p.outMinor)))}
               rx={3}
-              fill={TOKENS.series.expense}
+              style={{ fill: tokenVar("series.expense") }}
             >
               <title>{`${p.label} money out: ${formatMoney(p.outMinor)}`}</title>
             </rect>
@@ -94,9 +94,9 @@ export default function ForecastChart({
             </text>
           </g>
         ))}
-        <polyline points={line} fill="none" stroke={TOKENS.series.net} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={line} fill="none" style={{ stroke: tokenVar("series.net") }} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, index) => (
-          <circle key={index} cx={center(index)} cy={y(p.closingMinor)} r={4} fill={TOKENS.text.onDark} stroke={TOKENS.series.net} strokeWidth={3}>
+          <circle key={index} cx={center(index)} cy={y(p.closingMinor)} r={4} style={{ fill: tokenVar("text.onDark"), stroke: tokenVar("series.net") }} strokeWidth={3}>
             <title>{`${p.label} cash at week end: ${formatMoney(p.closingMinor)}`}</title>
           </circle>
         ))}

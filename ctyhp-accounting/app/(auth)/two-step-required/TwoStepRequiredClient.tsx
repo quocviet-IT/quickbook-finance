@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { Button, Typography } from "antd";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import TwoStepClient from "@/app/(app)/account/two-step/TwoStepClient";
 
 export default function TwoStepRequiredClient({ email }: { email: string }) {
@@ -21,7 +21,7 @@ export default function TwoStepRequiredClient({ email }: { email: string }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: TOKENS.surface.muted,
+        background: tokenVar("surface.muted"),
         paddingInline: 16,
       }}
     >

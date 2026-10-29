@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, HTMLAttributes, PointerEvent as ReactPointerEvent } from "react";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 
 /**
  * The header-cell renderer a `Table` is given through
@@ -71,7 +71,7 @@ export function ColumnHeaderCell(props: ColumnHeaderCellProps) {
     // Hovering with a column in hand: an inset rule in the one colour this
     // codebase is allowed to draw with (lib/design/tokens.ts), so it stays
     // correct if the palette ever changes and never needs a hex value here.
-    ...(dropTarget ? { boxShadow: `inset 3px 0 0 ${TOKENS.intent.primary}` } : null),
+    ...(dropTarget ? { boxShadow: `inset 3px 0 0 ${tokenVar("intent.primary")}` } : null),
     // The handle is positioned against this cell, so the cell has to be a
     // positioning context — but only if it is not already one. A fixed
     // column arrives `position: sticky` with a `left` offset that means

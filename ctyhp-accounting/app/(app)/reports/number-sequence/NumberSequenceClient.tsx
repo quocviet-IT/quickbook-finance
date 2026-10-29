@@ -33,7 +33,7 @@ import {
   sequenceAuditAction,
   sequenceOverviewAction,
 } from "./actions";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate, plural, pluralWord } from "@/lib/format";
 
@@ -268,7 +268,7 @@ export default function NumberSequenceClient({
               value={audit.summary.unexplained + audit.summary.beyondSequence}
               valueStyle={
                 audit.summary.unexplained + audit.summary.beyondSequence > 0
-                  ? { color: TOKENS.intent.danger }
+                  ? { color: tokenVar("intent.danger") }
                   : undefined
               }
             />

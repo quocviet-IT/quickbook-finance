@@ -24,7 +24,7 @@ import {
   type PostingVerdict,
 } from "@/lib/domain/gl-posting";
 import { controlReconciliationAction, postingReportAction } from "./actions";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 
 const VERDICT_COLOR: Record<PostingVerdict, string> = {
   posted: "green",
@@ -185,7 +185,7 @@ export default function GlPostingClient({
               <Statistic
                 title="Exceptions"
                 value={report.summary.exceptions}
-                valueStyle={report.summary.exceptions ? { color: TOKENS.intent.danger } : undefined}
+                valueStyle={report.summary.exceptions ? { color: tokenVar("intent.danger") } : undefined}
               />
               <Statistic title={`Live total (${baseCurrency})`} value={money(report.summary.liveTotalMinor)} />
             </Space>
@@ -297,7 +297,7 @@ export default function GlPostingClient({
                 row.tiesOut ? (
                   <Tag color="green">Ties out</Tag>
                 ) : (
-                  <b style={{ color: TOKENS.intent.danger }}>{money(row.varianceMinor)}</b>
+                  <b style={{ color: tokenVar("intent.danger") }}>{money(row.varianceMinor)}</b>
                 ),
             },
           ]}

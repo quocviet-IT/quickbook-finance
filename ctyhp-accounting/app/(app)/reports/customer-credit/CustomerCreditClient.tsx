@@ -15,7 +15,7 @@ import ReportBar from "@/components/reports/ReportBar";
 import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
 import { creditStateColor, sortByCreditRisk } from "@/lib/domain/credit";
 import type { CustomerCreditRow } from "@/lib/services/credit";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { statusToken } from "@/lib/design/status";
 import { customerCreditSheet } from "./credit-sheet";
 
@@ -90,7 +90,7 @@ export default function CustomerCreditClient({
         <Statistic
           title="Over limit"
           value={money(overLimitExposure)}
-          valueStyle={overLimitExposure > 0 ? { color: TOKENS.intent.danger } : undefined}
+          valueStyle={overLimitExposure > 0 ? { color: tokenVar("intent.danger") } : undefined}
         />
         <Statistic title="On credit hold" value={onHold} />
         <Statistic

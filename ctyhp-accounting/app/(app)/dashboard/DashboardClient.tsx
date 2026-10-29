@@ -27,7 +27,7 @@ import {
   ComparisonBars,
   PerformanceChart,
 } from "@/components/charts/FinancialCharts";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { fromMinor } from "@/lib/domain/money";
 import { formatDate, formatDateTime, formatMoney as formatCurrency, plural, timeZoneLabel } from "@/lib/format";
 import { INTERNAL_REPORT_HREFS } from "@/lib/domain/report-catalog";
@@ -274,19 +274,19 @@ export default function DashboardClient({
                 key: "current-assets",
                 label: "Current assets",
                 value: metrics.currentAssetsMinor,
-                color: TOKENS.intent.primary,
+                color: tokenVar("intent.primary"),
               },
               {
                 key: "current-liabilities",
                 label: "Current liabilities",
                 value: metrics.currentLiabilitiesMinor,
-                color: TOKENS.intent.warning,
+                color: tokenVar("intent.warning"),
               },
               {
                 key: "working-capital",
                 label: "Working capital",
                 value: metrics.workingCapitalMinor,
-                color: TOKENS.intent.info,
+                color: tokenVar("intent.info"),
               },
             ]}
             formatMoney={formatMoney}
@@ -304,19 +304,19 @@ export default function DashboardClient({
                 key: "overdue-receivables",
                 label: "Overdue receivables",
                 value: metrics.overdueArMinor,
-                color: TOKENS.intent.danger,
+                color: tokenVar("intent.danger"),
               },
               {
                 key: "overdue-payables",
                 label: "Overdue payables",
                 value: metrics.overdueApMinor,
-                color: TOKENS.intent.warning,
+                color: tokenVar("intent.warning"),
               },
               {
                 key: "unreconciled-bank",
                 label: "Unreconciled bank activity",
                 value: metrics.unreconciledMinor,
-                color: TOKENS.series.purchases,
+                color: tokenVar("series.purchases"),
               },
               // A company with credit cards under Banking (2.47): their charges no statement has proved yet.
               ...(metrics.unreconciledCards && metrics.unreconciledCards.cards > 0
@@ -325,7 +325,7 @@ export default function DashboardClient({
                       key: "unreconciled-cards",
                       label: "Unreconciled card activity",
                       value: metrics.unreconciledCards.minor,
-                      color: TOKENS.series.banking,
+                      color: tokenVar("series.banking"),
                     },
                   ]
                 : []),
@@ -570,13 +570,13 @@ const ACTIVITY_FILTERS: Array<{
 ];
 
 const ACTIVITY_COLORS: Record<DashboardActivityCategory, string> = {
-  sales: TOKENS.series.sales,
-  purchases: TOKENS.series.purchases,
-  inventory: TOKENS.series.inventory,
-  banking: TOKENS.series.banking,
-  close: TOKENS.series.close,
-  governance: TOKENS.series.governance,
-  other: TOKENS.series.other,
+  sales: tokenVar("series.sales"),
+  purchases: tokenVar("series.purchases"),
+  inventory: tokenVar("series.inventory"),
+  banking: tokenVar("series.banking"),
+  close: tokenVar("series.close"),
+  governance: tokenVar("series.governance"),
+  other: tokenVar("series.other"),
 };
 
 function ActivityTimeline({

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { App, Button, Card, Form, Input, Typography } from "antd";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/db/client";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import { owesSecondStep, readCode, verifiedAppFactors } from "@/lib/domain/two-step";
 
 interface LoginValues {
@@ -106,7 +106,7 @@ export default function LoginClient({ initialStep }: { initialStep: Step }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: TOKENS.surface.muted,
+        background: tokenVar("surface.muted"),
       }}
     >
       <Card style={{ width: 380 }}>

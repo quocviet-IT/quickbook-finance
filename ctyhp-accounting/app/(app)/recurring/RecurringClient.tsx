@@ -63,7 +63,7 @@ import { formatDate, formatDateTime, formatMoney, plural, toMinorUnits } from "@
 import { useCompanyClock } from "@/components/CompanyClock";
 import { withVendor } from "@/lib/domain/vendors";
 import NewVendorButton from "@/components/NewVendorButton";
-import { TOKENS } from "@/lib/design/tokens";
+import { tokenVar } from "@/lib/design/tokens";
 import {
   createRecurringTemplateAction,
   generateRecurringTemplateAction,
@@ -575,7 +575,7 @@ export default function RecurringClient({
               title="Failed runs"
               value={failedCount}
               prefix={failedCount ? <WarningOutlined /> : <CheckCircleOutlined />}
-              valueStyle={failedCount ? { color: TOKENS.intent.danger } : undefined}
+              valueStyle={failedCount ? { color: tokenVar("intent.danger") } : undefined}
             />
           </Card>
         </Col>

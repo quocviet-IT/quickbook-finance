@@ -30,7 +30,7 @@ import {
   rejectAdditionalAttachment,
   safeAttachmentName,
 } from "@/lib/domain/feedback-attachment";
-import { TOKENS } from "@/lib/design/tokens";
+import { resolveToken, tokenVar, tokenVariable } from "@/lib/design/tokens";
 
 /** Everything a developer needs to find the page again, gathered at open time. */
 function capturePageContext(pathname: string): FeedbackPageContext {
@@ -79,8 +79,12 @@ export default function ReportDialog({
         await domToPng(document.body, {
           scale: 0.6,
           // The page's own background is transparent in places; the capture
-          // needs an opaque one behind it, same as a card's surface.
-          backgroundColor: TOKENS.surface.card,
+          // needs an opaque one behind it, same as a card's surface. A canvas
+          // cannot read var(), so the value in force now: a dark page captured
+          // on a white ground came out as pale text on white.
+          backgroundColor:
+            getComputedStyle(document.documentElement).getPropertyValue(tokenVariable("surface.card")).trim() ||
+            resolveToken("surface.card"),
           filter: (node) => !(node instanceof Element && node.matches(CHROME)),
         }),
       );
@@ -353,7 +357,7 @@ export default function ReportDialog({
                   style={{
                     maxWidth: "100%",
                     maxHeight: 240,
-                    border: `1px solid ${TOKENS.border.default}`,
+                    border: `1px solid ${tokenVar("border.default")}`,
                     borderRadius: 4,
                   }}
                 />
