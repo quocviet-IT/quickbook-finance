@@ -38,7 +38,6 @@ function tablePattern(): RegExp {
  * gone (2026-09-28).
  */
 const RAW_TABLE = new Set<string>([
-  "app/(app)/approvals/ApprovalsClient.tsx",
   "app/(app)/banking/BankImportList.tsx",
   "app/(app)/banking/reconcile/ReconcileListClient.tsx",
   "app/(app)/banking/reconcile/[id]/ReconcileWorkspaceClient.tsx",
@@ -127,7 +126,7 @@ describe("table adoption", () => {
     // The allowlist is the outstanding work. Adding to it is how a guard
     // quietly stops guarding, and it reads in a diff exactly like a migration.
     // Lowering this number is the migration; raising it has to be argued for.
-    expect(RAW_TABLE.size).toBeLessThanOrEqual(43);
+    expect(RAW_TABLE.size).toBeLessThanOrEqual(42);
   });
 
   it("lists no file that has already been migrated", () => {

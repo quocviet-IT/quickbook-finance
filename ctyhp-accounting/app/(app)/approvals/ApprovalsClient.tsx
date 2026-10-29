@@ -3,13 +3,14 @@ import { useCompanyClock } from "@/components/CompanyClock";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Card, Space, Table, Tooltip, Typography, type TableColumnsType } from "antd";
+import { Alert, App, Button, Card, Space, Tooltip, Typography, type TableColumnsType } from "antd";
 import type { ApprovalPolicyRow, ApprovalRequestRow, ApprovalStatus } from "@/lib/db/types";
 import { canDecide } from "@/lib/domain/access";
 import { formatDateTime, formatMoney, plural, pluralWord } from "@/lib/format";
 import { approveRequestAction, cancelRequestAction, rejectRequestAction } from "./actions";
 import StatusTag from "@/components/ui/StatusTag";
 import TableEmpty from "@/components/ui/TableEmpty";
+import DataTable from "@/components/ui/DataTable";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { longTextColumn } from "@/components/ui/long-text-column";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
@@ -202,9 +203,9 @@ export default function ApprovalsClient({
       )}
 
       <Card title={`Pending (${visiblePending.length})`}>
-        <Table<ApprovalRequestRow>
+        <DataTable<ApprovalRequestRow>
           rowKey="id"
-          dataSource={visiblePending}
+          rows={visiblePending}
           rowClassName={(request) =>
             request.id === initialFocusId ? "accounting-data-row--focused" : ""
           }
@@ -253,9 +254,9 @@ export default function ApprovalsClient({
       </Card>
 
       <Card title="Decided">
-        <Table<ApprovalRequestRow>
+        <DataTable<ApprovalRequestRow>
           rowKey="id"
-          dataSource={history}
+          rows={history}
           pagination={clientTablePagination(
             decidedPageSize,
             setDecidedPageSize,
