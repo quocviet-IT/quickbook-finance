@@ -6,7 +6,7 @@ import {
   type AutomationCompany,
 } from "@/lib/domain/company-automation";
 import { takeCompanyBackup } from "@/lib/services/backup";
-import { companiesDueForBackup, type BackupCandidate } from "@/lib/services/backup-queue";
+import { BACKUP_TIME_BUDGET_MS, companiesDueForBackup, type BackupCandidate } from "@/lib/services/backup-queue";
 
 export interface BackupRunItemResult {
   slug: string;
@@ -29,6 +29,11 @@ export interface BackupRunResult {
    * night with a stuck retentionWarning; that night still succeeded.
    */
   failed: number;
+  /**
+   * Companies the night ran out of time for, by slug, in the order they wait.
+   * Not failures: nothing was tried, and they are first in line tomorrow.
+   */
+  deferred: string[];
   results: BackupRunItemResult[];
 }
 
@@ -42,6 +47,8 @@ interface BackupQueueDependencies {
     today: string,
   ) => ReturnType<typeof takeCompanyBackup>;
   today?: string;
+  /** Milliseconds, for the time budget. A test passes its own clock. */
+  now?: () => number;
 }
 
 /**
@@ -64,7 +71,8 @@ async function lastBackupDate(sb: SupabaseClient): Promise<string | null> {
 }
 
 /**
- * Tonight's snapshots: a batch of the companies waiting longest.
+ * Tonight's snapshots: every company, longest waiting first, for as long as
+ * the time budget lasts (BACKUP_TIME_BUDGET_MS).
  *
  * Ranking needs every company's last snapshot date, so that read runs for
  * all of them first, isolated per company through runForAutomationCompanies —
@@ -96,6 +104,8 @@ export async function runDueCompanyBackups(
   const takeBackup = deps.takeBackup ?? takeCompanyBackup;
   // A machine day, not a screen date: the nightly job ranks companies by how long since their last backup, on one clock for all of them, so UTC is right here.
   const today = deps.today ?? new Date().toISOString().slice(0, 10);
+  const now = deps.now ?? Date.now;
+  const started = now();
 
   const companies = await listCompanies();
   const reads = await runForAutomationCompanies(companies, (company) =>
@@ -120,7 +130,14 @@ export async function runDueCompanyBackups(
   }
 
   const due = companiesDueForBackup(candidates);
+  const deferred: string[] = [];
   for (const candidate of due) {
+    // Checked before each snapshot, never during one: a snapshot is started
+    // only while the budget lasts, and one under way always gets to finish.
+    if (now() - started >= BACKUP_TIME_BUDGET_MS) {
+      deferred.push(candidate.slug);
+      continue;
+    }
     try {
       const outcome = await takeBackup(
         createClient(candidate.company.schemaName),
@@ -146,12 +163,22 @@ export async function runDueCompanyBackups(
   }
 
   const result: BackupRunResult = {
-    attempted: due.length,
+    attempted: due.length - deferred.length,
     stored: results.filter((r) => r.ok && r.status === "stored").length,
     skipped: results.filter((r) => r.ok && r.status === "skipped").length,
     failed: results.filter((r) => !r.ok).length,
+    deferred,
     results,
   };
+
+  if (deferred.length > 0) {
+    // Not an error, and the route still answers 200: nothing failed. It is a
+    // sign the companies have outgrown one night, so it is logged where
+    // whoever reads the cron log will see it.
+    console.warn(
+      `Nightly backup: the ${BACKUP_TIME_BUDGET_MS / 1000}-second budget ran out; first in line tomorrow: ${deferred.join(", ")}`,
+    );
+  }
 
   if (result.failed > 0) {
     // Each failure above already named its own company; this line is for
