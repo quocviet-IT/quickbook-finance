@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.71",
+    date: "2026-10-29",
+    headline: "Settings › Users shows each person's email on a phone.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Users on a phone",
+        detail:
+          "On a phone the Users list had no Email column at all: Role, Status, MFA and Last sign-in took the whole screen and the address was squeezed to nothing. The list now keeps to the screen like every other list, with each person's email and name in view and the table scrolling sideways to the rest.",
+        route: "/settings/users",
+      },
+    ],
+  },
+  {
     version: "2.70",
     date: "2026-10-29",
     headline: "Approval Policies fits a phone, and grey second lines are readable in dark mode.",

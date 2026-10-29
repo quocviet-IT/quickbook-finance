@@ -20,8 +20,7 @@ import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table
  * why this has to live in state rather than as a literal on `pagination`. */
 const DECIDED_DEFAULT_PAGE_SIZE = 20;
 
-/** "10/19/2026 10:42 AM" at 14px, with the cell's padding. */
-const DATE_TIME_WIDTH = 160;
+const DATE_TIME_WIDTH = COLUMN.DATE_TIME;
 /** Approve, Reject and Cancel side by side. */
 const ACTIONS_WIDTH = 232;
 /**
