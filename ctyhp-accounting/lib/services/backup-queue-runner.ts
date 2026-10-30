@@ -31,7 +31,7 @@ export interface BackupRunResult {
   failed: number;
   /**
    * Companies the night ran out of time for, by slug, in the order they wait.
-   * Not failures: nothing was tried, and they are first in line tomorrow.
+   * Not failures: nothing was tried, and they are first in line for the next run.
    */
   deferred: string[];
   results: BackupRunItemResult[];
@@ -71,8 +71,9 @@ async function lastBackupDate(sb: SupabaseClient): Promise<string | null> {
 }
 
 /**
- * Tonight's snapshots: every company, longest waiting first, for as long as
- * the time budget lasts (BACKUP_TIME_BUDGET_MS).
+ * Tonight's snapshots: every company not yet backed up today, longest waiting
+ * first, for as long as the time budget lasts (BACKUP_TIME_BUDGET_MS). The
+ * night has three runs; each later one takes what an earlier one did not reach.
  *
  * Ranking needs every company's last snapshot date, so that read runs for
  * all of them first, isolated per company through runForAutomationCompanies —
@@ -129,7 +130,8 @@ export async function runDueCompanyBackups(
     }
   }
 
-  const due = companiesDueForBackup(candidates);
+  // A later run the same night covers only what an earlier one did not reach.
+  const due = companiesDueForBackup(candidates, today);
   const deferred: string[] = [];
   for (const candidate of due) {
     // Checked before each snapshot, never during one: a snapshot is started
@@ -176,7 +178,7 @@ export async function runDueCompanyBackups(
     // sign the companies have outgrown one night, so it is logged where
     // whoever reads the cron log will see it.
     console.warn(
-      `Nightly backup: the ${BACKUP_TIME_BUDGET_MS / 1000}-second budget ran out; first in line tomorrow: ${deferred.join(", ")}`,
+      `Nightly backup: the ${BACKUP_TIME_BUDGET_MS / 1000}-second budget ran out; first in line for the next run: ${deferred.join(", ")}`,
     );
   }
 

@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.89",
+    date: "2026-10-30",
+    headline: "Every company is backed up every night.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Nightly backups reach every company",
+        detail:
+          "2.74 meant to back up every company each night, but one nightly run has five minutes, and a company takes 35 to 75 seconds to snapshot: on 29 October the run reached five of seven, and two waited until the next night. The night now has three runs, ten minutes apart, and each later run takes only the companies not yet backed up that day, so all of them are covered with room to spare. Settings → Backups lists one snapshot, or Skipped, per company per day.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "2.88",
     date: "2026-10-30",
     headline: "The Dashboard opens with what needs you: lines to code, reconciliations, holding accounts and future dates.",

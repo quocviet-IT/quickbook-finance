@@ -14,11 +14,12 @@ function authorized(request: Request): boolean {
 /**
  * Tonight's snapshots.
  *
- * Covers every company, longest waiting first, until a time budget inside this
- * route's 300 seconds is spent: one company already takes 18.6 seconds to read,
- * and a run that never stops is a run that eventually covers nobody. A night
- * that runs out of time leaves the rest first in line tomorrow (see
- * BACKUP_TIME_BUDGET_MS).
+ * Covers every company not yet backed up today, longest waiting first, until a
+ * time budget inside this route's 300 seconds is spent: a company takes 35 to 75
+ * seconds, and a run that never stops is a run that eventually covers nobody.
+ * vercel.json calls it three times a night, ten minutes apart, so what one run
+ * does not reach the next one does (see BACKUP_TIME_BUDGET_MS). The ?pass=2 and
+ * ?pass=3 on the later calls only tell the runs apart in the cron log.
  */
 export async function POST(request: Request) {
   if (!authorized(request)) {
