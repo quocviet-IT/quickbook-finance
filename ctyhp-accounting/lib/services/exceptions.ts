@@ -1,7 +1,13 @@
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AttentionChecks, AttentionKey } from "@/lib/domain/dashboard-needs";
 import {
   buildExceptionReport,
+  futureDatedEntries,
+  holdingAccounts,
+  reconciliationsNoLongerAgreeing,
+  signedBalance,
+  unreconciledBankAccounts,
   yearTotalsFromMonthly,
   yearsWithIncomeAndNoCost,
   type CheckKey,
@@ -367,4 +373,75 @@ export async function getExceptionReport(
     timeZone,
     unavailable,
   });
+}
+
+/** Bank lines waiting on Bank Transactions: not yet posted to an account, not pending at the bank. */
+async function waitingLineCount(sb: SupabaseClient): Promise<number> {
+  const { count, error } = await sb
+    .from("acc_bank_transaction")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "unmatched")
+    .eq("pending", false)
+    .is("provider_removed_at", null);
+  if (error) throw new ExceptionsError(error.message);
+  return count ?? 0;
+}
+
+/**
+ * The Dashboard's checks (2.88): the few the Exception Report makes that a
+ * front door needs, from only the reads they stand on, so opening the Dashboard
+ * does not run the whole report. The verdicts are the report's own functions.
+ * A read that fails leaves its checks unavailable rather than clear.
+ */
+export async function getAttentionChecks(sb: SupabaseClient, today: string): Promise<AttentionChecks> {
+  const unavailable: AttentionKey[] = [];
+  const settle = async <T,>(keys: readonly AttentionKey[], fallback: T, run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch {
+      for (const key of keys) if (!unavailable.includes(key)) unavailable.push(key);
+      return fallback;
+    }
+  };
+  const [accountRows, balances, banks, lastReconciled, changes, future, waitingLines] = await Promise.all([
+    settle(["holding"], [] as AccountRow[], () => listAccounts(sb)),
+    settle(["holding", "neverReconciled"], [] as LedgerBalance[], () => getLedgerBalances(sb, null, today)),
+    settle(["neverReconciled", "noLongerAgree"], [] as BankAccountWithGl[], () => listBankAccounts(sb)),
+    settle(["neverReconciled"], new Map<string, string>(), () => lastReconciledByBankAccount(sb)),
+    settle(["noLongerAgree"], [] as ReconciliationChange[], () => getReconciliationChanges(sb)),
+    settle(["futureDated"], [] as TransactionListRow[], () => getTransactionList(sb, addDays(today, 1), "9999-12-31")),
+    settle(["waiting"], 0, () => waitingLineCount(sb)),
+  ]);
+
+  const accountById = new Map(accountRows.map((a) => [a.id, a]));
+  const accounts: ExceptionAccount[] = balances.map((b: LedgerBalance) => ({
+    accountId: b.accountId,
+    accountCode: b.accountCode,
+    name: b.name,
+    accountType: b.accountType,
+    isContra: accountById.get(b.accountId)?.is_contra ?? false,
+    isClearing: accountById.get(b.accountId)?.is_clearing ?? false,
+    detailType: accountById.get(b.accountId)?.detail_type ?? null,
+    debitBase: b.debitBase,
+    creditBase: b.creditBase,
+  }));
+  const bankAccounts: ExceptionBankAccount[] = banks.map((b) => ({
+    bankAccountId: b.id,
+    accountId: b.account_id,
+    accountName: b.account_name || b.bank_name,
+    lastReconciledDate: lastReconciled.get(b.id) ?? null,
+  }));
+  const balanceByAccountId = new Map(accounts.map((a) => [a.accountId, signedBalance(a)]));
+
+  return {
+    waitingLines,
+    neverReconciled: unreconciledBankAccounts(bankAccounts, balanceByAccountId, today).filter(
+      (row) => row.lastReconciledDate === null,
+    ),
+    noLongerAgree: unavailable.includes("noLongerAgree") ? [] : reconciliationsNoLongerAgreeing(bankAccounts, changes, today),
+    // Without the chart, Uncategorized cannot be told from any other account.
+    holding: unavailable.includes("holding") ? [] : holdingAccounts(accounts),
+    futureDated: futureDatedEntries(future, today),
+    unavailable,
+  };
 }
