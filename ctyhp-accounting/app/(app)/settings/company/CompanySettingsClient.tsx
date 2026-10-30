@@ -10,16 +10,25 @@ import {
   InputNumber,
   Select,
   Space,
-  Table,
   Typography,
 } from "antd";
 import { timeZoneLabel } from "@/lib/format";
 import FormActions from "@/components/ui/FormActions";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
 import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
+
+/**
+ * Version, Effective, Basis, Employer Identification Number. Legal name takes
+ * what is left, at least COLUMN.TEXT_MIN. The EIN heading is long and wraps; the
+ * value is nine masked characters.
+ */
+export const COMPANY_VERSIONS_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.DATE, COLUMN.CODE, COLUMN.PICKER] as const;
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 function maskEin(s: string | null | undefined): string {
@@ -238,13 +247,13 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
         </Card>
       )}
       <Card title="Version history">
-        <Table rowKey="id" size="small" dataSource={versions} pagination={false}
+        <DataTable<CompanySettingRow> rowKey="id" rows={versions} pagination={false}
           columns={[
-            { title: "Version", dataIndex: "version" },
-            { title: "Effective", dataIndex: "effective_from" },
-            { title: "Legal name", dataIndex: "legal_name" },
-            { title: "Basis", dataIndex: "accounting_basis", render: (v: string) => humanizeStatus(v) },
-            { title: "Employer Identification Number", render: (_, r) => maskEin(r.ein_ref) },
+            { title: "Version", dataIndex: "version", width: COMPANY_VERSIONS_FIXED_WIDTHS[0] },
+            { title: "Effective", dataIndex: "effective_from", width: COMPANY_VERSIONS_FIXED_WIDTHS[1] },
+            flexColumn<CompanySettingRow>({ title: "Legal name", dataIndex: "legal_name" }),
+            { title: "Basis", dataIndex: "accounting_basis", width: COMPANY_VERSIONS_FIXED_WIDTHS[2], render: (v: string) => humanizeStatus(v) },
+            { title: "Employer Identification Number", width: COMPANY_VERSIONS_FIXED_WIDTHS[3], render: (_, r) => maskEin(r.ein_ref) },
           ]} />
       </Card>
       <CompanyExportCard />

@@ -88,7 +88,8 @@ describe("the banking category column", () => {
     expect(filters).toContain("Not categorized yet");
     // Fetched beside the lines, in the one request the screen loads them with.
     expect(read("BankingClient.tsx")).toContain("getBankingViewAction");
-    expect(read("actions.ts")).toMatch(/getBankingViewAction[\s\S]*?listBankTransactionPostings\(sb, bankAccountId\)/);
+    expect(read("actions.ts")).toMatch(/getBankingViewAction[\s\S]*?readBankingView\(sb, bankAccountId\)/);
+    expect(read("banking-view.ts")).toMatch(/readBankingView[\s\S]*?listBankTransactionPostings\(sb, bankAccountId\)/);
   });
 
   it("never touches the feed's own category through this column", () => {

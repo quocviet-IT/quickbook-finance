@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Table, Tag, Typography } from "antd";
+import { App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
@@ -12,13 +12,31 @@ import { formatDate, formatMoney } from "@/lib/format";
 import type { BankStanding } from "@/lib/domain/bank-standing";
 import { reconcileHref } from "@/lib/domain/statement-alerts";
 import { chosenBankId, reconcileTableLoading, rowsForAccount } from "@/lib/domain/reconcile-alerts-screen";
+import { flexColumn } from "@/components/ui/columns";
 import { EmptyState } from "@/components/ui/PageStates";
 import TableEmpty from "@/components/ui/TableEmpty";
+import DataTable from "@/components/ui/DataTable";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { RECONCILE_HISTORY, RECONCILE_HISTORY_PATH } from "@/lib/domain/reconcile-history";
-import { bankStandingAction, createReconciliationAction, listReconciliationsAction } from "./actions";
+import { createReconciliationAction, reconcileAccountAction } from "./actions";
+import type { ReconcileAccountView } from "./account-view";
 import StandingCard from "./StandingCard";
 import StatementAlertsPanel from "./StatementAlertsPanel";
 import type { StatementReconciliationRow } from "@/lib/db/types";
+
+/**
+ * Ending date, the two balances, Status, and the Open and Report links.
+ * Statement (the bank's reference) takes what is left, at least
+ * COLUMN.TEXT_MIN. Status holds up to three tags (the state, Brought forward,
+ * Adjusted), so it gets two tokens' worth rather than wrapping every row.
+ */
+export const RECONCILE_LIST_FIXED_WIDTHS = [
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.STATUS * 2,
+  COLUMN.ACTION * 3,
+] as const;
 
 interface Bank {
   id: string;
@@ -35,9 +53,11 @@ interface Props {
   banks: Bank[];
   baseCurrency: string;
   baseDecimals: number;
+  /** What the page already read for the account it opens on (2.91). */
+  opening: ReconcileAccountView | null;
 }
 
-export default function ReconcileListClient({ canWrite, today, banks, baseCurrency, baseDecimals }: Props) {
+export default function ReconcileListClient({ canWrite, today, banks, baseCurrency, baseDecimals, opening }: Props) {
   const { message } = App.useApp();
   const router = useRouter();
   // The chosen account lives in the address (?account=<bank id>), so the
@@ -45,43 +65,42 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
   // that is not one of these accounts falls back to the first.
   const bankId = chosenBankId(banks, useSearchParams().get("account"));
   const bank = banks.find((b) => b.id === bankId);
-  const [rows, setRows] = useState<StatementReconciliationRow[]>([]);
+  // What the page read for the account it opened on (2.91), so the first paint
+  // has it. Taken only for that account, and only when its list was read.
+  const [seed] = useState(() =>
+    opening && opening.bankAccountId === bankId && opening.reconciliations.ok ? opening : null,
+  );
+  const [rows, setRows] = useState<StatementReconciliationRow[]>(() => seed?.reconciliations.data ?? []);
   const [loading, setLoading] = useState(false);
   // The account whose reconciliations were last read: the empty state waits for it.
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  const [standing, setStanding] = useState<BankStanding | null>(null);
+  const [loadedFor, setLoadedFor] = useState<string | null>(() => seed?.bankAccountId ?? null);
+  const [standing, setStanding] = useState<BankStanding | null>(() => seed?.standing.data ?? null);
   // The account whose standing read has settled, found or not: the empty state waits for it too.
-  const [standingFor, setStandingFor] = useState<string | null>(null);
+  const [standingFor, setStandingFor] = useState<string | null>(() => seed?.bankAccountId ?? null);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   // Only the latest read may draw: switch accounts quickly and a slower,
   // earlier answer would otherwise list another account's reconciliations.
   const latestLoad = useRef(0);
-  // The same guard for the standing card.
-  const latestStanding = useRef(0);
+  // The account the page already read; cleared on first use, so a switch reads.
+  const openedOn = useRef(seed ? bankId : undefined);
 
   const load = async (id: string | undefined) => {
     if (!id) return;
     const ticket = ++latestLoad.current;
-    const standingTicket = ++latestStanding.current;
     setLoading(true);
-    // The card is read beside the list and fails quietly: without it the table still works.
-    const settle = (found: BankStanding | null) => {
-      if (latestStanding.current !== standingTicket) return;
-      setStanding(found);
-      setStandingFor(id);
-    };
-    void bankStandingAction(id).then(
-      (s) => settle(s.ok ? (s.data ?? null) : null),
-      () => settle(null),
-    );
-    const r = await listReconciliationsAction(id);
+    // The list and the standing card in one request (2.91).
+    const r = await reconcileAccountAction(id);
     if (latestLoad.current !== ticket) return;
     setLoading(false);
-    if (r.ok && r.data) {
-      setRows(r.data);
+    const view = r.ok ? r.data : undefined;
+    // The card fails quietly: without it the table still works.
+    setStanding(view?.standing.ok ? (view.standing.data ?? null) : null);
+    setStandingFor(id);
+    if (view?.reconciliations.ok && view.reconciliations.data) {
+      setRows(view.reconciliations.data);
       setLoadedFor(id);
-    } else message.error(r.error ?? "Failed to load");
+    } else message.error(view?.reconciliations.error ?? r.error ?? "Failed to load");
   };
 
   const choose = (id: string) => {
@@ -89,8 +108,14 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
     // useSearchParams, where the account is read, without a server request.
     window.history.replaceState(null, "", reconcileHref(id));
   };
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // A layout effect, so this read is first in Next's queue of Server Actions.
+  // StatementAlertsPanel below asks from a passive effect, and every layout
+  // effect runs before any passive one, a child's included. Sent from a
+  // useEffect, the list waited behind the alerts' whole-ledger read.
+  useLayoutEffect(() => {
+    const already = openedOn.current !== undefined && openedOn.current === bankId;
+    openedOn.current = undefined;
+    if (already) return;
     void load(bankId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankId]);
@@ -212,18 +237,20 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
         </StandingCard>
       ) : null}
       {isEmpty ? null : (
-        <Table<StatementReconciliationRow>
+        <DataTable<StatementReconciliationRow>
           rowKey="id"
           loading={tableLoading}
-          dataSource={[...shownRows]}
+          rows={[...shownRows]}
           locale={{ emptyText: <TableEmpty loading={tableLoading} title="No reconciliations yet" /> }}
           columns={[
-            { title: "Ending date", dataIndex: "statement_ending_date", render: (value: string) => formatDate(value) },
-            { title: words.beginning, align: "right", render: (_, r) => money(shown(Number(r.beginning_balance_minor), side)) },
-            { title: words.ending, align: "right", render: (_, r) => money(shown(Number(r.statement_ending_balance_minor), side)) },
-            { title: "Statement", render: (_, r) => r.statement_ref ?? "—" },
+            { title: "Ending date", dataIndex: "statement_ending_date", width: RECONCILE_LIST_FIXED_WIDTHS[0], render: (value: string) => formatDate(value) },
+            { title: words.beginning, align: "right", width: RECONCILE_LIST_FIXED_WIDTHS[1], render: (_, r) => money(shown(Number(r.beginning_balance_minor), side)) },
+            { title: words.ending, align: "right", width: RECONCILE_LIST_FIXED_WIDTHS[2], render: (_, r) => money(shown(Number(r.statement_ending_balance_minor), side)) },
+            flexColumn<StatementReconciliationRow>({ title: "Statement", render: (_, r) => r.statement_ref ?? "—" }),
             {
               title: "Status",
+              // Not a bare StatusTag: Brought forward and Adjusted can sit beside it.
+              width: RECONCILE_LIST_FIXED_WIDTHS[3],
               render: (_, r) => (
                 <Space size={4} wrap>
                   <StatusTag status={r.status} />
@@ -242,6 +269,7 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
             },
             {
               title: "",
+              width: RECONCILE_LIST_FIXED_WIDTHS[4],
               render: (_, r) => (
                 <Space size={12}>
                   <Link href={`/banking/reconcile/${r.id}`}>Open</Link>

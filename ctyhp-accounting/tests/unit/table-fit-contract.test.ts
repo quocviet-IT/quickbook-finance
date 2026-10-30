@@ -26,14 +26,18 @@ const MATRIX = new Map<string, string>([
     "components/statement-file/StatementFileViewer.tsx",
     "A saved CSV shown as it arrived: its columns are the file's own, as many as the file has, so they cannot be designed to fit.",
   ],
+  [
+    "components/reports/AgingByPartyTable.tsx",
+    "The summary grid has a column per customer or vendor, as many as the books have, so the count is data rather than design.",
+  ],
 ]);
 
 /**
  * Three more were candidates and none of them qualified, which is the point of
- * checking rather than listing: the permission grid reaches for Ant Design's
- * Table directly, so this boundary never covered it (see
- * tests/unit/table-adoption.test.ts), and the budget view turned out to pass
- * no `scroll.x` at all. The saved-report viewer was the third; since 1.83 its
+ * checking rather than listing: the permission grid has one column per role,
+ * but the roles are a fixed list of four (APP_ROLES), so it is a designed
+ * table and a fitted DataTable since batch 2c, and the budget view turned out
+ * to pass no `scroll.x` at all. The saved-report viewer was the third; since 1.83 its
  * preview is the matrix above.
  */
 

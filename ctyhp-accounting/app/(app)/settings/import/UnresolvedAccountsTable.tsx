@@ -1,7 +1,17 @@
 "use client";
-import { Button, Select, Space, Table, Typography } from "antd";
+import { Button, Select, Space, Typography } from "antd";
 import type { AccountRow } from "@/lib/db/types";
 import type { UnresolvedRef } from "@/lib/services/import-preflight";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/**
+ * The count, then Read it as. "Name in the file" takes what is left, at least
+ * COLUMN.TEXT_MIN. Read it as holds a 250px picker and the Create button, so it
+ * has a width of its own.
+ */
+export const UNRESOLVED_ACCOUNTS_FIXED_WIDTHS = [COLUMN.QTY, 380] as const;
 
 export interface UnresolvedAccountsTableProps {
   rows: UnresolvedRef[];
@@ -48,13 +58,12 @@ export default function UnresolvedAccountsTable({
     }));
 
   return (
-    <Table<UnresolvedRef>
-      size="small"
+    <DataTable<UnresolvedRef>
       rowKey="ref"
       pagination={false}
-      dataSource={rows}
+      rows={rows}
       columns={[
-        {
+        flexColumn<UnresolvedRef>({
           title: "Name in the file",
           dataIndex: "ref",
           render: (ref: string, row) => (
@@ -68,12 +77,12 @@ export default function UnresolvedAccountsTable({
               </Typography.Text>
             </Space>
           ),
-        },
-        { title: countLabel, dataIndex: "rows", width: 80, align: "right" },
+        }),
+        { title: countLabel, dataIndex: "rows", width: UNRESOLVED_ACCOUNTS_FIXED_WIDTHS[0], align: "right" },
         {
           title: "Read it as",
           key: "as",
-          width: 380,
+          width: UNRESOLVED_ACCOUNTS_FIXED_WIDTHS[1],
           render: (_, row) => (
             <Space>
               <Select

@@ -14,13 +14,11 @@ import {
 } from "@/lib/services/statement-alerts";
 import {
   createReconciliation, setCleared, setClearedMany, recordAdjustment, completeReconciliation, reopenReconciliation,
-  listReconciliations, getReconciliationLines, getReconciliationDetail, getDiscrepancies,
+  getReconciliationLines, getReconciliationDetail, getDiscrepancies,
   BankRecError, type ReconLineView, type ReconDetail, type DiscrepancyRow,
 } from "@/lib/services/bankrec";
-import type { StatementReconciliationRow } from "@/lib/db/types";
-import type { BankStanding } from "@/lib/domain/bank-standing";
-import { getBankStandingWithChanges } from "@/lib/services/bank-standing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
+import { readReconcileAccount, type ReconcileAccountView } from "./account-view";
 import { matchAfterCompletion, type CompletionMatching } from "@/lib/services/statement-bank-lines";
 import {
   executeOrSubmitForApproval,
@@ -128,10 +126,6 @@ export async function reopenReconciliationAction(
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 
-export async function listReconciliationsAction(bankAccountId: string): Promise<ActionResult<StatementReconciliationRow[]>> {
-  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await listReconciliations(sb, bankAccountId) }; }
-  catch (e) { return { ok: false, error: msg(e) }; }
-}
 export async function reconciliationLinesAction(id: string): Promise<ActionResult<ReconLineView[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getReconciliationLines(sb, id) }; }
   catch (e) { return { ok: false, error: msg(e) }; }
@@ -146,18 +140,18 @@ export async function discrepanciesAction(bankAccountId: string): Promise<Action
 }
 
 /**
- * One bank account's standing against its statements at the company's today,
- * for any signed-in role; null when the read has no row for it. Reads only.
+ * One bank account's reconciliations and its standing against its statements
+ * at the company's today, for any signed-in role, in one request. Reads only.
+ * The screen sends it ahead of the statement alerts (see readReconcileAccount).
  */
-export async function bankStandingAction(bankAccountId: string): Promise<ActionResult<BankStanding | null>> {
+export async function reconcileAccountAction(bankAccountId: string): Promise<ActionResult<ReconcileAccountView>> {
   const role = await getUserRole();
   if (!role) return { ok: false, error: "Not authorized" };
   if (!z.uuid().safeParse(bankAccountId).success) return { ok: false, error: "Choose a bank account" };
   try {
     const sb = await createSupabaseServerClient();
     const { asOf } = await getBankingContext(sb);
-    const standings = await getBankStandingWithChanges(sb, asOf);
-    return { ok: true, data: standings.find((s) => s.bankAccountId === bankAccountId) ?? null };
+    return { ok: true, data: await readReconcileAccount(sb, bankAccountId, asOf) };
   }
   catch (e) { return { ok: false, error: msg(e) }; }
 }

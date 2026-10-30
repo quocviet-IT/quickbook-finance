@@ -1,12 +1,23 @@
 "use client";
 import { useState } from "react";
-import { App, DatePicker, Form, Input, InputNumber, Modal, Table, Typography } from "antd";
+import { App, DatePicker, Form, Input, InputNumber, Modal, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCompanyClock } from "@/components/CompanyClock";
 import type { PurchaseOrderLineRow } from "@/lib/db/types";
 import { remainingQty } from "@/lib/domain/purchasing";
 import { receivePurchaseOrderAction } from "../actions";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/** The dialog's width; its body, where the lines sit, is 48px less. */
+export const RECEIVE_MODAL_WIDTH = 720;
+
+/**
+ * #, Ordered, Outstanding and Receive now. Description takes what is left, at
+ * least COLUMN.TEXT_MIN. The quantity box is the width of an amount.
+ */
+export const RECEIVE_LINES_FIXED_WIDTHS = [COLUMN.ACTION, COLUMN.QTY, COLUMN.QTY, COLUMN.MONEY] as const;
 
 interface Props {
   open: boolean;
@@ -76,32 +87,33 @@ function ReceiveModalBody({ onClose, onDone, purchaseOrderId, lines }: Props) {
       onCancel={onClose}
       confirmLoading={saving}
       okText="Record receipt"
-      width={720}
+      width={RECEIVE_MODAL_WIDTH}
     >
       <Form form={form} layout="vertical" initialValues={{ receipt_date: dayjs(today) }}>
         <Form.Item name="receipt_date" label="Receipt date" rules={[{ required: true, message: "Receipt date" }]}>
           <DatePicker />
         </Form.Item>
-        <Table
+        {/* Every row stays visible: the quantities are edited here. */}
+        <DataTable<PurchaseOrderLineRow>
           rowKey="id"
-          size="small"
           pagination={false}
-          dataSource={receivable}
-          scroll={{ x: "max-content" }}
-          locale={{ emptyText: "Nothing outstanding to receive" }}
+          rows={receivable}
+          emptyTitle="Nothing outstanding to receive"
           columns={[
-            { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
-            { title: "Description", dataIndex: "description", ...longTextColumn() },
-            { title: "Ordered", dataIndex: "quantity", align: "right", render: (v: number) => Number(v) },
+            { title: "#", dataIndex: "line_order", width: RECEIVE_LINES_FIXED_WIDTHS[0], render: (v: number) => v + 1 },
+            flexColumn<PurchaseOrderLineRow>({ title: "Description", dataIndex: "description" }),
+            { title: "Ordered", dataIndex: "quantity", width: RECEIVE_LINES_FIXED_WIDTHS[1], align: "right", render: (v: number) => Number(v) },
             {
               title: "Outstanding",
               key: "outstanding",
+              width: RECEIVE_LINES_FIXED_WIDTHS[2],
               align: "right",
               render: (_, r) => remainingQty(Number(r.quantity), Number(r.qty_received)),
             },
             {
               title: "Receive now",
               key: "receive",
+              width: RECEIVE_LINES_FIXED_WIDTHS[3],
               align: "right",
               render: (_, r) => (
                 <InputNumber

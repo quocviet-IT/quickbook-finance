@@ -2,11 +2,14 @@
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
-import { App, Button, Checkbox, DatePicker, Input, Select, Space, Table, Tag, Typography } from "antd";
+import { App, Button, Checkbox, DatePicker, Input, Select, Space, Tag, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import FilterBar from "@/components/ui/FilterBar";
 import TableEmpty from "@/components/ui/TableEmpty";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import type { ActorRow, AuditEntryRow } from "@/lib/db/types";
 import {
   auditTrailCsv,
@@ -27,6 +30,18 @@ const ACTIONS = ["insert", "update", "delete", "post", "void"];
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const AUDIT_DEFAULT_PAGE_SIZE = 25;
+
+/**
+ * When, Action, Record type. Actor, Record and Changed share what is left:
+ * an email address, a record id and a summary of the fields are text somebody
+ * else wrote, and the whole value is one hover away.
+ */
+export const AUDIT_FIXED_WIDTHS = [COLUMN.DATE_TIME, COLUMN.STATUS, COLUMN.PICKER] as const;
+/** The floors of the three elastic columns, in order: Actor, Record, Changed. */
+export const AUDIT_ELASTIC_FLOORS = [160, 120, COLUMN.TEXT_MIN] as const;
+
+/** Field. Old value and New value share the rest of the opened entry. */
+export const AUDIT_FIELD_CHANGES_FIXED_WIDTHS = [240] as const;
 
 /**
  * A month is the unit an audit trail is reviewed in, so both the current and
@@ -169,9 +184,9 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
         </Checkbox>
       </FilterBar>
 
-      <Table<AuditEntryRow>
+      <DataTable<AuditEntryRow>
         rowKey="id"
-        dataSource={rows}
+        rows={rows}
         loading={loading}
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(AUDIT_DEFAULT_PAGE_SIZE))}
         locale={{
@@ -211,34 +226,40 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
           {
             title: "When",
             dataIndex: "created_at",
-            width: 170,
+            width: AUDIT_FIXED_WIDTHS[0],
             render: (v: string) => formatDateTime(v, timeZone),
           },
-          {
+          flexColumn<AuditEntryRow>({
             title: "Actor",
             dataIndex: "actor_email",
-            width: 200,
+            floor: AUDIT_ELASTIC_FLOORS[0],
             render: (v: string | null) => formatActor(v),
+          }),
+          {
+            title: "Action",
+            dataIndex: "action",
+            width: AUDIT_FIXED_WIDTHS[1],
+            render: (v: string) => <Tag>{ACTIVITY_VERBS[v] ?? v}</Tag>,
           },
-          { title: "Action", dataIndex: "action", width: 90, render: (v: string) => <Tag>{ACTIVITY_VERBS[v] ?? v}</Tag> },
           {
             title: "Record type",
             dataIndex: "table_name",
-            width: 200,
+            width: AUDIT_FIXED_WIDTHS[2],
             render: (v: string) => auditEntityLabel(v),
           },
-          {
+          flexColumn<AuditEntryRow>({
             title: "Record",
             dataIndex: "record_id",
-            width: 300,
+            floor: AUDIT_ELASTIC_FLOORS[1],
             render: (v: string | null) => v ?? "—",
-          },
-          {
+          }),
+          flexColumn<AuditEntryRow>({
             title: "Changed",
             key: "changes",
+            floor: AUDIT_ELASTIC_FLOORS[2],
             render: (_: unknown, r) =>
               summarizeAuditChanges(diffAuditEntry(r, { includeHousekeeping })),
-          },
+          }),
         ]}
       />
     </Space>
@@ -247,24 +268,23 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
 
 function FieldChanges({ changes }: { changes: AuditFieldChange[] }) {
   return (
-    <Table<AuditFieldChange>
+    <DataTable<AuditFieldChange>
       rowKey="field"
-      size="small"
       pagination={false}
-      dataSource={changes}
+      rows={changes}
       locale={{ emptyText: "No field changed" }}
       columns={[
-        { title: "Field", dataIndex: "field", width: 240 },
-        {
+        { title: "Field", dataIndex: "field", width: AUDIT_FIELD_CHANGES_FIXED_WIDTHS[0] },
+        flexColumn<AuditFieldChange>({
           title: "Old value",
           dataIndex: "before",
           render: (v: string | null) => formatAuditValue(v),
-        },
-        {
+        }),
+        flexColumn<AuditFieldChange>({
           title: "New value",
           dataIndex: "after",
           render: (v: string | null) => formatAuditValue(v),
-        },
+        }),
       ]}
     />
   );

@@ -1,13 +1,32 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Alert, App, DatePicker, Form, Input, InputNumber, Modal, Table, Tag } from "antd";
+import { Alert, App, DatePicker, Form, Input, InputNumber, Modal, Tag } from "antd";
 import dayjs from "dayjs";
 import { useCompanyClock } from "@/components/CompanyClock";
 import type { PurchaseOrderLineRow, PurchasingConfigRow } from "@/lib/db/types";
 import { threeWayMatchLine, type ThreeWayMatchResult } from "@/lib/domain/purchasing";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { createBillFromPoAction } from "../actions";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/** The dialog's width; its body, where the lines sit, is 48px less. */
+export const BILL_FROM_PO_MODAL_WIDTH = 860;
+
+/**
+ * #, Received, Already billed, Bill quantity, Unit cost and Match. Description
+ * takes what is left, at least COLUMN.TEXT_MIN. The two boxes are the width of
+ * an amount; Match holds up to two tags, which wrap.
+ */
+export const BILL_FROM_PO_FIXED_WIDTHS = [
+  COLUMN.ACTION,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+] as const;
 
 interface LineState {
   quantity: number;
@@ -137,7 +156,7 @@ function BillFromPoModalBody({
       confirmLoading={saving}
       okText="Create draft bill"
       okButtonProps={{ disabled: varianceBlocked }}
-      width={860}
+      width={BILL_FROM_PO_MODAL_WIDTH}
     >
       <Form form={form} layout="vertical" initialValues={{ bill_date: dayjs(today) }}>
         <Form.Item name="bill_date" label="Bill date" rules={[{ required: true, message: "Bill date" }]}>
@@ -150,21 +169,21 @@ function BillFromPoModalBody({
           <Input placeholder="Vendor invoice number" />
         </Form.Item>
 
-        <Table
+        {/* Every row stays visible: the quantities and costs are edited here. */}
+        <DataTable<PurchaseOrderLineRow>
           rowKey="id"
-          size="small"
           pagination={false}
-          dataSource={billable}
-          scroll={{ x: "max-content" }}
-          locale={{ emptyText: "Nothing received is waiting to be billed" }}
+          rows={billable}
+          emptyTitle="Nothing received is waiting to be billed"
           columns={[
-            { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
-            { title: "Description", dataIndex: "description", ...longTextColumn() },
-            { title: "Received", dataIndex: "qty_received", align: "right", render: (v: number) => Number(v) },
-            { title: "Already billed", dataIndex: "qty_billed", align: "right", render: (v: number) => Number(v) },
+            { title: "#", dataIndex: "line_order", width: BILL_FROM_PO_FIXED_WIDTHS[0], render: (v: number) => v + 1 },
+            flexColumn<PurchaseOrderLineRow>({ title: "Description", dataIndex: "description" }),
+            { title: "Received", dataIndex: "qty_received", width: BILL_FROM_PO_FIXED_WIDTHS[1], align: "right", render: (v: number) => Number(v) },
+            { title: "Already billed", dataIndex: "qty_billed", width: BILL_FROM_PO_FIXED_WIDTHS[2], align: "right", render: (v: number) => Number(v) },
             {
               title: "Bill quantity",
               key: "qty",
+              width: BILL_FROM_PO_FIXED_WIDTHS[3],
               align: "right",
               render: (_, r) => (
                 <InputNumber
@@ -180,6 +199,7 @@ function BillFromPoModalBody({
             {
               title: `Unit cost (${currencyCode})`,
               key: "cost",
+              width: BILL_FROM_PO_FIXED_WIDTHS[4],
               align: "right",
               render: (_, r) => (
                 <InputNumber
@@ -196,6 +216,7 @@ function BillFromPoModalBody({
             {
               title: "Match",
               key: "match",
+              width: BILL_FROM_PO_FIXED_WIDTHS[5],
               render: (_, r) => {
                 const m = matches[r.id];
                 if (!m) return "—";

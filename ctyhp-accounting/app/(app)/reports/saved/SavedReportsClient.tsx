@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Card, Empty, Input, Modal, Space, Table, Tag } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import { App, Button, Card, Input, Modal, Space, Tag } from "antd";
+import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { SAVED_REPORT_SOURCE_LABEL, type SavedReportSource } from "@/lib/domain/saved-reports";
 import type { SavedReportRow } from "@/lib/services/saved-reports";
 import { archiveSavedReportAction } from "./actions";
@@ -17,6 +19,17 @@ export interface SavedReportsClientProps {
   reports: SavedReportRow[];
   canManage: boolean;
 }
+
+/**
+ * From, Period, Saved, and the archive action. The report's title takes what is
+ * left, at least COLUMN.TEXT_MIN. Period holds two dates and an arrow.
+ */
+export const SAVED_REPORTS_FIXED_WIDTHS = [
+  COLUMN.STATUS,
+  COLUMN.DATE * 2 + COLUMN.ACTION,
+  COLUMN.DATE,
+  COLUMN.CODE,
+] as const;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -70,35 +83,28 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
         ) : null
       }
     >
-      <Table<SavedReportRow>
-        size="small"
+      <DataTable<SavedReportRow>
         rowKey="id"
-        dataSource={reports}
-        locale={{
-          emptyText: (
-            <Empty
-              image={<InboxOutlined style={{ fontSize: 36 }} />}
-              description="No reports saved yet. Anything saved here is kept as it arrived and never posted."
-            />
-          ),
-        }}
+        rows={reports}
+        emptyTitle="No reports saved yet"
+        emptyDescription="Anything saved here is kept as it arrived and never posted."
         columns={[
-          {
+          flexColumn<SavedReportRow>({
             title: "Report",
             dataIndex: "title",
-            render: (title: string, row: SavedReportRow) => (
+            render: (title: unknown, row: SavedReportRow) => (
               <Space direction="vertical" size={0}>
-                <a onClick={() => setViewing(row)}>{title}</a>
+                <a onClick={() => setViewing(row)}>{String(title)}</a>
                 <span style={{ color: tokenVar("text.secondary"), fontSize: 12 }}>
                   {row.file_name} · {formatBytes(row.size_bytes)}
                 </span>
               </Space>
             ),
-          },
+          }),
           {
             title: "From",
             dataIndex: "source",
-            width: 130,
+            width: SAVED_REPORTS_FIXED_WIDTHS[0],
             filters: (Object.keys(SAVED_REPORT_SOURCE_LABEL) as SavedReportSource[]).map((key) => ({
               text: SAVED_REPORT_SOURCE_LABEL[key],
               value: key,
@@ -108,16 +114,17 @@ export default function SavedReportsClient({ reports, canManage }: SavedReportsC
               <Tag>{SAVED_REPORT_SOURCE_LABEL[source] ?? source}</Tag>
             ),
           },
-          { title: "Period", width: 200, render: (_, row) => formatPeriod(row) },
+          { title: "Period", width: SAVED_REPORTS_FIXED_WIDTHS[1], render: (_, row) => formatPeriod(row) },
           {
             title: "Saved",
             dataIndex: "uploaded_at",
-            width: 130,
+            width: SAVED_REPORTS_FIXED_WIDTHS[2],
             render: (value: string) => formatDateInTimeZone(value, timeZone),
           },
           {
             title: "",
-            width: 110,
+            key: "archive",
+            width: SAVED_REPORTS_FIXED_WIDTHS[3],
             render: (_, row) =>
               row.status === "archived" ? (
                 <StatusTag status="archived" />

@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { App, Modal, Table, Tag } from "antd";
+import { App, Modal, Tag } from "antd";
 import type { InventoryTxnRow, ItemRow } from "@/lib/db/types";
 import { listItemMovementsAction } from "./inventory-actions";
 import { formatDate, formatMoney } from "@/lib/format";
 import { humanizeStatus } from "@/lib/domain/status-label";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -19,6 +21,27 @@ const SOURCE_COLOR: Record<string, string> = {
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const MOVEMENTS_DEFAULT_PAGE_SIZE = 20;
+
+/**
+ * The dialog's width; its body, where the table sits, is 48px less. Seven
+ * columns, one of them a memo, do not fit in the 812px the old 860 left, so it
+ * is a little wider.
+ */
+export const ITEM_MOVEMENTS_MODAL_WIDTH = 900;
+
+/**
+ * Date, Source (one tag), Quantity, Cost, On hand and Value (a running total,
+ * so a digit wider than Cost). Memo takes what is left, at least
+ * COLUMN.TEXT_MIN.
+ */
+export const ITEM_MOVEMENTS_FIXED_WIDTHS = [
+  COLUMN.DATE,
+  COLUMN.STATUS,
+  COLUMN.QTY,
+  COLUMN.MONEY,
+  COLUMN.QTY,
+  COLUMN.MONEY_WIDE,
+] as const;
 
 interface Props {
   open: boolean;
@@ -56,32 +79,32 @@ function ItemMovementsModalBody({ item, onClose, baseCurrency, baseDecimals }: P
   const money = (m: number) => formatMoney(m, baseCurrency, baseDecimals);
 
   return (
-    <Modal title={`Inventory movements — ${item.name}`} open onCancel={onClose} footer={null} width={860}>
-      <Table<InventoryTxnRow>
+    <Modal title={`Inventory movements — ${item.name}`} open onCancel={onClose} footer={null} width={ITEM_MOVEMENTS_MODAL_WIDTH}>
+      <DataTable<InventoryTxnRow>
         rowKey="id"
-        size="small"
         loading={loading}
-        dataSource={rows}
+        rows={rows}
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(MOVEMENTS_DEFAULT_PAGE_SIZE))}
-        scroll={{ x: "max-content" }}
         locale={{ emptyText: "No movements yet" }}
         columns={[
-          { title: "Date", dataIndex: "txn_date", render: (v: string) => formatDate(v) },
+          { title: "Date", dataIndex: "txn_date", width: ITEM_MOVEMENTS_FIXED_WIDTHS[0], render: (v: string) => formatDate(v) },
           {
             title: "Source",
             dataIndex: "source",
+            width: ITEM_MOVEMENTS_FIXED_WIDTHS[1],
             render: (v: string) => <Tag color={SOURCE_COLOR[v]}>{humanizeStatus(v)}</Tag>,
           },
-          { title: "Quantity", dataIndex: "qty_delta", align: "right", render: (v: number) => Number(v) },
-          { title: "Cost", dataIndex: "cost_delta_minor", align: "right", render: (v: number) => money(Number(v)) },
-          { title: "On hand", dataIndex: "running_qty", align: "right", render: (v: number) => Number(v) },
+          { title: "Quantity", dataIndex: "qty_delta", width: ITEM_MOVEMENTS_FIXED_WIDTHS[2], align: "right", render: (v: number) => Number(v) },
+          { title: "Cost", dataIndex: "cost_delta_minor", width: ITEM_MOVEMENTS_FIXED_WIDTHS[3], align: "right", render: (v: number) => money(Number(v)) },
+          { title: "On hand", dataIndex: "running_qty", width: ITEM_MOVEMENTS_FIXED_WIDTHS[4], align: "right", render: (v: number) => Number(v) },
           {
             title: "Value",
             dataIndex: "running_value_minor",
+            width: ITEM_MOVEMENTS_FIXED_WIDTHS[5],
             align: "right",
             render: (v: number) => money(Number(v)),
           },
-          { title: "Memo", dataIndex: "memo", ...longTextColumn() },
+          flexColumn<InventoryTxnRow>({ title: "Memo", dataIndex: "memo" }),
         ]}
       />
     </Modal>

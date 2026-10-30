@@ -2,16 +2,30 @@
 import { useCallback, useEffect, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Space, Table, Tag, Typography } from "antd";
+import { Alert, App, Button, Space, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import NewCompanyModal from "./NewCompanyModal";
 import {
   getCompanyRequestAction,
   retryCompanyRequestAction,
   type CompanyRequestView,
 } from "./actions";
+
+/**
+ * Status, Try again. Company and Detail share what is left: a legal name and
+ * the reason a build failed are both text of unknown length.
+ */
+export const COMPANY_REQUESTS_FIXED_WIDTHS = [COLUMN.STATUS, COLUMN.ACTION * 3] as const;
+/** The floors of Company and Detail, in that order. */
+export const COMPANY_REQUESTS_ELASTIC_FLOORS = [160, COLUMN.TEXT_MIN] as const;
+
+/** Status. Legal name takes what is left, at least COLUMN.TEXT_MIN. */
+export const COMPANIES_FIXED_WIDTHS = [COLUMN.STATUS] as const;
 
 export interface CompanyRow {
   id: string;
@@ -126,31 +140,35 @@ export default function CompaniesClient({
       {openRequests.length > 0 ? (
         <>
           <Typography.Text strong>In progress</Typography.Text>
-          <Table
+          <DataTable<CompanyRequestView>
             rowKey="id"
-            size="small"
             pagination={false}
             style={{ margin: "8px 0 24px" }}
-            dataSource={openRequests}
+            rows={openRequests}
             columns={[
-              { title: "Company", dataIndex: "legal_name" },
+              flexColumn<CompanyRequestView>({
+                title: "Company",
+                dataIndex: "legal_name",
+                floor: COMPANY_REQUESTS_ELASTIC_FLOORS[0],
+              }),
               {
                 title: "Status",
                 dataIndex: "status",
-                width: 180,
+                width: COMPANY_REQUESTS_FIXED_WIDTHS[0],
                 render: (s: CompanyRequestView["status"]) => (
                   <Tag color={REQUEST_STATUS[s].color}>{REQUEST_STATUS[s].text}</Tag>
                 ),
               },
-              {
+              flexColumn<CompanyRequestView>({
                 title: "Detail",
                 dataIndex: "error",
+                floor: COMPANY_REQUESTS_ELASTIC_FLOORS[1],
                 render: (error: string | null) => error ?? "—",
-              },
+              }),
               {
                 title: "",
                 key: "actions",
-                width: 110,
+                width: COMPANY_REQUESTS_FIXED_WIDTHS[1],
                 render: (_: unknown, r: CompanyRequestView) =>
                   r.status === "failed" && canCreate ? (
                     <Button size="small" loading={retrying === r.id} onClick={() => retry(r.id)}>
@@ -168,14 +186,13 @@ export default function CompaniesClient({
           of an accountant only invites questions. Both are still on the row —
           `CompanyRow` carries them — they are simply not shown. */}
       <Typography.Text strong>Companies</Typography.Text>
-      <Table
+      <DataTable<CompanyRow>
         rowKey="id"
-        size="small"
         pagination={false}
         style={{ marginTop: 8 }}
-        dataSource={companies}
+        rows={companies}
         columns={[
-          {
+          flexColumn<CompanyRow>({
             title: "Legal name",
             dataIndex: "legal_name",
             render: (name: string, r: CompanyRow) => (
@@ -184,11 +201,11 @@ export default function CompaniesClient({
                 {r.is_sample ? <Tag color="orange">Sample</Tag> : null}
               </Space>
             ),
-          },
+          }),
           {
             title: "Status",
             dataIndex: "status",
-            width: 120,
+            width: COMPANIES_FIXED_WIDTHS[0],
             render: (s: string) => <StatusTag status={s} />,
           },
         ]}

@@ -7,11 +7,13 @@ import { describe, expect, it } from "vitest";
  *
  * A screen reaching for Ant Design's `Table` directly is how 61 tables ended up
  * with no pagination, 173 hand-written alignments and 25 different ways of
- * printing money. The allowlist below is the work still outstanding: it shrinks
- * with each migration batch and is deleted with the last one.
+ * printing money. There was an allowlist here of the screens still to move:
+ * 49 on 2026-08-14, 37 after the first batch of everyday screens (2.75), and
+ * none since 2.91, when the last 37 moved and the list was deleted. A new raw
+ * table now fails outright; there is no list to add it to.
  *
  * `components/ui/DataTable.tsx` and `components/ui/ReportTable.tsx` are the
- * implementations and are exempt by path, not by list.
+ * implementations and are exempt by path.
  */
 const OWN_IMPLEMENTATION = new Set([
   "components/ui/DataTable.tsx",
@@ -19,63 +21,16 @@ const OWN_IMPLEMENTATION = new Set([
 ]);
 
 /**
- * Matches `<Table `, `<Table>`, `<Table/>`, `<Table` at end of line, and the
- * generic `<Table<Row>` this codebase mostly writes — but not `<TableOutlined`,
- * which is an icon. Built fresh on each call: a `/g` regex carries `lastIndex`
- * between `.test()` calls and would report every other file clean.
+ * Matches `<Table `, `<Table>`, `<Table/>`, `<Table` at end of line, the
+ * generic `<Table<Row>` this codebase mostly writes, and `<Table.Summary` —
+ * but not `<TableOutlined`, which is an icon. A summary row goes through
+ * ReportTable's SummaryRow and SummaryCell. Built fresh on each call: a `/g`
+ * regex carries `lastIndex` between `.test()` calls and would report every
+ * other file clean.
  */
 function tablePattern(): RegExp {
   return /<Table(?!\w)/;
 }
-
-/**
- * Screens still rendering Ant Design's Table directly. 49 as of 2026-08-14;
- * 47 as of 2026-09-28.
- *
- * ReportsClient.tsx and BudgetVsActualView.tsx were on this list for a
- * hand-rolled Table.Summary; the financial statements now render through
- * components/reports/StatementTable.tsx, a plain table, and both entries are
- * gone (2026-09-28).
- */
-const RAW_TABLE = new Set<string>([
-  "app/(app)/banking/BankImportList.tsx",
-  "app/(app)/banking/reconcile/ReconcileListClient.tsx",
-  "app/(app)/banking/reconcile/[id]/ReconcileWorkspaceClient.tsx",
-  "app/(app)/credit-memos/CreditMemosClient.tsx",
-  "app/(app)/items/ItemMovementsModal.tsx",
-  "app/(app)/opening-balances/OpeningBalancesClient.tsx",
-  "app/(app)/payments/PaymentDetailDrawer.tsx",
-  "app/(app)/payments/ReceivePaymentModal.tsx",
-  "app/(app)/purchase-orders/[id]/BillFromPoModal.tsx",
-  "app/(app)/purchase-orders/[id]/PurchaseOrderDetailClient.tsx",
-  "app/(app)/purchase-orders/[id]/ReceiveModal.tsx",
-  "app/(app)/reports/1099/Report1099Client.tsx",
-  "app/(app)/reports/gl-posting/GlPostingClient.tsx",
-  "app/(app)/reports/inventory-review/InventoryReviewClient.tsx",
-  "app/(app)/reports/journal/JournalReportClient.tsx",
-  "app/(app)/reports/number-sequence/NumberSequenceClient.tsx",
-  "app/(app)/reports/saved/SavedReportsClient.tsx",
-  "app/(app)/sales-tax/SalesTaxClient.tsx",
-  "app/(app)/settings/audit/AuditClient.tsx",
-  "app/(app)/settings/companies/CompaniesClient.tsx",
-  "app/(app)/settings/company/CompanySettingsClient.tsx",
-  "app/(app)/settings/import/AccountTypeReview.tsx",
-  "app/(app)/settings/import/ImportColumnsTable.tsx",
-  "app/(app)/settings/import/ImportPreflightPanel.tsx",
-  "app/(app)/settings/import/ImportPreviewPanel.tsx",
-  "app/(app)/settings/import/LedgerBatchList.tsx",
-  "app/(app)/settings/import/LedgerImportPanel.tsx",
-  "app/(app)/settings/import/UnresolvedAccountsTable.tsx",
-  "app/(app)/settings/periods/PeriodsClient.tsx",
-  "app/(app)/settings/permissions/PermissionMatrixClient.tsx",
-  "app/(app)/vendor-credits/VendorCreditsClient.tsx",
-  "app/(app)/vendors/VendorTaxDrawer.tsx",
-  "components/audit/DocumentAuditTrail.tsx",
-  "components/banking/SettleFromBankModal.tsx",
-  "components/reports/AgingByPartyTable.tsx",
-  "components/reports/AllowanceForDoubtfulAccounts.tsx",
-  "components/settlements/SettlementHistory.tsx",
-]);
 
 const ROOT = process.cwd();
 
@@ -99,6 +54,8 @@ const files = [...tsxFiles(join(ROOT, "app")), ...tsxFiles(join(ROOT, "component
 describe("table adoption", () => {
   it("finds files to check", () => {
     expect(files.length).toBeGreaterThan(150);
+    // A broken walk would pass by checking nothing; these two must be in it.
+    expect(files.map((file) => file.path)).toEqual(expect.arrayContaining([...OWN_IMPLEMENTATION]));
   });
 
   it("tells a table apart from the icon of one", () => {
@@ -106,39 +63,15 @@ describe("table adoption", () => {
     expect(tablePattern().test("<Table<InvoiceRow>")).toBe(true);
     expect(tablePattern().test("<Table\n  columns={cols}")).toBe(true);
     expect(tablePattern().test("<Table />")).toBe(true);
+    expect(tablePattern().test("<Table.Summary.Row>")).toBe(true);
     expect(tablePattern().test("<TableOutlined />")).toBe(false);
   });
 
-  it("renders Ant Design's Table nowhere outside the shrinking list", () => {
+  it("renders Ant Design's Table nowhere outside DataTable and ReportTable", () => {
     const offenders = files
-      .filter(({ path }) => !OWN_IMPLEMENTATION.has(path) && !RAW_TABLE.has(path))
+      .filter(({ path }) => !OWN_IMPLEMENTATION.has(path))
       .filter(({ source }) => tablePattern().test(source))
       .map(({ path }) => path);
     expect(offenders).toEqual([]);
-  });
-
-  it("only ever shrinks, so a new raw table cannot be waved through", () => {
-    // The allowlist is the outstanding work. Adding to it is how a guard
-    // quietly stops guarding, and it reads in a diff exactly like a migration.
-    // Lowering this number is the migration; raising it has to be argued for.
-    expect(RAW_TABLE.size).toBeLessThanOrEqual(37);
-  });
-
-  it("lists no file that has already been migrated", () => {
-    // Keeps the list honest. Migrate a screen and forget to delete its entry and
-    // this fails, so the list cannot inflate into a record of work already done.
-    const byPath = new Map(files.map((file) => [file.path, file.source]));
-    const stale = [...RAW_TABLE].filter(
-      (path) => !tablePattern().test(byPath.get(path) ?? ""),
-    );
-    expect(stale, "already migrated off Table").toEqual([]);
-  });
-
-  it("names a file that exists for every entry", () => {
-    // A path typo would otherwise sit in the list forever, silently exempting
-    // nothing and making the outstanding count look smaller than it is.
-    const known = new Set(files.map((file) => file.path));
-    const missing = [...RAW_TABLE].filter((path) => !known.has(path));
-    expect(missing, "listed but not found on disk").toEqual([]);
   });
 });

@@ -11,6 +11,7 @@ import {
   type ExportControlTotals,
   type ExportDataset,
 } from "@/lib/domain/company-export";
+import { mapInOrder } from "@/lib/domain/in-order";
 
 export class CompanyExportError extends Error {}
 
@@ -42,37 +43,52 @@ function columnsOf(rows: Array<Record<string, unknown>>): string[] {
   return [...seen];
 }
 
-/** Every exported table, read with the caller's own client so RLS still applies. */
-export async function collectExportDatasets(sb: SupabaseClient): Promise<ExportDataset[]> {
-  const datasets: ExportDataset[] = [];
-  for (const table of [...EXPORT_TABLES, SENSITIVE_TABLE]) {
+/**
+ * How many tables are read at once. One at a time, 79 reads from a server in
+ * the US to a database in Sydney cost 35 seconds for a company with almost no
+ * data in it, nearly all of it spent waiting. Kept well under the database
+ * API's connection pool, which people using the books at the time share.
+ */
+export const EXPORT_READ_CONCURRENCY = 6;
+
+/**
+ * Every exported table, read with the caller's own client so RLS still applies.
+ * Several tables are read at once; the datasets still come back in
+ * `EXPORT_TABLES` order, so the manifest (and the nightly backup's hash of it)
+ * does not depend on which read happened to finish first.
+ */
+export async function collectExportDatasets(
+  sb: SupabaseClient,
+  concurrency: number = EXPORT_READ_CONCURRENCY,
+): Promise<ExportDataset[]> {
+  return mapInOrder([...EXPORT_TABLES, SENSITIVE_TABLE], concurrency, async (table) => {
     const rows = await readTable(sb, table);
-    datasets.push({
+    return {
       table,
       columns: columnsOf(rows),
       rows,
       sensitive: table === SENSITIVE_TABLE,
-    });
-  }
-  return datasets;
+    };
+  });
 }
 
 export async function readControlTotals(
   sb: SupabaseClient,
   asOf: string,
 ): Promise<ExportControlTotals> {
-  const balances = await sb.rpc("acc_ledger_balances", { p_from: "1900-01-01", p_to: asOf });
+  // Four reads that do not depend on each other, asked for together.
+  const [balances, ar, ap, lines] = await Promise.all([
+    sb.rpc("acc_ledger_balances", { p_from: "1900-01-01", p_to: asOf }),
+    sb.rpc("acc_ar_ageing", { p_as_of: asOf }),
+    sb.rpc("acc_ap_ageing", { p_as_of: asOf }),
+    sb.from("acc_journal_line").select("id", { count: "exact", head: true }),
+  ]);
   if (balances.error) {
     throw new CompanyExportError(`Trial balance failed: ${balances.error.message}`);
   }
-  const ar = await sb.rpc("acc_ar_ageing", { p_as_of: asOf });
   if (ar.error) throw new CompanyExportError(`AR aging failed: ${ar.error.message}`);
-  const ap = await sb.rpc("acc_ap_ageing", { p_as_of: asOf });
   if (ap.error) throw new CompanyExportError(`AP aging failed: ${ap.error.message}`);
-
-  const { count, error } = await sb
-    .from("acc_journal_line")
-    .select("id", { count: "exact", head: true });
+  const { count, error } = lines;
   if (error) throw new CompanyExportError(`Counting journal lines failed: ${error.message}`);
 
   const sumBalances = (

@@ -8,7 +8,7 @@ import {
   ORDER_COLUMNS,
   orderColumnsFor,
 } from "@/lib/domain/company-export";
-import { collectExportDatasets } from "@/lib/services/company-export";
+import { collectExportDatasets, EXPORT_READ_CONCURRENCY } from "@/lib/services/company-export";
 
 const EXPORTED = [...EXPORT_TABLES, SENSITIVE_TABLE];
 
@@ -46,6 +46,32 @@ describe("reading a table for the export", () => {
         orderColumnsFor(table),
       );
     }
+  });
+
+  it("reads several tables at once, yet hands them back in export order (2.91)", async () => {
+    // Later tables answer first, the way a small table beats the journal.
+    let inFlight = 0;
+    let most = 0;
+    const sb = {
+      from(table: string) {
+        const chain = {
+          select: () => chain,
+          order: () => chain,
+          range: async () => {
+            inFlight += 1;
+            most = Math.max(most, inFlight);
+            await new Promise((resolve) => setTimeout(resolve, EXPORTED.length - EXPORTED.indexOf(table)));
+            inFlight -= 1;
+            return { data: [{ id: table }], error: null };
+          },
+        };
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+    const datasets = await collectExportDatasets(sb);
+    expect(datasets.map((d) => d.table)).toEqual(EXPORTED);
+    expect(datasets.map((d) => d.rows[0].id)).toEqual(EXPORTED);
+    expect(most).toBe(EXPORT_READ_CONCURRENCY);
   });
 
   it("orders every exported table by something, defaulting to id", () => {

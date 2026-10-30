@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Typography,
+  App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tabs, Typography,
 } from "antd";
 import dayjs from "dayjs";
 import { PlusOutlined } from "@ant-design/icons";
@@ -22,13 +22,61 @@ import {
 import RecordTaxPaymentModal from "@/components/sales-tax/RecordTaxPaymentModal";
 import { LIABILITY_REPORT_LINK_LABEL } from "@/lib/domain/sales-tax-liability";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import TableEmpty from "@/components/ui/TableEmpty";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const TAX_PAYMENTS_DEFAULT_PAGE_SIZE = 20;
+
+/** Owed by state: Taxable and Tax collected. State and its Rates take what is left. */
+export const SALES_TAX_BY_STATE_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.MONEY] as const;
+
+/**
+ * By rate: Code, State, Rate, Taxable and Tax collected. The rate's Name takes
+ * what is left, at least COLUMN.TEXT_MIN. State is a name of up to "District of
+ * Columbia", which is the picker width.
+ */
+export const SALES_TAX_BY_RATE_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.PICKER,
+  COLUMN.QTY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+] as const;
+
+/**
+ * Payments: Number, Date, Amount, Status and Actions. Nothing here is free
+ * text, so Period, two dates and an arrow, takes what is left and keeps the
+ * room it needs as its floor.
+ */
+export const SALES_TAX_PAYMENTS_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+  COLUMN.ACTION * 2,
+] as const;
+/** What Period needs: two dates and an arrow. */
+export const SALES_TAX_PERIOD_FLOOR = COLUMN.DATE * 2 + COLUMN.ACTION;
+
+/**
+ * Tax rates: State (with its filter), Code, Rate, Direction, Status and the
+ * Edit and Deactivate buttons. The rate's Name takes what is left, at least
+ * COLUMN.TEXT_MIN.
+ */
+export const SALES_TAX_RATES_FIXED_WIDTHS = [
+  COLUMN.PICKER,
+  COLUMN.CODE,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.CODE,
+  COLUMN.ACTION * 4,
+] as const;
 
 interface Props {
   initialFrom: string;
@@ -179,47 +227,46 @@ export default function SalesTaxClient(props: Props) {
               </FilterBar>
               {/* A return is filed per state, so the state total comes first and
                   the codes behind it stay below. */}
-              <Table<StateLiabilityLine>
+              <DataTable<StateLiabilityLine>
                 rowKey={(row) => row.stateCode ?? "none"}
                 loading={loading}
-                dataSource={byState}
+                rows={byState}
                 pagination={false}
-                scroll={{ x: "max-content" }}
                 style={{ marginBottom: 24 }}
                 title={() => <Typography.Text strong>Owed by state</Typography.Text>}
                 locale={{ emptyText: loading ? <TableEmpty loading title="" /> : noTaxCollected }}
                 columns={[
-                  { title: "State", dataIndex: "stateName" },
-                  {
+                  flexColumn<StateLiabilityLine>({ title: "State", dataIndex: "stateName" }),
+                  flexColumn<StateLiabilityLine>({
                     title: "Rates",
                     key: "codes",
-                    render: (_: unknown, r) => r.codes.map((c) => c.code).join(", "),
-                  },
-                  { title: "Taxable", dataIndex: "taxableMinor", align: "right", render: (v: number) => money(v) },
-                  { title: "Tax collected", dataIndex: "taxMinor", align: "right", render: (v: number) => money(v) },
+                    render: (_: unknown, r: StateLiabilityLine) => r.codes.map((c) => c.code).join(", "),
+                  }),
+                  { title: "Taxable", dataIndex: "taxableMinor", width: SALES_TAX_BY_STATE_FIXED_WIDTHS[0], align: "right", render: (v: number) => money(v) },
+                  { title: "Tax collected", dataIndex: "taxMinor", width: SALES_TAX_BY_STATE_FIXED_WIDTHS[1], align: "right", render: (v: number) => money(v) },
                 ]}
               />
               {/* The rates behind the state totals. With no tax at all it was
                   a second empty table under the first, saying "No data". */}
               {liability.lines.length > 0 ? (
-              <Table<SalesTaxLiability["lines"][number]>
+              <DataTable<SalesTaxLiability["lines"][number]>
                 rowKey="taxCodeId"
                 loading={loading}
-                dataSource={liability.lines}
+                rows={liability.lines}
                 pagination={false}
-                scroll={{ x: "max-content" }}
                 title={() => <Typography.Text strong>By rate</Typography.Text>}
                 columns={[
-                  { title: "Code", dataIndex: "code" },
+                  { title: "Code", dataIndex: "code", width: SALES_TAX_BY_RATE_FIXED_WIDTHS[0] },
                   {
                     title: "State",
                     key: "state",
+                    width: SALES_TAX_BY_RATE_FIXED_WIDTHS[1],
                     render: (_: unknown, r) => stateOfCode(r.taxCodeId),
                   },
-                  { title: "Name", dataIndex: "name" },
-                  { title: "Rate", dataIndex: "ratePercent", align: "right", render: (v: number) => `${v}%` },
-                  { title: "Taxable", dataIndex: "taxableMinor", align: "right", render: (v: number) => money(v) },
-                  { title: "Tax collected", dataIndex: "taxMinor", align: "right", render: (v: number) => money(v) },
+                  flexColumn<SalesTaxLiability["lines"][number]>({ title: "Name", dataIndex: "name" }),
+                  { title: "Rate", dataIndex: "ratePercent", width: SALES_TAX_BY_RATE_FIXED_WIDTHS[2], align: "right", render: (v: number) => `${v}%` },
+                  { title: "Taxable", dataIndex: "taxableMinor", width: SALES_TAX_BY_RATE_FIXED_WIDTHS[3], align: "right", render: (v: number) => money(v) },
+                  { title: "Tax collected", dataIndex: "taxMinor", width: SALES_TAX_BY_RATE_FIXED_WIDTHS[4], align: "right", render: (v: number) => money(v) },
                 ]}
               />
               ) : null}
@@ -235,9 +282,9 @@ export default function SalesTaxClient(props: Props) {
           key: "payments",
           label: "Payments",
           children: (
-            <Table<TaxPaymentRow>
+            <DataTable<TaxPaymentRow>
               rowKey="id"
-              dataSource={props.payments}
+              rows={props.payments}
               locale={{
                 emptyText: (
                   <TableEmpty
@@ -253,20 +300,25 @@ export default function SalesTaxClient(props: Props) {
                   />
                 ),
               }}
-              scroll={{ x: "max-content" }}
               pagination={clientTablePagination(
                 paymentsPageSize,
                 setPaymentsPageSize,
                 pageSizeOptionsFor(TAX_PAYMENTS_DEFAULT_PAGE_SIZE),
               )}
               columns={[
-                { title: "Number", dataIndex: "payment_number", render: (v) => v ?? "—" },
-                { title: "Date", dataIndex: "payment_date", render: (v: string) => formatDate(v) },
-                { title: "Period", key: "period", render: (_, r) => (r.period_start && r.period_end ? `${formatDate(r.period_start)} → ${formatDate(r.period_end)}` : "—") },
-                { title: "Amount", dataIndex: "amount_minor", align: "right", render: (v: number) => money(v) },
-                { title: "Status", dataIndex: "status", render: (s: string) => <StatusTag status={s} /> },
+                { title: "Number", dataIndex: "payment_number", width: SALES_TAX_PAYMENTS_FIXED_WIDTHS[0], render: (v) => v ?? "—" },
+                { title: "Date", dataIndex: "payment_date", width: SALES_TAX_PAYMENTS_FIXED_WIDTHS[1], render: (v: string) => formatDate(v) },
+                flexColumn<TaxPaymentRow>({
+                  title: "Period",
+                  key: "period",
+                  floor: SALES_TAX_PERIOD_FLOOR,
+                  render: (_, r) => (r.period_start && r.period_end ? `${formatDate(r.period_start)} → ${formatDate(r.period_end)}` : "—"),
+                }),
+                { title: "Amount", dataIndex: "amount_minor", width: SALES_TAX_PAYMENTS_FIXED_WIDTHS[2], align: "right", render: (v: number) => money(v) },
+                { title: "Status", dataIndex: "status", width: SALES_TAX_PAYMENTS_FIXED_WIDTHS[3], render: (s: string) => <StatusTag status={s} /> },
                 {
                   title: "Actions", key: "actions",
+                  width: SALES_TAX_PAYMENTS_FIXED_WIDTHS[4],
                   render: (_, r) => props.canWrite && r.status !== "void"
                     ? <Button size="small" type="link" danger onClick={() => confirmVoidPayment(r.id)}>Void</Button>
                     : null,
@@ -288,9 +340,9 @@ export default function SalesTaxClient(props: Props) {
                   ) : undefined
                 }
               />
-              <Table<TaxCodeRow>
+              <DataTable<TaxCodeRow>
                 rowKey="id"
-                dataSource={ratesByState}
+                rows={ratesByState}
                 locale={{
                   emptyText: (
                     <TableEmpty
@@ -310,23 +362,24 @@ export default function SalesTaxClient(props: Props) {
                     />
                   ),
                 }}
-                scroll={{ x: "max-content" }}
                 pagination={false}
                 columns={[
                   {
                     title: "State",
                     dataIndex: "state_code",
+                    width: SALES_TAX_RATES_FIXED_WIDTHS[0],
                     filters: stateFilters,
                     onFilter: (value, record) => (record.state_code ?? "") === value,
                     render: (v: string | null) => stateName(v, props.usStates),
                   },
-                  { title: "Code", dataIndex: "code" },
-                  { title: "Name", dataIndex: "name" },
-                  { title: "Rate", dataIndex: "rate_percent", align: "right", render: (v: number) => `${v}%` },
-                  { title: "Direction", dataIndex: "direction" },
-                  { title: "Status", dataIndex: "is_active", render: (v: boolean) => <StatusTag status={v ? "active" : "inactive"} /> },
+                  { title: "Code", dataIndex: "code", width: SALES_TAX_RATES_FIXED_WIDTHS[1] },
+                  flexColumn<TaxCodeRow>({ title: "Name", dataIndex: "name" }),
+                  { title: "Rate", dataIndex: "rate_percent", width: SALES_TAX_RATES_FIXED_WIDTHS[2], align: "right", render: (v: number) => `${v}%` },
+                  { title: "Direction", dataIndex: "direction", width: SALES_TAX_RATES_FIXED_WIDTHS[3] },
+                  { title: "Status", dataIndex: "is_active", width: SALES_TAX_RATES_FIXED_WIDTHS[4], render: (v: boolean) => <StatusTag status={v ? "active" : "inactive"} /> },
                   {
                     title: "Actions", key: "actions",
+                    width: SALES_TAX_RATES_FIXED_WIDTHS[5],
                     render: (_, r) => props.isAdmin ? (
                       <Space>
                         <Button size="small" type="link" onClick={() => openTaxCode(r)}>Edit</Button>

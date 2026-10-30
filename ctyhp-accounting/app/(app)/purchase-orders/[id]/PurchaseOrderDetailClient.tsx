@@ -3,9 +3,11 @@ import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Card, Descriptions, Space, Table, Tag, Typography } from "antd";
+import { Alert, App, Button, Card, Descriptions, Space, Tag, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { PAID_LABELS, RECEIVED_LABELS, humanizeStatus } from "@/lib/domain/status-label";
 import { formatDate, formatDateInTimeZone, formatMoney } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
@@ -15,7 +17,6 @@ import { remainingQty } from "@/lib/domain/purchasing";
 import PurchaseOrderFormModal from "../PurchaseOrderFormModal";
 import ReceiveModal from "./ReceiveModal";
 import BillFromPoModal from "./BillFromPoModal";
-import { longTextColumn } from "@/components/ui/long-text-column";
 import {
   approvePurchaseOrderAction,
   cancelPurchaseOrderAction,
@@ -24,6 +25,33 @@ import {
 } from "../actions";
 
 // US spelling, as the status filter reads.
+
+/**
+ * The lines, inside a card (984px less its 24px padding either side): #,
+ * Ordered, Received, Billed, Remaining (a number, or the Closed tag), Unit Cost
+ * and Line Total. Description takes what is left, at least COLUMN.TEXT_MIN.
+ */
+export const PO_LINES_FIXED_WIDTHS = [
+  COLUMN.ACTION,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.STATUS,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+] as const;
+
+/**
+ * The approved matching exceptions, in a card: Kind, Expected, Actual,
+ * Variance and Recorded. Reason takes what is left, at least COLUMN.TEXT_MIN.
+ */
+export const PO_EXCEPTIONS_FIXED_WIDTHS = [
+  COLUMN.STATUS,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.DATE,
+] as const;
 
 export default function PurchaseOrderDetailClient({
   initialBillOpen,
@@ -219,30 +247,31 @@ export default function PurchaseOrderDetailClient({
       )}
 
       <Card title="Lines">
-        <Table
+        <DataTable
           rowKey="id"
-          size="small"
           pagination={false}
-          dataSource={lines}
+          rows={lines}
           columns={[
-            { title: "#", dataIndex: "line_order", render: (v: number) => v + 1 },
-            { title: "Description", dataIndex: "description", ...longTextColumn() },
-            { title: "Ordered", dataIndex: "quantity", align: "right", render: (v: number) => Number(v) },
-            { title: "Received", dataIndex: "qty_received", align: "right", render: (v: number) => Number(v) },
-            { title: "Billed", dataIndex: "qty_billed", align: "right", render: (v: number) => Number(v) },
+            { title: "#", dataIndex: "line_order", width: PO_LINES_FIXED_WIDTHS[0], render: (v: number) => v + 1 },
+            flexColumn<(typeof lines)[number]>({ title: "Description", dataIndex: "description" }),
+            { title: "Ordered", dataIndex: "quantity", width: PO_LINES_FIXED_WIDTHS[1], align: "right", render: (v: number) => Number(v) },
+            { title: "Received", dataIndex: "qty_received", width: PO_LINES_FIXED_WIDTHS[2], align: "right", render: (v: number) => Number(v) },
+            { title: "Billed", dataIndex: "qty_billed", width: PO_LINES_FIXED_WIDTHS[3], align: "right", render: (v: number) => Number(v) },
             {
               title: "Remaining",
               key: "remaining",
+              width: PO_LINES_FIXED_WIDTHS[4],
               align: "right",
               render: (_, r) => (r.is_closed ? <StatusTag status="closed" /> : remainingQty(Number(r.quantity), Number(r.qty_received))),
             },
             {
               title: "Unit Cost",
               dataIndex: "unit_cost_minor",
+              width: PO_LINES_FIXED_WIDTHS[5],
               align: "right",
               render: (v: number) => formatMoney(v, order.currency_code, decimals),
             },
-            { title: "Line Total", dataIndex: "line_total_minor", align: "right", render: (v: number) => formatMoney(v, order.currency_code, decimals) },
+            { title: "Line Total", dataIndex: "line_total_minor", width: PO_LINES_FIXED_WIDTHS[6], align: "right", render: (v: number) => formatMoney(v, order.currency_code, decimals) },
           ]}
         />
       </Card>
@@ -323,23 +352,23 @@ export default function PurchaseOrderDetailClient({
 
       {exceptions.length > 0 && (
         <Card title="Approved matching exceptions">
-          <Table
+          <DataTable
             rowKey="id"
-            size="small"
             pagination={false}
-            dataSource={exceptions}
-              columns={[
-              { title: "Kind", dataIndex: "kind", render: (v: string) => <Tag color="orange">{humanizeStatus(v)}</Tag> },
-              { title: "Expected", dataIndex: "expected_value", align: "right", render: (v: number) => Number(v) },
-              { title: "Actual", dataIndex: "actual_value", align: "right", render: (v: number) => Number(v) },
+            rows={exceptions}
+            columns={[
+              { title: "Kind", dataIndex: "kind", width: PO_EXCEPTIONS_FIXED_WIDTHS[0], render: (v: string) => <Tag color="orange">{humanizeStatus(v)}</Tag> },
+              { title: "Expected", dataIndex: "expected_value", width: PO_EXCEPTIONS_FIXED_WIDTHS[1], align: "right", render: (v: number) => Number(v) },
+              { title: "Actual", dataIndex: "actual_value", width: PO_EXCEPTIONS_FIXED_WIDTHS[2], align: "right", render: (v: number) => Number(v) },
               {
                 title: "Variance",
                 dataIndex: "variance_bps",
+                width: PO_EXCEPTIONS_FIXED_WIDTHS[3],
                 align: "right",
                 render: (v: number) => `${(v / 100).toFixed(2)}%`,
               },
-              { title: "Reason", dataIndex: "reason", ...longTextColumn() },
-              { title: "Recorded", dataIndex: "created_at", render: (v: string) => formatDateInTimeZone(v, timeZone) },
+              flexColumn<(typeof exceptions)[number]>({ title: "Reason", dataIndex: "reason" }),
+              { title: "Recorded", dataIndex: "created_at", width: PO_EXCEPTIONS_FIXED_WIDTHS[4], render: (v: string) => formatDateInTimeZone(v, timeZone) },
             ]}
           />
         </Card>

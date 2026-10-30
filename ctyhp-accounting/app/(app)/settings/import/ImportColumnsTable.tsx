@@ -1,7 +1,21 @@
 "use client";
 import { plural, pluralWord } from "@/lib/format";
-import { Alert, Select, Space, Table, Tag, Typography } from "antd";
+import { Alert, Select, Space, Tag, Typography } from "antd";
 import type { FieldSpec } from "@/lib/domain/import-mapping";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/**
+ * Field, then the "Matched by AI" mark. The rows are the fields One Book
+ * imports, fixed by design, so the table is fitted; it is the file's headings
+ * that are data, and they sit inside the picker. Column in your file and the
+ * hint share what is left: the picker is 260px wide, so its column floors at
+ * 276, and the hint is free text at COLUMN.TEXT_MIN.
+ */
+export const IMPORT_COLUMNS_FIXED_WIDTHS = [200, COLUMN.STATUS] as const;
+/** The floors of Column in your file and the hint, in that order. */
+export const IMPORT_COLUMNS_ELASTIC_FLOORS = [276, COLUMN.TEXT_MIN] as const;
 
 export interface ImportColumnsTableProps {
   fields: readonly FieldSpec[];
@@ -42,16 +56,15 @@ export default function ImportColumnsTable({
         Proposed from the file&apos;s own headings. Change anything that is wrong — nothing is read
         until you do.
       </Typography.Paragraph>
-      <Table
-        size="small"
+      <DataTable<FieldSpec>
         rowKey="key"
         pagination={false}
-        dataSource={fields.map((field) => ({ ...field }))}
+        rows={fields.map((field) => ({ ...field }))}
         columns={[
           {
             title: "Field",
             dataIndex: "label",
-            width: 200,
+            width: IMPORT_COLUMNS_FIXED_WIDTHS[0],
             render: (label: string, field) => (
               <Space size={6}>
                 {label}
@@ -59,9 +72,10 @@ export default function ImportColumnsTable({
               </Space>
             ),
           },
-          {
+          flexColumn<FieldSpec>({
             title: "Column in your file",
             key: "column",
+            floor: IMPORT_COLUMNS_ELASTIC_FLOORS[0],
             render: (_: unknown, field) => (
               <Select
                 allowClear
@@ -72,17 +86,22 @@ export default function ImportColumnsTable({
                 options={headers.map((header, index) => ({ value: index, label: header }))}
               />
             ),
-          },
+          }),
           {
             // Marks what the alias matcher could not place. These are the
             // columns worth a second look before importing.
             title: "",
             key: "source",
-            width: 130,
+            width: IMPORT_COLUMNS_FIXED_WIDTHS[1],
             render: (_: unknown, field) =>
               aiFields.includes(field.key) ? <Tag color="purple">Matched by AI</Tag> : null,
           },
-          { title: "", dataIndex: "hint", render: (hint: string | undefined) => hint ?? "" },
+          flexColumn<FieldSpec>({
+            title: "",
+            dataIndex: "hint",
+            floor: IMPORT_COLUMNS_ELASTIC_FLOORS[1],
+            render: (hint: string | undefined) => hint ?? "",
+          }),
         ]}
       />
 

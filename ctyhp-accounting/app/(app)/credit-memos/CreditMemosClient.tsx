@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table } from "antd";
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import StatusTag from "@/components/ui/StatusTag";
 import { APPLIED_LABELS } from "@/lib/domain/status-label";
 import FilterBar from "@/components/ui/FilterBar";
@@ -35,6 +37,18 @@ interface LineForm {
   tax_code_id?: string | null;
 }
 
+/** An open document the memo can be applied to. */
+type OpenInvoice = { id: string; invoice_number: string; balance_due_minor: number };
+
+/** The Apply dialog is Ant Design's default width, 520; its body, where the table sits, is 48px less. */
+export const CREDIT_MEMO_APPLY_MODAL_WIDTH = 520;
+
+/**
+ * Balance and Apply (a number input). The invoice number takes what is left, at
+ * least COLUMN.TEXT_MIN.
+ */
+export const CREDIT_MEMO_APPLY_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.PICKER] as const;
+
 export default function CreditMemosClient({
   canWrite,
   customers,
@@ -52,7 +66,7 @@ export default function CreditMemosClient({
   const [lines, setLines] = useState<LineForm[]>([{}]);
   const [applyFor, setApplyFor] = useState<CreditMemoRow | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
-  const [openInvoices, setOpenInvoices] = useState<{ id: string; invoice_number: string; balance_due_minor: number }[]>(
+  const [openInvoices, setOpenInvoices] = useState<OpenInvoice[]>(
     [],
   );
   const [allocs, setAllocs] = useState<Record<string, number>>({});
@@ -332,6 +346,7 @@ export default function CreditMemosClient({
       <Modal
         open={!!applyFor}
         title={`Apply ${applyFor?.credit_memo_number ?? ""}`}
+        width={CREDIT_MEMO_APPLY_MODAL_WIDTH}
         onCancel={() => setApplyFor(null)}
         onOk={submitApply}
         confirmLoading={applyBusy}
@@ -340,15 +355,16 @@ export default function CreditMemosClient({
         <p>
           Remaining: {applyFor ? fmt(applyFor.balance_remaining_minor) : ""}
         </p>
-        <Table
+        <DataTable<OpenInvoice>
           rowKey="id"
           pagination={false}
-          dataSource={openInvoices}
+          rows={openInvoices}
           columns={[
-            { title: "Invoice", dataIndex: "invoice_number" },
-            { title: "Balance", align: "right", render: (_, r) => fmt(r.balance_due_minor) },
+            flexColumn<OpenInvoice>({ title: "Invoice", dataIndex: "invoice_number" }),
+            { title: "Balance", align: "right", width: CREDIT_MEMO_APPLY_FIXED_WIDTHS[0], render: (_, r) => fmt(r.balance_due_minor) },
             {
               title: "Apply",
+              width: CREDIT_MEMO_APPLY_FIXED_WIDTHS[1],
               render: (_, r) => (
                 <InputNumber
                   min={0}

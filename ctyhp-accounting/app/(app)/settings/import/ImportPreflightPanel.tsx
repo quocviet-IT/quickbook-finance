@@ -1,9 +1,19 @@
 "use client";
 import { plural, pluralWord } from "@/lib/format";
-import { Alert, Button, Card, Space, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Space, Tag, Typography } from "antd";
 import UnresolvedAccountsTable from "./UnresolvedAccountsTable";
 import type { AccountRow } from "@/lib/db/types";
 import type { ImportPreflight, UnbankedRef } from "@/lib/services/import-preflight";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/**
+ * Rows, then the button or the note beside it. "Name in the file" takes what is
+ * left, at least COLUMN.TEXT_MIN. The last column holds either one button or
+ * two sentences that wrap, so it has a width of its own.
+ */
+export const UNBANKED_FIXED_WIDTHS = [COLUMN.QTY, 380] as const;
 
 export interface ImportPreflightPanelProps {
   preflight: ImportPreflight;
@@ -126,13 +136,12 @@ export default function ImportPreflightPanel({
               message={`${plural(preflight.unbanked.length, "bank account")} ${pluralWord(preflight.unbanked.length, "has", "have")} no record under Banking`}
               description="Each row also writes a bank line, and that line is what stops a second import of the same file posting the same money twice. Declare them here."
             />
-            <Table<UnbankedRef>
-              size="small"
+            <DataTable<UnbankedRef>
               rowKey="ref"
               pagination={false}
-              dataSource={preflight.unbanked}
+              rows={preflight.unbanked}
               columns={[
-                {
+                flexColumn<UnbankedRef>({
                   title: "Name in the file",
                   dataIndex: "ref",
                   render: (ref: string, row) => (
@@ -143,12 +152,12 @@ export default function ImportPreflightPanel({
                       </Typography.Text>
                     </Space>
                   ),
-                },
-                { title: "Rows", dataIndex: "rows", width: 80, align: "right" },
+                }),
+                { title: "Rows", dataIndex: "rows", width: UNBANKED_FIXED_WIDTHS[0], align: "right" },
                 {
                   title: "",
                   key: "add",
-                  width: 380,
+                  width: UNBANKED_FIXED_WIDTHS[1],
                   render: (_, row) =>
                     row.canBeBanked ? (
                       <Button size="small" onClick={() => onAddBankRecord(row)}>
