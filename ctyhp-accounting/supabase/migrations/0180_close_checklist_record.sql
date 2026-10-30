@@ -45,6 +45,12 @@ declare
   v_event  uuid;
   v_before uuid[];
 begin
+  -- The caller first, as acc_close_period checks it: nobody without the right to
+  -- close learns anything else about the checklist or the period.
+  if not acc_is_staff() then raise exception 'Not authorized to close a period'; end if;
+  if not acc_has_permission('period.close') then
+    raise exception 'You do not have permission to close a period';
+  end if;
   if p_checklist is null or jsonb_typeof(p_checklist) <> 'array'
      or jsonb_array_length(p_checklist) = 0 or jsonb_array_length(p_checklist) > 40 then
     raise exception 'A close checklist is a list of between 1 and 40 steps';

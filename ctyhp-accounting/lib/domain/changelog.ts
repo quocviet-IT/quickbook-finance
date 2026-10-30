@@ -62,6 +62,20 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.82",
+    date: "2026-10-30",
+    headline: "Reconcile history links each account's last reconciliation to its report, and says when it was adjusted.",
+    changes: [
+      {
+        kind: "added",
+        title: "Report link and Adjusted tag on Reconcile history",
+        detail:
+          "Under Last reconciled, a Report link opens the report of the account's latest completed reconciliation: the statement bridged to the books, with the lines cleared and outstanding. When that reconciliation was completed with an adjusting entry, Status shows an Adjusted tag beside Reconciled, and holding the pointer over it shows the reason given. The Reconcile list already showed both for every reconciliation.",
+        route: "/banking/reconcile/history",
+      },
+    ],
+  },
+  {
     version: "2.81",
     date: "2026-10-30",
     headline: "Customer and vendor statements open with what was owed before the period, so a payment in the period counts once.",
