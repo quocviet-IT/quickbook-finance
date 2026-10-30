@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Dayjs } from "dayjs";
 import { Alert, App, Button, Card, DatePicker, InputNumber, Space, Spin, Typography, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { ToneBadge } from "@/lib/design/tone";
 import { toMinor } from "@/lib/domain/money";
@@ -11,6 +12,7 @@ import { shown, stored } from "@/lib/domain/card-account";
 import {
   OPEN_IN_PROGRESS,
   STATEMENT_BALANCE_ON,
+  adjustedTitle,
   defaultHistoryAccount,
   historyClosingCell,
   historyDatedCell,
@@ -26,7 +28,7 @@ import {
 import { bringHistoryForwardConfirmation } from "@/lib/domain/reconcile-statement";
 import { formatMoney, formatDate } from "@/lib/format";
 import { bringHistoryForwardAction, historyPreviewAction, reconciliationHistoryAction } from "../history-actions";
-import { HISTORY_COLUMN_WIDTH as W, HISTORY_ELASTIC_FLOOR, HISTORY_STATE_TONES } from "./history-columns";
+import { ADJUSTED_LOOK, HISTORY_COLUMN_WIDTH as W, HISTORY_ELASTIC_FLOOR, HISTORY_STATE_TONES } from "./history-columns";
 import styles from "./history.module.css";
 
 /** How long the preview waits after the date changes before it reads the books. */
@@ -209,6 +211,11 @@ export default function ReconcileHistoryClient({ canBringForward, today, baseCur
             {historyDateCell(row.lastReconciledDate)}
             {closing ? secondaryLine(closing.amount) : null}
             {closing?.broughtForward ? secondaryLine("(brought forward)") : null}
+            {row.lastCompleted ? (
+              <div style={{ fontSize: 12 }}>
+                <Link href={`/banking/reconcile/${row.lastCompleted.id}/report`}>Report</Link>
+              </div>
+            ) : null}
           </>
         );
       },
@@ -236,7 +243,12 @@ export default function ReconcileHistoryClient({ canBringForward, today, baseCur
       width: W.state,
       render: (_: unknown, row: HistoryAccount) => (
         <Space orientation="vertical" size={0}>
-          <ToneBadge tone={HISTORY_STATE_TONES[row.state].tone}>{HISTORY_STATE_TONES[row.state].label}</ToneBadge>
+          <Space size={6} wrap>
+            <ToneBadge tone={HISTORY_STATE_TONES[row.state].tone}>{HISTORY_STATE_TONES[row.state].label}</ToneBadge>
+            {row.lastCompleted?.adjusted ? (
+              <StatusTag status="adjusted" looks={ADJUSTED_LOOK} title={adjustedTitle(row.lastCompleted)} />
+            ) : null}
+          </Space>
           {row.inProgress ? (
             <Link href={`/banking/reconcile/${row.inProgress.id}`}>{inProgressText(row.inProgress.endingDate)}</Link>
           ) : null}

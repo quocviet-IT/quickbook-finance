@@ -43,11 +43,39 @@ export interface HistoryBankAccount {
 /** Never reconciled: the history can be brought forward. Reconciled: it cannot. */
 export type HistoryState = "never" | "reconciled";
 
+/** A completed reconciliation, as the history needs it: its report, and whether it was adjusted. */
+export interface CompletedReconciliation {
+  id: string;
+  bankAccountId: string;
+  statementEndingDate: string;
+  /** When it was signed off; settles two completed on the same statement date. */
+  completedAt: string | null;
+  /** Completed with an adjusting entry for a difference nobody could find. */
+  adjusted: boolean;
+  adjustmentReason: string | null;
+}
+
+/** Each account's latest completed reconciliation: the one Last reconciled names. */
+export function latestCompleted(rows: readonly CompletedReconciliation[]): Map<string, CompletedReconciliation> {
+  const latest = new Map<string, CompletedReconciliation>();
+  for (const row of rows) {
+    const held = latest.get(row.bankAccountId);
+    const later =
+      !held ||
+      row.statementEndingDate > held.statementEndingDate ||
+      (row.statementEndingDate === held.statementEndingDate && (row.completedAt ?? "") > (held.completedAt ?? ""));
+    if (later) latest.set(row.bankAccountId, row);
+  }
+  return latest;
+}
+
 export interface HistoryAccount extends ReconciliationHistoryRow {
   /** "Example Bank · 1010", as Banking and the reconciliation name the account. */
   label: string;
   maskedNumber: string | null;
   state: HistoryState;
+  /** The latest completed reconciliation, for its Report link and Adjusted tag; null when never reconciled. */
+  lastCompleted: CompletedReconciliation | null;
   /** Where the account stands against its statements (2.05); null or absent when it could not be read. */
   standing?: BankStanding | null;
   /** A credit card (2.45): its figures, and the balance typed, as its statement prints them. */
@@ -116,8 +144,13 @@ const noHistory = (bankAccountId: string): ReconciliationHistoryRow => ({
  * history does not name yet (added a moment ago) has nothing open; a history
  * row for an account this person cannot see is left out.
  */
-export function historyAccounts(rows: readonly ReconciliationHistoryRow[], banks: readonly HistoryBankAccount[]): HistoryAccount[] {
+export function historyAccounts(
+  rows: readonly ReconciliationHistoryRow[],
+  banks: readonly HistoryBankAccount[],
+  completed: readonly CompletedReconciliation[] = [],
+): HistoryAccount[] {
   const byAccount = new Map(rows.map((row) => [row.bankAccountId, row]));
+  const latest = latestCompleted(completed);
   return banks.map((bank) => {
     const row = byAccount.get(bank.id) ?? noHistory(bank.id);
     const side = balanceSideOf(bank.account_type);
@@ -126,9 +159,16 @@ export function historyAccounts(rows: readonly ReconciliationHistoryRow[], banks
       label: bankAccountLabel([bank.bank_name || bank.account_name, bank.account_code].filter(Boolean).join(" · "), side),
       maskedNumber: bank.account_number_masked,
       state: row.lastReconciledDate ? "reconciled" : "never",
+      lastCompleted: row.lastReconciledDate ? (latest.get(bank.id) ?? null) : null,
       side,
     };
   });
+}
+
+/** The Adjusted tag's words on hover: the reason given when the difference was posted. */
+export function adjustedTitle(reconciliation: CompletedReconciliation): string {
+  const reason = reconciliation.adjustmentReason?.trim();
+  return reason ? `Completed with an adjusting entry: ${reason}` : "Completed with an adjusting entry";
 }
 
 /** The page, and the link to it from the Reconcile start screen. */
