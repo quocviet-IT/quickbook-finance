@@ -9,7 +9,7 @@ export class CompanyError extends Error {}
 const COLS =
   "id,version,effective_from,legal_name,dba_name,ein_ref,address_line1,address_line2,city,region,postal_code,country," +
   "fiscal_year_start_month,base_currency_code,time_zone,accounting_basis,default_payment_terms_days," +
-  "inventory_valuation_method,inventory_policy_memo,created_at";
+  "inventory_valuation_method,inventory_policy_memo,pay_note,created_at";
 
 export async function getCurrentCompanySettings(sb: SupabaseClient): Promise<CompanySettingRow | null> {
   const { data, error } = await sb.from("acc_company_setting_version")
@@ -70,6 +70,8 @@ export async function saveCompanySettings(sb: SupabaseClient, input: CompanySett
     p_default_payment_terms_days: input.default_payment_terms_days,
     p_inventory_valuation_method: input.inventory_valuation_method ?? null,
     p_inventory_policy_memo: input.inventory_policy_memo || null,
+    // Left out keeps the note already saved; an empty string clears it (0179).
+    p_pay_note: input.pay_note === undefined ? null : (input.pay_note ?? ""),
   });
   if (error) throw new CompanyError(error.message);
   return data as string;

@@ -772,6 +772,8 @@ export const companySettingsSchema = z.object({
     .enum(["average_cost", "fifo", "specific_identification"])
     .optional(),
   inventory_policy_memo: z.string().trim().max(4000).optional().or(z.literal("")).nullable(),
+  /** How to pay, printed at the foot of every invoice (2.86). Left out keeps the note saved; empty clears it. */
+  pay_note: z.string().trim().max(600, "Keep how to pay to 600 characters").optional().or(z.literal("")).nullable(),
 });
 export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 

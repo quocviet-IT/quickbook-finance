@@ -3,6 +3,7 @@ import {
   buildInvoiceDocument,
   formatPostalAddress,
   invoiceDocumentFileName,
+  invoiceTermsLabel,
   type InvoiceDocumentSource,
 } from "@/lib/domain/invoice-document";
 
@@ -230,6 +231,22 @@ describe("buildInvoiceDocument", () => {
       invoice: { ...source.invoice, due_date: null },
     });
     expect(doc.meta).toContainEqual({ label: "Due date", value: "On receipt" });
+    expect(doc.meta).toContainEqual({ label: "Terms", value: "Due on receipt" });
+  });
+
+  it("states its terms from its own dates (2.86)", () => {
+    expect(buildInvoiceDocument(source).meta).toContainEqual({ label: "Terms", value: "Net 30" });
+    expect(invoiceTermsLabel("2026-01-31", "2026-03-02")).toBe("Net 30");
+    expect(invoiceTermsLabel("2026-03-22", "2026-03-22")).toBe("Due on receipt");
+    expect(invoiceTermsLabel("2026-03-22", null)).toBe("Due on receipt");
+  });
+
+  it("prints how to pay from the company's settings while anything is owed, and not on a paid or void one", () => {
+    const withNote = { ...source, company: { ...company, pay_note: "  Checks payable to Example Jewelry LLC.  " } };
+    expect(buildInvoiceDocument(withNote).payNote).toBe("Checks payable to Example Jewelry LLC.");
+    expect(buildInvoiceDocument({ ...withNote, invoice: { ...source.invoice, balance_due_minor: 0, status: "paid" } }).payNote).toBeNull();
+    expect(buildInvoiceDocument({ ...withNote, invoice: { ...source.invoice, status: "void" } }).payNote).toBeNull();
+    expect(buildInvoiceDocument(source).payNote).toBeNull();
   });
 
   it("shows the customer's name even when the address is empty", () => {
