@@ -41,7 +41,7 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
-    version: "2.80",
+    version: "2.82",
     date: "2026-10-30",
     headline: "Reconcile history links each account's last reconciliation to its report, and says when it was adjusted.",
     changes: [
@@ -51,6 +51,27 @@ export const RELEASES: Release[] = [
         detail:
           "Under Last reconciled, a Report link opens the report of the account's latest completed reconciliation: the statement bridged to the books, with the lines cleared and outstanding. When that reconciliation was completed with an adjusting entry, Status shows an Adjusted tag beside Reconciled, and holding the pointer over it shows the reason given. The Reconcile list already showed both for every reconciliation.",
         route: "/banking/reconcile/history",
+      },
+    ],
+  },
+  {
+    version: "2.81",
+    date: "2026-10-30",
+    headline: "Customer and vendor statements open with what was owed before the period, so a payment in the period counts once.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A statement's opening and closing balance",
+        detail:
+          "The opening balance was what is still unpaid today on documents dated before the period, so a payment made during the period had already come off it, and came off again as a line. An invoice of $1,000.00 dated in August and paid in September made September's statement close at -$1,000.00. The opening is now everything dated before the first day, the same way the lines count it: each statement's closing balance is the next one's opening, and the closing is what was owed on the last day.",
+        route: "/reports/customer-statement",
+      },
+      {
+        kind: "fixed",
+        title: "What a statement lists",
+        detail:
+          "Draft invoices, bills, credit memos and vendor credits are no longer listed: a draft is not owed until it is issued or posted. A write-off is now a line, on the customer's statement or the vendor's. An early payment discount taken on a bill is a line on the vendor's statement, dated with the payment that took it. The footnote now says how the balances are worked out, in place of a note that called point-in-time statements a later enhancement.",
+        route: "/reports/vendor-statement",
       },
     ],
   },

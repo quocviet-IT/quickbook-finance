@@ -82,7 +82,7 @@ describe("historyAccounts", () => {
   });
 });
 
-describe("the latest completed reconciliation (2.80)", () => {
+describe("the latest completed reconciliation (2.82)", () => {
   const done = (id: string, bankAccountId: string, statementEndingDate: string, over: Partial<CompletedReconciliation> = {}): CompletedReconciliation => ({
     id, bankAccountId, statementEndingDate, completedAt: `${statementEndingDate}T12:00:00Z`, adjusted: false, adjustmentReason: null, ...over,
   });
