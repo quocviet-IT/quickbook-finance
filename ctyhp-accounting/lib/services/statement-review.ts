@@ -14,9 +14,11 @@ import {
 import { registerClaim } from "@/lib/domain/register-claim";
 import { listAccounts } from "./accounts";
 import { getBankingPreference } from "./banking-preference";
+import { holdingAccountsOf, type HoldingAccounts } from "@/lib/domain/uncategorized";
 import {
   approveReconciliation,
   categoriseBankTransaction,
+  categoriseInsteadOfMatch,
   listBankAccounts,
   listSuggestions,
   settleFromBankTransaction,
@@ -65,6 +67,8 @@ export interface ImportReview {
   accounts: { id: string; label: string }[];
   /** The same accounts as chart rows, for the rule form. */
   ruleAccounts: AccountRow[];
+  /** Where a line added anew ("Not the same thing, add it") starts, for coding later. */
+  holding: HoldingAccounts;
 }
 
 async function openDocuments(sb: SupabaseClient): Promise<ReviewDocument[]> {
@@ -340,6 +344,7 @@ export async function loadImportReview(sb: SupabaseClient, batchId: string): Pro
     }),
     accounts: codable.map((row) => ({ id: row.id, label: `${row.account_code} — ${row.name}` })),
     ruleAccounts: codable,
+    holding: holdingAccountsOf(accountRows),
   };
 }
 
@@ -357,6 +362,8 @@ export interface ReviewPostDeps {
   approve: (sb: SupabaseClient, reconciliationId: string) => Promise<void>;
   settle: typeof settleFromBankTransaction;
   categorise: (sb: SupabaseClient, transactionId: string, accountId: string) => Promise<{ entry_number: string | null }>;
+  /** Turn down the line's ledger match and post it to the account, in one call. */
+  categoriseInstead: (sb: SupabaseClient, transactionId: string, reconciliationId: string, accountId: string) => Promise<{ entry_number: string | null }>;
   /** Post a transfer or funding pair; returns the entry numbers it made. */
   postPair: (sb: SupabaseClient, first: string, second: string, kind: "transfer" | "funding") => Promise<string[]>;
   /** Post a loan payment with the interest a person accepted; returns the entry number. */
@@ -381,6 +388,7 @@ const defaultDeps: ReviewPostDeps = {
   approve: approveReconciliation,
   settle: settleFromBankTransaction,
   categorise: categoriseBankTransaction,
+  categoriseInstead: categoriseInsteadOfMatch,
   postPair: async (sb, first, second, kind) => {
     const { data, error } = await sb.rpc("acc_post_bank_pair", { p_first: first, p_second: second, p_kind: kind });
     if (error) throw fail(error.message);
@@ -435,7 +443,10 @@ export async function postReviewItems(
         const entry = await deps.postLoan(sb, id, item.repaymentId, item.interestMinor);
         outcomes.push({ id, ok: true, detail: entry ?? "Posted" });
       } else {
-        const posted = await deps.categorise(sb, id, item.accountId);
+        // Not the same thing: the match is turned down in the call that posts the entry.
+        const posted = item.instead
+          ? await deps.categoriseInstead(sb, id, item.instead, item.accountId)
+          : await deps.categorise(sb, id, item.accountId);
         outcomes.push({ id, ok: true, detail: posted.entry_number ?? "Posted" });
       }
     } catch (err) {

@@ -9,6 +9,7 @@ const deps = (over: Partial<ReviewPostDeps> = {}): ReviewPostDeps => ({
   approve: vi.fn(async () => undefined),
   settle: vi.fn(async () => "pay-1"),
   categorise: vi.fn(async () => ({ entry_number: "JE-000010" })),
+  categoriseInstead: vi.fn(async () => ({ entry_number: "JE-000013" })),
   postPair: vi.fn(async () => ["JE-000011"]),
   postLoan: vi.fn(async () => "JE-000012"),
   ...over,
@@ -39,6 +40,15 @@ describe("postReviewItems", () => {
       memo: null,
     });
     expect(d.categorise).toHaveBeenCalledWith(sb, "t1", "acct-1");
+  });
+
+  it("turns down the match and posts the line in one call when it is not the same thing", async () => {
+    const d = deps();
+    const outcomes = await postReviewItems(sb, [{ transactionId: "t1", kind: "account", accountId: "acct-1", instead: "r1" }], d);
+    expect(outcomes).toEqual([{ id: "t1", ok: true, detail: "JE-000013" }]);
+    expect(d.categoriseInstead).toHaveBeenCalledWith(sb, "t1", "r1", "acct-1");
+    expect(d.categorise).not.toHaveBeenCalled();
+    expect(d.approve).not.toHaveBeenCalled();
   });
 
   it("posts nothing for a line that is gone or already handled", async () => {

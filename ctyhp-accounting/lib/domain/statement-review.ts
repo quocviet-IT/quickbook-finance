@@ -14,6 +14,7 @@
 import type { CodingSuggestionView } from "./coding";
 import type { LoanSuggestionView } from "./loan-interest";
 import { rivalsWhy } from "./register-claim";
+import type { HoldingAccounts } from "./uncategorized";
 
 export const REVIEW_POST_CHUNK = 50;
 
@@ -51,7 +52,7 @@ export interface ReviewPairView {
 
 export type ReviewProposal =
   | { kind: "handled"; why: string }
-  | { kind: "match"; reconciliationId: string; label: string; why: string }
+  | { kind: "match"; reconciliationId: string; entryNumber: string | null; label: string; why: string }
   | { kind: "document"; documentId: string; label: string; why: string }
   | { kind: "transfer"; counterpartId: string; label: string; why: string }
   | { kind: "funding"; counterpartId: string; label: string; why: string }
@@ -91,6 +92,7 @@ export function reviewProposal(input: {
     return {
       kind: "match",
       reconciliationId: match.reconciliationId,
+      entryNumber: match.entryNumber,
       label: `Already in the books · ${match.entryNumber ?? "entry"}`,
       why: "This amount is already posted to the bank account; posting approves the match and adds no entry",
     };
@@ -160,7 +162,13 @@ export function reviewProposal(input: {
 export type ReviewPostItem =
   | { transactionId: string; kind: "match"; reconciliationId: string }
   | { transactionId: string; kind: "document"; documentId: string }
-  | { transactionId: string; kind: "account"; accountId: string }
+  | {
+      transactionId: string;
+      kind: "account";
+      accountId: string;
+      /** The ledger match this line was proposed as, turned down in the same call that posts it. */
+      instead?: string;
+    }
   | { transactionId: string; kind: "pair"; pairKind: "transfer" | "funding"; counterpartId: string }
   | { transactionId: string; kind: "loan"; repaymentId: string; interestMinor: number };
 
@@ -200,6 +208,50 @@ export function itemFromValue(transactionId: string, value: string | null, inter
   if (kind === "account") return { transactionId, kind, accountId: id };
   if (kind === "loan") return interestMinor === null ? null : { transactionId, kind, repaymentId: id, interestMinor };
   return null;
+}
+
+/**
+ * What posting a line's chosen value does. An account chosen for a line
+ * proposed as already in the books carries that match with it: the line is
+ * new money, and the match is turned down as the entry is posted.
+ */
+export function reviewItem(
+  transactionId: string,
+  proposal: ReviewProposal,
+  value: string | null,
+  interestMinor: number | null = null,
+): ReviewPostItem | null {
+  const item = itemFromValue(transactionId, value, interestMinor);
+  if (item?.kind === "account" && proposal.kind === "match") return { ...item, instead: proposal.reconciliationId };
+  return item;
+}
+
+/**
+ * "Not the same thing, add it": a line proposed as already in the books, or as
+ * one side of a transfer, that a person says is new money. It goes in as its
+ * own entry.
+ */
+export function canAddAnew(proposal: ReviewProposal): boolean {
+  return proposal.kind === "match" || proposal.kind === "transfer";
+}
+
+/**
+ * Where a line added anew starts: Uncategorized Income or Expense, for coding
+ * later on Bank Transactions, when the chart has one; otherwise nothing, and a
+ * person chooses.
+ */
+export function addAnewValue(amountMinor: number, holding: HoldingAccounts): string | null {
+  const account = amountMinor > 0 ? holding.income : holding.expense;
+  return account ? `account:${account.id}` : null;
+}
+
+/** The line's note while it is being added anew. */
+export function addAnewWhy(proposal: ReviewProposal, chosen: boolean): string {
+  const what =
+    proposal.kind === "match"
+      ? `adds it as a new entry and turns down the match to ${proposal.entryNumber ?? "the entry in the books"}`
+      : "adds it as a new entry, not as a transfer";
+  return chosen ? `Posting ${what}` : `Choose an account: posting ${what}`;
 }
 
 /** The value the other line of a pair takes when this one chooses the pair. */

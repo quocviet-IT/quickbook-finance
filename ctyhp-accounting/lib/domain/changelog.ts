@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.79",
+    date: "2026-10-30",
+    headline: "Review import adds a line the books only seem to have, and a CSV whose dates read two ways asks which.",
+    changes: [
+      {
+        kind: "added",
+        title: "Not the same thing, add it",
+        detail:
+          "Review import proposes Already in the books when a line's amount is already posted to the bank account, and Transfer when another account has the other side. When it is new money, such as a second payment of the same amount, click Not the same thing, add it under the line. It is marked Adding as a new entry and starts in Uncategorized Income or Expense, for coding later on Bank Transactions, or you choose the account. Posting turns the match down and adds the entry in one step, so either both happen or neither does. Undo puts the line back as it was proposed. Choosing an account for a line already in the books now does the same, where before it was refused.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Dates that read two ways in a CSV",
+        detail:
+          "When every date in a CSV could be read either way round, such as 03/04/2026, Import statement read them month first without a word. It now says so, shows what the file's first such date becomes each way (March 4, 2026 or April 3, 2026), and lets you choose. This browser remembers the choice for the account's next import. A file with any date over 12 in it, or with dates written with dots, reads as before.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Categorising a line whose match was turned down",
+        detail:
+          "A line whose suggested match you rejected on Banking could not be categorised: it was refused as already matched to the ledger. A rejected match no longer counts. Undo on a categorised line also takes back only the entry it was posted with, never the entry a rejected match pointed at.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.78",
     date: "2026-10-29",
     headline: "Pages with a table download about 49 KB less.",

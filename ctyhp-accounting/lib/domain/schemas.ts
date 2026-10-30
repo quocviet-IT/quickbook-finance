@@ -1139,7 +1139,7 @@ export const reviewPostItemsSchema = z
     z.discriminatedUnion("kind", [
       z.object({ transactionId: z.uuid(), kind: z.literal("match"), reconciliationId: z.uuid() }),
       z.object({ transactionId: z.uuid(), kind: z.literal("document"), documentId: z.uuid() }),
-      z.object({ transactionId: z.uuid(), kind: z.literal("account"), accountId: z.uuid() }),
+      z.object({ transactionId: z.uuid(), kind: z.literal("account"), accountId: z.uuid(), instead: z.uuid().optional() }),
       z.object({
         transactionId: z.uuid(),
         kind: z.literal("pair"),

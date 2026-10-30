@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, App, Button, Checkbox, Input, Modal, Select, Space, Spin, Typography, Upload } from "antd";
+import { Alert, App, Button, Checkbox, Input, Modal, Radio, Select, Space, Spin, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { guessStatementColumns, readStatementCsv, statementCsvNote } from "@/lib/domain/statement-csv";
 import {
+  dateOrderChoices,
+  dateOrderNotice,
   describeStatementParse,
   detectDateOrder,
   parseStatementRows,
+  readDateOrder,
   statementColumnsComplete,
   type DateOrder,
   type StatementColumnMap,
@@ -176,6 +179,45 @@ const COLUMN_FIELDS: { key: keyof StatementColumnMap; label: string; required?: 
   { key: "balance", label: "Balance" },
 ];
 
+/**
+ * Every date in the file reads two ways round, so OneBook says which it read
+ * and offers the other: a warning until someone chooses, a plain note after.
+ */
+function DateOrderAlert({
+  example,
+  order,
+  chosen,
+  onChoose,
+}: {
+  example: string;
+  order: DateOrder;
+  chosen: boolean;
+  onChoose: (order: DateOrder) => void;
+}) {
+  const notice = dateOrderNotice(example, order, chosen);
+  return (
+    <Alert
+      style={{ marginTop: 12 }}
+      type={chosen ? "info" : "warning"}
+      showIcon
+      title={notice.title}
+      description={
+        <Space orientation="vertical" size={8}>
+          {notice.description ? <span>{notice.description}</span> : null}
+          <Radio.Group
+            aria-label="Which way round the dates are written"
+            optionType="button"
+            size="small"
+            value={chosen ? order : undefined}
+            onChange={(e) => onChoose(e.target.value as DateOrder)}
+            options={dateOrderChoices(example)}
+          />
+        </Space>
+      }
+    />
+  );
+}
+
 export default function ImportStatementModal({
   open,
   bankAccount,
@@ -195,6 +237,8 @@ export default function ImportStatementModal({
   const [file, setFile] = useState<FileState>({ kind: "none" });
   const [choice, setChoice] = useState<CsvChoice | null>(null);
   const [showColumns, setShowColumns] = useState(false);
+  // Whether the way round the dates are read was chosen — here, or for this bank's last import.
+  const [datesChosen, setDatesChosen] = useState(false);
   const [picked, setPicked] = useState(0);
   // A PDF is read asynchronously; choosing another file meanwhile makes the first answer stale.
   const reading = useRef(0);
@@ -226,6 +270,7 @@ export default function ImportStatementModal({
     setChosen(chosen);
     setShowColumns(false);
     setChoice(null);
+    setDatesChosen(false);
     if (isPdfFile(chosen)) {
       void readPdf(chosen, token);
       return false;
@@ -268,6 +313,7 @@ export default function ImportStatementModal({
       };
       setFile({ kind: "csv", headers, records, note: statementCsvNote(csv) });
       setChoice(next);
+      setDatesChosen(remembered !== null);
       setShowColumns(!statementColumnsComplete(next.columns));
     };
     reader.readAsText(chosen);
@@ -457,9 +503,21 @@ export default function ImportStatementModal({
 
   const okText = purpose === "attach" ? (okLabel ?? "Attach") : (okLabel ?? view.okLabel);
 
+  // A CSV whose every date reads two ways (03/04/2026) is asked about, not guessed in silence.
+  const dateColumn = file.kind === "csv" ? choice?.columns.date : null;
+  const dateReading = useMemo(
+    () => (file.kind === "csv" && dateColumn ? readDateOrder(file.records.map((record) => record[dateColumn] ?? "")) : null),
+    [file, dateColumn],
+  );
+  const chooseDateOrder = (order: DateOrder) => {
+    setChoice((current) => (current ? { ...current, dateOrder: order } : current));
+    setDatesChosen(true);
+  };
+
   // Choosing the date column reads that column again for which way round its
   // dates are written; the reader can still override it.
-  const setColumn = (key: keyof StatementColumnMap, value: string | null) =>
+  const setColumn = (key: keyof StatementColumnMap, value: string | null) => {
+    if (key === "date") setDatesChosen(false);
     setChoice((current) => {
       if (!current) return current;
       const dateOrder =
@@ -468,6 +526,7 @@ export default function ImportStatementModal({
           : current.dateOrder;
       return { ...current, columns: { ...current.columns, [key]: value }, dateOrder };
     });
+  };
 
   return (
     <Modal
@@ -539,7 +598,7 @@ export default function ImportStatementModal({
                     aria-label="Dates"
                     style={{ width: "100%" }}
                     value={choice.dateOrder}
-                    onChange={(value: DateOrder) => setChoice({ ...choice, dateOrder: value })}
+                    onChange={chooseDateOrder}
                     options={[
                       { value: "mdy", label: "Month/Day/Year" },
                       { value: "dmy", label: "Day/Month/Year" },
@@ -562,6 +621,10 @@ export default function ImportStatementModal({
             </Button>
           )}
         </div>
+      ) : null}
+
+      {choice && dateReading?.example ? (
+        <DateOrderAlert example={dateReading.example} order={choice.dateOrder} chosen={datesChosen} onChoose={chooseDateOrder} />
       ) : null}
 
       {wrongAccount && file.kind !== "pdf" ? <WrongAccountAlert description={wrongAccountText} /> : null}
