@@ -23,6 +23,7 @@ export default async function CustomerStatementPage() {
         baseCurrency={ctx.currencyCode}
         baseDecimals={ctx.decimals}
         presets={ctx.presets}
+        payNote={ctx.payNote}
       />
     </div>
   );

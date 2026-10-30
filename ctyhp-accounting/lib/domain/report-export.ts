@@ -17,6 +17,11 @@ export interface ReportExportSheet {
   currencyCode: string;
   columns: ReportExportColumn[];
   rows: Record<string, string | number | null>[];
+  /**
+   * Words printed under the table of the PDF, such as how to pay on a customer
+   * statement. CSV and Excel are data, so they leave these out.
+   */
+  notes?: { heading: string; text: string }[];
 }
 
 export function sanitizeExportFileName(value: string): string {

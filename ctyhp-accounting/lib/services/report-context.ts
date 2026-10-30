@@ -18,6 +18,8 @@ export interface ReportPageContext {
   timeZone: string;
   /** For the period presets: fiscal year and the span of posted entries. */
   presets: PresetContext;
+  /** How to pay (2.83), for a customer statement that closes owing something. */
+  payNote: string | null;
 }
 
 /** The company's today and time zone, for a report action that needs no more. */
@@ -50,5 +52,6 @@ export async function reportPageContext(sb: SupabaseClient): Promise<ReportPageC
       firstEntryDate: span.first,
       lastEntryDate: span.last,
     },
+    payNote: settings?.pay_note ?? null,
   };
 }

@@ -9,7 +9,8 @@ import { rememberedColumns } from "@/lib/client/statement-columns";
 import { detectStatementFormat } from "@/lib/domain/statement-files";
 import { guessStatementColumns, readStatementCsv } from "@/lib/domain/statement-csv";
 import {
-  detectDateOrder,
+  dateOrderReadings,
+  readDateOrder,
   parseStatementRows,
   statementColumnsComplete,
 } from "@/lib/domain/statement-import";
@@ -39,6 +40,17 @@ export interface RunBankAccount {
 
 const COLUMNS_NOT_RECOGNIZED = "Its columns were not recognized — import it once on Banking to choose them";
 const COULD_NOT_READ = "This file could not be read";
+
+/**
+ * A run cannot stop to ask which way round a file writes its dates, and
+ * guessing month first in silence is what 2.79 stopped Import statement doing.
+ * The file waits, as one with unknown columns does, until an import on Banking
+ * has asked and remembered the answer for this account.
+ */
+export function datesReadTwoWays(example: string): string {
+  const { mdy, dmy } = dateOrderReadings(example);
+  return `Its dates read two ways: ${example} is ${mdy} month first, or ${dmy} day first — import it once on Banking to choose`;
+}
 
 const isPdfFile = (file: File) => /\.pdf$/i.test(file.name) || file.type === "application/pdf";
 
@@ -98,7 +110,9 @@ async function readFile(file: File, bank: RunBankAccount): Promise<RunStatement[
   const remembered = rememberedColumns(bank.id, headers);
   const columns = remembered?.columns ?? guessStatementColumns(headers, records);
   if (!statementColumnsComplete(columns)) return [unreadable(file.name, "CSV", COLUMNS_NOT_RECOGNIZED)];
-  const dateOrder = remembered?.dateOrder ?? detectDateOrder(records.map((r) => (columns.date ? r[columns.date] ?? "" : "")));
+  const reading = remembered ? null : readDateOrder(records.map((r) => (columns.date ? r[columns.date] ?? "" : "")));
+  if (reading?.example) return [unreadable(file.name, "CSV", datesReadTwoWays(reading.example))];
+  const dateOrder = remembered?.dateOrder ?? reading?.order ?? "mdy";
   const { rows } = parseStatementRows(records, {
     decimals: bank.decimals,
     columns,

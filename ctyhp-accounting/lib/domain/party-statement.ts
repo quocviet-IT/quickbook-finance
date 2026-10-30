@@ -25,6 +25,16 @@ export function statementDocType(docType: string): string {
   return DOC_TYPES[docType] ?? humanizeStatus(docType);
 }
 
+/**
+ * How to pay, from the company's settings (2.83), on a customer's statement
+ * that closes owing something (2.87); never on a vendor's, which is what the
+ * company owes, nor on one that asks for nothing, as a paid invoice does not.
+ */
+export function statementPayNote(kind: "customer" | "vendor", closingMinor: number, payNote: string | null | undefined): string | null {
+  if (kind !== "customer" || closingMinor <= 0) return null;
+  return payNote?.trim() || null;
+}
+
 /** The footnote under the lines. */
 export function statementFootnote(kind: "customer" | "vendor"): string {
   const moves =

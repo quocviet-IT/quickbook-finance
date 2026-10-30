@@ -49,4 +49,23 @@ describe("a party statement's export", () => {
     expect(sheet.rows.slice(1, -1).map((row) => row.type)).toEqual(["Invoice", "Customer payment"]);
     expect(sheet.subtitle).toBe("Example Customer · 09/01/2026 – 09/30/2026");
   });
+
+  it("names a line as the screen does, and prints how to pay under a customer's statement that closes owing (2.87)", () => {
+    const owing: StatementReport = {
+      openingMinor: 0,
+      rows: [
+        { txnDate: "2026-09-02", docType: "invoice", docNumber: "INV-8", amountMinor: 5_000, runningMinor: 5_000 },
+        { txnDate: "2026-09-12", docType: "write_off", docNumber: "WO-1", amountMinor: -1_000, runningMinor: 4_000 },
+      ] as StatementReport["rows"],
+      closingMinor: 4_000,
+    };
+    const when = { from: "2026-09-01", to: "2026-09-30" };
+    const note = "Checks payable to Example Jewelry LLC.";
+    const sheet = partyStatementSheet("customer", "Example Customer", owing, when, ctx, note);
+    expect(sheet.rows.slice(1, -1).map((row) => row.type)).toEqual(["Invoice", "Write-off"]);
+    expect(sheet.notes).toEqual([{ heading: "How to pay", text: note }]);
+    expect(partyStatementSheet("customer", "Example Customer", report, when, ctx, note).notes).toBeUndefined();
+    expect(partyStatementSheet("vendor", "Example Vendor", owing, when, ctx, note).notes).toBeUndefined();
+    expect(partyStatementSheet("customer", "Example Customer", owing, when, ctx).notes).toBeUndefined();
+  });
 });

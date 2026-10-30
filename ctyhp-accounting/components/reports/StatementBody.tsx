@@ -6,7 +6,7 @@ import { ReportFoot, StatRow } from "@/components/reports/ReportPaper";
 import { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate, formatMoney } from "@/lib/format";
-import { statementDocType, statementFootnote } from "@/lib/domain/party-statement";
+import { statementDocType, statementFootnote, statementPayNote } from "@/lib/domain/party-statement";
 import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
 const PAGE_SIZE = 50;
@@ -27,16 +27,20 @@ export default function StatementBody({
   currencyCode,
   decimals,
   printing,
+  payNote = null,
 }: {
   kind: "customer" | "vendor";
   data: PartyStatement;
   currencyCode: string;
   decimals: number;
   printing: boolean;
+  /** The company's How to pay (2.83), shown on a customer statement that closes owing something. */
+  payNote?: string | null;
 }) {
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const money = (minor: number) => formatMoney(minor, currencyCode, decimals);
   const customer = kind === "customer";
+  const howToPay = statementPayNote(kind, data.report.closingMinor, payNote);
   return (
     <>
       <StatRow
@@ -60,6 +64,11 @@ export default function StatementBody({
           { title: "Running", align: "right", width: COLUMN.MONEY_WIDE, render: (_: unknown, r: StatementRow) => money(r.runningMinor) },
         ]}
       />
+      {howToPay ? (
+        <ReportFoot>
+          <strong>How to pay.</strong> <span style={{ whiteSpace: "pre-line" }}>{howToPay}</span>
+        </ReportFoot>
+      ) : null}
       <ReportFoot>
         <strong>How it reads.</strong> {statementFootnote(kind)}
       </ReportFoot>
