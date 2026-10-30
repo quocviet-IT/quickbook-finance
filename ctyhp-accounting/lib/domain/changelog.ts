@@ -49,7 +49,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Declining balance depreciation",
         detail:
-          "Fixed Assets offers Declining balance (200%, then straight-line) beside Straight-line. Each month it charges twice the straight-line rate on what is left of the cost, so an asset costs more in its first years, then switches to straight-line once that charges more, so it reaches its salvage value at the end of its useful life. Choosing it shows the first month's charge, the first year's, and when the last charge falls. The asset import takes declining_balance as a method too. Assets already registered keep their schedules.",
+          "Fixed Assets offers Declining balance (200%) beside Straight-line. Each month it charges twice the straight-line rate on what is left of the cost, so an asset costs more in its first years, then switches to straight-line once that charges more, so it reaches its salvage value at the end of its useful life. Choosing it shows the first month's charge, the first year's, and when the last charge falls. The asset import takes declining_balance as a method too. Assets already registered keep their schedules.",
         route: "/fixed-assets",
       },
     ],

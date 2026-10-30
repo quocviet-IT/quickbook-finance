@@ -3,7 +3,8 @@ import type { FixedAssetMethod } from "@/lib/db/types";
 /** The methods an asset can be registered under, as the form and the import offer them. */
 export const DEPRECIATION_METHOD_OPTIONS: { value: FixedAssetMethod; label: string }[] = [
   { value: "straight_line", label: "Straight-line (monthly)" },
-  { value: "declining_balance", label: "Declining balance (200%, then straight-line)" },
+  // Short enough for the form's select; the note under the form says it switches to straight-line.
+  { value: "declining_balance", label: "Declining balance (200%)" },
   { value: "none", label: "Not depreciated" },
 ];
 
