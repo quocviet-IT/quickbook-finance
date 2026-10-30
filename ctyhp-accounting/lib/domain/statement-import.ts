@@ -160,23 +160,94 @@ export function detectStatementColumns(headers: readonly string[]): { columns: S
   return { columns, complete: statementColumnsComplete(columns) };
 }
 
+/** Which way round a file's dates were read, and whether the file could be read the other way round. */
+export interface DateOrderReading {
+  order: DateOrder;
+  /**
+   * Nothing to ask: a date with a number over 12 shows the order, the file
+   * writes its dates with dots, or no date reads two ways.
+   */
+  settled: boolean;
+  /** The file's first date that reads two ways ("03/04/2026"), when the order is not settled. */
+  example: string | null;
+}
+
 /**
  * Which way round a file writes its dates. A first number over 12 can only be
  * a day; a second one over 12 can only be a day too, so month comes first.
- * With nothing to tell, month first — the US form, and the prototype's.
+ * With nothing to tell, month first — the US form, and the prototype's — but
+ * the reading says so, so the screen can ask instead of guessing in silence.
  */
-export function detectDateOrder(values: readonly string[]): DateOrder {
+export function readDateOrder(values: readonly string[]): DateOrderReading {
   let dotted = false;
+  let shown: DateOrder | null = null;
+  let example: string | null = null;
   for (const value of values) {
-    const parts = (value ?? "").trim().match(/^(\d{1,2})([/.-])(\d{1,2})[/.-](?:\d{2}|\d{4})$/);
+    const text = (value ?? "").trim();
+    const parts = text.match(/^(\d{1,2})([/.-])(\d{1,2})[/.-](?:\d{2}|\d{4})$/);
     if (!parts) continue;
-    if (Number(parts[1]) > 12) return "dmy";
-    if (Number(parts[3]) > 12) return "mdy";
+    const first = Number(parts[1]);
+    const second = Number(parts[3]);
+    if (first > 12) shown ??= "dmy";
+    else if (second > 12) shown ??= "mdy";
+    // 05/05/2026 is the same day either way round.
+    else if (first !== second) example ??= text;
     if (parts[2] === ".") dotted = true;
   }
   // Dates written with dots (31.07.2026) are day first wherever they are
   // written, so a file of them that never shows a day over 12 is still dmy.
-  return dotted ? "dmy" : "mdy";
+  const order = shown ?? (dotted ? "dmy" : "mdy");
+  const settled = shown !== null || dotted || example === null;
+  return { order, settled, example: settled ? null : example };
+}
+
+export function detectDateOrder(values: readonly string[]): DateOrder {
+  return readDateOrder(values).order;
+}
+
+const SPELLED_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * The one place a date is spelled out rather than shown as `03/04/2026`: the
+ * numbers are what is in question, so only the month's name can answer it.
+ */
+function spelled(iso: string | null, fallback: string): string {
+  const parts = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return parts ? `${SPELLED_MONTHS[Number(parts[2]) - 1]} ${Number(parts[3])}, ${parts[1]}` : fallback;
+}
+
+/** "03/04/2026": March 4, 2026 read month first, April 3, 2026 read day first. */
+export function dateOrderReadings(example: string): Record<DateOrder, string> {
+  return {
+    mdy: spelled(normalizeStatementDate(example, "mdy"), example),
+    dmy: spelled(normalizeStatementDate(example, "dmy"), example),
+  };
+}
+
+export const DATE_ORDER_WORDS: Record<DateOrder, string> = { mdy: "month first", dmy: "day first" };
+
+/** The two answers, each with what the file's own date becomes: "Month first · March 4, 2026". */
+export function dateOrderChoices(example: string): { value: DateOrder; label: string }[] {
+  const readings = dateOrderReadings(example);
+  return [
+    { value: "mdy", label: `Month first · ${readings.mdy}` },
+    { value: "dmy", label: `Day first · ${readings.dmy}` },
+  ];
+}
+
+/** What Import statement says about a file whose dates read two ways. */
+export function dateOrderNotice(example: string, order: DateOrder, chosen: boolean): { title: string; description: string | null } {
+  const readings = dateOrderReadings(example);
+  if (chosen) return { title: `Dates read ${DATE_ORDER_WORDS[order]}: ${example} is ${readings[order]}`, description: null };
+  return {
+    title: "Check which way round the dates are written",
+    description:
+      `Every date in this file reads two ways: ${example} is ${readings.mdy} month first, or ${readings.dmy} day first. ` +
+      `They are read ${DATE_ORDER_WORDS[order]} until you choose.`,
+  };
 }
 
 /**

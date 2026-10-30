@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
 import {
+  addAnewValue,
+  addAnewWhy,
+  canAddAnew,
   chunked,
   itemFromValue,
   proposalValue,
   REVIEW_POST_CHUNK,
+  reviewItem,
   reviewProposal,
   type ReviewDocument,
 } from "@/lib/domain/statement-review";
@@ -70,7 +74,7 @@ describe("reviewProposal", () => {
 
 describe("the Post as value", () => {
   it("round-trips each postable proposal, and an account a person picked", () => {
-    expect(itemFromValue("t1", proposalValue({ kind: "match", reconciliationId: "r1", label: "", why: "" }))).toEqual({ transactionId: "t1", kind: "match", reconciliationId: "r1" });
+    expect(itemFromValue("t1", proposalValue({ kind: "match", reconciliationId: "r1", entryNumber: null, label: "", why: "" }))).toEqual({ transactionId: "t1", kind: "match", reconciliationId: "r1" });
     expect(itemFromValue("t1", proposalValue({ kind: "document", documentId: "d1", label: "", why: "" }))).toEqual({ transactionId: "t1", kind: "document", documentId: "d1" });
     expect(itemFromValue("t1", "account:a1")).toEqual({ transactionId: "t1", kind: "account", accountId: "a1" });
   });
@@ -78,6 +82,42 @@ describe("the Post as value", () => {
     expect(proposalValue({ kind: "none", why: "" })).toBeNull();
     expect(itemFromValue("t1", null)).toBeNull();
     expect(itemFromValue("t1", "bogus:x")).toBeNull();
+  });
+});
+
+describe("Not the same thing, add it", () => {
+  const match = reviewProposal({ line: line(-125000), match: { reconciliationId: "r1", entryNumber: "JE-000123" }, documents: [], coding });
+  const transfer = { kind: "transfer" as const, counterpartId: "t2", label: "Transfer to Example Savings · 1020", why: "" };
+  const holding = {
+    income: { id: "acct-in", label: "4999 — Uncategorized Income" },
+    expense: { id: "acct-out", label: "6999 — Uncategorized Expense" },
+  };
+
+  it("is offered on a line already in the books and on one side of a transfer, and nowhere else", () => {
+    expect(canAddAnew(match)).toBe(true);
+    expect(canAddAnew(transfer)).toBe(true);
+    expect(canAddAnew({ kind: "document", documentId: "d1", label: "", why: "" })).toBe(false);
+    expect(canAddAnew({ kind: "account", accountId: "a1", label: "", why: "" })).toBe(false);
+    expect(canAddAnew({ kind: "none", why: "" })).toBe(false);
+  });
+
+  it("starts the line in Uncategorized for its direction, or nowhere when the chart has none", () => {
+    expect(addAnewValue(-125000, holding)).toBe("account:acct-out");
+    expect(addAnewValue(125000, holding)).toBe("account:acct-in");
+    expect(addAnewValue(-125000, { income: holding.income, expense: null })).toBeNull();
+  });
+
+  it("carries the match it turns down when an account is posted", () => {
+    expect(reviewItem("t1", match, "account:acct-out")).toEqual({ transactionId: "t1", kind: "account", accountId: "acct-out", instead: "r1" });
+    expect(reviewItem("t1", match, "match:r1")).toEqual({ transactionId: "t1", kind: "match", reconciliationId: "r1" });
+    expect(reviewItem("t1", transfer, "account:acct-out")).toEqual({ transactionId: "t1", kind: "account", accountId: "acct-out" });
+    expect(reviewItem("t1", match, null)).toBeNull();
+  });
+
+  it("says what posting will do", () => {
+    expect(addAnewWhy(match, true)).toBe("Posting adds it as a new entry and turns down the match to JE-000123");
+    expect(addAnewWhy(match, false)).toBe("Choose an account: posting adds it as a new entry and turns down the match to JE-000123");
+    expect(addAnewWhy(transfer, true)).toBe("Posting adds it as a new entry, not as a transfer");
   });
 });
 

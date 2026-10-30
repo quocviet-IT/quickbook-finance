@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  dateOrderChoices,
+  dateOrderNotice,
   detectDateOrder,
   detectStatementColumns,
   parseStatementRows,
+  readDateOrder,
   statementColumnsComplete,
 } from "@/lib/domain/statement-import";
 
@@ -65,5 +68,31 @@ describe("detectDateOrder", () => {
   });
   it("falls back to month first when nothing tells", () => {
     expect(detectDateOrder(["03/04/2026", "2026-04-03", ""])).toBe("mdy");
+  });
+});
+
+describe("readDateOrder", () => {
+  it("is settled by any date with a number over 12, wherever it is in the file", () => {
+    expect(readDateOrder(["03/04/2026", "05/06/2026", "13/04/2026"])).toEqual({ order: "dmy", settled: true, example: null });
+    expect(readDateOrder(["03/04/2026", "04/15/2026"])).toEqual({ order: "mdy", settled: true, example: null });
+  });
+  it("is settled when no date reads two ways, or when dates are written with dots", () => {
+    expect(readDateOrder(["2026-04-03", "05/05/2026", ""])).toMatchObject({ order: "mdy", settled: true });
+    expect(readDateOrder(["03.04.2026", "05.06.2026"])).toEqual({ order: "dmy", settled: true, example: null });
+  });
+  it("asks, with the file's first date that reads two ways, when nothing tells", () => {
+    expect(readDateOrder(["05/05/2026", "03/04/2026", "06/07/2026"])).toEqual({ order: "mdy", settled: false, example: "03/04/2026" });
+  });
+});
+
+describe("dateOrderNotice", () => {
+  it("shows both readings until someone chooses, and the one chosen after", () => {
+    expect(dateOrderNotice("03/04/2026", "mdy", false)).toEqual({
+      title: "Check which way round the dates are written",
+      description:
+        "Every date in this file reads two ways: 03/04/2026 is March 4, 2026 month first, or April 3, 2026 day first. They are read month first until you choose.",
+    });
+    expect(dateOrderNotice("03/04/2026", "dmy", true)).toEqual({ title: "Dates read day first: 03/04/2026 is April 3, 2026", description: null });
+    expect(dateOrderChoices("3-4-26").map((c) => c.label)).toEqual(["Month first · March 4, 2026", "Day first · April 3, 2026"]);
   });
 });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Progress, Select, Space, Typography, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { ruleSeedText } from "@/lib/domain/bank-rules";
@@ -12,21 +13,28 @@ import { batchResultSeverity, describeBatchResult, summarizeBatchResults, type B
 import { directionOf } from "@/lib/domain/coding-names";
 import { splitText } from "@/lib/domain/loan-interest";
 import {
+  addAnewValue,
+  addAnewWhy,
   alternativeValue,
+  canAddAnew,
   chunked,
   dedupePairItems,
   itemFromValue,
   proposalValue,
   reciprocalValue,
+  reviewItem,
   startsTicked,
   type ReviewPostItem,
 } from "@/lib/domain/statement-review";
+import type { StatusLook } from "@/lib/domain/status-label";
 import { formatDate, formatDateInTimeZone, formatMoney, plural } from "@/lib/format";
 import type { ImportReview, ReviewLineView, ReviewOutcome } from "@/lib/services/statement-review";
 import LoanSplitModal from "../../LoanSplitModal";
 import RuleFormModal, { EMPTY_RULE, type RuleFormValues } from "../../rules/RuleFormModal";
 import { postReviewItemsAction } from "../actions";
 import styles from "./review-import.module.css";
+
+const ADDING_LOOK: Record<string, StatusLook> = { adding: { label: "Adding as a new entry", tone: "warning" } };
 
 /**
  * One import's lines, each with what OneBook proposes, and the one button that
@@ -37,7 +45,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const { timeZone } = useCompanyClock();
   const { message } = App.useApp();
   const router = useRouter();
-  const { batch, lines, accounts } = review;
+  const { batch, lines, accounts, holding } = review;
   const money = (minor: number) => formatMoney(minor, batch.currencyCode, 2);
 
   const [choices, setChoices] = useState<Record<string, string | null>>(() =>
@@ -53,6 +61,8 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
     Object.fromEntries(lines.flatMap((line) => (line.proposal.kind === "loan" ? [[line.id, line.proposal.loan.interestMinor]] : []))),
   );
   const [splitting, setSplitting] = useState<ReviewLineView | null>(null);
+  // Lines a person said are not the match or transfer proposed: "Not the same thing, add it".
+  const [adding, setAdding] = useState<string[]>([]);
 
   const accountOptions = useMemo(() => accounts.map((a) => ({ value: `account:${a.id}`, label: a.label })), [accounts]);
   const byId = useMemo(() => new Map(lines.map((line) => [line.id, line])), [lines]);
@@ -70,7 +80,10 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   // A line handled since the page loaded — posted here, or elsewhere — is never
   // posted again, whatever its tick says.
   const open = (id: string) => byId.get(id)?.proposal.kind !== "handled";
-  const itemOf = (id: string) => itemFromValue(id, choices[id] ?? null, interests[id] ?? null);
+  const itemOf = (id: string) => {
+    const line = byId.get(id);
+    return line ? reviewItem(id, line.proposal, choices[id] ?? null, interests[id] ?? null) : null;
+  };
   const postable = ticked.filter((id) => choices[id] && open(id) && itemOf(id) !== null);
   const waiting = lines.filter((l) => l.proposal.kind !== "handled").length - postable.length;
 
@@ -102,6 +115,32 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
       for (const id of tickOn) next.add(id);
       return [...next];
     });
+  }
+
+  // Not the same thing: the line goes in as its own entry, to Uncategorized
+  // until someone codes it, or to nothing yet when the chart has no such account.
+  function addAnew(line: ReviewLineView) {
+    setAdding((current) => (current.includes(line.id) ? current : [...current, line.id]));
+    choose(line, addAnewValue(line.amountMinor, holding));
+  }
+
+  function keepProposal(line: ReviewLineView) {
+    setAdding((current) => current.filter((id) => id !== line.id));
+    choose(line, proposalValue(line.proposal));
+  }
+
+  // An account picked for a line already in the books is that line added anew;
+  // picking the proposal back, or clearing the line, ends it.
+  function pick(line: ReviewLineView, value: string | null) {
+    if (canAddAnew(line.proposal)) {
+      const own = proposalValue(line.proposal);
+      setAdding((current) => {
+        const rest = current.filter((id) => id !== line.id);
+        const stays = value !== null && value !== own && (line.proposal.kind === "match" || current.includes(line.id));
+        return stays ? [...rest, line.id] : rest;
+      });
+    }
+    choose(line, value);
   }
 
   // Ticking one line of a pair ticks both; unticking one unticks both.
@@ -147,6 +186,7 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
   const whyOf = (line: ReviewLineView) => {
     const own = proposalValue(line.proposal);
     const chosen = choices[line.id];
+    if (adding.includes(line.id)) return addAnewWhy(line.proposal, Boolean(chosen));
     if (chosen && line.proposal.kind === "account" && line.proposal.alternative && chosen === alternativeValue(line.proposal)) {
       return line.proposal.alternative.why;
     }
@@ -207,7 +247,12 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
         const own = ownValue && "label" in p ? [{ value: ownValue, label: p.label }] : [];
         // A funding pair offered beside a rule or history proposal.
         if (p.kind === "account" && p.alternative) own.push({ value: alternativeValue(p) as string, label: p.alternative.label });
+        const isAdding = adding.includes(line.id);
+        // A line added anew may sit in Uncategorized until it is coded; nothing else offers it.
+        const parked = isAdding ? (line.amountMinor > 0 ? holding.income : holding.expense) : null;
+        const parking = parked ? [{ value: `account:${parked.id}`, label: parked.label }] : [];
         const others = accountOptions.filter((option) => option.value !== ownValue);
+        const linkStyle = { padding: 0, height: "auto", fontSize: 12, marginRight: 12 };
         return (
           <div style={{ minWidth: 0 }}>
             <Select
@@ -217,14 +262,26 @@ export default function ReviewImportClient({ review, canWrite }: { review: Impor
               placeholder="Choose an account"
               optionFilterProp="label"
               value={choices[line.id] ?? undefined}
-              onChange={(value: string | undefined) => choose(line, value ?? null)}
-              options={[...own, ...others]}
+              onChange={(value: string | undefined) => pick(line, value ?? null)}
+              options={[...own, ...parking, ...others]}
             />
             <Typography.Text type="secondary" style={{ fontSize: 12, display: "block" }} ellipsis={{ tooltip: whyOf(line) }}>
               {whyOf(line)}
             </Typography.Text>
+            {isAdding ? (
+              <>
+                <StatusTag status="adding" looks={ADDING_LOOK} style={{ marginRight: 8 }} />
+                <Button type="link" size="small" style={linkStyle} onClick={() => keepProposal(line)}>
+                  Undo
+                </Button>
+              </>
+            ) : canAddAnew(p) && choices[line.id] === ownValue ? (
+              <Button type="link" size="small" style={linkStyle} onClick={() => addAnew(line)}>
+                Not the same thing, add it
+              </Button>
+            ) : null}
             {p.kind === "loan" && choices[line.id] === ownValue ? (
-              <Button type="link" size="small" style={{ padding: 0, height: "auto", fontSize: 12, marginRight: 12 }} onClick={() => setSplitting(line)}>
+              <Button type="link" size="small" style={linkStyle} onClick={() => setSplitting(line)}>
                 Split…
               </Button>
             ) : null}

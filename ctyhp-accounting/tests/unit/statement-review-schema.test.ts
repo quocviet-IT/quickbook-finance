@@ -12,6 +12,10 @@ describe("reviewPostItemsSchema", () => {
     ]);
     expect(parsed).toHaveLength(3);
   });
+  it("carries the match an account item turns down, by its id", () => {
+    expect(reviewPostItemsSchema.parse([{ transactionId: id, kind: "account", accountId: id, instead: id }])[0]).toMatchObject({ instead: id });
+    expect(reviewPostItemsSchema.safeParse([{ transactionId: id, kind: "account", accountId: id, instead: "JE-000123" }]).success).toBe(false);
+  });
   it("refuses nothing, more than fifty, and a kind it does not know", () => {
     expect(reviewPostItemsSchema.safeParse([]).success).toBe(false);
     expect(reviewPostItemsSchema.safeParse(Array.from({ length: 51 }, () => ({ transactionId: id, kind: "account", accountId: id }))).success).toBe(false);

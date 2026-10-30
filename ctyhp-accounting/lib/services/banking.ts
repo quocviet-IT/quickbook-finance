@@ -427,6 +427,30 @@ export async function categoriseBankTransaction(
   };
 }
 
+/**
+ * Not the same thing: the line a match proposed as already in the books is new
+ * money. Every match still on offer for it is turned down and the line posted
+ * to the account, in one database call — either both happen, or neither does.
+ */
+export async function categoriseInsteadOfMatch(
+  sb: SupabaseClient,
+  transactionId: string,
+  reconciliationId: string,
+  accountId: string,
+): Promise<{ entry_number: string | null; account_code: string; account_name: string }> {
+  const { data, error } = await sb.rpc("acc_categorise_instead_of_match", {
+    p_transaction_id: transactionId,
+    p_reconciliation_id: reconciliationId,
+    p_account_id: accountId,
+  });
+  if (error) throw new BankingError(error.message);
+  return (Array.isArray(data) ? data[0] : data) as {
+    entry_number: string | null;
+    account_code: string;
+    account_name: string;
+  };
+}
+
 /** Take it back: the entry is voided, and the line awaits review again. */
 export async function uncategoriseBankTransaction(
   sb: SupabaseClient,
