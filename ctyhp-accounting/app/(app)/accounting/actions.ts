@@ -4,8 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { canWrite, getUserRole, holdsPermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { ACCOUNTING_NOUNS } from "@/lib/domain/accounting-dashboard/lifecycle";
-import { closePeriod, PeriodsError, reopenPeriod } from "@/lib/services/periods";
+import { PeriodsError, reopenPeriod } from "@/lib/services/periods";
 import { getAccountingContext } from "@/lib/services/accounting-dashboard/context";
+import { closePeriodWithChecklist } from "@/lib/services/accounting-dashboard/close-record";
 import { getAccountingControls } from "@/lib/services/accounting-dashboard/controls";
 import {
   changeWorkItem,
@@ -91,8 +92,10 @@ export async function closePeriodAction(input: {
   }
   try {
     const sb = await createSupabaseServerClient();
-    await closePeriod(sb, input.periodId, input.reason.trim(), input.varianceNote);
+    // The checklist as it stood goes with the close (2.84).
+    await closePeriodWithChecklist(sb, input.periodId, input.reason.trim(), input.varianceNote);
     revalidatePath("/accounting");
+    revalidatePath("/reports/close-log");
     revalidatePath("/settings/periods");
     return { ok: true };
   } catch (error) {

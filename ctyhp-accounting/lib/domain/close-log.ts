@@ -2,13 +2,15 @@
  * Month-End Close Log: every close and reopen of a fiscal year's months, with
  * when, by whom and why.
  *
- * The books record each close and reopen (`acc_period_event`) with its reason,
- * but not which close checks passed at the time, so this log does not show a
- * check count: it would have to be invented.
+ * The books record each close and reopen (`acc_period_event`) with its reason.
+ * Since 2.84 a close made from the closing screens also keeps the month-end
+ * checklist as it stood (0180); a close from before then kept none, and the
+ * log says so rather than inventing one.
  *
  * Pure: periods and events in, log out.
  */
 
+import { checklistSummary, NO_CHECKLIST_KEPT, readChecklist, type RecordedCloseStep } from "./close-record";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { stampInTimeZone } from "./stamp";
 
@@ -25,6 +27,8 @@ export interface CloseEvent {
   reason: string;
   actorName: string | null;
   createdAt: string;
+  /** The checklist kept with a close, as stored; absent or null when none was kept. */
+  checklist?: unknown;
 }
 
 export type CloseLogEvent = "Closed" | "Reopened" | "Open";
@@ -42,6 +46,14 @@ export interface CloseLogLine {
   reason: string | null;
   /** The month's status now, on its first line. */
   statusNow: "open" | "closed";
+  /** On a Closed line: the checklist as it stood, or null when the close kept none. */
+  checklist: RecordedCloseStep[] | null;
+}
+
+/** A Closed line's Checklist cell: what it said, or that none was kept; nothing on other lines. */
+export function checklistCell(line: CloseLogLine): string | null {
+  if (line.event !== "Closed") return null;
+  return line.checklist ? checklistSummary(line.checklist) : NO_CHECKLIST_KEPT;
 }
 
 export interface CloseLogReport {
@@ -72,6 +84,7 @@ export function closeLog(periods: readonly ClosePeriod[], events: readonly Close
         by: null,
         reason: null,
         statusNow: period.status,
+        checklist: null,
       });
       continue;
     }
@@ -86,6 +99,7 @@ export function closeLog(periods: readonly ClosePeriod[], events: readonly Close
         by: event.actorName,
         reason: event.reason.trim() === "" ? null : event.reason,
         statusNow: period.status,
+        checklist: event.event === "close" ? readChecklist(event.checklist) : null,
       });
     });
   }
@@ -112,6 +126,7 @@ export function closeLogSheet(
       { key: "at", header: "When", kind: "text", width: 20 },
       { key: "by", header: "By", kind: "text", width: 28 },
       { key: "reason", header: "Reason or note", kind: "text", width: 48 },
+      { key: "checklist", header: "Checklist at close", kind: "text", width: 34 },
     ],
     rows: report.lines.map((line) => ({
       month: line.month,
@@ -119,6 +134,7 @@ export function closeLogSheet(
       at: line.at ? stampInTimeZone(line.at, ctx.timeZone) : "",
       by: line.by ?? "",
       reason: line.reason ?? "",
+      checklist: checklistCell(line) ?? "",
     })),
   };
 }
