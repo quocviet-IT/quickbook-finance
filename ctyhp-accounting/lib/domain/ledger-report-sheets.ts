@@ -9,6 +9,7 @@
 import { sourceLabel } from "./entry-detail";
 import { journalEntryAmountMinor } from "./journal-entry-amount";
 import { fromMinor } from "./money";
+import { statementDocType, statementPayNote } from "./party-statement";
 import { sanitizeExportFileName, type ReportExportSheet } from "./report-export";
 import { statusLabel, humanizeStatus } from "./status-label";
 import { formatDateRange } from "@/lib/format";
@@ -29,9 +30,12 @@ export function partyStatementSheet(
   report: StatementReport,
   when: { from: string | null; to: string },
   ctx: SheetContext,
+  /** The company's How to pay (2.83), printed under a customer statement that closes owing something. */
+  payNote: string | null = null,
 ): ReportExportSheet {
   const money = (minor: number) => fromMinor(minor, ctx.baseDecimals);
   const customer = kind === "customer";
+  const howToPay = statementPayNote(kind, report.closingMinor, payNote);
   return {
     fileName: sanitizeExportFileName(`${customer ? "customer" : "vendor"}-statement-${partyName}-${when.to}`),
     companyName: ctx.companyName,
@@ -49,13 +53,14 @@ export function partyStatementSheet(
       { date: "", type: "Opening balance", num: "", amount: null, running: money(report.openingMinor) },
       ...report.rows.map((row) => ({
         date: row.txnDate,
-        type: humanizeStatus(row.docType),
+        type: statementDocType(row.docType),
         num: row.docNumber ?? "",
         amount: money(row.amountMinor),
         running: money(row.runningMinor),
       })),
       { date: "", type: "Closing balance", num: "", amount: null, running: money(report.closingMinor) },
     ],
+    ...(howToPay ? { notes: [{ heading: "How to pay", text: howToPay }] } : {}),
   };
 }
 

@@ -192,6 +192,15 @@ export async function exportReportToPdf(
   sheet: ReportExportSheet,
   timeZone: string = DEFAULT_TIME_ZONE,
 ): Promise<void> {
+  const doc = await buildReportPdf(sheet, timeZone);
+  doc.save(`${sanitizeExportFileName(sheet.fileName)}.pdf`);
+}
+
+/** The report as a PDF document, not yet saved: the table, then the sheet's notes. */
+export async function buildReportPdf(
+  sheet: ReportExportSheet,
+  timeZone: string = DEFAULT_TIME_ZONE,
+): Promise<import("jspdf").jsPDF> {
   const [{ jsPDF }, autoTableModule] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
@@ -248,5 +257,27 @@ export async function exportReportToPdf(
       );
     },
   });
-  doc.save(`${sanitizeExportFileName(sheet.fileName)}.pdf`);
+  drawNotes(doc, sheet.notes ?? []);
+  return doc;
+}
+
+/** The sheet's notes under the table, each kept whole on one page (a heading split from its text helps nobody). */
+function drawNotes(doc: import("jspdf").jsPDF, notes: readonly { heading: string; text: string }[]): void {
+  const width = doc.internal.pageSize.getWidth() - 80;
+  const bottom = doc.internal.pageSize.getHeight() - 48;
+  let y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 112) + 22;
+  for (const note of notes) {
+    const lines: string[] = doc.splitTextToSize(note.text, width);
+    if (y + (lines.length + 1) * 12 > bottom) {
+      doc.addPage();
+      y = 56;
+    }
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.text(note.heading, 40, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(lines, 40, y + 13);
+    y += 13 + lines.length * 12 + 10;
+  }
 }
