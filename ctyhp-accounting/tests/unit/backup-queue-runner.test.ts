@@ -253,6 +253,35 @@ describe("runDueCompanyBackups", () => {
     expect(run.deferred).toEqual([]);
   });
 
+  it("on the night's last run, names what the night ended without and logs it as an error (2.90)", async () => {
+    const companies = [company("1", "a", "co_a"), company("2", "b", "co_b"), company("3", "c", "co_c")];
+    let clock = 0;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const base = {
+      listCompanies: async () => companies,
+      createClient: (schema: string) => clientFor(schema),
+      readLastBackup: async () => "2026-10-29",
+      takeBackup: async (_sb: SupabaseClient, companyId: string) => {
+        clock += BACKUP_TIME_BUDGET_MS * 0.6;
+        if (companyId === "2") throw new Error("storage unreachable");
+        return { status: "stored" as const, hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-10-30",
+      now: () => clock,
+    };
+    const final = await runDueCompanyBackups({ ...base, final: true });
+    expect(final.deferred).toEqual(["c"]);
+    expect(final.incomplete).toEqual(["c", "b"]);
+    expect(error.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(/last run is over.*c, b/);
+
+    clock = 0;
+    error.mockClear();
+    const earlier = await runDueCompanyBackups({ ...base, final: false });
+    expect(earlier.incomplete).toEqual([]);
+    expect(error.mock.calls.map((call) => call.join(" ")).join("\n")).not.toMatch(/last run is over/);
+    error.mockRestore();
+  });
+
   it("does nothing on a later run once every company has today's snapshot", async () => {
     const attempted: string[] = [];
     const run = await runDueCompanyBackups({
@@ -502,6 +531,33 @@ describe("app/api/backups/run/route.ts", () => {
     expect(response.status).not.toBe(200);
     const body = await response.json();
     expect(body.failed).toBe(1);
+  });
+
+  it("tells the night's last run it is the last, and answers 500 when the night ended with a company undone (2.90)", async () => {
+    const secret = "c".repeat(32);
+    process.env.CRON_SECRET = secret;
+    vi.resetModules();
+    const run = vi.fn(async (options: { final?: boolean } = {}) => ({
+      attempted: 1,
+      stored: 1,
+      skipped: 0,
+      failed: 0,
+      deferred: ["b"],
+      incomplete: options.final ? ["b"] : [],
+      results: [{ slug: "a", ok: true, status: "stored" }],
+    }));
+    vi.doMock("@/lib/services/backup-queue-runner", () => ({ runDueCompanyBackups: run }));
+    const { GET } = await import("@/app/api/backups/run/route");
+    const call = (path: string) => GET(new Request(`http://localhost${path}`, { headers: { authorization: `Bearer ${secret}` } }));
+
+    const last = await call("/api/backups/run?pass=3");
+    expect(run).toHaveBeenLastCalledWith({ final: true });
+    expect(last.status).toBe(500);
+    expect((await last.json()).incomplete).toEqual(["b"]);
+
+    const second = await call("/api/backups/run?pass=2");
+    expect(run).toHaveBeenLastCalledWith({ final: false });
+    expect(second.status).toBe(200);
   });
 
   it("answers 200 when the run reports no failures", async () => {

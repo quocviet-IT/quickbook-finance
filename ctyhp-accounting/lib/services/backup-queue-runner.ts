@@ -34,6 +34,12 @@ export interface BackupRunResult {
    * Not failures: nothing was tried, and they are first in line for the next run.
    */
   deferred: string[];
+  /**
+   * On the night's last run only (2.90): the companies the night ended without a
+   * snapshot for, deferred or failed. Empty on an earlier run, whose leftovers
+   * the next run takes.
+   */
+  incomplete: string[];
   results: BackupRunItemResult[];
 }
 
@@ -49,6 +55,8 @@ interface BackupQueueDependencies {
   today?: string;
   /** Milliseconds, for the time budget. A test passes its own clock. */
   now?: () => number;
+  /** The night's last run (?pass=3): what it leaves undone, nothing after it will do. */
+  final?: boolean;
 }
 
 /**
@@ -164,16 +172,26 @@ export async function runDueCompanyBackups(
     }
   }
 
+  const failedSlugs = results.filter((r) => !r.ok).map((r) => r.slug);
+  const incomplete = deps.final ? [...deferred, ...failedSlugs] : [];
   const result: BackupRunResult = {
     attempted: due.length - deferred.length,
     stored: results.filter((r) => r.ok && r.status === "stored").length,
     skipped: results.filter((r) => r.ok && r.status === "skipped").length,
     failed: results.filter((r) => !r.ok).length,
     deferred,
+    incomplete,
     results,
   };
 
-  if (deferred.length > 0) {
+  if (incomplete.length > 0) {
+    // The night is over: no later run will take these, so this is an error,
+    // and the route answers 500 for it (2.90). On 29 October two companies
+    // went without a snapshot under a 200 that said nothing.
+    console.error(
+      `Nightly backup: the night's last run is over and these companies have no snapshot today: ${incomplete.join(", ")}`,
+    );
+  } else if (deferred.length > 0) {
     // Not an error, and the route still answers 200: nothing failed. It is a
     // sign the companies have outgrown one night, so it is logged where
     // whoever reads the cron log will see it.

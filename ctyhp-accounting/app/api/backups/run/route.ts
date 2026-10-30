@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { runDueCompanyBackups } from "@/lib/services/backup-queue-runner";
+import { FINAL_BACKUP_PASS } from "@/lib/domain/backup-schedule";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -18,15 +19,19 @@ function authorized(request: Request): boolean {
  * time budget inside this route's 300 seconds is spent: a company takes 35 to 75
  * seconds, and a run that never stops is a run that eventually covers nobody.
  * vercel.json calls it three times a night, ten minutes apart, so what one run
- * does not reach the next one does (see BACKUP_TIME_BUDGET_MS). The ?pass=2 and
- * ?pass=3 on the later calls only tell the runs apart in the cron log.
+ * does not reach the next one does (see BACKUP_TIME_BUDGET_MS). ?pass=2 names the
+ * second run in the cron log; ?pass=3 is the night's last (FINAL_BACKUP_PASS),
+ * which also answers 500 for any company the night ended without a snapshot
+ * for (2.90), since nothing after it will take one.
  */
 export async function POST(request: Request) {
   if (!authorized(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const result = await runDueCompanyBackups();
+    // The night's last run (vercel.json ?pass=3) also answers for what is still undone.
+    const final = new URL(request.url).searchParams.get("pass") === FINAL_BACKUP_PASS;
+    const result = await runDueCompanyBackups({ final });
     // Vercel's cron log keeps path, status and duration and discards the
     // body — the same fact /api/health's httpStatusFor is built on. A run
     // that touched every company but failed some of them must not read as
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
     // failure is already logged where it happened (see
     // backup-queue-runner.ts), and this status is what makes the run itself
     // visible to whoever only ever looks at the status column.
-    const status = result.failed > 0 ? 500 : 200;
+    const status = result.failed > 0 || (result.incomplete?.length ?? 0) > 0 ? 500 : 200;
     return Response.json({ processedAt: new Date().toISOString(), ...result }, { status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Backups failed";
