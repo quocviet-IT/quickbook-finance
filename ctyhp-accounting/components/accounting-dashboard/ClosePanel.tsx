@@ -3,13 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Input, Modal, Progress, Tag, Tooltip, Typography } from "antd";
-import {
-  CheckCircleFilled,
-  CloseCircleFilled,
-  MinusCircleOutlined,
-  QuestionCircleOutlined,
-} from "@ant-design/icons";
-import type { CloseStepStatus } from "@/lib/domain/accounting-dashboard/close-checklist";
+import { CLOSE_STEP_ICON as STATUS_ICON, CLOSE_STEP_LABEL as STATUS_LABEL } from "./close-step-status";
 import type { CloseReadiness } from "@/lib/services/accounting-dashboard";
 import type { SectionEnvelope } from "@/lib/domain/accounting-dashboard/types";
 import { closePeriodAction, reopenPeriodAction } from "@/app/(app)/accounting/actions";
@@ -31,19 +25,6 @@ import { FreshnessNote, UnavailableNote } from "./DataStateNote";
  * re-stated here; this screen is one more caller of them.
  */
 
-const STATUS_ICON: Record<CloseStepStatus, React.ReactNode> = {
-  complete: <CheckCircleFilled style={{ color: "var(--ob-intent-success)" }} />,
-  outstanding: <CloseCircleFilled style={{ color: "var(--ob-intent-danger)" }} />,
-  "not-applicable": <MinusCircleOutlined style={{ color: "var(--ob-text-muted)" }} />,
-  unavailable: <QuestionCircleOutlined style={{ color: "var(--ob-intent-warning)" }} />,
-};
-
-const STATUS_LABEL: Record<CloseStepStatus, string> = {
-  complete: "Done",
-  outstanding: "Outstanding",
-  "not-applicable": "Not applicable",
-  unavailable: "Could not check",
-};
 
 export default function ClosePanel({
   close,

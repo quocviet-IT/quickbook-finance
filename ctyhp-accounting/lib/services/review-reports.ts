@@ -141,7 +141,7 @@ export async function getCloseLog(sb: SupabaseClient, fiscalYear: number): Promi
       (from, to) =>
         sb
           .from("acc_period_event")
-          .select("id,period_id,event,reason,actor_id,created_at")
+          .select("id,period_id,event,reason,actor_id,created_at,checklist")
           .in("period_id", periods.map((p) => p.id))
           .order("id")
           .range(from, to),
@@ -157,6 +157,7 @@ export async function getCloseLog(sb: SupabaseClient, fiscalYear: number): Promi
       reason: (r.reason as string | null) ?? "",
       actorName: r.actor_id ? (names.get(r.actor_id as string) ?? null) : null,
       createdAt: r.created_at as string,
+      checklist: r.checklist ?? null,
     }));
   return closeLog(periods, events);
 }

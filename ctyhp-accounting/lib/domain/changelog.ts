@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.84",
+    date: "2026-10-30",
+    headline: "Closing a month keeps the checklist as it stood, and the Month-End Close Log shows it.",
+    changes: [
+      {
+        kind: "added",
+        title: "The checklist, kept with each close",
+        detail:
+          "When you close a month, from Accounting or from Settings → Periods, the month-end checklist is worked out for that month and kept with the close: each check, whether it was done, outstanding, not applicable or could not run, and what it found. Before, the checklist was worked out only while you looked at it, and once the month was closed nobody could say what it had said.",
+        route: "/accounting",
+      },
+      {
+        kind: "added",
+        title: "Checklist at close on the Month-End Close Log",
+        detail:
+          "Each Closed line says what its checklist said, such as 9 of 11 complete, 2 outstanding, and opens to the checks themselves. A month closed before this release, or reopened and closed again, shows the checklist of each close on its own line; one from before says No checklist kept. The export has the same column.",
+        route: "/reports/close-log",
+      },
+    ],
+  },
+  {
     version: "2.82",
     date: "2026-10-30",
     headline: "Reconcile history links each account's last reconciliation to its report, and says when it was adjusted.",

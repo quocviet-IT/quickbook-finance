@@ -7,7 +7,8 @@ import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { ReportFoot, StatRow, reportPaperStyles as styles } from "@/components/reports/ReportPaper";
 import SimpleReport from "@/components/reports/SimpleReport";
-import { closeLogSheet, type CloseLogLine, type CloseLogReport } from "@/lib/domain/close-log";
+import { CLOSE_STEP_ICON, CLOSE_STEP_LABEL } from "@/components/accounting-dashboard/close-step-status";
+import { checklistCell, closeLogSheet, type CloseLogLine, type CloseLogReport } from "@/lib/domain/close-log";
 import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { formatDateTime } from "@/lib/format";
 
@@ -59,6 +60,25 @@ export default function CloseLogClient({
             dataSource={report.lines}
             pagination={false}
             rowClassName={(line) => (line.monthStart ? styles.groupStart : "")}
+            expandable={{
+              // A close that kept its checklist opens to it, step by step, as the closing screen showed it.
+              rowExpandable: (line) => Boolean(line.checklist),
+              expandedRowRender: (line) => (
+                <ul className={styles.checklist}>
+                  {(line.checklist ?? []).map((step) => (
+                    <li key={step.key}>
+                      <span className={styles.checklistStatus}>
+                        {CLOSE_STEP_ICON[step.status]} {CLOSE_STEP_LABEL[step.status]}
+                      </span>
+                      <span>
+                        <strong>{step.title}</strong>
+                        {step.evidence ? <span className={styles.muted}> · {step.evidence}</span> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ),
+            }}
             emptyTitle="No accounting periods for this fiscal year"
             emptyDescription="Months are closed one accounting period at a time, and this year has none set up yet."
             emptyAction={<Link href="/settings/periods">Set up accounting periods</Link>}
@@ -82,6 +102,16 @@ export default function CloseLogClient({
                 render: (at: string | null) => (at ? formatDateTime(at, timeZone) : "—"),
               },
               { title: "By", dataIndex: "by", width: 200, ellipsis: true, render: (by: string | null) => by ?? "—" },
+              {
+                title: "Checklist at close",
+                key: "checklist",
+                width: 220,
+                render: (_: unknown, line: CloseLogLine) => {
+                  const cell = checklistCell(line);
+                  if (!cell) return null;
+                  return line.checklist ? cell : <span className={styles.muted}>{cell}</span>;
+                },
+              },
               flexColumn<CloseLogLine>({
                 title: "Reason or note",
                 key: "reason",
@@ -94,8 +124,9 @@ export default function CloseLogClient({
             ]}
           />
           <ReportFoot>
-            Every close and every reopen is listed, with the reason given at the time. The books do not keep which close
-            checks passed when a month was closed, so this log does not show a count of them.
+            Every close and every reopen is listed, with the reason given at the time. Since 2.84 a close also keeps the
+            month-end checklist as it stood when the month was closed: open the line to see each check and what it found. A
+            close from before then kept none.
           </ReportFoot>
         </>
       )}

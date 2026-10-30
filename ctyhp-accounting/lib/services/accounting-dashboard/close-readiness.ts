@@ -87,8 +87,10 @@ export function targetPeriod(context: AccountingDashboardContext): AccountingPer
 export async function getCloseReadiness(
   sb: SupabaseClient,
   context: AccountingDashboardContext,
+  /** The period being closed, when it is not the one the screen would pick (2.84). */
+  chosen?: AccountingPeriodRow,
 ): Promise<CloseReadiness | null> {
-  const period = targetPeriod(context);
+  const period = chosen ?? targetPeriod(context);
   if (!period) return null;
   const { periodStart, periodEnd } = period;
 
