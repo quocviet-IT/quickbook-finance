@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.80",
+    date: "2026-10-30",
+    headline: "Reconcile history links each account's last reconciliation to its report, and says when it was adjusted.",
+    changes: [
+      {
+        kind: "added",
+        title: "Report link and Adjusted tag on Reconcile history",
+        detail:
+          "Under Last reconciled, a Report link opens the report of the account's latest completed reconciliation: the statement bridged to the books, with the lines cleared and outstanding. When that reconciliation was completed with an adjusting entry, Status shows an Adjusted tag beside Reconciled, and holding the pointer over it shows the reason given. The Reconcile list already showed both for every reconciliation.",
+        route: "/banking/reconcile/history",
+      },
+    ],
+  },
+  {
     version: "2.79",
     date: "2026-10-30",
     headline: "Review import adds a line the books only seem to have, and a CSV whose dates read two ways asks which.",
