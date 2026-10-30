@@ -703,7 +703,7 @@ export interface BankConnectionRow {
   updated_at: string;
 }
 
-export type FixedAssetMethod = "straight_line" | "none";
+export type FixedAssetMethod = "straight_line" | "declining_balance" | "none";
 export type FixedAssetStatus = "in_service" | "fully_depreciated" | "disposed";
 export type DepreciationScheduleStatus = "planned" | "opening" | "posted" | "cancelled";
 
