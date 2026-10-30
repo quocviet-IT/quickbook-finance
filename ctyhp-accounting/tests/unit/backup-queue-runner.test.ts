@@ -219,6 +219,57 @@ describe("runDueCompanyBackups", () => {
     warn.mockRestore();
   });
 
+  it("takes, on a later run the same night, only the companies the earlier one did not reach (2.89)", async () => {
+    // 29 October: the 12:00 run stored five companies in 226 seconds and left
+    // two. The 12:10 run must take those two and leave the five alone: a
+    // snapshot of a company already done today costs a full read to skip.
+    const companies = [
+      company("1", "done-a", "co_done_a"),
+      company("2", "left-b", "co_left_b"),
+      company("3", "done-c", "co_done_c"),
+      company("4", "left-d", "co_left_d"),
+    ];
+    const lastBackupBySchema: Record<string, string | null> = {
+      co_done_a: "2026-10-29",
+      co_left_b: "2026-10-28",
+      co_done_c: "2026-10-29",
+      co_left_d: "2026-10-28",
+    };
+    const attempted: string[] = [];
+    const run = await runDueCompanyBackups({
+      listCompanies: async () => companies,
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async (sb) => lastBackupBySchema[schemaOf(sb)],
+      takeBackup: async (_sb, companyId) => {
+        attempted.push(companyId);
+        return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-10-29",
+      now: () => 0,
+    });
+
+    expect(attempted).toEqual(["2", "4"]);
+    expect(run.attempted).toBe(2);
+    expect(run.deferred).toEqual([]);
+  });
+
+  it("does nothing on a later run once every company has today's snapshot", async () => {
+    const attempted: string[] = [];
+    const run = await runDueCompanyBackups({
+      listCompanies: async () => [company("1", "a", "co_a"), company("2", "b", "co_b")],
+      createClient: (schema) => clientFor(schema),
+      readLastBackup: async () => "2026-10-29",
+      takeBackup: async (_sb, companyId) => {
+        attempted.push(companyId);
+        return { status: "stored", hash: "h", path: "p", sizeBytes: 1 };
+      },
+      today: "2026-10-29",
+      now: () => 0,
+    });
+    expect(attempted).toEqual([]);
+    expect([run.attempted, run.failed, run.deferred.length]).toEqual([0, 0, 0]);
+  });
+
   it("fails the whole run when the company register itself cannot be read", async () => {
     // Same principle as the other automation jobs: without a trustworthy
     // register, a run that quietly covered nobody would look identical to a

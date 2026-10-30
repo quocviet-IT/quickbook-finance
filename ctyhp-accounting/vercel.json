@@ -15,6 +15,14 @@
     {
       "path": "/api/backups/run",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/backups/run?pass=2",
+      "schedule": "10 12 * * *"
+    },
+    {
+      "path": "/api/backups/run?pass=3",
+      "schedule": "20 12 * * *"
     }
   ]
 }
