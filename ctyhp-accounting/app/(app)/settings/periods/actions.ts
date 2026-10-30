@@ -3,9 +3,9 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite, getUserRole, holdsPermission, isAdmin } from "@/lib/auth";
 import { closePeriodSchema, reopenPeriodSchema } from "@/lib/domain/schemas";
+import { closePeriodWithChecklist } from "@/lib/services/accounting-dashboard/close-record";
 import {
   generatePeriods,
-  closePeriod,
   reopenPeriod,
   listPeriods,
   periodCloseBlockers,
@@ -48,7 +48,7 @@ export async function closePeriodAction(id: string, raw: unknown): Promise<Actio
   const denied = await refusal("close"); if (denied) return { ok: false, error: denied };
   const parsed = closePeriodSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
-  try { const sb = await createSupabaseServerClient(); await closePeriod(sb, id, parsed.data.reason, parsed.data.variance_note ?? null); revalidatePath("/settings/periods"); return { ok: true }; }
+  try { const sb = await createSupabaseServerClient(); await closePeriodWithChecklist(sb, id, parsed.data.reason, parsed.data.variance_note ?? null); revalidatePath("/settings/periods"); revalidatePath("/reports/close-log"); return { ok: true }; }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 /** What would stop this period closing — asked before the button is pressed. */

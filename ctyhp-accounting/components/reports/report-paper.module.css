@@ -198,6 +198,34 @@
   color: var(--ob-text-secondary);
 }
 
+/* A close's checklist as it stood (Month-End Close Log, 2.84): status, then the check and what it found. */
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.checklist li {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.checklistStatus {
+  white-space: nowrap;
+  color: var(--ob-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .checklist li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
 /* A switch and its words, sitting among a report's filters. */
 .inlineSwitch {
   display: inline-flex;
