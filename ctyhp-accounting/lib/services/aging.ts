@@ -94,15 +94,14 @@ export function getApAging(sb: SupabaseClient, asOf: string, options: AgingOptio
 export interface StatementRow { txnDate: string; docType: string; docNumber: string | null; amountMinor: number; runningMinor: number; }
 export interface StatementReport { openingMinor: number; rows: StatementRow[]; closingMinor: number; }
 
-async function statement(sb: SupabaseClient, rpc: string, idParam: string, entityId: string, from: string, to: string, agingRpc: string, asOfIdField: string): Promise<StatementReport> {
-  // Opening balance = the entity's open balance strictly before `from`, derived by
-  // running the aging RPC as of the day before `from` and summing this entity's items.
-  const dayBefore = shiftBack(from);
-  const openRes = await sb.rpc(agingRpc, { p_as_of: dayBefore });
+async function statement(sb: SupabaseClient, rpc: string, idParam: string, entityId: string, from: string, to: string, openingRpc: string): Promise<StatementReport> {
+  // The opening is the same activity as the lines, dated before `from` (0178):
+  // what was owed when the period began, whatever was paid later. The ageing
+  // as of the day before counted today's balances, so a payment in the period
+  // came off twice.
+  const openRes = await sb.rpc(openingRpc, { [idParam]: entityId, p_before: from } as Record<string, unknown>);
   if (openRes.error) throw new AgingError(openRes.error.message);
-  const openingMinor = (openRes.data ?? [])
-    .filter((r: Record<string, unknown>) => r[asOfIdField] === entityId)
-    .reduce((s: number, r: Record<string, unknown>) => s + Number(r.balance_minor), 0);
+  const openingMinor = Number(openRes.data ?? 0);
 
   const { data, error } = await sb.rpc(rpc, { [idParam]: entityId, p_from: from, p_to: to } as Record<string, unknown>);
   if (error) throw new AgingError(error.message);
@@ -115,15 +114,10 @@ async function statement(sb: SupabaseClient, rpc: string, idParam: string, entit
 }
 
 export function getCustomerStatement(sb: SupabaseClient, customerId: string, from: string, to: string): Promise<StatementReport> {
-  return statement(sb, "acc_customer_statement", "p_customer_id", customerId, from, to, "acc_ar_ageing", "customer_id");
+  return statement(sb, "acc_customer_statement", "p_customer_id", customerId, from, to, "acc_customer_statement_opening");
 }
 export function getVendorStatement(sb: SupabaseClient, vendorId: string, from: string, to: string): Promise<StatementReport> {
-  return statement(sb, "acc_vendor_statement", "p_vendor_id", vendorId, from, to, "acc_ap_ageing", "vendor_id");
-}
-
-function shiftBack(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  return statement(sb, "acc_vendor_statement", "p_vendor_id", vendorId, from, to, "acc_vendor_statement_opening");
 }
 
 // --- Allowance for doubtful accounts -----------------------------------------
