@@ -1,6 +1,6 @@
 import NeedsAttention from "@/components/dashboard/NeedsAttention";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import { CHECKS_FAILED, clearLine, dashboardNeeds, unavailableNote } from "@/lib/domain/dashboard-needs";
+import { CHECKS_FAILED, clearLine, dashboardNeeds, unavailableNote, type AttentionChecks } from "@/lib/domain/dashboard-needs";
 import { formatMoney } from "@/lib/format";
 import { getAttentionChecks } from "@/lib/services/exceptions";
 
@@ -18,14 +18,17 @@ export default async function NeedsSection({
   currencyCode: string;
   decimals: number;
 }) {
+  // Only the reads are guarded: an error while drawing belongs to an error boundary, not here.
+  let checks: AttentionChecks | null = null;
   try {
     const sb = await createSupabaseServerClient();
-    const checks = await getAttentionChecks(sb, today);
-    const needs = dashboardNeeds(checks, (minor) => formatMoney(minor, currencyCode, decimals));
-    const clear = clearLine(checks.unavailable);
-    if (needs.length === 0 && clear === null) return <NeedsAttention failure={CHECKS_FAILED} />;
-    return <NeedsAttention needs={needs} clear={clear} note={unavailableNote(checks.unavailable)} />;
+    checks = await getAttentionChecks(sb, today);
   } catch {
-    return <NeedsAttention failure={CHECKS_FAILED} />;
+    checks = null;
   }
+  if (!checks) return <NeedsAttention failure={CHECKS_FAILED} />;
+  const needs = dashboardNeeds(checks, (minor) => formatMoney(minor, currencyCode, decimals));
+  const clear = clearLine(checks.unavailable);
+  if (needs.length === 0 && clear === null) return <NeedsAttention failure={CHECKS_FAILED} />;
+  return <NeedsAttention needs={needs} clear={clear} note={unavailableNote(checks.unavailable)} />;
 }
