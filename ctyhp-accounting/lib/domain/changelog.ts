@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.87",
+    date: "2026-10-30",
+    headline: "Customer statements say how to pay, and Reconcile from files no longer guesses which way round a file's dates go.",
+    changes: [
+      {
+        kind: "added",
+        title: "How to pay on a customer statement",
+        detail:
+          "The How to pay words from Settings → Company now print under a customer statement that closes with something owed, on screen, when printed and in its PDF, as they do on an invoice. A statement that owes nothing, and every vendor statement, leaves them out. The statement's PDF and spreadsheet also name each line as the screen does, such as Write-off.",
+        route: "/reports/customer-statement",
+      },
+      {
+        kind: "fixed",
+        title: "Dates that read two ways in Reconcile from files",
+        detail:
+          "When every date in a bank's CSV could be read either way round, such as 03/04/2026, Reconcile from files read it month first without a word, as Import statement did before 2.79. The file now waits with the reason and both readings, until it has been imported once on Banking, where you choose and the choice is remembered for the account. A file with any day over 12 reads as before.",
+        route: "/banking/reconcile/from-files",
+      },
+    ],
+  },
+  {
     version: "2.86",
     date: "2026-10-30",
     headline: "Invoices print their terms, and how to pay them.",

@@ -18,9 +18,11 @@ interface Props {
   baseCurrency: string;
   baseDecimals: number;
   presets: PresetContext;
+  /** How to pay (2.83): under the statement, and in its PDF. */
+  payNote: string | null;
 }
 
-export default function CustomerStatementClient({ customers, companyName, baseCurrency, baseDecimals, presets }: Props) {
+export default function CustomerStatementClient({ customers, companyName, baseCurrency, baseDecimals, presets, payNote }: Props) {
   const [customerId, setCustomerId] = useState<string>();
   // Choosing another customer runs the report again over the dates last run.
   const [refreshKey, setRefreshKey] = useState(0);
@@ -37,8 +39,8 @@ export default function CustomerStatementClient({ customers, companyName, baseCu
   );
   const sheet = useCallback(
     (data: PartyStatement, when: ReportWhen) =>
-      partyStatementSheet("customer", data.partyName, data.report, when, { companyName, currencyCode: baseCurrency, baseDecimals }),
-    [companyName, baseCurrency, baseDecimals],
+      partyStatementSheet("customer", data.partyName, data.report, when, { companyName, currencyCode: baseCurrency, baseDecimals }, payNote),
+    [companyName, baseCurrency, baseDecimals, payNote],
   );
 
   return (
@@ -76,7 +78,14 @@ export default function CustomerStatementClient({ customers, companyName, baseCu
         />
       }
       render={(data, _when, { printing }) => (
-        <StatementBody kind="customer" data={data} currencyCode={baseCurrency} decimals={baseDecimals} printing={printing} />
+        <StatementBody
+          kind="customer"
+          data={data}
+          currencyCode={baseCurrency}
+          decimals={baseDecimals}
+          printing={printing}
+          payNote={payNote}
+        />
       )}
     />
   );
