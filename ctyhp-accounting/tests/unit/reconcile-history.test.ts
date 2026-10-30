@@ -16,6 +16,9 @@ import {
   historyOutByText,
   inProgressText,
   reconciledUpTo,
+  adjustedTitle,
+  latestCompleted,
+  type CompletedReconciliation,
   type ReconciliationHistoryRow,
 } from "@/lib/domain/reconcile-history";
 
@@ -54,6 +57,7 @@ describe("historyAccounts", () => {
         label: "Example Bank · 1010",
         maskedNumber: "****1111",
         state: "never",
+        lastCompleted: null,
         side: "bank",
       },
       {
@@ -61,6 +65,7 @@ describe("historyAccounts", () => {
         label: "Example Savings · 1020",
         maskedNumber: null,
         state: "reconciled",
+        lastCompleted: null,
         side: "bank",
       },
     ]);
@@ -68,12 +73,44 @@ describe("historyAccounts", () => {
 
   it("gives an account the history does not name yet nothing open, and leaves out a row for an account not listed", () => {
     const accounts = historyAccounts([row("hidden", { openLines: 5 })], [bank("new", "Example Bank", "")]);
-    expect(accounts).toEqual([{ ...row("new"), label: "Example Bank", maskedNumber: null, state: "never", side: "bank" }]);
+    expect(accounts).toEqual([{ ...row("new"), label: "Example Bank", maskedNumber: null, state: "never", lastCompleted: null, side: "bank" }]);
   });
 
   it("names a credit card as one, its figures to be said as its statement prints them (2.45)", () => {
     const [card] = historyAccounts([], [{ ...bank("c1", "Example Card Issuer", "2010"), account_type: "credit_card" }]);
     expect(card).toMatchObject({ label: "Example Card Issuer · 2010 · credit card", side: "card" });
+  });
+});
+
+describe("the latest completed reconciliation (2.82)", () => {
+  const done = (id: string, bankAccountId: string, statementEndingDate: string, over: Partial<CompletedReconciliation> = {}): CompletedReconciliation => ({
+    id, bankAccountId, statementEndingDate, completedAt: `${statementEndingDate}T12:00:00Z`, adjusted: false, adjustmentReason: null, ...over,
+  });
+
+  it("is each account's latest by statement date, then by when it was signed off", () => {
+    const latest = latestCompleted([
+      done("r1", "b1", "2026-08-31"),
+      done("r3", "b1", "2026-09-30", { completedAt: "2026-10-02T09:00:00Z" }),
+      done("r2", "b1", "2026-09-30", { completedAt: "2026-10-05T09:00:00Z" }),
+      done("r4", "b2", "2026-07-31"),
+    ]);
+    expect([latest.get("b1")?.id, latest.get("b2")?.id]).toEqual(["r2", "r4"]);
+  });
+
+  it("rides on a reconciled account's row, never on one never reconciled", () => {
+    const adjusted = done("r9", "b1", "2026-09-30", { adjusted: true, adjustmentReason: "Bank fee not on the statement" });
+    const [reconciled, never] = historyAccounts(
+      [row("b1", { lastReconciledDate: "2026-09-30" }), row("b2")],
+      [bank("b1", "Example Bank", "1010"), bank("b2", "Example Bank", "1020")],
+      [adjusted, done("r8", "b2", "2026-06-30")],
+    );
+    expect(reconciled.lastCompleted).toEqual(adjusted);
+    expect(never.lastCompleted).toBeNull();
+  });
+
+  it("says why it was adjusted on hover, and that it was when no reason was kept", () => {
+    expect(adjustedTitle(done("r1", "b1", "2026-09-30", { adjusted: true, adjustmentReason: " Bank fee " }))).toBe("Completed with an adjusting entry: Bank fee");
+    expect(adjustedTitle(done("r1", "b1", "2026-09-30", { adjusted: true }))).toBe("Completed with an adjusting entry");
   });
 });
 

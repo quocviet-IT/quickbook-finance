@@ -1,6 +1,7 @@
 import { COLUMN } from "@/lib/design/table-metrics";
 import type { Tone } from "@/lib/design/tone";
 import { HISTORY_STATE_LABELS, type HistoryState } from "@/lib/domain/reconcile-history";
+import type { StatusLook } from "@/lib/domain/status-label";
 
 /**
  * How each account's state reads: never reconciled needs a look, reconciled
@@ -10,6 +11,9 @@ export const HISTORY_STATE_TONES: Record<HistoryState, { tone: Tone; label: stri
   never: { tone: "warning", label: HISTORY_STATE_LABELS.never },
   reconciled: { tone: "positive", label: HISTORY_STATE_LABELS.reconciled },
 };
+
+/** The latest reconciliation was completed with an adjusting entry, as the Reconcile list tags it. */
+export const ADJUSTED_LOOK: Record<string, StatusLook> = { adjusted: { label: "Adjusted", tone: "warning" } };
 
 /**
  * A date as the page prints it, "09/30/2026", as the card under the table and

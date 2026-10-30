@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DuplicateMatch } from "@/lib/domain/add-missing";
 import {
   historyAccounts,
+  type CompletedReconciliation,
   type HistoryAccount,
   type HistoryPreview,
   type ReconciliationHistoryRow,
@@ -110,10 +111,36 @@ export async function readReconciliationHistory(sb: SupabaseClient): Promise<Rec
   }));
 }
 
+/** Every completed reconciliation, for each account's latest: its Report link and whether it was adjusted. */
+export async function readCompletedReconciliations(sb: SupabaseClient): Promise<CompletedReconciliation[]> {
+  const rows = await readAllPages<Record<string, unknown>>(
+    (from, to) =>
+      sb
+        .from("acc_statement_reconciliation")
+        .select("id,bank_account_id,statement_ending_date,completed_at,adjustment_entry_id,adjustment_reason")
+        .eq("status", "completed")
+        .order("id")
+        .range(from, to),
+    (message) => new BankRecError(message),
+  );
+  return rows.map((r) => ({
+    id: r.id as string,
+    bankAccountId: r.bank_account_id as string,
+    statementEndingDate: r.statement_ending_date as string,
+    completedAt: (r.completed_at as string) ?? null,
+    adjusted: Boolean(r.adjustment_entry_id),
+    adjustmentReason: (r.adjustment_reason as string) ?? null,
+  }));
+}
+
 /** Every bank account's history, named and ordered as Banking lists the accounts. */
 export async function getReconciliationHistory(sb: SupabaseClient): Promise<HistoryAccount[]> {
-  const [rows, banks] = await Promise.all([readReconciliationHistory(sb), listBankAccounts(sb)]);
-  return historyAccounts(rows, banks);
+  const [rows, banks, completed] = await Promise.all([
+    readReconciliationHistory(sb),
+    listBankAccounts(sb),
+    readCompletedReconciliations(sb),
+  ]);
+  return historyAccounts(rows, banks, completed);
 }
 
 /** What the books hold on an account through a day, and how many lines bringing it forward would mark. */
