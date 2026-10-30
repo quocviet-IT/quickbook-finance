@@ -1,6 +1,7 @@
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AttentionChecks, AttentionKey } from "@/lib/domain/dashboard-needs";
+import { expectedBackupDate } from "@/lib/domain/backup-schedule";
 import {
   buildExceptionReport,
   futureDatedEntries,
@@ -375,6 +376,13 @@ export async function getExceptionReport(
   });
 }
 
+/** The date of the company's latest snapshot, stored or skipped: either means that night was covered. */
+async function latestBackupDate(sb: SupabaseClient): Promise<string | null> {
+  const { data, error } = await sb.from("acc_backup").select("taken_at").order("taken_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new ExceptionsError(error.message);
+  return (data?.taken_at as string | undefined) ?? null;
+}
+
 /** Bank lines waiting on Bank Transactions: not yet posted to an account, not pending at the bank. */
 async function waitingLineCount(sb: SupabaseClient): Promise<number> {
   const { count, error } = await sb
@@ -393,7 +401,12 @@ async function waitingLineCount(sb: SupabaseClient): Promise<number> {
  * does not run the whole report. The verdicts are the report's own functions.
  * A read that fails leaves its checks unavailable rather than clear.
  */
-export async function getAttentionChecks(sb: SupabaseClient, today: string): Promise<AttentionChecks> {
+export async function getAttentionChecks(
+  sb: SupabaseClient,
+  today: string,
+  /** backups: the person holds company.export, so may see the snapshots (2.90). */
+  options: { backups?: boolean; now?: Date } = {},
+): Promise<AttentionChecks> {
   const unavailable: AttentionKey[] = [];
   const settle = async <T,>(keys: readonly AttentionKey[], fallback: T, run: () => Promise<T>): Promise<T> => {
     try {
@@ -403,7 +416,7 @@ export async function getAttentionChecks(sb: SupabaseClient, today: string): Pro
       return fallback;
     }
   };
-  const [accountRows, balances, banks, lastReconciled, changes, future, waitingLines] = await Promise.all([
+  const [accountRows, balances, banks, lastReconciled, changes, future, waitingLines, lastBackup] = await Promise.all([
     settle(["holding"], [] as AccountRow[], () => listAccounts(sb)),
     settle(["holding", "neverReconciled"], [] as LedgerBalance[], () => getLedgerBalances(sb, null, today)),
     settle(["neverReconciled", "noLongerAgree"], [] as BankAccountWithGl[], () => listBankAccounts(sb)),
@@ -411,6 +424,7 @@ export async function getAttentionChecks(sb: SupabaseClient, today: string): Pro
     settle(["noLongerAgree"], [] as ReconciliationChange[], () => getReconciliationChanges(sb)),
     settle(["futureDated"], [] as TransactionListRow[], () => getTransactionList(sb, addDays(today, 1), "9999-12-31")),
     settle(["waiting"], 0, () => waitingLineCount(sb)),
+    options.backups ? settle(["backup"], null as string | null, () => latestBackupDate(sb)) : Promise.resolve(null),
   ]);
 
   const accountById = new Map(accountRows.map((a) => [a.id, a]));
@@ -442,6 +456,13 @@ export async function getAttentionChecks(sb: SupabaseClient, today: string): Pro
     // Without the chart, Uncategorized cannot be told from any other account.
     holding: unavailable.includes("holding") ? [] : holdingAccounts(accounts),
     futureDated: futureDatedEntries(future, today),
+    ...(options.backups
+      ? {
+          backup: unavailable.includes("backup")
+            ? null
+            : { lastBackup, expected: expectedBackupDate(options.now ?? new Date()) },
+        }
+      : {}),
     unavailable,
   };
 }

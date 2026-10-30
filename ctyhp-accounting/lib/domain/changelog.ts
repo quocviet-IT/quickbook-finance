@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.90",
+    date: "2026-10-30",
+    headline: "A missed backup no longer goes unnoticed: the Dashboard says so, and the night's last run reports it.",
+    changes: [
+      {
+        kind: "added",
+        title: "Backup overdue on the Dashboard",
+        detail:
+          "When a company's latest snapshot is older than it should be (each night's backups are over by 12:30 UTC), Needs attention on the Dashboard opens with Backup overdue: the date of the last snapshot, the date one was due, how many nights are missing, and a link to Settings → Backups. It shows to whoever may see the backups (Export company data); for anyone else it says nothing, rather than guessing.",
+        route: "/dashboard",
+      },
+      {
+        kind: "fixed",
+        title: "The night's last backup run reports what is still undone",
+        detail:
+          "On 29 October two companies went without a snapshot while the run reported success. The night's last run now checks that every company has one dated that day; when one does not, it names the company in the log and ends with an error, so the cron log shows it.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "2.89",
     date: "2026-10-30",
     headline: "Every company is backed up every night.",

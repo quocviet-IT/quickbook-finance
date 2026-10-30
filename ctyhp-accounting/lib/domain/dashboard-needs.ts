@@ -19,10 +19,17 @@
 import { formatDate, plural } from "@/lib/format";
 import type { HoldingRow, NoLongerAgreeRow, UnreconciledRow } from "./exceptions";
 import type { TransactionListRow } from "./transaction-list";
+import { nightsMissed } from "./backup-schedule";
 
-export type AttentionKey = "waiting" | "neverReconciled" | "noLongerAgree" | "holding" | "futureDated";
+export type AttentionKey = "backup" | "waiting" | "neverReconciled" | "noLongerAgree" | "holding" | "futureDated";
 
 export interface AttentionChecks {
+  /**
+   * The company's latest snapshot date and the date it should be by now
+   * (backup-schedule.ts), for someone who may see the backups (company.export);
+   * absent for anyone else, who could not read them and must not be told none exist.
+   */
+  backup?: { lastBackup: string | null; expected: string } | null;
   /** Bank lines not yet posted to an account: waiting on Bank Transactions. */
   waitingLines: number;
   /** Bank accounts with a balance and no completed reconciliation. */
@@ -58,6 +65,22 @@ function named(names: readonly string[]): string {
 export function dashboardNeeds(checks: AttentionChecks, money: (minor: number) => string): DashboardNeed[] {
   const out: DashboardNeed[] = [];
   const ran = (key: AttentionKey) => !checks.unavailable.includes(key);
+
+  // First: books nobody can restore are the one thing here that cannot wait (2.90).
+  const missed = checks.backup ? nightsMissed(checks.backup.lastBackup, checks.backup.expected) : 0;
+  if (ran("backup") && checks.backup && missed > 0) {
+    out.push({
+      key: "backup",
+      count: missed,
+      tone: "danger",
+      title: "Backup overdue",
+      detail:
+        checks.backup.lastBackup === null
+          ? "These books have never been backed up by the nightly run."
+          : `The last snapshot of these books is from ${formatDate(checks.backup.lastBackup)}; one was due on ${formatDate(checks.backup.expected)}.`,
+      href: "/settings/backups",
+    });
+  }
 
   if (ran("waiting") && checks.waitingLines > 0) {
     out.push({
@@ -121,6 +144,7 @@ export function dashboardNeeds(checks: AttentionChecks, money: (minor: number) =
 }
 
 const UNAVAILABLE_WORDS: Record<AttentionKey, string> = {
+  backup: "the last backup",
   waiting: "lines waiting on Bank Transactions",
   neverReconciled: "bank accounts never reconciled",
   noLongerAgree: "reconciliations that no longer agree",
@@ -143,7 +167,10 @@ export const NOTHING_WAITING = "Nothing is waiting. Every check came back clear.
 export const CHECKS_FAILED = "The checks could not be read just now. The Exception report runs them in full.";
 
 /** The clear line: only a check that ran can come back clear. */
-export function clearLine(unavailable: readonly AttentionKey[]): string | null {
+export function clearLine(checks: Pick<AttentionChecks, "unavailable" | "backup">): string | null {
+  const unavailable = checks.unavailable;
   if (unavailable.length === 0) return NOTHING_WAITING;
-  return unavailable.length < Object.keys(UNAVAILABLE_WORDS).length ? "Nothing is waiting among the checks that ran." : null;
+  // The backup check is only made for someone who may see the backups.
+  const made = Object.keys(UNAVAILABLE_WORDS).length - (checks.backup === undefined ? 1 : 0);
+  return unavailable.length < made ? "Nothing is waiting among the checks that ran." : null;
 }

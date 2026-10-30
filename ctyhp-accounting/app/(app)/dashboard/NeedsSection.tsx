@@ -1,4 +1,5 @@
 import NeedsAttention from "@/components/dashboard/NeedsAttention";
+import { holdsPermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { CHECKS_FAILED, clearLine, dashboardNeeds, unavailableNote, type AttentionChecks } from "@/lib/domain/dashboard-needs";
 import { formatMoney } from "@/lib/format";
@@ -22,13 +23,14 @@ export default async function NeedsSection({
   let checks: AttentionChecks | null = null;
   try {
     const sb = await createSupabaseServerClient();
-    checks = await getAttentionChecks(sb, today);
+    // Only someone who may see the backups is told one is late; for anyone else the read finds nothing.
+    checks = await getAttentionChecks(sb, today, { backups: await holdsPermission("company.export") });
   } catch {
     checks = null;
   }
   if (!checks) return <NeedsAttention failure={CHECKS_FAILED} />;
   const needs = dashboardNeeds(checks, (minor) => formatMoney(minor, currencyCode, decimals));
-  const clear = clearLine(checks.unavailable);
+  const clear = clearLine(checks);
   if (needs.length === 0 && clear === null) return <NeedsAttention failure={CHECKS_FAILED} />;
   return <NeedsAttention needs={needs} clear={clear} note={unavailableNote(checks.unavailable)} />;
 }
