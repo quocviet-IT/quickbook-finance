@@ -1,11 +1,27 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Alert, Descriptions, Drawer, Table, Tag, Typography } from "antd";
+import { Alert, Descriptions, Drawer, Tag, Typography } from "antd";
 import { PAID_LABELS, humanizeStatus, statusLabel } from "@/lib/domain/status-label";
 import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
-import type { AuditEntryRow, PaymentDetail, PaymentRow } from "@/lib/db/types";
+import type { AuditEntryRow, PaymentAllocationView, PaymentDetail, PaymentJournalLine, PaymentRow } from "@/lib/db/types";
 import { formatDate, formatMoney } from "@/lib/format";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { getPaymentDrawerAction } from "./actions";
+
+/** The drawer's width; its body, where the tables sit, is 48px less. */
+export const PAYMENT_DRAWER_WIDTH = 720;
+
+/**
+ * Invoices settled: Applied, Invoice balance now (a heading 19 letters long,
+ * which is why it takes a picker's width) and Invoice status. The invoice
+ * number takes what is left, at least COLUMN.TEXT_MIN.
+ */
+export const PAYMENT_DRAWER_ALLOCATIONS_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.PICKER, COLUMN.STATUS] as const;
+
+/** The journal entry's lines: Debit and Credit. The account takes what is left, at least COLUMN.TEXT_MIN. */
+export const PAYMENT_DRAWER_JOURNAL_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.MONEY] as const;
 
 export interface PaymentDetailDrawerProps {
   payment: (PaymentRow & { customer_name: string }) | null;
@@ -66,7 +82,7 @@ export default function PaymentDetailDrawer({
       title={`Payment ${payment?.payment_number ?? "(unnumbered)"}`}
       open={!!payment}
       onClose={onClose}
-      width={720}
+      width={PAYMENT_DRAWER_WIDTH}
       destroyOnHidden
     >
       {payment ? (
@@ -102,38 +118,37 @@ export default function PaymentDetailDrawer({
           ) : null}
 
           <Typography.Text strong>Invoices settled</Typography.Text>
-          <Table
+          <DataTable<PaymentAllocationView>
             rowKey="invoiceId"
-            size="small"
             pagination={false}
             style={{ margin: "8px 0 16px" }}
             loading={loading}
-            dataSource={detail?.allocations ?? []}
+            rows={detail?.allocations ?? []}
             locale={{ emptyText: "This receipt was not applied to any invoice." }}
             columns={[
-              {
+              flexColumn<PaymentAllocationView>({
                 title: "Invoice",
                 dataIndex: "invoiceNumber",
                 render: (n: string | null) => n ?? "—",
-              },
+              }),
               {
                 title: "Applied",
                 dataIndex: "amountMinor",
-                width: 140,
+                width: PAYMENT_DRAWER_ALLOCATIONS_FIXED_WIDTHS[0],
                 align: "right",
                 render: (v: number, r) => formatMoney(v, r.currencyCode, decimalsOf(r.currencyCode)),
               },
               {
                 title: "Invoice balance now",
                 dataIndex: "invoiceBalanceMinor",
-                width: 170,
+                width: PAYMENT_DRAWER_ALLOCATIONS_FIXED_WIDTHS[1],
                 align: "right",
                 render: (v: number, r) => formatMoney(v, r.currencyCode, decimalsOf(r.currencyCode)),
               },
               {
                 title: "Invoice status",
                 dataIndex: "invoiceStatus",
-                width: 130,
+                width: PAYMENT_DRAWER_ALLOCATIONS_FIXED_WIDTHS[2],
                 render: (s: string) => statusLabel(s, { labels: PAID_LABELS }),
               },
             ]}
@@ -147,31 +162,30 @@ export default function PaymentDetailDrawer({
               </Tag>
             ) : null}
           </Typography.Text>
-          <Table
+          <DataTable<PaymentJournalLine>
             rowKey={(row) => `${row.accountCode}-${row.debitMinor}-${row.creditMinor}`}
-            size="small"
             pagination={false}
             style={{ margin: "8px 0 16px" }}
             loading={loading}
-            dataSource={detail?.journal?.lines ?? []}
+            rows={detail?.journal?.lines ?? []}
             locale={{ emptyText: "This receipt did not post a journal entry." }}
             columns={[
-              {
+              flexColumn<PaymentJournalLine>({
                 title: "Account",
                 key: "account",
                 render: (_: unknown, r) => `${r.accountCode} — ${r.accountName}`,
-              },
+              }),
               {
                 title: "Debit",
                 dataIndex: "debitMinor",
-                width: 130,
+                width: PAYMENT_DRAWER_JOURNAL_FIXED_WIDTHS[0],
                 align: "right",
                 render: (v: number) => (v ? formatMoney(v, payment.currency_code, decimals) : "—"),
               },
               {
                 title: "Credit",
                 dataIndex: "creditMinor",
-                width: 130,
+                width: PAYMENT_DRAWER_JOURNAL_FIXED_WIDTHS[1],
                 align: "right",
                 render: (v: number) => (v ? formatMoney(v, payment.currency_code, decimals) : "—"),
               },

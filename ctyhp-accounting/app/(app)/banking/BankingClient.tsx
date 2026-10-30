@@ -118,6 +118,7 @@ import {
   rejectReconciliationAction,
   syncBankConnectionAction,
 } from "./actions";
+import type { BankingView, OpeningBankingView } from "./banking-view";
 
 interface PlaidLinkAccount {
   id: string;
@@ -157,6 +158,11 @@ function formatSyncTime(value: string | null, timeZone: string): string {
   return formatDateTime(value, timeZone);
 }
 
+/** Every part of a banking read came back. */
+function completeView(view: BankingView): boolean {
+  return view.transactions.ok && view.suggestions.ok && view.postings.ok && view.recodes.ok;
+}
+
 interface PendingPlaidLink {
   publicToken: string;
   institutionId: string | null;
@@ -168,6 +174,7 @@ export default function BankingClient({
   bankAccounts,
   accounts,
   initialAccountId,
+  openingView,
   initialQueueStatus,
   initialFocusId,
   initialImport,
@@ -187,6 +194,8 @@ export default function BankingClient({
   /** The whole chart, so a line can be posted to any account money may go to. */
   accounts: AccountRow[];
   initialAccountId: string | null;
+  /** The lines the page already read for the account it opens on (2.91). */
+  openingView: OpeningBankingView | null;
   initialQueueStatus: "unmatched" | null;
   initialFocusId: string | null;
   /** Opened from the New menu to import a statement. */
@@ -220,20 +229,29 @@ export default function BankingClient({
   const [exactAmountText, setExactAmountText] = useState("");
   const [minAmountText, setMinAmountText] = useState("");
   const [maxAmountText, setMaxAmountText] = useState("");
-  const [txns, setTxns] = useState<BankTransactionRow[]>([]);
+  // What the page read for the account it opened on (2.91), so the first paint
+  // has the lines. Taken only whole and only for that account; anything less
+  // and the screen reads again, which handles each kind of failure itself.
+  const [opening] = useState<BankingView | null>(() =>
+    openingView && openingView.bankAccountId === selectedId && completeView(openingView.view) ? openingView.view : null,
+  );
+  const [txns, setTxns] = useState<BankTransactionRow[]>(() => opening?.transactions.data ?? []);
   // What each matched line was posted to. Fetched beside the transactions so
   // the Category column can show the answer instead of asking over the top of
   // it — fifteen lines read "Uncategorized" beside "Matched".
-  const [postings, setPostings] = useState<Map<string, BankPostingRow & { others: string[] }>>(new Map());
+  const [postings, setPostings] = useState<Map<string, BankPostingRow & { others: string[] }>>(() =>
+    postingsByLine(opening?.postings.data ?? []),
+  );
   const [postedToFilter, setPostedToFilter] = useState<string>("all");
   // Lines moved out of Uncategorized by a recode, and where their money went.
-  const [recodes, setRecodes] = useState<Map<string, BankRecodeRow>>(new Map());
-  const [suggestions, setSuggestions] = useState<SuggestionView[]>([]);
-  // Loading from the first paint when there is an account to load: the lines
-  // arrive after hydration, and until then an empty table read as "No bank
-  // transactions" — for four to six seconds, on a screen people come to for
-  // exactly those lines.
-  const [loading, setLoading] = useState(selectedId !== undefined);
+  const [recodes, setRecodes] = useState<Map<string, BankRecodeRow>>(
+    () => new Map((opening?.recodes.data ?? []).map((row) => [row.bank_transaction_id, row])),
+  );
+  const [suggestions, setSuggestions] = useState<SuggestionView[]>(() => opening?.suggestions.data ?? []);
+  // Loading from the first paint when there is an account to load and the page
+  // did not read it: an empty table must not read "No bank transactions" while
+  // the lines are still on their way.
+  const [loading, setLoading] = useState(selectedId !== undefined && opening === null);
   const [busy, setBusy] = useState<string | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
   const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
@@ -334,6 +352,13 @@ export default function BankingClient({
       ? formatMoney(row.transaction.amount_minor, row.currencyCode, decimalsOf(row.currencyCode))
       : String(row.transaction.amount_minor);
 
+  const loadHints = useCallback((accountFilter: string | null) => {
+    void getBankingHintsAction(accountFilter).then(({ coding: coded, loans: loanHints }) => {
+      if (coded.ok && coded.data) setCoding(new Map(coded.data.map((s) => [s.transactionId, s])));
+      if (loanHints.ok && loanHints.data) setLoans(new Map(loanHints.data.map((v) => [v.transactionId, v])));
+    });
+  }, []);
+
   const reload = useCallback(async () => {
     if (!selectedId) return;
     setLoading(true);
@@ -344,10 +369,7 @@ export default function BankingClient({
     // the lines go first as one request and the suggestions queue behind them:
     // the lines never wait for the hints.
     const view = getBankingViewAction(accountFilter);
-    void getBankingHintsAction(accountFilter).then(({ coding: coded, loans: loanHints }) => {
-      if (coded.ok && coded.data) setCoding(new Map(coded.data.map((s) => [s.transactionId, s])));
-      if (loanHints.ok && loanHints.data) setLoans(new Map(loanHints.data.map((v) => [v.transactionId, v])));
-    });
+    loadHints(accountFilter);
     const { transactions, suggestions: matches, postings: posted, recodes: recoded } = await view;
     setLoading(false);
     if (transactions.ok && transactions.data) setTxns(transactions.data);
@@ -360,7 +382,11 @@ export default function BankingClient({
     } else {
       message.warning("Recodes could not be read, so recoded lines may show as needing coding. Reload the page.");
     }
-  }, [selectedId, message]);
+  }, [selectedId, message, loadHints]);
+
+  // The account whose lines the page already read; cleared on first use, so
+  // choosing another account, or coming back to this one, reads again.
+  const openedOn = useRef(opening ? selectedId : undefined);
 
   // A layout effect so the lines are first in Next's queue of Server Actions.
   // The registers below the table (BankImportList, BankFeedSyncList) read
@@ -368,10 +394,16 @@ export default function BankingClient({
   // parent's — so a useEffect here sent both registers ahead of the lines.
   // Every layout effect runs before any passive one.
   useLayoutEffect(() => {
+    const already = openedOn.current !== undefined && openedOn.current === selectedId;
+    openedOn.current = undefined;
+    if (already) {
+      // The lines came with the page; only the suggestions are still to come.
+      loadHints(selectedId ?? null);
+      return;
+    }
     // Intentional synchronization after the selected account changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
-  }, [reload]);
+  }, [reload, selectedId, loadHints]);
 
   async function submitAccount() {
     const values = await acctForm.validateFields();

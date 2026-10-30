@@ -1,7 +1,10 @@
 "use client";
 import { useCallback } from "react";
-import { Alert, Space, Table, Tag, Tooltip } from "antd";
+import { Alert, Space, Tag, Tooltip } from "antd";
+import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { ReportFoot, StatRow } from "@/components/reports/ReportPaper";
 import SimpleReport from "@/components/reports/SimpleReport";
 import { humanizeStatus } from "@/lib/domain/status-label";
@@ -10,6 +13,20 @@ import type { ReportRunResult, ReportWhen } from "@/lib/domain/report-run";
 import { formatMoney } from "@/lib/format";
 import type { Report1099, Vendor1099Assessed } from "@/lib/services/vendorTax";
 import { report1099Action } from "../../vendors/tax-actions";
+
+/**
+ * W-9, TIN, Box, Paid, Reportable, Exceptions. Vendor takes what is left, at
+ * least COLUMN.TEXT_MIN, with the reporting name and classification under it.
+ * As columns of their own, the two names had 192px between them at 1280.
+ */
+export const REPORT_1099_FIXED_WIDTHS = [
+  COLUMN.STATUS,
+  COLUMN.CODE,
+  COLUMN.QTY,
+  COLUMN.MONEY,
+  COLUMN.QTY,
+  COLUMN.STATUS,
+] as const;
 
 export default function Report1099Client({
   defaultYear,
@@ -61,50 +78,68 @@ export default function Report1099Client({
               ]}
             />
 
-            <Table<Vendor1099Assessed>
+            <DataTable<Vendor1099Assessed>
               rowKey="vendor_id"
-              dataSource={rep.rows}
+              rows={rep.rows}
               pagination={false}
-              scroll={{ x: "max-content" }}
-              locale={{ emptyText: "No vendor was paid and none is marked eligible for this year" }}
+              emptyTitle="No vendor was paid and none is marked eligible for this year"
               columns={[
-                { title: "Vendor", dataIndex: "vendor_name" },
-                { title: "Reporting name", dataIndex: "reporting_name", render: (v: string | null) => v ?? "—" },
-                {
-                  title: "Classification",
-                  dataIndex: "classification",
-                  render: (v: string | null) => (v ? humanizeStatus(v) : "—"),
-                },
+                flexColumn<Vendor1099Assessed>({
+                  title: "Vendor",
+                  dataIndex: "vendor_name",
+                  render: (_: unknown, r: Vendor1099Assessed) => {
+                    // The name the form will carry, and how the vendor is
+                    // classified: read against the vendor, not scanned down.
+                    const reportsAs = [
+                      r.reporting_name ? `Reports as ${r.reporting_name}` : "No reporting name",
+                      r.classification ? humanizeStatus(r.classification) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
+                      <>
+                        <span title={r.vendor_name}>{r.vendor_name}</span>
+                        {secondaryLine(reportsAs)}
+                      </>
+                    );
+                  },
+                }),
                 {
                   title: "W-9",
                   dataIndex: "w9_status",
+                  width: REPORT_1099_FIXED_WIDTHS[0],
                   render: (v: string) => <StatusTag status={v} />,
                 },
                 {
                   title: "TIN",
                   dataIndex: "tin_on_file",
+                  width: REPORT_1099_FIXED_WIDTHS[1],
                   render: (v: boolean) => (v ? <StatusTag status="on_file" /> : <StatusTag status="missing" />),
                 },
                 {
                   title: "Box",
                   dataIndex: "box_code",
+                  width: REPORT_1099_FIXED_WIDTHS[2],
                   render: (v: string | null, r) =>
                     v ? <Tooltip title={r.box_label ?? ""}>{v}</Tooltip> : "—",
                 },
                 {
                   title: `Paid (${baseCurrency})`,
                   dataIndex: "paid_minor",
+                  width: REPORT_1099_FIXED_WIDTHS[3],
                   align: "right",
                   render: (v: number) => money(Number(v)),
                 },
                 {
                   title: "Reportable",
                   dataIndex: "reportable",
+                  width: REPORT_1099_FIXED_WIDTHS[4],
                   render: (v: boolean) => (v ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>),
                 },
                 {
                   title: "Exceptions",
                   key: "exceptions",
+                  width: REPORT_1099_FIXED_WIDTHS[5],
                   render: (_, r) =>
                     r.exceptions.length === 0 ? (
                       <Tag color="green">Clean</Tag>

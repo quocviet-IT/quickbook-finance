@@ -2,9 +2,21 @@
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, formatDateInTimeZone, plural } from "@/lib/format";
 import { useState } from "react";
-import { App, Button, Input, Modal, Table, Tag, Typography } from "antd";
+import { App, Button, Input, Modal, Tag, Typography } from "antd";
 import type { ImportBatchRow } from "@/lib/services/ledger-import";
 import { voidImportBatchAction } from "./actions";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/**
+ * Brought in, Covers, Entries, Lines, Imported, Undo. File and Imported by
+ * share what is left. Covers is two dates and an arrow; Brought in is one tag,
+ * "Whole history" at most; the last column is the Undo button or the Undone tag.
+ */
+export const LEDGER_BATCHES_FIXED_WIDTHS = [120, COLUMN.DATE * 2 + 24, COLUMN.QTY, COLUMN.QTY, COLUMN.DATE, 88] as const;
+/** The floors of File and Imported by, in that order. */
+export const LEDGER_BATCHES_ELASTIC_FLOORS = [140, 100] as const;
 
 export interface LedgerBatchListProps {
   batches: ImportBatchRow[];
@@ -62,21 +74,20 @@ export default function LedgerBatchList({
 
   return (
     <>
-      <Table<ImportBatchRow>
-        size="small"
+      <DataTable<ImportBatchRow>
         rowKey="id"
         pagination={false}
-        dataSource={batches}
+        rows={batches}
         locale={{ emptyText: emptyText ?? "No ledger has been imported into this company yet." }}
         columns={[
-          { title: "File", dataIndex: "file_name" },
+          flexColumn<ImportBatchRow>({ title: "File", dataIndex: "file_name", floor: LEDGER_BATCHES_ELASTIC_FLOORS[0] }),
           {
             // What the import produced, in the words of the thing it produced.
             // "Drafts raised" is true of an invoice import and nonsense on a
             // list of customers, and they share this column.
             title: "Brought in",
             key: "mode",
-            width: 140,
+            width: LEDGER_BATCHES_FIXED_WIDTHS[0],
             render: (_, row) => (
               <Tag>
                 {row.mode === "history"
@@ -91,31 +102,31 @@ export default function LedgerBatchList({
           },
           {
             title: "Covers",
-            width: 200,
+            width: LEDGER_BATCHES_FIXED_WIDTHS[1],
             render: (_, row) =>
               row.from_date ? `${formatDate(row.from_date)} → ${formatDate(row.to_date ?? row.from_date)}` : "—",
           },
-          { title: "Entries", dataIndex: "entry_count", width: 90, align: "right" },
-          { title: "Lines", dataIndex: "line_count", width: 90, align: "right" },
-          {
+          { title: "Entries", dataIndex: "entry_count", width: LEDGER_BATCHES_FIXED_WIDTHS[2], align: "right" },
+          { title: "Lines", dataIndex: "line_count", width: LEDGER_BATCHES_FIXED_WIDTHS[3], align: "right" },
+          flexColumn<ImportBatchRow>({
             // Who ran it. The register recorded this from the first day and
             // never showed it, so "who imported this file" was a question only
             // a database connection could answer.
             title: "Imported by",
             dataIndex: "imported_by_name",
-            width: 170,
+            floor: LEDGER_BATCHES_ELASTIC_FLOORS[1],
             render: (name: string | null) =>
               name ?? <Typography.Text type="secondary">—</Typography.Text>,
-          },
+          }),
           {
             title: "Imported",
             dataIndex: "imported_at",
-            width: 120,
+            width: LEDGER_BATCHES_FIXED_WIDTHS[4],
             render: (value: string) => formatDateInTimeZone(value, timeZone),
           },
           {
             title: "",
-            width: 110,
+            width: LEDGER_BATCHES_FIXED_WIDTHS[5],
             render: (_, row) =>
               row.status === "voided" ? (
                 <Tag color="default">Undone</Tag>

@@ -2,8 +2,9 @@
 import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, App, Segmented, Space, Statistic, Table, Tag } from "antd";
+import { Alert, App, Segmented, Space, Statistic, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import ReportTable, { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
 import StatusTag from "@/components/ui/StatusTag";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -34,6 +35,18 @@ const VERDICT_COLOR: Record<PostingVerdict, string> = {
   off_ledger: "default",
   posted_in_error: "red",
 };
+
+/**
+ * The control accounts: Ledger account, Subledger, Ledger balance and Variance.
+ * The control account's name takes what is left, at least COLUMN.TEXT_MIN.
+ * Ledger account is as wide as its "not configured" note needs.
+ */
+export const GL_CONTROL_FIXED_WIDTHS = [
+  COLUMN.STATUS,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY_WIDE,
+] as const;
 
 /**
  * Proof that every document reached the ledger, and that every control account
@@ -258,25 +271,24 @@ export default function GlPostingClient({
           />
         </>
       ) : (
-        <Table<ControlCheck>
+        <ReportTable<ControlCheck>
           rowKey="controlKey"
           loading={loading}
-          pagination={false}
-          dataSource={recon?.rows ?? []}
-          locale={{ emptyText: "Run the report to reconcile the control accounts" }}
+          rows={recon?.rows ?? []}
+          emptyTitle="Run the report to reconcile the control accounts"
           rowClassName={(row) => (row.isException ? "report-table-row--exception" : "")}
           columns={[
-            { title: "Control account", dataIndex: "label" },
+            flexColumn<ControlCheck>({ title: "Control account", dataIndex: "label" }),
             {
               title: "Ledger account",
               dataIndex: "accountCodes",
-              width: 140,
+              width: GL_CONTROL_FIXED_WIDTHS[0],
               render: (value: string | null) => value ?? <i>not configured</i>,
             },
             {
               title: "Subledger",
               key: "subledger",
-              width: 150,
+              width: GL_CONTROL_FIXED_WIDTHS[1],
               align: "right",
               render: (_: unknown, row) =>
                 row.hasSubledger ? money(row.subledgerMinor) : <i>no subledger</i>,
@@ -284,14 +296,14 @@ export default function GlPostingClient({
             {
               title: "Ledger balance",
               dataIndex: "controlMinor",
-              width: 150,
+              width: GL_CONTROL_FIXED_WIDTHS[2],
               align: "right",
               render: (value: number) => money(value),
             },
             {
               title: "Variance",
               key: "variance",
-              width: 150,
+              width: GL_CONTROL_FIXED_WIDTHS[3],
               align: "right",
               render: (_: unknown, row) =>
                 row.tiesOut ? (
@@ -303,18 +315,18 @@ export default function GlPostingClient({
           ]}
           summary={() =>
             recon ? (
-              <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={4}>
+              <SummaryRow>
+                <SummaryCell index={0} colSpan={4}>
                   <b>As of {formatDate(recon.asOf)}</b>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={4} align="right">
+                </SummaryCell>
+                <SummaryCell index={4} align="right">
                   {recon.allTieOut ? (
                     <Tag color="green">All tie out</Tag>
                   ) : (
                     <Tag color="red">{recon.exceptions.length} out</Tag>
                   )}
-                </Table.Summary.Cell>
-              </Table.Summary.Row>
+                </SummaryCell>
+              </SummaryRow>
             ) : null
           }
         />

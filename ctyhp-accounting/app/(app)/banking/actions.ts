@@ -10,23 +10,16 @@ import {
   type StatementImportCounts,
   categoriseBankTransaction,
   uncategoriseBankTransaction,
-  listBankTransactionPostings,
-  type BankPostingRow,
-  listBankRecodes,
   recodeUncategorized,
   undoRecode,
-  type BankRecodeRow,
   listBankStatementImports,
   undoBankStatementImport,
   deleteBankTransactionWithVoid,
   type BankStatementImportRow,
-  listBankTransactions,
   generateSuggestions,
-  listSuggestions,
   approveReconciliation,
   rejectReconciliation,
   type ImportRow,
-  type SuggestionView,
   BankingError,
   connectPlaidBank,
   getBankFeedStartDefaults,
@@ -37,7 +30,7 @@ import {
   type SettlementCandidateRow,
 } from "@/lib/services/banking";
 import { createPlaidLinkToken } from "@/lib/services/plaid";
-import type { BankTransactionRow } from "@/lib/db/types";
+import { readBankingView, settled, type BankingView } from "./banking-view";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { CODE_ALL_LIMIT, type CodingSuggestionView } from "@/lib/domain/coding";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
@@ -350,25 +343,6 @@ export async function undoRecodeAction(transactionId: string): Promise<ActionRes
   }
 }
 
-/** One part of a combined read: its own answer or its own error, never the others'. */
-async function settled<T>(read: () => Promise<T>): Promise<ActionResult<T>> {
-  try {
-    return { ok: true, data: await read() };
-  } catch (err) {
-    return { ok: false, error: msg(err) };
-  }
-}
-
-export interface BankingView {
-  transactions: ActionResult<BankTransactionRow[]>;
-  /** Proposed matches between the lines and the books. */
-  suggestions: ActionResult<SuggestionView[]>;
-  /** What each matched line was posted to — the Category column's answer. */
-  postings: ActionResult<BankPostingRow[]>;
-  /** Which coded lines were recoded out of Uncategorized, and to what. */
-  recodes: ActionResult<BankRecodeRow[]>;
-}
-
 /**
  * Reads only: everything the banking screen draws its lines with, in one
  * request. `null` asks for every bank account, which is how the review queue
@@ -378,9 +352,8 @@ export interface BankingView {
  * dispatches Server Actions one at a time per client (Server Actions and
  * Mutations, "Sequential dispatch"), so the four ran one after another — with
  * the two hint reads queued ahead of them — and the table read "No bank
- * transactions" for four to six seconds (production, 08/10). Here the reads run
- * side by side on the server, on one client, and each keeps its own error, so
- * one failed read does not blank the others.
+ * transactions" for four to six seconds (production, 08/10). The page now
+ * reads the account it opens on itself (2.91); this is for every read after.
  */
 export async function getBankingViewAction(bankAccountId: string | null): Promise<BankingView> {
   let sb: Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -390,13 +363,7 @@ export async function getBankingViewAction(bankAccountId: string | null): Promis
     const failed = { ok: false, error: msg(err) };
     return { transactions: failed, suggestions: failed, postings: failed, recodes: failed };
   }
-  const [transactions, suggestions, postings, recodes] = await Promise.all([
-    settled(() => listBankTransactions(sb, bankAccountId)),
-    settled(() => listSuggestions(sb, bankAccountId)),
-    settled(() => listBankTransactionPostings(sb, bankAccountId)),
-    settled(() => listBankRecodes(sb, bankAccountId)),
-  ]);
-  return { transactions, suggestions, postings, recodes };
+  return readBankingView(sb, bankAccountId);
 }
 
 export interface BankingHints {

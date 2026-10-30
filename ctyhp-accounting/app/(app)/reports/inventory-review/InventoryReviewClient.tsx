@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, App, Button, Form, Input, InputNumber, Modal, Space, Statistic, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Button, Form, Input, InputNumber, Modal, Space, Statistic, Tag, Tooltip, Typography } from "antd";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import ReportBar, { reportFieldLabel } from "@/components/reports/ReportBar";
 import { sanitizeExportFileName, type ReportExportSheet } from "@/lib/domain/report-export";
 import { fromMinor } from "@/lib/domain/money";
@@ -25,6 +28,22 @@ const VERDICT_COLOR: Record<StockVerdict, string> = {
   moving: "green",
   empty: "default",
 };
+
+/**
+ * Status (with Write down under the tag, for someone who may post it), On
+ * hand, Unit cost, Value, Realizable, Last moved. Item takes what is left, at
+ * least COLUMN.TEXT_MIN, with the assessment under the name. As two columns of
+ * their own beside a button column, Item and Assessment had 188px between them
+ * at 1280.
+ */
+export const INVENTORY_REVIEW_FIXED_WIDTHS = [
+  COLUMN.STATUS,
+  COLUMN.QTY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.CODE,
+] as const;
 
 /**
  * The quarterly obsolescence review.
@@ -197,49 +216,68 @@ export default function InventoryReviewClient({
         </Space>
       ) : null}
 
-      <Table<ReviewedStock>
+      <DataTable<ReviewedStock>
         rowKey="itemId"
-        size="small"
         loading={loading}
         pagination={false}
-        dataSource={review?.rows ?? []}
-        locale={{ emptyText: "No inventory items" }}
+        rows={review?.rows ?? []}
+        emptyTitle="No inventory items"
         rowClassName={(row) => (row.verdict === "above_nrv" ? "report-table-row--exception" : "")}
         columns={[
           {
             title: "Status",
             dataIndex: "verdict",
-            width: 190,
-            render: (value: StockVerdict) => (
-              <Tag color={VERDICT_COLOR[value]}>{VERDICT_LABEL[value]}</Tag>
+            width: INVENTORY_REVIEW_FIXED_WIDTHS[0],
+            render: (value: StockVerdict, row) => (
+              <Space direction="vertical" size={4}>
+                <Tag color={VERDICT_COLOR[value]}>{VERDICT_LABEL[value]}</Tag>
+                {canWrite && value === "above_nrv" ? (
+                  <Button size="small" danger onClick={() => openWriteDown(row)}>
+                    Write down
+                  </Button>
+                ) : null}
+              </Space>
             ),
           },
-          { title: "Item", dataIndex: "name" },
+          {
+            ...flexColumn<ReviewedStock>({ title: "Item", dataIndex: "name" }),
+            // The assessment is a sentence, so it wraps under the name rather
+            // than being cut; the name alone is cut, whole on hover.
+            ellipsis: false,
+            render: (_: unknown, row: ReviewedStock) => (
+              <>
+                <div title={row.name} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {row.name}
+                </div>
+                {row.reason ? <Typography.Text type="secondary">{row.reason}</Typography.Text> : null}
+              </>
+            ),
+          },
           {
             title: "On hand",
             dataIndex: "qtyOnHand",
-            width: 90,
+            width: INVENTORY_REVIEW_FIXED_WIDTHS[1],
             align: "right",
             render: (value: number) => value.toLocaleString("en-US"),
           },
           {
             title: "Unit cost",
             dataIndex: "unitCostMinor",
-            width: 110,
+            width: INVENTORY_REVIEW_FIXED_WIDTHS[2],
             align: "right",
             render: (value: number) => money(value),
           },
           {
             title: "Value",
             dataIndex: "valueMinor",
-            width: 120,
+            width: INVENTORY_REVIEW_FIXED_WIDTHS[3],
             align: "right",
             render: (value: number) => <b>{money(value)}</b>,
           },
           {
             title: "Realizable",
             key: "nrv",
-            width: 120,
+            width: INVENTORY_REVIEW_FIXED_WIDTHS[4],
             align: "right",
             render: (_: unknown, row) =>
               row.nrvMinor === null ? (
@@ -253,7 +291,7 @@ export default function InventoryReviewClient({
           {
             title: "Last moved",
             dataIndex: "lastMovementOn",
-            width: 120,
+            width: INVENTORY_REVIEW_FIXED_WIDTHS[5],
             render: (value: string | null, row) =>
               value ? (
                 <>
@@ -265,22 +303,6 @@ export default function InventoryReviewClient({
                 "never"
               ),
           },
-          { title: "Assessment", dataIndex: "reason" },
-          ...(canWrite
-            ? [
-                {
-                  title: "",
-                  key: "action",
-                  width: 130,
-                  render: (_: unknown, row: ReviewedStock) =>
-                    row.verdict === "above_nrv" ? (
-                      <Button size="small" danger onClick={() => openWriteDown(row)}>
-                        Write down
-                      </Button>
-                    ) : null,
-                },
-              ]
-            : []),
         ]}
       />
       </Space>

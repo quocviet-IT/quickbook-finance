@@ -41,6 +41,47 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.91",
+    date: "2026-10-30",
+    headline: "Backups, Bank Transactions and Reconcile stop waiting, and the last 37 lists keep to the screen.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A nightly backup takes seconds, not most of a minute",
+        detail:
+          "A snapshot read the company's 79 tables one after another, each a round trip to the database on another continent, so even a company with almost no data took 35 seconds. It now reads six at a time, and the control totals together: measured on the same books, 20.6 seconds became 4.3 for the sample company and 35.9 became 8.8 for the largest. The snapshot itself is unchanged, byte for byte, so unchanged books are still skipped. One run now covers every company; the two later runs stay as a safety net.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title: "Bank Transactions opens with its lines",
+        detail:
+          "The lines were read only once the page had loaded in the browser, so the table sat under a spinner for two to nine seconds. The page now reads the account it opens on itself, and the lines arrive with it; the coding and loan suggestions follow a moment later, as before. Choosing another account reads that account, as before.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Reconcile shows the chosen account's reconciliations sooner",
+        detail:
+          "After choosing an account, its reconciliations waited behind the statement alerts, which read the whole ledger, then behind the standing card: 1.7 to 2.9 seconds on 30 October, longer on a busy day. The list and the card are now one request, sent first, and the account the page opens on arrives with the page. The alerts still appear above them when their check is done.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "The remaining 37 lists fit the screen like the rest",
+        detail:
+          "The lists still drawn the old way (credit memos, vendor credits, a payment's details, receiving and billing a purchase order, sales tax, the 1099, GL posting, journal, inventory review, number sequence and saved reports, aging, audit, companies, periods, permissions, imports and more) now work like every other list: columns sized to what they hold, the longest text taking what is left and wrapping rather than being cut off, no sideways scrolling at 1280 pixels, dense rows, and on a phone the list scrolls inside its own frame. Every list in OneBook is now drawn one way.",
+      },
+      {
+        kind: "changed",
+        title: "Four lists put their smaller facts under the name",
+        detail:
+          "Where a list had more columns than the screen has room for, the facts nobody scans down a column for now sit in a grey line under the name, so nothing is cut off or pushed off the side. Payments & settlements on an invoice or a bill: the type, number, how it was paid and the reference are one Settlement column. 1099 Review: the reporting name and classification are under the vendor. Inventory Review: the assessment is under the item, and Write down is under the status. A/R and A/P Aging by customer or vendor: what each owes overdue, and the oldest due date, are under the name; the Overdue column is gone, and the overdue total is under Total at the foot.",
+        route: "/reports/ar-aging",
+      },
+    ],
+  },
+  {
     version: "2.90",
     date: "2026-10-30",
     headline: "A missed backup no longer goes unnoticed: the Dashboard says so, and the night's last run reports it.",

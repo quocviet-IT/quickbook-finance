@@ -12,7 +12,6 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   Typography,
 } from "antd";
@@ -23,12 +22,27 @@ import type { Box1099Row, VendorRow, VendorTaxProfileRow } from "@/lib/db/types"
 import { maskTin } from "@/lib/domain/vendorTax";
 import { TAX_CLASSIFICATIONS, TIN_TYPES, W9_STATUSES } from "@/lib/domain/schemas";
 import { listVendorTaxVersionsAction, saveVendorTaxProfileAction } from "./tax-actions";
-import { longTextColumn } from "@/components/ui/long-text-column";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, statusLabel } from "@/lib/domain/status-label";
 
 // humanizeStatus would spell the LLC classification "Llc".
 const classificationLabel = (c: string) => (c === "llc" ? "LLC" : humanizeStatus(c));
+
+/**
+ * The drawer's width; its body, where the version history sits, is 48px less.
+ * Five columns do not fit in the 512px the old 560 left, so it is a little
+ * wider.
+ */
+export const VENDOR_TAX_DRAWER_WIDTH = 620;
+
+/**
+ * Version history: v, W-9 (one status tag), 1099 (a tag with the box code) and
+ * Saved. Reason takes what is left, at least COLUMN.TEXT_MIN.
+ */
+export const VENDOR_TAX_VERSIONS_FIXED_WIDTHS = [COLUMN.ACTION, COLUMN.STATUS, COLUMN.QTY, COLUMN.DATE] as const;
 
 interface Props {
   open: boolean;
@@ -137,7 +151,7 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
       title={`Tax profile — ${vendor.name}`}
       open
       onClose={onClose}
-      width={560}
+      width={VENDOR_TAX_DRAWER_WIDTH}
       extra={
         canManage ? (
           <Button type="primary" loading={saving} onClick={submit}>
@@ -241,28 +255,28 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
       </Form>
 
       <Typography.Title level={5}>Version history</Typography.Title>
-      <Table<VendorTaxProfileRow>
+      <DataTable<VendorTaxProfileRow>
         rowKey="id"
-        size="small"
         loading={loading}
-        dataSource={versions}
+        rows={versions}
         pagination={false}
-        scroll={{ x: "max-content" }}
         locale={{ emptyText: "No tax profile recorded yet" }}
         columns={[
-          { title: "v", dataIndex: "version", width: 50 },
+          { title: "v", dataIndex: "version", width: VENDOR_TAX_VERSIONS_FIXED_WIDTHS[0] },
           {
             title: "W-9",
             dataIndex: "w9_status",
+            width: VENDOR_TAX_VERSIONS_FIXED_WIDTHS[1],
             render: (v: string) => <StatusTag status={v} />,
           },
           {
             title: "1099",
             dataIndex: "is_1099_eligible",
+            width: VENDOR_TAX_VERSIONS_FIXED_WIDTHS[2],
             render: (v: boolean, r) => (v ? <Tag color="blue">{r.box_code}</Tag> : <Tag>No</Tag>),
           },
-          { title: "Reason", dataIndex: "change_reason", ...longTextColumn() },
-          { title: "Saved", dataIndex: "created_at", render: (v: string) => formatDateInTimeZone(v, timeZone) },
+          flexColumn<VendorTaxProfileRow>({ title: "Reason", dataIndex: "change_reason" }),
+          { title: "Saved", dataIndex: "created_at", width: VENDOR_TAX_VERSIONS_FIXED_WIDTHS[3], render: (v: string) => formatDateInTimeZone(v, timeZone) },
         ]}
       />
     </Drawer>

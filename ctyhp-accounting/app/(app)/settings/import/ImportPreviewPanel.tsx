@@ -1,17 +1,30 @@
 "use client";
 import { plural, pluralWord } from "@/lib/format";
 import { useState } from "react";
-import { Alert, Button, Checkbox, DatePicker, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Alert, Button, Checkbox, DatePicker, Space, Statistic, Tag, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import type { ImportTarget } from "@/lib/domain/import-mapping";
 import type { ImportPreview } from "@/lib/services/data-import";
 import { DownloadOutlined } from "@ant-design/icons";
 import { tokenVar } from "@/lib/design/tokens";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const PREVIEW_DEFAULT_PAGE_SIZE = 10;
+
+type PreviewRow = ImportPreview["rows"][number];
+
+/**
+ * The create/update tag, then the amount. Name and Matched on share what is
+ * left. The rows are what the import will do, with the same four columns
+ * whatever the file's own headings were, so the table is fitted rather than a
+ * matrix. The amount's heading is long and wraps over two lines.
+ */
+export const IMPORT_PREVIEW_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.MONEY_WIDE] as const;
 
 export interface ImportPreviewPanelProps {
   preview: ImportPreview;
@@ -190,22 +203,21 @@ export default function ImportPreviewPanel({
         </Space>
       ) : null}
 
-      <Table
-        size="small"
+      <DataTable<PreviewRow>
         rowKey={(row) => `${row.action}-${row.key}`}
         pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(PREVIEW_DEFAULT_PAGE_SIZE))}
-        dataSource={preview.rows}
+        rows={preview.rows}
         columns={[
           {
             title: "",
             dataIndex: "action",
-            width: 90,
+            width: IMPORT_PREVIEW_FIXED_WIDTHS[0],
             render: (action: string) => (
               <Tag color={action === "create" ? "green" : "blue"}>{action}</Tag>
             ),
           },
-          { title: "Name", dataIndex: "name" },
-          { title: "Matched on", dataIndex: "key", width: 200 },
+          flexColumn<PreviewRow>({ title: "Name", dataIndex: "name" }),
+          flexColumn<PreviewRow>({ title: "Matched on", dataIndex: "key" }),
           {
             title:
               target === "invoices"
@@ -214,7 +226,7 @@ export default function ImportPreviewPanel({
                   ? "Amount"
                   : "Opening balance",
             dataIndex: "openingBalanceMinor",
-            width: 150,
+            width: IMPORT_PREVIEW_FIXED_WIDTHS[1],
             align: "right",
             render: (value: number) => (value === 0 ? "—" : money(value)),
           },

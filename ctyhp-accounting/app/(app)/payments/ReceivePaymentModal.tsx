@@ -12,7 +12,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Typography,
 } from "antd";
 import type { AccountRow, CurrencyRow, CustomerRow, InvoiceRow, PaymentRow } from "@/lib/db/types";
@@ -20,6 +19,9 @@ import { formatMoney, toMinorUnits } from "@/lib/format";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { describeNoOpenInvoices, unappliedRemainderMinor } from "@/lib/domain/settlement";
 import { paymentReplacementDraft } from "@/lib/domain/payment-void";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { correctPaymentAction, getOpenInvoicesAction, recordPaymentAction } from "./actions";
 
 /**
@@ -30,6 +32,17 @@ import { correctPaymentAction, getOpenInvoicesAction, recordPaymentAction } from
  * the original is still live, and submitting voids it and records this receipt
  * in a single transaction. Neither ever revives a void payment.
  */
+/** The dialog's width; its body, where the allocations sit, is 48px less. */
+export const RECEIVE_PAYMENT_MODAL_WIDTH = 760;
+
+/**
+ * Open invoices: Balance due and Apply (a number input with its "$" prefix).
+ * The invoice number takes what is left, at least COLUMN.TEXT_MIN. Every open
+ * invoice stays on screen (no pager), because each row is an allocation the
+ * person is entering.
+ */
+export const RECEIVE_PAYMENT_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.PICKER] as const;
+
 export type ReceivePaymentBasis =
   | { mode: "replacement"; payment: PaymentRow & { customer_name: string } }
   | { mode: "correction"; payment: PaymentRow & { customer_name: string } };
@@ -198,7 +211,7 @@ export default function ReceivePaymentModal({
       confirmLoading={saving}
       okText={correcting ? "Correct payment" : "Record payment"}
       cancelText="Cancel"
-      width={760}
+      width={RECEIVE_PAYMENT_MODAL_WIDTH}
       destroyOnHidden
     >
       {source ? (
@@ -294,32 +307,31 @@ export default function ReceivePaymentModal({
             Auto apply
           </Button>
         </Space>
-        <Table<InvoiceRow>
+        <DataTable<InvoiceRow>
           rowKey="id"
-          size="small"
           pagination={false}
           style={{ marginTop: 8 }}
-          dataSource={openInvoices}
+          rows={openInvoices}
           locale={{ emptyText: openInvoicesEmptyText }}
           columns={[
-            { title: "Invoice", dataIndex: "invoice_number", render: (n) => n ?? "—" },
+            flexColumn<InvoiceRow>({ title: "Invoice", dataIndex: "invoice_number", render: (n) => n ?? "—" }),
             {
               title: "Balance due",
               dataIndex: "balance_due_minor",
-              width: 140,
+              width: RECEIVE_PAYMENT_FIXED_WIDTHS[0],
               align: "right",
               render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
             },
             {
               title: "Apply",
               key: "apply",
-              width: 160,
+              width: RECEIVE_PAYMENT_FIXED_WIDTHS[1],
               render: (_: unknown, r) => (
                 <InputNumber
                   min={0}
                   step={0.01}
                   prefix="$"
-                  style={{ width: 140 }}
+                  style={{ width: "100%" }}
                   value={alloc[r.id]}
                   max={r.balance_due_minor / 10 ** decimalsOf(r.currency_code)}
                   onChange={(val) => setAlloc((prev) => ({ ...prev, [r.id]: Number(val ?? 0) }))}

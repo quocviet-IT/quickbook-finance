@@ -43,9 +43,13 @@ export async function takeCompanyBackup(
    */
   retentionWarning?: string;
 }> {
-  const datasets = await collectExportDatasets(sb);
-  const controlTotals = await readControlTotals(sb, today);
-  const schemaVersion = await readSchemaVersion(sb);
+  // Read together: none of the three waits on another, and every round trip
+  // to the database comes out of the nightly run's time budget.
+  const [datasets, controlTotals, schemaVersion] = await Promise.all([
+    collectExportDatasets(sb),
+    readControlTotals(sb, today),
+    readSchemaVersion(sb),
+  ]);
   // `today` is the one clock reading this whole snapshot is built from — not
   // a fresh one taken here. Stamping the manifest at midnight UTC on `today`
   // keeps `generatedAt`'s date portion equal to `today` by construction, the

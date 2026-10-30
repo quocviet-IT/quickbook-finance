@@ -16,7 +16,6 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Tag,
   Typography,
 } from "antd";
@@ -96,6 +95,9 @@ import styles from "./workspace.module.css";
 import type { ReconLineView, ReconDetail, ReconStatement, ReconStatementLine } from "@/lib/services/bankrec";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import StandingTag from "../StandingTag";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 
 /** The statement dialog Banking uses, fetched when somebody opens it. */
 const ImportStatementModal = dynamic(() => import("../../ImportStatementModal"), { ssr: false });
@@ -104,6 +106,23 @@ import type { ConfirmedImport } from "../../ImportStatementModal";
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const STATEMENT_LINES_DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * The ledger lines table: Cleared (a checkbox under its heading), Date, Entry,
+ * Source (one tag), Reference, Amount and the Outstanding tag. Memo takes what
+ * is left, at least COLUMN.TEXT_MIN. The statement lines table's widths are
+ * STATEMENT_LINE_WIDTH (./statement-line-columns), whose figures its phone
+ * rules draw with.
+ */
+export const LEDGER_LINES_FIXED_WIDTHS = [
+  72,
+  COLUMN.DATE,
+  COLUMN.CODE,
+  COLUMN.STATUS,
+  COLUMN.CODE,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+] as const;
 
 const IMPORT_INTRO =
   "Choose the statement for this reconciliation: a PDF, a CSV, or a Quicken or QuickBooks download (.ofx, .qfx, " +
@@ -867,10 +886,9 @@ export default function ReconcileWorkspaceClient({
             This statement shows money in and out the other way around; its amounts were reversed to pair them.
           </Typography.Paragraph>
         ) : null}
-        <Table<ReconStatementLine>
+        <DataTable<ReconStatementLine>
           className={writing ? `${styles.statementLines} ${styles.withAction}` : styles.statementLines}
           rowKey="lineNo"
-          size="small"
           pagination={
             (statement?.lines.length ?? 0) > 10
               ? clientTablePagination(
@@ -880,11 +898,11 @@ export default function ReconcileWorkspaceClient({
                 )
               : false
           }
-          dataSource={statement?.lines ?? []}
+          rows={statement?.lines ?? []}
           locale={{ emptyText: "No statement kept with this reconciliation" }}
           columns={[
             { title: "Date", dataIndex: "txnDate", width: SW.date, render: (value: string) => formatDate(value) },
-            { title: "Description", dataIndex: "description" },
+            flexColumn<ReconStatementLine>({ title: "Description", dataIndex: "description" }),
             {
               title: "Reference",
               dataIndex: "reference",
@@ -968,14 +986,15 @@ export default function ReconcileWorkspaceClient({
           </Space>
         ) : null}
       </Space>
-      <Table
+      <DataTable<ReconLineView>
         className={styles.ledgerLines}
         rowKey="journalLineId"
         loading={loading}
-        dataSource={lines}
+        rows={lines}
         columns={[
           {
             title: "Cleared",
+            width: LEDGER_LINES_FIXED_WIDTHS[0],
             render: (_, l) => (
               <input
                 type="checkbox"
@@ -985,15 +1004,26 @@ export default function ReconcileWorkspaceClient({
               />
             ),
           },
-          { title: "Date", dataIndex: "entryDate", render: (value: string) => formatDate(value) },
-          { title: "Entry", dataIndex: "entryNumber" },
-          { title: "Source", dataIndex: "sourceType", render: (source) => <Tag>{sourceLabel(source)}</Tag> },
-          { title: "Reference", dataIndex: "reference", render: (value: string | null) => value ?? "—" },
-          { title: "Memo", dataIndex: "memo" },
-          { title: "Amount", align: "right", render: (_, l) => money(l.signedMinor) },
+          { title: "Date", dataIndex: "entryDate", width: LEDGER_LINES_FIXED_WIDTHS[1], render: (value: string) => formatDate(value) },
+          { title: "Entry", dataIndex: "entryNumber", width: LEDGER_LINES_FIXED_WIDTHS[2] },
+          {
+            title: "Source",
+            dataIndex: "sourceType",
+            width: LEDGER_LINES_FIXED_WIDTHS[3],
+            render: (source) => <Tag>{sourceLabel(source)}</Tag>,
+          },
+          {
+            title: "Reference",
+            dataIndex: "reference",
+            width: LEDGER_LINES_FIXED_WIDTHS[4],
+            render: (value: string | null) => value ?? "—",
+          },
+          flexColumn<ReconLineView>({ title: "Memo", dataIndex: "memo" }),
+          { title: "Amount", align: "right", width: LEDGER_LINES_FIXED_WIDTHS[5], render: (_, l) => money(l.signedMinor) },
           {
             title: "",
             key: "outstanding",
+            width: LEDGER_LINES_FIXED_WIDTHS[6],
             render: (_, l) =>
               !l.cleared && outstanding.has(l.journalLineId) ? <Tag color="orange">Outstanding</Tag> : null,
           },

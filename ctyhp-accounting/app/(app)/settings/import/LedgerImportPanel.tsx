@@ -10,7 +10,6 @@ import {
   Radio,
   Space,
   Statistic,
-  Table,
   Upload,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
@@ -27,6 +26,9 @@ import {
 } from "@/lib/domain/wave-ledger";
 import type { ImportBatchRow } from "@/lib/services/ledger-import";
 import LedgerBatchList from "./LedgerBatchList";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import UnresolvedAccountsTable from "./UnresolvedAccountsTable";
 import CreateAccountFromImport from "./CreateAccountFromImport";
 import type { AccountRow } from "@/lib/db/types";
@@ -49,21 +51,24 @@ export interface LedgerImportPanelProps {
   accounts: AccountRow[];
 }
 
+/** Rows, Debit, Credit. Account takes what is left, at least COLUMN.TEXT_MIN. */
+export const LEDGER_SECTIONS_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.MONEY, COLUMN.MONEY] as const;
+
 function sectionColumns(money: (minor: number) => string) {
   return [
-    { title: "Account", dataIndex: "account" },
-    { title: "Rows", dataIndex: "rows", width: 80, align: "right" as const },
+    flexColumn<WaveLedgerSection>({ title: "Account", dataIndex: "account" }),
+    { title: "Rows", dataIndex: "rows", width: LEDGER_SECTIONS_FIXED_WIDTHS[0], align: "right" as const },
     {
       title: "Debit",
       dataIndex: "debitMinor",
-      width: 150,
+      width: LEDGER_SECTIONS_FIXED_WIDTHS[1],
       align: "right" as const,
       render: (value: number) => money(value),
     },
     {
       title: "Credit",
       dataIndex: "creditMinor",
-      width: 150,
+      width: LEDGER_SECTIONS_FIXED_WIDTHS[2],
       align: "right" as const,
       render: (value: number) => money(value),
     },
@@ -300,13 +305,12 @@ export default function LedgerImportPanel({
             />
           ) : null}
 
-          <Table<WaveLedgerSection>
+          <DataTable<WaveLedgerSection>
             style={{ marginTop: 12 }}
-            size="small"
             rowKey="account"
             pagination={false}
             scroll={{ y: 320 }}
-            dataSource={parse.sections}
+            rows={parse.sections}
             columns={sectionColumns(money)}
           />
         </Card>

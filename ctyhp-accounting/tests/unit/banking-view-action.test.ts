@@ -20,8 +20,10 @@ const mocks = vi.hoisted(() => ({
   listBankRecodes: vi.fn(),
   codingSuggestions: vi.fn(),
   loanSuggestions: vi.fn(),
+  headers: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClient }));
 vi.mock("@/lib/auth", () => ({ getUserRole: vi.fn(), canWrite: vi.fn(), getSessionUser: vi.fn() }));
 vi.mock("@/lib/services/banking", () => ({
@@ -42,6 +44,8 @@ vi.mock("@/lib/services/bank-feeds", () => ({
 }));
 
 import { getBankingHintsAction, getBankingViewAction } from "@/app/(app)/banking/actions";
+import { openingBankAccountId, readOpeningBankingView } from "@/app/(app)/banking/banking-view";
+import { isServerActionRender } from "@/lib/services/request-kind";
 
 const sb = { name: "company client" };
 
@@ -112,8 +116,9 @@ describe("the banking screen asks for its lines first and says it is loading", (
   const client = readFileSync(join(process.cwd(), "app/(app)/banking/BankingClient.tsx"), "utf8");
 
   it("dispatches the view before the hints, so the lines are first in Next's queue", () => {
-    const view = client.indexOf("getBankingViewAction(accountFilter)");
-    const hints = client.indexOf("getBankingHintsAction(accountFilter)");
+    const reload = client.slice(client.indexOf("const reload = useCallback("));
+    const view = reload.indexOf("getBankingViewAction(accountFilter)");
+    const hints = reload.indexOf("loadHints(accountFilter)");
     expect(view).toBeGreaterThan(-1);
     expect(hints).toBeGreaterThan(view);
   });
@@ -123,7 +128,7 @@ describe("the banking screen asks for its lines first and says it is loading", (
     // React runs a child's effects before its parent's, so a useEffect here put
     // both registers ahead of the lines in Next's queue (8 actions measured,
     // the lines sixth). Every layout effect runs before any passive one.
-    expect(client).toMatch(/useLayoutEffect\(\(\) => \{[\s\S]{0,400}?reload\(\);/);
+    expect(client).toMatch(/useLayoutEffect\(\(\) => \{[\s\S]{0,600}?reload\(\);/);
     expect(client).not.toMatch(/useEffect\(\(\) => \{[\s\S]{0,200}?reload\(\);\s*\}, \[reload\]\)/);
   });
 
@@ -142,6 +147,63 @@ describe("the banking screen asks for its lines first and says it is loading", (
 
   it("starts in the loading state when there is an account to load, not as an empty table", () => {
     expect(client).not.toMatch(/const \[loading, setLoading\] = useState\(false\)/);
-    expect(client).toMatch(/const \[loading, setLoading\] = useState\(selectedId !== undefined\)/);
+    expect(client).toMatch(/const \[loading, setLoading\] = useState\(selectedId !== undefined && opening === null\)/);
+  });
+});
+
+describe("the page reads the lines of the account Banking opens on (2.91)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.listBankTransactions.mockResolvedValue([{ id: "t1" }]);
+    mocks.listSuggestions.mockResolvedValue([]);
+    mocks.listBankTransactionPostings.mockResolvedValue([]);
+    mocks.listBankRecodes.mockResolvedValue([]);
+  });
+
+  it("opens on the account in the address when it is one of the company's, otherwise the first", () => {
+    const accounts = [{ id: "a1" }, { id: "a2" }];
+    expect(openingBankAccountId(accounts, "a2")).toBe("a2");
+    expect(openingBankAccountId(accounts, "someone-elses")).toBe("a1");
+    expect(openingBankAccountId(accounts, null)).toBe("a1");
+    expect(openingBankAccountId([], "a1")).toBeNull();
+  });
+
+  it("reads that account's lines with the page's client, and nothing when there is no account", async () => {
+    const opening = await readOpeningBankingView(sb as never, [{ id: "a1" }, { id: "a2" }], "a2");
+    expect(mocks.listBankTransactions).toHaveBeenCalledWith(sb, "a2");
+    expect(opening?.bankAccountId).toBe("a2");
+    expect(opening?.view.transactions).toEqual({ ok: true, data: [{ id: "t1" }] });
+    expect(await readOpeningBankingView(sb as never, [], null)).toBeNull();
+  });
+
+  it("is read beside the page's other reads and handed to the screen", () => {
+    const page = readFileSync(join(process.cwd(), "app/(app)/banking/page.tsx"), "utf8");
+    expect(page).toMatch(/bankAccountsRead\.then\(\(list\) => readOpeningBankingView\(sb, list, params\.account \?\? null\)\)/);
+    expect(page).toContain("openingView={openingView}");
+  });
+
+  it("is not read again when the page is drawn in answer to a save", async () => {
+    // Eighteen of this screen's actions revalidate /banking, and each answer
+    // carries the page drawn again; the screen keeps its own lines.
+    const page = readFileSync(join(process.cwd(), "app/(app)/banking/page.tsx"), "utf8");
+    expect(page).toContain("const afterSave = await isServerActionRender();");
+    expect(page).toMatch(/afterSave \? null : bankAccountsRead\.then/);
+    const reconcile = readFileSync(join(process.cwd(), "app/(app)/banking/reconcile/page.tsx"), "utf8");
+    expect(reconcile).toContain("const afterSave = await isServerActionRender();");
+    expect(reconcile).toMatch(/afterSave\s*\?\s*null\s*:\s*Promise\.all\(\[banksRead, contextRead\]\)/);
+
+    mocks.headers.mockResolvedValue(new Headers({ "Next-Action": "abc123" }));
+    expect(await isServerActionRender()).toBe(true);
+    mocks.headers.mockResolvedValue(new Headers({ rsc: "1" }));
+    expect(await isServerActionRender()).toBe(false);
+  });
+
+  it("draws the first paint from it, then asks only for the suggestions", () => {
+    const client = readFileSync(join(process.cwd(), "app/(app)/banking/BankingClient.tsx"), "utf8");
+    // Taken whole, and only for the account the screen opened on.
+    expect(client).toMatch(/openingView\.bankAccountId === selectedId && completeView\(openingView\.view\)/);
+    expect(client).toMatch(/useState<BankTransactionRow\[\]>\(\(\) => opening\?\.transactions\.data \?\? \[\]\)/);
+    // The first layout effect skips the read the page already did, but not the hints.
+    expect(client).toMatch(/if \(already\) \{[\s\S]{0,120}?loadHints\(selectedId \?\? null\);\s*return;/);
   });
 });

@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table } from "antd";
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import StatusTag from "@/components/ui/StatusTag";
 import { APPLIED_LABELS } from "@/lib/domain/status-label";
 import FilterBar from "@/components/ui/FilterBar";
@@ -34,6 +36,18 @@ interface LineForm {
   amount?: number;
 }
 
+/** An open document the memo can be applied to. */
+type OpenBill = { id: string; bill_number: string; balance_due_minor: number };
+
+/** The Apply dialog is Ant Design's default width, 520; its body, where the table sits, is 48px less. */
+export const VENDOR_CREDIT_APPLY_MODAL_WIDTH = 520;
+
+/**
+ * Balance and Apply (a number input). The bill number takes what is left, at
+ * least COLUMN.TEXT_MIN.
+ */
+export const VENDOR_CREDIT_APPLY_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.PICKER] as const;
+
 export default function VendorCreditsClient({
   canWrite,
   vendors,
@@ -50,7 +64,7 @@ export default function VendorCreditsClient({
   const [lines, setLines] = useState<LineForm[]>([{}]);
   const [applyFor, setApplyFor] = useState<VendorCreditRow | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
-  const [openBills, setOpenBills] = useState<{ id: string; bill_number: string; balance_due_minor: number }[]>([]);
+  const [openBills, setOpenBills] = useState<OpenBill[]>([]);
   const [allocs, setAllocs] = useState<Record<string, number>>({});
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CreditStatus>("all");
@@ -325,6 +339,7 @@ export default function VendorCreditsClient({
       <Modal
         open={!!applyFor}
         title={`Apply ${applyFor?.vendor_credit_number ?? ""}`}
+        width={VENDOR_CREDIT_APPLY_MODAL_WIDTH}
         onCancel={() => setApplyFor(null)}
         onOk={submitApply}
         confirmLoading={applyBusy}
@@ -333,15 +348,16 @@ export default function VendorCreditsClient({
         <p>
           Remaining: {applyFor ? fmt(applyFor.balance_remaining_minor) : ""}
         </p>
-        <Table
+        <DataTable<OpenBill>
           rowKey="id"
           pagination={false}
-          dataSource={openBills}
+          rows={openBills}
           columns={[
-            { title: "Bill", dataIndex: "bill_number" },
-            { title: "Balance", align: "right", render: (_, r) => fmt(r.balance_due_minor) },
+            flexColumn<OpenBill>({ title: "Bill", dataIndex: "bill_number" }),
+            { title: "Balance", align: "right", width: VENDOR_CREDIT_APPLY_FIXED_WIDTHS[0], render: (_, r) => fmt(r.balance_due_minor) },
             {
               title: "Apply",
+              width: VENDOR_CREDIT_APPLY_FIXED_WIDTHS[1],
               render: (_, r) => (
                 <InputNumber
                   min={0}

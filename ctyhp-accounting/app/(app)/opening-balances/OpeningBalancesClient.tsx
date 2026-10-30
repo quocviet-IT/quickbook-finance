@@ -1,12 +1,14 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
-import { App, Button, DatePicker, InputNumber, Select, Space, Table, Tooltip, Typography } from "antd";
+import { App, Button, DatePicker, InputNumber, Select, Space, Tooltip, Typography } from "antd";
 import { CheckCircleFilled, ClockCircleOutlined, InfoCircleFilled, InfoCircleOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
 import { toMinor } from "@/lib/domain/money";
 import { formatMoney } from "@/lib/format";
 import { reviewOpeningDraft, type OpeningDraftReview } from "@/lib/domain/opening-balances";
+import DataTable from "@/components/ui/DataTable";
 import FormActions from "@/components/ui/FormActions";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { postOpeningBalancesAction } from "./actions";
 
 interface Account {
@@ -26,6 +28,12 @@ interface Row {
   debit?: number;
   credit?: number;
 }
+
+/**
+ * Line, Debit and Credit (a number input each). Account is a select, so it
+ * takes what is left, at least COLUMN.RICH_MIN.
+ */
+export const OPENING_BALANCES_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.PICKER, COLUMN.PICKER] as const;
 
 const CONDITIONS_ID = "opening-balances-conditions";
 
@@ -86,18 +94,20 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
         onChange={setAsOf}
         style={{ width: 220 }}
       />
-      <Table
+      <DataTable<Row>
         rowKey="key"
         pagination={false}
-        dataSource={rows}
+        rows={rows}
         columns={[
           {
             title: "Line",
-            width: 64,
+            width: OPENING_BALANCES_FIXED_WIDTHS[0],
             render: (_, _r, index) => <Typography.Text type="secondary">{index + 1}</Typography.Text>,
           },
           {
             title: "Account",
+            // Elastic, and not cut: it holds a select.
+            minWidth: COLUMN.RICH_MIN,
             render: (_, r) => (
               <Select
                 showSearch
@@ -112,6 +122,7 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
           },
           {
             title: "Debit",
+            width: OPENING_BALANCES_FIXED_WIDTHS[1],
             align: "right",
             render: (_, r) => (
               <InputNumber
@@ -125,6 +136,7 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
           },
           {
             title: "Credit",
+            width: OPENING_BALANCES_FIXED_WIDTHS[2],
             align: "right",
             render: (_, r) => (
               <InputNumber

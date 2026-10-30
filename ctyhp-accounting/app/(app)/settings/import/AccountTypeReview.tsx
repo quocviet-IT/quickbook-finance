@@ -1,8 +1,18 @@
 "use client";
 import { plural, pluralWord } from "@/lib/format";
-import { Alert, Select, Space, Table, Tag, Typography } from "antd";
+import { Alert, Select, Space, Tag, Typography } from "antd";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABEL, type AccountType } from "@/lib/domain/accounts";
 import type { AccountTypeReading } from "@/lib/domain/account-type-readings";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
+
+/**
+ * Accounts, Read as. "In your file" takes what is left, at least
+ * COLUMN.TEXT_MIN. Read as holds a 220px picker and the "Yours" tag, so it has
+ * a width of its own, no token being wide enough for a picker with a search box.
+ */
+export const ACCOUNT_TYPE_REVIEW_FIXED_WIDTHS = [COLUMN.QTY, 320] as const;
 
 export interface AccountTypeReviewProps {
   readings: AccountTypeReading[];
@@ -43,13 +53,12 @@ export default function AccountTypeReview({ readings, onChange }: AccountTypeRev
             : "Each word in your file's type column, and what it was taken to mean. Change any of them — this is the last point at which it costs nothing."
         }
       />
-      <Table<AccountTypeReading>
-        size="small"
+      <DataTable<AccountTypeReading>
         rowKey="source"
         pagination={false}
-        dataSource={readings}
+        rows={readings}
         columns={[
-          {
+          flexColumn<AccountTypeReading>({
             title: "In your file",
             dataIndex: "source",
             render: (source: string, row) => (
@@ -62,12 +71,12 @@ export default function AccountTypeReview({ readings, onChange }: AccountTypeRev
                 ) : null}
               </Space>
             ),
-          },
-          { title: "Accounts", dataIndex: "rows", width: 90, align: "right" },
+          }),
+          { title: "Accounts", dataIndex: "rows", width: ACCOUNT_TYPE_REVIEW_FIXED_WIDTHS[0], align: "right" },
           {
             title: "Read as",
             key: "type",
-            width: 320,
+            width: ACCOUNT_TYPE_REVIEW_FIXED_WIDTHS[1],
             render: (_, row) => (
               <Space>
                 <Select

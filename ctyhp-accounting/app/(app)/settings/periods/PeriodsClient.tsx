@@ -3,7 +3,7 @@ import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDate, plural } from "@/lib/format";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, App, Button, Card, Input, InputNumber, Space, Table, Tag } from "antd";
+import { Alert, App, Button, Card, Input, InputNumber, Space, Tag } from "antd";
 import {
   listPeriodsAction,
   generatePeriodsAction,
@@ -13,7 +13,21 @@ import {
 } from "./actions";
 import StatusTag from "@/components/ui/StatusTag";
 import TableEmpty from "@/components/ui/TableEmpty";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import type { AccountingPeriodRow } from "@/lib/db/types";
+
+/**
+ * Start, End, Status, Close/Reopen. Period (the month's name) takes what is
+ * left, at least COLUMN.TEXT_MIN.
+ */
+export const PERIODS_FIXED_WIDTHS = [
+  COLUMN.DATE,
+  COLUMN.DATE,
+  COLUMN.STATUS,
+  COLUMN.ACTION * 2,
+] as const;
 
 export default function PeriodsClient({
   canGenerate,
@@ -190,10 +204,10 @@ export default function PeriodsClient({
           </Button>
         )}
       </Space>
-      <Table<AccountingPeriodRow>
+      <DataTable<AccountingPeriodRow>
         rowKey="id"
         loading={loading}
-        dataSource={rows}
+        rows={rows}
         pagination={false}
         locale={{
           emptyText: loadError ? (
@@ -216,16 +230,18 @@ export default function PeriodsClient({
           ),
         }}
         columns={[
-          { title: "Period", dataIndex: "label" },
-          { title: "Start", dataIndex: "period_start", render: (value: string) => formatDate(value) },
-          { title: "End", dataIndex: "period_end", render: (value: string) => formatDate(value) },
+          flexColumn<AccountingPeriodRow>({ title: "Period", dataIndex: "label" }),
+          { title: "Start", dataIndex: "period_start", width: PERIODS_FIXED_WIDTHS[0], render: (value: string) => formatDate(value) },
+          { title: "End", dataIndex: "period_end", width: PERIODS_FIXED_WIDTHS[1], render: (value: string) => formatDate(value) },
           {
             title: "Status",
             dataIndex: "status",
+            width: PERIODS_FIXED_WIDTHS[2],
             render: (s: string) => <StatusTag status={s} />,
           },
           {
             title: "",
+            width: PERIODS_FIXED_WIDTHS[3],
             render: (_, r) =>
               r.status === "open" ? (
                 canClose ? (

@@ -1,15 +1,32 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, App, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Space, Switch, Tag, Tooltip, Typography } from "antd";
 import type { AppRole, PermissionRow, RolePermissionRow } from "@/lib/db/types";
 import { emptyGrants, minRoleNote, roleMeets } from "@/lib/domain/access";
 import { APP_ROLES } from "@/lib/domain/schemas";
 import { setRolePermissionAction } from "./actions";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 
 // Columns follow the one ordered role list, so a role added later cannot be
 // missing a column here while being present everywhere else.
 const ROLES: AppRole[] = [...APP_ROLES];
+
+/**
+ * Area, Control (shown only while some permission is not enforced), then one
+ * column per role. Permission takes what is left, at least COLUMN.TEXT_MIN.
+ *
+ * The roles are the fixed list above, four of them, so this is a designed grid
+ * and fits its box like any other table: the rows are what grow with data. The
+ * widest case, with Control showing, is the one measured.
+ */
+export const PERMISSION_MATRIX_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.STATUS,
+  ...APP_ROLES.map(() => COLUMN.CODE),
+] as const;
 
 interface Row extends PermissionRow {
   allowed: Record<AppRole, boolean>;
@@ -69,13 +86,12 @@ export default function PermissionMatrixClient({
             : "Each permission is checked before its action runs. A greyed-out switch is one that role cannot use: bookkeeping actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin."
         }
       />
-      <Table<Row>
+      <DataTable<Row>
         rowKey="key"
-        dataSource={rows}
+        rows={rows}
         pagination={false}
-        scroll={{ x: "max-content" }}
         columns={[
-          {
+          flexColumn<Row>({
             title: "Permission",
             dataIndex: "label",
             render: (v: string, r) => (
@@ -90,21 +106,23 @@ export default function PermissionMatrixClient({
                 <Typography.Text strong>{v}</Typography.Text>
               </Tooltip>
             ),
-          },
-          { title: "Area", dataIndex: "category" },
+          }),
+          { title: "Area", dataIndex: "category", width: PERMISSION_MATRIX_FIXED_WIDTHS[0] },
           ...(advisory
             ? [
                 {
                   title: "Control",
                   dataIndex: "is_enforced",
+                  width: PERMISSION_MATRIX_FIXED_WIDTHS[1],
                   render: (v: boolean) =>
                     v ? <Tag color="green">Enforced</Tag> : <Tag color="default">Not enforced</Tag>,
                 },
               ]
             : []),
-          ...ROLES.map((role) => ({
+          ...ROLES.map((role, i) => ({
             title: role.charAt(0).toUpperCase() + role.slice(1),
             key: role,
+            width: PERMISSION_MATRIX_FIXED_WIDTHS[2 + i],
             align: "center" as const,
             render: (_: unknown, r: Row) => {
               // Below the permission's least role a grant would change nothing,

@@ -1,7 +1,7 @@
 "use client";
 import { sourceLabel } from "@/lib/domain/entry-detail";
 import { useCallback, useState, type Key } from "react";
-import { Select, Table, Tag } from "antd";
+import { Select, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
 import SimpleReport, { reportPagination } from "@/components/reports/SimpleReport";
@@ -36,6 +36,9 @@ const PAGE_SIZE = 50;
 
 /** "Opening balance", the longest source, as a tag on one line. */
 const SOURCE_WIDTH = 132;
+
+/** An opened entry's lines: Debit and Credit. Account takes what is left, at least COLUMN.TEXT_MIN. */
+export const JOURNAL_REPORT_LINES_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.MONEY] as const;
 
 /** A description cut to its column, whole in a tooltip that wraps. */
 const describe = longTextColumn().render;
@@ -110,15 +113,18 @@ export default function JournalReportClient({ companyName, presets, baseCurrency
             expandedRowKeys,
             onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys]),
             expandedRowRender: (e) => (
-              <Table
-                size="small"
+              <DataTable<JournalEntrySummary["lines"][number]>
                 rowKey={(_, i) => String(i)}
                 pagination={false}
-                dataSource={e.lines}
+                rows={e.lines}
                 columns={[
-                  { title: "Account", render: (_, l) => `${l.accountCode} ${l.accountName}` },
-                  { title: "Debit", align: "right", render: (_, l) => fmt(l.debitMinor) },
-                  { title: "Credit", align: "right", render: (_, l) => fmt(l.creditMinor) },
+                  flexColumn<JournalEntrySummary["lines"][number]>({
+                    title: "Account",
+                    key: "account",
+                    render: (_, l) => `${l.accountCode} ${l.accountName}`,
+                  }),
+                  { title: "Debit", key: "debit", width: JOURNAL_REPORT_LINES_FIXED_WIDTHS[0], align: "right", render: (_, l) => fmt(l.debitMinor) },
+                  { title: "Credit", key: "credit", width: JOURNAL_REPORT_LINES_FIXED_WIDTHS[1], align: "right", render: (_, l) => fmt(l.creditMinor) },
                 ]}
               />
             ),

@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { App, Alert, Button, Card, Space, Table, Tag } from "antd";
+import { App, Alert, Button, Card, Space, Tag } from "antd";
+import ReportTable, { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import type { AfdaEvaluation } from "@/lib/services/aging";
 import {
   afdaEvaluationAction,
@@ -14,6 +17,12 @@ const BUCKET_LABEL: Record<string, string> = {
   d61_90: "61–90",
   d90_plus: "90+",
 };
+
+/**
+ * Open balance, Reserve rate, Reserve. The bucket's name takes what is left, at
+ * least COLUMN.TEXT_MIN; it is short, but it also carries the total's label.
+ */
+export const AFDA_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.QTY, COLUMN.MONEY] as const;
 
 /**
  * The estimate that sits beside the aging: how much of what is owed will not
@@ -85,21 +94,20 @@ export default function AllowanceForDoubtfulAccounts({
         ) : null
       }
     >
-      <Table
-        size="small"
+      <ReportTable<AfdaEvaluation["buckets"][number]>
         loading={loading}
-        pagination={false}
         rowKey="bucketKey"
-        dataSource={evaluation?.buckets ?? []}
+        rows={evaluation?.buckets ?? []}
         columns={[
-          {
+          flexColumn<AfdaEvaluation["buckets"][number]>({
             title: "Bucket",
             dataIndex: "bucketKey",
-            render: (key: string) => BUCKET_LABEL[key] ?? key,
-          },
+            render: (key: unknown) => BUCKET_LABEL[key as string] ?? (key as string),
+          }),
           {
             title: "Open balance",
             dataIndex: "balanceMinor",
+            width: AFDA_FIXED_WIDTHS[0],
             align: "right",
             render: (minor: number) => money(minor),
           },
@@ -107,28 +115,29 @@ export default function AllowanceForDoubtfulAccounts({
             title: "Reserve rate",
             dataIndex: "rateBps",
             align: "right",
-            width: 130,
+            width: AFDA_FIXED_WIDTHS[1],
             render: (bps: number) => `${(bps / 100).toFixed(bps % 100 === 0 ? 0 : 2)}%`,
           },
           {
             title: "Reserve",
             dataIndex: "requiredMinor",
+            width: AFDA_FIXED_WIDTHS[2],
             align: "right",
             render: (minor: number) => money(minor),
           },
         ]}
         summary={() =>
           evaluation ? (
-            <Table.Summary.Row>
-              <Table.Summary.Cell index={0}>
+            <SummaryRow>
+              <SummaryCell index={0}>
                 <b>Required allowance</b>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={1} align="right" />
-              <Table.Summary.Cell index={2} align="right" />
-              <Table.Summary.Cell index={3} align="right">
+              </SummaryCell>
+              <SummaryCell index={1} align="right" />
+              <SummaryCell index={2} align="right" />
+              <SummaryCell index={3} align="right">
                 <b>{money(evaluation.requiredMinor)}</b>
-              </Table.Summary.Cell>
-            </Table.Summary.Row>
+              </SummaryCell>
+            </SummaryRow>
           ) : null
         }
       />

@@ -1,11 +1,22 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, App, Button, Input, Modal, Space, Table, Tag, Tooltip } from "antd";
+import { Alert, App, Button, Input, Modal, Space, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
 import { useCompanyClock } from "@/components/CompanyClock";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDateInTimeZone, plural, pluralWord } from "@/lib/format";
 import { getStatementImportsAction, undoStatementImportAction } from "./actions";
+
+/**
+ * Rows, Still here, Imported, and the Review/Undo buttons. File and Into take
+ * what is left; File carries a link, a tag and a second line, so its floor is
+ * COLUMN.RICH_MIN, and Into (an account name) is COLUMN.TEXT_MIN. The buttons
+ * are Review and Undo side by side, 190px as before.
+ */
+export const BANK_IMPORT_LIST_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.QTY, COLUMN.DATE, 190] as const;
 
 export interface BankImportListProps {
   /** Null shows every bank account's imports, matching the review queue. */
@@ -80,17 +91,18 @@ export default function BankImportList({
           title="Could not check which of these imports were out of balance."
         />
       ) : null}
-      <Table<BankStatementImportRow>
-        size="small"
+      <DataTable<BankStatementImportRow>
         rowKey="id"
         pagination={false}
-        dataSource={rows}
+        rows={rows}
         loading={!loaded}
         locale={{ emptyText: loaded ? "No statement has been imported into this company yet." : "" }}
         columns={[
           {
             title: "File",
             dataIndex: "filename",
+            // Elastic, and not cut: it holds a link, a tag and a second line.
+            minWidth: COLUMN.RICH_MIN,
             // The file itself, kept when it was read (1.83); imports before then kept only its name.
             render: (filename: string, row) => {
               const name = row.statement_file_id ? (
@@ -117,28 +129,27 @@ export default function BankImportList({
               );
             },
           },
-          {
+          flexColumn<BankStatementImportRow>({
             title: "Into",
-            width: 240,
             render: (_, row) => `${row.account_code} — ${row.account_name}`,
-          },
-          { title: "Rows", dataIndex: "row_count", width: 80, align: "right" },
+          }),
+          { title: "Rows", dataIndex: "row_count", width: BANK_IMPORT_LIST_FIXED_WIDTHS[0], align: "right" },
           {
             title: "Still here",
             dataIndex: "lines_here",
-            width: 100,
+            width: BANK_IMPORT_LIST_FIXED_WIDTHS[1],
             align: "right",
           },
           {
             title: "Imported",
             dataIndex: "imported_at",
-            width: 120,
+            width: BANK_IMPORT_LIST_FIXED_WIDTHS[2],
             render: (value: string) => formatDateInTimeZone(value, timeZone),
           },
           {
             title: "",
             key: "undo",
-            width: 190,
+            width: BANK_IMPORT_LIST_FIXED_WIDTHS[3],
             align: "right",
             render: (_, row) => {
               if (row.status === "voided") {

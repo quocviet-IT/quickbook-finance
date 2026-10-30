@@ -1,6 +1,9 @@
 "use client";
-import { Segmented, Space, Table, Tag, Typography } from "antd";
+import { Segmented, Space, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
+import ReportTable, { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
+import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import {
   AGING_BUCKETS,
   agingSummaryGrid,
@@ -12,6 +15,21 @@ import { formatDate } from "@/lib/format";
 import type { AgingReportRow } from "@/lib/services/aging";
 
 export type AgingGrouping = "grid" | "party" | "document";
+
+/**
+ * The by-party list: the five aging buckets and Total. The party takes what is
+ * left, at least COLUMN.TEXT_MIN, with what it has overdue and its oldest due
+ * date under the name. With Overdue as a seventh amount column the name had
+ * 172px of 984 at 1280.
+ */
+export const AGING_PARTY_FIXED_WIDTHS = [
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+] as const;
 
 /**
  * The aging report by customer or vendor: one row each, a column per bucket,
@@ -50,6 +68,17 @@ export default function AgingByPartyTable({
 }) {
   const pivot = pivotAgingByParty(rows);
   const grid = agingSummaryGrid(pivot);
+  // Under the name rather than in a column of its own: an eighth amount
+  // column left the name no room at 1280, and under Total it broke in two.
+  const overdueLine = (overdueMinor: number, oldestDueDate: string | null) => {
+    if (overdueMinor <= 0) return oldestDueDate ? secondaryLine(`Oldest due ${formatDate(oldestDueDate)}`) : null;
+    const overdue = `${money(overdueMinor)} overdue`;
+    return (
+      <Typography.Text type="danger" style={{ display: "block", fontSize: 12 }}>
+        {oldestDueDate ? `${overdue} · oldest due ${formatDate(oldestDueDate)}` : overdue}
+      </Typography.Text>
+    );
+  };
 
   return (
     <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -74,13 +103,15 @@ export default function AgingByPartyTable({
               <Typography.Text type="secondary">As of {formatDate(asOf)}</Typography.Text>
             </div>
           </div>
-          <Table<AgingGridRow>
+          {/* A matrix: one column per customer or vendor, as many as the data has, so
+              the count cannot be designed to fit. Named in table-fit-contract.test.ts. */}
+          <DataTable<AgingGridRow>
+            fit={false}
             rowKey="key"
-            size="small"
             loading={loading}
             pagination={false}
-            dataSource={grid.rows}
-            locale={{ emptyText: emptyDescription }}
+            rows={grid.rows}
+            emptyTitle={emptyDescription}
             columns={[
               {
                 title: partyLabel,
@@ -123,72 +154,55 @@ export default function AgingByPartyTable({
           columns={documentColumns}
         />
       ) : (
-        <DataTable<PartyAgingRow>
+        <ReportTable<PartyAgingRow>
           rowKey="entityId"
           loading={loading}
-          dataSource={pivot.rows}
+          rows={pivot.rows}
           pagination={false}
           emptyTitle={emptyTitle}
           emptyDescription={emptyDescription}
           columns={[
-            {
+            flexColumn<PartyAgingRow>({
               title: partyLabel,
               dataIndex: "entityName",
-              render: (name: string, row) =>
-                row.oldestDueDate ? (
-                  <Space size="small">
-                    {name}
-                    <Tag color="red">Oldest due {formatDate(row.oldestDueDate)}</Tag>
-                  </Space>
-                ) : (
-                  name
-                ),
-            },
-            ...AGING_BUCKETS.map((bucket) => ({
+              render: (_: unknown, row: PartyAgingRow) => (
+                <>
+                  <span title={row.entityName}>{row.entityName}</span>
+                  {overdueLine(row.overdueMinor, row.oldestDueDate)}
+                </>
+              ),
+            }),
+            ...AGING_BUCKETS.map((bucket, index) => ({
               title: bucket.label,
               key: bucket.key,
-              width: 120,
+              width: AGING_PARTY_FIXED_WIDTHS[index],
               align: "right" as const,
               render: (_: unknown, row: PartyAgingRow) => money(row.buckets[bucket.key] ?? 0),
             })),
             {
-              title: "Overdue",
-              key: "overdue",
-              width: 130,
-              align: "right",
-              render: (_: unknown, row: PartyAgingRow) =>
-                row.overdueMinor > 0 ? (
-                  <Typography.Text type="danger">{money(row.overdueMinor)}</Typography.Text>
-                ) : (
-                  money(0)
-                ),
-            },
-            {
               title: "Total",
               key: "total",
-              width: 140,
+              width: AGING_PARTY_FIXED_WIDTHS[5],
               align: "right",
               render: (_: unknown, row: PartyAgingRow) => <b>{money(row.totalMinor)}</b>,
             },
           ]}
           summary={() =>
             pivot.rows.length === 0 ? null : (
-              <Table.Summary.Row>
-                <Table.Summary.Cell index={0}>
+              <SummaryRow>
+                <SummaryCell index={0}>
                   <b>Total</b>
-                </Table.Summary.Cell>
+                  {overdueLine(pivot.overdueMinor, null)}
+                </SummaryCell>
                 {AGING_BUCKETS.map((bucket, index) => (
-                  <Table.Summary.Cell key={bucket.key} index={index + 1} align="right">
+                  <SummaryCell key={bucket.key} index={index + 1} align="right">
                     <b>{money(pivot.bucketTotals[bucket.key] ?? 0)}</b>
-                  </Table.Summary.Cell>
+                  </SummaryCell>
                 ))}
-                <Table.Summary.Cell index={AGING_BUCKETS.length + 1} align="right">
-                  <b>{money(pivot.overdueMinor)}</b>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={AGING_BUCKETS.length + 2} align="right">
+                <SummaryCell index={AGING_BUCKETS.length + 1} align="right">
                   <b>{money(pivot.totalMinor)}</b>
-                </Table.Summary.Cell>
-              </Table.Summary.Row>
+                </SummaryCell>
+              </SummaryRow>
             )
           }
         />

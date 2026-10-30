@@ -8,7 +8,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
 } from "antd";
@@ -26,6 +25,9 @@ import {
   settleFromBankTransactionAction,
   type SettlementCandidatesView,
 } from "@/app/(app)/banking/actions";
+import DataTable from "@/components/ui/DataTable";
+import { flexColumn } from "@/components/ui/columns";
+import { COLUMN } from "@/lib/design/table-metrics";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 
 /** Ranked, but still carrying the customer or vendor name the service fetched. */
@@ -34,6 +36,21 @@ type RankedRow = RankedCandidate<SettlementCandidateRow>;
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const CANDIDATES_DEFAULT_PAGE_SIZE = 8;
+
+/** The dialog's width; its body, where the table sits, is 48px less. */
+export const SETTLE_FROM_BANK_MODAL_WIDTH = 860;
+
+/**
+ * Invoice or Bill (a number and, beside it, the "Exact amount" tag), Date,
+ * Balance, and Apply (a number input). Customer or Vendor takes what is left,
+ * at least COLUMN.TEXT_MIN.
+ */
+export const SETTLE_FROM_BANK_FIXED_WIDTHS = [
+  COLUMN.CODE + COLUMN.QTY,
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.PICKER,
+] as const;
 
 export interface SettleTarget {
   id: string;
@@ -158,7 +175,7 @@ export default function SettleFromBankModal({
       okText={direction === "receivable" ? "Record receipt" : "Record payment"}
       okButtonProps={{ disabled: !fits || loading }}
       confirmLoading={saving}
-      width={860}
+      width={SETTLE_FROM_BANK_MODAL_WIDTH}
       destroyOnHidden
     >
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -173,12 +190,11 @@ export default function SettleFromBankModal({
           }
         />
 
-        <Table<RankedRow>
+        <DataTable<RankedRow>
           rowKey={(row) => row.candidate.documentId}
-          size="small"
           loading={loading}
           pagination={clientTablePagination(pageSize, setPageSize, pageSizeOptionsFor(CANDIDATES_DEFAULT_PAGE_SIZE))}
-          dataSource={ranked}
+          rows={ranked}
           locale={{
             emptyText:
               direction === "receivable"
@@ -189,6 +205,7 @@ export default function SettleFromBankModal({
             {
               title: direction === "receivable" ? "Invoice" : "Bill",
               key: "document",
+              width: SETTLE_FROM_BANK_FIXED_WIDTHS[0],
               render: (_v: unknown, row: RankedRow) => (
                 <Space size={6}>
                   <span>{row.candidate.documentNumber ?? "—"}</span>
@@ -198,15 +215,15 @@ export default function SettleFromBankModal({
                 </Space>
               ),
             },
-            {
+            flexColumn<RankedRow>({
               title: direction === "receivable" ? "Customer" : "Vendor",
               key: "party",
               render: (_v: unknown, row: RankedRow) => row.candidate.partyName,
-            },
+            }),
             {
               title: "Date",
               key: "date",
-              width: 110,
+              width: SETTLE_FROM_BANK_FIXED_WIDTHS[1],
               render: (_v: unknown, row: RankedRow) =>
                 formatDate(row.candidate.documentDate),
             },
@@ -214,20 +231,20 @@ export default function SettleFromBankModal({
               title: "Balance",
               key: "balance",
               align: "right",
-              width: 140,
+              width: SETTLE_FROM_BANK_FIXED_WIDTHS[2],
               render: (_v: unknown, row: RankedRow) =>
                 fmt(row.candidate.balanceDueMinor),
             },
             {
               title: "Apply",
               key: "apply",
-              width: 160,
+              width: SETTLE_FROM_BANK_FIXED_WIDTHS[3],
               render: (_v: unknown, row: RankedRow) => (
                 <InputNumber
                   min={0}
                   max={row.candidate.balanceDueMinor / 10 ** target.decimals}
                   precision={target.decimals}
-                  style={{ width: 140 }}
+                  style={{ width: "100%" }}
                   value={alloc[row.candidate.documentId]}
                   onChange={(value) =>
                     setAlloc((prev) => ({

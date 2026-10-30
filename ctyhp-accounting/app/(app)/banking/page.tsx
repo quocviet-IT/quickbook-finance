@@ -8,6 +8,8 @@ import { plaidConfiguration } from "@/lib/services/plaid";
 import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import BankingClient from "./BankingClient";
+import { isServerActionRender } from "@/lib/services/request-kind";
+import { readOpeningBankingView } from "./banking-view";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +26,13 @@ export default async function BankingPage({
 }) {
   const params = await searchParams;
   const sb = await createSupabaseServerClient();
+  // A save on this screen renders the page again in its answer; the screen
+  // keeps its own lines, so they are not read again for it.
+  const afterSave = await isServerActionRender();
+  const bankAccountsRead = listBankAccounts(sb);
   const [
     bankAccounts,
+    openingView,
     bankConnections,
     accounts,
     currencies,
@@ -34,7 +41,12 @@ export default async function BankingPage({
     canManageDocuments,
     canGovernDocuments,
   ] = await Promise.all([
-    listBankAccounts(sb),
+    bankAccountsRead,
+    // The lines of the account the screen opens on, read here rather than by
+    // the screen once it has loaded (2.91): from the browser that was a wait
+    // for the page's code, then a Server Action queued behind it, and the
+    // table sat empty under a spinner for four to six seconds.
+    afterSave ? null : bankAccountsRead.then((list) => readOpeningBankingView(sb, list, params.account ?? null)),
     listBankConnections(sb),
     listAccounts(sb),
     listCurrencies(sb),
@@ -65,6 +77,7 @@ export default async function BankingPage({
         bankAccounts={bankAccounts}
         accounts={accounts}
         initialAccountId={params.account ?? null}
+        openingView={openingView}
         initialQueueStatus={params.queue === "unmatched" ? "unmatched" : null}
         initialFocusId={params.focus ?? null}
         initialImport={params.import === "1"}

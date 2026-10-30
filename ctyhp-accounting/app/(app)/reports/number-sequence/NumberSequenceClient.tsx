@@ -12,12 +12,12 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Tag,
   Typography,
 } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
+import { flexColumn } from "@/components/ui/columns";
 import ReportBar from "@/components/reports/ReportBar";
 import {
   describeSequenceIntegrity,
@@ -38,6 +38,21 @@ import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate, plural, pluralWord } from "@/lib/format";
 
 type View = "breaks" | "all";
+
+/**
+ * Prefix, Issued, On file, Explained gaps, Unaccounted for, Next number. The
+ * document type takes what is left, at least COLUMN.TEXT_MIN. Prefix and Next
+ * number were 100px and 160px and now share the code width; the counts share
+ * the quantity width.
+ */
+export const SEQUENCE_OVERVIEW_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.CODE,
+  COLUMN.CODE,
+] as const;
 
 const STATE_COLOR: Record<SequenceRow["state"], string> = {
   present: "default",
@@ -176,40 +191,40 @@ export default function NumberSequenceClient({
       )}
 
       <Card size="small" title="All document types">
-        <Table<SequenceAudit>
+        <DataTable<SequenceAudit>
           rowKey={(row) => row.definition.sequence_key}
           size="small"
           loading={overviewLoading}
-          dataSource={overview ?? []}
+          rows={overview ?? []}
           pagination={false}
           onRow={(row) => ({
             onClick: () => setSequenceKey(row.definition.sequence_key),
             style: { cursor: "pointer" },
           })}
           columns={[
-            { title: "Document type", render: (_: unknown, row) => row.definition.label },
-            { title: "Prefix", width: 100, render: (_: unknown, row) => row.definition.prefix },
+            flexColumn<SequenceAudit>({ title: "Document type", key: "type", render: (_: unknown, row: SequenceAudit) => row.definition.label }),
+            { title: "Prefix", width: SEQUENCE_OVERVIEW_FIXED_WIDTHS[0], render: (_: unknown, row) => row.definition.prefix },
             {
               title: "Issued",
-              width: 100,
+              width: SEQUENCE_OVERVIEW_FIXED_WIDTHS[1],
               align: "right",
               render: (_: unknown, row) => row.summary.allocated,
             },
             {
               title: "On file",
-              width: 100,
+              width: SEQUENCE_OVERVIEW_FIXED_WIDTHS[2],
               align: "right",
               render: (_: unknown, row) => row.summary.present,
             },
             {
               title: "Explained gaps",
-              width: 140,
+              width: SEQUENCE_OVERVIEW_FIXED_WIDTHS[3],
               align: "right",
               render: (_: unknown, row) => row.summary.explained,
             },
             {
               title: "Unaccounted for",
-              width: 150,
+              width: SEQUENCE_OVERVIEW_FIXED_WIDTHS[4],
               align: "right",
               render: (_: unknown, row) => {
                 const open = row.summary.unexplained + row.summary.beyondSequence;
@@ -222,7 +237,7 @@ export default function NumberSequenceClient({
             },
             {
               title: "Next number",
-              width: 160,
+              width: SEQUENCE_OVERVIEW_FIXED_WIDTHS[5],
               render: (_: unknown, row) => row.summary.nextNumber,
             },
           ]}
