@@ -45,6 +45,8 @@ interface DashboardClientProps {
   baseDecimals: number;
   accountingBasis: string;
   timeZone: string;
+  /** Needs attention (2.88), streamed in by the page. */
+  needs?: ReactNode;
 }
 
 type TrendTone = "positive" | "negative" | "neutral";
@@ -56,6 +58,7 @@ export default function DashboardClient({
   baseDecimals,
   accountingBasis,
   timeZone,
+  needs = null,
 }: DashboardClientProps) {
   const [range, setRange] = useState<DashboardRange>(6);
   const { metrics, periodComparison, cashMovement, inventory, operatingPulse } = analytics;
@@ -122,6 +125,8 @@ export default function DashboardClient({
           Dashboard trends now show {range} months.
         </span>
       </section>
+
+      {needs}
 
       <section aria-labelledby="executive-overview-title">
         <div className="dashboard-section-heading">

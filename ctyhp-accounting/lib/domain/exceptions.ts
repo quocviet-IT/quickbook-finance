@@ -159,7 +159,7 @@ export interface WrongWayRow {
 }
 
 /** Debit-positive, so a credit balance reads negative. */
-function signedBalance(account: ExceptionAccount): number {
+export function signedBalance(account: ExceptionAccount): number {
   return account.debitBase - account.creditBase;
 }
 

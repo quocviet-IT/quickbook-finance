@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.88",
+    date: "2026-10-30",
+    headline: "The Dashboard opens with what needs you: lines to code, reconciliations, holding accounts and future dates.",
+    changes: [
+      {
+        kind: "added",
+        title: "Needs attention on the Dashboard",
+        detail:
+          "Under the Dashboard's filters, Needs attention counts what is waiting and links straight to it: bank lines waiting to be coded, bank accounts with a balance that were never reconciled, reconciliations that no longer agree with the books since they were signed off, money still in Uncategorized or another holding account, and entries dated in the future. The verdicts are the Exception report's own, so the two never disagree. When everything is clear it says so; a check that could not run is named, never counted as clear. It loads after the rest of the Dashboard, so the figures above it do not wait for it.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "2.87",
     date: "2026-10-30",
     headline: "Customer statements say how to pay, and Reconcile from files no longer guesses which way round a file's dates go.",
