@@ -59,7 +59,14 @@ import type {
   FixedAssetView,
   ImportFixedAssetRow,
 } from "@/lib/services/fixed-assets";
-import { calculateAssetDisposal } from "@/lib/domain/fixed-assets";
+import {
+  calculateAssetDisposal,
+  BOOK_DEPRECIATION_NOTE,
+  decliningBalancePreview,
+  DEPRECIATION_METHOD_OPTIONS,
+  DEPRECIATION_METHODS,
+  depreciates,
+} from "@/lib/domain/fixed-assets";
 import { parseCsv } from "@/lib/csv";
 import { formatDate, formatMoney, plural, toMinorUnits } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
@@ -246,6 +253,9 @@ export default function FixedAssetsClient({
   const [form] = Form.useForm<AssetFormValues>();
   const [disposalForm] = Form.useForm<DisposalFormValues>();
   const depreciationMethod = Form.useWatch("depreciation_method", form) ?? "straight_line";
+  const watchedCost = Form.useWatch("cost", form);
+  const watchedSalvage = Form.useWatch("salvage_value", form);
+  const watchedLife = Form.useWatch("useful_life_months", form);
   const disposalDate = Form.useWatch("disposal_date", disposalForm);
   const disposalSalePrice = Form.useWatch("sale_price", disposalForm) ?? 0;
   const disposalCost = Form.useWatch("disposal_cost", disposalForm) ?? 0;
@@ -280,6 +290,11 @@ export default function FixedAssetsClient({
 
   const money = (value: number) => formatMoney(value, currency.code, currency.decimal_places);
   const toMinor = (value: number) => toMinorUnits(value, currency.decimal_places);
+  // What a declining-balance schedule will charge, worked out as the database will (0182).
+  const decliningPreview =
+    depreciationMethod === "declining_balance" && typeof watchedCost === "number" && typeof watchedLife === "number"
+      ? decliningBalancePreview(toMinor(watchedCost), toMinor(Number(watchedSalvage ?? 0)), watchedLife, money)
+      : null;
   const toMajor = (value: number) => value / 10 ** currency.decimal_places;
 
   const filteredAssets = useMemo(() => {
@@ -425,15 +440,15 @@ export default function FixedAssetsClient({
       cost_minor: toMinor(values.cost),
       salvage_value_minor: toMinor(values.salvage_value ?? 0),
       useful_life_months:
-        values.depreciation_method === "straight_line" ? values.useful_life_months : null,
+        depreciates(values.depreciation_method) ? values.useful_life_months : null,
       depreciation_method: values.depreciation_method,
       asset_account_id: values.asset_account_id,
       accumulated_depreciation_account_id:
-        values.depreciation_method === "straight_line"
+        depreciates(values.depreciation_method)
           ? values.accumulated_depreciation_account_id
           : null,
       depreciation_expense_account_id:
-        values.depreciation_method === "straight_line"
+        depreciates(values.depreciation_method)
           ? values.depreciation_expense_account_id
           : null,
       vendor_id: values.vendor_id,
@@ -540,21 +555,21 @@ export default function FixedAssetsClient({
         !Number.isFinite(salvage) ||
         salvage < 0 ||
         salvage > cost ||
-        (method === "straight_line" && salvage === cost)
+        (depreciates(method) && salvage === cost)
       ) {
         rowErrors.push(
-          method === "straight_line"
+          depreciates(method)
             ? "salvage_value must be non-negative and below cost"
             : "salvage_value must be non-negative and no greater than cost",
         );
       }
-      if (!["straight_line", "none"].includes(method)) {
-        rowErrors.push("depreciation_method must be straight_line or none");
+      if (!DEPRECIATION_METHODS.includes(method)) {
+        rowErrors.push("depreciation_method must be straight_line, declining_balance or none");
       }
       if (!assetAccount || assetAccount.account_type !== "fixed_asset") {
         rowErrors.push("asset_account_code was not found as a fixed-asset account");
       }
-      if (method === "straight_line") {
+      if (depreciates(method)) {
         if (!Number.isInteger(usefulLife) || usefulLife < 1) {
           rowErrors.push("useful_life_months must be a positive whole number");
         }
@@ -598,13 +613,13 @@ export default function FixedAssetsClient({
         currency_code: currency.code,
         cost_minor: toMinor(cost),
         salvage_value_minor: toMinor(salvage),
-        useful_life_months: method === "straight_line" ? usefulLife : null,
+        useful_life_months: depreciates(method) ? usefulLife : null,
         depreciation_method: method,
         asset_account_id: assetAccount!.id,
         accumulated_depreciation_account_id:
-          method === "straight_line" ? accumulatedAccount!.id : null,
+          depreciates(method) ? accumulatedAccount!.id : null,
         depreciation_expense_account_id:
-          method === "straight_line" ? depreciationExpenseAccount!.id : null,
+          depreciates(method) ? depreciationExpenseAccount!.id : null,
         vendor_id: vendor?.id ?? null,
         opening_accumulated_depreciation_minor: toMinor(opening),
         opening_as_of_date: record.opening_as_of_date || null,
@@ -1102,11 +1117,11 @@ export default function FixedAssetsClient({
                         "depreciation_method",
                       ) as FixedAssetMethod;
                       return value > 0 &&
-                        (method === "straight_line" ? value > salvage : value >= salvage)
+                        (depreciates(method) ? value > salvage : value >= salvage)
                         ? Promise.resolve()
                         : Promise.reject(
                             new Error(
-                              method === "straight_line"
+                              depreciates(method)
                                 ? "Cost must exceed salvage value"
                                 : "Cost cannot be below salvage value",
                             ),
@@ -1141,16 +1156,11 @@ export default function FixedAssetsClient({
                 label="Depreciation method"
                 rules={[{ required: true }]}
               >
-                <Select
-                  options={[
-                    { value: "straight_line", label: "Straight-line (monthly)" },
-                    { value: "none", label: "Not depreciated" },
-                  ]}
-                />
+                <Select options={DEPRECIATION_METHOD_OPTIONS} />
               </Form.Item>
             </Col>
           </Row>
-          {depreciationMethod === "straight_line" ? (
+          {depreciates(depreciationMethod) ? (
             <Row gutter={16}>
               <Col xs={24} md={8}>
                 <Form.Item
@@ -1209,7 +1219,7 @@ export default function FixedAssetsClient({
             type="info"
             showIcon
             message="Book depreciation"
-            description="Straight-line depreciation uses a full-month convention beginning in the in-service month. Registering an asset from a posted bill links the records without duplicating the acquisition journal."
+            description={decliningPreview ? <>{decliningPreview} {BOOK_DEPRECIATION_NOTE}</> : BOOK_DEPRECIATION_NOTE}
           />
         </Form>
       </Modal>

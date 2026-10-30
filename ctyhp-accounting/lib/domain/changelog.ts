@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.85",
+    date: "2026-10-30",
+    headline: "Fixed assets can be depreciated on a declining balance.",
+    changes: [
+      {
+        kind: "added",
+        title: "Declining balance depreciation",
+        detail:
+          "Fixed Assets offers Declining balance (200%, then straight-line) beside Straight-line. Each month it charges twice the straight-line rate on what is left of the cost, so an asset costs more in its first years, then switches to straight-line once that charges more, so it reaches its salvage value at the end of its useful life. Choosing it shows the first month's charge, the first year's, and when the last charge falls. The asset import takes declining_balance as a method too. Assets already registered keep their schedules.",
+        route: "/fixed-assets",
+      },
+    ],
+  },
+  {
     version: "2.81",
     date: "2026-10-30",
     headline: "Customer and vendor statements open with what was owed before the period, so a payment in the period counts once.",
