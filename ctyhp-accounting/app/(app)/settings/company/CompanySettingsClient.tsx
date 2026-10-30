@@ -216,20 +216,20 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
               >
                 <Input.TextArea rows={5} maxLength={4000} showCount />
               </Form.Item>
-              <Form.Item
-                name="pay_note"
-                label="How to pay"
-                extra="Printed at the foot of every invoice, under the totals."
-                style={{ width: "100%" }}
-              >
-                <Input.TextArea
-                  rows={3}
-                  maxLength={600}
-                  showCount
-                  placeholder="Bank transfer to Example Jewelry LLC, routing 000000000, account 0000000000. Checks payable to Example Jewelry LLC."
-                />
-              </Form.Item>
             </Space>
+            {/* Its own row, the width of the form: bank details read badly in a narrow box. */}
+            <Form.Item
+              name="pay_note"
+              label="How to pay"
+              extra="Printed at the foot of every invoice, under the totals."
+            >
+              <Input.TextArea
+                rows={3}
+                maxLength={600}
+                showCount
+                placeholder="Bank transfer to Example Jewelry LLC, routing 000000000, account 0000000000. Checks payable to Example Jewelry LLC."
+              />
+            </Form.Item>
             <FormActions>
               <Button type="primary" onClick={submit}>Save new version</Button>
               <Button onClick={() => setEditing(false)}>Cancel</Button>
