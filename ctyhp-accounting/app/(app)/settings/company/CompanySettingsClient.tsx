@@ -56,6 +56,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
       default_payment_terms_days: current?.default_payment_terms_days ?? 30,
       inventory_valuation_method: current?.inventory_valuation_method ?? "average_cost",
       inventory_policy_memo: current?.inventory_policy_memo ?? "",
+      pay_note: current?.pay_note ?? "",
     });
     setEditing(true);
   };
@@ -136,6 +137,16 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
               */}
               <div className="company-settings__policy">
                 <Typography.Text type="secondary" className="company-settings__policy-label">
+                  How to pay
+                </Typography.Text>
+                {current.pay_note ? (
+                  <Typography.Paragraph style={{ whiteSpace: "pre-line" }}>{current.pay_note}</Typography.Paragraph>
+                ) : (
+                  <Typography.Paragraph type="secondary">
+                    Not set. Invoices print no payment instructions until it is.
+                  </Typography.Paragraph>
+                )}
+                <Typography.Text type="secondary" className="company-settings__policy-label">
                   Inventory policy
                 </Typography.Text>
                 {current.inventory_policy_memo ? (
@@ -204,6 +215,19 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
                 style={{ width: "100%" }}
               >
                 <Input.TextArea rows={5} maxLength={4000} showCount />
+              </Form.Item>
+              <Form.Item
+                name="pay_note"
+                label="How to pay"
+                extra="Printed at the foot of every invoice, under the totals."
+                style={{ width: "100%" }}
+              >
+                <Input.TextArea
+                  rows={3}
+                  maxLength={600}
+                  showCount
+                  placeholder="Bank transfer to Example Jewelry LLC, routing 000000000, account 0000000000. Checks payable to Example Jewelry LLC."
+                />
               </Form.Item>
             </Space>
             <FormActions>

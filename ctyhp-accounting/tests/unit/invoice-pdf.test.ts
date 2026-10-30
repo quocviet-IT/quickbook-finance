@@ -105,6 +105,33 @@ function pdfText(bytes: Uint8Array): string {
   return new TextDecoder("latin1").decode(bytes);
 }
 
+describe("renderInvoicePdf, terms and how to pay (2.82)", () => {
+  const payNote = "Bank transfer to Example Jewelry LLC, routing 000000000. Checks payable to Example Jewelry LLC.";
+  const text = async (balanceDue: number) => {
+    const doc = buildInvoiceDocument({
+      ...source,
+      invoice: { ...source.invoice, balance_due_minor: balanceDue },
+      company: { ...source.company, pay_note: payNote },
+    });
+    const pdf = await renderInvoicePdf(doc);
+    return pdfText(new Uint8Array(pdf.output("arraybuffer") as ArrayBuffer));
+  };
+
+  it("prints the terms beside the dates, and how to pay after the memo", async () => {
+    const page = await text(264_297);
+    expect(page).toContain("(Terms: Net 30)");
+    const memo = page.indexOf("(Payment due within 30 days. Thank you for your business.)");
+    const heading = page.indexOf("(How to pay)");
+    expect(memo).toBeGreaterThan(-1);
+    expect(heading).toBeGreaterThan(memo);
+    expect(page.indexOf("Checks payable to Example Jewelry LLC.")).toBeGreaterThan(heading);
+  });
+
+  it("asks for nothing once the invoice is paid", async () => {
+    expect(await text(0)).not.toContain("(How to pay)");
+  });
+});
+
 const estimateSource = {
   estimate: {
     estimate_number: "EST-000004",

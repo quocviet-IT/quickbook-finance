@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.82",
+    date: "2026-10-30",
+    headline: "Invoices print their terms, and how to pay them.",
+    changes: [
+      {
+        kind: "added",
+        title: "How to pay, at the foot of every invoice",
+        detail:
+          "Settings → Company has a How to pay box for the words your customers need to pay you, such as the bank details for a transfer or who checks are made out to. Every invoice PDF prints them under the totals and the memo, until the invoice is paid or voided. Each saved version of the settings keeps its own wording.",
+        route: "/settings/company",
+      },
+      {
+        kind: "added",
+        title: "Terms on the invoice",
+        detail:
+          "Beside the issue and due dates, an invoice PDF now says its terms: Net 30 when it is due 30 days after it was issued, Due on receipt when it is due the day it is issued or has no due date.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "2.79",
     date: "2026-10-30",
     headline: "Review import adds a line the books only seem to have, and a CSV whose dates read two ways asks which.",

@@ -656,6 +656,8 @@ export interface CompanySettingRow {
   created_at: string;
   inventory_valuation_method: string;
   inventory_policy_memo: string | null;
+  /** How to pay, printed at the foot of every invoice (0179). */
+  pay_note: string | null;
 }
 
 // --- Budgets and management reporting ---

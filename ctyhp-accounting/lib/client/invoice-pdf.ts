@@ -139,6 +139,23 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
     footY += memoLines.length * pdf.getLineHeight() + 8;
   }
 
+  if (doc.payNote) {
+    const noteLines: string[] = pdf.splitTextToSize(doc.payNote, pageWidth - MARGIN * 2);
+    // Kept whole: the heading on one page and the bank details on the next would be no use to anyone.
+    if (footY + (noteLines.length + 1) * 12 > pdf.internal.pageSize.getHeight() - 48) {
+      pdf.addPage();
+      footY = 64;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.setTextColor(...INK);
+    pdf.text("How to pay", MARGIN, footY);
+    footY += 12;
+    pdf.setFont("helvetica", "normal");
+    pdf.text(noteLines, MARGIN, footY);
+    footY += noteLines.length * pdf.getLineHeight() + 8;
+  }
+
   if (doc.footer) {
     // Starts a page of its own rather than running into the page number.
     if (footY > pdf.internal.pageSize.getHeight() - 48) {

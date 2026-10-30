@@ -35,6 +35,8 @@ export type DocumentCompany = PostalParty & {
   dba_name: string | null;
   /** Accepted so callers can pass the settings row as-is; never printed. */
   ein_ref?: string | null;
+  /** How to pay (0179): printed at the foot of an invoice, and of nothing else. */
+  pay_note?: string | null;
 };
 
 /** One stored line, as an invoice or an estimate keeps it. */
@@ -101,6 +103,8 @@ export interface PrintedDocument {
   lines: InvoiceDocumentLine[];
   totals: DocumentTotal[];
   memo: string | null;
+  /** How to pay, under the totals and the memo; an invoice's only (2.82). */
+  payNote?: string | null;
 }
 
 export interface InvoiceDocument extends PrintedDocument {
@@ -189,6 +193,19 @@ export function documentTotals(
   return totals;
 }
 
+/**
+ * The terms an invoice was raised under, read from its own dates: "Net 30"
+ * for 30 days between issue and due, "Due on receipt" when it is due the day
+ * it is issued or has no due date. An invoice keeps no terms of its own, so its
+ * dates are the record of them, and they cannot disagree with the Due date row.
+ */
+export function invoiceTermsLabel(issueDate: string, dueDate: string | null): string {
+  if (!dueDate) return "Due on receipt";
+  const day = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+  const days = Math.round((day(dueDate) - day(issueDate)) / 86_400_000);
+  return days > 0 ? `Net ${days}` : "Due on receipt";
+}
+
 export function buildInvoiceDocument(source: InvoiceDocumentSource): InvoiceDocument {
   const { invoice, customer, company } = source;
   const decimals = USD_DECIMAL_PLACES;
@@ -220,10 +237,13 @@ export function buildInvoiceDocument(source: InvoiceDocumentSource): InvoiceDocu
     meta: [
       { label: "Issue date", value: invoice.issue_date },
       { label: "Due date", value: invoice.due_date ?? "On receipt" },
+      { label: "Terms", value: invoiceTermsLabel(invoice.issue_date, invoice.due_date) },
     ],
     lines: documentLines(lines, money),
     totals,
     memo: invoice.memo?.trim() || null,
+    // A paid or voided invoice asks for nothing.
+    payNote: invoice.balance_due_minor > 0 && invoice.status !== "void" ? company.pay_note?.trim() || null : null,
   };
 }
 
