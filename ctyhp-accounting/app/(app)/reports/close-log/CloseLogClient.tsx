@@ -102,24 +102,26 @@ export default function CloseLogClient({
                 render: (at: string | null) => (at ? formatDateTime(at, timeZone) : "—"),
               },
               { title: "By", dataIndex: "by", width: 200, ellipsis: true, render: (by: string | null) => by ?? "—" },
-              {
-                title: "Checklist at close",
-                key: "checklist",
-                width: 220,
-                render: (_: unknown, line: CloseLogLine) => {
-                  const cell = checklistCell(line);
-                  if (!cell) return null;
-                  return line.checklist ? cell : <span className={styles.muted}>{cell}</span>;
-                },
-              },
               flexColumn<CloseLogLine>({
                 title: "Reason or note",
                 key: "reason",
-                render: (_: unknown, line: CloseLogLine) => (
-                  <span className={styles.muted} title={line.reason ?? ""}>
-                    {line.reason ?? "—"}
-                  </span>
-                ),
+                // A close's checklist, in one line under its reason: a column of its own
+                // pushed the reason off the page.
+                render: (_: unknown, line: CloseLogLine) => {
+                  const checklist = checklistCell(line);
+                  return (
+                    <>
+                      <span className={styles.muted} title={line.reason ?? ""}>
+                        {line.reason ?? "—"}
+                      </span>
+                      {checklist ? (
+                        <div style={{ fontSize: 12 }} className={line.checklist ? undefined : styles.muted}>
+                          Checklist at close: {checklist}
+                        </div>
+                      ) : null}
+                    </>
+                  );
+                },
               }),
             ]}
           />

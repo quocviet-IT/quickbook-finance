@@ -62,6 +62,27 @@ export const RELEASES: Release[] = [
     ],
   },
   {
+    version: "2.85",
+    date: "2026-10-30",
+    headline: "Fixed assets can be depreciated on a declining balance, and the close log keeps its reasons on the page.",
+    changes: [
+      {
+        kind: "added",
+        title: "Declining balance depreciation",
+        detail:
+          "Fixed Assets offers Declining balance (200%) beside Straight-line. Each month it charges twice the straight-line rate on what is left of the cost, so an asset costs more in its first years, then switches to straight-line once that charges more, so it reaches its salvage value at the end of its useful life. Choosing it shows the first month's charge, the first year's, and when the last charge falls. The asset import takes declining_balance as a method too. Assets already registered keep their schedules.",
+        route: "/fixed-assets",
+      },
+      {
+        kind: "fixed",
+        title: "The reason stays on the Month-End Close Log",
+        detail:
+          "2.84 gave the checklist kept with a close a column of its own, which pushed Reason or note off the right of the page. The checklist now reads under the reason, as Checklist at close: 9 of 11 complete, 2 outstanding, and the line still opens to the checks themselves.",
+        route: "/reports/close-log",
+      },
+    ],
+  },
+  {
     version: "2.84",
     date: "2026-10-30",
     headline: "Closing a month keeps the checklist as it stood, and the Month-End Close Log shows it.",
