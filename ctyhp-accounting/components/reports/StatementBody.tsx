@@ -6,7 +6,7 @@ import { ReportFoot, StatRow } from "@/components/reports/ReportPaper";
 import { reportPagination } from "@/components/reports/SimpleReport";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate, formatMoney } from "@/lib/format";
-import { humanizeStatus } from "@/lib/domain/status-label";
+import { statementDocType, statementFootnote } from "@/lib/domain/party-statement";
 import type { StatementReport, StatementRow } from "@/lib/services/aging";
 
 const PAGE_SIZE = 50;
@@ -54,15 +54,14 @@ export default function StatementBody({
         emptyDescription={`No ${kind} transactions were found for this date range.`}
         columns={[
           { title: "Date", dataIndex: "txnDate", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
-          { title: "Type", dataIndex: "docType", render: (v: string) => humanizeStatus(v) },
+          { title: "Type", dataIndex: "docType", render: (v: string) => statementDocType(v) },
           { title: "Number", dataIndex: "docNumber", width: COLUMN.CODE },
           { title: "Amount", align: "right", width: COLUMN.MONEY, render: (_: unknown, r: StatementRow) => money(r.amountMinor) },
           { title: "Running", align: "right", width: COLUMN.MONEY_WIDE, render: (_: unknown, r: StatementRow) => money(r.runningMinor) },
         ]}
       />
       <ReportFoot>
-        <strong>How it reads.</strong> The opening balance reflects current open items dated before the period; historical
-        point-in-time statements are a later enhancement.
+        <strong>How it reads.</strong> {statementFootnote(kind)}
       </ReportFoot>
     </>
   );

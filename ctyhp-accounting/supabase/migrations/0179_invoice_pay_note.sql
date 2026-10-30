@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0179  How to pay, printed at the foot of every invoice (2.82)
+-- 0179  How to pay, printed at the foot of every invoice (2.83)
 --
 -- An invoice said what was owed and by when, but not how to pay it: the bank
 -- details or the name a check is made out to had to be typed into each

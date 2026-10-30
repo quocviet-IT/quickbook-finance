@@ -1,5 +1,5 @@
 /**
- * 2.82: how to pay, kept in the company's settings (migration 0179).
+ * 2.83: how to pay, kept in the company's settings (migration 0179).
  *
  * In a throwaway company built from this tree inside ONE transaction that is
  * always rolled back; nothing survives. The settings are saved by OneBook's own

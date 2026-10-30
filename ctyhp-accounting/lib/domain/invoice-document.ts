@@ -103,7 +103,7 @@ export interface PrintedDocument {
   lines: InvoiceDocumentLine[];
   totals: DocumentTotal[];
   memo: string | null;
-  /** How to pay, under the totals and the memo; an invoice's only (2.82). */
+  /** How to pay, under the totals and the memo; an invoice's only (2.83). */
   payNote?: string | null;
 }
 

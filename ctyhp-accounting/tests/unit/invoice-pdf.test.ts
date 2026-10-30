@@ -105,7 +105,7 @@ function pdfText(bytes: Uint8Array): string {
   return new TextDecoder("latin1").decode(bytes);
 }
 
-describe("renderInvoicePdf, terms and how to pay (2.82)", () => {
+describe("renderInvoicePdf, terms and how to pay (2.83)", () => {
   const payNote = "Bank transfer to Example Jewelry LLC, routing 000000000. Checks payable to Example Jewelry LLC.";
   const text = async (balanceDue: number) => {
     const doc = buildInvoiceDocument({

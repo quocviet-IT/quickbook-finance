@@ -234,7 +234,7 @@ describe("buildInvoiceDocument", () => {
     expect(doc.meta).toContainEqual({ label: "Terms", value: "Due on receipt" });
   });
 
-  it("states its terms from its own dates (2.82)", () => {
+  it("states its terms from its own dates (2.83)", () => {
     expect(buildInvoiceDocument(source).meta).toContainEqual({ label: "Terms", value: "Net 30" });
     expect(invoiceTermsLabel("2026-01-31", "2026-03-02")).toBe("Net 30");
     expect(invoiceTermsLabel("2026-03-22", "2026-03-22")).toBe("Due on receipt");
