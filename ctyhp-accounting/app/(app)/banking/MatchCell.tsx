@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { Button, Space, Tag, Typography } from "antd";
 import { humanizeStatus } from "@/lib/domain/status-label";
-import type { BankReviewRow } from "@/lib/domain/banking-import";
+import type { BankReviewRow } from "@/lib/domain/bank-review-rows";
 import type { BankTransactionRow } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";
 
