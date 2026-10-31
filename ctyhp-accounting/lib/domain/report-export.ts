@@ -1,3 +1,4 @@
+import { spreadsheetSafe } from "@/lib/csv";
 import { fromMinor } from "./money";
 
 export type ExportCellKind = "text" | "number" | "money" | "percent";
@@ -110,7 +111,7 @@ export function csvWithReportIdentity(
   identity: { companyName: string; title: string; subtitle: string; currencyCode: string },
 ): string {
   const cell = (value: string): string => {
-    const text = value ?? "";
+    const text = spreadsheetSafe(value ?? "");
     return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
   };
   const preamble = [
@@ -141,10 +142,14 @@ function exportCellText(v: string | number | null | undefined, kind: ExportCellK
  * hands over, from the same sheet the PDF and Excel buttons use.
  *
  * Money is written as a plain number in the currency's own decimals, without a
- * symbol or thousands separators, so a spreadsheet reads it as a number.
+ * symbol or thousands separators, so a spreadsheet reads it as a number. A
+ * name that reads as a formula is made text (`spreadsheetSafe`).
  */
 export function csvFromExportSheet(sheet: ReportExportSheet): string {
-  const cell = (value: string): string => (/[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+  const cell = (value: string): string => {
+    const text = spreadsheetSafe(value);
+    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  };
   const digits = currencyDigits(sheet.currencyCode);
   const lines = [
     sheet.columns.map((c) => cell(c.header)).join(","),
@@ -156,10 +161,11 @@ export function csvFromExportSheet(sheet: ReportExportSheet): string {
 /**
  * A sheet as tab-separated text, for "Copy this report": pasted into a
  * spreadsheet it keeps its columns, with the report's identity above them. A
- * tab or line break inside a value would split it, so it becomes a space.
+ * tab or line break inside a value would split it, so it becomes a space; a
+ * pasted formula would run, so it is made text the same way as in the CSV.
  */
 export function tsvFromExportSheet(sheet: ReportExportSheet): string {
-  const clean = (value: string): string => value.replace(/[\t\r\n]+/g, " ");
+  const clean = (value: string): string => spreadsheetSafe(value.replace(/[\t\r\n]+/g, " "));
   const digits = currencyDigits(sheet.currencyCode);
   return [
     clean(sheet.companyName),

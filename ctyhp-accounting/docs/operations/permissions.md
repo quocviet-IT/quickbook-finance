@@ -91,8 +91,8 @@ greyed out on the screen, with a note:
 | Documents | Govern document retention | Set retention dates and legal holds | ✓ | | | | Any role |
 | Governance | Read the audit log | Search the audit history | ✓ | ✓ | | ✓ | Any role |
 | Governance | Approve or reject requests | Decide on a two-person approval request | ✓ | ✓ | | | Any role |
-| Governance | Manage users | Add users, change roles, suspend, offboard | ✓ | | | | Any role |
-| Governance | Manage permissions | Change this matrix | ✓ | | | | Any role |
+| Governance | Manage users | Add users, change roles, suspend, offboard | ✓ | | | | Admin |
+| Governance | Manage permissions | Change this matrix | ✓ | | | | Admin |
 | Governance | Manage settings | Company profile, work policy, the period calendar, purchasing tolerances and approval policies | ✓ | | | | Any role |
 | Governance | Export company data | Download the full company archive and backups | ✓ | | | | Any role |
 | Governance | Restore a backup | Restore a backup into a new company (platform administrators only) | ✓ | | | | Any role |
@@ -186,7 +186,9 @@ last active admin cannot be demoted.
 Settings › Permissions. Only someone holding **Manage permissions** can. Change
 it only for a business reason, and write the reason down where your team keeps
 such decisions; the switch itself is recorded in the audit log. An admin cannot
-switch off **Manage users** or **Manage permissions** for admins.
+switch off **Manage users** or **Manage permissions** for admins, and since 2.94
+neither can be given to any other role: either one lets its holder hand out
+every other permission, so both stay with admins.
 
 ### Turn on two-person approval
 

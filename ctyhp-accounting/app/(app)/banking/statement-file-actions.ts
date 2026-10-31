@@ -6,7 +6,7 @@
  * is a saved report of source "Bank".
  */
 import { revalidatePath } from "next/cache";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
@@ -45,6 +45,11 @@ export type PreparedStatementFile =
 /**
  * The file already kept, when one with this SHA-256 is — nothing to upload —
  * or a one-time ticket to upload it to this company's own folder.
+ *
+ * The ticket is minted with the service role, so it asks for the permission
+ * keeping the file needs (documents.manage, checked again by
+ * acc_keep_statement_file): someone who could never keep a file must not be
+ * able to fill the folder with uploads nothing will ever name.
  */
 export async function prepareStatementFileAction(
   sha256: string,
@@ -52,6 +57,9 @@ export async function prepareStatementFileAction(
 ): Promise<ActionResult<PreparedStatementFile>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
+  if (!(await holdsPermission("documents.manage"))) {
+    return { ok: false, error: "Keeping the statement file needs Manage supporting documents" };
+  }
   if (!/^[0-9a-f]{64}$/.test(sha256)) return { ok: false, error: "Expected a sha256 digest" };
   if (!(STATEMENT_FILE_MIME_TYPES as readonly string[]).includes(mimeType)) {
     return { ok: false, error: "OneBook keeps PDF, CSV, OFX, QFX, QBO and QIF statement files" };
