@@ -255,6 +255,14 @@ const EXEMPT_TABLES: Readonly<Record<string, Exemption>> = {
       "no screen or client reads it, and it is written only by migrations. Its anon and " +
       "authenticated privileges are revoked there on purpose.",
   },
+  "onebook.ai_request": {
+    kind: "security-definer-only",
+    reason:
+      "The count of questions each person has put to the model in the past hour (0183, 2.94). " +
+      "Read and written only inside onebook.take_ai_turn, which is `security definer`, created " +
+      "in the same migration; no screen or client reads it. Its anon and authenticated " +
+      "privileges are revoked there on purpose, so nobody can clear their own count.",
+  },
 };
 
 describe("a table-creating migration carries its own grants", () => {

@@ -27,7 +27,9 @@ import {
   type UndoOutcome,
   type ImportBatchRow,
 } from "@/lib/services/ledger-import";
-import { suggestMapping } from "@/lib/ai/suggest-mapping";
+import { MODEL_MAPPING_MAX_HEADERS, nameOnlyMapping, suggestMapping } from "@/lib/ai/suggest-mapping";
+import { takeAiTurn } from "@/lib/ai/quota";
+import { aiConfigured } from "@/lib/ai/provider";
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -159,8 +161,26 @@ export async function suggestMappingAction(
 ): Promise<ActionResult<MappingSuggestion>> {
   const denied = await guard(target);
   if (denied) return { ok: false, error: denied };
+  if (!Array.isArray(headers)) return { ok: false, error: "Expected the file's column headings" };
+  // A heading is a label; a long one is cut, so the question to the model stays small.
+  const columns = headers.map((header) => String(header ?? "").slice(0, 200));
   try {
-    return { ok: true, data: await suggestMapping(headers, target) };
+    if (aiConfigured() && columns.length > 0 && columns.length <= MODEL_MAPPING_MAX_HEADERS) {
+      const allowance = await takeAiTurn();
+      if (allowance === "limit") {
+        return {
+          ok: true,
+          data: nameOnlyMapping(columns, target, "The hourly limit for the assistant was reached, so columns were matched by name only."),
+        };
+      }
+      if (allowance === "unavailable") {
+        return {
+          ok: true,
+          data: nameOnlyMapping(columns, target, "The model could not be reached, so columns were matched by name only."),
+        };
+      }
+    }
+    return { ok: true, data: await suggestMapping(columns, target) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

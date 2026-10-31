@@ -60,6 +60,24 @@ export function parseCsv(text: string): Record<string, string>[] {
   });
 }
 
+const LEADS_A_FORMULA = /^[=+\-@\t\r]/;
+const PLAIN_NUMBER = /^[+-]?[$€£]?(\d[\d,]*(\.\d+)?|\.\d+)%?$/;
+
+/**
+ * A value as it may go into a spreadsheet cell without the spreadsheet running
+ * it. Excel and Google Sheets evaluate a cell that starts with =, +, - or @
+ * (and some read a leading tab or carriage return the same way), so a payee a
+ * bank sent as `=HYPERLINK(...)` would run when an accountant opened the
+ * export. A leading apostrophe makes such a cell text.
+ *
+ * A plain number is left as it is: a negative amount starts with a minus and
+ * must still add up in the sheet.
+ */
+export function spreadsheetSafe(text: string): string {
+  if (!LEADS_A_FORMULA.test(text) || PLAIN_NUMBER.test(text)) return text;
+  return `'${text}`;
+}
+
 export interface CsvColumn<T> {
   key: keyof T & string;
   header: string;
@@ -68,7 +86,8 @@ export interface CsvColumn<T> {
 /**
  * Serialize rows to CSV (RFC 4180: CRLF line breaks, quotes doubled, a field
  * quoted whenever it contains a comma, a quote, or a line break). Used for report
- * exports, so a value with a comma in it must never shift a column.
+ * exports, so a value with a comma in it must never shift a column, and a value
+ * that reads as a formula is made text (`spreadsheetSafe`).
  */
 export function toCsv<T extends Record<string, unknown>>(
   rows: T[],
@@ -76,7 +95,7 @@ export function toCsv<T extends Record<string, unknown>>(
 ): string {
   const cell = (value: unknown): string => {
     if (value === null || value === undefined) return "";
-    const text = String(value);
+    const text = spreadsheetSafe(String(value));
     return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   const lines = [columns.map((c) => cell(c.header)).join(",")];

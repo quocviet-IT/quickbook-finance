@@ -94,8 +94,8 @@ công tắc đó bị làm mờ, kèm ghi chú:
 | Documents | Govern document retention | Đặt thời hạn lưu trữ và giữ hồ sơ | ✓ | | | | Mọi vai trò |
 | Governance | Read the audit log | Tra cứu nhật ký thay đổi | ✓ | ✓ | | ✓ | Mọi vai trò |
 | Governance | Approve or reject requests | Duyệt yêu cầu hai người | ✓ | ✓ | | | Mọi vai trò |
-| Governance | Manage users | Thêm người dùng, đổi vai trò, tạm khoá, cho nghỉ | ✓ | | | | Mọi vai trò |
-| Governance | Manage permissions | Sửa ma trận này | ✓ | | | | Mọi vai trò |
+| Governance | Manage users | Thêm người dùng, đổi vai trò, tạm khoá, cho nghỉ | ✓ | | | | Admin |
+| Governance | Manage permissions | Sửa ma trận này | ✓ | | | | Admin |
 | Governance | Manage settings | Hồ sơ công ty, work policy, lịch kỳ kế toán, dung sai mua hàng, chính sách duyệt | ✓ | | | | Mọi vai trò |
 | Governance | Export company data | Tải toàn bộ dữ liệu công ty và bản sao lưu | ✓ | | | | Mọi vai trò |
 | Governance | Restore a backup | Khôi phục bản sao lưu thành công ty mới (chỉ platform admin) | ✓ | | | | Mọi vai trò |
@@ -188,7 +188,9 @@ vai trò được admin đang hoạt động cuối cùng.
 Settings › Permissions. Chỉ người giữ **Manage permissions** mới sửa được. Chỉ
 sửa khi có lý do nghiệp vụ, và ghi lý do vào nơi nhóm lưu các quyết định như vậy;
 bản thân thao tác bật tắt được lưu trong nhật ký. Admin không tắt được **Manage
-users** hay **Manage permissions** của vai trò admin.
+users** hay **Manage permissions** của vai trò admin, và từ bản 2.94 cũng không
+cấp được hai quyền này cho vai trò nào khác: giữ một trong hai là cấp được mọi
+quyền còn lại, nên cả hai chỉ dành cho admin.
 
 ### Bật duyệt hai người
 

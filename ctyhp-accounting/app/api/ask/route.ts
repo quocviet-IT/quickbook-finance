@@ -3,6 +3,7 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import { buildAskAiSystemPrompt, validateAskAiQuestion } from "@/lib/ai/ask-prompt";
 import { describeContextForAssistant } from "@/lib/domain/screen-context";
 import { AiNotConfiguredError, AiProviderError, askProvider, type AiTurn } from "@/lib/ai/provider";
+import { AI_TURN_REFUSAL, takeAiTurn } from "@/lib/ai/quota";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,6 +37,9 @@ function readHistory(raw: unknown): AiTurn[] {
  * rather than describing the application in general. Neither is taken on trust:
  * the company comes from the server's own resolution, never from the browser,
  * and the route only ever selects which part of the guide to quote.
+ *
+ * Only someone who belongs to the open company may ask, and each question is
+ * counted against an hourly allowance before it is sent (2.94).
  */
 export async function POST(request: Request) {
   const sb = await createSupabaseServerClient();
@@ -57,17 +61,25 @@ export async function POST(request: Request) {
   const check = validateAskAiQuestion(body?.question);
   if (!check.ok) return Response.json({ error: check.error }, { status: 400 });
 
-  const route = typeof body?.route === "string" ? body.route : "/";
+  const route = typeof body?.route === "string" ? body.route.slice(0, 200) : "/";
 
   const [{ active }, profile] = await Promise.all([
     resolveActiveCompany(),
     sb.from("acc_app_user").select("role").eq("id", user.id).maybeSingle(),
   ]);
+  if (!active) {
+    return Response.json({ error: "Open a company you belong to before asking." }, { status: 403 });
+  }
+
+  const allowance = await takeAiTurn();
+  if (allowance !== "granted") {
+    return Response.json({ error: AI_TURN_REFUSAL[allowance] }, { status: allowance === "limit" ? 429 : 503 });
+  }
 
   const briefing = describeContextForAssistant({
     route,
-    companyName: active?.legalName ?? "this company",
-    isSampleCompany: active?.isSample ?? false,
+    companyName: active.legalName,
+    isSampleCompany: active.isSample,
     role: (profile.data?.role as string | undefined) ?? null,
   });
 

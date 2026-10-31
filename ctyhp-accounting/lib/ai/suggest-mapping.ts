@@ -15,6 +15,18 @@ export interface SuggestedMapping extends MergedMapping {
   note: string | null;
 }
 
+/** The most columns a file may have for its headers to be sent to the model. */
+export const MODEL_MAPPING_MAX_HEADERS = 300;
+
+/** Matching by name alone, with a note saying why the model was not asked when it was not. */
+export function nameOnlyMapping(
+  headers: readonly string[],
+  target: ImportTarget,
+  note: string | null,
+): SuggestedMapping {
+  return { ...proposeMapping(headers, target), aiFields: [], note };
+}
+
 /**
  * Which column is which, with the model filling what the alias matcher could not.
  *
@@ -40,6 +52,9 @@ export async function suggestMapping(
   });
 
   if (headers.length === 0) return fallback(null);
+  if (headers.length > MODEL_MAPPING_MAX_HEADERS) {
+    return fallback("This file has too many columns to send to the model, so columns were matched by name only.");
+  }
 
   let answer;
   try {

@@ -27,6 +27,14 @@ export class AiNotConfiguredError extends Error {}
 export class AiProviderError extends Error {}
 
 /**
+ * How long one answer may take. The ask route may run for 60 seconds; a
+ * provider that has not answered well inside that is not going to, and an
+ * unanswered request would otherwise hold the function until the platform
+ * cuts it off.
+ */
+const ANSWER_TIMEOUT_MS = 45_000;
+
+/**
  * Reads configuration without throwing, so a page can show "the assistant is
  * not configured yet" instead of failing to render.
  */
@@ -96,7 +104,7 @@ export async function askProvider(input: {
     response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
       headers,
-      signal: input.signal,
+      signal: input.signal ?? AbortSignal.timeout(ANSWER_TIMEOUT_MS),
       body: JSON.stringify({
         model: config.model,
         max_tokens: input.maxOutputTokens ?? 1200,

@@ -41,6 +41,59 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.94",
+    date: "2026-10-31",
+    headline: "Tighter rules from a security review, and exports that a spreadsheet cannot run.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A name that looks like a formula stays text in a CSV export",
+        detail:
+          "A payee, customer or memo that begins with =, +, - or @ is written with an apostrophe in front when a report is saved as CSV or copied, so Excel and Google Sheets show it instead of running it. Amounts are unchanged: a negative amount is still a number.",
+        route: "/reports",
+      },
+      {
+        kind: "changed",
+        title: "Manage users and Manage permissions are for admins only",
+        detail:
+          "Either permission lets its holder hand out every other one, so the matrix no longer offers them to accountants, sales or viewers. Every company had them on admins alone already, so nobody loses anything they were using.",
+        route: "/settings/permissions",
+      },
+      {
+        kind: "changed",
+        title: "The assistant answers up to 60 questions an hour for each person",
+        detail:
+          "Each question is paid for, so they are now counted. Past 60 in an hour the assistant says so and answers again a little later; column matching on the import screen falls back to matching by name. A question that has not been answered after 45 seconds stops with a message instead of waiting.",
+        route: "/settings/import",
+      },
+      {
+        kind: "fixed",
+        title: "Feedback is filed only by people who belong to the company",
+        detail:
+          "A report and its files can be added only in a company you belong to, with one screenshot and up to five attachments, as the feedback dialog has always allowed.",
+        route: "/settings/feedback",
+      },
+      {
+        kind: "fixed",
+        title: "Keeping a statement file asks for Manage supporting documents from the start",
+        detail:
+          "The upload used to begin for anyone who could import and fail only at the end. It now says at once that keeping the file needs Manage supporting documents; the import itself is unchanged.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Two-step entries in the Change Log record only what happened",
+        detail:
+          "Turning off or resetting two-step sign-in is logged only once the second step is really gone. Work-hub tidy-up of finished items now happens when an admin or accountant opens a hub.",
+        route: "/settings/audit",
+      },
+      {
+        kind: "changed",
+        title: "Next.js and other libraries updated with their security fixes",
+      },
+    ],
+  },
+  {
     version: "2.93",
     date: "2026-10-31",
     headline: "The Journal reads one page at a time, and every entry can be paged to.",
