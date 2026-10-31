@@ -1,7 +1,7 @@
 "use client";
 import { DeleteOutlined } from "@ant-design/icons";
 import IconActionButton from "@/components/ui/IconActionButton";
-import type { BankReviewRow } from "@/lib/domain/banking-import";
+import type { BankReviewRow } from "@/lib/domain/bank-review-rows";
 import type { BankTransactionRow } from "@/lib/db/types";
 import type { BankPostingRow, SuggestionView } from "@/lib/services/banking";
 import {

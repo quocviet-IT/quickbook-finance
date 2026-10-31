@@ -82,7 +82,7 @@ import type { ConfirmedImport } from "./ImportStatementModal";
 const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
   ssr: false,
 });
-import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/banking-import";
+import { buildBankReviewRows, type BankReviewRow } from "@/lib/domain/bank-review-rows";
 import { postingsByLine } from "@/lib/domain/bank-postings";
 import { holdingAccountIds, needsCoding } from "@/lib/domain/uncategorized";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
