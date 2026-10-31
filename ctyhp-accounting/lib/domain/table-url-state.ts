@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /**
  * Which page of which sort a reader is looking at, expressed as URL parameters.

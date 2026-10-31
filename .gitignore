@@ -48,6 +48,13 @@ desktop.ini
 /*.html
 /*.md
 
+# Transcripts of calls and screen recordings. One sat in docs/research/ for
+# months: a colleague walking through the importer, by name. Research notes
+# written from a call stay in docs/; the transcript itself goes in data/.
+*transcript*.txt
+*transcript*.vtt
+*transcript*.srt
+
 # An environment file at the repo root would hold the same keys as the app's,
 # which ctyhp-accounting/ already ignores for itself.
 /.env*

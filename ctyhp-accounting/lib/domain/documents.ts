@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 export const DOCUMENT_BUCKET = "accounting-documents";
 export const DOCUMENT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;

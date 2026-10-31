@@ -124,3 +124,51 @@ describe("the proxy routes on verified claims, asking the auth server only on /l
     expect(response.headers.get("expires")).toBe("0");
   });
 });
+
+describe("the proxy gives every response a Content-Security-Policy with its own nonce (2.95)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.refresh = null;
+  });
+
+  const nonceIn = (policy: string | null) => /'nonce-([^']+)'/.exec(policy ?? "")?.[1];
+
+  it("sends the policy to the browser and the same nonce to the page", async () => {
+    mocks.getClaims.mockResolvedValue(signedIn);
+    const response = await proxy(request("/invoices"));
+    const policy = response.headers.get("content-security-policy");
+    const nonce = nonceIn(policy);
+    expect(nonce).toBeTruthy();
+    // NextResponse.next({ request: { headers } }) hands request headers on like this.
+    expect(response.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+    expect(response.headers.get("x-middleware-request-content-security-policy")).toBe(policy);
+  });
+
+  it("draws a new nonce for every response", async () => {
+    mocks.getClaims.mockResolvedValue(signedIn);
+    const first = nonceIn((await proxy(request("/invoices"))).headers.get("content-security-policy"));
+    const second = nonceIn((await proxy(request("/invoices"))).headers.get("content-security-policy"));
+    expect(first).not.toBe(second);
+  });
+
+  it("keeps the refreshed session cookie on the request the page sees", async () => {
+    mocks.refresh = {
+      cookies: [{ name: "sb-test-auth-token", value: "fresh", options: { path: "/" } }],
+      headers: {},
+    };
+    mocks.getClaims.mockResolvedValue(signedIn);
+    const response = await proxy(request("/invoices"));
+    expect(response.headers.get("x-middleware-request-cookie")).toContain("sb-test-auth-token=fresh");
+    expect(response.headers.get("x-middleware-request-x-nonce")).toBeTruthy();
+  });
+
+  it("covers the routes that skip the session, and the redirect to /login", async () => {
+    const status = await proxy(request("/status"));
+    expect(status.headers.get("content-security-policy")).toMatch(/script-src/);
+    expect(status.headers.get("x-middleware-request-x-nonce")).toBeTruthy();
+    mocks.getClaims.mockResolvedValue(signedOut);
+    const bounced = await proxy(request("/invoices"));
+    expect(bounced.status).toBe(307);
+    expect(bounced.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'/);
+  });
+});

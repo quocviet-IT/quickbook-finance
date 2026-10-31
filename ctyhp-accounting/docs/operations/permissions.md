@@ -144,8 +144,9 @@ Four layers, and the third is the one that decides:
 3. **Database functions.** Every action that changes the books runs inside a
    function that checks the caller's role and permission itself, and refuses
    anyone who is not a member of the company, including someone suspended.
-4. **Table rules.** Reading is allowed to members only. Writing goes through the
-   functions in layer 3. Since release 2.61 no record a screen changes can be
+4. **Table rules.** Reading is allowed to members only, and the audit history,
+   since 2.95, only to a role holding **Read the audit log**. Writing goes
+   through the functions in layer 3. Since release 2.61 no record a screen changes can be
    written around its function: documents, users and permissions, periods and
    the audit log, banking and purchasing, and master data such as accounts,
    customers, vendors and products.

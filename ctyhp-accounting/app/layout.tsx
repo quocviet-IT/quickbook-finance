@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import Providers from "./providers";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { NONCE_HEADER } from "@/lib/domain/content-security-policy";
 import {
   noFlashScript,
   parseSystemPrefersDark,
@@ -43,9 +44,12 @@ export default async function RootLayout({
   // writes with what the machine prefers. Without it every system reader on
   // a dark machine was rendered light and turned dark after hydration, and a
   // Suspense boundary that hydrated after the turn kept its light classes.
-  const jar = await cookies();
+  const [jar, requestHeaders] = await Promise.all([cookies(), headers()]);
   const initialMode = parseThemeMode(jar.get(THEME_STORAGE_KEY)?.value);
   const initialSystemPrefersDark = parseSystemPrefersDark(jar.get(SYSTEM_THEME_COOKIE)?.value);
+  // The Content-Security-Policy runs only scripts carrying this response's
+  // nonce (proxy.ts); Next stamps its own, this one is ours to stamp.
+  const nonce = requestHeaders.get(NONCE_HEADER) ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -62,7 +66,9 @@ export default async function RootLayout({
           React renders <html> without it and finds it already set; the
           warning is correct and the mismatch is the entire point.
         */}
-        <script dangerouslySetInnerHTML={{ __html: noFlashScript() }} />
+        {/* The browser hides a nonce from the DOM once it has checked it, so
+            hydration finds it empty; that difference is expected. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: noFlashScript() }} />
       </head>
       <body>
         <AntdRegistry>
