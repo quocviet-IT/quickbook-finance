@@ -16,9 +16,9 @@ import {
 import { RUN_MESSAGES, monthRefusal, simulateRun, type RunPreview, type RunStatement } from "@/lib/domain/statement-run";
 import {
   createReconciliationFromStatement, setReconciliationStatement, setStatementEnding, getBroughtForwardPreview,
-  bringForward, getReconciliationHeader, getReconciliationStatement, pairAndTick, getBankOpenLines,
+  bringForward, getReconciliationHeader, pairAndTick, getBankOpenLines,
   listReconciliations, getReconciliationDetail, completeReconciliation, getReconciliationLines, setClearedMany,
-  BankRecError, type ReconStatement, type StatementFileInput,
+  BankRecError, type StatementFileInput,
 } from "@/lib/services/bankrec";
 import { generateSuggestions, importStatement, isCardBankAccount, markLinesAlreadyHere } from "@/lib/services/banking";
 import { shown, stored } from "@/lib/domain/card-account";
@@ -400,11 +400,6 @@ export async function setStatementEndingAction(reconciliationId: string, endingM
 export async function matchAgainAction(reconciliationId: string): Promise<ActionResult<PairingOutcome>> {
   const denied = await guard(); if (denied) return { ok: false, error: denied };
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await pairAndTick(sb, reconciliationId) }; }
-  catch (e) { return { ok: false, error: msg(e) }; }
-}
-
-export async function reconciliationStatementAction(reconciliationId: string): Promise<ActionResult<ReconStatement>> {
-  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getReconciliationStatement(sb, reconciliationId) }; }
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 

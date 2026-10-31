@@ -11,7 +11,9 @@ import { formatMoney } from "@/lib/format";
 import { statementFileAccount } from "@/lib/domain/statement-evidence";
 import { balanceSideOf } from "@/lib/domain/card-account";
 import PageHeader from "@/components/PageHeader";
+import { firstPaintRead } from "@/lib/services/request-kind";
 import ReconcileWorkspaceClient from "./ReconcileWorkspaceClient";
+import { readReconcileWorkspace } from "./workspace-view";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +27,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
   const header = await findReconciliationHeader(sb, id);
   if (!header) notFound();
   const currenciesRead = listCurrencies(sb);
-  const [accounts, currencies, banks, overrides, holdsComplete, holdsReopen] = await Promise.all([
+  const [accounts, currencies, banks, overrides, holdsComplete, holdsReopen, initialView] = await Promise.all([
     listAccounts(sb),
     currenciesRead,
     listBankAccounts(sb),
@@ -38,6 +40,9 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
     }),
     holdsPermission("reconciliation.complete"),
     holdsPermission("reconciliation.reopen"),
+    // The lines, figures and statement, read here for the first paint (2.92)
+    // rather than by the screen once it has loaded.
+    firstPaintRead(() => readReconcileWorkspace(sb, id)),
   ]);
   const base = currencies.find((c) => c.is_base);
   const { notices, unavailable: overridesUnavailable } = overrides;
@@ -72,6 +77,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
           side: balanceSideOf(bank?.account_type),
         }}
         fileAccount={bank ? statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked) : "Bank account"}
+        initialView={initialView}
       />
     </div>
   );

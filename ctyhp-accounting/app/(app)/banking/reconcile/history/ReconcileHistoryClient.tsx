@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Dayjs } from "dayjs";
 import { Alert, App, Button, Card, DatePicker, InputNumber, Space, Spin, Typography, type TableColumnsType } from "antd";
@@ -49,16 +49,19 @@ const historyDateCell = (iso: string | null) => (iso ? <time dateTime={iso}>{for
 interface Props {
   /** Staff holding `reconciliation.complete`: bringing history forward records a completed reconciliation. */
   canBringForward: boolean;
+  /** The table the page read for the first paint; null when it did not (2.92). */
+  initialRows: HistoryAccount[] | null;
   /** The company's today, in its own time zone: no later date can be chosen. */
   today: string;
   baseCurrency: string;
   baseDecimals: number;
 }
 
-export default function ReconcileHistoryClient({ canBringForward, today, baseCurrency, baseDecimals }: Props) {
+export default function ReconcileHistoryClient({ canBringForward, initialRows, today, baseCurrency, baseDecimals }: Props) {
   const { message, modal } = App.useApp();
-  const [rows, setRows] = useState<HistoryAccount[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [rows, setRows] = useState<HistoryAccount[]>(initialRows ?? []);
+  const [loaded, setLoaded] = useState(initialRows !== null);
+  const seeded = useRef(initialRows !== null);
   const [picked, setPicked] = useState<string | null>(null);
   const [through, setThrough] = useState<Dayjs | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
@@ -79,7 +82,11 @@ export default function ReconcileHistoryClient({ canBringForward, today, baseCur
   }, [message]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // The page read the table for the first paint; every later change reads again.
+    if (seeded.current) {
+      seeded.current = false;
+      return;
+    }
     void load();
   }, [load]);
 

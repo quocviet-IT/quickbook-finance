@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Space, Statistic, Tag, Tooltip, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
@@ -39,11 +39,14 @@ const PRIORITY_COLOR: Record<PayPriority, string> = {
  * reason spelled out on every row.
  */
 export default function PayRunPanel({
+  initialRun = null,
   baseCurrency,
   baseDecimals,
   onPayVendor,
   canEnterBills = false,
 }: {
+  /** The run the page worked out for the first paint; null when it did not (2.92). */
+  initialRun?: PayRun | null;
   baseCurrency: string;
   baseDecimals: number;
   /** Opens the existing payment dialog for a vendor. */
@@ -52,11 +55,14 @@ export default function PayRunPanel({
   canEnterBills?: boolean;
 }) {
   const { message } = App.useApp();
-  const [run, setRun] = useState<PayRun | null>(null);
-  // Loading from the first render: the run is asked for once the page has
-  // mounted, and until it answers the table has not found nothing. Starting
-  // at false, it said "No open bills" for seconds over an overdue bill.
-  const [loading, setLoading] = useState(true);
+  const [run, setRun] = useState<PayRun | null>(initialRun);
+  // Loading from the first render when the page did not work the run out:
+  // it is then asked for once the page has mounted, and until it answers the
+  // table has not found nothing. Starting at false, it said "No open bills"
+  // for seconds over an overdue bill.
+  const [loading, setLoading] = useState(initialRun === null);
+  // The page's run is used once; every later change asks again.
+  const seeded = useRef(initialRun !== null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const money = useCallback(
@@ -79,7 +85,10 @@ export default function PayRunPanel({
   }, [message]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (seeded.current) {
+      seeded.current = false;
+      return;
+    }
     void load();
   }, [load]);
 

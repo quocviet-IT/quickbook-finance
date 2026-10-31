@@ -4,6 +4,8 @@ import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { listCustomers } from "@/lib/services/invoicing";
+import { listCreditMemos } from "@/lib/services/credits";
+import { firstPaintRead } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import CreditMemosClient from "./CreditMemosClient";
 
@@ -11,12 +13,13 @@ export const dynamic = "force-dynamic";
 
 export default async function CreditMemosPage() {
   const sb = await createSupabaseServerClient();
-  const [currencies, accounts, customers, taxCodes, role] = await Promise.all([
+  const [currencies, accounts, customers, taxCodes, role, memos] = await Promise.all([
     listCurrencies(sb),
     listAccounts(sb),
     listCustomers(sb),
     listTaxCodes(sb),
     getUserRole(),
+    firstPaintRead(() => listCreditMemos(sb)),
   ]);
   const base = currencies.find((c) => c.is_base);
   // A credit memo reverses a sale, so it credits back the same revenue.
@@ -27,6 +30,7 @@ export default async function CreditMemosPage() {
       <PageHeader title="Credit Memos" description="Issue customer credit memos and apply them to open invoices." />
       <CreditMemosClient
         canWrite={canWrite(role)}
+        initialMemos={memos}
         customers={customers}
         incomeAccounts={incomeAccounts}
         taxCodes={taxCodes}

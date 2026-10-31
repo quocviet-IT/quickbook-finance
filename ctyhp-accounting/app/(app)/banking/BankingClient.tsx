@@ -252,6 +252,15 @@ export default function BankingClient({
   // did not read it: an empty table must not read "No bank transactions" while
   // the lines are still on their way.
   const [loading, setLoading] = useState(selectedId !== undefined && opening === null);
+  // The registers under the lines, read with the page for the account it opened on (2.92).
+  const [openingRegisters] = useState(() =>
+    openingView && openingView.bankAccountId === selectedId
+      ? {
+          imports: openingView.imports.ok ? openingView.imports.data : undefined,
+          syncs: openingView.syncs.ok ? openingView.syncs.data : undefined,
+        }
+      : null,
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [attachmentTarget, setAttachmentTarget] = useState<AttachmentTarget | null>(null);
   const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
@@ -965,12 +974,19 @@ export default function BankingClient({
           canWrite={canWrite}
           reloadKey={importsKey}
           onChanged={reload}
+          initialRows={openingRegisters?.imports}
         />
       </Card>
 
       {/* One account's feed at a time, as Sync now: a sync belongs to a connection, and a connection to accounts. */}
       {selectedId && !allAccounts ? (
-        <BankFeedSyncList bankAccountId={selectedId} canWrite={canWrite} reloadKey={importsKey} onChanged={reload} />
+        <BankFeedSyncList
+          bankAccountId={selectedId}
+          canWrite={canWrite}
+          reloadKey={importsKey}
+          onChanged={reload}
+          initialRows={openingRegisters?.syncs}
+        />
       ) : null}
 
       <DisconnectBankModal

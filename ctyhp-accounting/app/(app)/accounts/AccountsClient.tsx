@@ -71,6 +71,7 @@ import { cashStandingAction } from "@/components/cash/actions";
 import { lastCountedLabel, CASH_COUNT_AMBER_DAYS, type CashStanding } from "@/lib/domain/cash-count";
 import { daysFromTo } from "@/lib/domain/bank-standing";
 import ClassifyAccountsButton from "./ClassifyAccountsButton";
+import type { ClassificationPlanSummary } from "@/lib/services/account-classification";
 import {
   chartBalancesAction,
   createAccountAction,
@@ -170,6 +171,7 @@ export default function AccountsClient({
   initialAsOf,
   initialBalances,
   initialCashStanding,
+  initialClassificationPlan,
   baseCurrency,
   baseDecimals,
 }: {
@@ -183,6 +185,8 @@ export default function AccountsClient({
   initialBalances: ChartBalances | null;
   /** The company's cash on hand accounts and when each was last counted; null when that read failed. */
   initialCashStanding: CashStanding[] | null;
+  /** What Classify accounts would do, read with the page; null when it was not (2.92). */
+  initialClassificationPlan: ClassificationPlanSummary | null;
   baseCurrency: string;
   baseDecimals: number;
 }) {
@@ -610,7 +614,7 @@ export default function AccountsClient({
         resultCount={listing.matched}
         actions={
           <Space wrap>
-            <ClassifyAccountsButton canWrite={canWrite} />
+            <ClassifyAccountsButton canWrite={canWrite} initialPlan={initialClassificationPlan} />
             {canWrite ? (
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
                 New account

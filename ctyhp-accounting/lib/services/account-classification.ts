@@ -49,6 +49,23 @@ export interface ClassificationOutcome {
   stillUnclassified: { account_code: string; name: string; account_type: string }[];
 }
 
+/** How many accounts the repair would classify, and the ones only a person can. */
+export interface ClassificationPlanSummary {
+  roles: number;
+  details: number;
+  unanswerable: { account_code: string; name: string }[];
+}
+
+/** The plan as the Classify button reads it: counted, with the unanswerable named. */
+export async function summarizeClassificationPlan(sb: SupabaseClient): Promise<ClassificationPlanSummary> {
+  const plan = await planAccountClassification(sb);
+  return {
+    roles: plan.roles.length,
+    details: plan.details.length,
+    unanswerable: plan.unanswerable.map((a) => ({ account_code: a.account_code, name: a.name })),
+  };
+}
+
 /** What a repair would change, without changing it. */
 export async function planAccountClassification(
   sb: SupabaseClient,

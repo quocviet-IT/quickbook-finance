@@ -13,11 +13,9 @@ import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { formatMoney } from "@/lib/format";
 import {
   historyBroughtForwardNote,
-  withStandings,
   type HistoryAccount,
   type HistoryPreview,
 } from "@/lib/domain/reconcile-history";
-import { getBankStanding } from "@/lib/services/bank-standing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import type { SessionHistoryFacts } from "@/lib/domain/reconcile-statement";
 import {
@@ -32,7 +30,7 @@ import {
   bringHistoryForwardFromSession,
   discardReconciliation,
   getHistoryPreview,
-  getReconciliationHistory,
+  getReconciliationHistoryWithStandings,
   getSessionHistoryAdvice,
   setStatementLineAside,
   type BroughtForwardHistory,
@@ -158,12 +156,7 @@ export async function reconciliationHistoryAction(): Promise<ActionResult<Histor
   try {
     const sb = await createSupabaseServerClient();
     const { asOf } = await getBankingContext(sb);
-    // One round trip for the client; a standing that cannot be read leaves the columns blank, not the page.
-    const [history, standings] = await Promise.all([
-      getReconciliationHistory(sb),
-      getBankStanding(sb, asOf).catch(() => null),
-    ]);
-    return { ok: true, data: withStandings(history, standings) };
+    return { ok: true, data: await getReconciliationHistoryWithStandings(sb, asOf) };
   } catch (e) {
     return { ok: false, error: msg(e) };
   }

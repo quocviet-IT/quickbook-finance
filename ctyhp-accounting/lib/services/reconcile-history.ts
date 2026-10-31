@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DuplicateMatch } from "@/lib/domain/add-missing";
 import {
   historyAccounts,
+  withStandings,
   type CompletedReconciliation,
   type HistoryAccount,
   type HistoryPreview,
@@ -28,6 +29,7 @@ import {
   type SessionHistoryFacts,
 } from "@/lib/domain/reconcile-statement";
 import { listBankAccounts } from "./banking";
+import { getBankStanding } from "./bank-standing";
 import {
   BankRecError,
   getBroughtForwardPreview,
@@ -131,6 +133,20 @@ export async function readCompletedReconciliations(sb: SupabaseClient): Promise<
     adjusted: Boolean(r.adjustment_entry_id),
     adjustmentReason: (r.adjustment_reason as string) ?? null,
   }));
+}
+
+/**
+ * The history with each account's standing at the company's today, as the
+ * Reconcile history screen lists it. A standing that cannot be read leaves
+ * those columns blank, not the page. Read by the page for its first paint
+ * (2.92) and by `reconciliationHistoryAction` after.
+ */
+export async function getReconciliationHistoryWithStandings(sb: SupabaseClient, asOf: string): Promise<HistoryAccount[]> {
+  const [history, standings] = await Promise.all([
+    getReconciliationHistory(sb),
+    getBankStanding(sb, asOf).catch(() => null),
+  ]);
+  return withStandings(history, standings);
 }
 
 /** Every bank account's history, named and ordered as Banking lists the accounts. */

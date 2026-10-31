@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Input, Modal, Space, Tag, Tooltip } from "antd";
 import type { BankStatementImportRow } from "@/lib/services/banking";
@@ -25,6 +25,8 @@ export interface BankImportListProps {
   /** Bumped by the screen after an import, and after an undo. */
   reloadKey: number;
   onChanged: () => void;
+  /** The rows the page read for the account the screen opened on (2.92), used once. */
+  initialRows?: BankStatementImportRow[];
 }
 
 /**
@@ -45,13 +47,16 @@ export default function BankImportList({
   canWrite,
   reloadKey,
   onChanged,
+  initialRows,
 }: BankImportListProps) {
   const { message } = App.useApp();
   const { timeZone } = useCompanyClock();
-  const [rows, setRows] = useState<BankStatementImportRow[]>([]);
-  // Until the first answer the register is loading, not empty: it reads after
-  // the bank lines in Next's one-at-a-time queue of Server Actions.
-  const [loaded, setLoaded] = useState(false);
+  const [rows, setRows] = useState<BankStatementImportRow[]>(initialRows ?? []);
+  // Until the first answer the register is loading, not empty: without the
+  // page's rows it reads after the bank lines in Next's one-at-a-time queue of
+  // Server Actions.
+  const [loaded, setLoaded] = useState(initialRows !== undefined);
+  const seeded = useRef(initialRows !== undefined);
   const [undoing, setUndoing] = useState<BankStatementImportRow | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,7 +68,14 @@ export default function BankImportList({
     });
   }, [bankAccountId]);
 
-  useEffect(refresh, [refresh, reloadKey]);
+  useEffect(() => {
+    // The page's rows stand for the first paint; every later change reads again.
+    if (seeded.current) {
+      seeded.current = false;
+      return;
+    }
+    refresh();
+  }, [refresh, reloadKey]);
 
   const confirmUndo = async () => {
     if (!undoing) return;

@@ -1,7 +1,7 @@
 "use client";
 import StatusTag from "@/components/ui/StatusTag";
 import { sourceLabel } from "@/lib/domain/entry-detail";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -45,10 +45,10 @@ import { formatDate, formatMoney, plural } from "@/lib/format";
 import { attachMismatch, keepFailureMessage, linesSpan, serverFailure } from "@/lib/domain/statement-evidence";
 import { downloadSavedFile } from "@/lib/client/saved-file-download";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
+import type { ReconcileWorkspaceView } from "./workspace-view";
 import { attachStatementFileAction } from "../../statement-file-actions";
 import {
-  reconciliationLinesAction,
-  reconciliationDetailAction,
+  reconcileWorkspaceAction,
   setClearedAction,
   setClearedManyAction,
   recordAdjustmentAction,
@@ -61,7 +61,6 @@ import {
   addMissingPlanAction,
   importStatementIntoReconciliationAction,
   matchAgainAction,
-  reconciliationStatementAction,
   setStatementEndingAction,
 } from "../statement-actions";
 import {
@@ -160,6 +159,13 @@ interface Props {
   };
   /** The account a kept statement file is named after: "Example Bank ****1183". */
   fileAccount: string;
+  /** What the page read for the first paint; null when it did not (2.92). */
+  initialView: ReconcileWorkspaceView | null;
+}
+
+/** Every part of the screen's read came back. */
+function workspaceComplete(view: ReconcileWorkspaceView): boolean {
+  return view.lines.ok && view.detail.ok && view.statement.ok;
 }
 
 export default function ReconcileWorkspaceClient({
@@ -175,6 +181,7 @@ export default function ReconcileWorkspaceClient({
   baseDecimals,
   bankAccount,
   fileAccount,
+  initialView,
 }: Props) {
   const { message, modal } = App.useApp();
   const router = useRouter();
@@ -184,9 +191,12 @@ export default function ReconcileWorkspaceClient({
   // agree; whatever goes back to the server is turned back with `stored`.
   const side: BalanceSide = bankAccount.side ?? "bank";
   const words = BALANCE_WORDS[side];
-  const [rawLines, setLines] = useState<ReconLineView[]>([]);
-  const [rawDetail, setDetail] = useState<ReconDetail | null>(null);
-  const [rawStatement, setStatement] = useState<ReconStatement | null>(null);
+  // The page read all three for the first paint (2.92); taken only whole.
+  const [seed] = useState(() => (initialView && workspaceComplete(initialView) ? initialView : null));
+  const [rawLines, setLines] = useState<ReconLineView[]>(() => seed?.lines.data ?? []);
+  const [rawDetail, setDetail] = useState<ReconDetail | null>(() => seed?.detail.data ?? null);
+  const [rawStatement, setStatement] = useState<ReconStatement | null>(() => seed?.statement.data ?? null);
+  const seeded = useRef(seed !== null);
   const lines = useMemo(() => cardBookLines(rawLines, side), [rawLines, side]);
   const detail = useMemo(() => (rawDetail ? cardDetail(rawDetail, side) : null), [rawDetail, side]);
   const statement = useMemo(() => (rawStatement ? cardStatement(rawStatement, side) : null), [rawStatement, side]);
@@ -228,11 +238,9 @@ export default function ReconcileWorkspaceClient({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [l, d, s] = await Promise.all([
-      reconciliationLinesAction(reconciliationId),
-      reconciliationDetailAction(reconciliationId),
-      reconciliationStatementAction(reconciliationId),
-    ]);
+    // One request for all three (2.92): Next sends Server Actions one at a
+    // time, so three of them were three round trips on every reload.
+    const { lines: l, detail: d, statement: s } = await reconcileWorkspaceAction(reconciliationId);
     setLoading(false);
     if (l.ok && l.data) setLines(l.data);
     else message.error(l.error ?? "Failed");
@@ -252,8 +260,10 @@ export default function ReconcileWorkspaceClient({
   }, [reconciliationId, message]);
 
   useEffect(() => {
+    // The page read the figures for the first paint; only the history is still to come.
+    if (seeded.current) seeded.current = false;
+    else void load();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
     void loadHistory();
   }, [load, loadHistory]);
 

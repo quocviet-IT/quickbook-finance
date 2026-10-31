@@ -22,16 +22,28 @@ vi.mock("@/lib/services/banking-surface/facts", () => ({ getBankingContext: mock
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/auth", () => ({ getUserRole: mocks.getUserRole, canWrite: mocks.canWrite, isAdmin: vi.fn() }));
 vi.mock("@/lib/db/server", () => ({ createSupabaseServerClient: mocks.createClient }));
-vi.mock("@/lib/services/reconcile-history", () => ({
-  discardReconciliation: mocks.discardReconciliation,
-  bringHistoryForward: mocks.bringHistoryForward,
-  bringHistoryForwardFromSession: mocks.bringHistoryForwardFromSession,
-  getHistoryPreview: mocks.getHistoryPreview,
-  getReconciliationHistory: mocks.getReconciliationHistory,
-  getSessionHistoryAdvice: mocks.getSessionHistoryAdvice,
-  setStatementLineAside: mocks.setStatementLineAside,
-  statementLineDuplicates: vi.fn(),
-}));
+vi.mock("@/lib/services/reconcile-history", async () => {
+  const { withStandings } = await import("@/lib/domain/reconcile-history");
+  return {
+    discardReconciliation: mocks.discardReconciliation,
+    bringHistoryForward: mocks.bringHistoryForward,
+    bringHistoryForwardFromSession: mocks.bringHistoryForwardFromSession,
+    getHistoryPreview: mocks.getHistoryPreview,
+    getReconciliationHistory: mocks.getReconciliationHistory,
+    // The service joins the two reads exactly so (2.92, shared with the page);
+    // built from the mocks here so each test can steer either read.
+    getReconciliationHistoryWithStandings: async (sb: unknown, asOf: string) => {
+      const [history, standings] = await Promise.all([
+        mocks.getReconciliationHistory(sb),
+        mocks.getBankStanding(sb, asOf).catch(() => null),
+      ]);
+      return withStandings(history, standings);
+    },
+    getSessionHistoryAdvice: mocks.getSessionHistoryAdvice,
+    setStatementLineAside: mocks.setStatementLineAside,
+    statementLineDuplicates: vi.fn(),
+  };
+});
 vi.mock("@/lib/services/add-missing", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/services/add-missing")>()),
   addMissingLines: mocks.addMissingLines,

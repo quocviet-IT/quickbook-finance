@@ -16,3 +16,20 @@ export async function isServerActionRender(): Promise<boolean> {
   // (ACTION_HEADER in next/dist/client/components/app-router-headers).
   return (await headers()).has("next-action");
 }
+
+/**
+ * A read a page does for its screen's first paint (2.92), so the list arrives
+ * with the HTML instead of after it, behind a Server Action Next would only
+ * send once the page's code had loaded. Null when the page is drawn in answer
+ * to a Server Action (see above), and null when the read fails: the screen
+ * then reads for itself, as it always did, and reports the failure its own
+ * way rather than the page failing as a whole.
+ */
+export async function firstPaintRead<T>(read: () => Promise<T>): Promise<T | null> {
+  if (await isServerActionRender()) return null;
+  try {
+    return await read();
+  } catch {
+    return null;
+  }
+}
