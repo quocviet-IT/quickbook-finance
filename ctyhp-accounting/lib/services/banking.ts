@@ -642,7 +642,7 @@ export async function connectPlaidBank(
     };
   });
 
-  const encryptedToken = encryptBankToken(accessToken);
+  const encryptedToken = encryptBankToken(accessToken, itemId);
   const { data, error } = await sb.rpc("acc_save_bank_connection", {
     p_provider_item_id: itemId,
     p_institution_id: input.institutionId,
@@ -754,7 +754,7 @@ export async function syncBankConnection(
 ): Promise<BankFeedSyncResult> {
   const { data: connection, error: connectionError } = await sb
     .from("acc_bank_connection")
-    .select("id,sync_cursor,status")
+    .select("id,sync_cursor,status,provider_item_id")
     .eq("id", connectionId)
     .single();
   if (connectionError) throw new BankingError(connectionError.message);
@@ -796,7 +796,7 @@ export async function syncBankConnection(
     );
 
     const changes = await collectPlaidChanges(
-      decryptBankToken(encryptedToken as string),
+      decryptBankToken(encryptedToken as string, (connection as { provider_item_id: string }).provider_item_id),
       (connection as { sync_cursor: string | null }).sync_cursor,
     );
     nextCursor = changes.nextCursor;

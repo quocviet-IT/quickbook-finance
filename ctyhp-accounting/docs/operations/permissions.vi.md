@@ -163,9 +163,13 @@ Công ty mới được tạo với đúng các luật như các công ty đang 
 
 - **Họ chưa từng đăng nhập OneBook:** Settings › Users › **Add user**. Nhập
   email, tên và vai trò. OneBook tạo tài khoản đăng nhập cho họ.
-- **Họ đã đăng nhập cho một công ty khác:** Settings › Users › **Add existing
-  account**. Nhập email họ dùng để đăng nhập và chọn vai trò cho công ty này. Họ
-  giữ nguyên mật khẩu.
+- **Họ đã đăng nhập cho một công ty khác mà bạn cũng làm việc:** Settings ›
+  Users › **Add existing account**. Nhập email họ dùng để đăng nhập và chọn vai
+  trò cho công ty này. Họ giữ nguyên mật khẩu. Từ bản 2.96 màn hình chỉ tìm
+  thấy đồng nghiệp như vậy; với mọi người khác, câu trả lời giống hệt nhau dù
+  email đó có tài khoản hay không, nên không dùng được để dò ai đang dùng
+  OneBook. Người chỉ làm ở những công ty bạn không làm thì do một admin làm ở
+  cả hai công ty thêm vào.
 - Cấp vai trò thấp nhất đủ làm việc. Chỉ bật thêm quyền cho một vai trò khi có
   việc thật cần đến.
 

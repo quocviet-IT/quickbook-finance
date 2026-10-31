@@ -16,18 +16,27 @@ vi.mock("@/lib/services/plaid", async (importOriginal) => {
     removePlaidItem: (token: string) => plaid.remove(token),
   };
 });
-vi.mock("@/lib/services/bank-token-crypto", () => ({ decryptBankToken: (payload: string) => `plain:${payload}` }));
+vi.mock("@/lib/services/bank-token-crypto", () => ({
+  decryptBankToken: (payload: string, itemId: string) => `plain:${payload}@${itemId}`,
+}));
 
 const { PlaidError } = await import("@/lib/services/plaid");
 const { BankFeedError, disconnectBankConnection, listBankFeedSyncs, undoBankFeedSync } = await import("@/lib/services/bank-feeds");
 
 type Answer = { data: unknown; error: { message: string } | null };
 
-/** A stand-in for PostgREST's rpc: scalar answers by function name, table answers paged; records every call. */
-function fakeClient(answers: Record<string, Answer | Record<string, unknown>[]>) {
+/**
+ * A stand-in for PostgREST's rpc: scalar answers by function name, table answers paged; records every call.
+ * The one table read is the connection's Plaid item, which the token is sealed for.
+ */
+function fakeClient(
+  answers: Record<string, Answer | Record<string, unknown>[]>,
+  connection: Answer = { data: { provider_item_id: "item-1" }, error: null },
+) {
   const calls: { fn: string; args: Record<string, unknown> }[] = [];
   const orders: string[] = [];
   const sb = {
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve(connection) }) }) }),
     rpc: (fn: string, args: Record<string, unknown>) => {
       calls.push({ fn, args });
       const answer = answers[fn] ?? { data: null, error: null };
@@ -63,7 +72,7 @@ describe("disconnecting a bank connection", () => {
   it("removes it at Plaid with the connection's own token, then disconnects it with no note", async () => {
     const { sb, calls } = fakeClient(token);
     expect(await disconnectBankConnection(sb, "conn-1", " The bank closed the account ", false)).toEqual({ disconnected: true, confirmedByPlaid: true });
-    expect(plaid.remove).toHaveBeenCalledWith("plain:sealed");
+    expect(plaid.remove).toHaveBeenCalledWith("plain:sealed@item-1");
     expect(calls.at(-1)).toEqual({
       fn: "acc_disconnect_bank_connection",
       args: { p_connection_id: "conn-1", p_reason: "The bank closed the account", p_note: null },
@@ -128,6 +137,15 @@ describe("disconnecting a bank connection", () => {
     });
     const onlyHere = fakeClient(token);
     expect(await disconnectBankConnection(onlyHere.sb, "conn-1", "Closed", true)).toEqual({ disconnected: true, confirmedByPlaid: false });
+  });
+
+  it("takes a connection it cannot find as not confirmed, since its token opens only for its own item", async () => {
+    const { sb } = fakeClient(token, { data: null, error: null });
+    expect(await disconnectBankConnection(sb, "conn-1", "Closed", false)).toEqual({
+      disconnected: false,
+      unconfirmed: "Plaid did not confirm the removal: the bank connection was not found. Try again, or tick Disconnect in OneBook only.",
+    });
+    expect(plaid.remove).not.toHaveBeenCalled();
   });
 
   it("says plainly when the stored token is missing", async () => {

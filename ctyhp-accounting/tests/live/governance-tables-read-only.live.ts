@@ -10,8 +10,8 @@
  *  1. No write policy is left on the eight tables; each keeps its read policy.
  *  2. The administrator writing them directly is refused: an insert errors,
  *     an update or delete reaches no row.
- *  3. Through the functions: add an existing account by email (refused twice,
- *     refused for an unknown email), add a new account's user row, change a
+ *  3. Through the functions: add an existing account and a new account's user
+ *     row (the email lookup by any address is gone since 0185), change a
  *     role, suspend, edit the matrix and an approval policy, generate, close
  *     and reopen a period, save the company settings — each leaves its audit
  *     row.
@@ -109,15 +109,12 @@ describe("the governance tables", () => {
       }
       expect((await q<{ role: string }>("select role::text from acc_app_user where id = $1", [admin.id]))[0].role).toBe("admin");
 
-      // 3. Through the functions.
+      // 3. Through the functions. The email lookup by any address is gone (0185);
+      // an existing account is added by id once onebook.find_colleague has found it.
+      expect((await attempt("select acc_add_existing_user($1, 'viewer')", [existing.email])).error).toMatch(/does not exist/);
       let before = await auditCount();
-      const added = await attempt("select acc_add_existing_user($1, 'accountant') as id", [existing.email.toUpperCase()]);
-      expect(added.error).toBeNull();
-      expect(added.rows[0].id).toBe(existing.id);
+      expect((await attempt("select acc_add_company_user($1, 'Existing Person', 'accountant')", [existing.id])).error).toBeNull();
       expect(await auditCount()).toBeGreaterThan(before);
-      expect((await attempt("select acc_add_existing_user($1, 'viewer')", [existing.email])).error).toMatch(/already in this company \(active\)/);
-      expect((await attempt("select acc_add_existing_user('nobody-at-all@example.invalid', 'viewer')")).error).toMatch(/No OneBook sign-in uses/);
-      expect((await attempt("select acc_add_existing_user('  ', 'viewer')")).error).toMatch(/Enter the email address/);
 
       before = await auditCount();
       expect((await attempt("select acc_add_company_user($1, 'New Person', 'viewer')", [fresh.id])).error).toBeNull();
@@ -143,7 +140,7 @@ describe("the governance tables", () => {
 
       // 4. Without users.manage, nobody is added.
       await as(existing.id);
-      expect((await attempt("select acc_add_existing_user($1, 'admin')", [fresh.email])).error).toMatch(/permission to manage users/);
+      expect((await attempt("select acc_add_company_user($1, 'X', 'admin')", [fresh.id])).error).toMatch(/permission to manage users/);
       expect((await attempt("select acc_add_company_user(gen_random_uuid(), 'X', 'admin')")).error).toMatch(/permission to manage users/);
     } finally {
       clearTimeout(killer);

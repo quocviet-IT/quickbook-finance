@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { resolveActiveCompany } from "@/lib/db/company";
-import { createSupabaseServerClient } from "@/lib/db/server";
+import { createSupabaseServerClient, createSupabaseServerClientForSchema } from "@/lib/db/server";
 import { holdsPermission } from "@/lib/auth";
 import {
   userAddExistingSchema,
@@ -44,7 +44,7 @@ export async function createUserAction(raw: unknown): Promise<ActionResult<{ id:
   }
 }
 
-/** A person who already has a OneBook sign-in, added to this company by email (2.57). */
+/** A colleague who already has a OneBook sign-in, added to this company by email (2.57; colleagues only since 2.96). */
 export async function addExistingUserAction(raw: unknown): Promise<ActionResult<{ id: string }>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };
@@ -53,8 +53,8 @@ export async function addExistingUserAction(raw: unknown): Promise<ActionResult<
   try {
     const company = await resolveActiveCompany();
     if (!company.active) return { ok: false, error: "No company is selected" };
-    const sb = await createSupabaseServerClient();
-    const id = await addExistingUser(sb, company.active.id, parsed.data);
+    const [sb, register] = await Promise.all([createSupabaseServerClient(), createSupabaseServerClientForSchema("onebook")]);
+    const id = await addExistingUser(sb, register, company.active.id, parsed.data);
     revalidatePath("/settings/users");
     return { ok: true, data: { id } };
   } catch (e) {

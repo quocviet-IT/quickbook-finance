@@ -41,6 +41,26 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.96",
+    date: "2026-10-31",
+    headline: "Add existing account finds only colleagues, and the bank feed key can be changed.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Add existing account finds only people you already work with",
+        detail:
+          "It finds someone who signs in for another company you also work in, or who is already on this company's list. For any other address it gives the same answer whether or not the address has a OneBook sign-in, so it can no longer be used to find out who uses OneBook. Someone who works only in companies you do not can be added by an administrator who works in both.",
+        route: "/settings/users",
+      },
+      {
+        kind: "changed",
+        title: "The key that protects bank feed connections can be replaced",
+        detail:
+          "Each connected bank's sign-in is stored sealed with a key that can now be changed without connecting the banks again, and a sealed sign-in opens only for its own connection. Nothing changes on the Banking screen.",
+      },
+    ],
+  },
+  {
     version: "2.95",
     date: "2026-10-31",
     headline: "Audit history follows its permission, refusals read in plain words, and pages run only their own scripts.",

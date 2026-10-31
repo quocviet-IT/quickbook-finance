@@ -161,9 +161,13 @@ A new company is created with exactly the same rules as the existing ones.
 
 - **They have never signed in to OneBook:** Settings › Users › **Add user**.
   Enter their email, name and role. OneBook creates their sign-in.
-- **They already sign in for another company:** Settings › Users › **Add
-  existing account**. Enter the email they sign in with and choose the role for
-  this company. They keep their password.
+- **They already sign in for another company you also work in:** Settings ›
+  Users › **Add existing account**. Enter the email they sign in with and
+  choose the role for this company. They keep their password. Since 2.96 only
+  such a colleague is found; for anyone else the screen gives the same answer
+  whether or not the address has a sign-in, so it cannot be used to find out
+  who uses OneBook. Someone who works only in companies you do not can be added
+  by an administrator who works in both.
 - Give the least role that does the job. Add permissions to a role only when a
   real task needs them.
 

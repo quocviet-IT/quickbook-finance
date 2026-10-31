@@ -86,10 +86,11 @@ describe("admins in a company", () => {
       expect((await roleOf(third.id)).role).toBe("accountant");
       expect(await attempt("select acc_set_user_status($1, 'active', 'Back from leave')", [dormant.id])).toMatch(CAP);
       expect((await roleOf(dormant.id)).status).toBe("suspended");
-      expect(await attempt("select acc_add_existing_user($1, 'admin')", [outsider.email])).toMatch(CAP);
+      // Adding a person (the road Add user and, since 2.96, Add existing account both take).
+      expect(await attempt("select acc_add_company_user($1, 'Outsider', 'admin')", [outsider.id])).toMatch(CAP);
       expect(await q("select 1 from acc_app_user where id = $1", [outsider.id])).toHaveLength(0);
       // An existing account may still join in another role.
-      expect(await attempt("select acc_add_existing_user($1, 'viewer')", [outsider.email])).toBeNull();
+      expect(await attempt("select acc_add_company_user($1, 'Outsider', 'viewer')", [outsider.id])).toBeNull();
 
       // Nor around the functions, even as the database owner.
       await client.query("reset role");

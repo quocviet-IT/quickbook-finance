@@ -9,8 +9,8 @@ vi.mock("@/lib/services/plaid", async (importOriginal) => {
   return { ...actual, syncPlaidTransactions: (...args: unknown[]) => plaid.sync(...args) };
 });
 vi.mock("@/lib/services/bank-token-crypto", () => ({
-  decryptBankToken: (payload: string) => `plain:${payload}`,
-  encryptBankToken: (token: string) => `sealed:${token}`,
+  decryptBankToken: (payload: string, itemId: string) => `plain:${payload}@${itemId}`,
+  encryptBankToken: (token: string, itemId: string) => `sealed:${token}@${itemId}`,
 }));
 
 const { syncBankConnection } = await import("@/lib/services/banking");
@@ -30,7 +30,7 @@ const transaction = (id: string, amount: number) => ({
 /** A stand-in for the client: tables answer with fixed rows (none for the ones a sync only scans), rpc answers by name; every rpc is recorded. */
 function fakeClient(rpcs: Record<string, unknown>) {
   const tables: Record<string, unknown[]> = {
-    acc_bank_connection: [{ id: "conn-1", sync_cursor: "cursor-before", status: "active" }],
+    acc_bank_connection: [{ id: "conn-1", sync_cursor: "cursor-before", status: "active", provider_item_id: "item-1" }],
     acc_bank_feed_account: [{ bank_account_id: "bank-1", provider_account_id: "acc-example-1", currency_code: "USD" }],
     acc_currency: [{ code: "USD", decimal_places: 2 }],
     acc_bank_account: [{ account_id: "gl-1" }],
@@ -101,5 +101,7 @@ describe("syncBankConnection", () => {
       "acc_finish_bank_feed_sync",
     ]);
     expect(calls.at(-1)?.args).toMatchObject({ p_run_id: "run-example-1", p_cursor: "cursor-after", p_error_message: null });
+    // The token is opened for the connection's own Plaid item (2.96).
+    expect(plaid.sync.mock.calls[0][0]).toBe("plain:sealed-token@item-1");
   });
 });
