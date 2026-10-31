@@ -320,9 +320,10 @@ export default function UsersClient({
 }
 
 /**
- * A person who already signs in to OneBook, for another company, given a
- * place in this one. Add user would refuse their email: it always creates a
- * new sign-in. Their name and password stay as they are.
+ * A colleague who already signs in to OneBook, for another company the admin
+ * also works in, given a place in this one. Add user would refuse their email:
+ * it always creates a new sign-in. Their name and password stay as they are.
+ * Since 2.96 nobody else is found (onebook.find_colleague, 0185).
  */
 function AddExistingUserModal({
   adminAllowed,
@@ -355,8 +356,9 @@ function AddExistingUserModal({
   return (
     <Modal title="Add an existing account" open onOk={submit} onCancel={onClose} confirmLoading={saving} okText="Add to this company">
       <Typography.Paragraph type="secondary">
-        For someone who already signs in to OneBook for another company. They keep their password; this gives them a
-        place in this company with the role you choose. It takes effect at once and is recorded in the audit log.
+        For someone who already signs in to OneBook for another company you also work in. They keep their password;
+        this gives them a place in this company with the role you choose. It takes effect at once and is recorded in
+        the audit log.
       </Typography.Paragraph>
       <Form form={form} layout="vertical" initialValues={{ role: "viewer" }}>
         <Form.Item

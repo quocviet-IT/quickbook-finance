@@ -1,37 +1,42 @@
 import "server-only";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { openBankToken, sealBankToken } from "@/lib/domain/bank-token-seal";
 
-const VERSION = "v1";
-
-function encryptionKey(): Buffer {
+/**
+ * The keys bank feed tokens are sealed with (lib/domain/bank-token-seal.ts).
+ *
+ *   BANK_FEED_ENCRYPTION_KEY           the key every new token is sealed with
+ *   BANK_FEED_ENCRYPTION_KEY_PREVIOUS  older keys, comma-separated, still read
+ *                                      while a rotation is under way
+ *
+ * Rotating: put the new key in BANK_FEED_ENCRYPTION_KEY and the old one in
+ * BANK_FEED_ENCRYPTION_KEY_PREVIOUS, deploy, run
+ * scripts/reseal-bank-tokens.mjs --commit, then remove the previous key.
+ */
+function currentSecret(): string {
   const secret = process.env.BANK_FEED_ENCRYPTION_KEY?.trim() ?? "";
   if (secret.length < 32) {
     throw new Error("BANK_FEED_ENCRYPTION_KEY must be configured with at least 32 characters");
   }
-  return createHash("sha256").update(secret, "utf8").digest();
+  return secret;
+}
+
+function previousSecrets(): string[] {
+  return (process.env.BANK_FEED_ENCRYPTION_KEY_PREVIOUS ?? "")
+    .split(",")
+    .map((secret) => secret.trim())
+    .filter((secret) => secret.length >= 32);
 }
 
 export function bankFeedEncryptionConfigured(): boolean {
   return (process.env.BANK_FEED_ENCRYPTION_KEY?.trim().length ?? 0) >= 32;
 }
 
-export function encryptBankToken(plainText: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(plainText, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return [VERSION, iv.toString("base64url"), tag.toString("base64url"), encrypted.toString("base64url")].join(".");
+/** Seals a Plaid access token for the item it belongs to. */
+export function encryptBankToken(plainText: string, itemId: string): string {
+  return sealBankToken(plainText, currentSecret(), itemId);
 }
 
-export function decryptBankToken(payload: string): string {
-  const [version, ivValue, tagValue, encryptedValue] = payload.split(".");
-  if (version !== VERSION || !ivValue || !tagValue || !encryptedValue) {
-    throw new Error("Bank token payload is invalid or uses an unsupported version");
-  }
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivValue, "base64url"));
-  decipher.setAuthTag(Buffer.from(tagValue, "base64url"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(encryptedValue, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
+/** Opens a stored token; `itemId` is the connection's Plaid item. */
+export function decryptBankToken(payload: string, itemId: string): string {
+  return openBankToken(payload, [currentSecret(), ...previousSecrets()], itemId);
 }

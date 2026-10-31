@@ -90,7 +90,9 @@ describe("the application side of 2.57", () => {
     const access = read("lib", "services", "access.ts");
     expect(access).not.toMatch(/from\("acc_app_user"\)\s*\.(insert|upsert|update|delete)/);
     expect(access).toMatch(/rpc\("acc_add_company_user"/);
-    expect(access).toMatch(/rpc\("acc_add_existing_user"/);
+    // Since 2.96 an existing account is found as a colleague first (0185); the email lookup by any address is gone.
+    expect(access).toMatch(/rpc\("find_colleague"/);
+    expect(access).not.toMatch(/acc_add_existing_user/);
   });
 
   it("offers Add existing account beside Add user", () => {

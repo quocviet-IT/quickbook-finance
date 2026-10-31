@@ -1058,7 +1058,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/settings/users",
         note:
           "Add user creates a new sign-in; Add existing account gives this company to someone who already signs in " +
-          "for another. Give the least role that does the job.",
+          "for another company you also work in. Give the least role that does the job.",
       },
       {
         action: "Stop someone who has left",

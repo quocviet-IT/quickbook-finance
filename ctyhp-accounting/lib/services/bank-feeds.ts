@@ -87,10 +87,17 @@ export async function disconnectBankConnection(
     if (!plaidConfiguration().configured) {
       problem = "OneBook has no Plaid keys";
     } else {
-      const { data: encrypted, error } = await sb.rpc("acc_get_bank_connection_token", { p_connection_id: connectionId });
+      // The token is sealed for its Plaid item (2.96), so the item is read with it.
+      const [{ data: encrypted, error }, { data: connection, error: connectionError }] = await Promise.all([
+        sb.rpc("acc_get_bank_connection_token", { p_connection_id: connectionId }),
+        sb.from("acc_bank_connection").select("provider_item_id").eq("id", connectionId).maybeSingle(),
+      ]);
       if (error) throw new BankFeedError(error.message);
+      if (connectionError) throw new BankFeedError(connectionError.message);
       if (typeof encrypted !== "string" || encrypted === "") throw new BankFeedError("the stored token was not found");
-      await removePlaidItem(decryptBankToken(encrypted));
+      const itemId = (connection as { provider_item_id?: string } | null)?.provider_item_id;
+      if (!itemId) throw new BankFeedError("the bank connection was not found");
+      await removePlaidItem(decryptBankToken(encrypted, itemId));
     }
   } catch (e) {
     if (!(e instanceof PlaidError && plaidItemAlreadyGone(e.code))) {

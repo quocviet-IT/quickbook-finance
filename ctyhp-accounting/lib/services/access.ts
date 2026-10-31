@@ -129,30 +129,49 @@ export async function createUser(
   return userId;
 }
 
+/** What Add existing account says when the address is not a colleague's, whether or not it has a sign-in. */
+export const NOT_A_COLLEAGUE =
+  "Nobody with that address works in a company you belong to. Check the address, or use Add user to create a sign-in for them.";
+
 /**
  * Give a person who already signs in to OneBook a place in this company, by
  * the email address they sign in with. Until 2.57 this could not be done on
  * screen: Add user always creates a new sign-in, and an email that already
  * has one was refused.
  *
- * The database finds the account, refuses one already in this company, and
- * checks users.manage; the register note that follows is best-effort, as in
+ * Since 2.96 only a colleague is found: someone already on this company's list
+ * or working in another company the administrator works in
+ * (onebook.find_colleague, migration 0185). Every other address gets the same
+ * answer, so the screen cannot be used to learn who signs in to OneBook
+ * elsewhere. acc_add_company_user then checks users.manage again and refuses
+ * one already here; the register note that follows is best-effort, as in
  * createUser.
  */
 export async function addExistingUser(
   sb: SupabaseClient,
+  /** The person's own client on the `onebook` schema, where find_colleague lives. */
+  register: SupabaseClient,
   companyId: string,
   input: UserAddExistingInput,
 ): Promise<string> {
-  const { data, error } = await sb.rpc("acc_add_existing_user", {
+  const { data: found, error: findError } = await register.rpc("find_colleague", {
+    p_company_id: companyId,
     p_email: input.email,
+  });
+  if (findError) throw new AccessError(findError.message);
+  const colleague = ((found ?? []) as { colleague_id: string; colleague_name: string }[])[0];
+  if (!colleague) throw new AccessError(NOT_A_COLLEAGUE);
+
+  const { error } = await sb.rpc("acc_add_company_user", {
+    p_user_id: colleague.colleague_id,
+    p_full_name: colleague.colleague_name,
     p_role: input.role,
   });
   if (error) throw new AccessError(error.message);
-  const userId = String(data);
+  const userId = colleague.colleague_id;
   try {
-    const register = createSupabaseAdminClient("onebook");
-    const { error: eMember } = await register
+    const note = createSupabaseAdminClient("onebook");
+    const { error: eMember } = await note
       .from("company_member")
       .upsert({ company_id: companyId, user_id: userId }, { ignoreDuplicates: true });
     if (eMember) throw eMember;
