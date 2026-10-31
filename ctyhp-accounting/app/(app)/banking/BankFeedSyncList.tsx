@@ -22,6 +22,8 @@ export interface BankFeedSyncListProps {
   /** Bumped by the screen after anything that can change the list. */
   reloadKey: number;
   onChanged: () => void;
+  /** The rows the page read for the account the screen opened on (2.92), used once. */
+  initialRows?: BankFeedSyncView[];
 }
 
 /** A count column: room for "Removed" or "Skipped" in the header and five digits below (2.50). */
@@ -40,19 +42,21 @@ const STATUS_COLOR: Record<BankFeedSyncStatus, string | undefined> = {
  * connection's newest that changed something — and the button says why when
  * it is shut instead of failing when pressed.
  */
-export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, onChanged }: BankFeedSyncListProps) {
+export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, onChanged, initialRows }: BankFeedSyncListProps) {
   const { message } = App.useApp();
   const { timeZone } = useCompanyClock();
   const when = (iso: string) => formatDateTime(iso, timeZone);
-  const [rows, setRows] = useState<BankFeedSyncView[]>([]);
+  const [rows, setRows] = useState<BankFeedSyncView[]>(initialRows ?? []);
   const [undoing, setUndoing] = useState<BankFeedSyncView | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
   const [readError, setReadError] = useState<string | null>(null);
-  // Until the first answer the list is loading, not empty: it reads after the
-  // bank lines in Next's one-at-a-time queue of Server Actions.
-  const [loaded, setLoaded] = useState(false);
+  // Until the first answer the list is loading, not empty: without the page's
+  // rows it reads after the bank lines in Next's one-at-a-time queue of Server
+  // Actions.
+  const [loaded, setLoaded] = useState(initialRows !== undefined);
+  const seeded = useRef(initialRows !== undefined);
   /** Counts reads, so only the latest one may set the rows: a slow answer for another account is dropped. */
   const latestRead = useRef(0);
 
@@ -79,7 +83,9 @@ export default function BankFeedSyncList({ bankAccountId, canWrite, reloadKey, o
   }, [bankAccountId]);
 
   useEffect(() => {
-    refresh();
+    // The page's rows stand for the first paint; every later change reads again.
+    if (seeded.current) seeded.current = false;
+    else refresh();
     // Leaving the account, or the screen, drops the read still in flight.
     return () => {
       latestRead.current += 1;

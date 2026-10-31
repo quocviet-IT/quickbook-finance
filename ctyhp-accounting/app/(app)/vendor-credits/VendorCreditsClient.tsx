@@ -25,6 +25,8 @@ import type { CreditStatus, VendorCreditRow, VendorRow, AccountRow } from "@/lib
 
 interface Props {
   canWrite: boolean;
+  /** The credits the page read for the first paint; null when it did not (2.92). */
+  initialCredits: VendorCreditRow[] | null;
   vendors: VendorRow[];
   expenseAccounts: AccountRow[];
   baseCurrency: string;
@@ -50,13 +52,14 @@ export const VENDOR_CREDIT_APPLY_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.PICKER] as
 
 export default function VendorCreditsClient({
   canWrite,
+  initialCredits,
   vendors,
   expenseAccounts,
   baseCurrency,
   baseDecimals,
 }: Props) {
   const { message } = App.useApp();
-  const [credits, setCredits] = useState<VendorCreditRow[]>([]);
+  const [credits, setCredits] = useState<VendorCreditRow[]>(initialCredits ?? []);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -85,6 +88,8 @@ export default function VendorCreditsClient({
     else message.error(r.error ?? "Failed to load vendor credits");
   };
   useEffect(() => {
+    // The page read the credits for the first paint; read here only when it could not.
+    if (initialCredits) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

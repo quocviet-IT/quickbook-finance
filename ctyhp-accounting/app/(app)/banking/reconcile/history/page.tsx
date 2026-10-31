@@ -5,6 +5,8 @@ import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { listCurrencies } from "@/lib/services/reference";
 import { RECONCILE_HISTORY } from "@/lib/domain/reconcile-history";
 import PageHeader from "@/components/PageHeader";
+import { getReconciliationHistoryWithStandings } from "@/lib/services/reconcile-history";
+import { firstPaintRead } from "@/lib/services/request-kind";
 import ReconcileHistoryClient from "./ReconcileHistoryClient";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +19,13 @@ export const dynamic = "force-dynamic";
 export default async function ReconcileHistoryPage() {
   const sb = await createSupabaseServerClient();
   const role = await getUserRole();
-  const [currencies, { asOf }, holdsComplete] = await Promise.all([
+  const contextRead = getBankingContext(sb);
+  const [currencies, { asOf }, holdsComplete, history] = await Promise.all([
     listCurrencies(sb),
-    getBankingContext(sb),
+    contextRead,
     holdsPermission("reconciliation.complete"),
+    // The table, read here for the first paint (2.92) rather than by the screen once it has loaded.
+    contextRead.then(({ asOf: today }) => firstPaintRead(() => getReconciliationHistoryWithStandings(sb, today))),
   ]);
   const base = currencies.find((c) => c.is_base);
   return (
@@ -34,6 +39,7 @@ export default async function ReconcileHistoryPage() {
       </p>
       <ReconcileHistoryClient
         canBringForward={canWrite(role) && holdsComplete}
+        initialRows={history}
         today={asOf}
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}

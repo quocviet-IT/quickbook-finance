@@ -1,18 +1,17 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, App, Button, List, Modal, Space, Typography } from "antd";
 import { plural, pluralWord } from "@/lib/format";
 import { classifyAccountsAction, planClassificationAction } from "./actions";
+import type { ClassificationPlanSummary } from "@/lib/services/account-classification";
 
 export interface ClassifyAccountsButtonProps {
   canWrite: boolean;
+  /** The plan the page read; null when it did not, and the button asks for itself (2.92). */
+  initialPlan?: Plan | null;
 }
 
-interface Plan {
-  roles: number;
-  details: number;
-  unanswerable: { account_code: string; name: string }[];
-}
+type Plan = ClassificationPlanSummary;
 
 /**
  * Give the accounts an import left unclassified the classification the rest
@@ -29,9 +28,10 @@ interface Plan {
  * classified is touched, and a generic current asset or liability is left for
  * an accountant, because whether a loan is operating or financing is a policy.
  */
-export default function ClassifyAccountsButton({ canWrite }: ClassifyAccountsButtonProps) {
+export default function ClassifyAccountsButton({ canWrite, initialPlan = null }: ClassifyAccountsButtonProps) {
   const { message } = App.useApp();
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(initialPlan);
+  const seeded = useRef(initialPlan !== null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +41,15 @@ export default function ClassifyAccountsButton({ canWrite }: ClassifyAccountsBut
     });
   }, []);
 
-  useEffect(refresh, [refresh]);
+  useEffect(() => {
+    // Nobody who may not classify is offered the button, so nothing to read for them.
+    if (!canWrite) return;
+    if (seeded.current) {
+      seeded.current = false;
+      return;
+    }
+    refresh();
+  }, [canWrite, refresh]);
 
   if (!canWrite || !plan) return null;
   const pending = plan.roles + plan.details;

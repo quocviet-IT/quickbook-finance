@@ -150,6 +150,24 @@ export async function countJournalEntries(
   return count ?? 0;
 }
 
+/** The Journal screen's list: the rows that fit, how many match, and the most one read returns. */
+export interface JournalList {
+  entries: JournalEntrySummary[];
+  total: number;
+  limit: number;
+}
+
+/**
+ * The count is asked for beside the rows so the screen can say how many it is
+ * not showing. Without it a truncated list is indistinguishable from a
+ * complete one, which is how three years of entries went missing in silence.
+ * Read by the Journal page for its first paint (2.92) and by its action after.
+ */
+export async function readJournalList(sb: SupabaseClient, filters: JournalFilters): Promise<JournalList> {
+  const [entries, total] = await Promise.all([listJournalEntries(sb, filters), countJournalEntries(sb, filters)]);
+  return { entries, total, limit: JOURNAL_LIST_LIMIT };
+}
+
 /**
  * An entry's adjusting mark. The mark's key is the entry's id, so PostgREST
  * embeds it as one object — or, in some versions, a one-element list.

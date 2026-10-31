@@ -36,12 +36,14 @@ describe("a loading table does not say it is empty", () => {
     // They now queue behind the lines in Next's one-at-a-time action queue, so
     // a register that claimed to be empty before its data came would claim it
     // for longer than before.
+    // Loaded from the start only when the page read the rows (2.92); otherwise
+    // loading until the first answer.
     const imports = readFileSync(join(process.cwd(), "app/(app)/banking/BankImportList.tsx"), "utf8");
-    expect(imports).toMatch(/const \[loaded, setLoaded\] = useState\(false\)/);
+    expect(imports).toMatch(/const \[loaded, setLoaded\] = useState\(initialRows !== undefined\)/);
     expect(imports).toMatch(/loading=\{!loaded\}/);
     expect(imports).toMatch(/emptyText: loaded \? "No statement has been imported into this company yet\." : ""/);
     const syncs = readFileSync(join(process.cwd(), "app/(app)/banking/BankFeedSyncList.tsx"), "utf8");
-    expect(syncs).toMatch(/const \[loaded, setLoaded\] = useState\(false\)/);
+    expect(syncs).toMatch(/const \[loaded, setLoaded\] = useState\(initialRows !== undefined\)/);
     expect(syncs).toMatch(/loading=\{!loaded\}/);
   });
 

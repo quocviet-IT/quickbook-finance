@@ -15,6 +15,7 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { AccountRow, BillPaymentRow, BillRow, CurrencyRow, VendorRow } from "@/lib/db/types";
+import type { PayRun } from "@/lib/domain/payment-terms";
 import { flexColumn } from "@/components/ui/columns";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
@@ -55,12 +56,15 @@ export const OPEN_BILLS_FIXED_WIDTHS = [COLUMN.CODE, COLUMN.DATE, COLUMN.MONEY, 
 
 export default function PayBillsClient({
   payments,
+  initialPayRun,
   vendors,
   paymentAccounts,
   currencies,
   canWrite,
 }: {
   payments: (BillPaymentRow & { vendor_name: string })[];
+  /** The pay run the page worked out for the first paint; null when it did not (2.92). */
+  initialPayRun: PayRun | null;
   vendors: VendorRow[];
   paymentAccounts: AccountRow[];
   currencies: CurrencyRow[];
@@ -187,6 +191,7 @@ export default function PayBillsClient({
     <>
       {/* What to pay, before how to pay it. */}
       <PayRunPanel
+        initialRun={initialPayRun}
         baseCurrency={currency}
         baseDecimals={decimals}
         onPayVendor={

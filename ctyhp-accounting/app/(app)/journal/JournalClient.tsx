@@ -19,7 +19,7 @@ import FilterBar from "@/components/ui/FilterBar";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
-import type { JournalEntrySummary } from "@/lib/services/journal";
+import type { JournalEntrySummary, JournalList } from "@/lib/services/journal";
 import AdjustingEntryControl from "./AdjustingEntryControl";
 import type { ClosedPeriodAsk } from "@/lib/domain/adjusting-entries";
 
@@ -39,6 +39,8 @@ interface Props {
   initialCreateOpen: boolean;
   /** Opens one journal from an operational report via `?entry=<uuid>`. */
   initialEntryId?: string;
+  /** The list the page read for the first paint; null when it did not (2.92). */
+  initialJournal: JournalList | null;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
@@ -86,6 +88,7 @@ export default function JournalClient({
   baseDecimals,
   initialCreateOpen,
   initialEntryId,
+  initialJournal,
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
@@ -93,7 +96,7 @@ export default function JournalClient({
 }: Props) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
-  const [entries, setEntries] = useState<JournalEntrySummary[]>([]);
+  const [entries, setEntries] = useState<JournalEntrySummary[]>(initialJournal?.entries ?? []);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
@@ -118,8 +121,8 @@ export default function JournalClient({
    * 1,000 of them; the ones it could not reach were the opening balances, which
    * is precisely what somebody goes looking for.
    */
-  const [total, setTotal] = useState(0);
-  const [limit, setLimit] = useState(0);
+  const [total, setTotal] = useState(initialJournal?.total ?? 0);
+  const [limit, setLimit] = useState(initialJournal?.limit ?? 0);
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
 
   const load = async (dates: [Dayjs, Dayjs] | null = range) => {
@@ -137,6 +140,8 @@ export default function JournalClient({
     } else message.error(r.error ?? "Failed to load journal entries");
   };
   useEffect(() => {
+    // The page read the list for the first paint; read here only when it could not.
+    if (initialJournal) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

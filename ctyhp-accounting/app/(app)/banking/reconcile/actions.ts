@@ -14,11 +14,12 @@ import {
 } from "@/lib/services/statement-alerts";
 import {
   createReconciliation, setCleared, setClearedMany, recordAdjustment, completeReconciliation, reopenReconciliation,
-  getReconciliationLines, getReconciliationDetail, getDiscrepancies,
-  BankRecError, type ReconLineView, type ReconDetail, type DiscrepancyRow,
+  getDiscrepancies,
+  BankRecError, type DiscrepancyRow,
 } from "@/lib/services/bankrec";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
 import { readReconcileAccount, type ReconcileAccountView } from "./account-view";
+import { readReconcileWorkspace, type ReconcileWorkspaceView } from "./[id]/workspace-view";
 import { matchAfterCompletion, type CompletionMatching } from "@/lib/services/statement-bank-lines";
 import {
   executeOrSubmitForApproval,
@@ -126,13 +127,19 @@ export async function reopenReconciliationAction(
   catch (e) { return { ok: false, error: msg(e) }; }
 }
 
-export async function reconciliationLinesAction(id: string): Promise<ActionResult<ReconLineView[]>> {
-  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getReconciliationLines(sb, id) }; }
-  catch (e) { return { ok: false, error: msg(e) }; }
-}
-export async function reconciliationDetailAction(id: string): Promise<ActionResult<ReconDetail>> {
-  try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getReconciliationDetail(sb, id) }; }
-  catch (e) { return { ok: false, error: msg(e) }; }
+/**
+ * Reads only: the reconciliation screen's lines, figures and statement in one
+ * request (2.92). They were three actions, which Next sent one after another
+ * on every reload; see readReconcileWorkspace.
+ */
+export async function reconcileWorkspaceAction(id: string): Promise<ReconcileWorkspaceView> {
+  try {
+    const sb = await createSupabaseServerClient();
+    return await readReconcileWorkspace(sb, id);
+  } catch (e) {
+    const failed = { ok: false, error: msg(e) };
+    return { lines: failed, detail: failed, statement: failed };
+  }
 }
 export async function discrepanciesAction(bankAccountId: string): Promise<ActionResult<DiscrepancyRow[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await getDiscrepancies(sb, bankAccountId) }; }

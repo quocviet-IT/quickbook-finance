@@ -370,7 +370,8 @@ describe("the workspace's bring forward and discard", () => {
   const workspace = read("[id]", "ReconcileWorkspaceClient.tsx");
 
   it("reads the offer alongside the figures, and words it while in progress only", () => {
-    expect(workspace).toMatch(/void load\(\);\s*void loadHistory\(\);\s*\}, \[load, loadHistory\]\);/);
+    // The figures come with the page when it read them (2.92); the advice is always asked for.
+    expect(workspace).toMatch(/else void load\(\);[\s\S]{0,120}?void loadHistory\(\);\s*\}, \[load, loadHistory\]\);/);
     expect(workspace).toContain("sessionHistoryAdviceAction(reconciliationId)");
     expect(workspace).toContain("const historyAdvice = inProgress ? sessionHistoryAdvice(historyFacts, money) : null;");
   });

@@ -23,6 +23,8 @@ import type { CreditMemoRow, CreditStatus, CustomerRow, AccountRow, TaxCodeRow }
 
 interface Props {
   canWrite: boolean;
+  /** The memos the page read for the first paint; null when it did not (2.92). */
+  initialMemos: CreditMemoRow[] | null;
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
@@ -51,6 +53,7 @@ export const CREDIT_MEMO_APPLY_FIXED_WIDTHS = [COLUMN.MONEY, COLUMN.PICKER] as c
 
 export default function CreditMemosClient({
   canWrite,
+  initialMemos,
   customers,
   incomeAccounts,
   taxCodes,
@@ -58,7 +61,7 @@ export default function CreditMemosClient({
   baseDecimals,
 }: Props) {
   const { message } = App.useApp();
-  const [memos, setMemos] = useState<CreditMemoRow[]>([]);
+  const [memos, setMemos] = useState<CreditMemoRow[]>(initialMemos ?? []);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,6 +100,8 @@ export default function CreditMemosClient({
     else message.error(r.error ?? "Failed to load credit memos");
   };
   useEffect(() => {
+    // The page read the memos for the first paint; read here only when it could not.
+    if (initialMemos) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

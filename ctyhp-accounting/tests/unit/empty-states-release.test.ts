@@ -63,9 +63,10 @@ describe("the five screens' empty lists", () => {
   });
 
   it("wait for the pay run and the periods before saying they are empty", () => {
-    for (const path of ["components/payables/PayRunPanel.tsx", "app/(app)/settings/periods/PeriodsClient.tsx"]) {
-      expect(read(path), path).toMatch(/const \[loading, setLoading\] = useState\(true\)/);
-    }
+    expect(read("app/(app)/settings/periods/PeriodsClient.tsx")).toMatch(/const \[loading, setLoading\] = useState\(true\)/);
+    // The pay run is loading from the first render unless the page already
+    // worked it out (2.92), in which case there is nothing to wait for.
+    expect(read("components/payables/PayRunPanel.tsx")).toMatch(/const \[loading, setLoading\] = useState\(initialRun === null\)/);
   });
 });
 

@@ -16,8 +16,9 @@ import {
 } from "@/lib/domain/schemas";
 import {
   classifyAccounts,
-  planAccountClassification,
+  summarizeClassificationPlan,
   type ClassificationOutcome,
+  type ClassificationPlanSummary,
 } from "@/lib/services/account-classification";
 import { getChartBalances, type ChartBalances } from "@/lib/services/chart-balances";
 
@@ -45,20 +46,10 @@ function messageFrom(err: unknown): string {
  * offered; one that needs an accountant's policy — a generic current asset or
  * liability — is listed separately and left alone.
  */
-export async function planClassificationAction(): Promise<
-  ActionResult<{ roles: number; details: number; unanswerable: { account_code: string; name: string }[] }>
-> {
+export async function planClassificationAction(): Promise<ActionResult<ClassificationPlanSummary>> {
   try {
     const sb = await createSupabaseServerClient();
-    const plan = await planAccountClassification(sb);
-    return {
-      ok: true,
-      data: {
-        roles: plan.roles.length,
-        details: plan.details.length,
-        unanswerable: plan.unanswerable.map((a) => ({ account_code: a.account_code, name: a.name })),
-      },
-    };
+    return { ok: true, data: await summarizeClassificationPlan(sb) };
   } catch (err) {
     return { ok: false, error: messageFrom(err) };
   }

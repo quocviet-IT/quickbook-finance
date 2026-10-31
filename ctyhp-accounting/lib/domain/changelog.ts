@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.92",
+    date: "2026-10-31",
+    headline: "Journal, Pay Bills, credit memos, vendor credits and reconciling open with their lists already there.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Seven screens no longer wait to start reading",
+        detail:
+          "Journal, Pay Bills' pay run, Credit Memos, Vendor Credits, Reconcile history, the Classify accounts button on Chart of Accounts, and the registers of statement imports and feed syncs under Bank Transactions used to ask for their list only once the page had loaded in the browser, one request after another. The page now reads them itself, so they arrive with it. On 31 October these screens took 1.3 to 2.5 seconds to settle, the Journal the longest on the largest company.",
+        route: "/journal",
+      },
+      {
+        kind: "fixed",
+        title: "Reconciling a statement answers each tick sooner",
+        detail:
+          "The reconciliation screen read its lines, its figures and its statement as three requests that ran one after another, when it opened and again after every tick, match or adjustment. They are one request now, and on opening they come with the page.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "2.91",
     date: "2026-10-30",
     headline: "Backups, Bank Transactions and Reconcile stop waiting, and the last 37 lists keep to the screen.",

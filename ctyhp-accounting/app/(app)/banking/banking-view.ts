@@ -4,12 +4,16 @@ import {
   BankingError,
   listBankRecodes,
   listBankTransactionPostings,
+  listBankStatementImports,
   listBankTransactions,
   listSuggestions,
   type BankPostingRow,
   type BankRecodeRow,
+  type BankStatementImportRow,
   type SuggestionView,
 } from "@/lib/services/banking";
+import { listBankFeedSyncs } from "@/lib/services/bank-feeds";
+import type { BankFeedSyncView } from "@/lib/domain/bank-feeds";
 import type { BankTransactionRow } from "@/lib/db/types";
 
 /** The same shape as the Server Actions' result, so the screen reads one kind. */
@@ -63,6 +67,9 @@ export async function readBankingView(sb: SupabaseClient, bankAccountId: string 
 export interface OpeningBankingView {
   bankAccountId: string;
   view: BankingView;
+  /** The registers under the lines (2.92): statement imports, and bank feed syncs. */
+  imports: ViewResult<BankStatementImportRow[]>;
+  syncs: ViewResult<BankFeedSyncView[]>;
 }
 
 /**
@@ -74,7 +81,11 @@ export function openingBankAccountId(bankAccounts: readonly { id: string }[], re
   return bankAccounts[0]?.id ?? null;
 }
 
-/** Reads the opening account's lines, or nothing when there is no account to open on. */
+/**
+ * Reads the opening account's lines, and the two registers under them, or
+ * nothing when there is no account to open on. The registers were two more
+ * Server Actions after the page had loaded, queued behind the suggestions.
+ */
 export async function readOpeningBankingView(
   sb: SupabaseClient,
   bankAccounts: readonly { id: string }[],
@@ -82,5 +93,10 @@ export async function readOpeningBankingView(
 ): Promise<OpeningBankingView | null> {
   const bankAccountId = openingBankAccountId(bankAccounts, requested);
   if (!bankAccountId) return null;
-  return { bankAccountId, view: await readBankingView(sb, bankAccountId) };
+  const [view, imports, syncs] = await Promise.all([
+    readBankingView(sb, bankAccountId),
+    settled(() => listBankStatementImports(sb, bankAccountId)),
+    settled(() => listBankFeedSyncs(sb, bankAccountId)),
+  ]);
+  return { bankAccountId, view, imports, syncs };
 }

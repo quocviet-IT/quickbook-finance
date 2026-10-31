@@ -62,6 +62,6 @@ describe("bank feed screens", () => {
     expect(banking).toContain("{selectedConnection && canWrite ? (");
     expect(banking).toContain("setDisconnecting(selectedConnection)");
     expect(banking).toContain("{selectedId && !allAccounts ? (");
-    expect(banking).toContain("<BankFeedSyncList bankAccountId={selectedId}");
+    expect(banking).toMatch(/<BankFeedSyncList\s+bankAccountId=\{selectedId\}/);
   });
 });

@@ -3,6 +3,8 @@ import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { hasPermission } from "@/lib/services/access";
+import { readJournalList } from "@/lib/services/journal";
+import { firstPaintRead } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import JournalClient from "./JournalClient";
 
@@ -26,6 +28,7 @@ export default async function JournalPage({
     canGovernDocuments,
     canMarkAdjusting,
     holdsReverse,
+    journal,
   ] = await Promise.all([
     listCurrencies(sb),
     listAccounts(sb),
@@ -35,6 +38,9 @@ export default async function JournalPage({
     hasPermission(sb, "documents.govern"),
     hasPermission(sb, "journal.post"),
     holdsPermission("journal.void"),
+    // The list as the screen first asks for it: every date, or the one entry
+    // a report linked to.
+    firstPaintRead(() => readJournalList(sb, { entryId: initialEntryId ?? null, from: null, to: null })),
   ]);
   const base = currencies.find((c) => c.is_base);
   const postingAccounts = accounts.filter((a) => a.is_posting_account && a.status === "active");
@@ -49,6 +55,7 @@ export default async function JournalPage({
         baseCurrency={base?.code ?? "USD"}
         baseDecimals={base?.decimal_places ?? 2}
         initialEntryId={initialEntryId}
+        initialJournal={journal}
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}

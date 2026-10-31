@@ -5,6 +5,8 @@ import { getChartBalances } from "@/lib/services/chart-balances";
 import { listCurrencies, listTaxCodes } from "@/lib/services/reference";
 import { companyClock } from "@/lib/services/report-context";
 import { getUserRole, canWrite } from "@/lib/auth";
+import { summarizeClassificationPlan } from "@/lib/services/account-classification";
+import { firstPaintRead } from "@/lib/services/request-kind";
 import AccountsClient from "./AccountsClient";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +16,12 @@ export default async function AccountsPage() {
   // The company's own day, in its time zone: at 6 p.m. in New York it is
   // already tomorrow in UTC, and the balances would run a day ahead.
   const clock = companyClock(sb);
-  const [accounts, currencies, taxCodes, role, { today }, balances, cashStanding] = await Promise.all([
+  const roleRead = getUserRole();
+  const [accounts, currencies, taxCodes, role, { today }, balances, cashStanding, classificationPlan] = await Promise.all([
     listAccounts(sb),
     listCurrencies(sb),
     listTaxCodes(sb),
-    getUserRole(),
+    roleRead,
     clock,
     // Read on its own: if it fails the list and Setup still work, and the
     // screen says the figures are unavailable rather than showing zeros.
@@ -38,6 +41,9 @@ export default async function AccountsPage() {
         return null;
       },
     ),
+    // What Classify accounts would do, for someone who may run it (2.92): the
+    // button read it once the page had loaded, an action after everything else.
+    roleRead.then((r) => (canWrite(r) ? firstPaintRead(() => summarizeClassificationPlan(sb)) : null)),
   ]);
   const base = currencies.find((c) => c.is_base);
 
@@ -52,6 +58,7 @@ export default async function AccountsPage() {
       // current assets, as there are no inventory account ids, until balances load.
       initialBalances={balances}
       initialCashStanding={cashStanding}
+      initialClassificationPlan={classificationPlan}
       baseCurrency={base?.code ?? "USD"}
       baseDecimals={base?.decimal_places ?? 2}
     />
