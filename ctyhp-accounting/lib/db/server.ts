@@ -4,6 +4,10 @@ import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { activeSchema } from "./company";
+import { sanitizingFetch } from "./sanitizing-fetch";
+
+/** Refusals the database words about itself reach the screen in its words (2.95). */
+const personFetch = sanitizingFetch();
 
 /**
  * A Supabase client bound to one schema.
@@ -33,6 +37,7 @@ export async function createSupabaseServerClientForSchema(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       db: { schema },
+      global: { fetch: personFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll();

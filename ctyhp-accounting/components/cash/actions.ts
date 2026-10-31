@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole } from "@/lib/auth";
 import { canWrite } from "@/lib/domain/roles";

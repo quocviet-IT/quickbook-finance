@@ -1,5 +1,5 @@
 /** Zod validation schemas for the accounting domain (input boundary). */
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { ACCOUNT_TYPES } from "./accounts";
 import { CASH_FLOW_ROLES, defaultCashFlowRole } from "./cashflow";
 import { CHART_TEMPLATE_KEYS } from "./chart-templates";

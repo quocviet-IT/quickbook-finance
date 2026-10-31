@@ -41,6 +41,32 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.95",
+    date: "2026-10-31",
+    headline: "Audit history follows its permission, refusals read in plain words, and pages run only their own scripts.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Read the audit log decides who sees audit history, everywhere",
+        detail:
+          "Switching Read the audit log off for a role used to hide the Change Log and the history panels while the history itself stayed readable. It is now withheld as well. Accountants and viewers hold the permission as before; the Sales role, which never held it, no longer sees any audit history.",
+        route: "/settings/permissions",
+      },
+      {
+        kind: "fixed",
+        title: "A refused save says what went wrong in a sentence",
+        detail:
+          "When the books turn something down for a reason of their own, such as a duplicate, a value that is not allowed or a record that is still in use, the message now says so plainly instead of quoting the database's rule and table names.",
+      },
+      {
+        kind: "changed",
+        title: "Every page runs only the scripts it was sent with",
+        detail:
+          "Each page now tells the browser exactly which scripts may run on it, so text that looks like a script, in a memo or a name, can never run. Connecting a bank with Plaid, reading PDF statements and the feedback screenshot work as before.",
+      },
+    ],
+  },
+  {
     version: "2.94",
     date: "2026-10-31",
     headline: "Tighter rules from a security review, and exports that a spreadsheet cannot run.",

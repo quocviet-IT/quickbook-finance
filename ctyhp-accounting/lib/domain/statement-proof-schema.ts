@@ -6,7 +6,7 @@
  * page, and through it this module, so it holds only what a schema needs and
  * pulls nothing else into the bundle every page shares.
  */
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 export const OPENING_BASES = ["printed", "running", "prior", "typed"] as const;
 export const CLOSING_BASES = ["printed", "running", "ledger", "typed"] as const;

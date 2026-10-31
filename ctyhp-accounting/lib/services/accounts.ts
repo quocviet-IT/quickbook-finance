@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountRow, AccountStatus } from "@/lib/db/types";
+import { violatedConstraint } from "@/lib/db/postgrest-errors";
 import { CLEARING_TYPE_MESSAGE } from "@/lib/domain/clearing-account-type";
 import {
   accountCreateSchema,
@@ -16,14 +17,18 @@ const COLUMNS =
 
 export class AccountServiceError extends Error {}
 
-function mapWriteError(message: string): never {
-  if (message.includes("acc_account_account_code_key") || message.includes("duplicate key")) {
+// The constraint is read by name: the message itself is the screen's sentence
+// by the time it gets here (lib/db/postgrest-errors.ts).
+function mapWriteError(error: { code?: string; message: string; details?: string | null }): never {
+  const { message } = error;
+  const constraint = violatedConstraint(error);
+  if (constraint === "acc_account_account_code_key") {
     throw new AccountServiceError("An account with this code already exists");
   }
   if (message.toLowerCase().includes("cycle")) {
     throw new AccountServiceError("This parent would create a circular account hierarchy");
   }
-  if (message.includes("acc_account_clearing_type_ck")) {
+  if (constraint === "acc_account_clearing_type_ck") {
     throw new AccountServiceError(CLEARING_TYPE_MESSAGE);
   }
   if (message.includes("same type as its parent")) {
@@ -52,7 +57,7 @@ export async function createAccount(
   // Saved through acc_save_account (2.60): it checks the role and writes only
   // the columns this form has.
   const { data, error } = await sb.rpc("acc_save_account", { p_id: null, p_values: parsed });
-  if (error) mapWriteError(error.message);
+  if (error) mapWriteError(error);
   return data as unknown as AccountRow;
 }
 
@@ -65,7 +70,7 @@ export async function updateAccount(
   const before = await getAccount(sb, id);
   if (!before) throw new AccountServiceError("Account not found");
   const { data, error } = await sb.rpc("acc_save_account", { p_id: id, p_values: parsed });
-  if (error) mapWriteError(error.message);
+  if (error) mapWriteError(error);
   return data as unknown as AccountRow;
 }
 

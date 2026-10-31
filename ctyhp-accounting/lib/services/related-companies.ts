@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { violatedConstraint } from "@/lib/db/postgrest-errors";
 import type { BankTransactionRow } from "@/lib/db/types";
 import { codingAccountOf } from "@/lib/domain/coding";
 import {
@@ -124,9 +125,9 @@ export async function relatedBalances(
   return Object.fromEntries(rows.map((row) => [row.account_id, Number(row.debit_base) - Number(row.credit_base)]));
 }
 
-/** Which of the two unique rules a save broke, in the screen's words. */
-export function relatedDuplicateMessage(dbMessage: string): string {
-  return /account_id/.test(dbMessage)
+/** Which of the two unique rules a save broke, in the screen's words, from the rule's name or the raw message. */
+export function relatedDuplicateMessage(constraintOrMessage: string): string {
+  return /account_id/.test(constraintOrMessage)
     ? "This account already belongs to a related company"
     : "A related company of this name is already here";
 }
@@ -150,7 +151,9 @@ export async function saveRelatedCompany(sb: SupabaseClient, id: string | null, 
   // acc_save_related_company (2.60): a row that is gone answers P0002.
   const result = await sb.rpc("acc_save_related_company", { p_id: id, p_values: fields });
   if (result.error) {
-    if (result.error.code === "23505") throw fail(relatedDuplicateMessage(result.error.message));
+    if (result.error.code === "23505") {
+      throw fail(relatedDuplicateMessage(violatedConstraint(result.error) ?? result.error.message));
+    }
     if (result.error.code === "P0002") throw fail("This related company is no longer in the list");
     throw fail(result.error.message);
   }

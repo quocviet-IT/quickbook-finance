@@ -6,7 +6,7 @@
  * statement a reconciliation was reconciled against, and what is said when a
  * file cannot be kept.
  */
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { periodLabel } from "./pdf-statement-view";
 import { SAVED_REPORT_MAX_BYTES } from "./saved-reports";
 import { statementProofPayloadSchema } from "./statement-proof-schema";

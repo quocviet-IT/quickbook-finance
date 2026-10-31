@@ -1,20 +1,43 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { contentSecurityPolicy, newNonce, NONCE_HEADER } from "@/lib/domain/content-security-policy";
 import { skipsSession } from "@/lib/domain/public-routes";
 import { sessionRedirect } from "@/lib/domain/two-step";
 
 /**
  * Runs before every matched request: refreshes the Supabase auth session
  * (keeping cookies fresh) and gates access — unauthenticated users are sent to
- * /login, authenticated users are kept out of /login.
+ * /login, authenticated users are kept out of /login — and gives the response
+ * its Content-Security-Policy with a fresh nonce (2.95).
  * (Next.js 16 renamed the middleware convention to `proxy`.)
  */
 export async function proxy(request: NextRequest) {
+  const nonce = newNonce();
+  const policy = contentSecurityPolicy({
+    nonce,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    development: process.env.NODE_ENV === "development",
+  });
+  // Next reads the nonce from the request's own policy header and stamps its
+  // scripts with it; the root layout reads NONCE_HEADER for the theme script.
+  // Built from the request each time: the session refresh below rewrites its
+  // cookies, and the page must see those too.
+  const next = () => {
+    const headers = new Headers(request.headers);
+    headers.set(NONCE_HEADER, nonce);
+    headers.set("content-security-policy", policy);
+    return NextResponse.next({ request: { headers } });
+  };
+  const withPolicy = <T extends NextResponse>(response: T): T => {
+    response.headers.set("Content-Security-Policy", policy);
+    return response;
+  };
+
   if (skipsSession(request.nextUrl.pathname)) {
-    return NextResponse.next();
+    return withPolicy(next());
   }
 
-  let response = NextResponse.next({ request });
+  let response = next();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,7 +49,7 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet, headers) {
           for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-          response = NextResponse.next({ request });
+          response = next();
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }
@@ -79,10 +102,10 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = target;
     url.search = "";
-    return NextResponse.redirect(url);
+    return withPolicy(NextResponse.redirect(url));
   }
 
-  return response;
+  return withPolicy(response);
 }
 
 export const config = {

@@ -145,7 +145,9 @@ Bốn lớp, và lớp thứ ba là lớp quyết định:
 3. **Hàm database.** Mọi thao tác thay đổi sổ sách chạy bên trong một hàm tự kiểm
    tra vai trò và quyền của người gọi, và từ chối ai không thuộc công ty, kể cả
    người đang bị tạm khoá.
-4. **Luật bảng.** Chỉ thành viên mới đọc được. Việc ghi đi qua các hàm ở lớp 3.
+4. **Luật bảng.** Chỉ thành viên mới đọc được, còn nhật ký thay đổi thì từ bản
+   2.95 chỉ vai trò có quyền **Read the audit log** mới đọc. Việc ghi đi qua các
+   hàm ở lớp 3.
    Từ bản 2.61, không dữ liệu nào mà màn hình thay đổi có thể bị ghi vòng qua
    hàm của nó: chứng từ, người dùng và phân quyền, kỳ kế toán và nhật ký, ngân
    hàng và mua hàng, và danh mục gốc như tài khoản, khách hàng, nhà cung cấp,

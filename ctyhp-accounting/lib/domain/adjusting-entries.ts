@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /**
  * Marking a journal entry adjusting: the checkbox and note of the client's
