@@ -3,7 +3,8 @@ import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import { hasPermission } from "@/lib/services/access";
-import { readJournalList } from "@/lib/services/journal";
+import { readJournalPage } from "@/lib/services/journal";
+import { JOURNAL_DEFAULT_PAGE_SIZE } from "@/lib/domain/journal-paging";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import JournalClient from "./JournalClient";
@@ -38,9 +39,11 @@ export default async function JournalPage({
     hasPermission(sb, "documents.govern"),
     hasPermission(sb, "journal.post"),
     holdsPermission("journal.void"),
-    // The list as the screen first asks for it: every date, or the one entry
-    // a report linked to.
-    firstPaintRead(() => readJournalList(sb, { entryId: initialEntryId ?? null, from: null, to: null })),
+    // The first page as the screen first asks for it: every date, or the one
+    // entry a report linked to.
+    firstPaintRead(() =>
+      readJournalPage(sb, { entryId: initialEntryId ?? null, from: null, to: null }, 1, JOURNAL_DEFAULT_PAGE_SIZE),
+    ),
   ]);
   const base = currencies.find((c) => c.is_base);
   const postingAccounts = accounts.filter((a) => a.is_posting_account && a.status === "active");

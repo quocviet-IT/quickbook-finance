@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountType } from "@/lib/domain/accounts";
 import { normalBalanceOf } from "@/lib/domain/accounts";
 import { computeRunningBalance } from "@/lib/domain/reports";
+import { journalPageSize } from "@/lib/domain/journal-paging";
 import type { ManualJournalInput, OpeningBalanceInput, ReverseEntryInput } from "@/lib/domain/schemas";
 
 export class JournalError extends Error {}
@@ -150,22 +151,38 @@ export async function countJournalEntries(
   return count ?? 0;
 }
 
-/** The Journal screen's list: the rows that fit, how many match, and the most one read returns. */
-export interface JournalList {
+/** One page of the Journal screen, and how many entries match altogether. */
+export interface JournalPage {
   entries: JournalEntrySummary[];
   total: number;
-  limit: number;
+  /** 1-based, as the table counts pages. */
+  pageIndex: number;
+  pageSize: number;
 }
 
 /**
- * The count is asked for beside the rows so the screen can say how many it is
- * not showing. Without it a truncated list is indistinguishable from a
- * complete one, which is how three years of entries went missing in silence.
- * Read by the Journal page for its first paint (2.92) and by its action after.
+ * The Journal screen's list, one page at a time (2.93).
+ *
+ * It was the newest 1,000 entries in one read, paged in the browser: 538 KB
+ * for the largest company to show 20 rows, and every entry older than the
+ * thousandth out of reach. A page is read now, with its lines (opening an
+ * entry stays instant), beside the count of everything that matches, so every
+ * entry can be paged to. Read by the Journal page for its first paint and by
+ * its action for every page and date range after.
  */
-export async function readJournalList(sb: SupabaseClient, filters: JournalFilters): Promise<JournalList> {
-  const [entries, total] = await Promise.all([listJournalEntries(sb, filters), countJournalEntries(sb, filters)]);
-  return { entries, total, limit: JOURNAL_LIST_LIMIT };
+export async function readJournalPage(
+  sb: SupabaseClient,
+  filters: JournalFilters,
+  pageIndex: number,
+  pageSize: number,
+): Promise<JournalPage> {
+  const size = journalPageSize(pageSize);
+  const index = Number.isInteger(pageIndex) && pageIndex > 0 ? pageIndex : 1;
+  const [entries, total] = await Promise.all([
+    listJournalEntries(sb, filters, { offset: (index - 1) * size, limit: size }),
+    countJournalEntries(sb, filters),
+  ]);
+  return { entries, total, pageIndex: index, pageSize: size };
 }
 
 /**
@@ -177,7 +194,21 @@ function markOf(v: EntryRow["acc_adjusting_entry"]): { note: string | null } | n
   return m ? { note: m.note ?? null } : null;
 }
 
-export async function listJournalEntries(sb: SupabaseClient, filters: JournalFilters): Promise<JournalEntrySummary[]> {
+/**
+ * Entries newest first, with their lines.
+ *
+ * Without `window`, the newest JOURNAL_LIST_LIMIT. With one, that slice of the
+ * same order, which is how the Journal screen pages (readJournalPage). The
+ * account filter keeps an entry after it is read, so it is not for paging.
+ */
+export async function listJournalEntries(
+  sb: SupabaseClient,
+  filters: JournalFilters,
+  window?: { offset: number; limit: number },
+): Promise<JournalEntrySummary[]> {
+  if (window && filters.accountId) {
+    throw new JournalError("The journal cannot be paged by account: the account filter applies after the read.");
+  }
   let q = sb
     .from("acc_journal_entry")
     .select(
@@ -187,9 +218,13 @@ export async function listJournalEntries(sb: SupabaseClient, filters: JournalFil
     )
     .order("entry_date", { ascending: false })
     .order("entry_number", { ascending: false })
-    // Asked for rather than left to the server's own cap, so the number is in
-    // this file where it can be read, compared against, and reported.
-    .limit(JOURNAL_LIST_LIMIT);
+    // A last key no two entries share, so no entry can sit on two pages, or none.
+    .order("id", { ascending: false });
+  q = window
+    ? q.range(window.offset, window.offset + window.limit - 1)
+    : // Asked for rather than left to the server's own cap, so the number is in
+      // this file where it can be read, compared against, and reported.
+      q.limit(JOURNAL_LIST_LIMIT);
   if (filters.from) q = q.gte("entry_date", filters.from);
   if (filters.to) q = q.lte("entry_date", filters.to);
   if (filters.entryId) q = q.eq("id", filters.entryId);

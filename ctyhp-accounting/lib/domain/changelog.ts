@@ -41,6 +41,27 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.93",
+    date: "2026-10-31",
+    headline: "The Journal reads one page at a time, and every entry can be paged to.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The Journal opens quickly however many entries a company has",
+        detail:
+          "The Journal read the newest 1,000 entries, with every line, each time it opened, to show 20 of them: for the largest company it still took 2.5 seconds after 2.92. It now reads only the page on screen, with its lines, so opening an entry is as quick as before. Changing the dates, the page or the page size reads that page.",
+        route: "/journal",
+      },
+      {
+        kind: "changed",
+        title: "No more \"showing the 1,000 most recent\"",
+        detail:
+          "An entry older than the thousandth could only be reached by narrowing the dates, which the Journal warned about. Every entry is now a page away, so the warning is gone, and the count beside the dates is every entry that matches them.",
+        route: "/journal",
+      },
+    ],
+  },
+  {
     version: "2.92",
     date: "2026-10-31",
     headline: "Journal, Pay Bills, credit memos, vendor credits and reconciling open with their lists already there.",
