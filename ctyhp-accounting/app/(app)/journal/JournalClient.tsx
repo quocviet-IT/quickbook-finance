@@ -1,6 +1,6 @@
 "use client";
 import { sourceLabel } from "@/lib/domain/entry-detail";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import StatusTag from "@/components/ui/StatusTag";
 import { Alert, App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag, Tooltip } from "antd";
@@ -11,7 +11,7 @@ import { journalEntryAmountMinor } from "@/lib/domain/journal-entry-amount";
 import { COLUMN } from "@/lib/design/table-metrics";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
-import { formatMoney, formatDate, plural } from "@/lib/format";
+import { formatMoney, formatDate } from "@/lib/format";
 import IconActionButton from "@/components/ui/IconActionButton";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
 import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
@@ -19,7 +19,8 @@ import FilterBar from "@/components/ui/FilterBar";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import { createJournalAction, reverseEntryAction, listJournalAction } from "./actions";
-import type { JournalEntrySummary, JournalList } from "@/lib/services/journal";
+import type { JournalEntrySummary, JournalPage } from "@/lib/services/journal";
+import { JOURNAL_DEFAULT_PAGE_SIZE, JOURNAL_PAGE_SIZES } from "@/lib/domain/journal-paging";
 import AdjustingEntryControl from "./AdjustingEntryControl";
 import type { ClosedPeriodAsk } from "@/lib/domain/adjusting-entries";
 
@@ -39,8 +40,8 @@ interface Props {
   initialCreateOpen: boolean;
   /** Opens one journal from an operational report via `?entry=<uuid>`. */
   initialEntryId?: string;
-  /** The list the page read for the first paint; null when it did not (2.92). */
-  initialJournal: JournalList | null;
+  /** The first page the page read; null when it did not (2.92). */
+  initialJournal: JournalPage | null;
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
@@ -96,7 +97,11 @@ export default function JournalClient({
 }: Props) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
-  const [entries, setEntries] = useState<JournalEntrySummary[]>(initialJournal?.entries ?? []);
+  // One page at a time (2.93): the rows on screen, and how many match altogether.
+  const [journal, setJournal] = useState<JournalPage>(
+    () => initialJournal ?? { entries: [], total: 0, pageIndex: 1, pageSize: JOURNAL_DEFAULT_PAGE_SIZE },
+  );
+  const entries = journal.entries;
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
@@ -111,33 +116,38 @@ export default function JournalClient({
   /** Asked once, then remembered for the rest of the visit. */
   const [unlocked, setUnlocked] = useState(false);
   const setAdjusting = (id: string, mark: JournalEntrySummary["adjusting"]) =>
-    setEntries((list) => list.map((e) => (e.id === id ? { ...e, adjusting: mark } : e)));
+    setJournal((page) => ({ ...page, entries: page.entries.map((e) => (e.id === id ? { ...e, adjusting: mark } : e)) }));
+
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+  /** Only the latest read may draw: page quickly and an earlier, slower page would otherwise land last. */
+  const latestRead = useRef(0);
 
   /**
-   * How many entries match the dates on screen, and how many were read.
-   *
-   * A journal that quietly shows its newest thousand looks exactly like one
-   * that is showing everything. This company had 7,532 entries and could reach
-   * 1,000 of them; the ones it could not reach were the opening balances, which
-   * is precisely what somebody goes looking for.
+   * Reads one page. Every entry is reachable by paging: the list was once the
+   * newest 1,000 in one read, and a company with 7,532 entries could not reach
+   * its opening balances, which is precisely what somebody goes looking for.
+   * New dates, a posted entry or a reversal start again at the first page.
    */
-  const [total, setTotal] = useState(initialJournal?.total ?? 0);
-  const [limit, setLimit] = useState(initialJournal?.limit ?? 0);
-  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
-
-  const load = async (dates: [Dayjs, Dayjs] | null = range) => {
+  const load = async (
+    dates: [Dayjs, Dayjs] | null = range,
+    pageIndex = 1,
+    pageSize = journal.pageSize,
+  ) => {
+    const read = ++latestRead.current;
     setLoading(true);
-    const r = await listJournalAction({
-      entryId: initialEntryId ?? null,
-      from: dates ? dates[0].format("YYYY-MM-DD") : null,
-      to: dates ? dates[1].format("YYYY-MM-DD") : null,
-    });
+    const r = await listJournalAction(
+      {
+        entryId: initialEntryId ?? null,
+        from: dates ? dates[0].format("YYYY-MM-DD") : null,
+        to: dates ? dates[1].format("YYYY-MM-DD") : null,
+      },
+      pageIndex,
+      pageSize,
+    );
+    if (read !== latestRead.current) return;
     setLoading(false);
-    if (r.ok && r.data) {
-      setEntries(r.data.entries);
-      setTotal(r.data.total);
-      setLimit(r.data.limit);
-    } else message.error(r.error ?? "Failed to load journal entries");
+    if (r.ok && r.data) setJournal(r.data);
+    else message.error(r.error ?? "Failed to load journal entries");
   };
   useEffect(() => {
     // The page read the list for the first paint; read here only when it could not.
@@ -243,7 +253,7 @@ export default function JournalClient({
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <FilterBar
         ariaLabel="Journal dates and actions"
-        resultCount={entries.length}
+        resultCount={journal.total}
         actions={
           canWrite ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
@@ -262,18 +272,6 @@ export default function JournalClient({
           }}
         />
       </FilterBar>
-      {total > entries.length && (
-        <Alert
-          type="warning"
-          showIcon
-          message={`Showing the ${entries.length.toLocaleString("en-US")} most recent of ${plural(total, "entry", "entries")}`}
-          description={
-            "One read carries at most " +
-            plural(limit, "entry", "entries") +
-            ". Narrow the dates above to reach the rest — an entry outside this list cannot be found by scrolling, however far you page."
-          }
-        />
-      )}
       {closedAsk ? (
         <Alert
           type="warning"
@@ -316,7 +314,12 @@ export default function JournalClient({
       <DataTable<JournalEntrySummary>
         rowKey="id"
         loading={loading}
-        rows={entries}
+        page={{ rows: entries, total: journal.total, pageIndex: journal.pageIndex, pageSize: journal.pageSize }}
+        pagination={{
+          pageSizeOptions: [...JOURNAL_PAGE_SIZES],
+          // A new size starts again at the first page: the old page number may not exist at the new size.
+          onChange: (pageIndex, pageSize) => void load(range, pageSize === journal.pageSize ? pageIndex : 1, pageSize),
+        }}
         expandable={{
           expandedRowKeys,
           onExpandedRowsChange: (keys) => setExpandedRowKeys([...keys].map(String)),

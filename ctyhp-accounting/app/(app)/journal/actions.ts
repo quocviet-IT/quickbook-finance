@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import { companyClock } from "@/lib/services/report-context";
 import { manualJournalSchema, reverseEntrySchema } from "@/lib/domain/schemas";
-import { createManualJournal, reverseEntry, readJournalList, listReversedEntries, JournalError, type JournalFilters, type JournalEntrySummary, type ReversedEntryRow } from "@/lib/services/journal";
+import { createManualJournal, reverseEntry, readJournalPage, listReversedEntries, JournalError, type JournalFilters, type JournalPage, type ReversedEntryRow } from "@/lib/services/journal";
 import {
   executeOrSubmitForApproval,
   toControlledActionResponse,
@@ -77,12 +77,17 @@ export async function reverseEntryAction(raw: unknown): Promise<ActionResult<{ i
   } catch (err) { return { ok: false, error: msg(err) }; }
 }
 
+/** Reads only: one page of the Journal screen (2.93), for the dates asked. */
 export async function listJournalAction(
-  filters: JournalFilters,
-): Promise<ActionResult<{ entries: JournalEntrySummary[]; total: number; limit: number }>> {
+  filters: Pick<JournalFilters, "entryId" | "from" | "to">,
+  pageIndex: number,
+  pageSize: number,
+): Promise<ActionResult<JournalPage>> {
   try {
     const sb = await createSupabaseServerClient();
-    return { ok: true, data: await readJournalList(sb, filters) };
+    // Only the screen's own filters: the account filter cannot be paged.
+    const { entryId = null, from = null, to = null } = filters;
+    return { ok: true, data: await readJournalPage(sb, { entryId, from, to }, pageIndex, pageSize) };
   } catch (err) { return { ok: false, error: msg(err) }; }
 }
 

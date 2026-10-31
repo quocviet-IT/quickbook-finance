@@ -43,7 +43,8 @@ describe("each screen's first list comes with its page", () => {
   const screens: Array<{ page: string; read: RegExp; client: string; skip: RegExp }> = [
     {
       page: "app/(app)/journal/page.tsx",
-      read: /firstPaintRead\(\(\) => readJournalList\(sb, \{ entryId: initialEntryId \?\? null, from: null, to: null \}\)\)/,
+      // One page since 2.93; see journal-paging.test.ts.
+      read: /firstPaintRead\(\(\) =>\s*readJournalPage\(sb, \{ entryId: initialEntryId \?\? null, from: null, to: null \}, 1, JOURNAL_DEFAULT_PAGE_SIZE\),?\s*\)/,
       client: "app/(app)/journal/JournalClient.tsx",
       skip: /if \(initialJournal\) return;\s*\/\/ eslint-disable-next-line react-hooks\/set-state-in-effect\s*void load\(\);/,
     },
