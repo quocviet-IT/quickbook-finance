@@ -20,7 +20,7 @@ import {
   BANK_WIDTH_STORAGE_KEY_V1,
   type BankColumnKey,
 } from "./bank-transaction-columns";
-import type { BankReviewRow } from "@/lib/domain/banking-import";
+import type { BankReviewRow } from "@/lib/domain/bank-review-rows";
 import type { LoanSuggestionView } from "@/lib/domain/loan-interest";
 import type { BankTransactionRow, BankTxnStatus } from "@/lib/db/types";
 import type { SuggestionView } from "@/lib/services/banking";

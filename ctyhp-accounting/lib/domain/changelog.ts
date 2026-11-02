@@ -41,6 +41,20 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.97",
+    date: "2026-10-31",
+    headline: "Bank Transactions downloads about a sixth less.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Bank Transactions opens with about 130 KB less to download",
+        detail:
+          "The screen was carrying a copy of a server-side hashing library it never used, about 130 KB compressed. It is gone, so the page's code is roughly 630 KB instead of 760 KB, and the browser no longer reports a blocked script check on this screen. Nothing on the screen changes.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "2.96",
     date: "2026-10-31",
     headline: "Add existing account finds only colleagues, and the bank feed key can be changed.",

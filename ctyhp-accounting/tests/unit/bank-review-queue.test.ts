@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBankReviewRows } from "@/lib/domain/banking-import";
+import { buildBankReviewRows } from "@/lib/domain/bank-review-rows";
 
 const account = (id: string, name: string, currency_code: string) => ({
   id,

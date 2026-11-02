@@ -26,10 +26,9 @@
  *
  * In development React and the dev server evaluate code, so 'unsafe-eval' is
  * added there and only there. In production nothing needs it: zod's probe for
- * it is switched off in the browser (lib/zod.ts), and the one report left, on
- * /banking, is is-generator-function trying `Function` inside a try/catch. It
- * arrives with the node:crypto polyfill that lib/domain/banking-import.ts pulls
- * into that page, and falls back without it.
+ * it is switched off in the browser (lib/zod.ts), and the node:crypto polyfill
+ * whose helpers probed it on /banking no longer reaches the browser (2.97,
+ * tests/unit/client-bundle-node-builtins.test.ts).
  */
 /** The request header proxy.ts hands the nonce to the layout in. */
 export const NONCE_HEADER = "x-nonce";
