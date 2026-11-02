@@ -108,11 +108,11 @@ change, so the account remains recognisable across exports.
 ## 5. A transaction
 
 ```
-2025-02-20 * "Northwind Supply" "Payment for bill BILL-000123" #bill_payment ^BILL-000123
+2026-05-14 * "Northwind Supply" "Payment for bill BILL-000123" #bill_payment ^BILL-000123
   entry: "JE-000456"
-  num: "1171"
-  Liabilities:Payable:2000-Accounts-Payable      3450.00 USD
-  Assets:Bank:1010-Operating-Checking           -3450.00 USD
+  num: "2045"
+  Liabilities:Payable:2000-Accounts-Payable      1250.00 USD
+  Assets:Bank:1010-Operating-Checking           -1250.00 USD
 ```
 
 - **Payee** is the entry's counterparty, taken from `acc_transaction_list`, which

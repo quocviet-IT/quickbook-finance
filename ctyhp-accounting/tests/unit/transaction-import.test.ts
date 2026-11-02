@@ -11,7 +11,7 @@ import {
 const base: TransactionImportRecord = {
   txn_date: "2026-01-15",
   description: "Zelle Transfer",
-  bank_account: "121 - PC49 BoA CK 3388",
+  bank_account: "121 - Riverbend Bank CK 4471",
   category_account: "Inventory Purchase",
   amount: null,
   debit: null,

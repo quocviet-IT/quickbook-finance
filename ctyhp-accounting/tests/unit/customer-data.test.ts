@@ -35,11 +35,13 @@ import { describe, expect, it } from "vitest";
  * this gate, scanning only `tests/` and root `docs/`, would not have caught
  * it.
  *
- * Some files predate this gate and still carry that shape; they are
- * grandfathered below by exact path. Whether and when to clean them up is a
- * decision for a person, not this test — this test only makes sure the
- * grandfathered list cannot grow, cannot go stale, and that nothing outside
- * it is allowed to carry the marker.
+ * Eleven files predated this gate and carried that shape; they were
+ * grandfathered by exact path until 2 November 2026, when all of them were
+ * rewritten with made-up labels, dates and amounts in the same shape (and the
+ * real figures beside the labels went with them, which this gate could never
+ * have seen). The list is now empty and must stay so: nothing anywhere in the
+ * scan roots may carry the marker. History still holds the old versions; that
+ * was decided, and is not this test's business.
  *
  * The first version of this list named 5 files, written from memory rather
  * than from a run of this test. Running it found 5 more — a sixth test file
@@ -47,41 +49,30 @@ import { describe, expect, it } from "vitest";
  * the result of actually running the scan, not of guessing at it again: 10
  * files, settled by measurement. Widening the scan roots to source and
  * schema found one more: a migration comment describing how the importer
- * resolves an account name. An applied migration is not rewritten after the
- * fact, so it is grandfathered too rather than edited — 11 files, still
- * settled by measurement rather than memory.
+ * resolves an account name — 11 files, settled by measurement rather than
+ * memory. That migration had been applied, which first kept it on the list;
+ * the marker sat in a comment, and the runner tracks a migration by its file
+ * name and the provisioner runs its statements, not its prose, so the
+ * comment was rewritten like the rest.
  *
  * `.claude/settings.json` also contains the `pc49` token once, but as part
  * of a recorded Bash permission pattern (a scratchpad script's filename from
  * an earlier session), not as ledger data. That file sits outside this
  * gate's scan roots already, and stays there deliberately rather than being
  * added below — allowlisting it would imply it is the same kind of debt as
- * the other eleven, which it is not.
+ * the eleven were, which it is not.
  */
 
 /** This file's own path, exempt because it necessarily names the pattern. */
 const SELF = "tests/unit/customer-data.test.ts";
 
 /**
- * Files that predate this gate and still contain the marker. Do not add to
- * this set to silence a new failure — that defeats the gate. Do not edit
- * the files themselves from this test either; removing the leak from them
- * is a separate decision for a human. This set exists only to shrink,
- * enforced by the "only ever shrinks" test below.
+ * Files exempt from the gate. Empty since 2 November 2026, when the last
+ * eleven were cleaned. Do not add to it to silence a failure — that defeats
+ * the gate; rewrite the data in the file instead, in the same shape with
+ * made-up values ("Riverbend Bank CK 4471" is the bank label the fixtures use).
  */
-const GRANDFATHERED = new Set<string>([
-  "tests/unit/account-classification.test.ts",
-  "tests/unit/excluded-rows.test.ts",
-  "tests/unit/import-preflight.test.ts",
-  "tests/unit/import-transactions-migration.test.ts",
-  "tests/unit/import-transactions-service.test.ts",
-  "tests/unit/transaction-import.test.ts",
-  "../docs/superpowers/plans/2026-08-06-import-guidance.md",
-  "../docs/superpowers/plans/2026-08-06-import-transactions.md",
-  "../docs/superpowers/specs/2026-08-05-import-guidance-design.md",
-  "../docs/superpowers/specs/2026-08-06-wave-ledger-import-design.md",
-  "supabase/migrations/0100_import_transactions.sql",
-]);
+const GRANDFATHERED = new Set<string>([]);
 
 /**
  * Matches the client's chart-of-accounts label shape: the `PC49` token on
@@ -150,7 +141,8 @@ describe("customer data leak gate", () => {
 
   it("tells the marker apart from ordinary text", () => {
     // The two mistakes this guard exists to avoid making itself.
-    expect(markerPattern().test("PC49 BoA CK 3388")).toBe(true);
+    // The digits here are made up; only the shape is the client's.
+    expect(markerPattern().test("PC49 BoA CK 0000")).toBe(true);
     expect(markerPattern().test("pc49")).toBe(true);
     expect(markerPattern().test("121 - Checking")).toBe(false);
     expect(markerPattern().test("BoA branch visit")).toBe(false);
@@ -164,12 +156,12 @@ describe("customer data leak gate", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("only ever shrinks, so a twelfth leaked file cannot be waved through", () => {
-    // The allowlist is the outstanding cleanup, not a resting place. Adding
-    // to it is how a guard quietly stops guarding, and it reads in a diff
-    // exactly like an unrelated change. Lowering this number is the
-    // cleanup; raising it has to be argued for, out loud, to a person.
-    expect(GRANDFATHERED.size).toBeLessThanOrEqual(11);
+  it("exempts nothing, so a leaked file cannot be waved through", () => {
+    // The allowlist was the outstanding cleanup, and the cleanup is done.
+    // Adding to it is how a guard quietly stops guarding, and it reads in a
+    // diff exactly like an unrelated change; raising this number has to be
+    // argued for, out loud, to a person.
+    expect(GRANDFATHERED.size).toBe(0);
   });
 
   it("lists no file that has already been cleaned", () => {

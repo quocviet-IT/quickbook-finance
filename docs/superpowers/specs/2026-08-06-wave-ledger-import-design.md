@@ -28,8 +28,8 @@ Measured, not assumed — every number below comes from the real file:
 | Rows with both a debit and a credit | 0 |
 | Distinct dates | 554 |
 | Dates where debits ≠ credits | **0** |
-| Total debits | $53,182,909.72 |
-| Total credits | $53,182,909.72 |
+| Total debits | equal to total credits *(the figure is the client's, and this repository is public)* |
+| Total credits | equal to total debits |
 | Date range | 2022-12-31 → 2025-12-31 |
 | Encoding | UTF-8 with BOM |
 
@@ -40,19 +40,21 @@ this one never does.
 
 ### The layout, and its three traps
 
+The shape is the file's; the names, dates and amounts below are made up.
+
 ```
 ACCOUNT NUMBER,DATE,DESCRIPTION,DEBIT (…),CREDIT (…),BALANCE (…)
-121 - PC49 BoA CK 3388,,,,,          <- first account: name in column 0
+121 - Riverbend Bank CK 4471,,,,,          <- first account: name in column 0
 ,,,,,$0.00
-,12/31/2022,Beginning Balance,"$968,798.29",,"$968,798.29"
+,12/31/2022,Beginning Balance,"$412,903.55",,"$412,903.55"
 …
-Totals and Ending Balance,,,"$16,533,569.28","$16,437,275.43","$96,293.85"
-Balance Change,,,"$96,293.85",,
+Totals and Ending Balance,,,"$1,284,530.10","$1,247,118.65","$37,411.45"
+Balance Change,,,"$37,411.45",,
 ,,,,,
-,123 - PC49 Relay CK 6764,,,,        <- every later account: name in column 1
+,123 - Harbor Relay CK 5810,,,,        <- every later account: name in column 1
 Starting Balance,,,,,$0.00
 …
-Payroll Processing Fee,8/29/2024,CHECKCARD 0828…,$51.00,,$51.00   <- name repeated per row
+Payroll Processing Fee,3/14/2024,CHECKCARD 0313…,$45.00,,$45.00   <- name repeated per row
 ```
 
 1. **The first account's name is in column 0; every later account's name is in
@@ -90,7 +92,7 @@ imported again. An import that turns out to be a mistake can be undone.
 
 Each row is half a transaction, so posting requires knowing which halves belong
 together. Matching on date, amount and description is guesswork: 3 January 2023
-alone holds several distinct Zelle rows of $10.00 and several of $320.00, and a
+alone holds several distinct Zelle rows of $25.00 and several of $150.00, and a
 wrong pairing produces books that balance while describing something that never
 happened.
 

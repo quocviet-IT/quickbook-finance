@@ -3,10 +3,11 @@ import { excludedRowsCsv } from "@/lib/domain/excluded-rows";
 import { parseCsv } from "@/lib/csv";
 
 const HEADERS = ["Date", "Description", "Bank account", "Chart of account", "Amount"];
+// Made up, in the shape of a Wave export: invented bank, dates, cheque and amounts.
 const ROWS = [
-  ["1/3/2023", "Zelle Transfer", "PC49 BoA CK 3388", "Sales", "1569"],
-  ["1/9/2023", "Fee waived, in full", "PC49 BoA CK 3388", "Bank Charges", "0.00"],
-  ["2/20/2025", "Check 1171", "PC49 BoA CK 3388", "Shareholder Loan", "-3450"],
+  ["4/7/2026", "Card deposit", "Riverbend Bank CK 4471", "Sales", "1200"],
+  ["4/9/2026", "Fee waived, in full", "Riverbend Bank CK 4471", "Bank Charges", "0.00"],
+  ["5/14/2026", "Check 2045", "Riverbend Bank CK 4471", "Loan from Owner", "-1250"],
 ];
 
 describe("excludedRowsCsv", () => {

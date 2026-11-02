@@ -19,9 +19,9 @@ const MAPPING = {
 };
 
 const ROWS = [
-  ["2026-01-15", "Card fee", "121 - PC49 BoA CK 3388", "Bank Charges", "-32.00"],
-  ["2026-01-16", "Deposit", "121 - PC49 BoA CK 3388", "Sales", "969.00"],
-  ["2026-01-17", "Wire out", "Petty Tin", "Transfer from PERFBUS", "-30.00"],
+  ["2026-01-15", "Card fee", "121 - Riverbend Bank CK 4471", "Bank Charges", "-32.00"],
+  ["2026-01-16", "Deposit", "121 - Riverbend Bank CK 4471", "Sales", "1240.00"],
+  ["2026-01-17", "Wire out", "Petty Tin", "Transfer from NORTHWIND", "-30.00"],
 ];
 
 /**
@@ -37,7 +37,7 @@ function companyClient(
 ) {
   const accounts = (
     overrides.accounts ?? [
-      ["121", "PC49 BoA CK 3388", "bank"],
+      ["121", "Riverbend Bank CK 4471", "bank"],
       ["", "Bank Charges", "expense"],
       ["", "Sales", "income"],
       ["140", "Petty Tin", "current_asset"],
@@ -123,8 +123,8 @@ describe("importPreflight", () => {
     const result = await importPreflight(companyClient(), "transactions", ROWS, MAPPING);
 
     const refs = result.unresolved.map((row) => row.ref);
-    expect(refs).toContain("Transfer from PERFBUS");
-    const missing = result.unresolved.find((row) => row.ref === "Transfer from PERFBUS");
+    expect(refs).toContain("Transfer from NORTHWIND");
+    const missing = result.unresolved.find((row) => row.ref === "Transfer from NORTHWIND");
     expect(missing?.column).toBe("category");
     expect(missing?.rows).toBe(1);
   });
@@ -150,10 +150,10 @@ describe("importPreflight", () => {
 
   it("stops reporting a name the reader has already answered", async () => {
     const result = await importPreflight(companyClient(), "transactions", ROWS, MAPPING, {
-      "Transfer from PERFBUS": "140",
+      "Transfer from NORTHWIND": "140",
     });
 
-    expect(result.unresolved.map((row) => row.ref)).not.toContain("Transfer from PERFBUS");
+    expect(result.unresolved.map((row) => row.ref)).not.toContain("Transfer from NORTHWIND");
   });
 
   it("orders the worst problem first", async () => {
@@ -168,10 +168,10 @@ describe("importPreflight", () => {
 describe("an override reaches the import, not just the screen", () => {
   it("resolves the name the reader pointed at an account", async () => {
     const plain = await previewImport(companyClient(), "transactions", ROWS, MAPPING);
-    expect(plain.missingAccounts).toContain("Transfer from PERFBUS");
+    expect(plain.missingAccounts).toContain("Transfer from NORTHWIND");
 
     const answered = await previewImport(companyClient(), "transactions", ROWS, MAPPING, {
-      accountOverrides: { "Transfer from PERFBUS": "140" },
+      accountOverrides: { "Transfer from NORTHWIND": "140" },
     });
 
     expect(answered.missingAccounts ?? []).toEqual([]);
@@ -179,7 +179,7 @@ describe("an override reaches the import, not just the screen", () => {
 
   it("sends the code, so the server resolves it the one way it resolves everything", async () => {
     const preview = await previewImport(companyClient(), "transactions", ROWS, MAPPING, {
-      accountOverrides: { "Transfer from PERFBUS": "140" },
+      accountOverrides: { "Transfer from NORTHWIND": "140" },
     });
 
     const row = preview.rows.find((entry) => entry.values.description === "Wire out");
@@ -216,11 +216,11 @@ describe("a Chart of account that is the row's own bank", () => {
   });
 
   it("is caught when the file itself names the same account twice", async () => {
-    const rows = [["2026-01-15", "Deposit", "121", "PC49 BoA CK 3388", "969.00"]];
+    const rows = [["2026-01-15", "Deposit", "121", "Riverbend Bank CK 4471", "1240.00"]];
 
     const result = await importPreflight(companyClient(), "transactions", rows, MAPPING);
 
-    expect(result.bankAsCategory).toEqual([{ ref: "PC49 BoA CK 3388", rows: 1 }]);
+    expect(result.bankAsCategory).toEqual([{ ref: "Riverbend Bank CK 4471", rows: 1 }]);
   });
 
   it("is not raised for an ordinary file", async () => {
@@ -247,11 +247,11 @@ describe("a Chart of account that is the row's own bank", () => {
     });
 
     expect(preview.missingAccounts).toEqual([NICKNAME]);
-    expect(preview.unbankedAccounts).toEqual(["121 PC49 BoA CK 3388, chosen above"]);
+    expect(preview.unbankedAccounts).toEqual(["121 Riverbend Bank CK 4471, chosen above"]);
   });
 
   it("blocks the preview against the bank chosen above when the file names none", async () => {
-    const rows = [["2026-01-15", "Deposit", "", "121", "969.00"]];
+    const rows = [["2026-01-15", "Deposit", "", "121", "1240.00"]];
 
     const preview = await previewImport(companyClient(), "transactions", rows, MAPPING, { bankAccountId: "account-0" });
 

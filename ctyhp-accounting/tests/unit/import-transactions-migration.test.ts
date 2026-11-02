@@ -28,7 +28,7 @@ describe("import transactions migration", () => {
 
   it("resolves an account by code, by code and name, or by name", () => {
     // All three comparisons are case- and space-insensitive, so a file that
-    // writes "121", "121 - PC49 BoA CK 3388" or the bare name all land.
+    // writes "121", "121 - Riverbend Bank CK 4471" or the bare name all land.
     expect(sql).toMatch(/lower\(btrim\(account_code\)\)\s*=\s*v_ref/i);
     expect(sql).toMatch(/lower\(btrim\(account_code \|\| ' - ' \|\| name\)\)\s*=\s*v_ref/i);
     expect(sql).toMatch(/lower\(btrim\(name\)\)\s*=\s*v_ref/i);
