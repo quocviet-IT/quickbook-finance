@@ -75,7 +75,7 @@ import {
 const base: TransactionImportRecord = {
   txn_date: "2026-01-15",
   description: "Zelle Transfer",
-  bank_account: "121 - PC49 BoA CK 3388",
+  bank_account: "121 - Riverbend Bank CK 4471",
   category_account: "Inventory Purchase",
   amount: null,
   debit: null,
@@ -165,7 +165,7 @@ describe("transactionRawHash", () => {
 
 describe("describeTransactionRow", () => {
   it("reads as the line a person would check", () => {
-    const line = describeTransactionRow({ ...base, amount: -320000 }, -320000);
+    const line = describeTransactionRow({ ...base, amount: -275000 }, -275000);
     expect(line).toContain("2026-01-15");
     expect(line).toContain("Inventory Purchase");
     expect(line).toContain("Zelle Transfer");
@@ -477,7 +477,7 @@ Create `ctyhp-accounting/supabase/migrations/0100_import_transactions.sql`:
 
 set search_path = public;
 
-/** Resolve "121", "121 - PC49 BoA CK 3388" or "PC49 BoA CK 3388" to one account. */
+/** Resolve "121", "121 - Riverbend Bank CK 4471" or "Riverbend Bank CK 4471" to one account. */
 create or replace function acc_resolve_account_ref(p_ref text) returns uuid
 language plpgsql stable security definer set search_path = public as $$
 declare
@@ -664,14 +664,14 @@ const MAPPING = {
 };
 const ROWS = [
   HEADERS,
-  ["2026-01-15", "Zelle Transfer", "121 - PC49 BoA CK 3388", "Inventory Purchase", "-3200.00"],
-  ["2026-01-16", "Deposit", "121 - PC49 BoA CK 3388", "Sales", "969.00"],
+  ["2026-01-15", "Zelle Transfer", "121 - Riverbend Bank CK 4471", "Inventory Purchase", "-2750.00"],
+  ["2026-01-16", "Deposit", "121 - Riverbend Bank CK 4471", "Sales", "1240.00"],
 ];
 
 /** A chart with both accounts, and no bank transactions yet. */
 function companyClient(overrides: { accounts?: string[][]; hashes?: string[] } = {}) {
   const accounts = overrides.accounts ?? [
-    ["121", "PC49 BoA CK 3388"],
+    ["121", "Riverbend Bank CK 4471"],
     ["", "Inventory Purchase"],
     ["", "Sales"],
   ];
@@ -717,7 +717,7 @@ describe("previewImport for transactions", () => {
   });
 
   it("blocks the file by naming every account the chart does not have", async () => {
-    const sb = companyClient({ accounts: [["121", "PC49 BoA CK 3388"]] });
+    const sb = companyClient({ accounts: [["121", "Riverbend Bank CK 4471"]] });
 
     const preview = await previewImport(sb, "transactions", ROWS, MAPPING);
 
@@ -736,7 +736,7 @@ describe("previewImport for transactions", () => {
   });
 
   it("refuses a row with no amount, and keeps the others", async () => {
-    const rows = [...ROWS, ["2026-01-17", "No amount", "121 - PC49 BoA CK 3388", "Sales", ""]];
+    const rows = [...ROWS, ["2026-01-17", "No amount", "121 - Riverbend Bank CK 4471", "Sales", ""]];
 
     const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
 
@@ -762,13 +762,13 @@ describe("runImport for transactions", () => {
     expect(sent.p_rows[0]).toMatchObject({
       txn_date: "2026-01-15",
       category_account: "Inventory Purchase",
-      signed_minor: -320000,
+      signed_minor: -275000,
     });
     expect(String(sent.p_rows[0].raw_hash)).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("refuses to run at all when an account is missing", async () => {
-    const sb = companyClient({ accounts: [["121", "PC49 BoA CK 3388"]] });
+    const sb = companyClient({ accounts: [["121", "Riverbend Bank CK 4471"]] });
 
     await expect(
       runImport(sb, "transactions", ROWS, MAPPING, { bankAccountId: "account-0" }),

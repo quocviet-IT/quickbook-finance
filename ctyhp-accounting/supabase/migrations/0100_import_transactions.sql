@@ -20,7 +20,7 @@
 
 set search_path = public;
 
--- Resolve "121", "121 - PC49 BoA CK 3388" or "PC49 BoA CK 3388" to one account.
+-- Resolve "121", "121 - Riverbend Bank CK 4471" or "Riverbend Bank CK 4471" to one account.
 create or replace function acc_resolve_account_ref(p_ref text) returns uuid
 language plpgsql stable security definer set search_path = public as $$
 declare

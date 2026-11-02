@@ -49,16 +49,10 @@ The Transactions file holds **1,566 data rows**:
 
 The row needing a human decision is source row 544:
 
-- Date: `2025-02-20`
-- Description: `Check 1171`
-- Bank account: one of the company's checking accounts *(the real name is held
-  back: this repository is public, and the name carries the bank and the last
-  four digits)*
-- Category account: `Shareholder Loan`
-- Amount: `-$3,450`
-- Debit: `$2,000`
-- Credit: `$3,450`
-- Debit less Credit: `-$1,450`
+- A cheque, paid from one of the company's checking accounts to an owner's
+  loan account *(its date, number, account name and amounts are held back:
+  this repository is public, and together they are one real transaction)*
+- The Amount column says one figure; Debit less Credit says another
 
 The system must not guess which figure is right. Whoever owns the source data
 has to say whether the Amount or the Debit/Credit pair is authoritative.
@@ -246,8 +240,8 @@ the plan has been invalidated.
 
 Fixing the importer and cleaning one company's data are two separate jobs.
 
-**Step 1 — the source file.** Settle the correct value for row 544
-(`Check 1171`). Keep the 99 no-money rows as `ignored` rather than failures.
+**Step 1 — the source file.** Settle the correct value for row 544.
+Keep the 99 no-money rows as `ignored` rather than failures.
 Rebuild the Preview and confirm Money In, Money Out and Net.
 
 **Step 2 — finish the Chart of Accounts.** Apply the 50 classifications that can

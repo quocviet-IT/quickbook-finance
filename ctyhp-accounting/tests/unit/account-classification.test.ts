@@ -19,7 +19,7 @@ const IMPORTED = [
   ["220", "Shareholder Loan", "equity", "unclassified", null],
   ["170", "Inventory Purchase", "current_asset", "unclassified", null],
   ["151", "Transfer Clearing", "current_asset", "unclassified", null],
-  ["121", "PC49 BoA CK 3388", "bank", "cash", "checking"],
+  ["121", "Riverbend Bank CK 4471", "bank", "cash", "checking"],
   ["133", "Northern Savings", "bank", "unclassified", null],
   ["610", "Fund Transfer", "expense", "investing", null],
 ];
@@ -116,7 +116,7 @@ describe("planAccountClassification", () => {
   });
 
   it("offers nothing when a bank account's name settles nothing", async () => {
-    const { client } = chartClient([["131", "PC49 Relay 3224", "bank", "cash", null]]);
+    const { client } = chartClient([["131", "Harbor Relay 5810", "bank", "cash", null]]);
 
     const plan = await planAccountClassification(client);
 
@@ -153,7 +153,7 @@ describe("detailTypeFromName", () => {
     expect(detailTypeFromName("Petty Cash")).toBe("cash_on_hand");
     expect(detailTypeFromName("1000 Cash on Hand")).toBe("cash_on_hand");
     expect(detailTypeFromName("Operating Bank Account")).toBe("checking");
-    expect(detailTypeFromName("PC49 BoA Checking 3388")).toBe("checking");
+    expect(detailTypeFromName("Riverbend Bank Checking 4471")).toBe("checking");
     expect(detailTypeFromName("Northern Savings")).toBe("savings");
     expect(detailTypeFromName("Treasury Money Market")).toBe("money_market");
   });
@@ -161,7 +161,7 @@ describe("detailTypeFromName", () => {
   it("says nothing when the name says nothing", () => {
     // 0072 stopped at four readings on purpose: guessing a classification onto
     // a ledger account is how a balance sheet ends up quietly wrong.
-    expect(detailTypeFromName("PC49 Relay CK 3224")).toBeNull();
+    expect(detailTypeFromName("Harbor Relay CK 5810")).toBeNull();
     expect(detailTypeFromName("")).toBeNull();
     expect(detailTypeFromName(null)).toBeNull();
   });

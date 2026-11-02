@@ -16,8 +16,9 @@ export interface CreateAccountFromImportProps {
  *
  * The review asked for missing accounts to be created automatically during the
  * import. They are not, and this is why: a transaction row is not evidence that
- * an account should exist. One file named "Transfer from PERFBUS CHK (530)",
- * which reads like an account and is actually a description of a transfer —
+ * an account should exist. One file named something like "Transfer from
+ * NORTHWIND CHK (771)", which reads like an account and is actually a
+ * description of a transfer —
  * created automatically it would have become a permanent account of a guessed
  * type, in books nobody would think to check.
  *

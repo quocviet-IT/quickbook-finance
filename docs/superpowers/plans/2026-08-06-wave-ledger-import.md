@@ -2451,8 +2451,9 @@ All six tasks done. Three things the plan did not foresee:
   warnings on a repository that had none of its own.
 
 **The real file, run through the parser once and then deleted:** 26 accounts,
-554 entries, 2,956 lines, 198 zero rows skipped, total debits
-**$53,182,909.72**, **zero** unbalanced dates and **zero** accounts where our
+554 entries, 2,956 lines, 198 zero rows skipped, total debits **equal to total
+credits** (the figure is the client's and stays out of this public repository),
+**zero** unbalanced dates and **zero** accounts where our
 sums disagree with Wave's own *Totals and Ending Balance* rows.
 
 Gates: `npm test` 1116 passed / 113 files · typecheck clean · lint 0 errors

@@ -10,7 +10,7 @@ Feedback report `428ca4db-a090-417a-8ed6-a40ef4f7d81e` (2026-08-04, `/settings/i
 > Hi Viet, could you please give me information on what to do here, do i need to
 > import one ledger at a time or i can batch the import of transactions like what
 > am doing right now. Also batch import can save time. i will sending you a
-> ledger balance for PC49 provide me a clear instruction how to add this ledger.
+> ledger balance for [the client] provide me a clear instruction how to add this ledger.
 
 The screenshot attached to that report says more than the words do. The file
 loaded was **"Pacific Four Nine (2.0) Account Transactions 2026-08-04 18_20.csv"**
@@ -41,7 +41,7 @@ mapping can read it**, because its layout changes inside one file.
 
 - 3,162 transaction rows under ~18 accounts, each account a *section*, spanning
   December 2022 to December 2025.
-- An account **with** a number puts it in column 0 — `121 - PC49 BoA CK 3388`,
+- An account **with** a number puts it in column 0 — `121 - Riverbend Bank CK 4471`,
   code and name in one cell.
 - An account **without** a number has its name pushed into column 1, the DATE
   column — `Cash on Hand`, `Transfer Clearing`, `Stripe Sales`.
@@ -95,7 +95,7 @@ derived from that list, so guidance cannot drift from the mapper:
 
 - `templateCsvFor(target: ImportTarget): string` — a header row of the target's
   field labels plus one example row. The example for `chart_of_accounts` is the
-  PC49 case from the report, so the answer to "how do I add this ledger" is a
+  client's case from the report, so the answer to "how do I add this ledger" is a
   file the user can open.
 - `detectFileShape(headers: readonly string[]): FileShapeDetection` where
 

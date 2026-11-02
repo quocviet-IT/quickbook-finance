@@ -69,7 +69,7 @@ describe("the pre-flight panel", () => {
 
   it("never offers to create an account without asking what kind it is", () => {
     // A transaction row is not evidence that an account should exist, and its
-    // type cannot be read off a row. "Transfer from PERFBUS CHK (530)" reads
+    // type cannot be read off a row. "Transfer from NORTHWIND CHK (771)" reads
     // like an account and is a description of a transfer.
     const create = read("CreateAccountFromImport.tsx");
     expect(create).toContain("ACCOUNT_TYPE_LABEL");

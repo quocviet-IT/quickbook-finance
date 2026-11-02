@@ -17,8 +17,8 @@ const MAPPING = {
 /** Data rows only: the screen keeps the header in its own state, and
  *  `applyMapping` is given what is left. */
 const ROWS = [
-  ["2026-01-15", "Zelle Transfer", "121 - PC49 BoA CK 3388", "Inventory Purchase", "-3200.00"],
-  ["2026-01-16", "Deposit", "121 - PC49 BoA CK 3388", "Sales", "969.00"],
+  ["2026-01-15", "Zelle Transfer", "121 - Riverbend Bank CK 4471", "Inventory Purchase", "-2750.00"],
+  ["2026-01-16", "Deposit", "121 - Riverbend Bank CK 4471", "Sales", "1240.00"],
 ];
 
 /** A chart with both accounts, a bank record for the bank, and no history. */
@@ -27,7 +27,7 @@ function companyClient(
 ) {
   const accounts = (
     overrides.accounts ?? [
-      ["121", "PC49 BoA CK 3388"],
+      ["121", "Riverbend Bank CK 4471"],
       ["", "Inventory Purchase"],
       ["", "Sales"],
     ]
@@ -120,7 +120,7 @@ describe("previewImport for transactions", () => {
   });
 
   it("blocks the file by naming every account the chart does not have", async () => {
-    const sb = companyClient({ accounts: [["121", "PC49 BoA CK 3388"]] });
+    const sb = companyClient({ accounts: [["121", "Riverbend Bank CK 4471"]] });
 
     const preview = await previewImport(sb, "transactions", ROWS, MAPPING);
 
@@ -142,7 +142,7 @@ describe("previewImport for transactions", () => {
     // A waived fee is written as 0.00 and there are 99 of them in the file the
     // tester imported. Calling that a problem told them to map a column they
     // had already mapped.
-    const rows = [...ROWS, ["2026-01-17", "Fee waived", "121 - PC49 BoA CK 3388", "Sales", ""]];
+    const rows = [...ROWS, ["2026-01-17", "Fee waived", "121 - Riverbend Bank CK 4471", "Sales", ""]];
 
     const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
 
@@ -157,7 +157,7 @@ describe("previewImport for transactions", () => {
     // the button went green and the import then refused.
     const sb = companyClient({
       accounts: [
-        ["121", "PC49 BoA CK 3388"],
+        ["121", "Riverbend Bank CK 4471"],
         ["", "Sales"],
         ["170", "Inventory Purchase"],
         ["510", "Inventory Purchase"],
@@ -176,7 +176,7 @@ describe("previewImport for transactions", () => {
   it("takes the account code over a name another account also answers to", async () => {
     const sb = companyClient({
       accounts: [
-        ["121", "PC49 BoA CK 3388"],
+        ["121", "Riverbend Bank CK 4471"],
         ["", "Sales"],
         ["170", "Inventory Purchase"],
         ["510", "Inventory Purchase"],
@@ -195,8 +195,8 @@ describe("previewImport for transactions", () => {
     // real; hashed alike, the second was dropped by the dedupe index without a
     // word, and the preview's count was one higher than what arrived.
     const twice = [
-      ["2026-01-15", "Wire Transfer Fee", "121 - PC49 BoA CK 3388", "Sales", "-30.00"],
-      ["2026-01-15", "Wire Transfer Fee", "121 - PC49 BoA CK 3388", "Sales", "-30.00"],
+      ["2026-01-15", "Wire Transfer Fee", "121 - Riverbend Bank CK 4471", "Sales", "-30.00"],
+      ["2026-01-15", "Wire Transfer Fee", "121 - Riverbend Bank CK 4471", "Sales", "-30.00"],
     ];
 
     const preview = await previewImport(companyClient(), "transactions", twice, MAPPING);
@@ -223,11 +223,11 @@ describe("what the preview says about the rows it leaves out", () => {
     // it counted records rather than lines. Off by one, and further off after
     // any blank line, on the one message telling somebody where to look.
     const rows = [
-      ["2026-01-15", "Zelle Transfer", "121 - PC49 BoA CK 3388", "Inventory Purchase", "-3200.00"],
-      ["2026-01-16", "Check 1171", "121 - PC49 BoA CK 3388", "Sales", "-3450"],
+      ["2026-01-15", "Zelle Transfer", "121 - Riverbend Bank CK 4471", "Inventory Purchase", "-2750.00"],
+      ["2026-01-16", "Check 2045", "121 - Riverbend Bank CK 4471", "Sales", "-1250"],
     ];
     const mapping = { ...MAPPING, debit: 5, credit: 6 };
-    const withConflict = rows.map((row, index) => [...row, index === 1 ? "2000" : "0", index === 1 ? "3450" : "0"]);
+    const withConflict = rows.map((row, index) => [...row, index === 1 ? "2000" : "0", index === 1 ? "1250" : "0"]);
 
     const preview = await previewImport(companyClient(), "transactions", withConflict, mapping);
 
@@ -237,9 +237,9 @@ describe("what the preview says about the rows it leaves out", () => {
 
   it("keeps counting lines correctly past a blank one", async () => {
     const rows = [
-      ["2026-01-15", "Zelle Transfer", "121 - PC49 BoA CK 3388", "Inventory Purchase", "-3200.00"],
+      ["2026-01-15", "Zelle Transfer", "121 - Riverbend Bank CK 4471", "Inventory Purchase", "-2750.00"],
       ["", "", "", "", ""],
-      ["2026-01-17", "Fee waived", "121 - PC49 BoA CK 3388", "Sales", "0.00"],
+      ["2026-01-17", "Fee waived", "121 - Riverbend Bank CK 4471", "Sales", "0.00"],
     ];
 
     const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
@@ -250,7 +250,7 @@ describe("what the preview says about the rows it leaves out", () => {
   });
 
   it("names every row it leaves out, with the reason", async () => {
-    const rows = [...ROWS, ["2026-01-17", "Fee waived", "121 - PC49 BoA CK 3388", "Sales", ""]];
+    const rows = [...ROWS, ["2026-01-17", "Fee waived", "121 - Riverbend Bank CK 4471", "Sales", ""]];
 
     const preview = await previewImport(companyClient(), "transactions", rows, MAPPING);
 
@@ -275,8 +275,8 @@ describe("what the preview says about the rows it leaves out", () => {
     // two do not, which is the whole reason they are reported.
     const preview = await previewImport(companyClient(), "transactions", ROWS, MAPPING);
 
-    expect(preview.moneyInMinor).toBe(96900);
-    expect(preview.moneyOutMinor).toBe(-320000);
+    expect(preview.moneyInMinor).toBe(124000);
+    expect(preview.moneyOutMinor).toBe(-275000);
     expect((preview.moneyInMinor ?? 0) + (preview.moneyOutMinor ?? 0)).toBe(
       preview.openingTotalMinor,
     );
@@ -300,7 +300,7 @@ describe("runImport for transactions", () => {
     expect(sent.p_rows[0]).toMatchObject({
       txn_date: "2026-01-15",
       category_account: "Inventory Purchase",
-      signed_minor: -320000,
+      signed_minor: -275000,
     });
     expect(String(sent.p_rows[0].raw_hash)).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -342,7 +342,7 @@ describe("runImport for transactions", () => {
   });
 
   it("refuses to run at all when an account is missing", async () => {
-    const sb = companyClient({ accounts: [["121", "PC49 BoA CK 3388"]] });
+    const sb = companyClient({ accounts: [["121", "Riverbend Bank CK 4471"]] });
 
     await expect(
       runImport(sb, "transactions", ROWS, MAPPING, { bankAccountId: "account-0" }),
@@ -353,7 +353,7 @@ describe("runImport for transactions", () => {
   it("refuses to run when a name in the file belongs to two accounts", async () => {
     const sb = companyClient({
       accounts: [
-        ["121", "PC49 BoA CK 3388"],
+        ["121", "Riverbend Bank CK 4471"],
         ["", "Inventory Purchase"],
         ["", "Sales"],
         ["170", "Inventory Purchase"],
