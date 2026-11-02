@@ -299,9 +299,11 @@ describe("getExceptionReport: the unavailable mechanism", () => {
     expect(report.checksRun).toBe(13);
   });
 
-  it("tags both statement checks, and only them, when the bank-account lines cannot be read", async () => {
+  it("tags the checks that read journal lines, and only them, when the lines cannot be read", async () => {
     // The statement checks share one read of every bank account's lines, so
-    // neither can claim "nothing found" when it fails, and no other check is
+    // neither can claim "nothing found" when it fails. Since 2.98 the check
+    // numbers read manual journal lines too, and the duplicates check keys on
+    // those references, so both are tagged with them. No other check is
     // taken down with it.
     const sb = fakeClient({
       bankAccounts: [BANK],
@@ -318,7 +320,7 @@ describe("getExceptionReport: the unavailable mechanism", () => {
       ],
     });
     const report = await getExceptionReport(sb, FROM, TO, TODAY);
-    expect(report.unavailable).toEqual(["statementBalance", "belowZero"]);
+    expect([...report.unavailable].sort()).toEqual(["belowZero", "checkNumber", "duplicates", "statementBalance"]);
     expect(report.holding).toHaveLength(1);
     expect(report.statementBalance).toEqual([]);
     expect(report.belowZero).toEqual([]);

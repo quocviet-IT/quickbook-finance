@@ -16,7 +16,9 @@ import {
   Tag,
   type TableColumnsType,
 } from "antd";
-import { CheckOutlined, EditOutlined, PlusOutlined, SearchOutlined, StopOutlined } from "@ant-design/icons";
+import { CheckOutlined, DownloadOutlined, EditOutlined, PlusOutlined, SearchOutlined, StopOutlined } from "@ant-design/icons";
+import { downloadTextFile } from "@/lib/client/download";
+import { chartOfAccountsCsv, chartOfAccountsFileName } from "@/lib/domain/chart-export";
 import dayjs from "dayjs";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -615,6 +617,14 @@ export default function AccountsClient({
         actions={
           <Space wrap>
             <ClassifyAccountsButton canWrite={canWrite} initialPlan={initialClassificationPlan} />
+            {/* The chart in the import's own columns, to start another company's books from it (2.98). */}
+            <Button
+              icon={<DownloadOutlined />}
+              title="Download the active accounts as a CSV that Settings › Import reads back"
+              onClick={() => downloadTextFile(chartOfAccountsFileName(initialAsOf), chartOfAccountsCsv(accounts))}
+            >
+              Export chart
+            </Button>
             {canWrite ? (
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
                 New account

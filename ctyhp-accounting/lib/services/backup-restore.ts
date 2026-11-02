@@ -260,7 +260,7 @@ export interface RestoreDependencies {
   readTotals?: (schema: string, asOf: string) => Promise<ExportControlTotals>;
 }
 
-interface TablePlan {
+export interface TablePlan {
   table: string;
   columns: string[];
   rows: Array<Array<string | null>>;
@@ -583,6 +583,163 @@ interface BackupRegisterRow {
   control_totals: ExportControlTotals;
 }
 
+/** Every exported table a restore loads: all of them but the ones a new company sets up for itself. */
+function restorableTables(): string[] {
+  const excluded = RESTORE_EXCLUDED_TABLES as readonly string[];
+  return [...EXPORT_TABLES, SENSITIVE_TABLE].filter((table) => !excluded.includes(table));
+}
+
+/**
+ * Opens a stored snapshot and reads it back into one plan per table, after
+ * proving it is the snapshot its register row recorded: it unzips, its
+ * manifest hashes to the register's content hash, its control totals and date
+ * agree with the register's copy, every file matches the manifest's checksum,
+ * nothing unlisted is in it, and no table in it is one today's schema no
+ * longer restores. Pure apart from hashing: no database, no storage, so the
+ * export-and-read-back round trip can be proved in CI (2.98,
+ * tests/unit/backup-roundtrip.test.ts) through the code a restore runs.
+ */
+export async function readSnapshotArchive(
+  bytes: Uint8Array,
+  register: {
+    storagePath: string;
+    contentHash: string;
+    controlTotals: Partial<ExportControlTotals> | null;
+    takenAt: string;
+  },
+): Promise<{ manifest: ExportManifest; plans: TablePlan[] }> {
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = unzipSync(bytes);
+  } catch (cause) {
+    throw new RestoreError(
+      `The snapshot file could not be unzipped: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  const manifestBytes = entries["manifest.json"];
+  if (!manifestBytes) {
+    throw new RestoreError("The archive holds no manifest.json, so it is not a One Book snapshot.");
+  }
+  const manifest = JSON.parse(strFromU8(manifestBytes)) as ExportManifest;
+
+  // Prove the file is the snapshot the register recorded — same hash, same
+  // derivation the nightly job used when it wrote the row — before a single
+  // byte of it is treated as books.
+  const actualHash = await snapshotHash(snapshotDescription(manifest));
+  if (actualHash !== register.contentHash) {
+    throw new RestoreError(
+      `The file at ${register.storagePath} is not the snapshot this register row recorded: its content ` +
+        `hashes to ${actualHash}, but the register says ${register.contentHash}.`,
+    );
+  }
+  // The hash above covers only manifest.files — the path→sha256 pairs. The
+  // control totals and their measurement date sit outside that hashed set, so
+  // anyone able to write to the bucket could edit them to whatever a broken
+  // restore happens to produce, and every check so far would still pass. The
+  // register row carries the nightly job's own copy of both, written behind
+  // row-level security where the bucket cannot reach (`control_totals` and
+  // `taken_at` are NOT NULL since the table's creation in 0114, so that copy
+  // always exists). The two copies must agree; a file that disagrees with its
+  // register row is refused rather than trusted over it — the disagreement
+  // means the stored file was altered after the register recorded it, or the
+  // job that wrote both is broken, and either one is worth a refusal, not a
+  // proof run against figures nothing vouches for.
+  // Compared over the union of both sides' keys, not compareControlTotals:
+  // that helper walks only the expected side's keys, so a copy missing a
+  // figure entirely (a tampered manifest with controlTotals deleted, or a
+  // job bug writing a partial register row) would slip through a one-sided
+  // walk without a word.
+  const manifestTotals: Partial<ExportControlTotals> = manifest.controlTotals ?? {};
+  const registerTotals: Partial<ExportControlTotals> = register.controlTotals ?? {};
+  const totalKeys = new Set<keyof ExportControlTotals>([
+    ...(Object.keys(registerTotals) as Array<keyof ExportControlTotals>),
+    ...(Object.keys(manifestTotals) as Array<keyof ExportControlTotals>),
+  ]);
+  const registerDisagreements: string[] = [];
+  for (const key of totalKeys) {
+    if (registerTotals[key] !== manifestTotals[key]) {
+      registerDisagreements.push(
+        `${key}: the register says ${registerTotals[key]}, the manifest says ${manifestTotals[key]}`,
+      );
+    }
+  }
+  if (manifest.controlTotalsAsOf !== register.takenAt) {
+    registerDisagreements.push(
+      `controlTotalsAsOf: the register's taken_at says ${register.takenAt}, the manifest says ${manifest.controlTotalsAsOf}`,
+    );
+  }
+  if (registerDisagreements.length > 0) {
+    throw new RestoreError(
+      `The archive's manifest does not agree with this snapshot's register row — ` +
+        `${registerDisagreements.join("; ")}. The register's copy is the one the storage bucket ` +
+        `cannot touch, so a manifest that contradicts it cannot be trusted, and the restore is refused.`,
+    );
+  }
+  // And prove the bytes match the manifest that hash was derived from.
+  for (const file of manifest.files) {
+    const entry = entries[file.path];
+    if (entry === undefined) {
+      throw new RestoreError(`The archive is missing ${file.path}, which its own manifest lists.`);
+    }
+    const digest = await sha256Hex(strFromU8(entry));
+    if (digest !== file.sha256) {
+      throw new RestoreError(
+        `${file.path} does not match the checksum the manifest recorded for it — the archive is corrupt.`,
+      );
+    }
+  }
+  // The loop above walks the manifest's list; this one walks the zip's. The
+  // loader below reads entries[archivePathFor(table)] for every restorable
+  // table, so an entry the manifest never listed would load with no digest
+  // ever checked — the exact shape of a data/T.csv smuggled into the stored
+  // file after a later migration added T to EXPORT_TABLES. Only manifest.json
+  // and README.txt legitimately live outside files[].
+  const vouchedFor = new Set(manifest.files.map((file) => file.path));
+  const unlisted = Object.keys(entries).filter(
+    (path) => path !== "manifest.json" && path !== "README.txt" && !vouchedFor.has(path),
+  );
+  if (unlisted.length > 0) {
+    throw new RestoreError(
+      `The archive holds files its own manifest does not list, so nothing vouches for their ` +
+        `content: ${unlisted.join(", ")}. They can only have been added after the snapshot was ` +
+        `taken, and the restore refuses to load anything unverified.`,
+    );
+  }
+
+  // A table the snapshot holds but this list no longer restores would vanish
+  // without these lines — same rule as refuseUnknownColumns, at table grain.
+  const knownTables = new Set<string>([...EXPORT_TABLES, SENSITIVE_TABLE]);
+  const orphanTables = manifest.tables
+    .map((table) => table.table)
+    .filter((table) => !knownTables.has(table));
+  if (orphanTables.length > 0) {
+    throw new RestoreError(
+      `This snapshot holds tables today's schema no longer restores: ${orphanTables.join(", ")}. ` +
+        `Loading the rest would drop their data in silence, so the restore is refused.`,
+    );
+  }
+
+  const plans: TablePlan[] = [];
+  for (const table of restorableTables()) {
+    // archivePathFor, not `data/${table}.csv`: vendor tax profiles live under
+    // sensitive/ and the attachment inventory is attachments.csv — a data/-only
+    // read would silently leave both behind.
+    const entry = entries[archivePathFor(table)];
+    // A table added since the snapshot has no file; it stays as provisioned,
+    // the table-level twin of "columns added since take their defaults".
+    if (entry === undefined) continue;
+    try {
+      const parsed = parseCsvTable(strFromU8(entry));
+      plans.push({ table, ...parsed });
+    } catch (cause) {
+      throw new RestoreError(
+        `${archivePathFor(table)}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      );
+    }
+  }
+  return { manifest, plans };
+}
+
 /**
  * Load a stored snapshot into a brand-new company beside the running books,
  * and say whether the books came back whole.
@@ -658,139 +815,13 @@ export async function restoreBackupIntoNewCompany(
   if (!user) throw new RestoreError("Your session has expired. Sign in again.");
 
   const bytes = await download(row.storage_path);
-  let entries: Record<string, Uint8Array>;
-  try {
-    entries = unzipSync(bytes);
-  } catch (cause) {
-    throw new RestoreError(
-      `The snapshot file could not be unzipped: ${cause instanceof Error ? cause.message : String(cause)}`,
-    );
-  }
-  const manifestBytes = entries["manifest.json"];
-  if (!manifestBytes) {
-    throw new RestoreError("The archive holds no manifest.json, so it is not a One Book snapshot.");
-  }
-  const manifest = JSON.parse(strFromU8(manifestBytes)) as ExportManifest;
-
-  // Prove the file is the snapshot the register recorded — same hash, same
-  // derivation the nightly job used when it wrote the row — before a single
-  // byte of it is treated as books.
-  const actualHash = await snapshotHash(snapshotDescription(manifest));
-  if (actualHash !== row.content_hash) {
-    throw new RestoreError(
-      `The file at ${row.storage_path} is not the snapshot this register row recorded: its content ` +
-        `hashes to ${actualHash}, but the register says ${row.content_hash}.`,
-    );
-  }
-  // The hash above covers only manifest.files — the path→sha256 pairs. The
-  // control totals and their measurement date sit outside that hashed set, so
-  // anyone able to write to the bucket could edit them to whatever a broken
-  // restore happens to produce, and every check so far would still pass. The
-  // register row carries the nightly job's own copy of both, written behind
-  // row-level security where the bucket cannot reach (`control_totals` and
-  // `taken_at` are NOT NULL since the table's creation in 0114, so that copy
-  // always exists). The two copies must agree; a file that disagrees with its
-  // register row is refused rather than trusted over it — the disagreement
-  // means the stored file was altered after the register recorded it, or the
-  // job that wrote both is broken, and either one is worth a refusal, not a
-  // proof run against figures nothing vouches for.
-  // Compared over the union of both sides' keys, not compareControlTotals:
-  // that helper walks only the expected side's keys, so a copy missing a
-  // figure entirely (a tampered manifest with controlTotals deleted, or a
-  // job bug writing a partial register row) would slip through a one-sided
-  // walk without a word.
-  const manifestTotals: Partial<ExportControlTotals> = manifest.controlTotals ?? {};
-  const registerTotals: Partial<ExportControlTotals> = row.control_totals ?? {};
-  const totalKeys = new Set<keyof ExportControlTotals>([
-    ...(Object.keys(registerTotals) as Array<keyof ExportControlTotals>),
-    ...(Object.keys(manifestTotals) as Array<keyof ExportControlTotals>),
-  ]);
-  const registerDisagreements: string[] = [];
-  for (const key of totalKeys) {
-    if (registerTotals[key] !== manifestTotals[key]) {
-      registerDisagreements.push(
-        `${key}: the register says ${registerTotals[key]}, the manifest says ${manifestTotals[key]}`,
-      );
-    }
-  }
-  if (manifest.controlTotalsAsOf !== row.taken_at) {
-    registerDisagreements.push(
-      `controlTotalsAsOf: the register's taken_at says ${row.taken_at}, the manifest says ${manifest.controlTotalsAsOf}`,
-    );
-  }
-  if (registerDisagreements.length > 0) {
-    throw new RestoreError(
-      `The archive's manifest does not agree with this snapshot's register row — ` +
-        `${registerDisagreements.join("; ")}. The register's copy is the one the storage bucket ` +
-        `cannot touch, so a manifest that contradicts it cannot be trusted, and the restore is refused.`,
-    );
-  }
-  // And prove the bytes match the manifest that hash was derived from.
-  for (const file of manifest.files) {
-    const entry = entries[file.path];
-    if (entry === undefined) {
-      throw new RestoreError(`The archive is missing ${file.path}, which its own manifest lists.`);
-    }
-    const digest = await sha256Hex(strFromU8(entry));
-    if (digest !== file.sha256) {
-      throw new RestoreError(
-        `${file.path} does not match the checksum the manifest recorded for it — the archive is corrupt.`,
-      );
-    }
-  }
-  // The loop above walks the manifest's list; this one walks the zip's. The
-  // loader below reads entries[archivePathFor(table)] for every restorable
-  // table, so an entry the manifest never listed would load with no digest
-  // ever checked — the exact shape of a data/T.csv smuggled into the stored
-  // file after a later migration added T to EXPORT_TABLES. Only manifest.json
-  // and README.txt legitimately live outside files[].
-  const vouchedFor = new Set(manifest.files.map((file) => file.path));
-  const unlisted = Object.keys(entries).filter(
-    (path) => path !== "manifest.json" && path !== "README.txt" && !vouchedFor.has(path),
-  );
-  if (unlisted.length > 0) {
-    throw new RestoreError(
-      `The archive holds files its own manifest does not list, so nothing vouches for their ` +
-        `content: ${unlisted.join(", ")}. They can only have been added after the snapshot was ` +
-        `taken, and the restore refuses to load anything unverified.`,
-    );
-  }
-
-  // A table the snapshot holds but this list no longer restores would vanish
-  // without these lines — same rule as refuseUnknownColumns, at table grain.
-  const knownTables = new Set<string>([...EXPORT_TABLES, SENSITIVE_TABLE]);
-  const orphanTables = manifest.tables
-    .map((table) => table.table)
-    .filter((table) => !knownTables.has(table));
-  if (orphanTables.length > 0) {
-    throw new RestoreError(
-      `This snapshot holds tables today's schema no longer restores: ${orphanTables.join(", ")}. ` +
-        `Loading the rest would drop their data in silence, so the restore is refused.`,
-    );
-  }
-
-  const excluded = RESTORE_EXCLUDED_TABLES as readonly string[];
-  const restorable = [...EXPORT_TABLES, SENSITIVE_TABLE].filter(
-    (table) => !excluded.includes(table),
-  );
-  const plans: TablePlan[] = [];
-  for (const table of restorable) {
-    // archivePathFor, not `data/${table}.csv`: vendor tax profiles live under
-    // sensitive/ and the attachment inventory is attachments.csv — a data/-only
-    // read would silently leave both behind.
-    const entry = entries[archivePathFor(table)];
-    // A table added since the snapshot has no file; it stays as provisioned,
-    // the table-level twin of "columns added since take their defaults".
-    if (entry === undefined) continue;
-    try {
-      const parsed = parseCsvTable(strFromU8(entry));
-      plans.push({ table, ...parsed });
-    } catch (cause) {
-      throw new RestoreError(
-        `${archivePathFor(table)}: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
-    }
-  }
+  const { plans } = await readSnapshotArchive(bytes, {
+    storagePath: row.storage_path,
+    contentHash: row.content_hash,
+    controlTotals: row.control_totals,
+    takenAt: row.taken_at,
+  });
+  const restorable = restorableTables();
 
   // Measured at the snapshot's own reporting date: balances move with the
   // date (a future-dated entry is excluded until its date arrives), so any

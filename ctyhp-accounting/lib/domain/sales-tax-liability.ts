@@ -247,8 +247,14 @@ export interface SalesTaxLiabilityReport {
   unlinked: { id: string; name: string }[];
 }
 
-function rateOf(collectedMinor: number, taxableMinor: number): number | null {
-  return taxableMinor === 0 ? null : (collectedMinor / taxableMinor) * 100;
+/**
+ * Collected over taxable, or none when nothing taxable was sold. A period
+ * whose taxable sales net below zero (only a credit memo in it) has no rate
+ * either: dividing two refunds printed the memo's own rate as if it were the
+ * period's (prototype parity check, 2.98; the prototype shows a dash).
+ */
+export function rateOf(collectedMinor: number, taxableMinor: number): number | null {
+  return taxableMinor <= 0 ? null : (collectedMinor / taxableMinor) * 100;
 }
 
 /** The report for one period size, from what the service read. */

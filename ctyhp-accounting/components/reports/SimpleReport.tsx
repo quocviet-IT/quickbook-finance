@@ -27,6 +27,12 @@ export type SimpleReportPeriod =
 export interface ReportView {
   /** True while the browser prints: every row is drawn, not one page of them. */
   printing: boolean;
+  /**
+   * Runs the report again over these dates, as if they had been chosen in the
+   * bar: what a row that names a period offers (2.98, a year on Purchases and
+   * Inventory), so its export is that period's.
+   */
+  runFor: (when: ReportWhen) => void;
 }
 
 /**
@@ -199,6 +205,15 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
   const shown = useMemo(() => (data === null ? null : view ? view(data) : data), [data, view]);
   const sheet = useMemo(() => (shown === null ? null : buildSheet(shown, ran)), [shown, ran, buildSheet]);
 
+  const runFor = useCallback(
+    (when: ReportWhen) => {
+      setPreset("custom");
+      setDraft(when);
+      void run(when);
+    },
+    [run],
+  );
+
   const choosePreset = (key: PeriodPreset) => {
     setPreset(key);
     if (key === "custom" || period.kind !== "range") return;
@@ -221,7 +236,9 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
         {waiting && shown === null ? (
           <ReportPrompt title={waiting.title} description={waiting.description} />
         ) : shown !== null ? (
-          props.render(shown, ran, { printing })
+          // runFor reads the run counter when a row's button is pressed, never while this renders.
+          // eslint-disable-next-line react-hooks/refs
+          props.render(shown, ran, { printing, runFor })
         ) : (
           <div style={{ textAlign: "center", padding: "48px 0" }}>
             {loading ? (
