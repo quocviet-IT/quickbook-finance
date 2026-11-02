@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link";
 import { Alert, Button, Space, Spin, Tag, type TableColumnsType } from "antd";
 import DataTable from "@/components/ui/DataTable";
-import { flexColumn, type FlexColumnSpec } from "@/components/ui/columns";
+import { flexColumn, secondaryLine, type FlexColumnSpec } from "@/components/ui/columns";
 import ReportBar from "@/components/reports/ReportBar";
 import EntryDetailDrawer from "@/components/reports/EntryDetailDrawer";
 import {
@@ -24,6 +24,7 @@ import {
   CHECK_LABEL,
   clearingSentences,
   exceptionReportSheet,
+  paymentRefLabel,
   type CheckKey,
   type ClearingRow,
   type ExceptionPaymentRef,
@@ -301,7 +302,7 @@ export default function ExceptionsClient({
           title={CHECK_LABEL.checkNumber}
           note={plural(r.checkNumberClashes.length, "number")}
           state={state("checkNumber", r.checkNumberClashes.length)}
-          why="Counted per bank account, so the same number in two different check books is not flagged. Two entries against one number on one account means one of them is miscoded, or the check was reissued."
+          why="Counted per bank account, so the same number in two different check books is not flagged. Two entries against one number on one account means one of them is miscoded, or the check was reissued. Customer payments, bill payments and manual journal entries with a reference are all read."
         >
           <DataTable<ClashTableRow>
             rowKey="key"
@@ -325,7 +326,13 @@ export default function ExceptionsClient({
               flexColumn<ClashTableRow>({
                 title: "Name",
                 key: "name",
-                render: (_, row) => row.payment.partyName || "—",
+                // Which kind of document, under the name: a journal entry clashes with a payment too (2.98).
+                render: (_, row) => (
+                  <>
+                    <span title={row.payment.partyName || undefined}>{row.payment.partyName || "—"}</span>
+                    {secondaryLine(paymentRefLabel(row.payment))}
+                  </>
+                ),
               }),
               {
                 title: "Amount",

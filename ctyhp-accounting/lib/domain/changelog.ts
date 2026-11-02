@@ -41,6 +41,62 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.98",
+    date: "2026-11-02",
+    headline: "The dashboard flags missed recurring entries and overspent budgets, and the chart of accounts exports.",
+    changes: [
+      {
+        kind: "added",
+        title: "Needs attention lists recurring entries that were due and not posted",
+        detail:
+          "A recurring entry whose date has passed without the nightly run posting it now appears on the dashboard, with the day it was due. Open it to see the schedule, which says why when a run failed.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "Needs attention lists accounts over budget",
+        detail:
+          "An expense or cost of goods sold account that has spent more this fiscal year than its budget allows to the end of this month appears on the dashboard with what was spent and what was budgeted, biggest overrun first. Companies with no budget see nothing new.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "Check number clashes include manual journal entries",
+        detail:
+          "A check number written as the reference of a manual journal entry on a bank or credit card account is now compared with customer and bill payments. Each row says whether the number came from a payment, a bill payment or a journal entry.",
+        route: "/reports/exceptions",
+      },
+      {
+        kind: "added",
+        title: "Export chart downloads the chart of accounts as a CSV",
+        detail:
+          "Chart of Accounts has an Export chart button. The file holds the active accounts in the columns Settings › Import reads, with subaccounts written Parent: Child, so another company's books can start from the same chart. Balances are left out.",
+        route: "/accounts",
+      },
+      {
+        kind: "added",
+        title: "Purchases & Inventory runs a single year from the table",
+        detail:
+          "Choose a year in the Year column to run the report over that year alone, ready to export as its own CSV.",
+        route: "/reports/purchases-inventory",
+      },
+      {
+        kind: "fixed",
+        title: "Sales Tax Liability shows a dash for the rate when a period has only refunds",
+        detail:
+          "A period whose taxable sales are zero or less no longer shows a percentage worked out from refunds; the rate column shows a dash, as the tax return does.",
+        route: "/reports/sales-tax-liability",
+      },
+      {
+        kind: "changed",
+        title: "Every change to the code proves a backup reads back whole",
+        detail:
+          "Each change is now checked by exporting a sample company and reading the file back through the same steps a restore takes: every value comes back as written, including negatives, commas, quotes and line breaks, and the books add up to the same totals. Nothing changes on the Backups screen.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "2.97",
     date: "2026-10-31",
     headline: "Bank Transactions downloads about a sixth less.",

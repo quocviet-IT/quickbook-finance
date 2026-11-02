@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Empty, Tag } from "antd";
+import { Button, Empty, Tag } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import ReportTable, { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
 import { flexColumn } from "@/components/ui/columns";
@@ -65,7 +65,7 @@ export default function PurchasesInventoryClient({
       load={load}
       sheet={sheet}
       runningText="Adding up the purchases…"
-      render={(report, _when, { printing }) => (
+      render={(report, when, { printing, runFor }) => (
         <>
           <StatRow
             items={[
@@ -90,7 +90,26 @@ export default function PurchasesInventoryClient({
                 emptyTitle="No years to show"
                 emptyDescription="Nothing has been posted to cost of sales or inventory."
                 columns={[
-                  flexColumn<PurchaseYearRow>({ title: "Year", dataIndex: "label" }),
+                  flexColumn<PurchaseYearRow>({
+                    title: "Year",
+                    dataIndex: "label",
+                    // One click runs the report over that year, so Export saves that year's
+                    // purchases, suppliers and months: the prototype's "Save one year" (2.98).
+                    render: (label: string, row: PurchaseYearRow) =>
+                      printing || (when.from === row.start && when.to === row.end) ? (
+                        label
+                      ) : (
+                        <Button
+                          type="link"
+                          size="small"
+                          style={{ padding: 0, height: "auto" }}
+                          title={`Run the report for ${label}, so it can be exported on its own`}
+                          onClick={() => runFor({ from: row.start, to: row.end, fiscalYear: null })}
+                        >
+                          {label}
+                        </Button>
+                      ),
+                  }),
                   { title: "Opening stock", dataIndex: "openingMinor", width: COLUMN.MONEY_WIDE, align: "right", render: moneyCell },
                   { title: "Net purchases", dataIndex: "boughtMinor", width: COLUMN.MONEY_WIDE + 20, align: "right", render: moneyCell },
                   { title: "Count adjustment", dataIndex: "countAdjustmentMinor", width: COLUMN.MONEY_WIDE + 8, align: "right", render: moneyCell },
@@ -193,7 +212,7 @@ export default function PurchasesInventoryClient({
             Each year reads opening stock + bought + count adjustment − cost of sales = closing stock. The supplier is
             the one on the bill, expense, vendor credit, bill payment or goods receipt behind the entry; anything else
             is on the line {"“(No vendor)”"}. The year table covers every fiscal year in the books; the other figures
-            cover the dates chosen.
+            cover the dates chosen. Choose a year in the table to run the report over that year alone, and export it.
           </ReportFoot>
         </>
       )}

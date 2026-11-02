@@ -122,8 +122,10 @@ export interface ExceptionBankAccount {
 
 /** A payment carrying the reference a statement is reconciled by. */
 export interface ExceptionPaymentRef {
+  /** For a journal entry, the entry and the account together: one entry can move money through two. */
   paymentId: string;
-  kind: "customer" | "vendor";
+  /** A customer payment, a bill payment, or (2.98) a manual journal entry against a bank or card account. */
+  kind: "customer" | "vendor" | "journal";
   paymentNumber: string | null;
   /**
    * The journal entry this payment posted, which is the only key that can join
@@ -573,6 +575,54 @@ export function futureDatedEntries(
     .sort((x, y) => x.entryDate.localeCompare(y.entryDate));
 }
 
+/**
+ * Manual journal lines against bank and card accounts, as references to scan
+ * for a check number used twice: one per entry and account, for the money the
+ * entry moved through that account. `rows` are journal lines with their
+ * account and entry embedded; `reversed` names entries a reversal undid.
+ */
+export function journalReferenceRows(
+  rows: readonly Record<string, unknown>[],
+  reversed: ReadonlySet<string>,
+): ExceptionPaymentRef[] {
+  const byEntryAccount = new Map<string, ExceptionPaymentRef & { netMinor: number }>();
+  for (const row of rows) {
+    const entryId = row.journal_entry_id as string;
+    if (reversed.has(entryId)) continue;
+    const entry = (row.acc_journal_entry ?? {}) as Record<string, unknown>;
+    const reference = ((entry.source_ref as string | null) ?? "").trim();
+    if (reference === "") continue;
+    const accountId = row.account_id as string;
+    const key = `${entryId}:${accountId}`;
+    const net = Number(row.debit_minor ?? 0) - Number(row.credit_minor ?? 0);
+    const seen = byEntryAccount.get(key);
+    if (seen) {
+      seen.netMinor += net;
+      continue;
+    }
+    byEntryAccount.set(key, {
+      paymentId: key,
+      kind: "journal",
+      paymentNumber: (entry.entry_number as string | null) ?? null,
+      journalEntryId: entryId,
+      paymentDate: entry.entry_date as string,
+      reference,
+      accountId,
+      accountName: ((row.acc_account as { name?: string } | null)?.name ?? "").trim(),
+      partyName: ((entry.description as string | null) ?? "").trim(),
+      amountMinor: 0,
+      netMinor: net,
+    });
+  }
+  return [...byEntryAccount.values()].map(({ netMinor, ...ref }) => ({ ...ref, amountMinor: Math.abs(netMinor) }));
+}
+
+/** How a reference's document is named on screen and in the export. */
+export function paymentRefLabel(p: Pick<ExceptionPaymentRef, "kind" | "paymentNumber">): string {
+  const noun = p.kind === "customer" ? "Payment" : p.kind === "vendor" ? "Bill payment" : "Journal entry";
+  return `${noun} ${p.paymentNumber ?? ""}`.trim();
+}
+
 export interface CheckNumberClash {
   accountId: string;
   accountName: string;
@@ -895,7 +945,7 @@ export function exceptionReportSheet(report: ExceptionReport, meta: ExceptionShe
       c.payments.map((p) => ({
         check: CHECK_LABEL.checkNumber,
         date: p.paymentDate,
-        type: `${p.kind === "customer" ? "Payment" : "Bill payment"} ${p.paymentNumber ?? ""}`.trim(),
+        type: paymentRefLabel(p),
         name: p.partyName,
         account: `${c.accountName}, number ${c.reference}`,
         amount: money(p.amountMinor),

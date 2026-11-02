@@ -14,6 +14,9 @@
  * - Lines waiting on Bank Transactions are counted here, which the report does
  *   not: they are posted nowhere yet, so no balance shows them.
  *
+ * Two more are the Dashboard's own (2.98): recurring entries the nightly run
+ * has not posted, and expense accounts already over this fiscal year's budget.
+ *
  * Pure: the checks in, the list out.
  */
 import { formatDate, plural } from "@/lib/format";
@@ -21,7 +24,29 @@ import type { HoldingRow, NoLongerAgreeRow, UnreconciledRow } from "./exceptions
 import type { TransactionListRow } from "./transaction-list";
 import { nightsMissed } from "./backup-schedule";
 
-export type AttentionKey = "backup" | "waiting" | "neverReconciled" | "noLongerAgree" | "holding" | "futureDated";
+export type AttentionKey =
+  | "backup"
+  | "waiting"
+  | "recurringDue"
+  | "neverReconciled"
+  | "noLongerAgree"
+  | "holding"
+  | "futureDated"
+  | "overBudget";
+
+/** An active recurring schedule whose date has passed without the nightly run posting it. */
+export interface RecurringDueRow {
+  name: string;
+  nextRunDate: string;
+}
+
+/** An expense account that has already spent more this fiscal year than its budget to the end of this month. */
+export interface OverBudgetRow {
+  accountCode: string;
+  name: string;
+  actualMinor: number;
+  budgetMinor: number;
+}
 
 export interface AttentionChecks {
   /**
@@ -32,11 +57,18 @@ export interface AttentionChecks {
   backup?: { lastBackup: string | null; expected: string } | null;
   /** Bank lines not yet posted to an account: waiting on Bank Transactions. */
   waitingLines: number;
+  /** Recurring entries due before today that the nightly run has not posted (2.98). */
+  recurringDue: RecurringDueRow[];
   /** Bank accounts with a balance and no completed reconciliation. */
   neverReconciled: UnreconciledRow[];
   noLongerAgree: NoLongerAgreeRow[];
   holding: HoldingRow[];
   futureDated: TransactionListRow[];
+  /**
+   * Expense accounts over budget (2.98); null when the company has no budget
+   * for this fiscal year, which is not a check that could fail.
+   */
+  overBudget: OverBudgetRow[] | null;
   /** The checks whose reads failed: neither clear nor counted. */
   unavailable: AttentionKey[];
 }
@@ -92,6 +124,18 @@ export function dashboardNeeds(checks: AttentionChecks, money: (minor: number) =
       href: "/banking?queue=unmatched",
     });
   }
+  if (ran("recurringDue") && checks.recurringDue.length > 0) {
+    out.push({
+      key: "recurringDue",
+      count: checks.recurringDue.length,
+      tone: "warning",
+      title: checks.recurringDue.length === 1 ? "Recurring entry not posted" : "Recurring entries not posted",
+      detail: `Due and not posted by the nightly run: ${named(
+        checks.recurringDue.map((row) => `${row.name} on ${formatDate(row.nextRunDate)}`),
+      )}. The schedule says why when a run failed.`,
+      href: "/recurring",
+    });
+  }
   if (ran("neverReconciled") && checks.neverReconciled.length > 0) {
     out.push({
       key: "neverReconciled",
@@ -140,16 +184,58 @@ export function dashboardNeeds(checks: AttentionChecks, money: (minor: number) =
       href: "/reports/exceptions",
     });
   }
+  if (ran("overBudget") && checks.overBudget && checks.overBudget.length > 0) {
+    out.push({
+      key: "overBudget",
+      count: checks.overBudget.length,
+      tone: "warning",
+      title: checks.overBudget.length === 1 ? "Account over budget" : "Accounts over budget",
+      detail: `Spent more this fiscal year than budgeted to the end of this month: ${named(
+        checks.overBudget.map(
+          (row) => `${row.accountCode} ${row.name} (${money(row.actualMinor)} of ${money(row.budgetMinor)})`,
+        ),
+      )}.`,
+      href: "/reports?report=budget",
+    });
+  }
   return out;
 }
+
+/**
+ * The expense accounts already over budget: spent from the first day of the
+ * fiscal year to today, against what is budgeted from then to the end of this
+ * month. Comparing with the whole month's budget means an account is named
+ * only once it has gone over what the month allows, never for being early in
+ * its spending. Biggest overrun first. Income under budget is not "over".
+ */
+export function overBudgetAccounts(
+  budget: readonly { accountId: string; accountCode: string; name: string; accountType: string; amountMinor: number }[],
+  actual: readonly { accountId: string; debitBase: number; creditBase: number }[],
+): OverBudgetRow[] {
+  const spent = new Map(actual.map((row) => [row.accountId, Number(row.debitBase) - Number(row.creditBase)]));
+  return budget
+    .filter((row) => EXPENSE_TYPES.has(row.accountType) && row.amountMinor > 0)
+    .map((row) => ({
+      accountCode: row.accountCode,
+      name: row.name,
+      actualMinor: spent.get(row.accountId) ?? 0,
+      budgetMinor: row.amountMinor,
+    }))
+    .filter((row) => row.actualMinor > row.budgetMinor)
+    .sort((a, b) => b.actualMinor - b.budgetMinor - (a.actualMinor - a.budgetMinor) || a.accountCode.localeCompare(b.accountCode));
+}
+
+const EXPENSE_TYPES = new Set(["expense", "cost_of_goods_sold", "other_expense"]);
 
 const UNAVAILABLE_WORDS: Record<AttentionKey, string> = {
   backup: "the last backup",
   waiting: "lines waiting on Bank Transactions",
+  recurringDue: "recurring entries not posted",
   neverReconciled: "bank accounts never reconciled",
   noLongerAgree: "reconciliations that no longer agree",
   holding: "holding accounts",
   futureDated: "entries dated in the future",
+  overBudget: "accounts over budget",
 };
 
 /** Said under the list when a check could not run: it is neither clear nor counted. */

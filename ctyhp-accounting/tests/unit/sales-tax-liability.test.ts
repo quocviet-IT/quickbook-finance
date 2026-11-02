@@ -5,6 +5,7 @@ import {
   classifyEntries,
   fiscalYearLabel,
   overpaidNote,
+  rateOf,
   readsAsSalesTax,
   resolveTaxAccounts,
   salesTaxLiabilitySheet,
@@ -243,5 +244,15 @@ describe("finding the tax accounts", () => {
   it("has no tax account when nothing qualifies", () => {
     const found = resolveTaxAccounts([{ id: "x", name: "Loans", accountType: "long_term_liability" }], []);
     expect(found).toEqual({ accountIds: [], basis: "none", unlinked: [] });
+  });
+});
+
+describe("the rate of a period (2.98)", () => {
+  it("is collected over taxable, and none when nothing taxable was sold or the period nets to a refund", () => {
+    // Checked against the prototype on the same made-up books: a period holding
+    // only a credit memo printed the memo's own rate, where the prototype prints a dash.
+    expect(rateOf(825, 10_000)).toBeCloseTo(8.25);
+    expect(rateOf(0, 0)).toBeNull();
+    expect(rateOf(-165, -2_000)).toBeNull();
   });
 });

@@ -37,7 +37,7 @@ describe("the report frame", () => {
   it("draws every row before the browser takes its print snapshot", () => {
     expect(frame).toMatch(/addEventListener\("beforeprint", before\)/);
     expect(frame).toMatch(/const before = \(\) => flushSync\(\(\) => setPrinting\(true\)\)/);
-    expect(frame).toMatch(/props\.render\(shown, ran, \{ printing \}\)/);
+    expect(frame).toMatch(/props\.render\(shown, ran, \{ printing, runFor \}\)/);
   });
 
   it("shows only the newest run's answer", () => {

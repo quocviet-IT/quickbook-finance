@@ -1,11 +1,20 @@
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AttentionChecks, AttentionKey } from "@/lib/domain/dashboard-needs";
+import {
+  overBudgetAccounts,
+  type AttentionChecks,
+  type AttentionKey,
+  type OverBudgetRow,
+  type RecurringDueRow,
+} from "@/lib/domain/dashboard-needs";
+import { fiscalMonths, fiscalYearForDate } from "@/lib/domain/fiscal";
+import { getBudgetAccountAmounts } from "@/lib/services/budgets";
 import { expectedBackupDate } from "@/lib/domain/backup-schedule";
 import {
   buildExceptionReport,
   futureDatedEntries,
   holdingAccounts,
+  journalReferenceRows,
   reconciliationsNoLongerAgreeing,
   signedBalance,
   unreconciledBankAccounts,
@@ -246,17 +255,60 @@ async function vendorPaymentReferences(sb: SupabaseClient): Promise<ExceptionPay
 }
 
 /**
- * Every payment carrying the reference a statement is reconciled by.
+ * Every posted manual journal entry carrying a reference, once per bank or
+ * card account it moves money through (2.98).
  *
- * `acc_account` needs no disambiguating hint: each of the two source tables
+ * A check written by hand and keyed as a journal entry carries its number in
+ * the entry's reference, and the check-number scan read only payments: the
+ * same check keyed once as a journal and once as a bill payment went unseen.
+ * An entry since reversed is left out, as its reversal undid it, and so is a
+ * reversal itself, which carries no reference of its own.
+ */
+async function journalReferences(sb: SupabaseClient): Promise<ExceptionPaymentRef[]> {
+  const [lines, links] = await Promise.all([
+    (async () => {
+      const out: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await sb
+          .from("acc_journal_line")
+          .select(
+            "id,journal_entry_id,account_id,debit_minor,credit_minor," +
+              "acc_account!inner(name,account_type)," +
+              "acc_journal_entry!inner(entry_number,entry_date,description,source_ref,source_type,status)",
+          )
+          .eq("acc_journal_entry.source_type", "manual")
+          .eq("acc_journal_entry.status", "posted")
+          .not("acc_journal_entry.source_ref", "is", null)
+          .in("acc_account.account_type", ["bank", "credit_card"])
+          .order("id")
+          .range(from, from + PAGE - 1);
+        if (error) throw new ExceptionsError(error.message);
+        const rows = (data ?? []) as unknown as Record<string, unknown>[];
+        out.push(...rows);
+        if (rows.length < PAGE) return out;
+      }
+    })(),
+    sb.from("acc_journal_reversal_link").select("original_entry_id"),
+  ]);
+  if (links.error) throw new ExceptionsError(links.error.message);
+  const reversed = new Set((links.data ?? []).map((l) => l.original_entry_id as string));
+  return journalReferenceRows(lines, reversed);
+}
+
+/**
+ * Every payment, and every manual journal entry, carrying the reference a
+ * statement is reconciled by.
+ *
+ * `acc_account` needs no disambiguating hint: each of the two payment tables
  * has exactly one foreign key to it (`deposit_account_id`, `payment_account_id`).
  */
 async function paymentReferences(sb: SupabaseClient): Promise<ExceptionPaymentRef[]> {
-  const [customer, vendor] = await Promise.all([
+  const [customer, vendor, journal] = await Promise.all([
     customerPaymentReferences(sb),
     vendorPaymentReferences(sb),
+    journalReferences(sb),
   ]);
-  return [...customer, ...vendor];
+  return [...customer, ...vendor, ...journal];
 }
 
 /**
@@ -383,6 +435,41 @@ async function latestBackupDate(sb: SupabaseClient): Promise<string | null> {
   return (data?.taken_at as string | undefined) ?? null;
 }
 
+/**
+ * Active recurring schedules dated before today that have not run (2.98).
+ * Today's are left out: the nightly run may simply not have reached them yet.
+ */
+async function recurringDueBefore(sb: SupabaseClient, today: string): Promise<RecurringDueRow[]> {
+  const { data, error } = await sb
+    .from("acc_recurring_template")
+    .select("name,next_run_date")
+    .eq("status", "active")
+    .lt("next_run_date", today)
+    .order("next_run_date")
+    .order("name");
+  if (error) throw new ExceptionsError(error.message);
+  return (data ?? []).map((row) => ({ name: row.name as string, nextRunDate: row.next_run_date as string }));
+}
+
+/**
+ * Expense accounts already over this fiscal year's budget (2.98): spent from
+ * the fiscal year's first day to today, against the budget to the end of this
+ * month. Null when nothing is budgeted this fiscal year.
+ */
+async function overBudgetToday(sb: SupabaseClient, today: string): Promise<OverBudgetRow[] | null> {
+  const settings = await getCurrentCompanySettings(sb);
+  const startMonth = settings?.fiscal_year_start_month ?? 1;
+  const months = fiscalMonths(fiscalYearForDate(today, startMonth), startMonth);
+  const yearStart = months[0].start;
+  const monthEnd = months.find((m) => m.start <= today && today <= m.end)?.end ?? months[months.length - 1].end;
+  const [budget, actual] = await Promise.all([
+    getBudgetAccountAmounts(sb, fiscalYearForDate(today, startMonth), yearStart, monthEnd),
+    getLedgerBalances(sb, yearStart, today),
+  ]);
+  if (!budget.some((row) => row.amountMinor !== 0)) return null;
+  return overBudgetAccounts(budget, actual);
+}
+
 /** Bank lines waiting on Bank Transactions: not yet posted to an account, not pending at the bank. */
 async function waitingLineCount(sb: SupabaseClient): Promise<number> {
   const { count, error } = await sb
@@ -416,7 +503,7 @@ export async function getAttentionChecks(
       return fallback;
     }
   };
-  const [accountRows, balances, banks, lastReconciled, changes, future, waitingLines, lastBackup] = await Promise.all([
+  const [accountRows, balances, banks, lastReconciled, changes, future, waitingLines, lastBackup, recurringDue, overBudget] = await Promise.all([
     settle(["holding"], [] as AccountRow[], () => listAccounts(sb)),
     settle(["holding", "neverReconciled"], [] as LedgerBalance[], () => getLedgerBalances(sb, null, today)),
     settle(["neverReconciled", "noLongerAgree"], [] as BankAccountWithGl[], () => listBankAccounts(sb)),
@@ -425,6 +512,8 @@ export async function getAttentionChecks(
     settle(["futureDated"], [] as TransactionListRow[], () => getTransactionList(sb, addDays(today, 1), "9999-12-31")),
     settle(["waiting"], 0, () => waitingLineCount(sb)),
     options.backups ? settle(["backup"], null as string | null, () => latestBackupDate(sb)) : Promise.resolve(null),
+    settle(["recurringDue"], [] as RecurringDueRow[], () => recurringDueBefore(sb, today)),
+    settle(["overBudget"], null as OverBudgetRow[] | null, () => overBudgetToday(sb, today)),
   ]);
 
   const accountById = new Map(accountRows.map((a) => [a.id, a]));
@@ -456,6 +545,8 @@ export async function getAttentionChecks(
     // Without the chart, Uncategorized cannot be told from any other account.
     holding: unavailable.includes("holding") ? [] : holdingAccounts(accounts),
     futureDated: futureDatedEntries(future, today),
+    recurringDue,
+    overBudget,
     ...(options.backups
       ? {
           backup: unavailable.includes("backup")
