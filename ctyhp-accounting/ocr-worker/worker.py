@@ -12,8 +12,10 @@ Environment, from /etc/onebook-ocr.env (root-only, never in the repo):
 """
 import base64
 import json
+import math
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -72,11 +74,24 @@ def count_pages(source, mime):
     return count
 
 
+def render_dpi(pdfinfo_text):
+    """Keep ordinary pages at 300 dpi and cap a very large page near 3300 px."""
+    found = re.search(r"Page size:\s+([\d.]+) x ([\d.]+) pts", pdfinfo_text)
+    if not found:
+        return 300
+    long_side = max(float(found.group(1)), float(found.group(2))) / 72
+    # 12 in is 3600 px at 300 dpi, so A4 (11.7 in) stays at 300
+    if long_side <= 12:
+        return 300
+    return max(100, math.floor(3300 / long_side))
+
+
 def images_of(source, mime, workdir):
     if mime != "application/pdf":
         return [source]
-    # -scale-to caps the long side, so a hostile page size cannot exhaust memory; US Letter at 300 dpi is 3300 px
-    subprocess.run(["pdftoppm", "-r", "300", "-scale-to", "3300", "-png", str(source), str(workdir / "page")], check=True, timeout=300)
+    info = subprocess.run(["pdfinfo", str(source)], capture_output=True, text=True, timeout=60).stdout
+    dpi = render_dpi(info)
+    subprocess.run(["pdftoppm", "-r", str(dpi), "-png", str(source), str(workdir / "page")], check=True, timeout=300)
     images = sorted(workdir.glob("page-*.png"))
     if not images:
         raise Unreadable("The PDF has no pages.")
@@ -123,7 +138,7 @@ def read_page(image):
         "vllm_xargs": {"ngram_size": 35, "window_size": 128},
     }
     req = urllib.request.Request(f"{VLLM}/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=600) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
         return json.load(resp)["choices"][0]["message"]["content"]
 
 
@@ -135,15 +150,16 @@ def work(job):
         # report as soon as the page count is known: rendering can take minutes and the lease is 10
         total = count_pages(source, job["mimeType"])
         if not report(job["id"], 0, total):
-            return
+            return False
         images = images_of(source, job["mimeType"], workdir)
         pages = []
         for n, image in enumerate(images, 1):
             # OneBook accepts at most 100,000 characters a page; cut here so one runaway page cannot fail the whole job
             pages.append({"page": n, "text": read_page(image)[:100_000]})
             if not report(job["id"], n, len(images)):
-                return
+                return False
         onebook("complete", id=job["id"], result={"engine": VERSION + "+unlimited-ocr", "pages": pages})
+        return True
 
 
 def main():
@@ -163,12 +179,14 @@ def main():
         busy_until = time.monotonic() + BUSY_WINDOW
         started = time.monotonic()
         try:
-            work(job)
-            print(f"job {job['id']} read in {time.monotonic() - started:.0f} s", flush=True)
+            if work(job):
+                print(f"job {job['id']} read in {time.monotonic() - started:.0f} s", flush=True)
+            else:
+                print(f"job {job['id']} abandoned: no longer ours", flush=True)
         except Exception as error:
             reason = str(error) if isinstance(error, Unreadable) else "The OCR server could not read this file."
             # these carry a status or a command line, never the file's text; anything else is the class name only
-            known = (urllib.error.HTTPError, urllib.error.URLError, subprocess.TimeoutExpired, subprocess.CalledProcessError)
+            known = (Unreadable, urllib.error.HTTPError, urllib.error.URLError, subprocess.TimeoutExpired, subprocess.CalledProcessError)
             detail = str(error) if isinstance(error, known) else type(error).__name__
             print(f"job {job['id']} failed: {detail}", flush=True)
             try:
