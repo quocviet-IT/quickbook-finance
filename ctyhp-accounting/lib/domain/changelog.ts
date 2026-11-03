@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.3",
+    date: "2026-11-03",
+    headline: "A scanned bank statement can be read by the company's own OCR server and imported like any PDF.",
+    changes: [
+      {
+        kind: "added",
+        title: "Import statement reads a scanned PDF with OCR",
+        detail:
+          "A statement PDF that is only an image used to be refused. Import statement now offers Read with OCR: the file is kept, sent to the company's own OCR server (never to an outside service), read page by page, and its lines come back to the same review and the same check that the opening balance plus the lines comes to the closing balance. A line whose running balance does not follow from the one before is named, so a misread figure is easy to find.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.2",
     date: "2026-11-03",
     headline: "Version numbers read v3.0, v3.0.1, v3.0.2 from here on.",
