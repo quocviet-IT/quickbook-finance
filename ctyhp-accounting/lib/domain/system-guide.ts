@@ -1110,6 +1110,55 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
+    id: "set-up-a-company",
+    area: "data",
+    title: "Set up a new company",
+    purpose:
+      "A new company starts with its tables and its chart of accounts and little else. Settings › Company lists what "
+      + "it still needs, read from the books, and ticks each step off as it is done.",
+    route: "/settings/companies",
+    steps: [
+      {
+        action: "Create the company",
+        control: "New company",
+        route: "/settings/companies",
+        note:
+          "Only a platform administrator sees it. Choose the chart of accounts to start from; building the books takes "
+          + "about half a minute, and you are the company's first administrator. Then choose it in the company list "
+          + "at the top.",
+      },
+      {
+        action: "Fill in the company's details",
+        control: "Edit",
+        route: "/settings/company",
+        note:
+          "Setting up this company, at the top of Settings › Company, shows the four steps and how far each is. Edit "
+          + "saves the legal name, the address, phone and email that invoices, estimates and sales receipts print, the "
+          + "time zone every date is read in and the month the fiscal year starts. Each save is a new version.",
+      },
+      {
+        action: "Enter where the books start",
+        control: "Post opening balances",
+        route: "/opening-balances",
+        note:
+          "What each account held on the day the books start in OneBook. A business that starts with nothing can skip "
+          + "this; books brought in from another system usually carry their balances in their first entries instead.",
+      },
+      {
+        action: "Add the bank and card accounts",
+        control: "Add bank account",
+        route: "/banking",
+        note: "Each one links a ledger account to the statements that will be brought in and reconciled against it.",
+      },
+      {
+        action: "Add the people who work in the books",
+        control: "Add user",
+        route: "/settings/users",
+        note: "Someone who already signs in to OneBook for another company is added with Add existing account instead.",
+      },
+    ],
+  },
+  {
     id: "restore-a-backup",
     area: "data",
     title: "Find a backup, and open it as a second company to compare against",

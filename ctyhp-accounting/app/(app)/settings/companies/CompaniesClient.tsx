@@ -2,13 +2,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
-import { Alert, App, Button, Space, Tag, Typography } from "antd";
+import { Alert, App, Button, Space, Tag, Tooltip, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import StatusTag from "@/components/ui/StatusTag";
 import FilterBar from "@/components/ui/FilterBar";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
+import { setupProgressLabel, type CompanySummary, type SetupProgress } from "@/lib/domain/company-setup";
 import NewCompanyModal from "./NewCompanyModal";
 import {
   getCompanyRequestAction,
@@ -24,8 +25,22 @@ export const COMPANY_REQUESTS_FIXED_WIDTHS = [COLUMN.STATUS, COLUMN.ACTION * 3] 
 /** The floors of Company and Detail, in that order. */
 export const COMPANY_REQUESTS_ELASTIC_FLOORS = [160, COLUMN.TEXT_MIN] as const;
 
-/** Status. Legal name takes what is left, at least COLUMN.TEXT_MIN. */
-export const COMPANIES_FIXED_WIDTHS = [COLUMN.STATUS] as const;
+/**
+ * Status, Set up, Entries, Invoices, Bills, Accounts. Legal name takes what is
+ * left, at least COLUMN.TEXT_MIN. The counts are four digits at most today and
+ * "Set up" holds a tag like "3 of 4".
+ */
+export const COMPANIES_FIXED_WIDTHS = [
+  COLUMN.STATUS,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.QTY,
+  COLUMN.QTY,
+] as const;
+
+/** A company's books as the list shows them (3.00): their size, and how far they are set up. */
+export type CompanyBooks = CompanySummary & { setup: SetupProgress };
 
 export interface CompanyRow {
   id: string;
@@ -55,11 +70,14 @@ export default function CompaniesClient({
   canCreate,
   companies,
   requests,
+  books = {},
 }: {
   initialCreateOpen: boolean;
   canCreate: boolean;
   companies: CompanyRow[];
   requests: CompanyRequestView[];
+  /** By schema; a company this person cannot open has no entry, and shows dashes. */
+  books?: Record<string, CompanyBooks>;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -97,6 +115,18 @@ export default function CompaniesClient({
     },
     [router],
   );
+
+  /** A count from the company's books, or a dash for a company this person cannot open. */
+  const countColumn = (title: string, key: keyof CompanySummary, width: number) => ({
+    title,
+    key,
+    width,
+    align: "right" as const,
+    render: (_: unknown, r: CompanyRow) => {
+      const value = books[r.schema_name]?.[key];
+      return value === undefined ? "—" : value.toLocaleString("en-US");
+    },
+  });
 
   async function retry(id: string) {
     setRetrying(id);
@@ -208,6 +238,26 @@ export default function CompaniesClient({
             width: COMPANIES_FIXED_WIDTHS[0],
             render: (s: string) => <StatusTag status={s} />,
           },
+          {
+            title: "Set up",
+            key: "setup",
+            width: COMPANIES_FIXED_WIDTHS[1],
+            render: (_: unknown, r: CompanyRow) => {
+              const setup = books[r.schema_name]?.setup;
+              if (!setup) return "—";
+              return (
+                <Tooltip title={`${setupProgressLabel(setup)}. Open the company's Settings › Company to see each step.`}>
+                  <Tag color={setup.complete ? "green" : "orange"}>
+                    {setup.done} of {setup.total}
+                  </Tag>
+                </Tooltip>
+              );
+            },
+          },
+          countColumn("Entries", "postedEntries", COMPANIES_FIXED_WIDTHS[2]),
+          countColumn("Invoices", "invoices", COMPANIES_FIXED_WIDTHS[3]),
+          countColumn("Bills", "bills", COMPANIES_FIXED_WIDTHS[4]),
+          countColumn("Accounts", "activeAccounts", COMPANIES_FIXED_WIDTHS[5]),
         ]}
       />
 

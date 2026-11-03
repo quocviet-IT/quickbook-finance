@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "3.00",
+    date: "2026-11-03",
+    headline: "Company settings say what a company still needs to be set up, and the company list shows how far each one is.",
+    changes: [
+      {
+        kind: "added",
+        title: "Setting up this company: a checklist read from the books",
+        detail:
+          "Settings › Company opens with four steps: the company's details, its opening balances, its bank and card accounts, and the people who work in it. Each is read from the books, so it ticks itself off when the work is saved, and each says what is missing and opens the screen to do it. Settings written only when the company was created do not count as saved. When the books start with entries but none from Opening Balances, the step asks for a check rather than a fix, because a business that began with nothing needs none.",
+        route: "/settings/company",
+      },
+      {
+        kind: "added",
+        title: "The company list shows each company's books",
+        detail:
+          "Settings › Companies shows, for every company you can open, how many steps of its setup are done and how many posted entries, issued invoices, bills and active accounts it holds. A company you cannot open shows dashes; its books are not read.",
+        route: "/settings/companies",
+      },
+      {
+        kind: "added",
+        title: "The guide walks through setting up a new company",
+        detail:
+          "Under Data & setup, Set up a new company goes from New company to the details, the opening balances, the bank accounts and the people, each with the button that does it.",
+        route: "/settings/companies",
+      },
+    ],
+  },
+  {
     version: "2.99",
     date: "2026-11-03",
     headline: "Invoices, estimates and sales receipts print the company's phone and email, and cash basis says it is not implemented.",

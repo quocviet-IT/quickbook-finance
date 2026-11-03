@@ -1,0 +1,66 @@
+/* The setup checklist (3.00) reads like the month-end close steps: an icon, the
+   step, its state on the right, and one sentence of evidence under it. */
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ob-panel-lineFaint);
+}
+
+.step:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.icon {
+  padding-top: 3px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.state {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ob-text-faint);
+}
+
+.action {
+  align-self: flex-start;
+  font-size: 13px;
+}
+
+.lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  margin-bottom: 14px;
+}
