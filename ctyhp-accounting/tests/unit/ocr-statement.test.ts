@@ -111,6 +111,7 @@ describe("balanceBreaks across lines with no printed balance", () => {
 describe("ocrResultSchema", () => {
   it("accepts the worker's answer and refuses too many pages", () => {
     expect(ocrResultSchema.safeParse({ engine: "e", pages: [{ page: 1, text: "t" }] }).success).toBe(true);
+    expect(ocrResultSchema.safeParse({ engine: "e", pages: [{ page: 1, text: "t".repeat(100_001) }] }).success).toBe(false);
     const many = Array.from({ length: OCR_MAX_PAGES + 1 }, (_, i) => ({ page: i + 1, text: "t" }));
     expect(ocrResultSchema.safeParse({ engine: "e", pages: many }).success).toBe(false);
   });

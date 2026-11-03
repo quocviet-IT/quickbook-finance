@@ -18,7 +18,8 @@ export const OCR_MAX_PAGES = 20;
 export const ocrResultSchema = z.object({
   engine: z.string().min(1).max(100),
   pages: z
-    .array(z.object({ page: z.number().int().min(1).max(OCR_MAX_PAGES), text: z.string().max(200_000) }))
+    // twenty pages at most stay well under Vercel's 4.5 MB request body
+    .array(z.object({ page: z.number().int().min(1).max(OCR_MAX_PAGES), text: z.string().max(100_000) }))
     .min(1)
     .max(OCR_MAX_PAGES),
 });

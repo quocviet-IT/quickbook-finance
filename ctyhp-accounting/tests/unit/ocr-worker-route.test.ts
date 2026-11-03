@@ -66,4 +66,31 @@ describe("POST /api/ocr/worker", () => {
     expect(res.status).toBe(200);
     expect(completeOcrJob).toHaveBeenCalledWith(ID, { engine: "e", pages: [{ page: 1, text: "t" }] });
   });
+  it("answers 400 to a body that is not JSON", async () => {
+    const res = await POST(new Request("https://onebook.test/api/ocr/worker", {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}` },
+      body: "not json",
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  it("answers 400 to an unknown action", async () => {
+    expect((await post({ action: "explode" })).status).toBe(400);
+  });
+
+  it("answers 404, not 401, to a wrong bearer when the secret is unset", async () => {
+    delete process.env.OCR_WORKER_SECRET;
+    expect((await post({ action: "claim", version: "v" }, "Bearer nope")).status).toBe(404);
+  });
+
+  it("does not leak database error text in a 500", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(claimOcrJob).mockRejectedValueOnce(new Error("relation onebook.ocr_job does not exist"));
+    const res = await post({ action: "claim", version: "v" });
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).not.toContain("relation");
+    expect(JSON.parse(text)).toEqual({ error: "The OCR queue failed" });
+  });
 });

@@ -37,7 +37,12 @@ export async function claimOcrJob(
   if (!job) return null;
   const signed = await storage.storage.from(SAVED_REPORT_BUCKET).createSignedUrl(job.storage_path, DOWNLOAD_SECONDS);
   if (signed.error || !signed.data?.signedUrl) {
-    await flag(sb, "fail_ocr_job", { p_id: job.id, p_error: "OneBook could not open the kept file for reading." });
+    try {
+      await flag(sb, "fail_ocr_job", { p_id: job.id, p_error: "OneBook could not open the kept file for reading." });
+    } catch (error) {
+      // The lease will run out and the job is handed out again.
+      console.error("Could not fail OCR job", job.id, error instanceof Error ? error.message : error);
+    }
     return null;
   }
   return { id: job.id, downloadUrl: signed.data.signedUrl, mimeType: job.mime_type, attempts: job.attempts };

@@ -47,8 +47,7 @@ export async function POST(request: Request) {
         return Response.json({ ok: await failOcrJob(body.id, body.error) });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The OCR queue failed";
-    console.error("OCR worker request failed:", message);
-    return Response.json({ error: message }, { status: 500 });
+    console.error("OCR worker request failed:", error instanceof Error ? error.message : error);
+    return Response.json({ error: "The OCR queue failed" }, { status: 500 });
   }
 }
