@@ -6,6 +6,8 @@ import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import ExpensesClient from "./ExpensesClient";
+import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
+import { defaultIn } from "@/lib/domain/posting-defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ export default async function ExpensesPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    postingDefaults,
   ] = await Promise.all([
     listExpenses(sb),
     listVendors(sb),
@@ -34,6 +37,7 @@ export default async function ExpensesPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    postingDefaultsOrNone(sb),
   ]);
 
   const expenseAccounts = accounts.filter(
@@ -55,6 +59,8 @@ export default async function ExpensesPage({
         vendors={vendors}
         expenseAccounts={expenseAccounts}
         paymentAccounts={paymentAccounts}
+        defaultPayFromAccountId={defaultIn(postingDefaults.payFromAccountId, paymentAccounts) ?? null}
+        defaultExpenseAccountId={postingDefaults.expenseAccountId}
         currencies={currencies}
         canWrite={canWrite(role)}
         canReadDocuments={canReadDocuments}

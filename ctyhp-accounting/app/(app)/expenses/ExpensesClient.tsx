@@ -19,6 +19,7 @@ import { matchesDocumentKeyword } from "@/lib/domain/document-filter";
 import { withVendor } from "@/lib/domain/vendors";
 import { formatDate, formatMoney } from "@/lib/format";
 import NewVendorButton from "@/components/NewVendorButton";
+import { useLineAccountDefault } from "@/lib/client/use-line-account-default";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
 
 interface LineForm {
@@ -44,6 +45,8 @@ export default function ExpensesClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
+  defaultPayFromAccountId = null,
+  defaultExpenseAccountId = null,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -56,6 +59,10 @@ export default function ExpensesClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
+  /** Where money out comes from unless somebody chooses otherwise (3.01). */
+  defaultPayFromAccountId?: string | null;
+  /** The company's default expense account, for a line when the vendor has none (3.01). */
+  defaultExpenseAccountId?: string | null;
 }) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
@@ -83,6 +90,12 @@ export default function ExpensesClient({
     setLocalVendors((prev) => withVendor(prev, vendor));
     form.setFieldValue("vendor_id", vendor.id);
   }
+  const lineDefault = useLineAccountDefault({
+    form,
+    vendors: localVendors,
+    companyDefault: defaultExpenseAccountId,
+    choices: expenseAccounts,
+  });
 
   const decimals = useMemo(
     () => currencies.find((c) => c.code === currency)?.decimal_places ?? 2,
@@ -114,6 +127,7 @@ export default function ExpensesClient({
       message.success("Expense recorded");
       setOpen(false);
       form.resetFields();
+      lineDefault.reset();
     } else {
       message.error(res.error ?? "Failed to record expense");
     }
@@ -238,7 +252,14 @@ export default function ExpensesClient({
         okText="Record"
         width={720}
       >
-        <Form form={form} layout="vertical" initialValues={{ lines: [{}] }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            payment_account_id: defaultPayFromAccountId ?? undefined,
+            lines: [{ expense_account_id: lineDefault.initialLineAccount }],
+          }}
+        >
           <Space size="middle" style={{ display: "flex" }}>
             <Form.Item name="vendor_id" label="Vendor (optional)">
               <Select
@@ -247,6 +268,7 @@ export default function ExpensesClient({
                 optionFilterProp="label"
                 style={{ width: 220 }}
                 options={localVendors.map((v) => ({ value: v.id, label: v.name }))}
+                onChange={(vendorId?: string) => lineDefault.onVendorChange(vendorId)}
               />
             </Form.Item>
             <Form.Item label=" ">
@@ -314,7 +336,11 @@ export default function ExpensesClient({
                     )}
                   </Space>
                 ))}
-                <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>
+                <Button
+                  type="dashed"
+                  onClick={() => add({ expense_account_id: lineDefault.newLineAccount() })}
+                  icon={<PlusOutlined />}
+                >
                   Add line
                 </Button>
               </>

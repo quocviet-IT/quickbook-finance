@@ -41,6 +41,47 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "3.01",
+    date: "2026-11-03",
+    headline: "Posting defaults: new documents start on the company's own accounts, and a bill or expense on the vendor's.",
+    changes: [
+      {
+        kind: "added",
+        title: "Settings › Company keeps four posting defaults",
+        detail:
+          "Posting defaults, under the company's details, holds where money in lands, where money out comes from, a default income account and a default expense account. Each list offers only accounts of the right kind, and changing a default never changes a document already saved: each keeps the accounts it was posted to.",
+        route: "/settings/company",
+      },
+      {
+        kind: "changed",
+        title: "Receive payment, sales receipts, Pay Bills and expenses start on the company's accounts",
+        detail:
+          "Receive payment and a new sales receipt start on Money in lands here; Pay Bills and a new expense on Money out comes from. A sales receipt with no default set still starts on the first bank account, as before. The account is shown and can be changed before saving.",
+        route: "/payments",
+      },
+      {
+        kind: "changed",
+        title: "Bill and expense lines start on the vendor's expense account",
+        detail:
+          "Choosing a vendor fills its default expense account, the one kept on the vendor, into the lines that have none or still hold one the form filled in; a line whose account you chose keeps it. With no vendor default, lines start on the company's default expense account.",
+        route: "/bills",
+      },
+      {
+        kind: "changed",
+        title: "Invoice, estimate and sales receipt lines without an item start on the default income account",
+        detail: "Picking an item still fills that item's own income account, as before.",
+        route: "/invoices",
+      },
+      {
+        kind: "fixed",
+        title: "Settings › Company shows what was just saved",
+        detail:
+          "After Save new version, the current settings and the setup checklist went on showing what was there before until the page was opened again. They are now read again as soon as the save is done, so a step of the checklist ticks off at once.",
+        route: "/settings/company",
+      },
+    ],
+  },
+  {
     version: "3.00",
     date: "2026-11-03",
     headline: "Company settings say what a company still needs to be set up, and the company list shows how far each one is.",

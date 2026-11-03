@@ -118,6 +118,7 @@ export default function InvoicesClient({
   invoices,
   customers,
   incomeAccounts,
+  defaultIncomeAccountId = null,
   expenseAccounts,
   taxCodes,
   currencies,
@@ -148,6 +149,8 @@ export default function InvoicesClient({
   invoices: InvoiceWithCustomer[];
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
+  /** The company's default income account (3.01), for a line with no item. */
+  defaultIncomeAccountId?: string | null;
   expenseAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
   currencies: CurrencyRow[];
@@ -184,6 +187,8 @@ export default function InvoicesClient({
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
   const router = useRouter();
   const [form] = Form.useForm();
+  /** A new invoice's first line: on the company's default income account until an item says otherwise (3.01). */
+  const newInvoiceLine = { quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined };
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -335,7 +340,7 @@ export default function InvoicesClient({
       due_date: undefined,
       memo: undefined,
       currency_code: baseCurrency,
-      lines: [{ quantity: 1 }],
+      lines: [newInvoiceLine],
     });
     setOpen(true);
   }
@@ -883,7 +888,7 @@ export default function InvoicesClient({
           form={form}
           layout="vertical"
           requiredMark={false}
-          initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [{ quantity: 1 }] }}
+          initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }}
         >
           <Space align="end" wrap>
             <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>
@@ -980,6 +985,7 @@ export default function InvoicesClient({
             decimals={decimalsOf(currency)}
             canManageItems={canManageItems}
             removeLabel="Remove invoice line"
+            defaultIncomeAccountId={defaultIncomeAccountId}
           />
 
           <Form.Item name="memo" label="Memo" style={{ marginTop: 12 }}>

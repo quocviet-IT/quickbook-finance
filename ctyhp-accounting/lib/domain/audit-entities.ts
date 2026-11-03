@@ -56,6 +56,7 @@ export const ACTIVITY_ENTITIES: Record<
   acc_app_user: { entity: "User", href: "/settings/audit", category: "governance" },
   acc_approval_policy: { entity: "Approval policy", href: "/settings/audit", category: "governance" },
   acc_company_setting_version: { entity: "Company settings version", href: "/settings/company", category: "governance" },
+  acc_posting_default: { entity: "Posting defaults", href: "/settings/company", category: "governance" },
   acc_document_attachment: { entity: "Attachment", href: "/settings/audit", category: "other" },
   acc_purchasing_config: { entity: "Purchasing settings", href: "/settings/audit", category: "governance" },
   acc_role_permission: { entity: "Role permission", href: "/settings/audit", category: "governance" },

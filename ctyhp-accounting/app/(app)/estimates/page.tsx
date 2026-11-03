@@ -11,6 +11,8 @@ import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { estimateStateOf } from "@/lib/domain/estimates";
 import PageHeader from "@/components/PageHeader";
 import EstimatesClient from "./EstimatesClient";
+import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
+import { defaultIn } from "@/lib/domain/posting-defaults";
 import type { EstimateListEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,7 @@ export default async function EstimatesPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [rows, clock, customers, accounts, taxCodes, usStates, items, role, canManageItems] =
+  const [rows, clock, customers, accounts, taxCodes, usStates, items, role, canManageItems, postingDefaults] =
     await Promise.all([
       listEstimates(sb),
       companyClock(sb),
@@ -33,7 +35,9 @@ export default async function EstimatesPage({
       listItems(sb),
       getUserRole(),
       hasPermission(sb, "items.manage"),
+      postingDefaultsOrNone(sb),
     ]);
+  const incomeAccounts = salesRevenueAccounts(accounts);
 
   // Every state is worked out for the company's today, in its own time zone,
   // once, here: the list, the pills and the form all read the same day.
@@ -53,7 +57,8 @@ export default async function EstimatesPage({
         estimates={estimates}
         today={clock.today}
         customers={customers}
-        incomeAccounts={salesRevenueAccounts(accounts)}
+        incomeAccounts={incomeAccounts}
+        defaultIncomeAccountId={defaultIn(postingDefaults.incomeAccountId, incomeAccounts) ?? null}
         taxCodes={taxCodes}
         usStates={usStates}
         items={items.filter((item) => item.is_sold && item.is_active)}

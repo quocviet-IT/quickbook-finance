@@ -61,6 +61,7 @@ export default function PayBillsClient({
   paymentAccounts,
   currencies,
   canWrite,
+  defaultPayFromAccountId = null,
 }: {
   payments: (BillPaymentRow & { vendor_name: string })[];
   /** The pay run the page worked out for the first paint; null when it did not (2.92). */
@@ -69,6 +70,8 @@ export default function PayBillsClient({
   paymentAccounts: AccountRow[];
   currencies: CurrencyRow[];
   canWrite: boolean;
+  /** Where money out comes from unless somebody chooses otherwise (3.01). */
+  defaultPayFromAccountId?: string | null;
 }) {
   const { message, modal } = App.useApp();
   const [open, setOpen] = useState(false);
@@ -280,7 +283,7 @@ export default function PayBillsClient({
         okText="Record payment"
         width={PAY_BILLS_MODAL_WIDTH}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" initialValues={{ payment_account_id: defaultPayFromAccountId ?? undefined }}>
           <Space size="middle" style={{ display: "flex" }}>
             <Form.Item name="vendor_id" label="Vendor" rules={[{ required: true, message: "Select a vendor" }]}>
               <Select

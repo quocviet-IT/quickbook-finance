@@ -53,6 +53,8 @@ export interface ReceivePaymentModalProps {
   basis: ReceivePaymentBasis | null;
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
+  /** Where a new payment lands unless somebody chooses otherwise (3.01); a correction keeps its own. */
+  defaultDepositAccountId?: string | null;
   currencies: CurrencyRow[];
   onClose: () => void;
   onDone: () => void;
@@ -63,6 +65,7 @@ export default function ReceivePaymentModal({
   basis,
   customers,
   depositAccounts,
+  defaultDepositAccountId = null,
   currencies,
   onClose,
   onDone,
@@ -94,7 +97,7 @@ export default function ReceivePaymentModal({
   const draft = source ? paymentReplacementDraft(source, decimalsOf(source.currency_code)) : null;
   const initialValues = draft
     ? { ...draft, payment_date: dayjs(draft.payment_date) }
-    : { currency_code: baseCurrency };
+    : { currency_code: baseCurrency, deposit_account_id: defaultDepositAccountId ?? undefined };
 
   // Prefilled, never pre-submitted: the form shows the same customer's open
   // invoices, and which of them it settles is chosen again on purpose.

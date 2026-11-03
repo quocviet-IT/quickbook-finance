@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   App,
   Button,
@@ -19,12 +20,14 @@ import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { saveCompanySettingsAction, listCompanySettingVersionsAction } from "./actions";
 import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
-import type { CompanySettingRow } from "@/lib/db/types";
+import type { AccountRow, CompanySettingRow } from "@/lib/db/types";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
 import { formatPostalAddress } from "@/lib/domain/invoice-document";
 import type { SetupStep } from "@/lib/domain/company-setup";
 import CompanySetupCard from "@/components/settings/CompanySetupCard";
+import PostingDefaultsCard from "@/components/settings/PostingDefaultsCard";
+import { NO_POSTING_DEFAULTS, type PostingDefaults } from "@/lib/domain/posting-defaults";
 
 /**
  * Version, Effective, Basis, Employer Identification Number. Legal name takes
@@ -44,13 +47,19 @@ export default function CompanySettingsClient({
   canEdit,
   current,
   setupSteps = null,
+  accounts = [],
+  postingDefaults = NO_POSTING_DEFAULTS,
 }: {
   canEdit: boolean;
   current: CompanySettingRow | null;
   /** The setup checklist (3.00); null when it could not be read, and then not shown. */
   setupSteps?: SetupStep[] | null;
+  /** The chart, for the posting defaults' pickers (3.01). */
+  accounts?: AccountRow[];
+  postingDefaults?: PostingDefaults;
 }) {
   const { message } = App.useApp();
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [form] = Form.useForm();
   const [versions, setVersions] = useState<CompanySettingRow[]>([]);
@@ -102,6 +111,9 @@ export default function CompanySettingsClient({
     }
     setEditing(false);
     void loadVersions();
+    // The current settings and the setup checklist are the page's; read them
+    // again, as the other settings screens do after a save.
+    router.refresh();
   };
 
   return (
@@ -294,6 +306,7 @@ export default function CompanySettingsClient({
           </Form>
         </Card>
       )}
+      {!editing ? <PostingDefaultsCard defaults={postingDefaults} accounts={accounts} canEdit={canEdit} /> : null}
       <Card title="Version history">
         <DataTable<CompanySettingRow> rowKey="id" rows={versions} pagination={false}
           columns={[
