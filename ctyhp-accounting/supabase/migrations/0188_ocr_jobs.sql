@@ -78,8 +78,10 @@ grant  all on onebook.ocr_job, onebook.ocr_worker to service_role;
  *
  * The caller must be a member of the company and hold documents.manage there,
  * the permission that kept the file in the first place. Asking twice for the
- * same file returns the job already waiting, running or done, so a second
- * click never reads the file twice. A failed job can be asked for again.
+ * same file returns your own job, already waiting, running or done, so a second
+ * click never reads the file twice. Another member asking for the same file
+ * gets a job of their own, since only the person who asked can read a job. A
+ * failed job can be asked for again.
  */
 create or replace function onebook.request_ocr_job(p_schema text, p_saved_report_id uuid)
 returns uuid
@@ -94,6 +96,9 @@ begin
   if v_user is null then
     raise exception 'Sign in to read a scanned statement';
   end if;
+
+  -- One request per company at a time, so two clicks cannot duplicate a job or pass the cap of three.
+  perform pg_advisory_xact_lock(hashtext('onebook.ocr_job:' || p_schema));
 
   if not exists (
     select 1
@@ -125,6 +130,7 @@ begin
   select j.id into v_id
     from onebook.ocr_job j
    where j.schema_name = p_schema and j.saved_report_id = p_saved_report_id
+     and j.requested_by = v_user
      and j.status in ('pending', 'running', 'done')
    order by j.created_at desc
    limit 1;
@@ -244,32 +250,38 @@ $$;
 create or replace function onebook.report_ocr_progress(p_id uuid, p_pages_done int, p_pages_total int)
 returns boolean
 language sql security definer set search_path = onebook, public as $$
-  update onebook.ocr_job
-     set pages_done = greatest(0, p_pages_done), pages_total = p_pages_total,
-         lease_until = now() + interval '10 minutes'
-   where id = p_id and status = 'running'
-  returning true;
+  with u as (
+    update onebook.ocr_job
+       set pages_done = greatest(0, p_pages_done), pages_total = p_pages_total,
+           lease_until = now() + interval '10 minutes'
+     where id = p_id and status = 'running'
+    returning 1)
+  select exists (select 1 from u);
 $$;
 
 /** The text of every page, as the worker read it. */
 create or replace function onebook.complete_ocr_job(p_id uuid, p_result jsonb)
 returns boolean
 language sql security definer set search_path = onebook, public as $$
-  update onebook.ocr_job
-     set status = 'done', result = p_result, finished_at = now(), lease_until = null, error = null
-   where id = p_id and status = 'running'
-  returning true;
+  with u as (
+    update onebook.ocr_job
+       set status = 'done', result = p_result, finished_at = now(), lease_until = null, error = null
+     where id = p_id and status = 'running'
+    returning 1)
+  select exists (select 1 from u);
 $$;
 
 /** Why the file could not be read, in words the person who asked can act on. */
 create or replace function onebook.fail_ocr_job(p_id uuid, p_error text)
 returns boolean
 language sql security definer set search_path = onebook, public as $$
-  update onebook.ocr_job
-     set status = 'failed', finished_at = now(), lease_until = null,
-         error = left(coalesce(nullif(btrim(p_error), ''), 'The OCR server could not read this file.'), 2000)
-   where id = p_id and status = 'running'
-  returning true;
+  with u as (
+    update onebook.ocr_job
+       set status = 'failed', finished_at = now(), lease_until = null,
+           error = left(coalesce(nullif(btrim(p_error), ''), 'The OCR server could not read this file.'), 2000)
+     where id = p_id and status = 'running'
+    returning 1)
+  select exists (select 1 from u);
 $$;
 
 revoke all on function onebook.claim_ocr_job(text)                    from public, anon, authenticated;
