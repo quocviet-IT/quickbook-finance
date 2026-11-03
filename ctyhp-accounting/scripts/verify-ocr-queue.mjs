@@ -5,7 +5,7 @@
  * Checks: a requester's own job (same file, same job; another member, another job), the status view,
  * refusals (outsider, no documents.manage, the table, the worker functions), the cap of three, the
  * worker's claim/progress/complete, false from the worker functions on a finished or unknown job, and
- * a job whose worker stopped three times.
+ * a job whose worker stopped three times, the worker's heartbeat on progress, and the 7-day purge of a result.
  *
  * Needs SUPABASE_DB_URL (the pooler) and 0188 applied to the database it points at.
  * Run: node --env-file=.env.local scripts/verify-ocr-queue.mjs
@@ -220,6 +220,12 @@ try {
 
   const progressed = (await client.query("select onebook.report_ocr_progress($1, 1, 2) as ok", [job])).rows[0].ok;
   check("progress is recorded", progressed === true);
+
+  // A long job must not look offline: progress is a sign of life, not only the claim.
+  await client.query("update onebook.ocr_worker set last_seen_at = now() - interval '10 minutes'");
+  check("the worker looks offline after ten silent minutes", (await client.query("select onebook.ocr_worker_online() as ok")).rows[0].ok === false);
+  await client.query("select onebook.report_ocr_progress($1, 2, 2)", [job]);
+  check("reporting progress marks the worker online", (await client.query("select onebook.ocr_worker_online() as ok")).rows[0].ok === true);
   const done = (await client.query("select onebook.complete_ocr_job($1, $2) as ok", [job, { engine: "verify", pages: [{ page: 1, text: "x" }] }])).rows[0].ok;
   check("the job completes", done === true);
 
@@ -250,6 +256,21 @@ try {
   await client.query("select * from onebook.claim_ocr_job('verify')");
   const failed = (await client.query("select status, error from onebook.ocr_job where id = $1", [stuck])).rows[0];
   check("a job whose worker stopped three times fails with a reason", failed.status === "failed" && /three times/.test(failed.error));
+
+  // A result is kept for a week: the claim clears an older one, and asking again reads the file again.
+  const old = (await client.query(
+    `insert into onebook.ocr_job (schema_name, saved_report_id, storage_path, mime_type, requested_by, status, attempts, result, finished_at)
+     values ('public', $2, 'public/old.pdf', 'application/pdf', $1, 'done', 1, '{"engine":"verify","pages":[{"page":1,"text":"x"}]}'::jsonb, now() - interval '8 days')
+     returning id`,
+    [user, more[2]],
+  )).rows[0].id;
+  await client.query("select * from onebook.claim_ocr_job('verify')");
+  const purged = (await client.query("select result, purged_at from onebook.ocr_job where id = $1", [old])).rows[0];
+  check("a result older than seven days is cleared by the next claim", purged.result === null && purged.purged_at !== null);
+  await as(user);
+  const reread = (await client.query("select onebook.request_ocr_job('public', $1) as id", [more[2]])).rows[0].id;
+  await asService();
+  check("asking for a file whose only job is purged starts a new job", reread !== old, reread);
 } finally {
   await client.query("rollback").catch(() => {});
   await client.end();

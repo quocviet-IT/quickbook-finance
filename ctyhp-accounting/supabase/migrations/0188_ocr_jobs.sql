@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0188  OCR jobs: a scanned statement read by the company's own OCR server (3.02)
+-- 0188  OCR jobs: a scanned statement read by the company's own OCR server (3.0.3)
 --
 -- A scanned statement PDF holds no text, so Import statement refused it. The
 -- company now runs an OCR model on a GPU machine inside its own network. That
@@ -19,10 +19,14 @@
 --                        once it is done, the text of every page
 --   ocr_worker_online    whether the OCR server has asked for work lately
 --   claim_ocr_job        service role: the oldest waiting job, or one whose
---                        worker stopped before its lease ran out
+--                        worker stopped before its lease ran out; it also
+--                        clears the text of jobs finished over 7 days ago
 --   report_ocr_progress  service role: pages read so far; extends the lease
 --   complete_ocr_job     service role: the text of every page
 --   fail_ocr_job         service role: why the file could not be read
+--
+-- The text of a read statement is kept for 7 days, long enough to import it; the
+-- kept file stays as the record, and asking again reads the file again.
 --
 -- Nothing existing is changed. Every statement names `onebook.`, so the runner
 -- applies this file once and never replays it into a company schema.
@@ -30,7 +34,7 @@
 
 create table if not exists onebook.ocr_job (
   id               uuid primary key default gen_random_uuid(),
-  schema_name      text not null references onebook.company (schema_name),
+  schema_name      text not null references onebook.company (schema_name) on delete cascade,
   saved_report_id  uuid not null,
   storage_path     text not null,
   mime_type        text not null
@@ -49,9 +53,10 @@ create table if not exists onebook.ocr_job (
   started_at       timestamptz,
   lease_until      timestamptz,
   finished_at      timestamptz,
+  purged_at        timestamptz,
   -- The file always sits in the folder of the company that asked.
   check (storage_path !~ '\.\.' and starts_with(storage_path, schema_name || '/')),
-  check (status <> 'done' or result is not null)
+  check (status <> 'done' or result is not null or purged_at is not null)
 );
 
 create index if not exists onebook_ocr_job_queue_idx
@@ -132,6 +137,7 @@ begin
    where j.schema_name = p_schema and j.saved_report_id = p_saved_report_id
      and j.requested_by = v_user
      and j.status in ('pending', 'running', 'done')
+     and j.purged_at is null
    order by j.created_at desc
    limit 1;
   if v_id is not null then
@@ -220,6 +226,10 @@ begin
   on conflict on constraint ocr_worker_pkey
   do update set last_seen_at = now(), version = excluded.version;
 
+  -- A read result is kept for a week, long enough to import it; the kept file remains the record.
+  update onebook.ocr_job j set result = null, purged_at = now()
+   where j.status = 'done' and j.result is not null and j.finished_at < now() - interval '7 days';
+
   update onebook.ocr_job j
      set status = 'failed', finished_at = now(), lease_until = null,
          error = 'The OCR server stopped three times while reading this file.'
@@ -246,11 +256,15 @@ begin
 end;
 $$;
 
-/** Pages read so far. Each report gives the worker another ten minutes. */
+/** Pages read so far. Each report gives the worker another ten minutes, and counts as a sign of life. */
 create or replace function onebook.report_ocr_progress(p_id uuid, p_pages_done int, p_pages_total int)
 returns boolean
 language sql security definer set search_path = onebook, public as $$
-  with u as (
+  with beat as (
+    insert into onebook.ocr_worker (id, last_seen_at) values (true, now())
+    on conflict on constraint ocr_worker_pkey do update set last_seen_at = now()
+    returning 1),
+  u as (
     update onebook.ocr_job
        set pages_done = greatest(0, p_pages_done), pages_total = p_pages_total,
            lease_until = now() + interval '10 minutes'
@@ -263,7 +277,11 @@ $$;
 create or replace function onebook.complete_ocr_job(p_id uuid, p_result jsonb)
 returns boolean
 language sql security definer set search_path = onebook, public as $$
-  with u as (
+  with beat as (
+    insert into onebook.ocr_worker (id, last_seen_at) values (true, now())
+    on conflict on constraint ocr_worker_pkey do update set last_seen_at = now()
+    returning 1),
+  u as (
     update onebook.ocr_job
        set status = 'done', result = p_result, finished_at = now(), lease_until = null, error = null
      where id = p_id and status = 'running'
@@ -275,7 +293,11 @@ $$;
 create or replace function onebook.fail_ocr_job(p_id uuid, p_error text)
 returns boolean
 language sql security definer set search_path = onebook, public as $$
-  with u as (
+  with beat as (
+    insert into onebook.ocr_worker (id, last_seen_at) values (true, now())
+    on conflict on constraint ocr_worker_pkey do update set last_seen_at = now()
+    returning 1),
+  u as (
     update onebook.ocr_job
        set status = 'failed', finished_at = now(), lease_until = null,
            error = left(coalesce(nullif(btrim(p_error), ''), 'The OCR server could not read this file.'), 2000)
