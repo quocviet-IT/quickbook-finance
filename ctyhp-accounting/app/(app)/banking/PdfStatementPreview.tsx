@@ -84,7 +84,7 @@ export function ScannedPdf({ reading, onRead }: { reading: ScannedReading; onRea
   return (
     <Space style={{ marginTop: 12 }}>
       <Spin size="small" />
-      <Typography.Text>{text}</Typography.Text>
+      <Typography.Text role="status" aria-live="polite">{text}</Typography.Text>
     </Space>
   );
 }

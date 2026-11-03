@@ -245,6 +245,8 @@ export default function ImportStatementModal({
   const [picked, setPicked] = useState(0);
   // A PDF is read asynchronously; choosing another file meanwhile makes the first answer stale.
   const reading = useRef(0);
+  // The file (by its token) whose OCR read has begun, so a double click starts it once.
+  const ocrStarted = useRef(0);
   // Which file was chosen last: what the person did in the dialog belongs to it.
   const [token, setToken] = useState(0);
   // Closing the dialog makes a reading in progress stale, so it stops polling.
@@ -282,6 +284,10 @@ export default function ImportStatementModal({
   async function readWithOcr() {
     if (!chosen) return;
     const token = reading.current;
+    // A second click for the same file would keep it twice and ask the server twice.
+    if (ocrStarted.current === token) return;
+    ocrStarted.current = token;
+    setFile({ kind: "scanned", reading: { phase: "sending" } });
     const { readScannedStatement } = await import("@/lib/client/read-scanned-statement");
     const result = await readScannedStatement(
       chosen,
@@ -294,6 +300,7 @@ export default function ImportStatementModal({
     );
     if (token !== reading.current) return;
     if ("message" in result) {
+      ocrStarted.current = 0; // "Try again" may start this file's read anew
       setFile({ kind: "scanned", reading: { phase: "failed", message: result.message } });
       return;
     }
