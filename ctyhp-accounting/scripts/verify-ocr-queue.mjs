@@ -2,6 +2,11 @@
  * The OCR queue (0188), end to end, inside one transaction that is always
  * rolled back: nothing it does is left behind.
  *
+ * Checks: a requester's own job (same file, same job; another member, another job), the status view,
+ * refusals (outsider, no documents.manage, the table, the worker functions), the cap of three, the
+ * worker's claim/progress/complete, false from the worker functions on a finished or unknown job, and
+ * a job whose worker stopped three times.
+ *
  * Needs SUPABASE_DB_URL (the pooler) and 0188 applied to the database it points at.
  * Run: node --env-file=.env.local scripts/verify-ocr-queue.mjs
  */
@@ -11,8 +16,10 @@ const client = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ss
 const checks = [];
 const check = (name, ok, detail = "") => checks.push({ name, ok: Boolean(ok), detail });
 
-async function as(user) {
-  await client.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: user, role: "authenticated" })]);
+// `aal` is set only where a check must not depend on the user's two-step state (see acc_current_role, 0175).
+async function as(user, aal) {
+  const claims = { sub: user, role: "authenticated", ...(aal ? { aal } : {}) };
+  await client.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
   await client.query("set local role authenticated");
 }
 async function asService() {
@@ -23,12 +30,12 @@ async function asService() {
 // Runs one statement as `user` inside its own savepoint, so a refusal takes back only itself.
 // Always leaves the session as the service role. Returns { ok, rows, message }.
 // A success is taken back too, unless `keep` is set (the cap check needs the accepted jobs to stay).
-async function attempt(user, sql, params = [], keep = false) {
+async function attempt(user, sql, params = [], keep = false, aal) {
   await asService();
   await client.query("savepoint x");
   let outcome;
   try {
-    if (user) await as(user);
+    if (user) await as(user, aal);
     outcome = { ok: true, rows: (await client.query(sql, params)).rows, message: "" };
   } catch (e) {
     outcome = { ok: false, rows: [], message: String(e.message) };
@@ -101,32 +108,72 @@ try {
   const outsiderSees = await attempt(outsider, "select * from onebook.ocr_job_status($1)", [first]);
   check("another user reads nothing of the job", outsiderSees.ok && outsiderSees.rows.length === 0);
 
-  // A member without documents.manage. Prefer one who already lacks it.
-  let limited = null;
+  // A second member who may keep statement files, then the same member with a role that may not.
+  // Everything in this block happens inside the savepoint "second_member" and is rolled back at its
+  // end, so the claim step below still sees only `first` waiting.
+  // These calls carry aal2 in the claims: acc_current_role() (0175) returns null for a member with a
+  // verified two-step factor but no aal2 claim, and a null role would refuse the request for the wrong
+  // reason (the MFA gate, not the missing permission). With aal2 the role always resolves; the check
+  // "the member's role resolves" below confirms it before the refusal is read.
+  const AAL = "aal2";
+  await client.query("savepoint second_member");
+  let second = null;
+  let borrowed = false;
   for (const { user_id } of members.rows) {
-    const r = await attempt(user_id, "select public.acc_has_permission('documents.manage') as ok");
-    if (r.ok && r.rows[0].ok === false) { limited = user_id; break; }
+    if (user_id === user) continue;
+    const r = await attempt(user_id, "select public.acc_has_permission('documents.manage') as ok", [], false, AAL);
+    if (r.ok && r.rows[0].ok === true) { second = user_id; break; }
   }
-  let limitedAsk;
-  if (limited) {
-    limitedAsk = await attempt(limited, "select onebook.request_ocr_job('public', $1) as id", [fileId]);
-  } else {
-    // None lacks it: take the member's role away for the length of the savepoint.
-    // acc_current_role() reads public.acc_app_user.role, and acc_has_permission() looks that role up in
-    // public.acc_role_permission; so set acc_app_user.role to a role with no allowed documents.manage row.
-    const lacking = (await client.query(
+  const lacking = (await client.query(
+    `select r::text as role from unnest(enum_range(null::public.acc_app_role)) r
+      where not coalesce((select p.allowed from public.acc_role_permission p
+                           where p.role = r and p.permission_key = 'documents.manage'), false)
+      limit 1`,
+  )).rows[0]?.role;
+  if (!lacking) throw new Error("Every role holds documents.manage; cannot test the refusal");
+  if (!second) {
+    // No other member holds the permission. Borrow the outsider for the length of the savepoint:
+    // insert one onebook.company_member row (first company) and upsert one public.acc_app_user row
+    // (a non-admin role with documents.manage, status active), which are what request_ocr_job and
+    // acc_current_role() read. Both vanish with "rollback to savepoint second_member".
+    const withPermission = (await client.query(
       `select r::text as role from unnest(enum_range(null::public.acc_app_role)) r
-        where not coalesce((select p.allowed from public.acc_role_permission p
-                             where p.role = r and p.permission_key = 'documents.manage'), false)
+        where r <> 'admin' and coalesce((select p.allowed from public.acc_role_permission p
+                                          where p.role = r and p.permission_key = 'documents.manage'), false)
         limit 1`,
     )).rows[0]?.role;
-    if (!lacking) throw new Error("Every role holds documents.manage; cannot test the refusal");
-    await client.query("savepoint role_change");
-    await client.query("update public.acc_app_user set role = $1 where id = $2", [lacking, user]);
-    limitedAsk = await attempt(user, "select onebook.request_ocr_job('public', $1) as id", [fileId]);
-    await client.query("rollback to savepoint role_change");
+    if (!withPermission) throw new Error("No role other than admin holds documents.manage; cannot test a second requester");
+    await client.query(
+      `insert into onebook.company_member (company_id, user_id)
+       select c.id, $1 from onebook.company c where c.schema_name = 'public'`,
+      [outsider],
+    );
+    await client.query(
+      `insert into public.acc_app_user (id, full_name, role, status) values ($1, 'OCR verify', $2, 'active')
+       on conflict (id) do update set role = excluded.role, status = 'active'`,
+      [outsider, withPermission],
+    );
+    second = outsider;
+    borrowed = true;
   }
-  check("a member without documents.manage is refused", !limitedAsk.ok && /permission/.test(limitedAsk.message), limitedAsk.message);
+  const secondHolds = await attempt(second, "select public.acc_has_permission('documents.manage') as ok", [], false, AAL);
+  check("a second member holds documents.manage", secondHolds.ok && secondHolds.rows[0].ok === true, borrowed ? "borrowed the outsider" : "existing member");
+
+  // Each requester gets their own job; the first keeps getting theirs, even with the second's job waiting.
+  const secondAsk = await attempt(second, "select onebook.request_ocr_job('public', $1) as id", [fileId], true, AAL);
+  check("a second member asking for the same file gets a job of their own", secondAsk.ok && Boolean(secondAsk.rows[0].id) && secondAsk.rows[0].id !== first, secondAsk.message);
+  const firstAgain = await attempt(user, "select onebook.request_ocr_job('public', $1) as id", [fileId]);
+  check("the first member asking again still gets their own job", firstAgain.ok && firstAgain.rows[0].id === first, firstAgain.message);
+
+  // The same member, now holding a role with no allowed documents.manage row.
+  await client.query("update public.acc_app_user set role = $1 where id = $2", [lacking, second]);
+  const roleNow = await attempt(second, "select public.acc_current_role()::text as role", [], false, AAL);
+  check("the member's role resolves (not null) to one without documents.manage", roleNow.ok && roleNow.rows[0].role === lacking, roleNow.message);
+  const limitedAsk = await attempt(second, "select onebook.request_ocr_job('public', $1) as id", [fileId], false, AAL);
+  check("a member without documents.manage is refused", !limitedAsk.ok && /keep statement files/.test(limitedAsk.message), limitedAsk.message);
+  await client.query("rollback to savepoint second_member");
+  await client.query("release savepoint second_member");
+  await asService();
 
   // The worker's functions are not for a signed-in session.
   for (const [name, sql] of [
@@ -136,7 +183,7 @@ try {
     ["fail_ocr_job", "select onebook.fail_ocr_job($1::uuid, 'x')"],
   ]) {
     const r = await attempt(user, sql, name === "claim_ocr_job" ? [] : [first]);
-    check(`a signed-in session cannot run ${name}`, !r.ok && /permission denied/.test(r.message), r.message);
+    check(`a signed-in session cannot run ${name}`, !r.ok && /permission denied for function/.test(r.message), r.message);
   }
 
   // At most three open jobs per company. The first job is one; two more fit, the next is refused.
@@ -175,6 +222,19 @@ try {
   check("progress is recorded", progressed === true);
   const done = (await client.query("select onebook.complete_ocr_job($1, $2) as ok", [job, { engine: "verify", pages: [{ page: 1, text: "x" }] }])).rows[0].ok;
   check("the job completes", done === true);
+
+  // A finished job is no longer running, and an unknown job never was: each answers false, not null.
+  const ghost = crypto.randomUUID();
+  for (const [name, sql] of [
+    ["report_ocr_progress", "select onebook.report_ocr_progress($1::uuid, 1, 1) as ok"],
+    ["complete_ocr_job", "select onebook.complete_ocr_job($1::uuid, '{}'::jsonb) as ok"],
+    ["fail_ocr_job", "select onebook.fail_ocr_job($1::uuid, 'x') as ok"],
+  ]) {
+    const onDone = (await client.query(sql, [job])).rows[0].ok;
+    check(`${name} on a finished job returns false`, onDone === false, String(onDone));
+    const onUnknown = (await client.query(sql, [ghost])).rows[0].ok;
+    check(`${name} on an unknown job returns false`, onUnknown === false, String(onUnknown));
+  }
 
   await as(user);
   const finished = (await client.query("select * from onebook.ocr_job_status($1)", [job])).rows[0];

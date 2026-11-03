@@ -97,9 +97,6 @@ begin
     raise exception 'Sign in to read a scanned statement';
   end if;
 
-  -- One request per company at a time, so two clicks cannot duplicate a job or pass the cap of three.
-  perform pg_advisory_xact_lock(hashtext('onebook.ocr_job:' || p_schema));
-
   if not exists (
     select 1
       from onebook.company c
@@ -108,6 +105,9 @@ begin
   ) then
     raise exception 'You are not a member of this company';
   end if;
+
+  -- One request per company at a time, so two clicks cannot duplicate a job or pass the cap of three.
+  perform pg_advisory_xact_lock(hashtext('onebook.ocr_job:' || p_schema));
 
   -- p_schema is now a registered company's schema, and %I quotes it anyway.
   execute format('select %I.acc_has_permission($1)', p_schema)
