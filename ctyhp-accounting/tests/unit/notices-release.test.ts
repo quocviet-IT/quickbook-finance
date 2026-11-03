@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { theme } from "antd";
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { antdThemeTokens, resolveToken } from "@/lib/design/tokens";
 
 describe("the notices release in the release notes", () => {
@@ -11,7 +11,7 @@ describe("the notices release in the release notes", () => {
 
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(Number(release.version));
+    expect(compareVersions(APP_VERSION, release.version)).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-20");
   });
 

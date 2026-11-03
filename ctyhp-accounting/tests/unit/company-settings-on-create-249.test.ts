@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 
 function read(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8").replace(/\r/g, "");
@@ -43,7 +43,7 @@ describe("the 2.49 release in the release notes", () => {
 
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.49);
+    expect(compareVersions(APP_VERSION, "2.49")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-24");
   });
 

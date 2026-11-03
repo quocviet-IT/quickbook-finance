@@ -4,7 +4,7 @@ import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { Space, Tag, Typography } from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
-import { CHANGE_KIND_LABEL, type ChangeKind, type Release } from "@/lib/domain/changelog";
+import { CHANGE_KIND_LABEL, versionLabel, type ChangeKind, type Release } from "@/lib/domain/changelog";
 
 const KIND_COLOR: Record<ChangeKind, string> = {
   added: "green",
@@ -38,7 +38,7 @@ export default function WhatsNewPanel({ releases, onNavigate, showHeading = true
           {showHeading ? (
             <>
               <div className="release-notes__head">
-                <Typography.Text strong>Version {release.version}</Typography.Text>
+                <Typography.Text strong>{versionLabel(release.version)}</Typography.Text>
                 <Typography.Text type="secondary">{formatDate(release.date)}</Typography.Text>
               </div>
               <Typography.Paragraph type="secondary" className="release-notes__headline">

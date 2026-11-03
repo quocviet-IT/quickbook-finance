@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { TABLE_BOX_AT_1280 } from "@/lib/design/table-metrics";
 
 const src = readFileSync(join(process.cwd(), "app/(app)/banking/BankFeedSyncList.tsx"), "utf8").replace(/\r/g, "");
@@ -29,7 +29,7 @@ describe("the 2.50 release in the release notes", () => {
 
   it("is listed and dated the day it was built", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.5);
+    expect(compareVersions(APP_VERSION, "2.50")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-24");
     expect(release.changes[0].detail).toContain("the tag moves under the name");
   });
