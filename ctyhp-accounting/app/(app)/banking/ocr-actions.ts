@@ -1,6 +1,6 @@
 "use server";
 /**
- * A scanned statement read by the company's own OCR server (3.02): whether the
+ * A scanned statement read by the company's own OCR server (3.0.3): whether the
  * server is there, asking for a kept file to be read, and where that stands.
  * Who may ask, and who may see the answer, is decided again by the onebook
  * functions (0188); these only carry the request.

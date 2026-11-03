@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OneBook OCR worker (3.02).
+"""OneBook OCR worker (3.0.3).
 
 Asks OneBook for scanned statements to read, reads each page with the local
 Unlimited-OCR server, and sends the text back. Outbound HTTPS only; nothing
@@ -45,7 +45,7 @@ class Unreadable(Exception):
 def onebook(action, **fields):
     req = urllib.request.Request(
         f"{ONEBOOK}/api/ocr/worker",
-        json.dumps({"action": action, **fields}).encode(),
+        json.dumps({"action": action, **fields}, ensure_ascii=False).encode("utf-8"),
         {"Content-Type": "application/json", "Authorization": f"Bearer {SECRET}"},
     )
     with urllib.request.urlopen(req, timeout=60) as resp:
@@ -75,11 +75,13 @@ def count_pages(source, mime):
 
 
 def render_dpi(pdfinfo_text):
-    """Keep ordinary pages at 300 dpi and cap a very large page near 3300 px."""
-    found = re.search(r"Page size:\s+([\d.]+) x ([\d.]+) pts", pdfinfo_text)
-    if not found:
+    """Keep ordinary pages at 300 dpi and cap the largest page (of the first 20) near 3300 px."""
+    sizes = re.findall(r"^Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+) pts", pdfinfo_text, re.MULTILINE)
+    if not sizes:
+        sizes = re.findall(r"Page size:\s+([\d.]+) x ([\d.]+) pts", pdfinfo_text)
+    if not sizes:
         return 300
-    long_side = max(float(found.group(1)), float(found.group(2))) / 72
+    long_side = max(max(float(w), float(h)) for w, h in sizes) / 72
     # 12 in is 3600 px at 300 dpi, so A4 (11.7 in) stays at 300
     if long_side <= 12:
         return 300
@@ -89,7 +91,7 @@ def render_dpi(pdfinfo_text):
 def images_of(source, mime, workdir):
     if mime != "application/pdf":
         return [source]
-    info = subprocess.run(["pdfinfo", str(source)], capture_output=True, text=True, timeout=60).stdout
+    info = subprocess.run(["pdfinfo", "-f", "1", "-l", str(MAX_PAGES), str(source)], capture_output=True, text=True, timeout=60).stdout
     dpi = render_dpi(info)
     subprocess.run(["pdftoppm", "-r", str(dpi), "-png", str(source), str(workdir / "page")], check=True, timeout=300)
     images = sorted(workdir.glob("page-*.png"))
@@ -124,6 +126,11 @@ def report(job_id, done, total):
     return True
 
 
+def cut_page(text):
+    """Cut to 100,000 UTF-16 code units, the way OneBook counts, without splitting a character."""
+    return text.encode("utf-16-le")[: 2 * 100_000].decode("utf-16-le", "ignore")
+
+
 def read_page(image):
     mime = "image/png" if image.suffix == ".png" else "image/jpeg"
     data = base64.b64encode(image.read_bytes()).decode()
@@ -155,11 +162,11 @@ def work(job):
         pages = []
         for n, image in enumerate(images, 1):
             # OneBook accepts at most 100,000 characters a page; cut here so one runaway page cannot fail the whole job
-            pages.append({"page": n, "text": read_page(image)[:100_000]})
+            pages.append({"page": n, "text": cut_page(read_page(image))})
             if not report(job["id"], n, len(images)):
                 return False
-        onebook("complete", id=job["id"], result={"engine": VERSION + "+unlimited-ocr", "pages": pages})
-        return True
+        answer = onebook("complete", id=job["id"], result={"engine": VERSION + "+unlimited-ocr", "pages": pages})
+        return not (isinstance(answer, dict) and answer.get("ok") is False)
 
 
 def main():

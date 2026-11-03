@@ -1,6 +1,6 @@
 "use client";
 /**
- * Reading a scanned statement (3.02): the file is kept as evidence, as an
+ * Reading a scanned statement (3.0.3): the file is kept as evidence, as an
  * import keeps it (1.83; the import later finds the same file by its SHA-256),
  * the company's OCR server is asked to read it, and its answer is read by the
  * same rules as a PDF with text. Never throws: every failure comes back as the

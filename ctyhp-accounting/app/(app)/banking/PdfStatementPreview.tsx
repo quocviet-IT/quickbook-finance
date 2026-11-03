@@ -48,7 +48,7 @@ export function UnreadableFile({ message }: { message: string }) {
   return <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={message} />;
 }
 
-/** A PDF with no text (3.02): offered to the company's OCR server, and how far reading it has got. */
+/** A PDF with no text (3.0.3): offered to the company's OCR server, and how far reading it has got. */
 export function ScannedPdf({ reading, onRead }: { reading: ScannedReading; onRead: () => void }) {
   if (reading.phase === "offline") {
     return <Alert style={{ marginTop: 12 }} type="error" showIcon title={OCR_TEXT.title} description={OCR_TEXT.offline} />;

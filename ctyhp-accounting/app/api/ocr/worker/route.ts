@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * The company's OCR server asks for work and answers it here (3.02). It sits
+ * The company's OCR server asks for work and answers it here (3.0.3). It sits
  * inside the office network and only ever calls out, so this is the only way
  * work reaches it. Twenty pages of text is far below Vercel's 4.5 MB body cap.
  */

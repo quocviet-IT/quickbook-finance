@@ -295,7 +295,7 @@ describe("the import dialog", () => {
   it("asks the server once per statement read and never on a tick, and works out which lines are here in the browser", () => {
     // The only server calls the dialog makes: the prior closing when it opens,
     // and the bank lines over the file's days when a statement is read.
-    // A scanned PDF also asks once whether the company's OCR server is online (3.02).
+    // A scanned PDF also asks once whether the company's OCR server is online (3.0.3).
     expect([...new Set(modal.match(/\b\w+Action(?=\()/g) ?? [])].sort()).toEqual(["bankLinesOnAction", "ocrAvailableAction", "priorClosingAction"]);
     expect(modal).not.toContain("checkStatementLinesAction");
     expect(modal).toContain("priorClosingAction(accountId)");
