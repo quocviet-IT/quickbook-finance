@@ -288,7 +288,21 @@ export default function ImportStatementModal({
     if (ocrStarted.current === token) return;
     ocrStarted.current = token;
     setFile({ kind: "scanned", reading: { phase: "sending" } });
-    const { readScannedStatement } = await import("@/lib/client/read-scanned-statement");
+    // One place for the way out of a failed read: "Try again" may start this file's read anew.
+    const ocrFailed = (message: string) => {
+      ocrStarted.current = 0;
+      setFile({ kind: "scanned", reading: { phase: "failed", message } });
+    };
+    let readScannedStatement: typeof import("@/lib/client/read-scanned-statement").readScannedStatement;
+    try {
+      ({ readScannedStatement } = await import("@/lib/client/read-scanned-statement"));
+    } catch {
+      // A chunk that fails to load (or being offline) must not leave "Sending…" spinning for ever.
+      if (token === reading.current) {
+        ocrFailed("The OCR reader could not be loaded. Check your connection and try again.");
+      }
+      return;
+    }
     const result = await readScannedStatement(
       chosen,
       statementFileAccount(bankAccount.label, bankAccount.maskedNumber),
@@ -300,8 +314,7 @@ export default function ImportStatementModal({
     );
     if (token !== reading.current) return;
     if ("message" in result) {
-      ocrStarted.current = 0; // "Try again" may start this file's read anew
-      setFile({ kind: "scanned", reading: { phase: "failed", message: result.message } });
+      ocrFailed(result.message);
       return;
     }
     setPicked(pickStatement(result.statements, bankAccount.maskedNumber));
