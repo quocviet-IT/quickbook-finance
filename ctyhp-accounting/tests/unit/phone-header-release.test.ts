@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 
 describe("2.26 in the release notes", () => {
   const release = RELEASES.find((r) => r.version === "2.26")!;
@@ -8,7 +8,7 @@ describe("2.26 in the release notes", () => {
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
     expect(RELEASES.indexOf(release)).toBeGreaterThanOrEqual(0);
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.26);
+    expect(compareVersions(APP_VERSION, "2.26")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-19");
   });
 

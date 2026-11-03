@@ -88,7 +88,7 @@ describe("guide notices", () => {
 
   it("names the version the browser is running, never a first release (2.51)", () => {
     const version = GUIDE_NOTICES.find((notice) => notice.id === "version");
-    expect(version?.title).toBe(`You are on OneBook ${APP_VERSION}`);
+    expect(version?.title).toBe(`You are on OneBook v${APP_VERSION}`);
     const said = GUIDE_NOTICES.map((notice) => `${notice.title} ${notice.body}`).join(" ").toLowerCase();
     expect(said).not.toContain("version 1");
     expect(said).not.toContain("first release");

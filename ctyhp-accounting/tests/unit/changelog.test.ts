@@ -6,7 +6,10 @@ import {
   compareVersions,
   RELEASES,
   releasesSince,
+  currentVersionName,
+  versionLabel,
 } from "@/lib/domain/changelog";
+import { searchReleases } from "@/lib/domain/screen-context";
 
 /** Every static route the app serves, read from the route folders. */
 function appRoutes(dir = join(process.cwd(), "app", "(app)"), prefix = ""): string[] {
@@ -140,5 +143,43 @@ describe("RELEASES", () => {
       release.changes.map((change) => change.route).filter((route): route is string => !!route),
     ).filter((route) => !served.has(pathOf(route)));
     expect(missing, `changelog links to pages that do not exist: ${missing.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("version names from v3.0 (v3.0.2)", () => {
+  it("prints a version with a v, old and new alike", () => {
+    expect(versionLabel("3.0.1")).toBe("v3.0.1");
+    expect(versionLabel("2.98")).toBe("v2.98");
+  });
+
+  it("orders the new names after the old ones", () => {
+    expect(compareVersions("3.0", "2.99")).toBeGreaterThan(0);
+    expect(compareVersions("3.0.1", "3.0")).toBeGreaterThan(0);
+    expect(compareVersions("3.0.2", "3.0.1")).toBeGreaterThan(0);
+    expect(compareVersions("3.1", "3.0.9")).toBeGreaterThan(0);
+  });
+
+  it("publishes the first two v3 releases under their new names only", () => {
+    const versions = RELEASES.map((release) => release.version);
+    expect(versions).toContain("3.0");
+    expect(versions).toContain("3.0.1");
+    expect(versions).not.toContain("3.00");
+    expect(versions).not.toContain("3.01");
+  });
+
+  it("keeps a release read under its old name read, rather than showing everything again", () => {
+    expect(currentVersionName("3.01")).toBe("3.0.1");
+    expect(currentVersionName("2.98")).toBe("2.98");
+    const since = releasesSince("3.01");
+    expect(since.length).toBeLessThan(RELEASES.length);
+    expect(since.every((release) => compareVersions(release.version, "3.0.1") > 0)).toBe(true);
+    expect(releasesSince("3.01")).toEqual(releasesSince("3.0.1"));
+  });
+
+  it("finds a release by its new name, with or without the v, and by the name it first had", () => {
+    const named = RELEASES.find((release) => release.version === "3.0.1");
+    expect(searchReleases("v3.0.1", RELEASES)).toEqual([named]);
+    expect(searchReleases("3.0.1", RELEASES)).toEqual([named]);
+    expect(searchReleases("3.01", RELEASES)).toEqual([named]);
   });
 });

@@ -87,6 +87,7 @@ export interface GuideFlow {
 }
 
 import { APP_VERSION } from "./changelog";
+import { versionLabel } from "./version-name";
 
 /**
  * The product's version, not the guide's. A person saying "I am on 1.1" means
@@ -104,7 +105,7 @@ export { APP_VERSION as GUIDE_VERSION } from "./changelog";
 export const GUIDE_NOTICES = [
   {
     id: "version",
-    title: `You are on OneBook ${APP_VERSION}`,
+    title: `You are on OneBook ${versionLabel(APP_VERSION)}`,
     body:
       "OneBook is in day-to-day use. Every release is listed under What's new with " +
       "the date it went live and the screens it changed, and the number above is " +

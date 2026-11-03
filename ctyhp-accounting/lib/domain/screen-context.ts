@@ -15,6 +15,7 @@
 
 import { GUIDE_FLOWS, type GuideFlow, type GuideStep } from "./system-guide";
 import type { Release } from "./changelog";
+import { currentVersionName } from "./version-name";
 import { plural, pluralWord } from "@/lib/format";
 
 export interface ScreenContext {
@@ -179,7 +180,10 @@ export const RELEASE_SEARCH_LIMIT = 8;
  */
 export function searchReleases(query: string, releases: readonly Release[]): Release[] {
   const version = query.trim().replace(/^v(ersion)?\s*/i, "");
-  if (/^\d+\.\d+$/.test(version)) return releases.filter((release) => release.version === version);
+  // v3.0.1 or 3.0.1, and 3.01, the name it first went out under (v3.0.2).
+  if (/^\d+\.\d+(\.\d+)?$/.test(version)) {
+    return releases.filter((release) => release.version === version || release.version === currentVersionName(version));
+  }
 
   const terms = searchTerms(query);
   if (terms.length === 0) return [];

@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { theme } from "antd";
 import { describe, expect, it } from "vitest";
 import TableEmpty from "@/components/ui/TableEmpty";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { antdThemeTokens, resolveToken } from "@/lib/design/tokens";
 
 describe("the empty lists release in the release notes", () => {
@@ -14,7 +14,7 @@ describe("the empty lists release in the release notes", () => {
 
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(Number(release.version));
+    expect(compareVersions(APP_VERSION, release.version)).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-20");
   });
 

@@ -11,6 +11,8 @@
  * links to nothing.
  */
 
+import { currentVersionName } from "./version-name";
+
 export type ChangeKind = "added" | "changed" | "fixed";
 
 export const CHANGE_KIND_LABEL: Record<ChangeKind, string> = {
@@ -38,10 +40,28 @@ export interface Release {
   changes: ChangeEntry[];
 }
 
-/** Newest first. That is the order they are read in, so it is the order stored. */
+/**
+ * Newest first. That is the order they are read in, so it is the order stored.
+ *
+ * Versions are named as lib/domain/version-name says: v3.0, v3.0.1, v3.0.2
+ * from 3 November 2026, two digits after the point before it (2.98, 2.99).
+ */
 export const RELEASES: Release[] = [
   {
-    version: "3.01",
+    version: "3.0.2",
+    date: "2026-11-03",
+    headline: "Version numbers read v3.0, v3.0.1, v3.0.2 from here on.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Versions are numbered v3.0, v3.0.1, v3.0.2",
+        detail:
+          "What's new and the guide show each version with a v. The releases first numbered 3.00 and 3.01 are v3.0 and v3.0.1, and the next ones follow on as v3.0.2, v3.0.3, with v3.1 for a larger step. Earlier releases keep their numbers, such as v2.98. Searching What's new finds a release by either form, v3.0.1 or 3.01, and what you had already read stays read.",
+      },
+    ],
+  },
+  {
+    version: "3.0.1",
     date: "2026-11-03",
     headline: "Posting defaults: new documents start on the company's own accounts, and a bill or expense on the vendor's.",
     changes: [
@@ -82,7 +102,7 @@ export const RELEASES: Release[] = [
     ],
   },
   {
-    version: "3.00",
+    version: "3.0",
     date: "2026-11-03",
     headline: "Company settings say what a company still needs to be set up, and the company list shows how far each one is.",
     changes: [
@@ -5506,6 +5526,8 @@ export const RELEASES: Release[] = [
 
 export const APP_VERSION = RELEASES[0].version;
 
+export { currentVersionName, LEGACY_VERSION_NAMES, versionLabel } from "./version-name";
+
 /**
  * Compare two versions by their parts.
  *
@@ -5531,8 +5553,9 @@ export function compareVersions(a: string, b: string): number {
  * they are shown everything rather than nothing — the cost of being wrong that
  * way is a minute of reading.
  */
-export function releasesSince(seen: string | null): Release[] {
-  if (!seen) return RELEASES;
+export function releasesSince(stored: string | null): Release[] {
+  if (!stored) return RELEASES;
+  const seen = currentVersionName(stored);
   if (!RELEASES.some((release) => release.version === seen)) return RELEASES;
   return RELEASES.filter((release) => compareVersions(release.version, seen) > 0);
 }
