@@ -31,6 +31,9 @@ describe("workerAccess", () => {
     expect(workerAccess(`Bearer ${SECRET}x`, SECRET)).toBe("unauthorized");
     expect(workerAccess(null, SECRET)).toBe("unauthorized");
   });
+  it("refuses a non-ASCII bearer of the same length without throwing", () => {
+    expect(workerAccess(`Bearer ${"\u00e9".repeat(32)}`, SECRET)).toBe("unauthorized");
+  });
 });
 
 describe("POST /api/ocr/worker", () => {
@@ -85,12 +88,13 @@ describe("POST /api/ocr/worker", () => {
   });
 
   it("does not leak database error text in a 500", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(claimOcrJob).mockRejectedValueOnce(new Error("relation onebook.ocr_job does not exist"));
     const res = await post({ action: "claim", version: "v" });
     expect(res.status).toBe(500);
     const text = await res.text();
     expect(text).not.toContain("relation");
     expect(JSON.parse(text)).toEqual({ error: "The OCR queue failed" });
+    spy.mockRestore();
   });
 });

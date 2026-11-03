@@ -9,6 +9,9 @@ export function workerAccess(authorization: string | null, configured: string | 
   const secret = configured?.trim() ?? "";
   if (secret.length < 24) return "disabled";
   const supplied = authorization?.replace(/^Bearer\s+/i, "") ?? "";
-  if (supplied.length !== secret.length) return "unauthorized";
-  return timingSafeEqual(Buffer.from(secret), Buffer.from(supplied)) ? "ok" : "unauthorized";
+  const expected = Buffer.from(secret);
+  const given = Buffer.from(supplied);
+  // Same character count can still mean different byte counts (non-ASCII), and timingSafeEqual throws on that.
+  if (given.length !== expected.length) return "unauthorized";
+  return timingSafeEqual(expected, given) ? "ok" : "unauthorized";
 }
