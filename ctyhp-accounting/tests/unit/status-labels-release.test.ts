@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 
 describe("2.19 in the release notes", () => {
@@ -9,7 +9,7 @@ describe("2.19 in the release notes", () => {
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
     expect(RELEASES.indexOf(release)).toBeGreaterThanOrEqual(0);
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.19);
+    expect(compareVersions(APP_VERSION, "2.19")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-17");
   });
 

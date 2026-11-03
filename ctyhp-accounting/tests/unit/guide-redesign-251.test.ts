@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 
 function read(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8").replace(/\r/g, "");
@@ -18,7 +18,7 @@ describe("the System guide drawer (2.51)", () => {
 
   it("lists workflows under the areas, and says the version and the date it was released", () => {
     expect(drawer).toMatch(/GUIDE_AREAS\.map\(\(area\) =>/);
-    expect(drawer).toContain("OneBook {GUIDE_VERSION} · updated {formatDate(latest.date)}");
+    expect(drawer).toContain("OneBook {versionLabel(GUIDE_VERSION)} · updated {formatDate(latest.date)}");
   });
 
   it("says which books are open", () => {
@@ -59,7 +59,7 @@ describe("the 2.51 release in the release notes", () => {
 
   it("is listed and dated the day it was built", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.51);
+    expect(compareVersions(APP_VERSION, "2.51")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-24");
   });
 

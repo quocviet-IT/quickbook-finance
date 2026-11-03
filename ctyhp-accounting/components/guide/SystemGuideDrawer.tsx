@@ -25,7 +25,7 @@ import {
   type GuideFlow,
 } from "@/lib/domain/system-guide";
 import { screenContextFor, searchCountLine, searchGuide, searchReleases } from "@/lib/domain/screen-context";
-import { RELEASES, releasesSince, type Release } from "@/lib/domain/changelog";
+import { RELEASES, releasesSince, versionLabel, type Release } from "@/lib/domain/changelog";
 import { lastReleaseSeen, markReleasesSeen } from "@/lib/client/release-notes";
 import { formatDate, plural } from "@/lib/format";
 import WhatsNewPanel from "./WhatsNewPanel";
@@ -196,7 +196,7 @@ function ReleaseLabel({ release, unread }: { release: Release; unread: boolean }
   return (
     <div className="guide-release">
       <div className="guide-release__head">
-        <span className="guide-release__version">Version {release.version}</span>
+        <span className="guide-release__version">{versionLabel(release.version)}</span>
         <Typography.Text type="secondary">{formatDate(release.date)}</Typography.Text>
         {unread ? <Tag color="blue">New</Tag> : null}
       </div>
@@ -367,7 +367,7 @@ export default function SystemGuideDrawer({
         <div className="guide-title">
           <span className="guide-title__name">System guide</span>
           <span className="guide-title__version">
-            OneBook {GUIDE_VERSION} · updated {formatDate(latest.date)}
+            OneBook {versionLabel(GUIDE_VERSION)} · updated {formatDate(latest.date)}
           </span>
         </div>
       }

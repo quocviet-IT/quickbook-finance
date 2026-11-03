@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cardsReconciledStep, type CardCloseStanding } from "@/lib/domain/accounting-dashboard/close-checklist";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { planCompanySchema } from "@/lib/domain/schema-template";
 
 const FILE = "0160_unreconciled_cards.sql";
@@ -155,7 +155,7 @@ describe("the 2.47 release in the release notes", () => {
 
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.47);
+    expect(compareVersions(APP_VERSION, "2.47")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-23");
   });
 

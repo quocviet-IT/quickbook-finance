@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { documentCanBeAccessed } from "@/lib/domain/documents";
 import { planCompanySchema } from "@/lib/domain/schema-template";
 
@@ -96,7 +96,7 @@ describe("the 2.52 release in the release notes", () => {
 
   it("is listed and dated the day it was built", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.52);
+    expect(compareVersions(APP_VERSION, "2.52")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-24");
   });
 

@@ -11,7 +11,7 @@ import {
   syncedMessage,
   validFeedStart,
 } from "@/lib/domain/bank-feed-start";
-import { APP_VERSION, RELEASES } from "@/lib/domain/changelog";
+import { APP_VERSION, RELEASES, compareVersions } from "@/lib/domain/changelog";
 import { planCompanySchema } from "@/lib/domain/schema-template";
 
 const FILE = "0161_bank_feed_skips_lines_already_here.sql";
@@ -174,7 +174,7 @@ describe("the 2.48 release in the release notes", () => {
 
   it("is listed, dated the day it was built, and newer releases sit above it", () => {
     expect(release).toBeDefined();
-    expect(Number(APP_VERSION)).toBeGreaterThanOrEqual(2.48);
+    expect(compareVersions(APP_VERSION, "2.48")).toBeGreaterThanOrEqual(0);
     expect(release.date).toBe("2026-10-24");
   });
 
