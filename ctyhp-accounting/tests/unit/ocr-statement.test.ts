@@ -108,7 +108,23 @@ describe("balanceBreaks across lines with no printed balance", () => {
   });
 });
 
+describe("hostile table spans", () => {
+  it("clamps a huge colspan and rowspan instead of looping", () => {
+    const started = Date.now();
+    const glyphs = glyphsFromOcrPages([
+      { page: 1, text: '<table><tr><td colspan="1000000000" rowspan="2">A</td><td>B</td></tr><tr><td>C</td></tr></table>' },
+    ]);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(glyphs.length).toBeGreaterThan(0);
+  });
+});
+
 describe("ocrResultSchema", () => {
+  it("accepts a page of exactly 100,000 characters and refuses one more", () => {
+    expect(ocrResultSchema.safeParse({ engine: "e", pages: [{ page: 1, text: "t".repeat(100_000) }] }).success).toBe(true);
+    expect(ocrResultSchema.safeParse({ engine: "e", pages: [{ page: 1, text: "t".repeat(100_001) }] }).success).toBe(false);
+  });
+
   it("accepts the worker's answer and refuses too many pages", () => {
     expect(ocrResultSchema.safeParse({ engine: "e", pages: [{ page: 1, text: "t" }] }).success).toBe(true);
     expect(ocrResultSchema.safeParse({ engine: "e", pages: [{ page: 1, text: "t".repeat(100_001) }] }).success).toBe(false);

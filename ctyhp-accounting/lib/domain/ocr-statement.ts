@@ -1,5 +1,5 @@
 /**
- * A scanned statement, read by the company's own OCR server (3.02).
+ * A scanned statement, read by the company's own OCR server (3.0.3).
  *
  * The model answers each page with its words, its tables as HTML, and layout
  * tags (a label and a box) around each block. Here that answer becomes the
@@ -57,6 +57,9 @@ function withoutLayout(text: string): string {
   return text.replace(/<\|ref\|>[\s\S]*?<\|\/ref\|>/g, "").replace(/<\|det\|>[\s\S]*?<\|\/det\|>/g, "\n");
 }
 
+/** A table cell never spans more than this many columns or rows, so hostile output cannot make the loops run for ever. */
+const MAX_SPAN = 50;
+
 type Line = { x: number; text: string }[];
 
 function tableLines(table: string): Line[] {
@@ -70,8 +73,8 @@ function tableLines(table: string): Line[] {
     let column = 0;
     for (const cell of row[1].matchAll(/<t[dh]([^>]*)>([\s\S]*?)<\/t[dh]>/gi)) {
       while (heldNow.has(column)) column++;
-      const span = Math.max(1, Number(/colspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1));
-      const down = Math.max(1, Number(/rowspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1));
+      const span = Math.min(MAX_SPAN, Math.max(1, Number(/colspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1)));
+      const down = Math.min(MAX_SPAN, Math.max(1, Number(/rowspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1)));
       const text = clean(cell[2]);
       if (text) cells.push({ x: COLUMN_GAP * (column + 1), text });
       if (down > 1) for (let c = column; c < column + span; c++) taken.set(c, down - 1);
