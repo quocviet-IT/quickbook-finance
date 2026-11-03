@@ -35,10 +35,15 @@ const PAGE_TOP = 100_000;
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
+/** A numeric entity as its character; one that is not a code point stays as written. */
+function fromCode(whole: string, code: number): string {
+  return Number.isNaN(code) || code > 0x10ffff ? whole : String.fromCodePoint(code);
+}
+
 function decode(text: string): string {
   return text
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
+    .replace(/&#x([0-9a-f]+);/gi, (whole, hex: string) => fromCode(whole, parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (whole, dec: string) => fromCode(whole, Number(dec)))
     .replace(/&([a-z]+);/gi, (whole, name: string) => ENTITIES[name.toLowerCase()] ?? whole);
 }
 
@@ -55,15 +60,27 @@ type Line = { x: number; text: string }[];
 
 function tableLines(table: string): Line[] {
   const lines: Line[] = [];
+  // Columns still held by a rowspan from the rows above, and for how many more rows.
+  const held = new Map<number, number>();
   for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
     const cells: Line = [];
+    const heldNow = new Set(held.keys());
+    const taken = new Map<number, number>();
     let column = 0;
     for (const cell of row[1].matchAll(/<t[dh]([^>]*)>([\s\S]*?)<\/t[dh]>/gi)) {
-      const span = Number(/colspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1);
+      while (heldNow.has(column)) column++;
+      const span = Math.max(1, Number(/colspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1));
+      const down = Math.max(1, Number(/rowspan\s*=\s*"?(\d+)/i.exec(cell[1])?.[1] ?? 1));
       const text = clean(cell[2]);
       if (text) cells.push({ x: COLUMN_GAP * (column + 1), text });
-      column += Math.max(1, span);
+      if (down > 1) for (let c = column; c < column + span; c++) taken.set(c, down - 1);
+      column += span;
     }
+    for (const [c, left] of held) {
+      if (left <= 1) held.delete(c);
+      else held.set(c, left - 1);
+    }
+    for (const [c, left] of taken) held.set(c, left);
     if (cells.length) lines.push(cells);
   }
   return lines;
@@ -100,15 +117,17 @@ export function glyphsFromOcrPages(pages: OcrResult["pages"]): PdfGlyph[] {
 
 /**
  * The lines whose printed balance does not follow from the one before (the
- * opening, for the first). A misread digit shows here on its own row, where
- * the proof only says the total is out.
+ * opening, for the first). A line that prints no balance (many statements
+ * print one only on the last line of a day) carries the running balance on,
+ * so the next printed balance is still checked. A misread digit shows here on
+ * its own row, where the proof only says the total is out.
  */
 export function balanceBreaks(lines: readonly PdfStatementLine[], openingMinor: number | null): number[] {
   const breaks: number[] = [];
   let previous = openingMinor;
   lines.forEach((l, i) => {
     if (l.balanceMinor === null) {
-      previous = null;
+      previous = previous === null ? null : previous + l.amountMinor;
       return;
     }
     if (previous !== null && previous + l.amountMinor !== l.balanceMinor) breaks.push(i);

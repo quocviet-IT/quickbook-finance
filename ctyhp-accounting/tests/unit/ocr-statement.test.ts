@@ -40,6 +40,21 @@ describe("glyphsFromOcrPages", () => {
     expect(row.cells[1].x - row.cells[0].x).toBeGreaterThan(290);
   });
 
+  it("leaves an out-of-range numeric entity as it was", () => {
+    const run = () => glyphsFromOcrPages([{ page: 1, text: "A &#x110000; B &#99999999; C" }]);
+    expect(run).not.toThrow();
+    expect(rowsFromGlyphs(run())[0].text).toBe("A &#x110000; B &#99999999; C");
+  });
+
+  it("keeps the columns a rowspan still holds in the rows below", () => {
+    const glyphs = glyphsFromOcrPages([
+      { page: 1, text: '<table><tr><td rowspan="2">10/02/2026</td><td>A</td><td>1.00</td></tr><tr><td>B</td><td>2.00</td></tr></table>' },
+    ]);
+    const x = (t: string) => glyphs.find((g) => g.text === t)!.x;
+    expect(x("B")).toBe(x("A"));
+    expect(x("2.00")).toBe(x("1.00"));
+  });
+
   it("orders pages one after another", () => {
     const glyphs = glyphsFromOcrPages([{ page: 2, text: "second" }, { page: 1, text: "first" }]);
     expect(rowsFromGlyphs(glyphs).map((r) => r.text)).toEqual(["first", "second"]);
@@ -80,6 +95,16 @@ describe("balanceBreaks", () => {
 
   it("checks the first line against the opening, and skips lines with no balance", () => {
     expect(balanceBreaks([line(100, 1200), line(5, null), line(5, 1210)], 1000)).toEqual([0]);
+  });
+});
+
+describe("balanceBreaks across lines with no printed balance", () => {
+  const line = (amountMinor: number, balanceMinor: number | null) =>
+    ({ date: "2026-10-01", description: "x", checkNumber: null, amountMinor, balanceMinor, raw: "x" });
+
+  it("carries the balance over a line that prints none", () => {
+    expect(balanceBreaks([line(100, 1100), line(-50, null), line(10, 1060)], 1000)).toEqual([]);
+    expect(balanceBreaks([line(100, 1100), line(-50, null), line(10, 1070)], 1000)).toEqual([2]);
   });
 });
 
