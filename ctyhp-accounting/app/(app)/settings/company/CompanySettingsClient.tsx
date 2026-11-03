@@ -22,6 +22,7 @@ import { CompanyExportCard } from "@/components/settings/CompanyExportCard";
 import type { CompanySettingRow } from "@/lib/db/types";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
+import { formatPostalAddress } from "@/lib/domain/invoice-document";
 
 /**
  * Version, Effective, Basis, Employer Identification Number. Legal name takes
@@ -42,6 +43,8 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
   const [editing, setEditing] = useState(false);
   const [form] = Form.useForm();
   const [versions, setVersions] = useState<CompanySettingRow[]>([]);
+  /** The address as a document prints it, every missing part dropped. */
+  const addressLines = current ? formatPostalAddress(current) : [];
 
   const loadVersions = async () => {
     const r = await listCompanySettingVersionsAction();
@@ -66,6 +69,8 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
       inventory_valuation_method: current?.inventory_valuation_method ?? "average_cost",
       inventory_policy_memo: current?.inventory_policy_memo ?? "",
       pay_note: current?.pay_note ?? "",
+      phone: current?.phone ?? "",
+      email: current?.email ?? "",
     });
     setEditing(true);
   };
@@ -123,6 +128,15 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
                 <Descriptions.Item label="Employer Identification Number">
                   {maskEin(current.ein_ref)}
                 </Descriptions.Item>
+                <Descriptions.Item label="Address">
+                  {addressLines.length > 0 ? (
+                    <span style={{ whiteSpace: "pre-line" }}>{addressLines.join("\n")}</span>
+                  ) : (
+                    "—"
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Phone">{current.phone ?? "—"}</Descriptions.Item>
+                <Descriptions.Item label="Email">{current.email ?? "—"}</Descriptions.Item>
                 <Descriptions.Item label="Fiscal year start">
                   {MONTHS[(current.fiscal_year_start_month ?? 1) - 1]}
                 </Descriptions.Item>
@@ -189,11 +203,33 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
               <Form.Item name="country" label="Country"><Input /></Form.Item>
             </Space>
             <Space wrap>
+              <Form.Item name="phone" label="Phone" rules={[{ max: 40 }]}>
+                <Input type="tel" autoComplete="tel" style={{ width: 220 }} />
+              </Form.Item>
+              <Form.Item name="email" label="Email" rules={[{ type: "email", message: "Enter a valid email" }, { max: 254 }]}>
+                <Input type="email" autoComplete="email" style={{ width: 300 }} />
+              </Form.Item>
+            </Space>
+            <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+              The address, phone and email are printed at the top of every invoice, estimate and sales receipt.
+            </Typography.Paragraph>
+            <Space wrap>
               <Form.Item name="fiscal_year_start_month" label="Fiscal year start" rules={[{ required: true }]}>
                 <Select style={{ width: 160 }} options={MONTHS.map((m, i) => ({ value: i + 1, label: m }))} />
               </Form.Item>
-              <Form.Item name="accounting_basis" label="Accounting basis" rules={[{ required: true }]}>
-                <Select style={{ width: 140 }} options={[{ value: "accrual", label: "Accrual" }, { value: "cash", label: "Cash" }]} />
+              <Form.Item
+                name="accounting_basis"
+                label="Accounting basis"
+                rules={[{ required: true }]}
+                tooltip="Every report is prepared on the accrual basis. Cash basis is not implemented, so it cannot be recorded as the company's basis."
+              >
+                <Select
+                  style={{ width: 240 }}
+                  options={[
+                    { value: "accrual", label: "Accrual" },
+                    { value: "cash", label: "Cash (not implemented)", disabled: true },
+                  ]}
+                />
               </Form.Item>
               <Form.Item name="base_currency_code" label="Base currency">
                 <Input disabled style={{ width: 100 }} />

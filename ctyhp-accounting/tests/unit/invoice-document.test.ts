@@ -139,6 +139,28 @@ describe("buildInvoiceDocument", () => {
     expect(doc.seller.legalLine).toBeNull();
   });
 
+  it("prints the company's phone and then its email under the address (2.99)", () => {
+    const doc = buildInvoiceDocument({
+      ...source,
+      company: { ...company, phone: " (617) 555-0100 ", email: "billing@example.com" },
+    });
+    expect(doc.seller.lines).toEqual([
+      "18 Pearl Street",
+      "Suite 400",
+      "Boston, MA 02109",
+      "United States",
+      "(617) 555-0100",
+      "billing@example.com",
+    ]);
+  });
+
+  it("prints no contact line for a phone or email that is not saved (2.99)", () => {
+    const withoutPhone = buildInvoiceDocument({ ...source, company: { ...company, phone: "  ", email: "billing@example.com" } });
+    expect(withoutPhone.seller.lines.slice(-2)).toEqual(["United States", "billing@example.com"]);
+    // A settings row from before 0186 has neither field at all.
+    expect(buildInvoiceDocument(source).seller.lines).toEqual(["18 Pearl Street", "Suite 400", "Boston, MA 02109", "United States"]);
+  });
+
   it("never prints the employer identification number", () => {
     // A customer-facing invoice has no reason to carry the seller's EIN.
     expect(JSON.stringify(buildInvoiceDocument(source))).not.toContain("12-3456789");

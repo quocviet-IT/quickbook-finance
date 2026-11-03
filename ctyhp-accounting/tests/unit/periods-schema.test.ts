@@ -7,6 +7,16 @@ describe("companySettingsSchema", () => {
     expect(companySettingsSchema.safeParse({ legal_name: "", fiscal_year_start_month: 1, accounting_basis: "accrual", default_payment_terms_days: 30 }).success).toBe(false);
     expect(companySettingsSchema.safeParse({ legal_name: "X", fiscal_year_start_month: 13, accounting_basis: "accrual", default_payment_terms_days: 30 }).success).toBe(false);
   });
+
+  it("takes a phone and an email, or neither, and refuses an email that is not one (2.99)", () => {
+    const base = { legal_name: "CTYHP LLC", fiscal_year_start_month: 1, accounting_basis: "accrual", default_payment_terms_days: 30 };
+    const ok = companySettingsSchema.safeParse({ ...base, phone: "(617) 555-0100", email: "billing@example.com" });
+    expect(ok.success && [ok.data.phone, ok.data.email]).toEqual(["(617) 555-0100", "billing@example.com"]);
+    expect(companySettingsSchema.safeParse({ ...base, phone: "", email: "" }).success).toBe(true);
+    expect(companySettingsSchema.safeParse(base).success).toBe(true);
+    expect(companySettingsSchema.safeParse({ ...base, email: "billing at example" }).success).toBe(false);
+    expect(companySettingsSchema.safeParse({ ...base, phone: "5".repeat(41) }).success).toBe(false);
+  });
 });
 
 describe("closePeriodSchema", () => {

@@ -41,6 +41,34 @@ export interface Release {
 /** Newest first. That is the order they are read in, so it is the order stored. */
 export const RELEASES: Release[] = [
   {
+    version: "2.99",
+    date: "2026-11-03",
+    headline: "Invoices, estimates and sales receipts print the company's phone and email, and cash basis says it is not implemented.",
+    changes: [
+      {
+        kind: "added",
+        title: "Company settings keep a phone and an email, printed on every invoice, estimate and sales receipt",
+        detail:
+          "Settings › Company has Phone and Email under the address. Both are printed at the top of the PDF, under the company's address, so a customer can answer the document. Leave them empty and nothing is printed. Each save is a new version, as before.",
+        route: "/settings/company",
+      },
+      {
+        kind: "added",
+        title: "Company settings show the address",
+        detail:
+          "The current settings now show the address the documents print, with the phone and email beside it. It was already saved; it was only shown while editing.",
+        route: "/settings/company",
+      },
+      {
+        kind: "changed",
+        title: "Cash basis can no longer be chosen",
+        detail:
+          "Every report is prepared on the accrual basis, and says so. The settings offered Cash too and saved it, so a company could be told one basis by its settings and the dashboard and another by every figure. Cash now reads Cash (not implemented), as the inventory methods that are not implemented already do, and cannot be picked or saved. No company had chosen it, so no setting and no figure changes.",
+        route: "/settings/company",
+      },
+    ],
+  },
+  {
     version: "2.98",
     date: "2026-11-02",
     headline: "The dashboard flags missed recurring entries and overspent budgets, and the chart of accounts exports.",
