@@ -1,7 +1,8 @@
 "use client";
 import { plural } from "@/lib/format";
 import type { ReactNode } from "react";
-import { Alert, Select, Space, Spin, Typography } from "antd";
+import { Alert, Button, Select, Space, Spin, Typography } from "antd";
+import { OCR_TEXT, balanceBreaks, type ScannedReading } from "@/lib/domain/ocr-statement";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import { periodLabel, skippedNote, statementLabel, summarizeStatement } from "@/lib/domain/pdf-statement-view";
 import styles from "./import-statement.module.css";
@@ -45,6 +46,61 @@ export function ReadingPdf() {
 /** Said when a chosen file cannot be read, with why. */
 export function UnreadableFile({ message }: { message: string }) {
   return <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={message} />;
+}
+
+/** A PDF with no text (3.02): offered to the company's OCR server, and how far reading it has got. */
+export function ScannedPdf({ reading, onRead }: { reading: ScannedReading; onRead: () => void }) {
+  if (reading.phase === "offline") {
+    return <Alert style={{ marginTop: 12 }} type="error" showIcon title={OCR_TEXT.title} description={OCR_TEXT.offline} />;
+  }
+  if (reading.phase === "failed") {
+    return (
+      <Alert
+        style={{ marginTop: 12 }}
+        type="error"
+        showIcon
+        title="The scanned statement could not be read"
+        description={reading.message}
+        action={<Button onClick={onRead}>Try again</Button>}
+      />
+    );
+  }
+  if (reading.phase === "ready") {
+    return (
+      <Alert
+        style={{ marginTop: 12 }}
+        type="info"
+        showIcon
+        title={OCR_TEXT.title}
+        description={OCR_TEXT.ready}
+        action={<Button type="primary" onClick={onRead}>{OCR_TEXT.button}</Button>}
+      />
+    );
+  }
+  const text =
+    reading.phase === "sending" ? OCR_TEXT.sending
+    : reading.phase === "waiting" ? OCR_TEXT.waiting
+    : OCR_TEXT.reading(reading.pagesDone, reading.pagesTotal);
+  return (
+    <Space style={{ marginTop: 12 }}>
+      <Spin size="small" />
+      <Typography.Text>{text}</Typography.Text>
+    </Space>
+  );
+}
+
+/** Said above the lines of a statement read by OCR: check them, and where the running balance breaks. */
+export function OcrNotice({ statement }: { statement: PdfStatement }) {
+  const breaks = balanceBreaks(statement.lines, statement.openingMinor);
+  return (
+    <Alert
+      style={{ marginTop: 12 }}
+      type={breaks.length ? "warning" : "info"}
+      showIcon
+      title={OCR_TEXT.banner}
+      description={breaks.length ? OCR_TEXT.breaks(breaks) : undefined}
+    />
+  );
 }
 
 function Figure({ label, value }: { label: string; value: string }) {

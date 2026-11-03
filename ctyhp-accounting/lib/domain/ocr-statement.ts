@@ -10,7 +10,7 @@
  *
  * Pure: no network, no React.
  */
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import type { PdfGlyph, PdfStatementLine } from "./pdf-statement";
 
 export const OCR_MAX_PAGES = 20;

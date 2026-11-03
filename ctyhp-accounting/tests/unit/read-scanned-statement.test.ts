@@ -43,4 +43,20 @@ describe("readScannedStatement", () => {
       message: "The file could not be sent for reading: the store is full.",
     });
   });
+
+  it("stops following the job once the dialog has moved on", async () => {
+    const row = { status: "running", pages_done: 0, pages_total: 3, result: null, error: null };
+    const d = deps([row, row, row, row]);
+    let cancelled = false;
+    const seen: string[] = [];
+    const out = await readScannedStatement(
+      file,
+      "x",
+      (r) => seen.push(r.phase),
+      { ...d, status: vi.fn(async () => { cancelled = true; return { ok: true, data: row as never }; }) },
+      { isCancelled: () => cancelled },
+    );
+    expect(out).toEqual({ message: "cancelled" });
+    expect(seen).toEqual(["sending"]);
+  });
 });

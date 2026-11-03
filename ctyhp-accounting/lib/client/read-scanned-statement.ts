@@ -43,18 +43,25 @@ export async function readScannedStatement(
   account: string,
   onProgress: (reading: ScannedReading) => void,
   deps?: ScannedStatementDeps,
+  options?: { isCancelled?: () => boolean },
 ): Promise<{ statements: PdfStatement[] } | { message: string }> {
+  const cancelled = () => options?.isCancelled?.() === true;
+  const stopped = { message: "cancelled" };
   try {
     const d = deps ?? (await defaultDeps());
     onProgress({ phase: "sending" });
     const kept = await d.keep(file, account, { from: null, to: null });
+    if (cancelled()) return stopped;
     if (!kept.ok) return { message: `The file could not be sent for reading: ${kept.reason}.` };
     const requested = await d.request(kept.id);
+    if (cancelled()) return stopped;
     if (!requested.ok || !requested.data) return { message: requested.error ?? "The reading could not be requested." };
 
     const started = Date.now();
     while (Date.now() - started < GIVE_UP_MS) {
+      if (cancelled()) return stopped;
       const status = await d.status(requested.data.jobId);
+      if (cancelled()) return stopped;
       if (!status.ok || !status.data) return { message: status.error ?? "The reading could not be followed." };
       const job = status.data;
       if (job.status === "failed") return { message: job.error ?? "The OCR server could not read this file." };
@@ -66,6 +73,7 @@ export async function readScannedStatement(
       }
       onProgress(job.status === "pending" ? { phase: "waiting" } : { phase: "reading", pagesDone: job.pages_done, pagesTotal: job.pages_total });
       await d.wait(POLL_MS);
+      if (cancelled()) return stopped;
     }
     return { message: OCR_TEXT.timedOut };
   } catch (error) {

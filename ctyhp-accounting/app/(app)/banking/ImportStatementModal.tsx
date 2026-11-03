@@ -24,7 +24,7 @@ import {
   type StatementFileResult,
 } from "@/lib/domain/statement-files";
 import { toStatementLines, type PdfStatement } from "@/lib/domain/pdf-statement";
-import { STATEMENT_READING_NOTE, pickStatement } from "@/lib/domain/pdf-statement-view";
+import { PDF_MESSAGES, STATEMENT_READING_NOTE, pickStatement } from "@/lib/domain/pdf-statement-view";
 import {
   fileFigures,
   pdfFigures,
@@ -47,7 +47,7 @@ import {
   type DialogMarks,
   type StatementDialogPurpose,
 } from "@/lib/domain/statement-import-dialog";
-import { serverFailure } from "@/lib/domain/statement-evidence";
+import { serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
 import {
   BALANCE_WORDS,
   CARD_IMPORT_NOTE,
@@ -64,7 +64,9 @@ import { formatMoney } from "@/lib/format";
 import { rememberColumns, rememberedColumns, type CsvColumnChoice } from "@/lib/client/statement-columns";
 import { statementLineKeyTable } from "@/lib/client/statement-line-keys";
 import { bankLinesOnAction, priorClosingAction } from "./actions";
-import PdfStatementPreview, { ReadingPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
+import PdfStatementPreview, { OcrNotice, ReadingPdf, ScannedPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
+import { ocrAvailableAction } from "./ocr-actions";
+import type { ScannedReading } from "@/lib/domain/ocr-statement";
 import StatementProofPanel from "./StatementProofPanel";
 import StatementLinesPreview from "./StatementLinesPreview";
 import { IMPORT_DIALOG_WIDTH } from "./import-preview-columns";
@@ -163,7 +165,8 @@ type FileState =
   | { kind: "unsupported"; message: string }
   | CsvState
   | { kind: "file"; format: "OFX" | "QIF"; result: StatementFileResult }
-  | { kind: "pdf"; statements: PdfStatement[] };
+  | { kind: "scanned"; reading: ScannedReading }
+  | { kind: "pdf"; statements: PdfStatement[]; viaOcr?: boolean };
 
 type CsvChoice = CsvColumnChoice;
 
@@ -244,6 +247,13 @@ export default function ImportStatementModal({
   const reading = useRef(0);
   // Which file was chosen last: what the person did in the dialog belongs to it.
   const [token, setToken] = useState(0);
+  // Closing the dialog makes a reading in progress stale, so it stops polling.
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      reading.current += 1;
+    };
+  }, [open]);
 
   async function readPdf(chosen: File, token: number) {
     // A card statement's PDF prints charges positive beside a summary block: not read yet (2.45).
@@ -256,11 +266,39 @@ export default function ImportStatementModal({
     const result = await readPdfStatementFile(chosen, bankAccount.decimals);
     if (token !== reading.current) return;
     if ("message" in result) {
+      if (result.message === PDF_MESSAGES.scanned) {
+        const online = await ocrAvailableAction();
+        if (token !== reading.current) return;
+        setFile({ kind: "scanned", reading: { phase: online ? "ready" : "offline" } });
+        return;
+      }
       setFile({ kind: "unsupported", message: result.message });
       return;
     }
     setPicked(pickStatement(result.statements, bankAccount.maskedNumber));
     setFile({ kind: "pdf", statements: result.statements });
+  }
+
+  async function readWithOcr() {
+    if (!chosen) return;
+    const token = reading.current;
+    const { readScannedStatement } = await import("@/lib/client/read-scanned-statement");
+    const result = await readScannedStatement(
+      chosen,
+      statementFileAccount(bankAccount.label, bankAccount.maskedNumber),
+      (progress) => {
+        if (token === reading.current) setFile({ kind: "scanned", reading: progress });
+      },
+      undefined,
+      { isCancelled: () => token !== reading.current },
+    );
+    if (token !== reading.current) return;
+    if ("message" in result) {
+      setFile({ kind: "scanned", reading: { phase: "failed", message: result.message } });
+      return;
+    }
+    setPicked(pickStatement(result.statements, bankAccount.maskedNumber));
+    setFile({ kind: "pdf", statements: result.statements, viaOcr: true });
   }
 
   function read(chosen: File) {
@@ -566,6 +604,8 @@ export default function ImportStatementModal({
 
       {file.kind === "unsupported" ? <UnreadableFile message={file.message} /> : null}
 
+      {file.kind === "scanned" ? <ScannedPdf reading={file.reading} onRead={() => void readWithOcr()} /> : null}
+
       {file.kind === "csv" && choice ? (
         <div style={{ marginTop: 12 }}>
           {showColumns ? (
@@ -638,6 +678,7 @@ export default function ImportStatementModal({
           pickPrompt="Import the one for:"
           money={money}
         >
+          {file.viaOcr && statement ? <OcrNotice statement={statement} /> : null}
           {wrongAccount ? <WrongAccountAlert description={wrongAccountText} /> : null}
         </PdfStatementPreview>
       ) : null}

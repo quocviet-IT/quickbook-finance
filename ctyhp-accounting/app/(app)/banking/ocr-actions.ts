@@ -6,7 +6,7 @@
  * functions (0188); these only carry the request.
  */
 import { z } from "zod";
-import { canWrite, getUserRole } from "@/lib/auth";
+import { canWrite, getUserRole, holdsPermission } from "@/lib/auth";
 import { activeSchema } from "@/lib/db/company";
 import { createSupabaseServerClientForSchema } from "@/lib/db/server";
 import type { ActionResult } from "./actions";
@@ -23,6 +23,8 @@ const ocrConfigured = () => (process.env.OCR_WORKER_SECRET?.trim().length ?? 0) 
 
 export async function ocrAvailableAction(): Promise<boolean> {
   if (!ocrConfigured()) return false;
+  // Shown only to people who may use it; the database decides again in request_ocr_job.
+  if (!canWrite(await getUserRole()) || !(await holdsPermission("documents.manage"))) return false;
   try {
     const sb = await createSupabaseServerClientForSchema("onebook");
     const { data, error } = await sb.rpc("ocr_worker_online");
