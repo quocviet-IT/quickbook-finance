@@ -774,6 +774,9 @@ export const companySettingsSchema = z.object({
   inventory_policy_memo: z.string().trim().max(4000).optional().or(z.literal("")).nullable(),
   /** How to pay, printed at the foot of every invoice (2.86). Left out keeps the note saved; empty clears it. */
   pay_note: z.string().trim().max(600, "Keep how to pay to 600 characters").optional().or(z.literal("")).nullable(),
+  /** Printed under the address on invoices, estimates and sales receipts (2.99). Left out keeps what is saved; empty clears it. */
+  email: z.email("Enter a valid email").max(254).optional().or(z.literal("")).nullable(),
+  phone: z.string().trim().max(40, "Keep the phone to 40 characters").optional().or(z.literal("")).nullable(),
 });
 export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 

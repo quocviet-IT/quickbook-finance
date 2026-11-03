@@ -658,6 +658,9 @@ export interface CompanySettingRow {
   inventory_policy_memo: string | null;
   /** How to pay, printed at the foot of every invoice (0179). */
   pay_note: string | null;
+  /** Printed under the address on invoices, estimates and sales receipts (0186). */
+  email: string | null;
+  phone: string | null;
 }
 
 // --- Budgets and management reporting ---

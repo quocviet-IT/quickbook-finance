@@ -37,6 +37,9 @@ export type DocumentCompany = PostalParty & {
   ein_ref?: string | null;
   /** How to pay (0179): printed at the foot of an invoice, and of nothing else. */
   pay_note?: string | null;
+  /** Printed under the address, phone first, as the bill-to block prints a customer's (0186). */
+  phone?: string | null;
+  email?: string | null;
 };
 
 /** One stored line, as an invoice or an estimate keeps it. */
@@ -127,12 +130,19 @@ function quantityText(quantity: number): string {
   return Number.isInteger(quantity) ? String(quantity) : String(quantity);
 }
 
-/** The trading name first, the legal name beneath it only when they differ. */
+/**
+ * The trading name first, the legal name beneath it only when they differ, then
+ * the address and how to reach the company: whatever of its phone and email is
+ * saved, in the order the bill-to block gives a customer's.
+ */
 export function documentSeller(company: DocumentCompany): DocumentSeller {
+  const contactLines = [company.phone, company.email]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length > 0);
   return {
     displayName: company.dba_name?.trim() || company.legal_name,
     legalLine: company.dba_name?.trim() ? company.legal_name : null,
-    lines: formatPostalAddress(company),
+    lines: [...formatPostalAddress(company), ...contactLines],
   };
 }
 
