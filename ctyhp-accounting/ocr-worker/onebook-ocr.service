@@ -1,0 +1,18 @@
+[Unit]
+Description=OneBook OCR worker (reads scanned statements with the local Unlimited-OCR server)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/onebook-ocr.env
+ExecStart=/usr/bin/python3 /opt/onebook-ocr/worker.py
+Restart=always
+RestartSec=10
+DynamicUser=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
