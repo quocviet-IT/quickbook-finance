@@ -2,7 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { holdsPermission } from "@/lib/auth";
-import { companySettingsSchema } from "@/lib/domain/schemas";
+import { companySettingsSchema, postingDefaultsSchema } from "@/lib/domain/schemas";
+import { savePostingDefaults } from "@/lib/services/posting-defaults";
 import {
   saveCompanySettings,
   syncCompanyRegisterName,
@@ -63,6 +64,22 @@ export async function saveCompanySettingsAction(
     return { ok: false, error: msg(e) };
   }
 }
+/** The posting defaults (3.01). The database checks the permission and each account's type again. */
+export async function savePostingDefaultsAction(raw: unknown): Promise<ActionResult> {
+  if (!(await holdsPermission("settings.manage"))) {
+    return { ok: false, error: "You do not have permission to change company settings" };
+  }
+  const parsed = postingDefaultsSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    await savePostingDefaults(await createSupabaseServerClient(), parsed.data);
+    revalidatePath("/settings/company");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: msg(e) };
+  }
+}
+
 export async function listCompanySettingVersionsAction(): Promise<ActionResult<CompanySettingRow[]>> {
   try { const sb = await createSupabaseServerClient(); return { ok: true, data: await listCompanySettingVersions(sb) }; }
   catch (e) { return { ok: false, error: msg(e) }; }

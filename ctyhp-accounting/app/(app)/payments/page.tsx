@@ -6,6 +6,8 @@ import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { hasPermission, listActors } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import PaymentsClient from "./PaymentsClient";
+import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
+import { defaultIn } from "@/lib/domain/posting-defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,7 @@ export default async function PaymentsPage({
     canGovernDocuments,
     canReadAudit,
     actors,
+    postingDefaults,
   ] = await Promise.all([
     listPayments(sb),
     listCustomers(sb),
@@ -38,6 +41,7 @@ export default async function PaymentsPage({
     hasPermission(sb, "documents.govern"),
     hasPermission(sb, "audit.read"),
     listActors(sb),
+    postingDefaultsOrNone(sb),
   ]);
 
   const depositAccounts = accounts.filter(
@@ -52,6 +56,7 @@ export default async function PaymentsPage({
         payments={payments}
         customers={customers}
         depositAccounts={depositAccounts}
+        defaultDepositAccountId={defaultIn(postingDefaults.depositAccountId, depositAccounts) ?? null}
         currencies={currencies}
         actors={actors}
         canWrite={canWrite(role)}

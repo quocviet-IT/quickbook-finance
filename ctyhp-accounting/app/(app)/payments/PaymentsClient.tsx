@@ -75,6 +75,7 @@ export default function PaymentsClient({
   payments,
   customers,
   depositAccounts,
+  defaultDepositAccountId = null,
   currencies,
   actors,
   canWrite,
@@ -89,6 +90,8 @@ export default function PaymentsClient({
   payments: PaymentListRow[];
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
+  /** Where a new payment lands unless somebody chooses otherwise (3.01). */
+  defaultDepositAccountId?: string | null;
   currencies: CurrencyRow[];
   actors: ActorRow[];
   canWrite: boolean;
@@ -339,6 +342,7 @@ export default function PaymentsClient({
           basis={basis}
           customers={customers}
           depositAccounts={depositAccounts}
+          defaultDepositAccountId={defaultDepositAccountId}
           currencies={currencies}
           onClose={() => {
             setReceiveOpen(false);

@@ -27,6 +27,7 @@ export default function SalesLineItems({
   decimals,
   canManageItems,
   removeLabel,
+  defaultIncomeAccountId = null,
 }: {
   /** Sold, active catalog entries. */
   items: ItemRow[];
@@ -39,6 +40,8 @@ export default function SalesLineItems({
   canManageItems: boolean;
   /** Read out for the remove button on each line. */
   removeLabel: string;
+  /** The company's default income account (3.01), for a line added without an item. */
+  defaultIncomeAccountId?: string | null;
 }) {
   const form = Form.useFormInstance();
   return (
@@ -107,7 +110,7 @@ export default function SalesLineItems({
                 />
               </Space>
             ))}
-            <Button type="dashed" onClick={() => add({ quantity: 1 })} icon={<PlusOutlined />} block>
+            <Button type="dashed" onClick={() => add({ quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined })} icon={<PlusOutlined />} block>
               Add line
             </Button>
           </div>

@@ -1137,6 +1137,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           + "time zone every date is read in and the month the fiscal year starts. Each save is a new version.",
       },
       {
+        action: "Choose where new documents land",
+        control: "Edit",
+        route: "/settings/company",
+        note:
+          "On Posting defaults, under the company's details: where money in lands, where money out comes from, and "
+          + "the income and expense accounts a line starts on. They only fill a form; a saved document keeps its own "
+          + "accounts.",
+      },
+      {
         action: "Enter where the books start",
         control: "Post opening balances",
         route: "/opening-balances",

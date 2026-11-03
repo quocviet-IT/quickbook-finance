@@ -780,6 +780,16 @@ export const companySettingsSchema = z.object({
 });
 export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
 
+/** The four posting defaults (3.01); a field left empty is no default. */
+const optionalAccountId = z.uuid("Choose an account from the list").nullable().optional();
+export const postingDefaultsSchema = z.object({
+  depositAccountId: optionalAccountId,
+  payFromAccountId: optionalAccountId,
+  incomeAccountId: optionalAccountId,
+  expenseAccountId: optionalAccountId,
+});
+export type PostingDefaultsInput = z.infer<typeof postingDefaultsSchema>;
+
 export const closePeriodSchema = z.object({
   reason: z.string().trim().min(1, "A reason is required").max(300),
   /** Required only when a control account does not tie out at the period end. */

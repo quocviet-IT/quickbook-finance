@@ -42,6 +42,8 @@ interface Props {
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
   defaultDepositAccountId: string | null;
+  /** The company's default income account (3.01), for a line with no item. */
+  defaultIncomeAccountId?: string | null;
   incomeAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
   usStates: { code: string; name: string }[];
@@ -84,6 +86,7 @@ function SalesReceiptFormBody({
   customers,
   depositAccounts,
   defaultDepositAccountId,
+  defaultIncomeAccountId = null,
   incomeAccounts,
   taxCodes,
   usStates,
@@ -141,7 +144,7 @@ function SalesReceiptFormBody({
       return {
         receipt_date: dayjs(today),
         deposit_account_id: defaultDepositAccountId ?? undefined,
-        lines: [{ quantity: 1 }],
+        lines: [{ quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined }],
       };
     }
     return {
@@ -354,6 +357,7 @@ function SalesReceiptFormBody({
           decimals={USD_DECIMAL_PLACES}
           canManageItems={canManageItems}
           removeLabel="Remove sales receipt line"
+          defaultIncomeAccountId={defaultIncomeAccountId}
         />
 
         <Form.Item name="memo" label="Note printed on the receipt" style={{ marginTop: 12 }}>

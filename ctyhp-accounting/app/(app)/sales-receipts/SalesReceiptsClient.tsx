@@ -30,6 +30,7 @@ export default function SalesReceiptsClient({
   customers,
   depositAccounts,
   defaultDepositAccountId,
+  defaultIncomeAccountId = null,
   incomeAccounts,
   taxCodes,
   usStates,
@@ -47,6 +48,8 @@ export default function SalesReceiptsClient({
   depositAccounts: AccountRow[];
   /** The first bank account; null when the company has none yet. */
   defaultDepositAccountId: string | null;
+  /** The company's default income account (3.01). */
+  defaultIncomeAccountId?: string | null;
   incomeAccounts: AccountRow[];
   taxCodes: TaxCodeRow[];
   usStates: { code: string; name: string }[];
@@ -224,6 +227,7 @@ export default function SalesReceiptsClient({
         customers={customers}
         depositAccounts={depositAccounts}
         defaultDepositAccountId={defaultDepositAccountId}
+        defaultIncomeAccountId={defaultIncomeAccountId}
         incomeAccounts={incomeAccounts}
         taxCodes={taxCodes}
         usStates={usStates}

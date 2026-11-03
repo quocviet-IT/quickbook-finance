@@ -15,6 +15,8 @@ import { estimateIdSchema } from "@/lib/domain/schemas";
 import type { EstimateInvoicePrefill } from "@/lib/domain/estimates";
 import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
+import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
+import { defaultIn } from "@/lib/domain/posting-defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +90,7 @@ export default async function InvoicesPage({
     holdsCreate,
     holdsIssue,
     holdsVoid,
+    postingDefaults,
   ] = await Promise.all([
     listInvoices(sb),
     listCustomers(sb),
@@ -113,6 +116,7 @@ export default async function InvoicesPage({
     holdsPermission("invoice.create"),
     holdsPermission("invoice.issue"),
     holdsPermission("invoice.void"),
+    postingDefaultsOrNone(sb),
   ]);
 
   // An estimate that cannot be turned into an invoice now says so instead of
@@ -166,6 +170,7 @@ export default async function InvoicesPage({
         invoices={invoices}
         customers={customers}
         incomeAccounts={incomeAccounts}
+        defaultIncomeAccountId={defaultIn(postingDefaults.incomeAccountId, incomeAccounts) ?? null}
         expenseAccounts={expenseAccounts}
         taxCodes={taxCodes}
         currencies={currencies}

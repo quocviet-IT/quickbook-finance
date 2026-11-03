@@ -37,6 +37,7 @@ import { withVendor } from "@/lib/domain/vendors";
 import type { BillablePurchaseOrder } from "@/lib/domain/purchasing";
 import EmptyCatalogHint from "@/components/EmptyCatalogHint";
 import NewVendorButton from "@/components/NewVendorButton";
+import { useLineAccountDefault } from "@/lib/client/use-line-account-default";
 import {
   createBillAction,
   getBillSettlementsAction,
@@ -80,6 +81,7 @@ export default function BillsClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
+  defaultExpenseAccountId = null,
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
@@ -103,6 +105,8 @@ export default function BillsClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
+  /** The company's default expense account, for a line when the vendor has none (3.01). */
+  defaultExpenseAccountId?: string | null;
 }) {
   const { message, modal } = App.useApp();
   const { makeRecurring, pendingId: recurringId } = useMakeRecurring();
@@ -124,6 +128,12 @@ export default function BillsClient({
     setLocalVendors((prev) => withVendor(prev, vendor));
     form.setFieldValue("vendor_id", vendor.id);
   }
+  const lineDefault = useLineAccountDefault({
+    form,
+    vendors: localVendors,
+    companyDefault: defaultExpenseAccountId,
+    choices: expenseAccounts,
+  });
 
   // Which purchase orders this vendor still owes a bill for. A bill raised
   // against one has to be matched against what actually arrived, and this form
@@ -204,6 +214,7 @@ export default function BillsClient({
       message.success("Draft bill created");
       setOpen(false);
       form.resetFields();
+      lineDefault.reset();
     } else {
       message.error(res.error ?? "Failed to create bill");
     }
@@ -446,7 +457,11 @@ export default function BillsClient({
         okText="Create draft"
         width={720}
       >
-        <Form form={form} layout="vertical" initialValues={{ lines: [{}] }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{ lines: [{ expense_account_id: lineDefault.initialLineAccount }] }}
+        >
           <Space align="end" wrap style={{ display: "flex" }}>
             <Form.Item
               name="vendor_id"
@@ -458,6 +473,7 @@ export default function BillsClient({
                 showSearch
                 optionFilterProp="label"
                 options={localVendors.map((v) => ({ value: v.id, label: v.name }))}
+                onChange={(vendorId?: string) => lineDefault.onVendorChange(vendorId)}
               />
             </Form.Item>
             <Form.Item label=" ">
@@ -569,7 +585,11 @@ export default function BillsClient({
                     )}
                   </Space>
                 ))}
-                <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>
+                <Button
+                  type="dashed"
+                  onClick={() => add({ expense_account_id: lineDefault.newLineAccount() })}
+                  icon={<PlusOutlined />}
+                >
                   Add line
                 </Button>
               </>

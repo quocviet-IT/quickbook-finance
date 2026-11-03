@@ -9,6 +9,7 @@ import { getReceivedNotBilled, listPurchaseOrders } from "@/lib/services/purchas
 import { billablePurchaseOrders } from "@/lib/domain/purchasing";
 import PageHeader from "@/components/PageHeader";
 import BillsClient from "./BillsClient";
+import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function BillsPage({
     purchaseOrders,
     holdsPost,
     holdsVoid,
+    postingDefaults,
   ] = await Promise.all([
     listBills(sb),
     listVendors(sb),
@@ -61,6 +63,7 @@ export default async function BillsPage({
     listPurchaseOrders(sb),
     holdsPermission("bill.post"),
     holdsPermission("bill.void"),
+    postingDefaultsOrNone(sb),
   ]);
 
   // A bill raised against a purchase order has to go through three-way matching,
@@ -96,6 +99,7 @@ export default async function BillsPage({
         bills={bills}
         vendors={vendors}
         expenseAccounts={billDebitAccounts}
+        defaultExpenseAccountId={postingDefaults.expenseAccountId}
         incomeAccounts={incomeAccounts}
         currencies={currencies}
         items={purchaseItems}

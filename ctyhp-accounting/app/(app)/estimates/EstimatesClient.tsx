@@ -41,6 +41,7 @@ export default function EstimatesClient({
   today,
   customers,
   incomeAccounts,
+  defaultIncomeAccountId = null,
   taxCodes,
   usStates,
   items,
@@ -55,6 +56,8 @@ export default function EstimatesClient({
   today: string;
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
+  /** The company's default income account (3.01). */
+  defaultIncomeAccountId?: string | null;
   taxCodes: TaxCodeRow[];
   usStates: { code: string; name: string }[];
   /** Sold, active catalog entries. */
@@ -300,6 +303,7 @@ export default function EstimatesClient({
         today={today}
         customers={customers}
         incomeAccounts={incomeAccounts}
+        defaultIncomeAccountId={defaultIncomeAccountId}
         taxCodes={taxCodes}
         usStates={usStates}
         items={items}

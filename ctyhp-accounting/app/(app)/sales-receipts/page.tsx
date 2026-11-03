@@ -11,6 +11,8 @@ import { salesRevenueAccounts } from "@/lib/domain/accounts";
 import { defaultDepositAccountId, depositAccountChoices } from "@/lib/domain/sales-receipts";
 import PageHeader from "@/components/PageHeader";
 import SalesReceiptsClient from "./SalesReceiptsClient";
+import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
+import { defaultIn } from "@/lib/domain/posting-defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ export default async function SalesReceiptsPage({
 }) {
   const initialCreateOpen = (await searchParams).new === "1";
   const sb = await createSupabaseServerClient();
-  const [receipts, clock, customers, accounts, taxCodes, usStates, items, role, canManageItems] =
+  const [receipts, clock, customers, accounts, taxCodes, usStates, items, role, canManageItems, postingDefaults] =
     await Promise.all([
       listSalesReceipts(sb),
       companyClock(sb),
@@ -32,8 +34,10 @@ export default async function SalesReceiptsPage({
       listItems(sb),
       getUserRole(),
       hasPermission(sb, "items.manage"),
+      postingDefaultsOrNone(sb),
     ]);
   const depositAccounts = depositAccountChoices(accounts);
+  const incomeAccounts = salesRevenueAccounts(accounts);
 
   return (
     <div>
@@ -47,8 +51,12 @@ export default async function SalesReceiptsPage({
         today={clock.today}
         customers={customers}
         depositAccounts={depositAccounts}
-        defaultDepositAccountId={defaultDepositAccountId(depositAccounts)}
-        incomeAccounts={salesRevenueAccounts(accounts)}
+        defaultDepositAccountId={
+          // The company's choice first (3.01); without one, the first bank account, as before.
+          defaultIn(postingDefaults.depositAccountId, depositAccounts) ?? defaultDepositAccountId(depositAccounts)
+        }
+        defaultIncomeAccountId={defaultIn(postingDefaults.incomeAccountId, incomeAccounts) ?? null}
+        incomeAccounts={incomeAccounts}
         taxCodes={taxCodes}
         usStates={usStates}
         items={items.filter((item) => item.is_sold && item.is_active)}

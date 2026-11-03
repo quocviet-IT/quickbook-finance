@@ -44,6 +44,8 @@ interface Props {
   today: string;
   customers: CustomerRow[];
   incomeAccounts: AccountRow[];
+  /** The company's default income account (3.01), for a line with no item. */
+  defaultIncomeAccountId?: string | null;
   taxCodes: TaxCodeRow[];
   usStates: { code: string; name: string }[];
   items: ItemRow[];
@@ -80,6 +82,7 @@ function EstimateFormBody({
   today,
   customers,
   incomeAccounts,
+  defaultIncomeAccountId = null,
   taxCodes,
   usStates,
   items,
@@ -127,7 +130,7 @@ function EstimateFormBody({
       return {
         estimate_date: dayjs(today),
         expiry_date: dayjs(defaultExpiryDate(today)),
-        lines: [{ quantity: 1 }],
+        lines: [{ quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined }],
       };
     }
     return {
@@ -339,6 +342,7 @@ function EstimateFormBody({
           decimals={USD_DECIMAL_PLACES}
           canManageItems={canManageItems}
           removeLabel="Remove estimate line"
+          defaultIncomeAccountId={defaultIncomeAccountId}
         />
 
         <Form.Item name="memo" label="Note printed at the foot" style={{ marginTop: 12 }}>
