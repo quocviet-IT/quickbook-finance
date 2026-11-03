@@ -23,6 +23,8 @@ import type { CompanySettingRow } from "@/lib/db/types";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { METHOD_LABEL } from "@/lib/domain/inventory-review";
 import { formatPostalAddress } from "@/lib/domain/invoice-document";
+import type { SetupStep } from "@/lib/domain/company-setup";
+import CompanySetupCard from "@/components/settings/CompanySetupCard";
 
 /**
  * Version, Effective, Basis, Employer Identification Number. Legal name takes
@@ -38,7 +40,16 @@ function maskEin(s: string | null | undefined): string {
   return t.length <= 4 ? "••" : `•••••${t.slice(-4)}`;
 }
 
-export default function CompanySettingsClient({ canEdit, current }: { canEdit: boolean; current: CompanySettingRow | null }) {
+export default function CompanySettingsClient({
+  canEdit,
+  current,
+  setupSteps = null,
+}: {
+  canEdit: boolean;
+  current: CompanySettingRow | null;
+  /** The setup checklist (3.00); null when it could not be read, and then not shown. */
+  setupSteps?: SetupStep[] | null;
+}) {
   const { message } = App.useApp();
   const [editing, setEditing] = useState(false);
   const [form] = Form.useForm();
@@ -95,6 +106,7 @@ export default function CompanySettingsClient({ canEdit, current }: { canEdit: b
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
+      {!editing && setupSteps ? <CompanySetupCard steps={setupSteps} onEdit={canEdit ? startEdit : undefined} /> : null}
       {!editing && (
         <Card
           title="Current settings"
