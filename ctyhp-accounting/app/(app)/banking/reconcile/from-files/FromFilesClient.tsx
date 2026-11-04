@@ -505,6 +505,27 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
               size="small"
               pagination={false}
               dataSource={check.statements}
+              expandable={{
+                // Open for every scanned file, with no expand button (and so no
+                // extra column to shift the measured widths in run-table.module.css).
+                showExpandColumn: false,
+                expandedRowKeys: card ? [] : check.statements.filter((c) => needsOcr(c.statement) && fileByKey.has(c.statement.key)).map((c) => c.statement.key),
+                rowExpandable: () => !card,
+                expandedRowRender: (c) => {
+                  const scanned = fileByKey.get(c.statement.key);
+                  if (!scanned) return null;
+                  return (
+                    <div className={styles.ocrOffer}>
+                      <ScannedPdf
+                        reading={ocr.get(scanned) ?? { phase: "offline" }}
+                        onRead={() => void readWithOcr(scanned)}
+                        disabled={busy || previewing}
+                        photo={isPhotoFile(scanned)}
+                      />
+                    </div>
+                  );
+                },
+              }}
               columns={[
                 { title: "File", render: (_, c) => c.statement.fileName },
                 { title: "Period", render: (_, c) => (c.statement.to ? periodLabel(c.statement.from, c.statement.to) : "—") },
@@ -526,16 +547,13 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
                   // still run, it says "Out by … — import this statement on its own to
                   // correct it.", and every later one waits behind it.
                   render: (_, c) => {
-                    const scanned = !card && needsOcr(c.statement) ? fileByKey.get(c.statement.key) : undefined;
-                    if (scanned) {
-                      return (
-                        <ScannedPdf
-                          reading={ocr.get(scanned) ?? { phase: "offline" }}
-                          onRead={() => void readWithOcr(scanned)}
-                          disabled={busy || previewing}
-                          photo={isPhotoFile(scanned)}
-                        />
-                      );
+                    // A scanned file's offer (title, explanation, Read with OCR, then
+                    // progress or failure) is a sentence-sized block; in this narrow
+                    // cell it was drawn a letter wide. It sits in a full-width row
+                    // under the file instead (expandedRowRender below), and this
+                    // cell only names the state.
+                    if (!card && needsOcr(c.statement) && fileByKey.has(c.statement.key)) {
+                      return <Tag color="blue" style={{ whiteSpace: "normal" }}>Needs OCR</Tag>;
                     }
                     return (
                     <>
