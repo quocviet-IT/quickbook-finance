@@ -59,12 +59,13 @@
   white-space: normal;
 }
 
+/*
+ * The alert's own top margin (ScannedPdf is also drawn in Import statement) is
+ * not wanted here. Narrow: the button wraps under the text instead of being
+ * drawn over it.
+ */
 .ocrOffer :global(.ant-alert) {
   margin-top: 0 !important;
-}
-
-/* Narrow: the button drops under the text instead of being drawn over it. */
-.ocrOffer :global(.ant-alert) {
   flex-wrap: wrap;
   row-gap: 8px;
 }
