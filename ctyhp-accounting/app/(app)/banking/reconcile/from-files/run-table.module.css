@@ -45,3 +45,30 @@
     white-space: normal;
   }
 }
+
+/*
+ * The OCR offer of a scanned file sits in a full-width row under the file. It
+ * is held to a readable measure, and on a phone, where the table is wider than
+ * the screen and scrolls, it stays at the left edge of what is on screen.
+ */
+.ocrOffer {
+  position: sticky;
+  left: 0;
+  max-width: min(640px, calc(100vw - 64px));
+  /* The cells are kept to one line (globals.css); this is prose. */
+  white-space: normal;
+}
+
+.ocrOffer :global(.ant-alert) {
+  margin-top: 0 !important;
+}
+
+/* Narrow: the button drops under the text instead of being drawn over it. */
+.ocrOffer :global(.ant-alert) {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.ocrOffer :global(.ant-alert-section) {
+  min-width: 200px;
+}

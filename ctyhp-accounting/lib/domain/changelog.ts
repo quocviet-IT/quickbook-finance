@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.7",
+    date: "2026-11-04",
+    headline: "A scanned statement's offer to read it has room.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Read with OCR can be read in From statement files",
+        detail:
+          "A scanned PDF or a photo added in From statement files showed its offer squeezed into the narrow Read column, one letter to a line, and made the row hundreds of pixels tall. The offer now sits in its own full-width line under the file, with the file name, period and balances staying at the top of the row, on a desktop and on a phone.",
+        route: "/banking/reconcile/from-files",
+      },
+    ],
+  },
+  {
     version: "3.0.6",
     date: "2026-11-04",
     headline: "A photo of a statement is called a photo.",
