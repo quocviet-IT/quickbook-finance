@@ -8,6 +8,7 @@ import {
   statementFileAccount,
   statementFileAttachSchema,
   statementFileKeepSchema,
+  isPhotoFile,
   statementFileMime,
   statementFileMismatch,
   statementFileRefusal,
@@ -322,5 +323,15 @@ describe("attachMismatch (2.04)", () => {
     const plain = { to: "2026-05-31", closingMinor: 616001, lines: target.keptLines };
     expect(attachMismatch(plain, [], target, money)).toBe(statementFileMismatch(plain, target, money));
     expect(attachMismatch({ ...plain, closingMinor: 1 }, [], target, money)).toBe(statementFileMismatch({ ...plain, closingMinor: 1 }, target, money));
+  });
+});
+
+describe("isPhotoFile (3.0.5)", () => {
+  it("is a JPG or PNG by its name or by its type", () => {
+    expect(isPhotoFile({ name: "scan.JPG", type: "" })).toBe(true);
+    expect(isPhotoFile({ name: "scan.png", type: "" })).toBe(true);
+    expect(isPhotoFile({ name: "scan", type: "image/jpeg" })).toBe(true);
+    expect(isPhotoFile({ name: "scan.pdf", type: "application/pdf" })).toBe(false);
+    expect(isPhotoFile({ name: "scan.gif", type: "image/gif" })).toBe(false);
   });
 });

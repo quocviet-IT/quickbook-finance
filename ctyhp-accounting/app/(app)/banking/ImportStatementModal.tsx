@@ -47,7 +47,7 @@ import {
   type DialogMarks,
   type StatementDialogPurpose,
 } from "@/lib/domain/statement-import-dialog";
-import { serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
+import { isPhotoFile, serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
 import {
   BALANCE_WORDS,
   CARD_IMPORT_NOTE,
@@ -171,7 +171,6 @@ type FileState =
 type CsvChoice = CsvColumnChoice;
 
 const isPdfFile = (file: File) => /\.pdf$/i.test(file.name) || file.type === "application/pdf";
-const isPhotoFile = (file: File) => /\.(jpe?g|png)$/i.test(file.name) || file.type === "image/jpeg" || file.type === "image/png";
 
 const COLUMN_FIELDS: { key: keyof StatementColumnMap; label: string; required?: boolean }[] = [
   { key: "date", label: "Date", required: true },

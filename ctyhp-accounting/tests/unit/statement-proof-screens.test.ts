@@ -464,7 +464,7 @@ describe("a run of statement files", () => {
     expect(fromFiles).toContain("Preview {plural(check.usable.length, \"statement\")}");
     // A stop of the whole run (a gap, a reconciliation in progress) still keeps Preview and Sign off from going.
     expect(fromFiles).toContain("{check.stops.map((stop) => (");
-    expect(fromFiles).toContain("disabled={check.stops.length > 0 || reading > 0 || busy}");
+    expect(fromFiles).toContain("disabled={check.stops.length > 0 || reading > 0 || busy || ocrRunning}");
     expect(fromFiles).toContain("if (!preview || previewing || check.stops.length > 0) return;");
   });
 

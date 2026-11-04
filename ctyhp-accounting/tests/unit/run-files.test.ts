@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { datesReadTwoWays, readRunFile } from "@/lib/client/run-files";
+
+// A PDF whose pages hold no text, as pdf.js reports it.
+vi.mock("@/lib/client/pdf-text", () => ({
+  readPdfStatementFile: async () => ({ message: (await import("@/lib/domain/pdf-statement-view")).PDF_MESSAGES.scanned }),
+}));
+import { datesReadTwoWays, needsOcr, readRunFile } from "@/lib/client/run-files";
 import { guessStatementColumns, readStatementCsv } from "@/lib/domain/statement-csv";
 import { RUN_MESSAGES } from "@/lib/domain/statement-run";
+import { PDF_MESSAGES } from "@/lib/domain/pdf-statement-view";
 
 const bank = { id: "bank-1", maskedNumber: "****7917", decimals: 2 };
 
@@ -68,5 +74,33 @@ describe("readRunFile", () => {
     const broken = { name: "broken.csv", type: "text/csv", text: () => Promise.reject(new Error("gone")) } as unknown as File;
     const [only] = await readRunFile(broken, bank);
     expect([only.fileName, only.source, only.problem]).toEqual(["broken.csv", "CSV", "This file could not be read"]);
+  });
+});
+
+describe("a scanned statement or a photo (3.0.5)", () => {
+  it("makes a photo of a statement a file that waits for OCR, not one that cannot be read", async () => {
+    for (const name of ["page.jpg", "page.JPEG", "page.png"]) {
+      const read = await readRunFile(new File(["x"], name), bank);
+      expect(read).toHaveLength(1);
+      expect(needsOcr(read[0])).toBe(true);
+      expect(read[0].fileName).toBe(name);
+    }
+  });
+
+  it("makes a PDF with no text a file that waits for OCR", async () => {
+    const read = await readRunFile(new File(["%PDF"], "scan.pdf", { type: "application/pdf" }), bank);
+    expect(read.map(needsOcr)).toEqual([true]);
+  });
+
+  it("leaves a file that failed for another reason unreadable", async () => {
+    const [csv] = await readRunFile(new File(["OFXHEADER:100\n<OFX></OFX>"], "bank.ofx"), bank);
+    expect(needsOcr(csv)).toBe(false);
+    expect(needsOcr({ ...csv, problem: PDF_MESSAGES.noLines })).toBe(false);
+  });
+
+  it("does not read a photo for a credit card", async () => {
+    const [only] = await readRunFile(new File(["x"], "page.jpg"), { ...bank, side: "card" });
+    expect(needsOcr(only)).toBe(false);
+    expect(only.problem).toBe(RUN_MESSAGES.cardNeedsPdf);
   });
 });

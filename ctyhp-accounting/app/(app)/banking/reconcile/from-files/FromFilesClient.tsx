@@ -1,16 +1,18 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Space, Spin, Tag, Typography, Upload } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
-import { readRunFile } from "@/lib/client/run-files";
+import { needsOcr, readRunFile } from "@/lib/client/run-files";
 import { periodLabel } from "@/lib/domain/pdf-statement-view";
+import { OCR_TEXT, type ScannedReading } from "@/lib/domain/ocr-statement";
 import {
   checkRun,
   monthSentence,
   runStatementPayload,
+  statementsFromPdf,
   type CheckedStatement,
   type MonthOutcome,
   type RunContext,
@@ -35,6 +37,8 @@ import {
 } from "@/lib/domain/statement-bank-lines";
 import type { BalanceSide } from "@/lib/domain/card-account";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
+import { ocrAvailableAction } from "../../ocr-actions";
+import { ScannedPdf } from "../../PdfStatementPreview";
 import { previewRunAction, reconcileRunMonthAction } from "../statement-actions";
 import StandingTag from "../StandingTag";
 import styles from "./run-table.module.css";
@@ -64,7 +68,27 @@ interface Props {
 }
 
 /** A statement read from a file, with the file — kept as its evidence when its month is signed (1.83). */
-type ChosenStatement = RunStatement & { file?: File };
+type ChosenStatement = RunStatement & {
+  file?: File;
+  /** Read by the company's OCR server (3.0.5): shown with a note to check it against the statement. */
+  viaOcr?: boolean;
+};
+
+/** New statements after the current ones; one whose key is taken stays as a row under a new key. */
+function withFreshKeys(current: readonly ChosenStatement[], read: readonly ChosenStatement[]): ChosenStatement[] {
+  // A file chosen twice, or two files of one name, stay as rows: the
+  // table says "Same month as another file" rather than one vanishing.
+  const keys = new Set(current.map((s) => s.key));
+  const fresh = read.map((s) => {
+    let key = s.key;
+    for (let n = 2; keys.has(key); n += 1) key = `${s.key}~${n}`;
+    keys.add(key);
+    return key === s.key ? s : { ...s, key };
+  });
+  return [...current, ...fresh];
+}
+
+const OCR_RUNNING: ScannedReading["phase"][] = ["sending", "waiting", "reading"];
 
 interface Done {
   signed: number;
@@ -134,6 +158,18 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
   // between makes the answer stale, and it is dropped.
   const asked = useRef(0);
   const [progress, setProgress] = useState<string | null>(null);
+  // Scanned files and photos (3.0.5): where reading each stands. A file is read once;
+  // `epoch` moves on when the run starts again or the page is left, so polling stops.
+  const [ocr, setOcr] = useState<ReadonlyMap<File, ScannedReading>>(new Map());
+  const ocrStarted = useRef(new Set<File>());
+  const epoch = useRef(0);
+  useEffect(() => {
+    const started = ocrStarted.current;
+    return () => {
+      epoch.current += 1;
+      started.clear();
+    };
+  }, []);
   const [done, setDone] = useState<Done | null>(null);
   const { currencyCode, decimals } = bankAccount;
   const money = (minor: number) => formatMoney(minor, currencyCode, decimals);
@@ -172,6 +208,9 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
   );
   const previewedByKey = useMemo(() => new Map(previewed.map((s) => [s.key, s])), [previewed]);
   const busy = progress !== null;
+  const ocrRunning = [...ocr.values()].some((r) => OCR_RUNNING.includes(r.phase));
+  const fileByKey = new Map(statements.map((s) => [s.key, s.file]));
+  const ocrKeys = new Set(statements.filter((s) => s.viaOcr).map((s) => s.key));
 
   if (!canWrite) {
     return <Alert type="info" showIcon title="Reconciling statements needs permission to write in this company." />;
@@ -184,24 +223,65 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
     setDone(null);
     try {
       const read: ChosenStatement[] = (await readRunFile(file, { ...bankAccount, side })).map((s) => ({ ...s, file }));
-      setStatements((current) => {
-        // A file chosen twice, or two files of one name, stay as rows: the
-        // table says "Same month as another file" rather than one vanishing.
-        const keys = new Set(current.map((s) => s.key));
-        const fresh = read.map((s) => {
-          let key = s.key;
-          for (let n = 2; keys.has(key); n += 1) key = `${s.key}~${n}`;
-          keys.add(key);
-          return key === s.key ? s : { ...s, key };
-        });
-        return [...current, ...fresh];
-      });
+      // A scanned PDF or a photo of a bank statement waits for OCR; a card's does not (CARD_PDF_NOT_READ).
+      if (!card && read.some(needsOcr)) {
+        const online = await ocrAvailableAction();
+        setOcr((current) => new Map(current).set(file, { phase: online ? "ready" : "offline" }));
+      }
+      setStatements((current) => withFreshKeys(current, read));
     } finally {
       setReading((n) => n - 1);
     }
   }
 
+  /** Read one scanned file with OCR; what it returns joins the run as a text PDF's statements do. */
+  async function readWithOcr(file: File) {
+    // A second click for the same file would keep it twice and ask the server twice.
+    if (ocrStarted.current.has(file)) return;
+    ocrStarted.current.add(file);
+    const mine = epoch.current;
+    const stale = () => epoch.current !== mine;
+    const show = (reading: ScannedReading) => {
+      if (!stale()) setOcr((current) => new Map(current).set(file, reading));
+    };
+    const failed = (reason: string) => {
+      ocrStarted.current.delete(file);
+      show({ phase: "failed", message: reason });
+    };
+    show({ phase: "sending" });
+    let readScannedStatement: typeof import("@/lib/client/read-scanned-statement").readScannedStatement;
+    try {
+      ({ readScannedStatement } = await import("@/lib/client/read-scanned-statement"));
+    } catch {
+      if (!stale()) failed("The OCR reader could not be loaded. Check your connection and try again.");
+      return;
+    }
+    const result = await readScannedStatement(file, fileAccount, show, undefined, { isCancelled: stale });
+    if (stale()) return;
+    if ("message" in result) {
+      failed(result.message);
+      return;
+    }
+    asked.current += 1;
+    setPreview(null);
+    setDone(null);
+    const read: ChosenStatement[] = statementsFromPdf(file.name, result.statements, bankAccount.maskedNumber).map((s) => ({
+      ...s,
+      file,
+      viaOcr: true,
+    }));
+    setStatements((current) => withFreshKeys(current.filter((s) => !(s.file === file && needsOcr(s))), read));
+    setOcr((current) => {
+      const next = new Map(current);
+      next.delete(file);
+      return next;
+    });
+  }
+
   function startAgain() {
+    epoch.current += 1;
+    ocrStarted.current.clear();
+    setOcr(new Map());
     asked.current += 1;
     setStatements([]);
     setPreview(null);
@@ -376,7 +456,7 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
         </Typography.Paragraph>
       ) : (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          Bank account <strong>{bankAccount.label}</strong>. Choose PDF statements, or a CSV export with a running balance
+          Bank account <strong>{bankAccount.label}</strong>. Choose PDF statements (a scanned one, or a photo, is read with OCR), or a CSV export with a running balance
           column — one file or many. Every closing balance is read out of the file itself, never taken from the books.
           Nothing is written until you sign off; then each file is kept, once, with the reconciliations made from it.
           Reconciling checks the statements against the books: a line already in Bank Transactions is left as it is, never
@@ -385,7 +465,11 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
       )}
       <Upload.Dragger
         multiple
-        accept={card ? ".pdf,application/pdf" : ".pdf,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf"}
+        accept={
+          card
+            ? ".pdf,application/pdf"
+            : ".pdf,.jpg,.jpeg,.png,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf,image/jpeg,image/png"
+        }
         beforeUpload={(file) => {
           void add(file);
           return false;
@@ -437,7 +521,12 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
                   // stops at the first that does not add up: the statements before it
                   // still run, it says "Out by … — import this statement on its own to
                   // correct it.", and every later one waits behind it.
-                  render: (_, c) => (
+                  render: (_, c) => {
+                    const scanned = !card && needsOcr(c.statement) ? fileByKey.get(c.statement.key) : undefined;
+                    if (scanned) {
+                      return <ScannedPdf reading={ocr.get(scanned) ?? { phase: "offline" }} onRead={() => void readWithOcr(scanned)} />;
+                    }
+                    return (
                     <>
                       <Tag color={STATE_COLOR[c.state]} style={{ whiteSpace: "normal" }}>
                         {c.note}
@@ -452,8 +541,14 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
                           {c.proof.sentences.detail}
                         </Typography.Text>
                       ) : null}
+                      {ocrKeys.has(c.statement.key) ? (
+                        <Typography.Text type="warning" style={{ display: "block", fontSize: 12 }}>
+                          {OCR_TEXT.banner}
+                        </Typography.Text>
+                      ) : null}
                     </>
-                  ),
+                    );
+                  },
                 },
               ]}
             />
@@ -465,7 +560,7 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
             <Button
               type="primary"
               loading={previewing}
-              disabled={check.stops.length > 0 || reading > 0 || busy}
+              disabled={check.stops.length > 0 || reading > 0 || busy || ocrRunning}
               onClick={() => void runPreview()}
             >
               Preview {plural(check.usable.length, "statement")}

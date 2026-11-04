@@ -26,6 +26,7 @@ import type { BalanceSide } from "@/lib/domain/card-account";
 import { readCardStatementSummary } from "@/lib/domain/card-statement-pdf";
 import { rowsFromGlyphs } from "@/lib/domain/pdf-statement";
 import { PDF_MESSAGES } from "@/lib/domain/pdf-statement-view";
+import { isPhotoFile } from "@/lib/domain/statement-evidence";
 import { formatMoney } from "@/lib/format";
 
 export interface RunBankAccount {
@@ -69,6 +70,16 @@ function unreadable(fileName: string, source: RunSource, problem: string): RunSt
   };
 }
 
+/**
+ * A scanned PDF, or a photo, holds no text for the browser to read (3.0.5). It
+ * comes back as an entry that waits for the company's OCR server, and the page
+ * offers "Read with OCR" on it; what OCR returns then enters the run as a PDF's
+ * statements do.
+ */
+export function needsOcr(statement: RunStatement): boolean {
+  return statement.problem === PDF_MESSAGES.scanned;
+}
+
 async function readPdf(file: File, bank: RunBankAccount): Promise<RunStatement[]> {
   const { readPdfStatementFile } = await import("@/lib/client/pdf-text");
   const result = await readPdfStatementFile(file, bank.decimals);
@@ -99,6 +110,7 @@ async function readFile(file: File, bank: RunBankAccount): Promise<RunStatement[
     return [unreadable(file.name, "CSV", RUN_MESSAGES.cardNeedsPdf)];
   }
   if (isPdfFile(file)) return readPdf(file, bank);
+  if (isPhotoFile(file)) return [unreadable(file.name, "PDF", PDF_MESSAGES.scanned)];
   const text = await file.text();
   const verdict = detectStatementFormat(file.name, text);
   if ("unsupported" in verdict) return [unreadable(file.name, "CSV", verdict.unsupported)];

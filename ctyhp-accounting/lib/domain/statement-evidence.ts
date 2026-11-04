@@ -19,6 +19,11 @@ import { formatDate, plural } from "@/lib/format";
 export const STATEMENT_FILE_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg", "text/csv", "text/plain"] as const;
 export type StatementFileMime = (typeof STATEMENT_FILE_MIME_TYPES)[number];
 
+/** A JPG or PNG: a photo of a statement, which holds no text and goes to OCR (3.0.5). */
+export function isPhotoFile(file: { name: string; type: string }): boolean {
+  return /\.(jpe?g|png)$/i.test(file.name) || file.type === "image/jpeg" || file.type === "image/png";
+}
+
 const BY_EXTENSION: Record<string, StatementFileMime> = {
   pdf: "application/pdf",
   png: "image/png",
