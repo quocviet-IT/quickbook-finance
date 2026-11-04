@@ -48,6 +48,34 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.5",
+    date: "2026-11-04",
+    headline: "Statements dated like “Oct 03”, photos of a statement, and scans in From statement files are now read.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Statement dates written with the month's name are read",
+        detail:
+          "A statement that prints its dates as Oct 03 or October 3, with no year on the line, used to come in with no lines at all; the year is now taken from the statement period, as it is for 10/03. A column headed Date paid, Posted, Posting date or Transaction date is read as the date column, so a Checks paid table is no longer skipped, and a description that starts like a date (MAR 15 PAYMENT) stays a description.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "A photo of a statement can be read with OCR",
+        detail:
+          "Import statement takes a JPG or PNG photo of a statement and offers Read with OCR, as it does for a scanned PDF. The photo is kept as the statement file; it can be downloaded but is not shown on screen.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Reconcile › From statement files reads scans and photos",
+        detail:
+          "A scanned PDF or a photo in a run of statement files offers Read with OCR on its own row. Once read, it joins the run like any other statement and is checked the same way.",
+        route: "/banking/reconcile/from-files",
+      },
+    ],
+  },
+  {
     version: "3.0.4",
     date: "2026-11-04",
     headline: "The scheduled jobs refuse a wrong key cleanly.",

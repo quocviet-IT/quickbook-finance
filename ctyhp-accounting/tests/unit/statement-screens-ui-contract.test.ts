@@ -53,4 +53,21 @@ describe("the statement screens", () => {
     expect(fromFiles).toContain("bankLinesMatchedSentence(done.matched)");
     expect(fromFiles).toContain("bankLinesNotMatchedSentence(res.data.matchError");
   });
+
+  it("From statement files reads a scanned PDF or a photo with OCR, once, and stops when the run starts again (3.0.5)", () => {
+    const body = handler(fromFiles, "readWithOcr");
+    expect(body).toContain("if (ocrStarted.current.has(file)) return;");
+    expect(body).toContain("{ isCancelled: stale }");
+    expect(body).toContain("statementsFromPdf(file.name, result.statements, bankAccount.maskedNumber)");
+    expect(fromFiles).toContain("!card && needsOcr(");
+    expect(fromFiles).toContain("image/jpeg,image/png");
+    expect(fromFiles).toMatch(/function startAgain\(\) \{\s*epoch\.current \+= 1;/);
+  });
+  it("From statement files does not start OCR during a sign-off or preview, and add() drops a result after Start again (3.0.5)", () => {
+    expect(fromFiles).toMatch(/<ScannedPdf.*disabled=\{busy \|\| previewing\}/);
+    const body = handler(fromFiles, "add");
+    expect(body).toContain("const mine = epoch.current;");
+    expect(body.match(/epoch\.current !== mine/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(read("PdfStatementPreview.tsx")).toContain("disabled?: boolean");
+  });
 });

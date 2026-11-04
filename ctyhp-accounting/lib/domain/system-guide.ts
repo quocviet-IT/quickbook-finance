@@ -607,7 +607,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "When it does, Import N lines is one click. When it does not, it says how much it is out by and names " +
           "the line a CSV's balance jumps after, or the one line it is out by; Import is blocked until the " +
           "statement adds up. A bank download (CSV, QFX or OFX) is read exactly; a PDF is read from its text, " +
-          "and a check image or a summary table can be misread. A scanned PDF has no text to read.",
+          "and a check image or a summary table can be misread. A scanned PDF or a photo of a statement has no " +
+          "text of its own: choose Read with OCR and your company's OCR server reads it, then check the lines " +
+          "against the statement before importing.",
       },
       {
         action: "Make a statement add up",

@@ -12,6 +12,7 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { SAVED_REPORT_BUCKET } from "@/lib/domain/saved-reports";
 import {
+  STATEMENT_FILE_KINDS_MESSAGE,
   STATEMENT_FILE_MIME_TYPES,
   attachMismatch,
   statementFileAttachSchema,
@@ -62,7 +63,7 @@ export async function prepareStatementFileAction(
   }
   if (!/^[0-9a-f]{64}$/.test(sha256)) return { ok: false, error: "Expected a sha256 digest" };
   if (!(STATEMENT_FILE_MIME_TYPES as readonly string[]).includes(mimeType)) {
-    return { ok: false, error: "OneBook keeps PDF, CSV, OFX, QFX, QBO and QIF statement files" };
+    return { ok: false, error: STATEMENT_FILE_KINDS_MESSAGE };
   }
   const company = await resolveActiveCompany();
   if (!company.active) return { ok: false, error: "No company is selected" };

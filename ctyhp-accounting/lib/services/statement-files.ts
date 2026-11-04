@@ -52,7 +52,7 @@ export async function keepStatementFile(
  */
 export async function removeUnkeptUpload(sb: SupabaseClient, folder: string, path: string): Promise<void> {
   if (!/^[a-z0-9_]+$/.test(folder)) return;
-  if (!new RegExp(`^${folder}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(pdf|csv|txt)$`).test(path)) return;
+  if (!new RegExp(`^${folder}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(pdf|csv|txt|png|jpg)$`).test(path)) return;
   const { data, error } = await sb.from("acc_saved_report").select("id").eq("storage_path", path).maybeSingle();
   if (error || data) return;
   await createSavedReportStorageClient().storage.from(SAVED_REPORT_BUCKET).remove([path]);

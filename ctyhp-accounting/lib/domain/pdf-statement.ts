@@ -6,7 +6,7 @@
  *
  * Pure: the browser turns the file into glyphs (lib/client/pdf-text.ts) and
  * this turns the glyphs into statements. It departs from the prototype in
- * five places, each marked "OneBook:" where it happens:
+ * seven places, each marked "OneBook:" where it happens:
  *   1. a figure with two decimals is never a date (the prototype reads 75.00 as
  *      month 75, day 00, and loses a cheque in a grid);
  *   2. "Statement date: November 30, 2026" is read with its whole month name;
@@ -15,7 +15,11 @@
  *      the words;
  *   5. inside the images of cheques, a "Checks" or "Fees" caption does not end
  *      the skip, nor does a table of cheque numbers that captions the images:
- *      only a table of activity or a transaction history does.
+ *      only a table of activity or a transaction history does;
+ *   6. a date written with the month's name ("Oct 03", "3 Oct 2026", "3-Oct-26")
+ *      is a date, and takes its year the way a date without one always has;
+ *   7. a date column may be headed "Date paid", "Posted", "Transaction date"
+ *      and the like, not only "Date".
  */
 import type { StatementLine } from "./statement-import";
 
@@ -115,10 +119,58 @@ function monthNo(word: string): number {
   return MONTHS.indexOf(String(word).slice(0, 3).toLowerCase()) + 1;
 }
 
+/**
+ * OneBook: the months a date may be written with, as a word: three letters or
+ * the whole name, and not "Octopus". Case-insensitive where it is used.
+ */
+const MONTH_WORD =
+  "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?![a-z])";
+/** "Oct 03", "October 3, 2026", "Oct. 3 2026" */
+const MONTH_FIRST = new RegExp(`^${MONTH_WORD}\\.?\\s+(\\d{1,2})(?!\\d)(?:,?\\s+((?:19|20)\\d\\d)(?![\\d.,]))?`, "i");
+/** "03 Oct", "3 Oct 2026" */
+const DAY_FIRST = new RegExp(`^(\\d{1,2})\\s+${MONTH_WORD}\\.?(?:,?\\s+((?:19|20)\\d\\d)(?![\\d.,]))?`, "i");
+/** "03-Oct", "3-Oct-26", "3-Oct-2026" */
+const DAY_DASH_MONTH = new RegExp(`^(\\d{1,2})-${MONTH_WORD}\\.?(?:-(\\d{4}|\\d{2})(?!\\d))?`, "i");
+
+interface NamedDate {
+  /** How many characters of the text the date takes. */
+  length: number;
+  mo: number;
+  da: number;
+  /** The year as printed (four digits), or null. */
+  year: number | null;
+}
+
+/** OneBook: a date written with the month's name at the start of the text, or null. It must end the text or be followed by a space. */
+function namedDateAt(text: string): NamedDate | null {
+  const t = String(text);
+  let m = MONTH_FIRST.exec(t);
+  let mo = "";
+  let da = "";
+  let yr: string | undefined;
+  if (m) [, mo, da, yr] = m;
+  else if ((m = DAY_FIRST.exec(t))) [, da, mo, yr] = m;
+  else if ((m = DAY_DASH_MONTH.exec(t))) [, da, mo, yr] = m;
+  else return null;
+  if (t.length > m[0].length && !/\s/.test(t[m[0].length])) return null;
+  return { length: m[0].length, mo: monthNo(mo), da: Number(da), year: yr ? Number(yr.length === 2 ? `20${yr}` : yr) : null };
+}
+
 function isDateCell(text: string): boolean {
   const t = String(text).trim();
   // OneBook: 75.00 is a figure, not month 75 day 00.
-  return /^\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?$/.test(t) && !/^\d{1,2}\.\d\d$/.test(t);
+  if (/^\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?$/.test(t) && !/^\d{1,2}\.\d\d$/.test(t)) return true;
+  const named = namedDateAt(t);
+  return named !== null && named.length === t.length;
+}
+
+/** A date cell as month, day and the year it prints (null when it prints none). */
+function readDateCell(dateCell: string): { mo: number; da: number; year: number | null } | null {
+  const dm = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/.exec(dateCell);
+  if (dm) return { mo: Number(dm[1]), da: Number(dm[2]), year: dm[3] ? Number(dm[3].length === 2 ? `20${dm[3]}` : dm[3]) : null };
+  // OneBook: a date written with the month's name.
+  const named = namedDateAt(dateCell.trim());
+  return named ? { mo: named.mo, da: named.da, year: named.year } : null;
 }
 
 function isRealDate(iso: string): boolean {
@@ -168,14 +220,29 @@ export function readPeriod(joined: string): { from: string; to: string } {
  * OneBook: pdf.js joins a date to the words printed just after it ("07/02/2026
  * EXAMPLE DEPOSIT") when the gap is narrow, and the prototype then misses the
  * whole line. Such a cell is read as the date and the words, as printed.
+ * A numeric date is split off any cell; a date written with the month's name
+ * ("Oct 03 ACH") only from a row's first cell (index 0), so a description such
+ * as "MAR 15 PAYMENT" further along the row is left whole.
  */
-function splitLeadingDate(cell: PdfCell): PdfCell[] {
+function splitLeadingDate(cell: PdfCell, index = 0): PdfCell[] {
   const m = /^(\S+)\s+(\S.*)$/.exec(cell.text);
-  if (!m || !isDateCell(m[1])) return [cell];
-  return [
-    { x: cell.x, text: m[1] },
-    { x: cell.x + 0.01, text: m[2] },
-  ];
+  if (m && isDateCell(m[1])) {
+    return [
+      { x: cell.x, text: m[1] },
+      { x: cell.x + 0.01, text: m[2] },
+    ];
+  }
+  // OneBook: "Oct 03 ACH DEPOSIT" or "03 Oct 2026 ACH DEPOSIT": the date is several words long.
+  // Only the row's first (leftmost) cell, where a date is printed: a description
+  // such as "MAR 15 PAYMENT" further along the row is not a date and the words.
+  const named = index === 0 ? namedDateAt(cell.text) : null;
+  if (named && named.length < cell.text.length) {
+    return [
+      { x: cell.x, text: cell.text.slice(0, named.length) },
+      { x: cell.x + 0.01, text: cell.text.slice(named.length).trim() },
+    ];
+  }
+  return [cell];
 }
 
 /** A PDF holds glyphs at coordinates, not rows: everything on one baseline is one row, read left to right. */
@@ -193,7 +260,7 @@ export function rowsFromGlyphs(glyphs: readonly PdfGlyph[]): PdfRow[] {
       byLine.set(key, line);
     }
     for (const key of [...byLine.keys()].sort((a, b) => b - a)) {
-      const cells = byLine.get(key)!.sort((a, b) => a.x - b.x).flatMap(splitLeadingDate);
+      const cells = byLine.get(key)!.sort((a, b) => a.x - b.x).flatMap((c, i) => splitLeadingDate(c, i));
       rows.push({ cells, text: cells.map((c) => c.text).join(" ") });
     }
   }
@@ -263,6 +330,10 @@ function foldHeading(cells: readonly PdfCell[], above: readonly PdfRow[]): PdfCe
   return cols.map((k) => ({ x: k.x, text: k.parts.join(" ") }));
 }
 
+/** OneBook: the headings, besides "Date", that name a date column (after lower-casing, letters and spaces only). */
+const DATE_HEADING =
+  /^(date paid|date posted|posted|post date|posting date|trans date|transaction date|effective date|value date|date cleared)$/;
+
 function headerShape(cells: readonly PdfCell[], prev: PdfRow | null, prev2: PdfRow | null): Heading | null {
   // A heading names columns; it never holds a figure or a date.
   if (!cells.length) return null;
@@ -273,12 +344,30 @@ function headerShape(cells: readonly PdfCell[], prev: PdfRow | null, prev2: PdfR
       r !== null && r.cells.length > 0 && r.cells.every((c) => !isMoneyCell(c.text) && !isDateCell(c.text) && c.text.length < 26),
   );
   const merged = foldHeading(cells, above);
+  let named = false;
+  let firstDate = "";
   for (const c of merged) {
     const s = c.text.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
     if (!s) continue;
     if (s === "date" || s === "dates") {
+      if (named) continue;
       h.dates++;
       if (h.dateX === null) h.dateX = c.x;
+      continue;
+    }
+    // OneBook: a date column need not be headed "Date". A different heading
+    // ("Trans date" beside "Post date") is the same column's other date, not a
+    // grid of entries, so only the first counts; the same heading repeated
+    // ("Date paid" twice) is a two-up grid, as "Date" twice always was.
+    if (DATE_HEADING.test(s)) {
+      if (h.dates) {
+        if (named && s === firstDate) h.dates++;
+        continue;
+      }
+      named = true;
+      firstDate = s;
+      h.dates++;
+      h.dateX = c.x;
       continue;
     }
     if (/^(debits?|withdrawals?|payments?|money out|paid out|charges?|checks and debits|withdrawals debits?)$/.test(s)) h.debit = c.x;
@@ -351,13 +440,20 @@ function readStatementRows(rows: readonly PdfRow[]) {
   let secNo = 0;
 
   const push = (dateCell: string, cells: readonly PdfCell[], amount: number, bal: number | null, wantCheck: boolean, raw: string) => {
-    const dm = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/.exec(dateCell);
-    if (!dm) return;
-    let y = dm[3] ? Number(dm[3].length === 2 ? `20${dm[3]}` : dm[3]) : per.to ? Number(per.to.slice(0, 4)) : 0;
-    const mo = Number(dm[1]);
-    const da = Number(dm[2]);
-    if (!dm[3] && per.to) {
+    const read = readDateCell(dateCell);
+    if (!read) return;
+    // OneBook: a printed year more than one year from the statement's is a reference or
+    // check number ("Oct 03 2015 PAYMENT"), not the year: the period's year rule is used,
+    // and the digits stay in the description.
+    const perYear = per.to ? Number(per.to.slice(0, 4)) : 0;
+    const farYear = read.year !== null && perYear > 0 && Math.abs(read.year - perYear) > 1;
+    const dm = farYear ? { ...read, year: null } : read;
+    let y = dm.year ?? (per.to ? Number(per.to.slice(0, 4)) : 0);
+    const mo = dm.mo;
+    const da = dm.da;
+    if (dm.year === null && per.to) {
       // A line dated 12/28 on a January statement belongs to the December before.
+      // OneBook: a date written "Dec 28" is placed by the same rule.
       const pm = Number(per.to.slice(5, 7));
       if (mo > pm + 1 || (mo === 12 && pm === 1)) y -= 1;
     }
@@ -369,6 +465,7 @@ function readStatementRows(rows: readonly PdfRow[]) {
       return;
     }
     const words = cells.filter((c) => !isMoneyCell(c.text) && !isDateCell(c.text)).map((c) => c.text);
+    if (farYear) words.unshift(String(read.year));
     const text = words.join(" ");
     let check = "";
     const named = text.match(/che?c?k\s*(?:no\.?|number|#)?\s*:?\s*(\d{2,7})/i);

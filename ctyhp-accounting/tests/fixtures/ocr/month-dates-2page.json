@@ -1,0 +1,234 @@
+{
+ "account": "6093",
+ "from_": "2026-10-01",
+ "to": "2026-10-31",
+ "opening": 2450075,
+ "closing": 1197106,
+ "lines": [
+  {
+   "date": "2026-10-03",
+   "label": "Oct 03",
+   "description": "ACH DEPOSIT COPPER KETTLE LLC",
+   "amount": 588463,
+   "balance": 3038538
+  },
+  {
+   "date": "2026-10-05",
+   "label": "Oct 05",
+   "description": "PAYROLL RUN 1001",
+   "amount": -267355,
+   "balance": 2771183
+  },
+  {
+   "date": "2026-10-06",
+   "label": "Oct 06",
+   "description": "CHECK 3102",
+   "amount": -422575,
+   "balance": 2348608
+  },
+  {
+   "date": "2026-10-08",
+   "label": "Oct 08",
+   "description": "MOBILE DEPOSIT",
+   "amount": 645282,
+   "balance": 2993890
+  },
+  {
+   "date": "2026-10-09",
+   "label": "Oct 09",
+   "description": "CARD PURCHASE GREENLEAF MARKET",
+   "amount": -235243,
+   "balance": 2758647
+  },
+  {
+   "date": "2026-10-10",
+   "label": "Oct 10",
+   "description": "CHECK 3105",
+   "amount": -48637,
+   "balance": 2710010
+  },
+  {
+   "date": "2026-10-10",
+   "label": "Oct 10",
+   "description": "SERVICE FEE",
+   "amount": -516052,
+   "balance": 2193958
+  },
+  {
+   "date": "2026-10-12",
+   "label": "Oct 12",
+   "description": "PAYROLL RUN 1007",
+   "amount": -343943,
+   "balance": 1850015
+  },
+  {
+   "date": "2026-10-13",
+   "label": "Oct 13",
+   "description": "SERVICE FEE",
+   "amount": -8964,
+   "balance": 1841051
+  },
+  {
+   "date": "2026-10-13",
+   "label": "Oct 13",
+   "description": "ACH DEPOSIT HILLSIDE DENTAL INV 2009",
+   "amount": 38884,
+   "balance": 1879935
+  },
+  {
+   "date": "2026-10-14",
+   "label": "Oct 14",
+   "description": "WIRE IN ORCHARD FREIGHT",
+   "amount": 630245,
+   "balance": 2510180
+  },
+  {
+   "date": "2026-10-14",
+   "label": "Oct 14",
+   "description": "CARD PURCHASE BRIGHTON PRINT",
+   "amount": -244335,
+   "balance": 2265845
+  },
+  {
+   "date": "2026-10-15",
+   "label": "Oct 15",
+   "description": "PAYROLL RUN 1012",
+   "amount": -310932,
+   "balance": 1954913
+  },
+  {
+   "date": "2026-10-16",
+   "label": "Oct 16",
+   "description": "ACH DEPOSIT MAPLE STREET CAFE",
+   "amount": 246495,
+   "balance": 2201408
+  },
+  {
+   "date": "2026-10-17",
+   "label": "Oct 17",
+   "description": "PAYROLL RUN 1014",
+   "amount": -3508,
+   "balance": 2197900
+  },
+  {
+   "date": "2026-10-17",
+   "label": "Oct 17",
+   "description": "PAYROLL RUN 1015",
+   "amount": -344404,
+   "balance": 1853496
+  },
+  {
+   "date": "2026-10-18",
+   "label": "Oct 18",
+   "description": "CARD PURCHASE TRAILHEAD FUEL",
+   "amount": -290123,
+   "balance": 1563373
+  },
+  {
+   "date": "2026-10-18",
+   "label": "Oct 18",
+   "description": "ACH PAYMENT SUMMIT INSURANCE",
+   "amount": -134266,
+   "balance": 1429107
+  },
+  {
+   "date": "2026-10-19",
+   "label": "Oct 19",
+   "description": "CARD PURCHASE BRIGHTON PRINT",
+   "amount": -121511,
+   "balance": 1307596
+  },
+  {
+   "date": "2026-10-20",
+   "label": "Oct 20",
+   "description": "ACH DEPOSIT HILLSIDE DENTAL INV 2019",
+   "amount": 75134,
+   "balance": 1382730
+  },
+  {
+   "date": "2026-10-20",
+   "label": "Oct 20",
+   "description": "CARD PURCHASE TRAILHEAD FUEL",
+   "amount": -57619,
+   "balance": 1325111
+  },
+  {
+   "date": "2026-10-21",
+   "label": "Oct 21",
+   "description": "CARD PURCHASE TRAILHEAD FUEL",
+   "amount": -36136,
+   "balance": 1288975
+  },
+  {
+   "date": "2026-10-21",
+   "label": "Oct 21",
+   "description": "ACH DEPOSIT COPPER KETTLE LLC",
+   "amount": 719667,
+   "balance": 2008642
+  },
+  {
+   "date": "2026-10-21",
+   "label": "Oct 21",
+   "description": "WIRE IN ORCHARD FREIGHT",
+   "amount": 221404,
+   "balance": 2230046
+  },
+  {
+   "date": "2026-10-21",
+   "label": "Oct 21",
+   "description": "PAYROLL RUN 1024",
+   "amount": -197950,
+   "balance": 2032096
+  },
+  {
+   "date": "2026-10-23",
+   "label": "Oct 23",
+   "description": "CARD PURCHASE TRAILHEAD FUEL",
+   "amount": -39393,
+   "balance": 1992703
+  },
+  {
+   "date": "2026-10-24",
+   "label": "Oct 24",
+   "description": "CARD PURCHASE BRIGHTON PRINT",
+   "amount": -354946,
+   "balance": 1637757
+  },
+  {
+   "date": "2026-10-25",
+   "label": "Oct 25",
+   "description": "ONLINE TRANSFER FROM SAVINGS",
+   "amount": 92877,
+   "balance": 1730634
+  },
+  {
+   "date": "2026-10-26",
+   "label": "Oct 26",
+   "description": "ONLINE TRANSFER FROM SAVINGS",
+   "amount": 17385,
+   "balance": 1748019
+  },
+  {
+   "date": "2026-10-28",
+   "label": "Oct 28",
+   "description": "CARD PURCHASE BRIGHTON PRINT",
+   "amount": -484937,
+   "balance": 1263082
+  },
+  {
+   "date": "2026-10-28",
+   "label": "Oct 28",
+   "description": "CHECK 3130",
+   "amount": -130278,
+   "balance": 1132804
+  },
+  {
+   "date": "2026-10-28",
+   "label": "Oct 28",
+   "description": "ACH DEPOSIT HILLSIDE DENTAL INV 2031",
+   "amount": 64302,
+   "balance": 1197106
+  }
+ ],
+ "has_balance": true
+}

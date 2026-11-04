@@ -8,6 +8,7 @@ import {
   statementFileAccount,
   statementFileAttachSchema,
   statementFileKeepSchema,
+  isPhotoFile,
   statementFileMime,
   statementFileMismatch,
   statementFileRefusal,
@@ -37,6 +38,13 @@ describe("statementFileMime", () => {
     expect(statementFileMime("statement", "application/x-msdownload")).toBeNull();
     expect(statementFileMime("statement.xlsx")).toBeNull();
   });
+
+  it("keeps a photo of a statement as an image (3.0.5)", () => {
+    expect(statementFileMime("scan.JPG", "")).toBe("image/jpeg");
+    expect(statementFileMime("scan.jpeg")).toBe("image/jpeg");
+    expect(statementFileMime("scan.png")).toBe("image/png");
+    expect(statementFileMime("scan.gif", "image/gif")).toBeNull();
+  });
 });
 
 describe("statementFileRefusal", () => {
@@ -48,7 +56,10 @@ describe("statementFileRefusal", () => {
     expect(statementFileRefusal({ name: "may.pdf", size: 0 })).toBe("the file is empty");
     expect(statementFileRefusal({ name: "may.pdf", size: 10_485_761 })).toBe("it is larger than 10 MB");
     expect(statementFileRefusal({ name: `${"x".repeat(252)}.pdf`, size: 1 })).toBe("its name is longer than 255 characters");
-    expect(statementFileRefusal({ name: "may.xlsx", size: 1 })).toBe("OneBook keeps PDF, CSV, OFX, QFX, QBO and QIF statement files");
+    expect(statementFileRefusal({ name: "may.xlsx", size: 1 })).toBe("OneBook keeps PDF, JPG, PNG, CSV, OFX, QFX, QBO and QIF statement files");
+    expect(statementFileRefusal({ name: "scan.gif", size: 1 })).toMatch(/JPG, PNG/);
+    expect(statementFileRefusal({ name: "photo.jpg", size: 11 * 1024 * 1024 })).toBe("it is larger than 10 MB");
+    expect(statementFileRefusal({ name: "photo.jpg", size: 3 * 1024 * 1024 })).toBeNull();
   });
 
   it("allows exactly 10 MB", () => {
@@ -249,8 +260,13 @@ describe("statementFileKeepSchema", () => {
     expect(statementFileKeepSchema.safeParse({ ...valid, mime_type: "text/plain" }).success).toBe(true);
   });
 
+  it("accepts a photo of a statement (3.0.5)", () => {
+    expect(statementFileKeepSchema.safeParse({ ...valid, mime_type: "image/png" }).success).toBe(true);
+    expect(statementFileKeepSchema.safeParse({ ...valid, mime_type: "image/jpeg" }).success).toBe(true);
+  });
+
   it("refuses a type the store does not keep for statements, a bad digest, and a period backwards", () => {
-    expect(statementFileKeepSchema.safeParse({ ...valid, mime_type: "image/png" }).success).toBe(false);
+    expect(statementFileKeepSchema.safeParse({ ...valid, mime_type: "image/gif" }).success).toBe(false);
     expect(statementFileKeepSchema.safeParse({ ...valid, sha256: "xyz" }).success).toBe(false);
     expect(statementFileKeepSchema.safeParse({ ...valid, period_start: "2026-06-01" }).success).toBe(false);
   });
@@ -307,5 +323,15 @@ describe("attachMismatch (2.04)", () => {
     const plain = { to: "2026-05-31", closingMinor: 616001, lines: target.keptLines };
     expect(attachMismatch(plain, [], target, money)).toBe(statementFileMismatch(plain, target, money));
     expect(attachMismatch({ ...plain, closingMinor: 1 }, [], target, money)).toBe(statementFileMismatch({ ...plain, closingMinor: 1 }, target, money));
+  });
+});
+
+describe("isPhotoFile (3.0.5)", () => {
+  it("is a JPG or PNG by its name or by its type", () => {
+    expect(isPhotoFile({ name: "scan.JPG", type: "" })).toBe(true);
+    expect(isPhotoFile({ name: "scan.png", type: "" })).toBe(true);
+    expect(isPhotoFile({ name: "scan", type: "image/jpeg" })).toBe(true);
+    expect(isPhotoFile({ name: "scan.pdf", type: "application/pdf" })).toBe(false);
+    expect(isPhotoFile({ name: "scan.gif", type: "image/gif" })).toBe(false);
   });
 });
