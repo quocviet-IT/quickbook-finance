@@ -1,0 +1,17 @@
+<|det|>header [110, 33, 428, 52]<|/det|>Demo National Bank
+<|det|>header [109, 58, 248, 72]<|/det|>Commercial Checking
+<|det|>header [782, 35, 889, 47]<|/det|>Statement period
+<|det|>header [631, 47, 890, 59]<|/det|>November 1, 2026 - November 30, 2026
+<|det|>page_number [816, 60, 889, 73]<|/det|>Page 1 of 1
+<|det|>text [108, 96, 503, 111]<|/det|>SAMPLE SURVEY GROUP Account number: ****9918
+<|det|>text [108, 122, 332, 137]<|/det|>Beginning balance $31,200.40
+<|det|>text [395, 122, 598, 137]<|/det|>Ending balance $65,749.34
+<|det|>text [108, 148, 271, 162]<|/det|>Deposits and credits
+<|det|>table [108, 165, 890, 320]<|/det|><table><tr><td>Date</td><td>Description</td><td>Amount</td></tr><tr><td>11/02</td><td>PAYROLL REFUND ADJUSTMENT</td><td>180.00</td></tr><tr><td>11/04</td><td>DEPOSIT ELMWOOD GALLERY</td><td>6,400.00</td></tr><tr><td>11/06</td><td>ACH CREDIT NORTHSTAR LABS</td><td>11,800.25</td></tr><tr><td>11/10</td><td>DEPOSIT MOBILE</td><td>955.00</td></tr><tr><td>11/13</td><td>WIRE CREDIT OAKRIDGE MILLING</td><td>22,000.00</td></tr><tr><td>11/18</td><td>ACH CREDIT QUARRY HILL LLC</td><td>4,500.12</td></tr><tr><td>11/21</td><td>DEPOSIT CASH</td><td>275.00</td></tr><tr><td>11/26</td><td>INTEREST PAID</td><td>6.55</td></tr></table>
+<|det|>text [108, 330, 252, 343]<|/det|>Other withdrawals
+<|det|>table [108, 348, 890, 466]<|/det|><table><tr><td>Date</td><td>Description</td><td>Amount</td></tr><tr><td>11/03</td><td>ACH DEBIT SUNDIAL UTILITIES</td><td>318.77</td></tr><tr><td>11/09</td><td>DEBIT CARD ANCHOR OFFICE MART</td><td>142.90</td></tr><tr><td>11/15</td><td>ACH DEBIT RIDGELINE RENT</td><td>2,400.00</td></tr><tr><td>11/19</td><td>ACH DEBIT TELEPORT PHONE</td><td>65.40</td></tr><tr><td>11/24</td><td>SERVICE CHARGE</td><td>25.00</td></tr><tr><td>11/28</td><td>ACH DEBIT SAGE PAYROLL TAXES</td><td>1,880.31</td></tr></table>
+<|det|>text [108, 476, 208, 491]<|/det|>Checks paid
+<|det|>table [108, 495, 890, 613]<|/det|><table><tr><td>Check No.</td><td>Date paid</td><td>Amount</td></tr><tr><td>7201</td><td>11/05</td><td>520.00</td></tr><tr><td>7202</td><td>11/08</td><td>1,750.55</td></tr><tr><td>7203</td><td>11/12</td><td>88.30</td></tr><tr><td>7205</td><td>11/17</td><td>961.00</td></tr><tr><td>7206</td><td>11/22</td><td>415.75</td></tr><tr><td>7207</td><td>11/29</td><td>3,000.00</td></tr></table>
+<|det|>text [108, 623, 273, 638]<|/det|>Daily ending balance
+<|det|>table [108, 642, 890, 830]<|/det|><table><tr><td>Date</td><td>Balance Date</td><td>Balance</td></tr><tr><td>11/02</td><td>31,380.40 11/15</td><td>67,315.13</td></tr><tr><td>11/03</td><td>31,061.63 11/17</td><td>66,354.13</td></tr><tr><td>11/04</td><td>37,461.63 11/18</td><td>70,854.25</td></tr><tr><td>11/05</td><td>36,941.63 11/19</td><td>70,788.85</td></tr><tr><td>11/06</td><td>48,741.88 11/21</td><td>71,063.85</td></tr><tr><td>11/08</td><td>46,991.33 11/22</td><td>70,648.10</td></tr><tr><td>11/09</td><td>46,848.43 11/24</td><td>70,623.10</td></tr><tr><td>11/10</td><td>47,803.43 11/26</td><td>70,629.65</td></tr><tr><td>11/12</td><td>47,715.13 11/28</td><td>68,749.34</td></tr><tr><td>11/13</td><td>69,715.13 11/29</td><td>65,749.34</td></tr></table>
+<|det|>footer [108, 957, 571, 969]<|/det|>Made-up statement for testing text recognition. Demo National Bank is not a real bank.

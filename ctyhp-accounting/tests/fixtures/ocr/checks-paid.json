@@ -1,0 +1,252 @@
+{
+ "account": "9918",
+ "from_": "2026-11-01",
+ "to": "2026-11-30",
+ "opening": 3120040,
+ "closing": 6574934,
+ "lines": [
+  {
+   "date": "2026-11-02",
+   "label": "11/02",
+   "description": "PAYROLL REFUND ADJUSTMENT",
+   "amount": 18000,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-04",
+   "label": "11/04",
+   "description": "DEPOSIT ELMWOOD GALLERY",
+   "amount": 640000,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-06",
+   "label": "11/06",
+   "description": "ACH CREDIT NORTHSTAR LABS",
+   "amount": 1180025,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-10",
+   "label": "11/10",
+   "description": "DEPOSIT MOBILE",
+   "amount": 95500,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-13",
+   "label": "11/13",
+   "description": "WIRE CREDIT OAKRIDGE MILLING",
+   "amount": 2200000,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-18",
+   "label": "11/18",
+   "description": "ACH CREDIT QUARRY HILL LLC",
+   "amount": 450012,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-21",
+   "label": "11/21",
+   "description": "DEPOSIT CASH",
+   "amount": 27500,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-26",
+   "label": "11/26",
+   "description": "INTEREST PAID",
+   "amount": 655,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-03",
+   "label": "11/03",
+   "description": "ACH DEBIT SUNDIAL UTILITIES",
+   "amount": -31877,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-09",
+   "label": "11/09",
+   "description": "DEBIT CARD ANCHOR OFFICE MART",
+   "amount": -14290,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-15",
+   "label": "11/15",
+   "description": "ACH DEBIT RIDGELINE RENT",
+   "amount": -240000,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-19",
+   "label": "11/19",
+   "description": "ACH DEBIT TELEPORT PHONE",
+   "amount": -6540,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-24",
+   "label": "11/24",
+   "description": "SERVICE CHARGE",
+   "amount": -2500,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-28",
+   "label": "11/28",
+   "description": "ACH DEBIT SAGE PAYROLL TAXES",
+   "amount": -188031,
+   "balance": null,
+   "check": null
+  },
+  {
+   "date": "2026-11-05",
+   "label": "11/05",
+   "description": "Check 7201",
+   "amount": -52000,
+   "balance": null,
+   "check": "7201"
+  },
+  {
+   "date": "2026-11-08",
+   "label": "11/08",
+   "description": "Check 7202",
+   "amount": -175055,
+   "balance": null,
+   "check": "7202"
+  },
+  {
+   "date": "2026-11-12",
+   "label": "11/12",
+   "description": "Check 7203",
+   "amount": -8830,
+   "balance": null,
+   "check": "7203"
+  },
+  {
+   "date": "2026-11-17",
+   "label": "11/17",
+   "description": "Check 7205",
+   "amount": -96100,
+   "balance": null,
+   "check": "7205"
+  },
+  {
+   "date": "2026-11-22",
+   "label": "11/22",
+   "description": "Check 7206",
+   "amount": -41575,
+   "balance": null,
+   "check": "7206"
+  },
+  {
+   "date": "2026-11-29",
+   "label": "11/29",
+   "description": "Check 7207",
+   "amount": -300000,
+   "balance": null,
+   "check": "7207"
+  }
+ ],
+ "has_balance": false,
+ "daily": [
+  [
+   "11/02",
+   3138040
+  ],
+  [
+   "11/03",
+   3106163
+  ],
+  [
+   "11/04",
+   3746163
+  ],
+  [
+   "11/05",
+   3694163
+  ],
+  [
+   "11/06",
+   4874188
+  ],
+  [
+   "11/08",
+   4699133
+  ],
+  [
+   "11/09",
+   4684843
+  ],
+  [
+   "11/10",
+   4780343
+  ],
+  [
+   "11/12",
+   4771513
+  ],
+  [
+   "11/13",
+   6971513
+  ],
+  [
+   "11/15",
+   6731513
+  ],
+  [
+   "11/17",
+   6635413
+  ],
+  [
+   "11/18",
+   7085425
+  ],
+  [
+   "11/19",
+   7078885
+  ],
+  [
+   "11/21",
+   7106385
+  ],
+  [
+   "11/22",
+   7064810
+  ],
+  [
+   "11/24",
+   7062310
+  ],
+  [
+   "11/26",
+   7062965
+  ],
+  [
+   "11/28",
+   6874934
+  ],
+  [
+   "11/29",
+   6574934
+  ]
+ ]
+}
