@@ -47,6 +47,12 @@ describe("removeUnkeptUpload", () => {
     expect(storage.remove).toHaveBeenCalledWith([good]);
   });
 
+  it.each(["png", "jpg", "csv", "txt"])("deletes a redundant .%s upload no row names", async (ext) => {
+    const path = `${folder}/6d0f1e2a-1111-4222-8333-444455556666.${ext}`;
+    await removeUnkeptUpload(stubClient(null), folder, path);
+    expect(storage.remove).toHaveBeenCalledWith([path]);
+  });
+
   it("does not delete a well-formed path a row names", async () => {
     await removeUnkeptUpload(stubClient({ id: "row" }), folder, good);
     expect(storage.remove).not.toHaveBeenCalled();

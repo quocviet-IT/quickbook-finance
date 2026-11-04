@@ -42,12 +42,15 @@ export function statementFileMime(fileName: string, browserType = ""): Statement
   return (STATEMENT_FILE_MIME_TYPES as readonly string[]).includes(browserType) ? (browserType as StatementFileMime) : null;
 }
 
+/** Said whenever a file of another kind is offered, here and on the server. */
+export const STATEMENT_FILE_KINDS_MESSAGE = "OneBook keeps PDF, JPG, PNG, CSV, OFX, QFX, QBO and QIF statement files";
+
 /** Why a file cannot be kept, said before anything is sent; null when it can. */
 export function statementFileRefusal(file: { name: string; type?: string; size: number }): string | null {
   if (file.size <= 0) return "the file is empty";
   if (file.size > SAVED_REPORT_MAX_BYTES) return "it is larger than 10 MB";
   if (file.name.length > 255) return "its name is longer than 255 characters";
-  if (!statementFileMime(file.name, file.type)) return "OneBook keeps PDF, JPG, PNG, CSV, OFX, QFX, QBO and QIF statement files";
+  if (!statementFileMime(file.name, file.type)) return STATEMENT_FILE_KINDS_MESSAGE;
   return null;
 }
 

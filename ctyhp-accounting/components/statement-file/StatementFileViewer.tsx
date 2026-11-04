@@ -80,7 +80,7 @@ export default function StatementFileViewer({ id, mimeType }: StatementFileViewe
         type="info"
         showIcon
         message="This format is not shown in OneBook"
-        description="OneBook shows PDF, CSV and bank download files on screen. Download the original to open this one."
+        description="OneBook shows PDF, CSV and bank download files on screen; a photo is kept for download only. Download the original to open this one."
       />
     );
   }
