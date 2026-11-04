@@ -24,6 +24,11 @@ export function isPhotoFile(file: { name: string; type: string }): boolean {
   return /\.(jpe?g|png)$/i.test(file.name) || file.type === "image/jpeg" || file.type === "image/png";
 }
 
+/** What a statement file is called beside its name once it has been read: a photo or a PDF. */
+export function statementFileKindLabel(fileName: string): "photo" | "PDF" {
+  return isPhotoFile({ name: fileName, type: "" }) ? "photo" : "PDF";
+}
+
 const BY_EXTENSION: Record<string, StatementFileMime> = {
   pdf: "application/pdf",
   png: "image/png",

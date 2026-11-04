@@ -9,6 +9,7 @@ import {
   statementFileAttachSchema,
   statementFileKeepSchema,
   isPhotoFile,
+  statementFileKindLabel,
   statementFileMime,
   statementFileMismatch,
   statementFileRefusal,
@@ -333,5 +334,15 @@ describe("isPhotoFile (3.0.5)", () => {
     expect(isPhotoFile({ name: "scan", type: "image/jpeg" })).toBe(true);
     expect(isPhotoFile({ name: "scan.pdf", type: "application/pdf" })).toBe(false);
     expect(isPhotoFile({ name: "scan.gif", type: "image/gif" })).toBe(false);
+  });
+});
+
+describe("statementFileKindLabel (3.0.6)", () => {
+  it("calls a photo a photo and anything else a PDF", () => {
+    expect(statementFileKindLabel("statement.JPG")).toBe("photo");
+    expect(statementFileKindLabel("statement.jpeg")).toBe("photo");
+    expect(statementFileKindLabel("statement.png")).toBe("photo");
+    expect(statementFileKindLabel("statement.pdf")).toBe("PDF");
+    expect(statementFileKindLabel("statement")).toBe("PDF");
   });
 });

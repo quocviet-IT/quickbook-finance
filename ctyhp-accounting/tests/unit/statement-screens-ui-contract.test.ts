@@ -64,7 +64,7 @@ describe("the statement screens", () => {
     expect(fromFiles).toMatch(/function startAgain\(\) \{\s*epoch\.current \+= 1;/);
   });
   it("From statement files does not start OCR during a sign-off or preview, and add() drops a result after Start again (3.0.5)", () => {
-    expect(fromFiles).toMatch(/<ScannedPdf.*disabled=\{busy \|\| previewing\}/);
+    expect(fromFiles).toMatch(/<ScannedPdf[\s\S]{0,300}disabled=\{busy \|\| previewing\}/);
     const body = handler(fromFiles, "add");
     expect(body).toContain("const mine = epoch.current;");
     expect(body.match(/epoch\.current !== mine/g)?.length).toBeGreaterThanOrEqual(2);

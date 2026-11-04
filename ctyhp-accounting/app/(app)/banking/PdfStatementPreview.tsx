@@ -5,6 +5,7 @@ import { Alert, Button, Select, Space, Spin, Typography } from "antd";
 import { OCR_TEXT, balanceBreaks, type ScannedReading } from "@/lib/domain/ocr-statement";
 import type { PdfStatement } from "@/lib/domain/pdf-statement";
 import { periodLabel, skippedNote, statementLabel, summarizeStatement } from "@/lib/domain/pdf-statement-view";
+import { statementFileKindLabel } from "@/lib/domain/statement-evidence";
 import styles from "./import-statement.module.css";
 
 /**
@@ -48,10 +49,25 @@ export function UnreadableFile({ message }: { message: string }) {
   return <Alert style={{ marginTop: 12 }} type="error" showIcon title="This file cannot be read" description={message} />;
 }
 
-/** A PDF with no text (3.0.3): offered to the company's OCR server, and how far reading it has got. */
-export function ScannedPdf({ reading, onRead, disabled }: { reading: ScannedReading; onRead: () => void; disabled?: boolean }) {
+/**
+ * A PDF with no text (3.0.3), or a photo of a statement (3.0.5): offered to the
+ * company's OCR server, and how far reading it has got. A photo is called a
+ * photo (3.0.6), not a scanned PDF.
+ */
+export function ScannedPdf({
+  reading,
+  onRead,
+  disabled,
+  photo = false,
+}: {
+  reading: ScannedReading;
+  onRead: () => void;
+  disabled?: boolean;
+  photo?: boolean;
+}) {
+  const title = photo ? OCR_TEXT.photoTitle : OCR_TEXT.title;
   if (reading.phase === "offline") {
-    return <Alert style={{ marginTop: 12 }} type="error" showIcon title={OCR_TEXT.title} description={OCR_TEXT.offline} />;
+    return <Alert style={{ marginTop: 12 }} type="error" showIcon title={title} description={OCR_TEXT.offline} />;
   }
   if (reading.phase === "failed") {
     return (
@@ -59,7 +75,7 @@ export function ScannedPdf({ reading, onRead, disabled }: { reading: ScannedRead
         style={{ marginTop: 12 }}
         type="error"
         showIcon
-        title="The scanned statement could not be read"
+        title={photo ? "The photo could not be read" : "The scanned statement could not be read"}
         description={reading.message}
         action={<Button onClick={onRead} disabled={disabled}>Try again</Button>}
       />
@@ -71,7 +87,7 @@ export function ScannedPdf({ reading, onRead, disabled }: { reading: ScannedRead
         style={{ marginTop: 12 }}
         type="info"
         showIcon
-        title={OCR_TEXT.title}
+        title={title}
         description={OCR_TEXT.ready}
         action={<Button type="primary" onClick={onRead} disabled={disabled}>{OCR_TEXT.button}</Button>}
       />
@@ -146,7 +162,7 @@ export default function PdfStatementPreview({
 
       <div style={{ marginTop: 12 }}>
         <Typography.Paragraph style={{ marginBottom: 8 }}>
-          <strong>{fileName}</strong> (PDF): {periodLabel(statement.from, statement.to)}
+          <strong>{fileName}</strong> ({statementFileKindLabel(fileName)}): {periodLabel(statement.from, statement.to)}
         </Typography.Paragraph>
         <div className={styles.figures}>
           <Figure label="Opening balance" value={statement.openingMinor === null ? "—" : money(statement.openingMinor)} />
