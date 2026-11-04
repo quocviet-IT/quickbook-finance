@@ -48,6 +48,19 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.4",
+    date: "2026-11-04",
+    headline: "The scheduled jobs refuse a wrong key cleanly.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A wrong key for a scheduled job is refused, not an error",
+        detail:
+          "The nightly backups, recurring entries, bank feed sync and company setup run on a schedule and check a key before they start. A wrong key with an accented character in it used to stop the check itself with a server error; it is now simply refused, like any other wrong key. All four, and the OCR server's route, check their key in one place.",
+      },
+    ],
+  },
+  {
     version: "3.0.3",
     date: "2026-11-03",
     headline: "A scanned bank statement can be read by the company's own OCR server and imported like any PDF.",

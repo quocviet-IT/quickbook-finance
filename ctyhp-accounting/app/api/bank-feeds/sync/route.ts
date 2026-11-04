@@ -1,14 +1,11 @@
-import { timingSafeEqual } from "node:crypto";
+import { bearerMatches } from "@/lib/domain/bearer-secret";
 import { runBankFeedAutomationJob } from "@/lib/services/automation-jobs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 function authorized(request: Request): boolean {
-  const configured = process.env.CRON_SECRET?.trim() ?? "";
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (configured.length < 24 || configured.length !== supplied.length) return false;
-  return timingSafeEqual(Buffer.from(configured), Buffer.from(supplied));
+  return bearerMatches(request.headers.get("authorization"), process.env.CRON_SECRET);
 }
 
 export async function GET(request: Request) {

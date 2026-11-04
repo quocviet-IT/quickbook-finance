@@ -483,9 +483,9 @@ describe("wiring", () => {
 });
 
 describe("app/api/backups/run/route.ts", () => {
-  it("reuses the timing-safe authorization block and delegates the run", () => {
+  it("reuses the shared timing-safe secret check and delegates the run", () => {
     const source = readFileSync(join(process.cwd(), "app/api/backups/run/route.ts"), "utf8");
-    expect(source).toContain("timingSafeEqual");
+    expect(source).toContain('bearerMatches(request.headers.get("authorization"), process.env.CRON_SECRET)');
     expect(source).toContain(
       'import { runDueCompanyBackups } from "@/lib/services/backup-queue-runner"',
     );

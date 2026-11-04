@@ -8,8 +8,7 @@ describe("company provisioning route", () => {
   const route = read("app", "api", "companies", "provision", "route.ts");
 
   it("is gated by the same secret as the other background work", () => {
-    expect(route).toContain("timingSafeEqual");
-    expect(route).toContain("CRON_SECRET");
+    expect(route).toContain('bearerMatches(request.headers.get("authorization"), process.env.CRON_SECRET)');
     expect(route).toContain('export const dynamic = "force-dynamic"');
     expect(route).toContain("export const maxDuration = 300");
   });
