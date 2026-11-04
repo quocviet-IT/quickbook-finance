@@ -241,3 +241,36 @@ describe("repeated date headings", () => {
     ]);
   });
 });
+
+describe("a printed year never swallows what follows the date", () => {
+  const head = ["Date", "Description", "Amount", "Balance"];
+  const period = "October 1, 2026 - October 31, 2026";
+  it("keeps the amount glued after the day: 'Oct 10 2000.00'", () => {
+    const glyphs = grid(head, period, [], "Beginning balance $1,000.00", "Ending balance $3,000.00");
+    glyphs.push({ page: 1, x: 40, y: 650, text: "Oct 10 2000.00" }, { page: 1, x: 130, y: 650, text: "ACH DEPOSIT" }, { page: 1, x: 460, y: 650, text: "3,000.00" });
+    const [s] = readPdfStatements(glyphs);
+    expect(s.lines.map((l) => [l.date, l.amountMinor])).toEqual([["2026-10-10", 200000]]);
+  });
+  it("ignores a year far from the period: 'Oct 03 2015 PAYMENT'", () => {
+    const glyphs = grid(head, period, [], "Beginning balance $1,000.00", "Ending balance $1,250.00");
+    glyphs.push({ page: 1, x: 40, y: 650, text: "Oct 03 2015 PAYMENT" }, { page: 1, x: 360, y: 650, text: "250.00" }, { page: 1, x: 460, y: 650, text: "1,250.00" });
+    const [s] = readPdfStatements(glyphs);
+    expect(s.lines.map((l) => l.date)).toEqual(["2026-10-03"]);
+    expect(s.lines[0].description).toContain("2015 PAYMENT");
+  });
+  it("still reads a printed year close to the period", () => {
+    const [s] = readPdfStatements(
+      grid(head, period, [["Oct 3, 2026", "ACH DEPOSIT", "250.00", "1,250.00"]], "Beginning balance $1,000.00", "Ending balance $1,250.00"),
+    );
+    expect(s.lines.map((l) => l.date)).toEqual(["2026-10-03"]);
+  });
+  it("still reads Dec 30, 2026 and Jan 04, 2027 on a year-end period", () => {
+    const [s] = readPdfStatements(
+      grid(head, "December 15, 2026 - January 14, 2027", [
+        ["Dec 30, 2026", "ACH DEPOSIT", "100.00", "1,100.00"],
+        ["Jan 04, 2027", "ACH DEPOSIT", "100.00", "1,200.00"],
+      ], "Beginning balance $1,000.00", "Ending balance $1,200.00"),
+    );
+    expect(s.lines.map((l) => l.date)).toEqual(["2026-12-30", "2027-01-04"]);
+  });
+});

@@ -63,4 +63,11 @@ describe("the statement screens", () => {
     expect(fromFiles).toContain("image/jpeg,image/png");
     expect(fromFiles).toMatch(/function startAgain\(\) \{\s*epoch\.current \+= 1;/);
   });
+  it("From statement files does not start OCR during a sign-off or preview, and add() drops a result after Start again (3.0.5)", () => {
+    expect(fromFiles).toMatch(/<ScannedPdf.*disabled=\{busy \|\| previewing\}/);
+    const body = handler(fromFiles, "add");
+    expect(body).toContain("const mine = epoch.current;");
+    expect(body.match(/epoch\.current !== mine/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(read("PdfStatementPreview.tsx")).toContain("disabled?: boolean");
+  });
 });

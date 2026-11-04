@@ -217,15 +217,19 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
   }
 
   async function add(file: File) {
+    // Start again while this file is read or its OCR check is out: what comes back is dropped.
+    const mine = epoch.current;
     asked.current += 1;
     setReading((n) => n + 1);
     setPreview(null);
     setDone(null);
     try {
       const read: ChosenStatement[] = (await readRunFile(file, { ...bankAccount, side })).map((s) => ({ ...s, file }));
+      if (epoch.current !== mine) return;
       // A scanned PDF or a photo of a bank statement waits for OCR; a card's does not (CARD_PDF_NOT_READ).
       if (!card && read.some(needsOcr)) {
         const online = await ocrAvailableAction();
+        if (epoch.current !== mine) return;
         setOcr((current) => new Map(current).set(file, { phase: online ? "ready" : "offline" }));
       }
       setStatements((current) => withFreshKeys(current, read));
@@ -524,7 +528,7 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
                   render: (_, c) => {
                     const scanned = !card && needsOcr(c.statement) ? fileByKey.get(c.statement.key) : undefined;
                     if (scanned) {
-                      return <ScannedPdf reading={ocr.get(scanned) ?? { phase: "offline" }} onRead={() => void readWithOcr(scanned)} />;
+                      return <ScannedPdf reading={ocr.get(scanned) ?? { phase: "offline" }} onRead={() => void readWithOcr(scanned)} disabled={busy || previewing} />;
                     }
                     return (
                     <>

@@ -126,9 +126,9 @@ function monthNo(word: string): number {
 const MONTH_WORD =
   "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?![a-z])";
 /** "Oct 03", "October 3, 2026", "Oct. 3 2026" */
-const MONTH_FIRST = new RegExp(`^${MONTH_WORD}\\.?\\s+(\\d{1,2})(?!\\d)(?:,?\\s+((?:19|20)\\d\\d)(?!\\d))?`, "i");
+const MONTH_FIRST = new RegExp(`^${MONTH_WORD}\\.?\\s+(\\d{1,2})(?!\\d)(?:,?\\s+((?:19|20)\\d\\d)(?![\\d.,]))?`, "i");
 /** "03 Oct", "3 Oct 2026" */
-const DAY_FIRST = new RegExp(`^(\\d{1,2})\\s+${MONTH_WORD}\\.?(?:,?\\s+((?:19|20)\\d\\d)(?!\\d))?`, "i");
+const DAY_FIRST = new RegExp(`^(\\d{1,2})\\s+${MONTH_WORD}\\.?(?:,?\\s+((?:19|20)\\d\\d)(?![\\d.,]))?`, "i");
 /** "03-Oct", "3-Oct-26", "3-Oct-2026" */
 const DAY_DASH_MONTH = new RegExp(`^(\\d{1,2})-${MONTH_WORD}\\.?(?:-(\\d{4}|\\d{2})(?!\\d))?`, "i");
 
@@ -220,6 +220,9 @@ export function readPeriod(joined: string): { from: string; to: string } {
  * OneBook: pdf.js joins a date to the words printed just after it ("07/02/2026
  * EXAMPLE DEPOSIT") when the gap is narrow, and the prototype then misses the
  * whole line. Such a cell is read as the date and the words, as printed.
+ * A numeric date is split off any cell; a date written with the month's name
+ * ("Oct 03 ACH") only from a row's first cell (index 0), so a description such
+ * as "MAR 15 PAYMENT" further along the row is left whole.
  */
 function splitLeadingDate(cell: PdfCell, index = 0): PdfCell[] {
   const m = /^(\S+)\s+(\S.*)$/.exec(cell.text);
@@ -437,8 +440,14 @@ function readStatementRows(rows: readonly PdfRow[]) {
   let secNo = 0;
 
   const push = (dateCell: string, cells: readonly PdfCell[], amount: number, bal: number | null, wantCheck: boolean, raw: string) => {
-    const dm = readDateCell(dateCell);
-    if (!dm) return;
+    const read = readDateCell(dateCell);
+    if (!read) return;
+    // OneBook: a printed year more than one year from the statement's is a reference or
+    // check number ("Oct 03 2015 PAYMENT"), not the year: the period's year rule is used,
+    // and the digits stay in the description.
+    const perYear = per.to ? Number(per.to.slice(0, 4)) : 0;
+    const farYear = read.year !== null && perYear > 0 && Math.abs(read.year - perYear) > 1;
+    const dm = farYear ? { ...read, year: null } : read;
     let y = dm.year ?? (per.to ? Number(per.to.slice(0, 4)) : 0);
     const mo = dm.mo;
     const da = dm.da;
@@ -456,6 +465,7 @@ function readStatementRows(rows: readonly PdfRow[]) {
       return;
     }
     const words = cells.filter((c) => !isMoneyCell(c.text) && !isDateCell(c.text)).map((c) => c.text);
+    if (farYear) words.unshift(String(read.year));
     const text = words.join(" ");
     let check = "";
     const named = text.match(/che?c?k\s*(?:no\.?|number|#)?\s*:?\s*(\d{2,7})/i);

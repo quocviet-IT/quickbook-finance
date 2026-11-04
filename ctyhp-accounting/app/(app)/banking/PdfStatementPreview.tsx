@@ -49,7 +49,7 @@ export function UnreadableFile({ message }: { message: string }) {
 }
 
 /** A PDF with no text (3.0.3): offered to the company's OCR server, and how far reading it has got. */
-export function ScannedPdf({ reading, onRead }: { reading: ScannedReading; onRead: () => void }) {
+export function ScannedPdf({ reading, onRead, disabled }: { reading: ScannedReading; onRead: () => void; disabled?: boolean }) {
   if (reading.phase === "offline") {
     return <Alert style={{ marginTop: 12 }} type="error" showIcon title={OCR_TEXT.title} description={OCR_TEXT.offline} />;
   }
@@ -61,7 +61,7 @@ export function ScannedPdf({ reading, onRead }: { reading: ScannedReading; onRea
         showIcon
         title="The scanned statement could not be read"
         description={reading.message}
-        action={<Button onClick={onRead}>Try again</Button>}
+        action={<Button onClick={onRead} disabled={disabled}>Try again</Button>}
       />
     );
   }
@@ -73,7 +73,7 @@ export function ScannedPdf({ reading, onRead }: { reading: ScannedReading; onRea
         showIcon
         title={OCR_TEXT.title}
         description={OCR_TEXT.ready}
-        action={<Button type="primary" onClick={onRead}>{OCR_TEXT.button}</Button>}
+        action={<Button type="primary" onClick={onRead} disabled={disabled}>{OCR_TEXT.button}</Button>}
       />
     );
   }
