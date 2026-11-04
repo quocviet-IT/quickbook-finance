@@ -227,8 +227,9 @@ describe("cron route contracts", () => {
     const source = readFileSync(join(process.cwd(), file), "utf8");
 
     expect(source).toContain(`import { ${job} } from "@/lib/services/automation-jobs"`);
-    // The route keeps the secret check and the runtime configuration...
-    expect(source).toContain("timingSafeEqual");
+    // The route keeps the secret check (the shared one, which cannot throw on a
+    // non-ASCII key) and the runtime configuration...
+    expect(source).toContain('bearerMatches(request.headers.get("authorization"), process.env.CRON_SECRET)');
     expect(source).toContain('export const dynamic = "force-dynamic"');
     expect(source).toContain("export const maxDuration = 300");
     // ...and stops owning per-item work or the service-role client.
