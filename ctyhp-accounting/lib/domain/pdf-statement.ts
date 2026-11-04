@@ -221,7 +221,7 @@ export function readPeriod(joined: string): { from: string; to: string } {
  * EXAMPLE DEPOSIT") when the gap is narrow, and the prototype then misses the
  * whole line. Such a cell is read as the date and the words, as printed.
  */
-function splitLeadingDate(cell: PdfCell): PdfCell[] {
+function splitLeadingDate(cell: PdfCell, index = 0): PdfCell[] {
   const m = /^(\S+)\s+(\S.*)$/.exec(cell.text);
   if (m && isDateCell(m[1])) {
     return [
@@ -230,7 +230,9 @@ function splitLeadingDate(cell: PdfCell): PdfCell[] {
     ];
   }
   // OneBook: "Oct 03 ACH DEPOSIT" or "03 Oct 2026 ACH DEPOSIT": the date is several words long.
-  const named = namedDateAt(cell.text);
+  // Only the row's first (leftmost) cell, where a date is printed: a description
+  // such as "MAR 15 PAYMENT" further along the row is not a date and the words.
+  const named = index === 0 ? namedDateAt(cell.text) : null;
   if (named && named.length < cell.text.length) {
     return [
       { x: cell.x, text: cell.text.slice(0, named.length) },
@@ -255,7 +257,7 @@ export function rowsFromGlyphs(glyphs: readonly PdfGlyph[]): PdfRow[] {
       byLine.set(key, line);
     }
     for (const key of [...byLine.keys()].sort((a, b) => b - a)) {
-      const cells = byLine.get(key)!.sort((a, b) => a.x - b.x).flatMap(splitLeadingDate);
+      const cells = byLine.get(key)!.sort((a, b) => a.x - b.x).flatMap((c, i) => splitLeadingDate(c, i));
       rows.push({ cells, text: cells.map((c) => c.text).join(" ") });
     }
   }
@@ -340,6 +342,7 @@ function headerShape(cells: readonly PdfCell[], prev: PdfRow | null, prev2: PdfR
   );
   const merged = foldHeading(cells, above);
   let named = false;
+  let firstDate = "";
   for (const c of merged) {
     const s = c.text.toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
     if (!s) continue;
@@ -349,12 +352,17 @@ function headerShape(cells: readonly PdfCell[], prev: PdfRow | null, prev2: PdfR
       if (h.dateX === null) h.dateX = c.x;
       continue;
     }
-    // OneBook: a date column need not be headed "Date". A second such heading
+    // OneBook: a date column need not be headed "Date". A different heading
     // ("Trans date" beside "Post date") is the same column's other date, not a
-    // grid of entries, so only the first counts.
+    // grid of entries, so only the first counts; the same heading repeated
+    // ("Date paid" twice) is a two-up grid, as "Date" twice always was.
     if (DATE_HEADING.test(s)) {
-      if (h.dates) continue;
+      if (h.dates) {
+        if (named && s === firstDate) h.dates++;
+        continue;
+      }
       named = true;
+      firstDate = s;
       h.dates++;
       h.dateX = c.x;
       continue;

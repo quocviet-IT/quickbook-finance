@@ -165,3 +165,79 @@ describe("date column headings", () => {
     expect(s.lines.map((l) => l.date)).toEqual(["2026-10-03"]);
   });
 });
+
+/** Glyphs for a free layout: header columns at xs, then rows of cells at the same xs. */
+function table(xs: number[], header: string[], rows: string[][], period = "October 1, 2026 - October 31, 2026"): PdfGlyph[] {
+  const out: PdfGlyph[] = [];
+  const put = (y: number, cells: string[]) => cells.forEach((t, i) => t && out.push({ page: 1, x: xs[i], y, text: t }));
+  out.push({ page: 1, x: 40, y: 760, text: "Example Bank" }, { page: 1, x: 40, y: 745, text: period });
+  out.push({ page: 1, x: 40, y: 730, text: "Account number: 0000-4444" });
+  out.push({ page: 1, x: 40, y: 715, text: "Beginning balance $1,000.00" }, { page: 1, x: 40, y: 700, text: "Ending balance $1,200.00" });
+  put(670, header);
+  rows.forEach((r, k) => put(650 - k * 15, r));
+  return out;
+}
+
+describe("a month and a number at the start of a description", () => {
+  it("is not split off as a date when the date column is first", () => {
+    const [s] = readPdfStatements(
+      grid(["Date", "Description", "Amount", "Balance"], "October 1, 2026 - October 31, 2026", [
+        ["Oct 3", "MAR 15 PAYMENT", "120.00", "5,120.00"],
+      ], "Beginning balance $5,000.00", "Ending balance $5,120.00"),
+    );
+    expect(s.lines).toHaveLength(1);
+    expect(s.lines[0].date).toBe("2026-10-03");
+    expect(s.lines[0].description).toContain("MAR 15 PAYMENT");
+  });
+
+  it("does not steal the date when the date column is not first", () => {
+    const [s] = readPdfStatements(
+      table([40, 130, 300, 400], ["Check No.", "Date paid", "Description", "Amount"], [
+        ["1001", "Oct 3", "MAR 15 PAYMENT", "-120.00"],
+        ["1002", "Oct 9", "MAY 2 SUPPLIES", "-80.00"],
+      ]),
+    );
+    expect(s.lines.map((l) => [l.date, l.amountMinor])).toEqual([
+      ["2026-10-03", -12000],
+      ["2026-10-09", -8000],
+    ]);
+  });
+
+  it("splits only the leftmost cell of a row", () => {
+    const rows = rowsFromGlyphs([
+      { page: 1, x: 40, y: 600, text: "1001" },
+      { page: 1, x: 130, y: 600, text: "MAR 15 PAYMENT" },
+    ]);
+    expect(rows[0].cells.map((c) => c.text)).toEqual(["1001", "MAR 15 PAYMENT"]);
+  });
+});
+
+describe("repeated date headings", () => {
+  it("keeps both columns of a two-up 'Date paid' table", () => {
+    const [s] = readPdfStatements(
+      table([40, 110, 180, 300, 370, 440], ["Check No.", "Date paid", "Amount", "Check No.", "Date paid", "Amount"], [
+        ["1001", "10/03", "120.00", "1004", "10/05", "40.00"],
+        ["1002", "10/04", "80.00", "1005", "10/07", "60.00"],
+      ]),
+    );
+    expect(s.lines.map((l) => [l.date, Math.abs(l.amountMinor)]).sort()).toEqual([
+      ["2026-10-03", 12000],
+      ["2026-10-04", 8000],
+      ["2026-10-05", 4000],
+      ["2026-10-07", 6000],
+    ]);
+  });
+
+  it("does not make a grid of 'Trans date' beside 'Post date'", () => {
+    const [s] = readPdfStatements(
+      table([40, 110, 180, 360, 460], ["Trans date", "Post date", "Description", "Amount", "Balance"], [
+        ["10/02", "10/03", "ACH DEPOSIT", "250.00", "1,250.00"],
+        ["10/04", "10/05", "CARD PURCHASE", "-50.00", "1,200.00"],
+      ]),
+    );
+    expect(s.lines.map((l) => [l.date, l.amountMinor])).toEqual([
+      ["2026-10-02", 25000],
+      ["2026-10-04", -5000],
+    ]);
+  });
+});
