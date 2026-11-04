@@ -77,7 +77,7 @@ import styles from "./import-statement.module.css";
  * opens it rather than when they open /banking.
  *
  * It reads the file in the browser — a PDF statement, CSV, OFX, QFX, QBO or QIF
- * — and, for a CSV whose headings it does not know, asks which column is which.
+ * (a photo of a statement goes to OCR) — and, for a CSV whose headings it does not know, asks which column is which.
  * A PDF is read by its layout, so it needs no columns.
  *
  * Since 2.04 every statement is proved before it is imported: its opening plus
@@ -148,7 +148,7 @@ export interface ImportStatementModalProps {
 }
 
 const BANKING_INTRO =
-  "Choose the file your bank gives you: a PDF statement, a CSV, or a Quicken or QuickBooks download (.ofx, .qfx, " +
+  "Choose the file your bank gives you: a PDF statement, a photo (JPG or PNG), a CSV, or a Quicken or QuickBooks download (.ofx, .qfx, " +
   ".qbo, .qif). After the import, Review import proposes an account, a match or a document for every line, and " +
   "nothing is posted until you click Post.";
 
@@ -171,6 +171,7 @@ type FileState =
 type CsvChoice = CsvColumnChoice;
 
 const isPdfFile = (file: File) => /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+const isPhotoFile = (file: File) => /\.(jpe?g|png)$/i.test(file.name) || file.type === "image/jpeg" || file.type === "image/png";
 
 const COLUMN_FIELDS: { key: keyof StatementColumnMap; label: string; required?: boolean }[] = [
   { key: "date", label: "Date", required: true },
@@ -281,6 +282,18 @@ export default function ImportStatementModal({
     setFile({ kind: "pdf", statements: result.statements });
   }
 
+  // A photo of a statement holds no text for pdf.js: it goes to OCR, as a PDF without text does (3.0.5).
+  async function readPhoto(token: number) {
+    if (side === "card") {
+      setFile({ kind: "unsupported", message: CARD_PDF_NOT_READ });
+      return;
+    }
+    setFile({ kind: "reading" });
+    const online = await ocrAvailableAction();
+    if (token !== reading.current) return;
+    setFile({ kind: "scanned", reading: { phase: online ? "ready" : "offline" } });
+  }
+
   async function readWithOcr() {
     if (!chosen) return;
     const token = reading.current;
@@ -331,6 +344,10 @@ export default function ImportStatementModal({
     setDatesChosen(false);
     if (isPdfFile(chosen)) {
       void readPdf(chosen, token);
+      return false;
+    }
+    if (isPhotoFile(chosen)) {
+      void readPhoto(token);
       return false;
     }
     const reader = new FileReader();
@@ -605,7 +622,7 @@ export default function ImportStatementModal({
         </Typography.Paragraph>
       ) : null}
       <Upload.Dragger
-        accept=".pdf,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf"
+        accept=".pdf,.jpg,.jpeg,.png,.csv,.txt,.ofx,.qfx,.qbo,.qif,application/pdf,image/jpeg,image/png"
         beforeUpload={read}
         maxCount={1}
         showUploadList={{ showRemoveIcon: false }}

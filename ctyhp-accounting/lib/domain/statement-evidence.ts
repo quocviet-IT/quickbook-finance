@@ -12,12 +12,18 @@ import { SAVED_REPORT_MAX_BYTES } from "./saved-reports";
 import { statementProofPayloadSchema } from "./statement-proof-schema";
 
 import { formatDate, plural } from "@/lib/format";
-/** A bank's own download (OFX, QFX, QBO, QIF) is text, and kept as text. */
-export const STATEMENT_FILE_MIME_TYPES = ["application/pdf", "text/csv", "text/plain"] as const;
+/**
+ * A bank's own download (OFX, QFX, QBO, QIF) is text, and kept as text. A photo
+ * of a statement (JPG or PNG, 3.0.5) is kept as the image and read with OCR.
+ */
+export const STATEMENT_FILE_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg", "text/csv", "text/plain"] as const;
 export type StatementFileMime = (typeof STATEMENT_FILE_MIME_TYPES)[number];
 
 const BY_EXTENSION: Record<string, StatementFileMime> = {
   pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
   csv: "text/csv",
   ofx: "text/plain",
   qfx: "text/plain",
@@ -41,7 +47,7 @@ export function statementFileRefusal(file: { name: string; type?: string; size: 
   if (file.size <= 0) return "the file is empty";
   if (file.size > SAVED_REPORT_MAX_BYTES) return "it is larger than 10 MB";
   if (file.name.length > 255) return "its name is longer than 255 characters";
-  if (!statementFileMime(file.name, file.type)) return "OneBook keeps PDF, CSV, OFX, QFX, QBO and QIF statement files";
+  if (!statementFileMime(file.name, file.type)) return "OneBook keeps PDF, JPG, PNG, CSV, OFX, QFX, QBO and QIF statement files";
   return null;
 }
 
