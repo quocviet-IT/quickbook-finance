@@ -50,3 +50,23 @@ describe("0189_statement_photos", () => {
     expect(code).toMatch(/grant execute on function acc_keep_statement_file\(text, date, date, text, text, text, int, text\) to authenticated, service_role;/);
   });
 });
+
+describe("a photo is called a photo (3.0.6)", () => {
+  const preview = read("app", "(app)", "banking", "PdfStatementPreview.tsx");
+  const fromFiles = read("app", "(app)", "banking", "reconcile", "from-files", "FromFilesClient.tsx");
+
+  it("titles the OCR offer by what the file is", () => {
+    expect(preview).toMatch(/const title = photo \? OCR_TEXT\.photoTitle : OCR_TEXT\.title/);
+    expect(preview).not.toMatch(/title=\{OCR_TEXT\.title\}/);
+  });
+
+  it("tells the offer whether the file is a photo, in both places it is shown", () => {
+    expect(dialog).toMatch(/<ScannedPdf[\s\S]{0,200}photo=\{chosen \? isPhotoFile\(chosen\) : false\}/);
+    expect(fromFiles).toMatch(/<ScannedPdf[\s\S]{0,300}photo=\{isPhotoFile\(scanned\)\}/);
+  });
+
+  it("labels a read photo as a photo, not a PDF", () => {
+    expect(preview).toMatch(/\(\{statementFileKindLabel\(fileName\)\}\)/);
+    expect(preview).not.toMatch(/<\/strong> \(PDF\)/);
+  });
+});

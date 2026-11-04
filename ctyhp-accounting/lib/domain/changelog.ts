@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.6",
+    date: "2026-11-04",
+    headline: "A photo of a statement is called a photo.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A statement photo is no longer called a PDF",
+        detail:
+          "When a JPG or PNG photo of a statement is chosen, Import statement and From statement files now say \"This is a photo of a statement\" instead of \"This PDF is a scanned image\", and once it is read its summary says (photo), not (PDF).",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.5",
     date: "2026-11-04",
     headline: "Statements dated like “Oct 03”, photos of a statement, and scans in From statement files are now read.",

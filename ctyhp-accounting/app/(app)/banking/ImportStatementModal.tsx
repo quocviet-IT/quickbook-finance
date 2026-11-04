@@ -640,7 +640,9 @@ export default function ImportStatementModal({
 
       {file.kind === "unsupported" ? <UnreadableFile message={file.message} /> : null}
 
-      {file.kind === "scanned" ? <ScannedPdf reading={file.reading} onRead={() => void readWithOcr()} /> : null}
+      {file.kind === "scanned" ? (
+        <ScannedPdf reading={file.reading} onRead={() => void readWithOcr()} photo={chosen ? isPhotoFile(chosen) : false} />
+      ) : null}
 
       {file.kind === "csv" && choice ? (
         <div style={{ marginTop: 12 }}>

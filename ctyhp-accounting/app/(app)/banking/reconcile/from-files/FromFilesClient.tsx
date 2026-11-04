@@ -21,7 +21,7 @@ import {
   type RunStatement,
 } from "@/lib/domain/statement-run";
 import { formatDate, formatMoney, plural, pluralWord } from "@/lib/format";
-import { keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
+import { isPhotoFile, keepFailureMessage, statementFileSpan } from "@/lib/domain/statement-evidence";
 import { COMPLETE_NEEDS_PERMISSION } from "@/lib/domain/reconcile-statement";
 import {
   NO_BANK_LINE_MATCHES,
@@ -528,7 +528,14 @@ export default function FromFilesClient({ canWrite, canComplete, bankAccount, fi
                   render: (_, c) => {
                     const scanned = !card && needsOcr(c.statement) ? fileByKey.get(c.statement.key) : undefined;
                     if (scanned) {
-                      return <ScannedPdf reading={ocr.get(scanned) ?? { phase: "offline" }} onRead={() => void readWithOcr(scanned)} disabled={busy || previewing} />;
+                      return (
+                        <ScannedPdf
+                          reading={ocr.get(scanned) ?? { phase: "offline" }}
+                          onRead={() => void readWithOcr(scanned)}
+                          disabled={busy || previewing}
+                          photo={isPhotoFile(scanned)}
+                        />
+                      );
                     }
                     return (
                     <>

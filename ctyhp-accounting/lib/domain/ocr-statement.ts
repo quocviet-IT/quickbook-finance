@@ -151,6 +151,7 @@ export type ScannedReading =
 
 export const OCR_TEXT = {
   title: "This PDF is a scanned image",
+  photoTitle: "This is a photo of a statement",
   ready:
     "OneBook can read it with your company's own OCR server. The file is sent to that server, never to an outside service, and the lines come back here to be checked before anything is imported.",
   offline:
