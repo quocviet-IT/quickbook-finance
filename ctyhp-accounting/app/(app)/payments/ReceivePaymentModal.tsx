@@ -55,6 +55,8 @@ export interface ReceivePaymentModalProps {
   depositAccounts: AccountRow[];
   /** Where a new payment lands unless somebody chooses otherwise (3.01); a correction keeps its own. */
   defaultDepositAccountId?: string | null;
+  /** Opens an ordinary receipt with this customer chosen and their open invoices listed. */
+  initialCustomerId?: string | null;
   currencies: CurrencyRow[];
   onClose: () => void;
   onDone: () => void;
@@ -66,6 +68,7 @@ export default function ReceivePaymentModal({
   customers,
   depositAccounts,
   defaultDepositAccountId = null,
+  initialCustomerId = null,
   currencies,
   onClose,
   onDone,
@@ -97,7 +100,11 @@ export default function ReceivePaymentModal({
   const draft = source ? paymentReplacementDraft(source, decimalsOf(source.currency_code)) : null;
   const initialValues = draft
     ? { ...draft, payment_date: dayjs(draft.payment_date) }
-    : { currency_code: baseCurrency, deposit_account_id: defaultDepositAccountId ?? undefined };
+    : {
+        currency_code: baseCurrency,
+        deposit_account_id: defaultDepositAccountId ?? undefined,
+        customer_id: initialCustomerId ?? undefined,
+      };
 
   // Prefilled, never pre-submitted: the form shows the same customer's open
   // invoices, and which of them it settles is chosen again on purpose.
@@ -115,6 +122,22 @@ export default function ReceivePaymentModal({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.customer_id]);
+
+  // Opened from a customer's page: list that customer's open invoices too.
+  useEffect(() => {
+    if (draft || !initialCustomerId) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await getOpenInvoicesAction(initialCustomerId);
+      if (cancelled) return;
+      if (res.ok && res.data) setOpenInvoices(res.data);
+      else message.error(res.error ?? "Failed to load open invoices");
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onCustomerChange(customerId: string) {
     setAlloc({});

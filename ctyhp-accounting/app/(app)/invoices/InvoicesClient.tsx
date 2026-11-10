@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
@@ -139,6 +139,7 @@ export const INVOICE_LIST_FIXED_WIDTHS = [
 
 export default function InvoicesClient({
   initialCreateOpen,
+  initialCustomerId,
   estimatePrefill,
   estimateNotice,
   initialQueue,
@@ -168,6 +169,8 @@ export default function InvoicesClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  /** From a customer's page (`?customer=`): the customer the form opens with, chosen once. */
+  initialCustomerId: string | null;
   /** From "Turn into an invoice" (`?estimate=`): the customer and lines the form opens with. */
   estimatePrefill: EstimateInvoicePrefill | null;
   /** Shown instead of opening the form when that estimate cannot be turned into an invoice now. */
@@ -217,6 +220,7 @@ export default function InvoicesClient({
   /** A new invoice's first line: on the company's default income account until an item says otherwise (3.01). */
   const newInvoiceLine = { quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined };
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
+  const prefilled = useRef(false);
   // Set by the reader's own typing or picking, not by the defaults the form
   // opens with: closing a form nobody touched needs no question.
   const [createDirty, setCreateDirty] = useState(false);
@@ -414,6 +418,15 @@ export default function InvoicesClient({
    * never over a rate somebody chose. Nothing is filled where the company has
    * no rate there, or where its state has more than one: neither is a default.
    */
+  // One shot: a later New invoice from the same page starts empty.
+  useEffect(() => {
+    if (!open || !initialCustomerId || prefilled.current) return;
+    prefilled.current = true;
+    form.setFieldValue("customer_id", initialCustomerId);
+    applyCustomerDefaults(initialCustomerId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCustomerId]);
+
   function applyCustomerDefaults(customerId: string) {
     const customer = localCustomers.find((c) => c.id === customerId);
 
