@@ -21,10 +21,15 @@ describe("opening New invoice / Receive payment with a customer chosen", () => {
     expect(invoicesPage).toContain("initialCustomerId={prefillCustomer}");
   });
 
-  it("InvoicesClient applies the customer once, with its defaults", () => {
+  it("InvoicesClient prefills as Form data from one shared helper, once", () => {
     expect(invoicesClient).toContain("initialCustomerId");
-    expect(invoicesClient).toContain("applyCustomerDefaults(initialCustomerId)");
-    expect(invoicesClient).toContain("prefilled.current");
+    expect(invoicesClient).toContain("customerPrefillValues");
+    expect(invoicesClient).toContain("prefillPending ? customerPrefillValues : null");
+    expect(invoicesClient).toContain("!initialCreateOpen || !initialCustomerId || estimatePrefill");
+    expect(invoicesClient.match(/customerDefaults\(/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(invoicesClient).toContain("setPrefillPending(false)");
+    expect(invoicesClient).not.toContain("applyCustomerDefaults(initialCustomerId)");
+    expect(invoicesClient).not.toContain("prefilled.current");
   });
 
   it("only the first ordinary receipt gets the customer", () => {
@@ -33,6 +38,7 @@ describe("opening New invoice / Receive payment with a customer chosen", () => {
 
   it("ReceivePaymentModal chooses the customer and loads their open invoices", () => {
     expect(receiveModal).toContain("customer_id: initialCustomerId");
-    expect(receiveModal).toContain("getOpenInvoicesAction(initialCustomerId)");
+    expect(receiveModal).toContain("draft?.customer_id ?? initialCustomerId");
+    expect(receiveModal.match(/getOpenInvoicesAction\(prefillCustomerId\)/g)).toHaveLength(1);
   });
 });

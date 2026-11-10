@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
@@ -220,7 +220,6 @@ export default function InvoicesClient({
   /** A new invoice's first line: on the company's default income account until an item says otherwise (3.01). */
   const newInvoiceLine = { quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined };
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
-  const prefilled = useRef(false);
   // Set by the reader's own typing or picking, not by the defaults the form
   // opens with: closing a form nobody touched needs no question.
   const [createDirty, setCreateDirty] = useState(false);
@@ -377,11 +376,13 @@ export default function InvoicesClient({
       lines: [newInvoiceLine],
     });
     setCreateDirty(false);
+    setPrefillPending(false);
     setOpen(true);
   }
 
   function finishCreate() {
     setCreateDirty(false);
+    setPrefillPending(false);
     setOpen(false);
   }
 
@@ -418,26 +419,47 @@ export default function InvoicesClient({
    * never over a rate somebody chose. Nothing is filled where the company has
    * no rate there, or where its state has more than one: neither is a default.
    */
-  // One shot: a later New invoice from the same page starts empty.
-  useEffect(() => {
-    if (!open || !initialCustomerId || prefilled.current) return;
-    prefilled.current = true;
-    form.setFieldValue("customer_id", initialCustomerId);
-    applyCustomerDefaults(initialCustomerId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialCustomerId]);
-
-  function applyCustomerDefaults(customerId: string) {
+  /**
+   * What knowing the customer sets: the due date from their terms and the rate
+   * registered in their state. Shared by picking a customer and by opening the
+   * form with one already chosen (`?customer=`), so the two cannot drift.
+   */
+  function customerDefaults(customerId: string, issue: dayjs.Dayjs) {
     const customer = localCustomers.find((c) => c.id === customerId);
-
     // Terms are a promise about when the money arrives, so they belong on the
     // invoice the moment the customer is known — net 15 for a retail buyer and
     // net 30 for a trade account are different due dates, not a preference.
     const terms = customer?.credit_terms_days ?? defaultTermsDays;
-    const issue = form.getFieldValue("issue_date") ?? dayjs(today);
-    form.setFieldValue("due_date", issue.add(terms, "day"));
+    return {
+      customer,
+      dueDate: issue.add(terms, "day"),
+      rate: defaultTaxCodeForState(customer?.region, taxCodes),
+    };
+  }
 
-    const rate = defaultTaxCodeForState(customer?.region, taxCodes);
+  /**
+   * Opened from a customer's page (`?customer=`): the form's values with that
+   * customer chosen, as Form data so they are there when the form mounts. Held
+   * only until the first New invoice or close, so a later one starts empty.
+   */
+  const customerPrefillValues = useMemo(() => {
+    if (!initialCreateOpen || !initialCustomerId || estimatePrefill) return null;
+    const { dueDate, rate } = customerDefaults(initialCustomerId, dayjs(today));
+    return {
+      customer_id: initialCustomerId,
+      currency_code: baseCurrency,
+      due_date: dueDate,
+      lines: [{ ...newInvoiceLine, tax_code_id: rate?.id ?? undefined }],
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [prefillPending, setPrefillPending] = useState(Boolean(customerPrefillValues));
+
+  function applyCustomerDefaults(customerId: string) {
+    const issue = form.getFieldValue("issue_date") ?? dayjs(today);
+    const { customer, dueDate, rate } = customerDefaults(customerId, issue);
+    form.setFieldValue("due_date", dueDate);
+
     if (!rate) return;
     const lines: LineForm[] = form.getFieldValue("lines") ?? [];
     let filled = 0;
@@ -917,7 +939,10 @@ export default function InvoicesClient({
         <Form
           form={form}
           layout="vertical"
-          initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }}
+          initialValues={
+            estimateFormValues ??
+            (prefillPending ? customerPrefillValues : null) ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }
+          }
           // Fires on the reader's edits only; the defaults set above do not count.
           onValuesChange={() => setCreateDirty(true)}
         >

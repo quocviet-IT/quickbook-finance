@@ -106,13 +106,15 @@ export default function ReceivePaymentModal({
         customer_id: initialCustomerId ?? undefined,
       };
 
+  // A replacement's customer, or the one a customer's page opened this with.
+  const prefillCustomerId = draft?.customer_id ?? initialCustomerId ?? null;
   // Prefilled, never pre-submitted: the form shows the same customer's open
   // invoices, and which of them it settles is chosen again on purpose.
   useEffect(() => {
-    if (!draft) return;
+    if (!prefillCustomerId) return;
     let cancelled = false;
     void (async () => {
-      const res = await getOpenInvoicesAction(draft.customer_id);
+      const res = await getOpenInvoicesAction(prefillCustomerId);
       if (cancelled) return;
       if (res.ok && res.data) setOpenInvoices(res.data);
       else message.error(res.error ?? "Failed to load open invoices");
@@ -121,23 +123,7 @@ export default function ReceivePaymentModal({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft?.customer_id]);
-
-  // Opened from a customer's page: list that customer's open invoices too.
-  useEffect(() => {
-    if (draft || !initialCustomerId) return;
-    let cancelled = false;
-    void (async () => {
-      const res = await getOpenInvoicesAction(initialCustomerId);
-      if (cancelled) return;
-      if (res.ok && res.data) setOpenInvoices(res.data);
-      else message.error(res.error ?? "Failed to load open invoices");
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [prefillCustomerId]);
 
   async function onCustomerChange(customerId: string) {
     setAlloc({});
