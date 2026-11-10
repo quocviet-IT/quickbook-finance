@@ -1,0 +1,75 @@
+/* The line items editor (SalesLineItems): one row per line, a heading on every column. */
+
+.scroll {
+  /* Narrower than its columns (a phone, a small window): scroll sideways, never wrap a line in two. */
+  overflow-x: auto;
+  border: 1px solid var(--ob-border-muted);
+  border-radius: 6px;
+}
+
+.table {
+  width: 100%;
+  /* The fixed columns take 840px; this leaves Description at least 160px. A
+     1100px dialog's body is 1052px, so it scrolls only in a narrower window. */
+  min-width: 1000px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th {
+  padding: 8px;
+  background: var(--ob-surface-subtle);
+  border-bottom: 1px solid var(--ob-border-muted);
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  /* 32px fields in 40px rows. */
+  padding: 4px;
+  border-bottom: 1px solid var(--ob-border-muted);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table th.number,
+.table td.amount {
+  text-align: right;
+}
+
+/* Text, not a field: padded to sit on the fields' baseline. */
+.table td.amount {
+  padding: 9px 8px;
+  color: var(--ob-text-body);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A field in a cell: no gap below unless it has an error to show. */
+.cell {
+  margin-bottom: 0;
+}
+
+.numberInput {
+  width: 100%;
+}
+
+.numberInput :global(.ant-input-number-input) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.required {
+  color: var(--ob-intent-danger);
+}
+
+.add {
+  margin-top: 8px;
+}

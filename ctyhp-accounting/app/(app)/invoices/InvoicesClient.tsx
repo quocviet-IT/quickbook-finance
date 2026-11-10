@@ -49,7 +49,9 @@ import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatDate, formatDateInTimeZone, formatMoney, toMinorUnits } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
-import SalesLineItems from "@/components/SalesLineItems";
+import SalesLineItems, { SALES_DOCUMENT_MODAL_WIDTH } from "@/components/SalesLineItems";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
+import { draftInvoiceCreatedMessage } from "@/lib/domain/sales-form";
 import {
   estimateMessages,
   invoiceFormFromEstimate,
@@ -304,6 +306,13 @@ export default function InvoicesClient({
   // `today` above is the one the Age column already uses; the Overdue filter
   // reads the same clock so a row aged "12 days late" can never be outside it.
 
+  /** The reader's own search or status choice, as opposed to the work queue's. */
+  const narrowed = Boolean(keyword) || statusFilter !== "all";
+  function clearFilters() {
+    setKeyword("");
+    setStatusFilter("all");
+  }
+
   const visibleInvoices = useMemo(() => {
     if (!initialQueue) return invoices;
     const filtered = invoices.filter(
@@ -438,7 +447,9 @@ export default function InvoicesClient({
   }
 
   async function submitInvoice() {
-    const v = await form.validateFields();
+    // On a wrong or missing field: focus goes to the first one, nothing is sent.
+    const v = await validateOrFocus(form);
+    if (!v) return;
     const dec = decimalsOf(v.currency_code);
     const lines = (v.lines as LineForm[]).map((l) => ({
       description: l.description ?? "",
@@ -476,10 +487,13 @@ export default function InvoicesClient({
       return;
     }
     if (res.ok) {
-      message.success("Draft invoice created");
+      const customerName = localCustomers.find((c) => c.id === v.customer_id)?.name ?? "the customer";
+      message.success(draftInvoiceCreatedMessage(customerName));
       finishCreate();
     } else {
-      message.error(res.error ?? "Failed to create invoice");
+      // In the form, where it stays until the next save, as on the estimate
+      // path above: a toast disappeared before it could be read (3.0.10).
+      setCreateError(res.error ?? "Failed to create invoice");
     }
   }
 
@@ -873,16 +887,29 @@ export default function InvoicesClient({
         }
         sticky
         emptyTitle={
-          keyword || statusFilter !== "all"
+          narrowed
             ? "No invoices match these filters"
             : initialQueue
               ? "No overdue invoices"
               : "No invoices yet"
         }
         emptyDescription={
-          initialQueue
-            ? "Customer balances are current as of the selected work queue date."
-            : "Create a draft invoice, review it, then issue it to the ledger."
+          narrowed
+            ? "Clear the filters, or search for another number or customer."
+            : initialQueue
+              ? "Customer balances are current as of the selected work queue date."
+              : "Create a draft invoice, review it, then issue it to the ledger."
+        }
+        // The next step, in the empty table itself (3.0.10). The work queue
+        // already offers Show all beside its tag.
+        emptyAction={
+          narrowed ? (
+            <Button onClick={clearFilters}>Clear filters</Button>
+          ) : !initialQueue && canCreate ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              New invoice
+            </Button>
+          ) : undefined
         }
       />
 
@@ -909,7 +936,7 @@ export default function InvoicesClient({
         confirmLoading={saving}
         okText="Save draft"
         cancelText="Cancel"
-        width={860}
+        width={SALES_DOCUMENT_MODAL_WIDTH}
         destroyOnHidden
       >
         {fromEstimate ? (
@@ -925,7 +952,6 @@ export default function InvoicesClient({
         <Form
           form={form}
           layout="vertical"
-          requiredMark={false}
           initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }}
           // Fires on the reader's edits only; the defaults set above do not count.
           onValuesChange={() => setCreateDirty(true)}
@@ -1023,6 +1049,7 @@ export default function InvoicesClient({
             incomeAccounts={incomeAccounts}
             taxOptions={taxOptions}
             decimals={decimalsOf(currency)}
+            currencyCode={currency}
             canManageItems={canManageItems}
             removeLabel="Remove invoice line"
             defaultIncomeAccountId={defaultIncomeAccountId}
@@ -1054,12 +1081,12 @@ export default function InvoicesClient({
         cancelText="Cancel"
         destroyOnHidden
       >
-        <Form form={custForm} layout="vertical" requiredMark={false}>
+        <Form form={custForm} layout="vertical">
           <Form.Item name="name" label="Name" rules={[{ required: true, message: "Enter a name" }]}>
             <Input />
           </Form.Item>
           <Form.Item name="email" label="Email">
-            <Input />
+            <Input type="email" autoComplete="email" />
           </Form.Item>
         </Form>
       </Modal>
@@ -1159,7 +1186,7 @@ export default function InvoicesClient({
           }
         />
         {canOverrideCredit ? (
-          <Form form={overrideForm} layout="vertical" requiredMark={false}>
+          <Form form={overrideForm} layout="vertical">
             <Form.Item
               name="reason"
               label="Why is this invoice being issued anyway?"

@@ -48,6 +48,47 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.10",
+    date: "2026-11-10",
+    headline: "Invoice and estimate lines are a table with a heading on every column, and the sales forms say what to fix.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Line items are a table, with an amount on each line",
+        detail:
+          "In New invoice and in an estimate, each line is now one row under the headings Item, Description, Qty, Unit price, Amount, Income account and Tax, instead of unlabelled boxes broken over two rows. Amount shows quantity times unit price for the line as you type. The forms are wider to fit the table, and in a narrow window it scrolls sideways.",
+        route: "/invoices",
+      },
+      {
+        kind: "fixed",
+        title: "Saving a form with something missing takes you to it",
+        detail:
+          "Required fields are marked with *. Save with one missing or wrong and the cursor moves to the first such field, with errors that say what to do (Enter a unit price, Choose an income account) instead of one word (Price, Account). A save the server refuses keeps its reason in the form instead of a message that vanished after a few seconds.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "Empty lists offer the next step, and saved records are named",
+        detail:
+          "Invoices and Customers with nothing yet show a New invoice or New customer button in the empty table; when filters hide everything they show Clear filters. Saving now says \"Draft invoice for BlueRidge Foods created\" or \"BlueRidge Foods updated\" instead of a message that names nothing.",
+        route: "/customers",
+      },
+      {
+        kind: "changed",
+        title: "Customer email and phone",
+        detail:
+          "A customer's email in the list opens your mail program. The Email and Phone fields are email and phone fields, so a browser can fill them in and a phone shows the right keyboard.",
+        route: "/customers",
+      },
+      {
+        kind: "changed",
+        title: "Grey text under titles is darker and easier to read",
+        detail:
+          "The description under every page title, form help text and other secondary text used Ant Design's own pale grey, which was below the contrast needed for comfortable reading. It now uses OneBook's secondary text colour, in light and dark mode.",
+      },
+    ],
+  },
+  {
     version: "3.0.9",
     date: "2026-11-10",
     headline: "Every question before something that cannot be undone now starts on Cancel, and bills void as carefully as invoices.",

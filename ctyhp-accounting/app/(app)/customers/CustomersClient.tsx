@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import {
+  Alert,
   App,
   Button,
   Col,
@@ -31,6 +32,8 @@ import { formatMoney, toMinorUnits } from "@/lib/format";
 import { createCustomerAction, updateCustomerAction } from "./actions";
 import { closeOrConfirmDiscard } from "@/lib/client/destructive-confirm";
 import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
+import { customerSavedMessage } from "@/lib/domain/sales-form";
 
 const CONTACT_FIELDS = [
   "name",
@@ -68,6 +71,8 @@ export default function CustomersClient({
   // Set by the reader's edits, not by the record the form opens with.
   const [dirty, setDirty] = useState(false);
   useUnsavedGuard(open && dirty, modal, "this customer");
+  /** Why the last save failed, shown in the form until the next attempt (3.0.10). */
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // The register had no way to search at all — every professional
   // bookkeeping product leads its contact list with one (QuickBooks' "Find a
@@ -80,6 +85,12 @@ export default function CustomersClient({
   const [keyword, setKeyword] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [creditFilter, setCreditFilter] = useState<CreditState | "all">("all");
+  const narrowed = Boolean(keyword) || creditFilter !== "all" || activeFilter !== "all";
+  function clearFilters() {
+    setKeyword("");
+    setCreditFilter("all");
+    setActiveFilter("all");
+  }
 
   const visibleCustomers = filterContacts(customers, keyword, activeFilter).filter((row) => {
     if (creditFilter === "all") return true;
@@ -96,6 +107,7 @@ export default function CustomersClient({
     setEditing(null);
     form.resetFields();
     setDirty(false);
+    setSaveError(null);
     setOpen(true);
   }
 
@@ -111,6 +123,7 @@ export default function CustomersClient({
       credit_review_note: customer.credit_review_note ?? "",
     });
     setDirty(false);
+    setSaveError(null);
     setOpen(true);
   }
 
@@ -131,7 +144,9 @@ export default function CustomersClient({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    // On a wrong or missing field: focus goes to the first one, nothing is sent.
+    const values = await validateOrFocus(form);
+    if (!values) return;
     // An empty limit box means "no limit", which is not the same as a limit of
     // zero — that one means cash only, and both have to reach the server intact.
     const { credit_limit: creditLimit, ...rest } = values;
@@ -148,16 +163,19 @@ export default function CustomersClient({
       credit_hold: Boolean(values.credit_hold),
     };
     setSaving(true);
+    setSaveError(null);
     const res = editing
       ? await updateCustomerAction({ ...payload, id: editing.id })
       : await createCustomerAction(payload);
     setSaving(false);
     if (res.ok) {
-      message.success(editing ? "Customer updated" : "Customer created");
+      message.success(customerSavedMessage(String(values.name), editing ? "updated" : "created"));
       finishForm();
       form.resetFields();
     } else {
-      message.error(res.error ?? "Failed to save the customer");
+      // In the form, where it stays until the next save: a toast disappeared
+      // before it could be read (3.0.10).
+      setSaveError(res.error ?? "Failed to save the customer");
     }
   }
 
@@ -173,10 +191,21 @@ export default function CustomersClient({
           const lines = formatPostalAddress(row);
           const city = [row.city, row.region].filter(Boolean).join(", ");
           const where = lines.length === 0 ? "No address" : city || lines[0];
+          // An email opens the mail program (3.0.10).
           return (
             <div style={{ minWidth: 0 }}>
               <span title={row.name}>{row.name}</span>
-              {secondaryLine(`${row.email ?? "No email"} · ${where}`)}
+              {secondaryLine(
+                row.email ? (
+                  <>
+                    <a href={`mailto:${row.email}`}>{row.email}</a>
+                    {` · ${where}`}
+                  </>
+                ) : (
+                  `No email · ${where}`
+                ),
+                `${row.email ?? "No email"} · ${where}`,
+              )}
             </div>
           );
         },
@@ -307,15 +336,21 @@ export default function CustomersClient({
         columns={columns}
         dataSource={visibleCustomers}
         sticky
-        emptyTitle={
-          keyword || creditFilter !== "all" || activeFilter !== "all"
-            ? "No customers match these filters"
-            : "No customers yet"
-        }
+        emptyTitle={narrowed ? "No customers match these filters" : "No customers yet"}
         emptyDescription={
-          keyword || creditFilter !== "all" || activeFilter !== "all"
-            ? "Clear a filter, or widen the search."
+          narrowed
+            ? "Clear the filters, or search for another name, contact, email or city."
             : "Add a customer to create invoices and receive payments."
+        }
+        // The next step, in the empty table itself (3.0.10).
+        emptyAction={
+          narrowed ? (
+            <Button onClick={clearFilters}>Clear filters</Button>
+          ) : canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              New customer
+            </Button>
+          ) : undefined
         }
       />
 
@@ -332,7 +367,7 @@ export default function CustomersClient({
         width={640}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false} onValuesChange={() => setDirty(true)}>
+        <Form form={form} layout="vertical" onValuesChange={() => setDirty(true)}>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
@@ -345,7 +380,7 @@ export default function CustomersClient({
             </Col>
             <Col span={12}>
               <Form.Item name="email" label="Email">
-                <Input />
+                <Input type="email" autoComplete="email" />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -355,7 +390,7 @@ export default function CustomersClient({
             </Col>
             <Col span={12}>
               <Form.Item name="phone" label="Phone">
-                <Input />
+                <Input type="tel" autoComplete="tel" />
               </Form.Item>
             </Col>
             <Col span={24}>
@@ -442,6 +477,7 @@ export default function CustomersClient({
               </Form.Item>
             </Col>
           </Row>
+          {saveError ? <Alert type="error" showIcon role="alert" title={saveError} /> : null}
         </Form>
       </Modal>
     </div>
