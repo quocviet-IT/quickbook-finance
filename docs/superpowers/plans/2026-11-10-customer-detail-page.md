@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Language and money:** UI text is US English, money is USD, dates are MM/DD/YYYY via `formatDate` and `formatMoney` from `@/lib/format`.
-- **Attribution:** no Claude/Claude Code attribution in commits, PR bodies or files. Stage files by name, never `git add -A`.
+- **Attribution:** no tool attribution lines in commits, PR bodies or files. Stage files by name, never `git add -A`.
 - **CRLF:** contract tests that match multi-line source must normalise CRLF: `readFileSync(...).replace(/\r\n/g, "\n")`.
 - **Tables:** go through `@/components/ui/DataTable`. A raw antd `<Table` fails `table-adoption.test.ts`. Measured widths come from `COLUMN` in `@/lib/design/table-metrics`, and an elastic column uses `flexColumn`. A list table must pass `fitsBox(sum(fixed), COLUMN.TEXT_MIN)`.
 - **Inline colours:** use `tokenVar("…")` from `@/lib/design/tokens`, never `TOKENS.*`.
