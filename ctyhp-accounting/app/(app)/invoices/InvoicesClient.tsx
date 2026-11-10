@@ -9,13 +9,16 @@ import {
   App,
   Button,
   DatePicker,
+  Descriptions,
   Form,
   Input,
   Modal,
   Select,
   Space,
+  Tabs,
   Tag,
   Typography,
+  type DescriptionsProps,
   type MenuProps,
   type TableColumnsType,
 } from "antd";
@@ -46,7 +49,7 @@ import type {
 } from "@/lib/db/types";
 import type { InvoiceEstimateLink, InvoiceWithCustomer } from "@/lib/services/invoicing";
 import type { CustomerCreditRow } from "@/lib/services/credit";
-import { formatDate, formatDateInTimeZone, formatMoney, toMinorUnits } from "@/lib/format";
+import { formatDate, formatMoney, toMinorUnits } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { computeInvoiceLine, sumInvoiceTotals } from "@/lib/domain/money";
 import SalesLineItems, { SALES_DOCUMENT_MODAL_WIDTH } from "@/components/SalesLineItems";
@@ -57,7 +60,6 @@ import {
   invoiceFormFromEstimate,
   type EstimateInvoicePrefill,
 } from "@/lib/domain/estimates";
-import { documentAttribution } from "@/lib/domain/audit";
 import {
   CREDIT_SALES_WINDOW_DAYS,
   checkInvoiceAgainstCredit,
@@ -72,7 +74,6 @@ import {
 } from "@/lib/domain/tax-jurisdiction";
 import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
 import SettlementHistory from "@/components/settlements/SettlementHistory";
-import { outstandingAge } from "@/lib/domain/settlement";
 import type { SettlementEvent } from "@/lib/domain/settlement";
 import {
   createInvoiceAction,
@@ -89,6 +90,14 @@ import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMake
 import { closeOrConfirmDiscard, destructiveConfirmProps } from "@/lib/client/destructive-confirm";
 import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
 import { invoiceVoidConfirm, invoiceVoidOption } from "@/lib/domain/invoice-void";
+import {
+  invoiceAttention,
+  invoiceAttentionLook,
+  invoiceStatusCounts,
+  sortInvoicesByAttention,
+  type InvoiceStatusTab,
+} from "@/lib/domain/invoice-attention";
+import { tokenVar } from "@/lib/design/tokens";
 
 interface LineForm {
   description?: string;
@@ -114,6 +123,34 @@ export const VIEW_INVOICE_MODAL_WIDTH = 820;
  * the width every other money column has.
  */
 export const INVOICE_LINES_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.MONEY, COLUMN.MONEY, COLUMN.MONEY] as const;
+
+/**
+ * The list's measured columns: Number, Issued, Due, Total, Balance due,
+ * Status, Actions. Customer takes what is left, at least COLUMN.TEXT_MIN at
+ * 1280px (tests/unit/invoice-list-layout.test.ts). Adding Due in 3.0.11 cost
+ * 88px, paid for by Number (110 → 100: "INV-000004" is 80px of text) and
+ * Actions (140 → 124: paperclip, Issue and ⋮ need 122).
+ */
+/** The status tabs above the list, in the order an accountant works them. */
+const INVOICE_STATUS_TABS: readonly { key: InvoiceStatusTab; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "overdue", label: "Overdue" },
+  { key: "draft", label: "Draft" },
+  { key: "issued", label: "Issued" },
+  { key: "partial", label: "Partially paid" },
+  { key: "paid", label: "Paid" },
+  { key: "void", label: "Void" },
+];
+
+export const INVOICE_LIST_FIXED_WIDTHS = [
+  100,
+  COLUMN.DATE,
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+  124,
+] as const;
 
 export default function InvoicesClient({
   initialCreateOpen,
@@ -250,7 +287,7 @@ export default function InvoicesClient({
   );
 
   // One "today" for every row, so a list cannot show two different ages.
-  const { today, timeZone } = useCompanyClock();
+  const { today } = useCompanyClock();
 
   const creditByCustomer = useMemo(
     () => new Map(credit.map((row) => [row.customerId, row])),
@@ -302,9 +339,9 @@ export default function InvoicesClient({
   // with it — and it reuses the exact rule the dashboard's work queue already
   // applies, via the shared helper, so the two can never disagree.
   const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "overdue" | InvoiceStatus>("all");
-  // `today` above is the one the Age column already uses; the Overdue filter
-  // reads the same clock so a row aged "12 days late" can never be outside it.
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatusTab>("all");
+  // `today` above is the one the Status column's "N days late" uses; the
+  // Overdue tab reads the same clock, so a row tagged overdue is always in it.
 
   /** The reader's own search or status choice, as opposed to the work queue's. */
   const narrowed = Boolean(keyword) || statusFilter !== "all";
@@ -314,7 +351,8 @@ export default function InvoicesClient({
   }
 
   const visibleInvoices = useMemo(() => {
-    if (!initialQueue) return invoices;
+    // Overdue first, then due within a week, then drafts, then the rest (3.0.11).
+    if (!initialQueue) return sortInvoicesByAttention(invoices, today);
     const filtered = invoices.filter(
       (invoice) =>
         (invoice.status === "issued" || invoice.status === "partial") &&
@@ -327,7 +365,10 @@ export default function InvoicesClient({
       if (right.id === initialQueue.focusId) return 1;
       return (left.due_date ?? "").localeCompare(right.due_date ?? "");
     });
-  }, [initialQueue, invoices]);
+  }, [initialQueue, invoices, today]);
+
+  /** What each status tab holds, counted by the rule its filter applies. */
+  const statusCounts = useMemo(() => invoiceStatusCounts(visibleInvoices, today), [visibleInvoices, today]);
 
   const filteredInvoices = visibleInvoices.filter((invoice) => {
     if (!matchesDocumentKeyword([invoice.invoice_number, invoice.customer_name], keyword)) {
@@ -501,8 +542,11 @@ export default function InvoicesClient({
     setBusyId(id);
     const res = await issueInvoiceAction(id, overrideReason);
     setBusyId(null);
-    if (res.ok) message.success("Invoice issued and posted to the ledger");
-    else message.error(res.error ?? "Failed to issue invoice");
+    if (res.ok) {
+      message.success("Invoice issued and posted to the ledger");
+      // Issued from its dialog: the dialog showed the draft, which no longer exists.
+      setLinesOpen(false);
+    } else message.error(res.error ?? "Failed to issue invoice");
   }
 
   /**
@@ -543,8 +587,10 @@ export default function InvoicesClient({
     setBusyId(id);
     const res = await voidInvoiceAction(id);
     setBusyId(null);
-    if (res.ok) message.success("Invoice voided");
-    else message.error(res.error ?? "Failed to void invoice");
+    if (res.ok) {
+      message.success("Invoice voided");
+      setLinesOpen(false);
+    } else message.error(res.error ?? "Failed to void invoice");
   }
 
   /**
@@ -605,50 +651,66 @@ export default function InvoicesClient({
     }
   }
 
+  const money = (minor: number, code: string) => formatMoney(minor, code, decimalsOf(code));
+
+  /** Void as the open invoice's dialog offers it: the menu's rule (invoiceVoidOption). */
+  const viewVoid = viewInvoice ? invoiceVoidOption(viewInvoice) : null;
+
+  /**
+   * The head of an invoice's dialog: who, what state, which dates, which entry
+   * and what is still owed (3.0.11). The status reads as in the list, plus how
+   * late or how soon when that is the point.
+   */
+  function invoiceHeaderItems(inv: InvoiceWithCustomer): DescriptionsProps["items"] {
+    const look = invoiceAttentionLook(invoiceAttention(inv, today));
+    const code = look?.tone === "danger" ? "overdue" : "due_soon";
+    return [
+      { key: "customer", label: "Customer", children: inv.customer_name },
+      {
+        key: "status",
+        label: "Status",
+        children: (
+          <Space size={4} wrap>
+            <StatusTag status={inv.status} labels={PAID_LABELS} />
+            {look ? <StatusTag status={code} looks={{ [code]: look }} /> : null}
+          </Space>
+        ),
+      },
+      { key: "issued", label: "Issued", children: formatDate(inv.issue_date) },
+      { key: "due", label: "Due", children: inv.due_date ? formatDate(inv.due_date) : "—" },
+      {
+        key: "entry",
+        label: "Journal entry",
+        children:
+          inv.entry_number && inv.journal_entry_id ? (
+            <Link href={`/journal?entry=${inv.journal_entry_id}`}>{inv.entry_number}</Link>
+          ) : (
+            "Not posted yet"
+          ),
+      },
+      { key: "balance", label: "Balance due", children: money(inv.balance_due_minor, inv.currency_code) },
+    ];
+  }
+
+  // One line per row since 3.0.11. The journal entry, who raised the invoice and
+  // what has been paid moved to the invoice's dialog; how late it is moved to
+  // the status. Rows had been 58–59px, three cells stacking a second line.
   const columns: TableColumnsType<InvoiceWithCustomer> = [
     {
       title: "Number",
       dataIndex: "invoice_number",
-      width: COLUMN.CODE,
-      // Drafts have no number yet and sort to the top; everything else runs in
-      // sequence, which is how a break becomes visible while scrolling.
-      defaultSortOrder: "descend",
+      width: INVOICE_LIST_FIXED_WIDTHS[0],
+      // No default sort: the list opens in attention order (sortInvoicesByAttention).
+      // Sorted by number, drafts (no number yet) come first.
       sorter: (a, b) => (a.invoice_number ?? "￿").localeCompare(b.invoice_number ?? "￿"),
       render: (n) => n ?? <StatusTag status="draft" />,
     },
     {
-      // The elastic column: no width, so it takes whatever the measured ones
-      // leave. Its second line carries the journal entry and who raised the
-      // document, both of which used to be columns of their own and pushed
-      // this table 116px past the screen.
+      // The elastic column: no width, so it takes whatever the measured ones leave.
       ...flexColumn<InvoiceWithCustomer>({
         title: "Customer",
         key: "customer_name",
-        render: (_: unknown, r: InvoiceWithCustomer) => {
-          const attribution = documentAttribution(r, directory);
-          const under = [
-            r.entry_number ?? null,
-            `raised ${formatDateInTimeZone(attribution.createdAt, timeZone)} by ${attribution.createdBy}`,
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          return (
-            <div style={{ minWidth: 0 }}>
-              <span title={r.customer_name}>{r.customer_name}</span>
-              {secondaryLine(
-                r.entry_number ? (
-                  <>
-                    <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
-                    {` · ${under.slice(r.entry_number.length + 3)}`}
-                  </>
-                ) : (
-                  under
-                ),
-                under,
-              )}
-            </div>
-          );
-        },
+        render: (_: unknown, r: InvoiceWithCustomer) => <span title={r.customer_name}>{r.customer_name}</span>,
       }),
       sorter: (a: InvoiceWithCustomer, b: InvoiceWithCustomer) =>
         a.customer_name.localeCompare(b.customer_name),
@@ -658,71 +720,50 @@ export default function InvoicesClient({
       // every heading row taller; the one-word form says the same thing.
       title: "Issued",
       dataIndex: "issue_date",
-      width: COLUMN.DATE,
+      width: INVOICE_LIST_FIXED_WIDTHS[1],
       render: (v: string) => formatDate(v),
       sorter: (a, b) => a.issue_date.localeCompare(b.issue_date),
     },
     {
+      title: "Due",
+      dataIndex: "due_date",
+      width: INVOICE_LIST_FIXED_WIDTHS[2],
+      render: (v: string | null) => (v ? formatDate(v) : "—"),
+      sorter: (a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""),
+    },
+    {
       title: "Total",
       dataIndex: "total_minor",
-      width: COLUMN.MONEY,
+      width: INVOICE_LIST_FIXED_WIDTHS[3],
       align: "right",
       sorter: (a, b) => a.total_minor - b.total_minor,
       render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
-      // Paid used to be a column of its own beside this one. It is the same
-      // fact read the other way round — total less balance — so it reads under
-      // the balance instead of costing another 130px of the row.
       title: "Balance due",
       dataIndex: "balance_due_minor",
-      width: COLUMN.MONEY,
+      width: INVOICE_LIST_FIXED_WIDTHS[4],
       align: "right",
       sorter: (a, b) => a.balance_due_minor - b.balance_due_minor,
-      render: (v: number, r) => (
-        <div>
-          {formatMoney(v, r.currency_code, decimalsOf(r.currency_code))}
-          {r.total_minor - r.balance_due_minor > 0
-            ? secondaryLine(
-                `${formatMoney(r.total_minor - r.balance_due_minor, r.currency_code, decimalsOf(r.currency_code))} paid`,
-              )
-            : null}
-        </div>
-      ),
+      render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
     },
     {
-      // Age used to be a column of its own, 130px to print "31 d overdue" on
-      // the rows that had one. It qualifies the status, so it reads under it.
+      // A row that needs attention says so in its status, "200 days late"
+      // or "Due in 5 days"; the rest show the invoice's own status.
       title: "Status",
       dataIndex: "status",
-      width: COLUMN.STATUS,
+      width: INVOICE_LIST_FIXED_WIDTHS[5],
       render: (s: InvoiceStatus, r: InvoiceWithCustomer) => {
-        const age =
-          s === "paid" || s === "void" || s === "draft"
-            ? null
-            : outstandingAge({ issueDate: r.issue_date, dueDate: r.due_date, asOf: today });
-        return (
-          <div>
-            <StatusTag status={s} labels={PAID_LABELS} />
-            {age
-              ? secondaryLine(
-                  age.isOverdue ? (
-                    <Typography.Text type="danger" style={{ fontSize: 12 }}>
-                      {age.overdueDays} d overdue
-                    </Typography.Text>
-                  ) : (
-                    `${age.ageDays} d old`
-                  ),
-                )
-              : null}
-          </div>
-        );
+        const look = invoiceAttentionLook(invoiceAttention(r, today));
+        if (!look) return <StatusTag status={s} labels={PAID_LABELS} />;
+        const code = look.tone === "danger" ? "overdue" : "due_soon";
+        return <StatusTag status={code} looks={{ [code]: look }} />;
       },
     },
     {
       title: "Actions",
       key: "actions",
-      width: 140,
+      width: INVOICE_LIST_FIXED_WIDTHS[6],
       align: "right",
       // The shape Payments settled on and Bills followed: the paperclip, the one
       // state-advancing action a draft has, and everything else behind one ⋯.
@@ -836,6 +877,25 @@ export default function InvoicesClient({
         />
       ) : null}
 
+      {/* Status tabs with their counts, in place of a status select (3.0.11):
+          how many are overdue is the first thing this list is opened to learn. */}
+      <Tabs
+        className="accounting-status-tabs"
+        activeKey={statusFilter}
+        onChange={(key) => setStatusFilter(key as InvoiceStatusTab)}
+        items={INVOICE_STATUS_TABS.map(({ key, label }) => ({
+          key,
+          label: (
+            <span>
+              {label}{" "}
+              <span style={{ color: tokenVar("text.secondary"), fontVariantNumeric: "tabular-nums" }}>
+                {statusCounts[key]}
+              </span>
+            </span>
+          ),
+        }))}
+      />
+
       <FilterBar
         resultCount={filteredInvoices.length}
         actions={
@@ -860,21 +920,6 @@ export default function InvoicesClient({
           style={{ width: 260 }}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-        />
-        <Select
-          aria-label="Filter invoices by status"
-          value={statusFilter}
-          onChange={setStatusFilter}
-          style={{ minWidth: 150 }}
-          options={[
-            { value: "all", label: "All statuses" },
-            { value: "overdue", label: "Overdue" },
-            { value: "draft", label: "Draft" },
-            { value: "issued", label: "Issued" },
-            { value: "partial", label: "Partially paid" },
-            { value: "paid", label: "Paid" },
-            { value: "void", label: "Void" },
-          ]}
         />
       </FilterBar>
 
@@ -1096,37 +1141,51 @@ export default function InvoicesClient({
         title={`Invoice ${viewInvoice?.invoice_number ?? "(draft)"}`}
         open={linesOpen}
         onCancel={() => setLinesOpen(false)}
-        footer={null}
+        // The invoice's own actions, where the reader is looking at it (3.0.11).
+        // Void follows the menu's rule: refused once money is applied, and then
+        // the reason stands in its place.
+        footer={
+          viewInvoice ? (
+            <Space wrap>
+              {canVoid && viewVoid?.offered ? (
+                viewVoid.blockedReason ? (
+                  <Typography.Text type="secondary">{viewVoid.blockedReason}</Typography.Text>
+                ) : (
+                  <Button danger onClick={() => confirmVoid(viewInvoice)}>
+                    Void invoice
+                  </Button>
+                )
+              ) : null}
+              <Button loading={pdfId === viewInvoice.id} onClick={() => downloadPdf(viewInvoice)}>
+                Download PDF
+              </Button>
+              <Button onClick={() => setLinesOpen(false)}>Close</Button>
+              {canIssue && viewInvoice.status === "draft" ? (
+                <Button type="primary" loading={busyId === viewInvoice.id} onClick={() => startIssue(viewInvoice)}>
+                  Issue
+                </Button>
+              ) : null}
+            </Space>
+          ) : null
+        }
         width={VIEW_INVOICE_MODAL_WIDTH}
       >
+        {/* Who, what state and which dates, before anything else. The journal
+            entry and who raised it used to sit under the customer in the list. */}
+        {viewInvoice ? (
+          <Descriptions
+            size="small"
+            column={2}
+            bordered
+            style={{ marginBottom: 16 }}
+            items={invoiceHeaderItems(viewInvoice)}
+          />
+        ) : null}
+
         {viewEstimate ? (
           <Typography.Paragraph>
             <Link href="/estimates">{estimateMessages.fromEstimate(viewEstimate.estimate_number)}</Link>
           </Typography.Paragraph>
-        ) : null}
-
-        {viewInvoice ? (
-          <DocumentAuditTrail
-            record={viewInvoice}
-            directory={directory}
-            entries={viewAudit}
-            loading={auditLoading}
-            canReadAudit={canReadAudit}
-          />
-        ) : null}
-
-        {viewInvoice ? (
-          <div style={{ marginBottom: 16 }}>
-            <SettlementHistory
-              totalMinor={viewInvoice.total_minor}
-              balanceDueMinor={viewInvoice.balance_due_minor}
-              currencyCode={viewInvoice.currency_code}
-              decimals={decimalsOf(viewInvoice.currency_code)}
-              events={viewSettlements}
-              loading={settlementsLoading}
-              emptyText="No payment, credit or write-off has been applied to this invoice yet."
-            />
-          </div>
         ) : null}
 
         <DataTable<InvoiceLineRow>
@@ -1162,6 +1221,40 @@ export default function InvoicesClient({
             },
           ]}
         />
+
+        {/* The invoice's own totals, under its lines, as the New invoice form shows them. */}
+        {viewInvoice ? (
+          <div style={{ textAlign: "right", marginTop: 12, fontVariantNumeric: "tabular-nums" }}>
+            <div>Subtotal: {money(viewInvoice.subtotal_minor, viewInvoice.currency_code)}</div>
+            <div>Tax: {money(viewInvoice.tax_total_minor, viewInvoice.currency_code)}</div>
+            <Typography.Text strong>Total: {money(viewInvoice.total_minor, viewInvoice.currency_code)}</Typography.Text>
+          </div>
+        ) : null}
+
+        {viewInvoice ? (
+          <div style={{ margin: "16px 0" }}>
+            <SettlementHistory
+              totalMinor={viewInvoice.total_minor}
+              balanceDueMinor={viewInvoice.balance_due_minor}
+              currencyCode={viewInvoice.currency_code}
+              decimals={decimalsOf(viewInvoice.currency_code)}
+              events={viewSettlements}
+              loading={settlementsLoading}
+              emptyText="No payment, credit or write-off has been applied to this invoice yet."
+            />
+          </div>
+        ) : null}
+
+        {/* Last: who changed what, for the reader checking the record. */}
+        {viewInvoice ? (
+          <DocumentAuditTrail
+            record={viewInvoice}
+            directory={directory}
+            entries={viewAudit}
+            loading={auditLoading}
+            canReadAudit={canReadAudit}
+          />
+        ) : null}
       </Modal>
 
       <Modal
