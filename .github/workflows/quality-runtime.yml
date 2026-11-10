@@ -1,9 +1,15 @@
 name: Runtime quality report
 
+# Manual runs only. The audit signs in to a live deployment, so it needs the
+# QUALITY_BASE_URL and NEXT_PUBLIC_SUPABASE_URL variables and the
+# NEXT_PUBLIC_SUPABASE_ANON_KEY, SMOKE_EMAIL and SMOKE_PASSWORD secrets. The
+# repository holds none of them, and the weekly schedule that used to live here
+# failed at "Validate runtime configuration" on every run from #1 to #13
+# without auditing anything. Add the configuration, using a dedicated read-only
+# account rather than an administrator's, before you run this from the Actions
+# tab. Restore a schedule only once a manual run passes.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 3 * * 1"
 
 permissions:
   contents: read

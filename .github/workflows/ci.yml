@@ -66,7 +66,8 @@ jobs:
       # and useless as a guard. This one refuses: it compares the same artifact
       # against the ceilings in tests/quality/budgets.json and fails the build
       # when one is crossed. Needs only the build — no server, no sign-in, no
-      # clock — so it runs on every push rather than weekly.
+      # clock — so it runs on every push, unlike the runtime report, which
+      # runs only by hand.
       - name: Bundle budget gate
         run: npm run quality:budget
 
