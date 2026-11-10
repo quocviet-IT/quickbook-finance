@@ -1,7 +1,7 @@
 "use client";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { formatDateTime } from "@/lib/format";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Alert, Descriptions, Space, Tag, Typography } from "antd";
 import type { AuditEntryRow } from "@/lib/db/types";
 import {
@@ -60,7 +60,6 @@ export default function DocumentAuditTrail({
   canReadAudit: boolean;
 }) {
   const attribution = documentAttribution(record, directory);
-  const [pageSize, setPageSize] = useState<number>(CHANGE_HISTORY_DEFAULT_PAGE_SIZE);
   const { timeZone } = useCompanyClock();
 
   return (
@@ -89,67 +88,105 @@ export default function DocumentAuditTrail({
       {canReadAudit ? (
         <div>
           <Typography.Text strong>Change history</Typography.Text>
-          <DataTable<AuditEntryRow>
-            rowKey="id"
-            style={{ marginTop: 8 }}
-            loading={loading}
-            rows={entries}
-            pagination={
-              entries.length > 10
-                ? clientTablePagination(
-                    pageSize,
-                    setPageSize,
-                    pageSizeOptionsFor(CHANGE_HISTORY_DEFAULT_PAGE_SIZE),
-                  )
-                : false
-            }
-            locale={{ emptyText: "No recorded change" }}
-            expandable={{
-              rowExpandable: (entry) => diffAuditEntry(entry).length > 0,
-              expandedRowRender: (entry) => (
-                <FieldChanges changes={diffAuditEntry(entry)} currencyCode={auditEntryCurrency(entry)} />
-              ),
-            }}
-            columns={[
-              {
-                title: "When",
-                dataIndex: "created_at",
-                width: DOCUMENT_AUDIT_TRAIL_FIXED_WIDTHS[0],
-                render: (value: string) => formatDateTime(value, timeZone),
-              },
-              flexColumn<AuditEntryRow>({
-                title: "Who",
-                dataIndex: "actor_email",
-                floor: DOCUMENT_AUDIT_TRAIL_ELASTIC_FLOORS[0],
-                render: (value: string | null) => formatActor(value),
-              }),
-              {
-                title: "Action",
-                dataIndex: "action",
-                width: DOCUMENT_AUDIT_TRAIL_FIXED_WIDTHS[1],
-                render: (value: string) => <Tag>{ACTIVITY_VERBS[value] ?? humanizeStatus(value)}</Tag>,
-              },
-              flexColumn<AuditEntryRow>({
-                title: "Changed",
-                key: "changes",
-                floor: DOCUMENT_AUDIT_TRAIL_ELASTIC_FLOORS[1],
-                // Amounts are stored in cents; read them as money in the
-                // document's own currency, not as 2680000 (3.0.8).
-                render: (_: unknown, entry) =>
-                  summarizeAuditChanges(diffAuditEntry(entry), 3, auditEntryCurrency(entry)),
-              }),
-            ]}
-          />
+          <ChangeHistoryTable entries={entries} loading={loading} style={{ marginTop: 8 }} />
         </div>
       ) : (
-        <Alert
-          type="info"
-          showIcon
-          message="Your role cannot read the change history"
-          description="Ask an administrator for the audit.read permission to see every change made to this document."
-        />
+        <ChangeHistoryUnavailable />
       )}
     </Space>
+  );
+}
+
+/**
+ * Every change the audit log holds for one record: when, who, what kind of
+ * change and a one-line summary, each row opening onto its fields one by one.
+ * A document's dialog shows it under its attribution; a customer's page shows
+ * it as its Activity tab (3.0.12).
+ */
+export function ChangeHistoryTable({
+  entries,
+  loading,
+  currencyFallback,
+  style,
+}: {
+  entries: AuditEntryRow[];
+  loading: boolean;
+  /**
+   * The currency to read amounts in when an entry's snapshot names none. A
+   * customer's record carries no currency of its own, but its credit limit is
+   * in dollars.
+   */
+  currencyFallback?: string;
+  style?: CSSProperties;
+}) {
+  const [pageSize, setPageSize] = useState<number>(CHANGE_HISTORY_DEFAULT_PAGE_SIZE);
+  const { timeZone } = useCompanyClock();
+  const currencyOf = (entry: AuditEntryRow) => auditEntryCurrency(entry) ?? currencyFallback ?? null;
+
+  return (
+    <DataTable<AuditEntryRow>
+      rowKey="id"
+      style={style}
+      loading={loading}
+      rows={entries}
+      pagination={
+        entries.length > 10
+          ? clientTablePagination(
+              pageSize,
+              setPageSize,
+              pageSizeOptionsFor(CHANGE_HISTORY_DEFAULT_PAGE_SIZE),
+            )
+          : false
+      }
+      locale={{ emptyText: "No recorded change" }}
+      expandable={{
+        rowExpandable: (entry) => diffAuditEntry(entry).length > 0,
+        expandedRowRender: (entry) => (
+          <FieldChanges changes={diffAuditEntry(entry)} currencyCode={currencyOf(entry)} />
+        ),
+      }}
+      columns={[
+        {
+          title: "When",
+          dataIndex: "created_at",
+          width: DOCUMENT_AUDIT_TRAIL_FIXED_WIDTHS[0],
+          render: (value: string) => formatDateTime(value, timeZone),
+        },
+        flexColumn<AuditEntryRow>({
+          title: "Who",
+          dataIndex: "actor_email",
+          floor: DOCUMENT_AUDIT_TRAIL_ELASTIC_FLOORS[0],
+          render: (value: string | null) => formatActor(value),
+        }),
+        {
+          title: "Action",
+          dataIndex: "action",
+          width: DOCUMENT_AUDIT_TRAIL_FIXED_WIDTHS[1],
+          render: (value: string) => <Tag>{ACTIVITY_VERBS[value] ?? humanizeStatus(value)}</Tag>,
+        },
+        flexColumn<AuditEntryRow>({
+          title: "Changed",
+          key: "changes",
+          floor: DOCUMENT_AUDIT_TRAIL_ELASTIC_FLOORS[1],
+          // Amounts are stored in cents; read them as money in the
+          // document's own currency, not as 2680000 (3.0.8).
+          render: (_: unknown, entry) =>
+            summarizeAuditChanges(diffAuditEntry(entry), 3, currencyOf(entry)),
+        }),
+      ]}
+    />
+  );
+}
+
+/** What a role without audit.read sees where the change history would be. */
+export function ChangeHistoryUnavailable({ subject = "this document" }: { subject?: string }) {
+  return (
+    <Alert
+      type="info"
+      showIcon
+      title="Your role cannot read the change history"
+      description={`Ask an administrator for the audit.read permission to see every change made to ${subject}.`}
+    />
   );
 }
 

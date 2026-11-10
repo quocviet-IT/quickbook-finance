@@ -91,7 +91,9 @@ describe("voiding an invoice", () => {
 describe("change history shows amounts as money", () => {
   it("the trail on a document formats each entry in that entry's currency", () => {
     const source = read("components", "audit", "DocumentAuditTrail.tsx");
-    expect(source).toContain("summarizeAuditChanges(diffAuditEntry(entry), 3, auditEntryCurrency(entry))");
+    expect(source).toContain("summarizeAuditChanges(diffAuditEntry(entry), 3, currencyOf(entry))");
+    // The entry's own currency first; a record that names none (a customer) falls back (3.0.12).
+    expect(source).toContain("auditEntryCurrency(entry) ?? currencyFallback ?? null");
     expect(source).toContain("auditDisplayValue(");
   });
 
