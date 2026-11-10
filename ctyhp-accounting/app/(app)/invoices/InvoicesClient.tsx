@@ -84,6 +84,9 @@ import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
 import WriteOffModal from "../settlements/WriteOffModal";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
 import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
+import { closeOrConfirmDiscard, destructiveConfirmProps } from "@/lib/client/destructive-confirm";
+import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
+import { invoiceVoidConfirm, invoiceVoidOption } from "@/lib/domain/invoice-void";
 
 interface LineForm {
   description?: string;
@@ -190,6 +193,10 @@ export default function InvoicesClient({
   /** A new invoice's first line: on the company's default income account until an item says otherwise (3.01). */
   const newInvoiceLine = { quantity: 1, income_account_id: defaultIncomeAccountId ?? undefined };
   const [open, setOpen] = useInitiallyOpen(initialCreateOpen);
+  // Set by the reader's own typing or picking, not by the defaults the form
+  // opens with: closing a form nobody touched needs no question.
+  const [createDirty, setCreateDirty] = useState(false);
+  useUnsavedGuard(open && createDirty, modal, "this invoice");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pdfId, setPdfId] = useState<string | null>(null);
@@ -342,7 +349,23 @@ export default function InvoicesClient({
       currency_code: baseCurrency,
       lines: [newInvoiceLine],
     });
+    setCreateDirty(false);
     setOpen(true);
+  }
+
+  function finishCreate() {
+    setCreateDirty(false);
+    setOpen(false);
+  }
+
+  /** Escape, the close button and Cancel: asks first once something has been typed. */
+  function closeCreate() {
+    closeOrConfirmDiscard({
+      dirty: createDirty,
+      what: "this invoice",
+      confirm: modal.confirm,
+      close: finishCreate,
+    });
   }
 
   /**
@@ -447,14 +470,14 @@ export default function InvoicesClient({
       }
       message.success(estimateMessages.invoiceCreated(fromEstimate.estimateNumber));
       setFromEstimate(null);
-      setOpen(false);
+      finishCreate();
       // Off the estimate's link, so a reload does not try to convert it again.
       router.replace("/invoices");
       return;
     }
     if (res.ok) {
       message.success("Draft invoice created");
-      setOpen(false);
+      finishCreate();
     } else {
       message.error(res.error ?? "Failed to create invoice");
     }
@@ -515,17 +538,18 @@ export default function InvoicesClient({
    *
    * A Popconfirm anchored to a menu item lands over the menu it came from, and
    * says the least at the moment the reader most needs telling — that this
-   * reverses a posted journal entry and cannot be undone by re-issuing.
+   * reverses a posted journal entry and cannot be undone by re-issuing. A
+   * draft's question says the ledger does not change, since it posted nothing,
+   * and the dialog opens with focus on Cancel, not on Void.
    */
   function confirmVoid(invoice: InvoiceWithCustomer) {
-    modal.confirm({
-      title: `Void ${invoice.invoice_number ?? "this draft invoice"}?`,
-      content:
-        "This reverses its journal entry. The invoice number is not reused, and an invoice with payments applied cannot be voided.",
-      okText: "Void",
-      okButtonProps: { danger: true },
-      onOk: () => voidInv(invoice.id),
-    });
+    modal.confirm(
+      destructiveConfirmProps({
+        ...invoiceVoidConfirm(invoice),
+        okText: "Void",
+        onOk: () => voidInv(invoice.id),
+      }),
+    );
   }
 
   async function viewInvoiceLines(inv: InvoiceWithCustomer) {
@@ -717,12 +741,24 @@ export default function InvoicesClient({
         }
         // Last, and separated. The divider is conditional because a menu whose
         // only item is Void would otherwise open with an orphaned line above it.
-        if (canVoid && r.status !== "void" && r.status !== "paid") {
+        // Once money is applied the database refuses a void, so the item stays
+        // in its place, disabled, and says why — rather than refusing only
+        // after the reader has confirmed.
+        const voidOption = invoiceVoidOption(r);
+        if (canVoid && voidOption.offered) {
           if (menu.length) menu.push({ type: "divider" as const, key: "before-void" });
           menu.push({
             key: "void",
-            label: "Void invoice",
+            label: voidOption.blockedReason ? (
+              <>
+                Void invoice
+                {secondaryLine(voidOption.blockedReason)}
+              </>
+            ) : (
+              "Void invoice"
+            ),
             danger: true,
+            disabled: voidOption.blockedReason !== null,
             onClick: () => confirmVoid(r),
           });
         }
@@ -867,7 +903,9 @@ export default function InvoicesClient({
         title="New invoice"
         open={open}
         onOk={submitInvoice}
-        onCancel={() => setOpen(false)}
+        onCancel={closeCreate}
+        // A click beside the form is too easy to make to cost a half-written invoice.
+        maskClosable={false}
         confirmLoading={saving}
         okText="Save draft"
         cancelText="Cancel"
@@ -889,6 +927,8 @@ export default function InvoicesClient({
           layout="vertical"
           requiredMark={false}
           initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }}
+          // Fires on the reader's edits only; the defaults set above do not count.
+          onValuesChange={() => setCreateDirty(true)}
         >
           <Space align="end" wrap>
             <Form.Item name="customer_id" label="Customer" rules={[{ required: true, message: "Select a customer" }]} style={{ minWidth: 280 }}>

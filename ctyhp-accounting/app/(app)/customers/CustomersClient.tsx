@@ -29,6 +29,8 @@ import { creditStateColor, creditStateLabel, type CreditState } from "@/lib/doma
 import { filterContacts, type ActiveFilter } from "@/lib/domain/contact-filter";
 import { formatMoney, toMinorUnits } from "@/lib/format";
 import { createCustomerAction, updateCustomerAction } from "./actions";
+import { closeOrConfirmDiscard } from "@/lib/client/destructive-confirm";
+import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
 
 const CONTACT_FIELDS = [
   "name",
@@ -57,12 +59,15 @@ export default function CustomersClient({
   usStates: { code: string; name: string }[];
   canWrite: boolean;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const creditByCustomer = new Map(credit.map((row) => [row.customerId, row]));
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [saving, setSaving] = useState(false);
+  // Set by the reader's edits, not by the record the form opens with.
+  const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(open && dirty, modal, "this customer");
 
   // The register had no way to search at all — every professional
   // bookkeeping product leads its contact list with one (QuickBooks' "Find a
@@ -90,6 +95,7 @@ export default function CustomersClient({
   function openCreate() {
     setEditing(null);
     form.resetFields();
+    setDirty(false);
     setOpen(true);
   }
 
@@ -104,7 +110,24 @@ export default function CustomersClient({
       credit_hold: customer.credit_hold,
       credit_review_note: customer.credit_review_note ?? "",
     });
+    setDirty(false);
     setOpen(true);
+  }
+
+  function finishForm() {
+    setOpen(false);
+    setEditing(null);
+    setDirty(false);
+  }
+
+  /** Escape, the close button and Cancel: asks first once something has been typed. */
+  function closeForm() {
+    closeOrConfirmDiscard({
+      dirty,
+      what: editing ? `the changes to ${editing.name}` : "this customer",
+      confirm: modal.confirm,
+      close: finishForm,
+    });
   }
 
   async function submit() {
@@ -131,8 +154,7 @@ export default function CustomersClient({
     setSaving(false);
     if (res.ok) {
       message.success(editing ? "Customer updated" : "Customer created");
-      setOpen(false);
-      setEditing(null);
+      finishForm();
       form.resetFields();
     } else {
       message.error(res.error ?? "Failed to save the customer");
@@ -301,17 +323,16 @@ export default function CustomersClient({
         title={editing ? `Edit ${editing.name}` : "New customer"}
         open={open}
         onOk={submit}
-        onCancel={() => {
-          setOpen(false);
-          setEditing(null);
-        }}
+        onCancel={closeForm}
+        // A click beside the form is too easy to make to cost what was typed.
+        maskClosable={false}
         confirmLoading={saving}
         okText="Save"
         cancelText="Cancel"
         width={640}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        <Form form={form} layout="vertical" requiredMark={false} onValuesChange={() => setDirty(true)}>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
