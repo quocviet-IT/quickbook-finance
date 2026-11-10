@@ -666,6 +666,10 @@ export function antdThemeTokens(theme: ThemeName = "light") {
       colorBgContainer: t("surface.card"),
       colorBgElevated: t("surface.raised"),
       colorTextHeading: t("text.heading"),
+      // Typography type="secondary", form help, empty-state and statistic
+      // captions. Left to Ant Design it was a translucent grey that read
+      // 3.32:1 under every page title (3.0.10).
+      colorTextDescription: t("text.secondary"),
     },
     components: {
       Layout: {

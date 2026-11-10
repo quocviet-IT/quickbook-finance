@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import { Alert, App, Button, DatePicker, Form, Input, Modal, Select, Space } from "antd";
-import SalesLineItems from "@/components/SalesLineItems";
+import SalesLineItems, { SALES_DOCUMENT_MODAL_WIDTH } from "@/components/SalesLineItems";
 import NewCustomerButton from "@/components/NewCustomerButton";
 import { ToneBadge } from "@/lib/design/tone";
 import type { AccountRow, CustomerRow, ItemRow, TaxCodeRow } from "@/lib/db/types";
@@ -26,6 +26,7 @@ import {
 import { formatMoney } from "@/lib/format";
 import { closeOrConfirmDiscard } from "@/lib/client/destructive-confirm";
 import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 import { saveEstimateAction, type EstimateDetailView } from "./actions";
 import { ESTIMATE_STATE_TONES } from "./estimate-columns";
 import styles from "./estimates.module.css";
@@ -204,12 +205,9 @@ function EstimateFormBody({
 
   /** Saves the form; the number is assigned on the first save. Null when it did not save. */
   async function save(): Promise<{ id: string; estimate_number: string; expiry_date: string } | null> {
-    let values: FormValues;
-    try {
-      values = await form.validateFields();
-    } catch {
-      return null;
-    }
+    // On a wrong or missing field: focus goes to the first one, nothing is sent (3.0.10).
+    const values = await validateOrFocus(form);
+    if (!values) return null;
     const expiry = values.expiry_date ? values.expiry_date.format(ISO) : null;
     setSaving(true);
     setError(null);
@@ -291,7 +289,7 @@ function EstimateFormBody({
   }
 
   return (
-    <Modal title={title} open onCancel={closeForm} maskClosable={false} footer={footer} width={860}>
+    <Modal title={title} open onCancel={closeForm} maskClosable={false} footer={footer} width={SALES_DOCUMENT_MODAL_WIDTH}>
       {estimate?.live_invoice ? (
         <Alert
           className={styles.notice}
@@ -304,7 +302,6 @@ function EstimateFormBody({
       <Form<FormValues>
         form={form}
         layout="vertical"
-        requiredMark={false}
         disabled={readOnly}
         initialValues={initialValues}
         // Fires on the reader's edits only; the values the form opens with do not count.
@@ -359,6 +356,7 @@ function EstimateFormBody({
           incomeAccounts={incomeAccounts}
           taxOptions={taxOptions}
           decimals={USD_DECIMAL_PLACES}
+          currencyCode={USD_CURRENCY_CODE}
           canManageItems={canManageItems}
           removeLabel="Remove estimate line"
           defaultIncomeAccountId={defaultIncomeAccountId}
