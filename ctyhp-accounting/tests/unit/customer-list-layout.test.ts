@@ -26,4 +26,12 @@ describe("the Customers list", () => {
     expect(source).toMatch(/overdueMinor/);
     expect(source).toMatch(/b\.overdue - a\.overdue|overdueOf\(b\) - overdueOf\(a\)/);
   });
+
+  it("colours amounts with the list's own defined styles, not classes that do not exist", () => {
+    expect(source).not.toContain("accounting-negative");
+    expect(source).not.toContain("accounting-muted");
+    expect(source).toContain("className={styles.overdue}");
+    expect(source).toContain("styles.negative");
+    expect(source).toContain("className={styles.muted}");
+  });
 });

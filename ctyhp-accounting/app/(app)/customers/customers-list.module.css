@@ -1,0 +1,9 @@
+.overdue,
+.negative {
+  color: var(--ob-money-negative);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--ob-text-secondary);
+}

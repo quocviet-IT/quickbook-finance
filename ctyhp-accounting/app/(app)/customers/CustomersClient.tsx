@@ -22,6 +22,7 @@ import { creditStateColor, creditStateLabel, type CreditState } from "@/lib/doma
 import { filterContacts, type ActiveFilter } from "@/lib/domain/contact-filter";
 import { formatMoney } from "@/lib/format";
 import CustomerFormModal from "./CustomerFormModal";
+import styles from "./customers-list.module.css";
 
 const money = (minor: number) => formatMoney(minor, "USD", 2);
 
@@ -118,7 +119,7 @@ export default function CustomersClient({
       render: (_, row) =>
         row.credit_limit_minor === null ? (
           <Tooltip title="No limit is enforced for this customer">
-            <span className="accounting-muted">Not set</span>
+            <span className={styles.muted}>Not set</span>
           </Tooltip>
         ) : (
           money(row.credit_limit_minor)
@@ -139,7 +140,7 @@ export default function CustomersClient({
       sorter: (a: CustomerRow, b: CustomerRow) => overdueOf(a) - overdueOf(b),
       render: (_, row) => {
         const overdue = overdueOf(row);
-        return overdue === 0 ? "\u2014" : <span className="accounting-negative">{money(overdue)}</span>;
+        return overdue === 0 ? "\u2014" : <span className={styles.overdue}>{money(overdue)}</span>;
       },
     },
     {
@@ -151,7 +152,7 @@ export default function CustomersClient({
         const available = creditByCustomer.get(row.id)?.status.availableMinor ?? null;
         if (available === null) return "\u2014";
         return (
-          <span className={available < 0 ? "accounting-negative" : undefined}>
+          <span className={available < 0 ? styles.negative : undefined}>
             {money(available)}
           </span>
         );
