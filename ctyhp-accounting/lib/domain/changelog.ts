@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.11",
+    date: "2026-11-10",
+    headline: "Invoices opens with what is overdue, shows when each is due, and an invoice's dialog shows the whole invoice.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Overdue invoices come first",
+        detail:
+          "Invoices used to open newest number first, so the invoice longest past due was at the bottom. It now opens with overdue invoices (the oldest due date first), then those due within a week, then drafts waiting to be issued, then the rest, newest first. Clicking a column heading still sorts by that column.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "A Due column, and a status that says how late",
+        detail:
+          "The list has a Due column with each invoice's due date. An overdue invoice's status reads \"200 days late\" and one due within a week reads \"Due in 5 days\" or \"Due today\"; others show their own status. Each row is now one line: the journal entry, who raised the invoice and what has been paid are in the invoice's dialog.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "Status tabs with counts",
+        detail:
+          "The status filter is now a row of tabs that show how many invoices each holds: All, Overdue, Draft, Issued, Partially paid, Paid and Void.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "An invoice's dialog shows the whole invoice",
+        detail:
+          "View lines now opens with the customer, status, issue and due dates, journal entry and balance due, then the lines with Subtotal, Tax and Total under them, then payments, with the change history last. Download PDF, Issue (for a draft) and Void invoice are at the foot of the dialog; when payments or credits are applied, it says why the invoice cannot be voided.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "3.0.10",
     date: "2026-11-10",
     headline: "Invoice and estimate lines are a table with a heading on every column, and the sales forms say what to fix.",
