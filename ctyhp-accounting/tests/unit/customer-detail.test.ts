@@ -16,7 +16,7 @@ function credit(over: Partial<CustomerCreditRow["status"]> = {}): CustomerCredit
 }
 
 describe("customerFacts", () => {
-  it("sums what is owed and overdue from the open invoices, and finds the latest one", () => {
+  it("sums what is owed and overdue from the open invoices, and finds the oldest overdue one", () => {
     const facts = customerFacts({
       creditTermsDays: null, defaultTermsDays: 30, credit: credit(), today: TODAY,
       openInvoices: [open("4", "2026-04-23", 1_000_000, 2_680_000, "partial"), open("9", "2026-11-15", 50_000)],
@@ -35,6 +35,15 @@ describe("customerFacts", () => {
     expect(facts).toMatchObject({ owedMinor: 0, openCount: 0, overdueMinor: 0, oldestLateDays: null, availableMinor: 400_000, limitMinor: 500_000, termsDays: 15, termsAreDefault: false, dsoDays: 22.4 });
   });
 
+  it("shows a payment's reference, falling back to its memo when it has none", () => {
+    const base = { id: "p", payment_number: "PMT-1", payment_date: "2026-03-30", amount_minor: 1, currency_code: "USD", status: "applied" };
+    const rows = mergeCustomerTransactions({
+      invoices: [], creditMemos: [], salesReceipts: [],
+      payments: [{ ...base, id: "p1", reference: "RCV-1", memo: "a memo" }, { ...base, id: "p2", payment_number: "PMT-0", reference: null, memo: "only memo" }],
+    });
+    expect(rows.map((r) => r.reference)).toEqual(["RCV-1", "only memo"]);
+  });
+
   it("says so when the credit status could not be read", () => {
     expect(customerFacts({ creditTermsDays: null, defaultTermsDays: 30, credit: null, today: TODAY, openInvoices: [] })).toMatchObject({
       creditKnown: false, availableMinor: null, limitMinor: null, dsoDays: null,
@@ -43,10 +52,10 @@ describe("customerFacts", () => {
 });
 
 describe("mergeCustomerTransactions", () => {
-  it("puts every kind of document in one list, newest first, typed and signed as the customer sees it", () => {
+  it("puts every kind of document in one list, newest first, typed as the customer sees it", () => {
     const rows = mergeCustomerTransactions({
       invoices: [{ id: "i1", invoice_number: "INV-000004", issue_date: "2026-03-24", total_minor: 2_680_000, currency_code: "USD", status: "partial", memo: null }],
-      payments: [{ id: "p1", payment_number: "PMT-000003", payment_date: "2026-03-30", amount_minor: 1_680_000, currency_code: "USD", status: "applied", memo: "RCV-1003" }],
+      payments: [{ id: "p1", payment_number: "PMT-000003", payment_date: "2026-03-30", amount_minor: 1_680_000, currency_code: "USD", status: "applied", reference: "RCV-1003", memo: "March deposit" }],
       creditMemos: [{ id: "m1", credit_memo_number: "CM-000001", memo_date: "2026-03-30", total_minor: 5_000, currency_code: "USD", status: "applied", memo: null }],
       salesReceipts: [{ id: "s1", receipt_number: "SR-000001", receipt_date: "2026-02-01", total_minor: 9_900, currency_code: "USD", status: "posted", reference: "Card" }],
     });

@@ -52,6 +52,7 @@ function fakeClient(
       call.order.push(column);
       return builder;
     };
+    builder.limit = () => builder;
     builder.range = (a: number, b: number) => {
       call.range.push([a, b]);
       return builder;
@@ -108,6 +109,14 @@ describe("customer detail reads", () => {
     // A draft invoice is not a transaction yet.
     expect(sb.calls.find((c) => c.table === "acc_invoice")!.neq).toContainEqual(["status", "draft"]);
     expect(sb.calls.find((c) => c.table === "acc_credit_memo")!.neq).toContainEqual(["status", "draft"]);
+    // A payment has its own Reference apart from its memo.
+    expect(sb.calls.find((c) => c.table === "acc_payment")!.select).toContain("reference,memo");
+  });
+
+  it("reads the credit status as of the company's day, not the server's", async () => {
+    const sb = fakeClient({ acc_customer: [{ id: "c1", name: "BlueRidge Foods" }], acc_invoice: [] });
+    await getCustomerDetail(sb, "c1");
+    expect(sb.rpc).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ p_as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
   });
 
   it("keeps the page when the credit status cannot be read", async () => {

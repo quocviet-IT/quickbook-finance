@@ -23,7 +23,7 @@ export interface CustomerFacts {
   owedMinor: number;
   openCount: number;
   overdueMinor: number;
-  /** Days past due of the latest open invoice; null when none is overdue. */
+  /** Days past due of the oldest overdue invoice; null when none is overdue. */
   oldestLateDays: number | null;
   availableMinor: number | null;
   limitMinor: number | null;
@@ -86,7 +86,7 @@ export interface CustomerTransaction {
 
 export interface CustomerTransactionParts {
   invoices: { id: string; invoice_number: string | null; issue_date: string; total_minor: number; currency_code: string; status: string; memo: string | null }[];
-  payments: { id: string; payment_number: string | null; payment_date: string; amount_minor: number; currency_code: string; status: string; memo: string | null }[];
+  payments: { id: string; payment_number: string | null; payment_date: string; amount_minor: number; currency_code: string; status: string; reference: string | null; memo: string | null }[];
   creditMemos: { id: string; credit_memo_number: string | null; memo_date: string; total_minor: number; currency_code: string; status: string; memo: string | null }[];
   salesReceipts: { id: string; receipt_number: string; receipt_date: string; total_minor: number; currency_code: string; status: string; reference: string | null }[];
 }
@@ -96,7 +96,7 @@ export function mergeCustomerTransactions(parts: CustomerTransactionParts): Cust
   const rank: Record<CustomerTransactionType, number> = { payment: 0, credit_memo: 1, sales_receipt: 2, invoice: 3 };
   const rows: CustomerTransaction[] = [
     ...parts.invoices.map((r) => ({ id: r.id, type: "invoice" as const, date: r.issue_date, number: r.invoice_number, reference: r.memo, amountMinor: r.total_minor, currencyCode: r.currency_code, status: r.status })),
-    ...parts.payments.map((r) => ({ id: r.id, type: "payment" as const, date: r.payment_date, number: r.payment_number, reference: r.memo, amountMinor: r.amount_minor, currencyCode: r.currency_code, status: r.status })),
+    ...parts.payments.map((r) => ({ id: r.id, type: "payment" as const, date: r.payment_date, number: r.payment_number, reference: r.reference ?? r.memo, amountMinor: r.amount_minor, currencyCode: r.currency_code, status: r.status })),
     ...parts.creditMemos.map((r) => ({ id: r.id, type: "credit_memo" as const, date: r.memo_date, number: r.credit_memo_number, reference: r.memo, amountMinor: r.total_minor, currencyCode: r.currency_code, status: r.status })),
     ...parts.salesReceipts.map((r) => ({ id: r.id, type: "sales_receipt" as const, date: r.receipt_date, number: r.receipt_number, reference: r.reference, amountMinor: r.total_minor, currencyCode: r.currency_code, status: r.status })),
   ];

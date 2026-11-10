@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CustomerRow, InvoiceRow } from "@/lib/db/types";
 import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
 import { listCustomerCredit, type CustomerCreditRow } from "@/lib/services/credit";
+import { companyToday } from "@/lib/services/company";
 import { readAllPages } from "@/lib/services/paging";
 import { mergeCustomerTransactions, type CustomerTransaction, type CustomerTransactionParts } from "@/lib/domain/customer-detail";
 
@@ -61,7 +62,7 @@ export async function getCustomerDetail(sb: SupabaseClient, id: string): Promise
   const [openInvoices, credit] = await Promise.all([
     readOpenInvoices(sb, customer),
     // The credit read covers every customer (one RPC); a failure must not take the page down.
-    listCustomerCredit(sb).then(
+    companyToday(sb).then((asOf) => listCustomerCredit(sb, { asOf })).then(
       (rows) => ({ row: rows.find((r) => r.customerId === id) ?? null, error: null }),
       (error: unknown) => {
         console.error("Reading customer credit failed:", error instanceof Error ? error.message : error);
@@ -89,7 +90,7 @@ export async function listCustomerTransactions(
     readAllPages<CustomerTransactionParts["invoices"][number]>((f, t) =>
       between(sb.from("acc_invoice").select("id,invoice_number,issue_date,total_minor,currency_code,status,memo").eq("customer_id", id).neq("status", "draft"), "issue_date").order("issue_date").order("id").range(f, t), fail),
     readAllPages<CustomerTransactionParts["payments"][number]>((f, t) =>
-      between(sb.from("acc_payment").select("id,payment_number,payment_date,amount_minor,currency_code,status,memo").eq("customer_id", id), "payment_date").order("payment_date").order("id").range(f, t), fail),
+      between(sb.from("acc_payment").select("id,payment_number,payment_date,amount_minor,currency_code,status,reference,memo").eq("customer_id", id), "payment_date").order("payment_date").order("id").range(f, t), fail),
     readAllPages<CustomerTransactionParts["creditMemos"][number]>((f, t) =>
       between(sb.from("acc_credit_memo").select("id,credit_memo_number,memo_date,total_minor,currency_code,status,memo").eq("customer_id", id).neq("status", "draft"), "memo_date").order("memo_date").order("id").range(f, t), fail),
     readAllPages<CustomerTransactionParts["salesReceipts"][number]>((f, t) =>

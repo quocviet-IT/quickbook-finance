@@ -17,6 +17,20 @@ describe("the shared invoice dialog", () => {
     expect(dialog).toContain("href={`/customers/${invoice.customer_id}`}");
   });
 
+  it("can leave its customer unlinked, for the customer's own page", () => {
+    const dialog = read("InvoiceDetailDialog.tsx");
+    expect(dialog).toContain("linkCustomer?: boolean");
+    expect(dialog).toContain("linkCustomer = true");
+    expect(dialog).toMatch(/linkCustomer \?[\s\S]*?href=\{`\/customers\/\$\{invoice.customer_id\}`\}[\s\S]*?\) : \(\s+invoice\.customer_name/);
+  });
+
+  it("gives the list's dialog Issue and Void only to those who hold them", () => {
+    const list = read("InvoicesClient.tsx");
+    expect(list).toContain("onIssue={canIssue ? startIssue : undefined}");
+    expect(list).toContain("onVoid={canVoid ? confirmVoid : undefined}");
+    expect(list).not.toMatch(/onVoid=\{voidInv/);
+  });
+
   it("is rendered by the list, which no longer loads the details itself", () => {
     const list = read("InvoicesClient.tsx");
     expect(list).toContain("<InvoiceDetailDialog");
