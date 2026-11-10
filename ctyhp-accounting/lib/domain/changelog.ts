@@ -48,6 +48,40 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.12",
+    date: "2026-11-10",
+    headline: "Each customer has a page of their own: what they owe, what is late, and Receive payment one click away.",
+    changes: [
+      {
+        kind: "added",
+        title: "A page for each customer",
+        detail:
+          "Click a customer's name to open their page. At the top: their status and credit tags, email and phone, and five figures — Owed now, Overdue (with how late the oldest invoice is), Available credit, Terms and DSO — beside Receive payment and New invoice. Below, four tabs: Open invoices (overdue first, with what has been paid on each), Transactions (every invoice, payment, credit memo and sales receipt for a date range, the last 12 months to start), Contact & credit (with Edit), and Activity (who changed what on the customer, for those allowed to read the audit log).",
+        route: "/customers",
+      },
+      {
+        kind: "changed",
+        title: "Customers list",
+        detail:
+          "Each customer's name opens their page. Rows are one line each, with the email and city now on the customer's page, and a new Overdue column. The list opens with the customers who owe overdue money first, largest first.",
+        route: "/customers",
+      },
+      {
+        kind: "changed",
+        title: "Receive payment and New invoice start with the customer chosen",
+        detail:
+          "From a customer's page, Receive payment opens with that customer and their open invoices loaded, and New invoice opens with the customer, their due date and their state's sales tax already filled in.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "An invoice's customer links to their page",
+        detail: "In an invoice's dialog, the customer's name opens the customer's page.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "3.0.11",
     date: "2026-11-10",
     headline: "Invoices opens with what is overdue, shows when each is due, and an invoice's dialog shows the whole invoice.",

@@ -12,13 +12,19 @@ import { describe, expect, it } from "vitest";
 const read = (...parts: string[]) =>
   readFileSync(join(process.cwd(), ...parts), "utf8").replace(/\r\n/g, "\n");
 const invoices = () => read("app", "(app)", "invoices", "InvoicesClient.tsx");
-const customers = () => read("app", "(app)", "customers", "CustomersClient.tsx");
+const customers = () => read("app", "(app)", "customers", "CustomerFormModal.tsx");
 
 /** The opening tag of the `<Modal` whose title attribute is `title`. */
 function modalTag(source: string, title: string): string {
-  const start = source.indexOf(`<Modal\n        title=${title}`);
-  expect(start, `a <Modal title=${title}>`).toBeGreaterThanOrEqual(0);
-  return source.slice(start, source.indexOf("\n      >", start));
+  // The forms sit at different indentations, so the whitespace is not fixed.
+  const lines = source.split("\n");
+  const at = lines.findIndex(
+    (line, i) => line.trim() === "<Modal" && lines[i + 1]?.trim() === `title=${title}`,
+  );
+  expect(at, `a <Modal title=${title}>`).toBeGreaterThanOrEqual(0);
+  const indent = lines[at].length - lines[at].trimStart().length;
+  const end = lines.findIndex((line, i) => i > at && line === `${" ".repeat(indent)}>`);
+  return lines.slice(at, end).join("\n");
 }
 
 describe("a half-written form is not thrown away by a stray key or click", () => {
@@ -33,7 +39,7 @@ describe("a half-written form is not thrown away by a stray key or click", () =>
 
   it("the customer form does the same", () => {
     const source = customers();
-    const tag = modalTag(source, '{editing ? `Edit ${editing.name}` : "New customer"}');
+    const tag = modalTag(source, '{customer ? `Edit ${customer.name}` : "New customer"}');
     expect(tag).toContain("maskClosable={false}");
     expect(tag).toContain("onCancel={closeForm}");
     expect(source).toMatch(/function closeForm\(\)[\s\S]{0,400}closeOrConfirmDiscard\(/);
@@ -85,7 +91,9 @@ describe("voiding an invoice", () => {
 describe("change history shows amounts as money", () => {
   it("the trail on a document formats each entry in that entry's currency", () => {
     const source = read("components", "audit", "DocumentAuditTrail.tsx");
-    expect(source).toContain("summarizeAuditChanges(diffAuditEntry(entry), 3, auditEntryCurrency(entry))");
+    expect(source).toContain("summarizeAuditChanges(diffAuditEntry(entry), 3, currencyOf(entry))");
+    // The entry's own currency first; a record that names none (a customer) falls back (3.0.12).
+    expect(source).toContain("auditEntryCurrency(entry) ?? currencyFallback ?? null");
     expect(source).toContain("auditDisplayValue(");
   });
 

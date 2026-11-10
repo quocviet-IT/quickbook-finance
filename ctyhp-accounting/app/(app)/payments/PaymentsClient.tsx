@@ -72,6 +72,7 @@ const AttachmentDrawer = dynamic(() => import("@/components/documents/Attachment
 
 export default function PaymentsClient({
   initialCreateOpen,
+  initialCustomerId = null,
   payments,
   customers,
   depositAccounts,
@@ -87,6 +88,8 @@ export default function PaymentsClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  /** From a customer's page (`?customer=`): chosen in the first Receive payment form only. */
+  initialCustomerId?: string | null;
   payments: PaymentListRow[];
   customers: CustomerRow[];
   depositAccounts: AccountRow[];
@@ -340,6 +343,7 @@ export default function PaymentsClient({
           key={`receive-${receiveSession}`}
           open={receiveOpen}
           basis={basis}
+          initialCustomerId={receiveSession === 0 && !basis ? initialCustomerId : null}
           customers={customers}
           depositAccounts={depositAccounts}
           defaultDepositAccountId={defaultDepositAccountId}

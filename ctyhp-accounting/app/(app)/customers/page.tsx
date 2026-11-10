@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listCustomers } from "@/lib/services/invoicing";
 import { listCustomerCredit } from "@/lib/services/credit";
+import { companyToday } from "@/lib/services/company";
 import { listUsStates } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
@@ -12,7 +13,8 @@ export default async function CustomersPage() {
   const sb = await createSupabaseServerClient();
   const [customers, credit, usStates, role] = await Promise.all([
     listCustomers(sb),
-    listCustomerCredit(sb),
+    // The company's own day, as the customer page counts overdue, not the server's UTC one.
+    companyToday(sb).then((asOf) => listCustomerCredit(sb, { asOf })),
     listUsStates(sb),
     getUserRole(),
   ]);

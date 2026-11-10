@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{ new?: string; customer?: string }>;
 }) {
-  const initialCreateOpen = (await searchParams).new === "1";
+  const params = await searchParams;
+  const initialCreateOpen = params.new === "1";
   const sb = await createSupabaseServerClient();
   const [
     payments,
@@ -44,6 +45,11 @@ export default async function PaymentsPage({
     postingDefaultsOrNone(sb),
   ]);
 
+  // `?customer=<id>`, from a customer's page. Any existing customer can pay,
+  // inactive or not; an unknown id is ignored.
+  const prefillCustomer =
+    params.customer && customers.some((c) => c.id === params.customer) ? params.customer : null;
+
   const depositAccounts = accounts.filter(
     (a) => (a.account_type === "bank" || a.account_code === "1210") && a.is_posting_account && a.status === "active",
   );
@@ -53,6 +59,7 @@ export default async function PaymentsPage({
       <PageHeader title="Payments" description="Record customer payments and apply them to open invoices." />
       <PaymentsClient
         initialCreateOpen={initialCreateOpen}
+        initialCustomerId={prefillCustomer}
         payments={payments}
         customers={customers}
         depositAccounts={depositAccounts}

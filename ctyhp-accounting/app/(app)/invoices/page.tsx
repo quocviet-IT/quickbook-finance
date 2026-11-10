@@ -57,6 +57,7 @@ export default async function InvoicesPage({
     asOf?: string;
     focus?: string;
     estimate?: string;
+    customer?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -128,6 +129,14 @@ export default async function InvoicesPage({
     fromEstimate.notice === null &&
     (params.estimate ? fromEstimate.prefill !== null : holdsCreate);
 
+  // `?customer=<id>`, from a customer's page: the form opens with that customer
+  // chosen. Only an active customer can be invoiced, so anything else is
+  // ignored; an estimate's own customer takes precedence.
+  const prefillCustomer =
+    !params.estimate && params.customer && customers.some((c) => c.id === params.customer && c.is_active)
+      ? params.customer
+      : null;
+
   // A number the sequence issued that no invoice holds is the sign of a removed
   // sale, so the warning belongs where invoices are worked on — not only in the
   // report somebody has to remember to open.
@@ -164,6 +173,7 @@ export default async function InvoicesPage({
         // estimate converted) does not remount it to say so.
         key={params.estimate ?? "invoices"}
         initialCreateOpen={initialCreateOpen}
+        initialCustomerId={prefillCustomer}
         estimatePrefill={fromEstimate.prefill}
         estimateNotice={fromEstimate.notice}
         initialQueue={initialQueue}

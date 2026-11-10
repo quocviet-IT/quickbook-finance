@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Dropdown, Tooltip, type MenuProps } from "antd";
+import { Button, Dropdown, Tooltip, type ButtonProps, type MenuProps } from "antd";
 import { MoreOutlined } from "@ant-design/icons";
 
 /** What the ⋮ button says when pointed at: the same words on every list. */
@@ -19,17 +19,20 @@ export default function RowActionsMenu({
   label,
   loading,
   minWidth = 148,
+  size = "small",
 }: {
   items: MenuProps["items"];
   /** What a screen reader hears, naming the row: "Actions for INV-0042". */
   label: string;
   loading?: boolean;
   minWidth?: number;
+  /** Small in a table row; a page header's ⋯ sits beside full-size buttons. */
+  size?: ButtonProps["size"];
 }) {
   return (
     <Dropdown menu={{ items, style: { minWidth } }} trigger={["click"]}>
       <Tooltip title={MORE_ACTIONS}>
-        <Button size="small" icon={<MoreOutlined />} loading={loading} aria-label={label} />
+        <Button size={size} icon={<MoreOutlined />} loading={loading} aria-label={label} />
       </Tooltip>
     </Dropdown>
   );

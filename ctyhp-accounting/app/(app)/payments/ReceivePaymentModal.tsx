@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
   App,
@@ -55,6 +55,8 @@ export interface ReceivePaymentModalProps {
   depositAccounts: AccountRow[];
   /** Where a new payment lands unless somebody chooses otherwise (3.01); a correction keeps its own. */
   defaultDepositAccountId?: string | null;
+  /** Opens an ordinary receipt with this customer chosen and their open invoices listed. */
+  initialCustomerId?: string | null;
   currencies: CurrencyRow[];
   onClose: () => void;
   onDone: () => void;
@@ -66,6 +68,7 @@ export default function ReceivePaymentModal({
   customers,
   depositAccounts,
   defaultDepositAccountId = null,
+  initialCustomerId = null,
   currencies,
   onClose,
   onDone,
@@ -81,8 +84,13 @@ export default function ReceivePaymentModal({
   const currency: string = Form.useWatch("currency_code", form) ?? baseCurrency;
   const amount: number = Form.useWatch("amount", form) ?? 0;
 
+  // The customer whose open invoices were asked for last: a slower earlier answer must not replace theirs.
+  const latestCustomerId = useRef<string | null>(null);
+
   async function loadOpenInvoices(customerId: string) {
+    latestCustomerId.current = customerId;
     const res = await getOpenInvoicesAction(customerId);
+    if (latestCustomerId.current !== customerId) return;
     if (res.ok && res.data) setOpenInvoices(res.data);
     else {
       setOpenInvoices([]);
@@ -97,16 +105,23 @@ export default function ReceivePaymentModal({
   const draft = source ? paymentReplacementDraft(source, decimalsOf(source.currency_code)) : null;
   const initialValues = draft
     ? { ...draft, payment_date: dayjs(draft.payment_date) }
-    : { currency_code: baseCurrency, deposit_account_id: defaultDepositAccountId ?? undefined };
+    : {
+        currency_code: baseCurrency,
+        deposit_account_id: defaultDepositAccountId ?? undefined,
+        customer_id: initialCustomerId ?? undefined,
+      };
 
+  // A replacement's customer, or the one a customer's page opened this with.
+  const prefillCustomerId = draft?.customer_id ?? initialCustomerId ?? null;
   // Prefilled, never pre-submitted: the form shows the same customer's open
   // invoices, and which of them it settles is chosen again on purpose.
   useEffect(() => {
-    if (!draft) return;
+    if (!prefillCustomerId) return;
     let cancelled = false;
+    latestCustomerId.current = prefillCustomerId;
     void (async () => {
-      const res = await getOpenInvoicesAction(draft.customer_id);
-      if (cancelled) return;
+      const res = await getOpenInvoicesAction(prefillCustomerId);
+      if (cancelled || latestCustomerId.current !== prefillCustomerId) return;
       if (res.ok && res.data) setOpenInvoices(res.data);
       else message.error(res.error ?? "Failed to load open invoices");
     })();
@@ -114,7 +129,7 @@ export default function ReceivePaymentModal({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft?.customer_id]);
+  }, [prefillCustomerId]);
 
   async function onCustomerChange(customerId: string) {
     setAlloc({});

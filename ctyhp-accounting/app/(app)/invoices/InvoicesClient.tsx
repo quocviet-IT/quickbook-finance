@@ -2,14 +2,12 @@
 import { useMemo, useState } from "react";
 import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import dayjs from "dayjs";
 import {
   Alert,
   App,
   Button,
   DatePicker,
-  Descriptions,
   Form,
   Input,
   Modal,
@@ -18,7 +16,6 @@ import {
   Tabs,
   Tag,
   Typography,
-  type DescriptionsProps,
   type MenuProps,
   type TableColumnsType,
 } from "antd";
@@ -39,15 +36,13 @@ import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
 import type {
   AccountRow,
   ActorRow,
-  AuditEntryRow,
   CurrencyRow,
   TaxCodeRow,
   CustomerRow,
   InvoiceStatus,
-  InvoiceLineRow,
   ItemRow,
 } from "@/lib/db/types";
-import type { InvoiceEstimateLink, InvoiceWithCustomer } from "@/lib/services/invoicing";
+import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
 import type { CustomerCreditRow } from "@/lib/services/credit";
 import { formatDate, formatMoney, toMinorUnits } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
@@ -72,15 +67,12 @@ import {
   groupTaxCodesByState,
   taxCodeLabel,
 } from "@/lib/domain/tax-jurisdiction";
-import DocumentAuditTrail from "@/components/audit/DocumentAuditTrail";
-import SettlementHistory from "@/components/settlements/SettlementHistory";
-import type { SettlementEvent } from "@/lib/domain/settlement";
+import InvoiceDetailDialog from "./InvoiceDetailDialog";
 import {
   createInvoiceAction,
   createCustomerAction,
   issueInvoiceAction,
   voidInvoiceAction,
-  getInvoiceDetailAction,
   getInvoiceDocumentAction,
 } from "./actions";
 import { downloadInvoicePdf } from "@/lib/client/invoice-pdf";
@@ -114,15 +106,8 @@ const AttachmentDrawer = dynamic(() => import("@/components/documents/Attachment
   ssr: false,
 });
 
-/** The dialog an invoice's lines open in, whose body is the lines table's box. */
-export const VIEW_INVOICE_MODAL_WIDTH = 820;
-
-/**
- * Quantity, Unit price, Subtotal, Tax. Description takes what is left. They
- * were 90, 110, 110 and 100, this dialog's own numbers; the amounts now take
- * the width every other money column has.
- */
-export const INVOICE_LINES_FIXED_WIDTHS = [COLUMN.QTY, COLUMN.MONEY, COLUMN.MONEY, COLUMN.MONEY] as const;
+/** The invoice dialog's sizes live with the dialog; tests read them from here. */
+export { VIEW_INVOICE_MODAL_WIDTH, INVOICE_LINES_FIXED_WIDTHS } from "./InvoiceDetailDialog";
 
 /**
  * The list's measured columns: Number, Issued, Due, Total, Balance due,
@@ -154,6 +139,7 @@ export const INVOICE_LIST_FIXED_WIDTHS = [
 
 export default function InvoicesClient({
   initialCreateOpen,
+  initialCustomerId,
   estimatePrefill,
   estimateNotice,
   initialQueue,
@@ -183,6 +169,8 @@ export default function InvoicesClient({
 }: {
   /** Seeded by the top-bar New menu via `?new=1`. */
   initialCreateOpen: boolean;
+  /** From a customer's page (`?customer=`): the customer the form opens with, chosen once. */
+  initialCustomerId: string | null;
   /** From "Turn into an invoice" (`?estimate=`): the customer and lines the form opens with. */
   estimatePrefill: EstimateInvoicePrefill | null;
   /** Shown instead of opening the form when that estimate cannot be turned into an invoice now. */
@@ -259,20 +247,8 @@ export default function InvoicesClient({
   const [custForm] = Form.useForm();
   const [localCustomers, setLocalCustomers] = useState<CustomerRow[]>(customers);
 
-  // View lines
-  const [linesOpen, setLinesOpen] = useState(false);
-  const [viewLines, setViewLines] = useState<InvoiceLineRow[]>([]);
-  const [viewInvoice, setViewInvoice] = useState<InvoiceWithCustomer | null>(null);
-  const [viewAudit, setViewAudit] = useState<AuditEntryRow[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [viewSettlements, setViewSettlements] = useState<SettlementEvent[]>([]);
-  const [settlementsLoading, setSettlementsLoading] = useState(false);
-  const [viewEstimate, setViewEstimate] = useState<InvoiceEstimateLink | null>(null);
-
-  const directory = useMemo(
-    () => new Map(actors.map((a) => [a.id, a.email || a.full_name])),
-    [actors],
-  );
+  // The invoice whose dialog is open (InvoiceDetailDialog loads the rest).
+  const [viewing, setViewing] = useState<InvoiceWithCustomer | null>(null);
 
   // Rates differ by state, so the picker is grouped by state rather than being
   // a flat list of codes nobody can tell apart.
@@ -400,11 +376,13 @@ export default function InvoicesClient({
       lines: [newInvoiceLine],
     });
     setCreateDirty(false);
+    setPrefillPending(false);
     setOpen(true);
   }
 
   function finishCreate() {
     setCreateDirty(false);
+    setPrefillPending(false);
     setOpen(false);
   }
 
@@ -441,17 +419,47 @@ export default function InvoicesClient({
    * never over a rate somebody chose. Nothing is filled where the company has
    * no rate there, or where its state has more than one: neither is a default.
    */
-  function applyCustomerDefaults(customerId: string) {
+  /**
+   * What knowing the customer sets: the due date from their terms and the rate
+   * registered in their state. Shared by picking a customer and by opening the
+   * form with one already chosen (`?customer=`), so the two cannot drift.
+   */
+  function customerDefaults(customerId: string, issue: dayjs.Dayjs) {
     const customer = localCustomers.find((c) => c.id === customerId);
-
     // Terms are a promise about when the money arrives, so they belong on the
     // invoice the moment the customer is known — net 15 for a retail buyer and
     // net 30 for a trade account are different due dates, not a preference.
     const terms = customer?.credit_terms_days ?? defaultTermsDays;
-    const issue = form.getFieldValue("issue_date") ?? dayjs(today);
-    form.setFieldValue("due_date", issue.add(terms, "day"));
+    return {
+      customer,
+      dueDate: issue.add(terms, "day"),
+      rate: defaultTaxCodeForState(customer?.region, taxCodes),
+    };
+  }
 
-    const rate = defaultTaxCodeForState(customer?.region, taxCodes);
+  /**
+   * Opened from a customer's page (`?customer=`): the form's values with that
+   * customer chosen, as Form data so they are there when the form mounts. Held
+   * only until the first New invoice or close, so a later one starts empty.
+   */
+  const customerPrefillValues = useMemo(() => {
+    if (!initialCreateOpen || !initialCustomerId || estimatePrefill) return null;
+    const { dueDate, rate } = customerDefaults(initialCustomerId, dayjs(today));
+    return {
+      customer_id: initialCustomerId,
+      currency_code: baseCurrency,
+      due_date: dueDate,
+      lines: [{ ...newInvoiceLine, tax_code_id: rate?.id ?? undefined }],
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [prefillPending, setPrefillPending] = useState(Boolean(customerPrefillValues));
+
+  function applyCustomerDefaults(customerId: string) {
+    const issue = form.getFieldValue("issue_date") ?? dayjs(today);
+    const { customer, dueDate, rate } = customerDefaults(customerId, issue);
+    form.setFieldValue("due_date", dueDate);
+
     if (!rate) return;
     const lines: LineForm[] = form.getFieldValue("lines") ?? [];
     let filled = 0;
@@ -545,7 +553,7 @@ export default function InvoicesClient({
     if (res.ok) {
       message.success("Invoice issued and posted to the ledger");
       // Issued from its dialog: the dialog showed the draft, which no longer exists.
-      setLinesOpen(false);
+      setViewing(null);
     } else message.error(res.error ?? "Failed to issue invoice");
   }
 
@@ -589,7 +597,7 @@ export default function InvoicesClient({
     setBusyId(null);
     if (res.ok) {
       message.success("Invoice voided");
-      setLinesOpen(false);
+      setViewing(null);
     } else message.error(res.error ?? "Failed to void invoice");
   }
 
@@ -612,31 +620,6 @@ export default function InvoicesClient({
     );
   }
 
-  async function viewInvoiceLines(inv: InvoiceWithCustomer) {
-    setViewInvoice(inv);
-    setViewLines([]);
-    setViewAudit([]);
-    setViewSettlements([]);
-    setViewEstimate(null);
-    setLinesOpen(true);
-    setSettlementsLoading(true);
-    if (canReadAudit) setAuditLoading(true);
-    // One request: Next runs Server Actions one at a time, so these three
-    // reads sent as separate actions were three trips in a row.
-    const { lines: res, settlements: settled, audit: trail, estimate: madeFrom } = await getInvoiceDetailAction(inv.id, canReadAudit);
-    setSettlementsLoading(false);
-    setAuditLoading(false);
-    if (res.ok && res.data) setViewLines(res.data);
-    else message.error(res.error ?? "Failed to load lines");
-    if (settled.ok && settled.data) setViewSettlements(settled.data);
-    else message.error(settled.error ?? "Failed to load the payment history");
-    if (madeFrom.ok) setViewEstimate(madeFrom.data ?? null);
-    else message.error(madeFrom.error ?? "Failed to load the estimate it was made from");
-    if (!trail) return;
-    if (trail.ok && trail.data) setViewAudit(trail.data);
-    else message.error(trail.error ?? "Failed to load the change history");
-  }
-
   async function downloadPdf(inv: InvoiceWithCustomer) {
     setPdfId(inv.id);
     try {
@@ -649,47 +632,6 @@ export default function InvoicesClient({
     } finally {
       setPdfId(null);
     }
-  }
-
-  const money = (minor: number, code: string) => formatMoney(minor, code, decimalsOf(code));
-
-  /** Void as the open invoice's dialog offers it: the menu's rule (invoiceVoidOption). */
-  const viewVoid = viewInvoice ? invoiceVoidOption(viewInvoice) : null;
-
-  /**
-   * The head of an invoice's dialog: who, what state, which dates, which entry
-   * and what is still owed (3.0.11). The status reads as in the list, plus how
-   * late or how soon when that is the point.
-   */
-  function invoiceHeaderItems(inv: InvoiceWithCustomer): DescriptionsProps["items"] {
-    const look = invoiceAttentionLook(invoiceAttention(inv, today));
-    const code = look?.tone === "danger" ? "overdue" : "due_soon";
-    return [
-      { key: "customer", label: "Customer", children: inv.customer_name },
-      {
-        key: "status",
-        label: "Status",
-        children: (
-          <Space size={4} wrap>
-            <StatusTag status={inv.status} labels={PAID_LABELS} />
-            {look ? <StatusTag status={code} looks={{ [code]: look }} /> : null}
-          </Space>
-        ),
-      },
-      { key: "issued", label: "Issued", children: formatDate(inv.issue_date) },
-      { key: "due", label: "Due", children: inv.due_date ? formatDate(inv.due_date) : "—" },
-      {
-        key: "entry",
-        label: "Journal entry",
-        children:
-          inv.entry_number && inv.journal_entry_id ? (
-            <Link href={`/journal?entry=${inv.journal_entry_id}`}>{inv.entry_number}</Link>
-          ) : (
-            "Not posted yet"
-          ),
-      },
-      { key: "balance", label: "Balance due", children: money(inv.balance_due_minor, inv.currency_code) },
-    ];
   }
 
   // One line per row since 3.0.11. The journal entry, who raised the invoice and
@@ -775,7 +717,7 @@ export default function InvoicesClient({
       // competing with Void for the reader's attention.
       render: (_: unknown, r) => {
         const menu: MenuProps["items"] = [
-          { key: "lines", label: "View lines", onClick: () => viewInvoiceLines(r) },
+          { key: "lines", label: "View lines", onClick: () => setViewing(r) },
           {
             key: "pdf",
             label: pdfId === r.id ? "Preparing PDF…" : "Download PDF",
@@ -997,7 +939,10 @@ export default function InvoicesClient({
         <Form
           form={form}
           layout="vertical"
-          initialValues={estimateFormValues ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }}
+          initialValues={
+            estimateFormValues ??
+            (prefillPending ? customerPrefillValues : null) ?? { currency_code: baseCurrency, lines: [newInvoiceLine] }
+          }
           // Fires on the reader's edits only; the defaults set above do not count.
           onValuesChange={() => setCreateDirty(true)}
         >
@@ -1136,126 +1081,18 @@ export default function InvoicesClient({
         </Form>
       </Modal>
 
-      {/* View lines */}
-      <Modal
-        title={`Invoice ${viewInvoice?.invoice_number ?? "(draft)"}`}
-        open={linesOpen}
-        onCancel={() => setLinesOpen(false)}
-        // The invoice's own actions, where the reader is looking at it (3.0.11).
-        // Void follows the menu's rule: refused once money is applied, and then
-        // the reason stands in its place.
-        footer={
-          viewInvoice ? (
-            <Space wrap>
-              {canVoid && viewVoid?.offered ? (
-                viewVoid.blockedReason ? (
-                  <Typography.Text type="secondary">{viewVoid.blockedReason}</Typography.Text>
-                ) : (
-                  <Button danger onClick={() => confirmVoid(viewInvoice)}>
-                    Void invoice
-                  </Button>
-                )
-              ) : null}
-              <Button loading={pdfId === viewInvoice.id} onClick={() => downloadPdf(viewInvoice)}>
-                Download PDF
-              </Button>
-              <Button onClick={() => setLinesOpen(false)}>Close</Button>
-              {canIssue && viewInvoice.status === "draft" ? (
-                <Button type="primary" loading={busyId === viewInvoice.id} onClick={() => startIssue(viewInvoice)}>
-                  Issue
-                </Button>
-              ) : null}
-            </Space>
-          ) : null
-        }
-        width={VIEW_INVOICE_MODAL_WIDTH}
-      >
-        {/* Who, what state and which dates, before anything else. The journal
-            entry and who raised it used to sit under the customer in the list. */}
-        {viewInvoice ? (
-          <Descriptions
-            size="small"
-            column={2}
-            bordered
-            style={{ marginBottom: 16 }}
-            items={invoiceHeaderItems(viewInvoice)}
-          />
-        ) : null}
-
-        {viewEstimate ? (
-          <Typography.Paragraph>
-            <Link href="/estimates">{estimateMessages.fromEstimate(viewEstimate.estimate_number)}</Link>
-          </Typography.Paragraph>
-        ) : null}
-
-        <DataTable<InvoiceLineRow>
-          rowKey="id"
-          pagination={false}
-          rows={viewLines}
-          columns={[
-            flexColumn<InvoiceLineRow>({ title: "Description", dataIndex: "description" }),
-            { title: "Quantity", dataIndex: "quantity", width: INVOICE_LINES_FIXED_WIDTHS[0], align: "right" },
-            {
-              title: "Unit price",
-              dataIndex: "unit_price_minor",
-              width: INVOICE_LINES_FIXED_WIDTHS[1],
-              align: "right",
-              render: (v: number) =>
-                viewInvoice ? formatMoney(v, viewInvoice.currency_code, decimalsOf(viewInvoice.currency_code)) : v,
-            },
-            {
-              title: "Subtotal",
-              dataIndex: "line_subtotal_minor",
-              width: INVOICE_LINES_FIXED_WIDTHS[2],
-              align: "right",
-              render: (v: number) =>
-                viewInvoice ? formatMoney(v, viewInvoice.currency_code, decimalsOf(viewInvoice.currency_code)) : v,
-            },
-            {
-              title: "Tax",
-              dataIndex: "line_tax_minor",
-              width: INVOICE_LINES_FIXED_WIDTHS[3],
-              align: "right",
-              render: (v: number) =>
-                viewInvoice ? formatMoney(v, viewInvoice.currency_code, decimalsOf(viewInvoice.currency_code)) : v,
-            },
-          ]}
-        />
-
-        {/* The invoice's own totals, under its lines, as the New invoice form shows them. */}
-        {viewInvoice ? (
-          <div style={{ textAlign: "right", marginTop: 12, fontVariantNumeric: "tabular-nums" }}>
-            <div>Subtotal: {money(viewInvoice.subtotal_minor, viewInvoice.currency_code)}</div>
-            <div>Tax: {money(viewInvoice.tax_total_minor, viewInvoice.currency_code)}</div>
-            <Typography.Text strong>Total: {money(viewInvoice.total_minor, viewInvoice.currency_code)}</Typography.Text>
-          </div>
-        ) : null}
-
-        {viewInvoice ? (
-          <div style={{ margin: "16px 0" }}>
-            <SettlementHistory
-              totalMinor={viewInvoice.total_minor}
-              balanceDueMinor={viewInvoice.balance_due_minor}
-              currencyCode={viewInvoice.currency_code}
-              decimals={decimalsOf(viewInvoice.currency_code)}
-              events={viewSettlements}
-              loading={settlementsLoading}
-              emptyText="No payment, credit or write-off has been applied to this invoice yet."
-            />
-          </div>
-        ) : null}
-
-        {/* Last: who changed what, for the reader checking the record. */}
-        {viewInvoice ? (
-          <DocumentAuditTrail
-            record={viewInvoice}
-            directory={directory}
-            entries={viewAudit}
-            loading={auditLoading}
-            canReadAudit={canReadAudit}
-          />
-        ) : null}
-      </Modal>
+      <InvoiceDetailDialog
+        invoice={viewing}
+        currencies={currencies}
+        actors={actors}
+        canReadAudit={canReadAudit}
+        onClose={() => setViewing(null)}
+        onDownloadPdf={downloadPdf}
+        pdfBusy={pdfId === viewing?.id}
+        onIssue={canIssue ? startIssue : undefined}
+        issueBusy={busyId === viewing?.id}
+        onVoid={canVoid ? confirmVoid : undefined}
+      />
 
       <Modal
         title="Issue over the credit limit"
