@@ -304,14 +304,14 @@ describe("quality CI contracts", () => {
     expect(structuralTokens(workflow).join("\n")).not.toMatch(/\$\{\{\s*secrets\./);
   });
 
-  it("runs the authenticated audit only in a secret-minimal manual or weekly report workflow", () => {
+  it("runs the authenticated audit only in a secret-minimal, manually dispatched report workflow", () => {
     const workflow = readWorkflow("quality-runtime.yml");
     expect(workflow, "the runtime quality workflow must exist and parse as YAML").not.toBeNull();
 
-    expect(workflow!.on).toEqual({
-      workflow_dispatch: null,
-      schedule: [{ cron: "17 3 * * 1" }],
-    });
+    // No schedule: the repository holds none of the sign-in configuration, so
+    // every weekly run failed at validation without auditing anything. A
+    // schedule comes back only after a manual run passes.
+    expect(workflow!.on).toEqual({ workflow_dispatch: null });
     expect(workflow!.permissions).toEqual({ contents: "read" });
 
     const job = workflow!.jobs?.["runtime-quality"];
