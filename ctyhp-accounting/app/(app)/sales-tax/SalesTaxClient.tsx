@@ -138,7 +138,9 @@ export default function SalesTaxClient(props: Props) {
 
   function confirmVoidPayment(id: string) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Void this tax payment?",
+      okText: "Void",
       okButtonProps: { danger: true },
       onOk: async () => {
         const res = await voidTaxPaymentAction(id);

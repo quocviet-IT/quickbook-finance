@@ -452,6 +452,7 @@ export default function ReconcileWorkspaceClient({
     let discarded = false;
     setDiscarding(true);
     const dialog = modal.confirm({
+      autoFocusButton: "cancel",
       title: `${DISCARD_RECONCILIATION}?`,
       content: (
         <Space orientation="vertical" size="small" style={{ width: "100%" }}>

@@ -135,8 +135,10 @@ export default function ExpensesClient({
 
   function confirmVoid(id: string) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Void this expense?",
       content: "This reverses its journal entry.",
+      okText: "Void",
       okButtonProps: { danger: true },
       onOk: async () => {
         const res = await voidExpenseAction(id);

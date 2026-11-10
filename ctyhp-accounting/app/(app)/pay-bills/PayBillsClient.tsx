@@ -179,8 +179,10 @@ export default function PayBillsClient({
 
   function confirmVoid(id: string) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Void this bill payment?",
       content: "This reverses the journal entry and restores the bill balances.",
+      okText: "Void",
       okButtonProps: { danger: true },
       onOk: async () => {
         const res = await voidBillPaymentAction(id);

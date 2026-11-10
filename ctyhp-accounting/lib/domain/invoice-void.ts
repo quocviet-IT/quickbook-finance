@@ -1,13 +1,11 @@
 /**
  * When an invoice can be voided, and what the question says before it is.
  *
- * Pure. The rule is acc_void_invoice's (0169): a draft is marked void with
- * nothing to reverse; an issued invoice has its journal entry voided; and any
- * invoice whose balance due differs from its total — a payment, a credit or a
- * write-off applied — is refused. The menu follows the same rule, so nobody
- * confirms a void only to be told no.
+ * Pure. The rule is shared with bills (document-void.ts, after
+ * acc_void_invoice in 0169); this file holds the invoice's own words.
  */
 import type { InvoiceStatus } from "@/lib/db/types";
+import { DRAFT_VOID_CONTENT, documentVoidOption, type VoidOption } from "@/lib/domain/document-void";
 
 export interface VoidableInvoice {
   status: InvoiceStatus;
@@ -19,19 +17,10 @@ export interface VoidableInvoice {
   entry_number: string | null;
 }
 
-export type InvoiceVoidOption =
-  | { offered: false }
-  /** Offered; when `blockedReason` is set, shown disabled with that reason. */
-  | { offered: true; blockedReason: string | null };
-
-export const VOID_BLOCKED_BY_SETTLEMENT = "Payments or credits are applied to it, so it cannot be voided";
+export type InvoiceVoidOption = VoidOption;
 
 export function invoiceVoidOption(invoice: VoidableInvoice): InvoiceVoidOption {
-  if (invoice.status === "void" || invoice.status === "paid") return { offered: false };
-  if (invoice.status !== "draft" && invoice.balance_due_minor !== invoice.total_minor) {
-    return { offered: true, blockedReason: VOID_BLOCKED_BY_SETTLEMENT };
-  }
-  return { offered: true, blockedReason: null };
+  return documentVoidOption(invoice);
 }
 
 /** The confirmation's title and body, naming the invoice and what voiding does to it. */
@@ -39,8 +28,7 @@ export function invoiceVoidConfirm(invoice: VoidableInvoice): { title: string; c
   if (invoice.status === "draft" || !invoice.invoice_number) {
     return {
       title: `Void the draft invoice for ${invoice.customer_name}?`,
-      content:
-        "Nothing has been posted for a draft, so the ledger does not change. The draft stays in the list, marked Void.",
+      content: DRAFT_VOID_CONTENT,
     };
   }
   const entry = invoice.entry_number ? `journal entry ${invoice.entry_number}` : "its journal entry";

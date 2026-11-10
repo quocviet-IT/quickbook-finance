@@ -39,6 +39,32 @@ describe("a half-written form is not thrown away by a stray key or click", () =>
     expect(source).toMatch(/function closeForm\(\)[\s\S]{0,400}closeOrConfirmDiscard\(/);
     expect(source).toMatch(/useUnsavedGuard\(open && dirty, modal, "this customer"\)/);
   });
+
+  // 3.0.9: the estimate form shares the invoice's line editor and lost its
+  // lines the same way.
+  it("the estimate form does the same, from its Cancel button too", () => {
+    const source = read("app", "(app)", "estimates", "EstimateFormModal.tsx");
+    expect(source).toMatch(/<Modal title=\{title\} open onCancel=\{closeForm\} maskClosable=\{false\}/);
+    expect(source).toMatch(/<Button key="close" onClick=\{closeForm\}>/);
+    expect(source).toMatch(/function closeForm\(\)[\s\S]{0,400}closeOrConfirmDiscard\(/);
+    expect(source).toMatch(/useUnsavedGuard\(dirty, modal, "this estimate"\)/);
+  });
+});
+
+describe("voiding a bill (3.0.9)", () => {
+  const bills = () => read("app", "(app)", "bills", "BillsClient.tsx");
+
+  it("asks through the destructive dialog, with the words the bill's state calls for", () => {
+    const source = bills();
+    expect(source).toMatch(/modal\.confirm\(\s*destructiveConfirmProps\(\{\s*\.\.\.billVoidConfirm\(bill\)/);
+    expect(source).not.toContain("Bills with payments applied cannot be voided");
+  });
+
+  it("offers Void by the database's rule, disabled with its reason when money is applied", () => {
+    const source = bills();
+    expect(source).toContain("const voidOption = billVoidOption(r);");
+    expect(source).toMatch(/disabled: voidOption\.blockedReason !== null/);
+  });
 });
 
 describe("voiding an invoice", () => {

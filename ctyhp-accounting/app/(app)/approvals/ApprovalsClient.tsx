@@ -94,6 +94,7 @@ export default function ApprovalsClient({
   async function reject(req: ApprovalRequestRow) {
     let note = "";
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Reject "${req.title}"?`,
       content: (
         <div>

@@ -97,6 +97,7 @@ export default function PeriodsClient({
     let varianceNote = "";
 
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Close ${row.label}?`,
       width: problem ? 560 : undefined,
       okText: problem ? "Close over the variance" : "Close",

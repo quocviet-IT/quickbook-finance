@@ -50,6 +50,7 @@ export function useUnsavedGuard(dirty: boolean, modal: HookAPI, what = "this cou
       event.stopPropagation();
       const destination = `${url.pathname}${url.search}${url.hash}`;
       modal.confirm({
+        autoFocusButton: "cancel",
         title: "Leave without saving?",
         content: `You have changes to ${what} that are not saved. Leaving now throws them away.`,
         okText: "Leave",

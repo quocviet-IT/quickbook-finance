@@ -72,6 +72,7 @@ export default function RelatedCompaniesSection({
 
   function remove(row: RelatedListRow) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Remove this related company?",
       content: `${row.name}. Lines already posted stay as they are; new ones naming it are no longer offered to ${row.accountLabel}.`,
       okText: "Remove related company",
