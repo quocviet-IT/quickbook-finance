@@ -25,7 +25,10 @@ export async function getCustomerDetail(sb: SupabaseClient, id: string): Promise
     // The credit read covers every customer (one RPC); a failure must not take the page down.
     listCustomerCredit(sb).then(
       (rows) => ({ row: rows.find((r) => r.customerId === id) ?? null, error: null }),
-      () => ({ row: null, error: "Credit status could not be read" }),
+      (error: unknown) => {
+        console.error("Reading customer credit failed:", error instanceof Error ? error.message : error);
+        return { row: null, error: "Credit status could not be read" };
+      },
     ),
   ]);
   return { customer: data as CustomerRow, credit: credit.row, creditError: credit.error, openInvoices };

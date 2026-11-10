@@ -85,8 +85,11 @@ describe("customer detail reads", () => {
       { acc_customer: [{ id: "c1", name: "BlueRidge Foods" }], acc_invoice: [] },
       { error: { message: "rpc down" } },
     );
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     const detail = await getCustomerDetail(sb, "c1");
     expect(detail?.credit).toBeNull();
     expect(detail?.creditError).toBe("Credit status could not be read");
+    expect(logged).toHaveBeenCalledWith("Reading customer credit failed:", "rpc down");
+    logged.mockRestore();
   });
 });
