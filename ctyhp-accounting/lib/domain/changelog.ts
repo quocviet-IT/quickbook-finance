@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.9",
+    date: "2026-11-10",
+    headline: "Every question before something that cannot be undone now starts on Cancel, and bills void as carefully as invoices.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Questions before something that cannot be undone start on Cancel",
+        detail:
+          "Questions such as Reverse JE-000123?, Void this expense?, Turn off two-step sign-in?, Reject a request, Delete this rule? and Close a period opened with their red button selected, so pressing Enter went ahead. Every one now opens with Cancel selected, and the red button has to be chosen. Void questions that used to have a button labelled OK now say Void, and archiving an analysis says Archive.",
+        route: "/journal",
+      },
+      {
+        kind: "changed",
+        title: "Void bill says why it is unavailable once money is applied",
+        detail:
+          "A bill with a payment, a vendor credit or a write-off applied cannot be voided. The menu used to offer Void anyway and refuse only after you had confirmed. It now shows Void bill greyed out with the reason underneath.",
+        route: "/bills",
+      },
+      {
+        kind: "fixed",
+        title: "Voiding a bill names it and says what happens",
+        detail:
+          "The question before voiding a bill said \"Void this bill?\" whichever bill it was, and warned a draft that its journal entry would be reversed. It now names the bill and the journal entry it reverses, and says the vendor is no longer owed it. For a draft it names the vendor and says the ledger does not change.",
+        route: "/bills",
+      },
+      {
+        kind: "fixed",
+        title: "A half-written estimate is not thrown away by Escape or a stray click",
+        detail:
+          "Like New invoice in v3.0.8, the estimate form now asks before discarding what was typed when you press Escape, click the close button or click Cancel, and a click beside the form no longer closes it.",
+        route: "/estimates",
+      },
+    ],
+  },
+  {
     version: "3.0.8",
     date: "2026-11-10",
     headline: "Invoices and customers no longer lose what you typed, and voiding asks more carefully.",

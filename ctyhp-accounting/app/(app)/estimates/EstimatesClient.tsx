@@ -141,6 +141,7 @@ export default function EstimatesClient({
 
   function confirmDelete(row: EstimateListEntry) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: estimateMessages.deleteConfirm(row.estimate_number),
       okText: "Delete",
       okButtonProps: { danger: true },

@@ -24,6 +24,8 @@ import {
   taxCodeLabel,
 } from "@/lib/domain/tax-jurisdiction";
 import { formatMoney } from "@/lib/format";
+import { closeOrConfirmDiscard } from "@/lib/client/destructive-confirm";
+import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
 import { saveEstimateAction, type EstimateDetailView } from "./actions";
 import { ESTIMATE_STATE_TONES } from "./estimate-columns";
 import styles from "./estimates.module.css";
@@ -91,7 +93,7 @@ function EstimateFormBody({
   onClose,
   onConvert,
 }: Props) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +101,21 @@ function EstimateFormBody({
   const estimate = detail?.estimate ?? null;
   const actions = detail ? estimateActions(detail.state, canWrite) : null;
   const readOnly = detail ? !actions!.edit : !canWrite;
+
+  // Set by the reader's edits, not by the values the form opens with. A
+  // read-only estimate has nothing to lose.
+  const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(dirty, modal, "this estimate");
+
+  /** Escape, the close button and Cancel: asks first once something has been typed (3.0.9). */
+  function closeForm() {
+    closeOrConfirmDiscard({
+      dirty,
+      what: estimate ? `the changes to ${estimate.estimate_number}` : "this estimate",
+      confirm: modal.confirm,
+      close: onClose,
+    });
+  }
 
   // A customer added from inside this dialog has to be pickable now; the
   // page's own list catches up when the estimate is saved.
@@ -254,7 +271,7 @@ function EstimateFormBody({
   );
 
   const footer = [
-    <Button key="close" onClick={onClose}>
+    <Button key="close" onClick={closeForm}>
       {readOnly ? "Close" : "Cancel"}
     </Button>,
   ];
@@ -274,7 +291,7 @@ function EstimateFormBody({
   }
 
   return (
-    <Modal title={title} open onCancel={onClose} footer={footer} width={860}>
+    <Modal title={title} open onCancel={closeForm} maskClosable={false} footer={footer} width={860}>
       {estimate?.live_invoice ? (
         <Alert
           className={styles.notice}
@@ -290,6 +307,8 @@ function EstimateFormBody({
         requiredMark={false}
         disabled={readOnly}
         initialValues={initialValues}
+        // Fires on the reader's edits only; the values the form opens with do not count.
+        onValuesChange={() => setDirty(true)}
       >
         {/* A block row, so "Line items" below starts on its own line. */}
         <Space align="end" wrap style={{ display: "flex" }}>

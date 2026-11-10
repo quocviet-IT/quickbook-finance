@@ -216,6 +216,7 @@ export default function AnalysisClient({
   function confirmArchive(row: FinancialAnalysisRow) {
     let reason = "";
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Archive this frozen analysis?",
       content: (
         <Input
@@ -225,6 +226,7 @@ export default function AnalysisClient({
           }}
         />
       ),
+      okText: "Archive",
       okButtonProps: { danger: true },
       onOk: async () => {
         const res = await archiveAnalysisAction(row.id, reason || null);

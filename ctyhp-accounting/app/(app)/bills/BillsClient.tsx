@@ -49,6 +49,8 @@ import SettlementHistory from "@/components/settlements/SettlementHistory";
 import type { SettlementEvent } from "@/lib/domain/settlement";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
 import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
+import { destructiveConfirmProps } from "@/lib/client/destructive-confirm";
+import { billVoidConfirm, billVoidOption } from "@/lib/domain/bill-void";
 
 interface LineForm {
   description?: string;
@@ -237,17 +239,22 @@ export default function BillsClient({
     else message.error(res.error ?? "Failed to load the payment history");
   }
 
-  function confirmVoid(id: string) {
-    modal.confirm({
-      title: "Void this bill?",
-      content: "This reverses its journal entry. Bills with payments applied cannot be voided.",
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        const res = await voidBillAction(id);
-        if (res.ok) message.success("Bill voided");
-        else message.error(res.error ?? "Failed to void bill");
-      },
-    });
+  /**
+   * Names the bill and what voiding does to it: a draft posted nothing, a
+   * posted bill's entry is reversed. Opens with focus on Cancel (3.0.9).
+   */
+  function confirmVoid(bill: BillWithVendor) {
+    modal.confirm(
+      destructiveConfirmProps({
+        ...billVoidConfirm(bill),
+        okText: "Void",
+        onOk: async () => {
+          const res = await voidBillAction(bill.id);
+          if (res.ok) message.success("Bill voided");
+          else message.error(res.error ?? "Failed to void bill");
+        },
+      }),
+    );
   }
 
   return (
@@ -404,9 +411,25 @@ export default function BillsClient({
               // Last, and separated — but only separated when there is
               // something to separate from: a draft's menu holds Void alone,
               // and a divider above a menu's only item is an orphaned line.
-              if (canVoid && r.status !== "void" && r.status !== "paid") {
+              // Once money is applied the database refuses a void, so the item
+              // stays, disabled, and says why (3.0.9).
+              const voidOption = billVoidOption(r);
+              if (canVoid && voidOption.offered) {
                 if (menu.length) menu.push({ type: "divider" as const, key: "before-void" });
-                menu.push({ key: "void", label: "Void bill", danger: true, onClick: () => confirmVoid(r.id) });
+                menu.push({
+                  key: "void",
+                  label: voidOption.blockedReason ? (
+                    <>
+                      Void bill
+                      {secondaryLine(voidOption.blockedReason)}
+                    </>
+                  ) : (
+                    "Void bill"
+                  ),
+                  danger: true,
+                  disabled: voidOption.blockedReason !== null,
+                  onClick: () => confirmVoid(r),
+                });
               }
               return canReadDocuments || canWrite || canRegisterAsset ? (
                 <Space>

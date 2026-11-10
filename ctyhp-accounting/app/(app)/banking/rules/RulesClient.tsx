@@ -88,6 +88,7 @@ export default function RulesClient({
 
   function remove(rule: RuleListRow) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Delete this rule?",
       content: `"${rule.matchText}" → ${rule.accountLabel}. Lines already coded stay as they are.`,
       okText: "Delete rule",

@@ -93,6 +93,7 @@ export default function RepaymentsSection({
 
   function remove(row: RepaymentListRow) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Remove this ${row.kind}?`,
       content: `${row.accountLabel}. Lines already posted stay as they are; new ones are no longer recognized as payments to it.`,
       okText: `Remove ${row.kind}`,

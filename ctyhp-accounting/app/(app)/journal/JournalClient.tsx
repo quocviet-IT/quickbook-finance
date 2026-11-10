@@ -206,6 +206,7 @@ export default function JournalClient({
     // entry that should never have been posted is taken back.
     let reversalDate: Dayjs | null = dayjs(entry.entryDate);
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Reverse ${entry.entryNumber}?`,
       content: (
         <Space direction="vertical" style={{ width: "100%" }}>

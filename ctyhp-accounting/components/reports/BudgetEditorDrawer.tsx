@@ -147,6 +147,7 @@ export default function BudgetEditorDrawer({
 
   const confirmClear = () =>
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Clear FY ${fiscalYear}?`,
       content: "This empties every month in the grid. Nothing changes in the books until you press Save.",
       okText: "Clear this year",
@@ -210,6 +211,7 @@ export default function BudgetEditorDrawer({
       return;
     }
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Discard the changes you have not saved?",
       okText: "Discard",
       okButtonProps: { danger: true },

@@ -42,6 +42,7 @@ export default function TwoStepClient({
 
   function turnOff() {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Turn off two-step sign-in?",
       content: "Your password alone will open your books again. You can set it up again here at any time.",
       okText: "Turn off",

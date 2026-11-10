@@ -318,6 +318,7 @@ export default function BalanceComparisonClient({
     const go = () => router.push(`${PATH}?asOf=${date}`);
     if (!dirty) return go();
     modal.confirm({
+      autoFocusButton: "cancel",
       title: "Leave without saving?",
       content: "You have figures that are not saved. Changing the date now throws them away.",
       okText: "Change the date",

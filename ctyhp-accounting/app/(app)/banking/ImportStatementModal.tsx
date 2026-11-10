@@ -544,6 +544,7 @@ export default function ImportStatementModal({
     if (view.override !== "button" || view.checking || importing) return;
     let reason = "";
     const dialog = modal.confirm({
+      autoFocusButton: "cancel",
       title: OVERRIDE_DIALOG.title,
       content: (
         <Space orientation="vertical" size="small" style={{ width: "100%" }}>
