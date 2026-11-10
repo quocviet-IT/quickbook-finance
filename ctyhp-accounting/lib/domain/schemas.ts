@@ -124,6 +124,15 @@ export const customerUpdateSchema = customerCreateSchema
   .extend({ id: z.uuid("Select a customer") });
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
 
+/** A customer's id, for the reads on the customer's page (3.0.12). */
+export const customerIdSchema = z.uuid("Customer not found");
+
+/** The customer page's Transactions range; an open end reads every date on that side. */
+export const customerTransactionRangeSchema = z.object({
+  from: z.iso.date("Choose a valid start date").nullable(),
+  to: z.iso.date("Choose a valid end date").nullable(),
+});
+
 // --- Invoices ---
 export const invoiceLineInputSchema = z.object({
   description: z.string().trim().max(300).default(""),

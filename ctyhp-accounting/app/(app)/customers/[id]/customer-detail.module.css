@@ -1,0 +1,161 @@
+/*
+ * A customer's page (CustomerDetailClient.tsx): who they are and how to reach
+ * them, five figures about what they owe, then the tabs. Every colour is a
+ * theme variable, so the dark theme follows.
+ */
+
+/* ---------- who, and how to reach them (the toolbar's left side) ---------- */
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tags :global(.ant-tag) {
+  margin-inline-end: 0;
+}
+
+.contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 2px;
+  color: var(--ob-text-secondary);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.contactItem {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.contactItem + .contactItem::before {
+  content: "\00B7";
+  margin: 0 8px;
+  color: var(--ob-text-faint);
+}
+
+/* A link button without the button's padding, so it reads as part of the line. */
+.inlineLink.inlineLink {
+  height: auto;
+  padding: 0;
+  margin-left: 12px;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* ---------- the facts strip ---------- */
+
+/*
+ * One strip of five figures, not five dashboard tiles: a single border, the
+ * cells divided by hairlines drawn as the 1px gaps of the grid, so the
+ * dividers stay right however many columns the strip wraps to.
+ */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 20px;
+  overflow: hidden;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-border-subtle);
+}
+
+.fact {
+  min-width: 0;
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--ob-surface-card);
+}
+
+.label {
+  margin: 0;
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.value {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--ob-text-heading);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.danger {
+  color: var(--ob-money-negative);
+}
+
+.note {
+  margin: 2px 0 0;
+  color: var(--ob-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+@container app-workspace (max-width: 860px) {
+  .facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Five cells over three columns: the last one takes the two left on its row. */
+  .fact:last-child {
+    grid-column: span 2;
+  }
+}
+
+@container app-workspace (max-width: 540px) {
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- the tabs ---------- */
+
+.tabCount {
+  margin-left: 4px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The line above a table that says what it holds and in which order. */
+.summary {
+  margin: 0 0 12px;
+  color: var(--ob-text-secondary);
+  font-size: 13.5px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+
+/* The number opens the invoice; a link button without the button's padding. */
+.number.number {
+  height: auto;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+}

@@ -13,6 +13,7 @@ function fakeClient(
 ) {
   const calls: {
     table: string;
+    select: string;
     eq: Pair[];
     neq: Pair[];
     gte: Pair[];
@@ -25,6 +26,7 @@ function fakeClient(
   const from = vi.fn((table: string) => {
     const call = {
       table,
+      select: "",
       eq: [] as Pair[],
       neq: [] as Pair[],
       gte: [] as Pair[],
@@ -36,7 +38,10 @@ function fakeClient(
     };
     calls.push(call);
     const builder: Record<string, unknown> = {};
-    builder.select = () => builder;
+    builder.select = (columns: string) => {
+      call.select = columns;
+      return builder;
+    };
     for (const name of ["eq", "neq", "gte", "lte", "in", "gt"] as const) {
       builder[name] = (column: string, value: unknown) => {
         call[name].push([column, value]);
@@ -64,6 +69,31 @@ describe("customer detail reads", () => {
   it("returns null for a customer that does not exist", async () => {
     const sb = fakeClient({ acc_customer: [] });
     await expect(getCustomerDetail(sb, "missing")).resolves.toBeNull();
+  });
+
+  it("reads the open invoices with the entry each posted, named for this customer, a page at a time", async () => {
+    const sb = fakeClient({
+      acc_customer: [{ id: "c1", name: "BlueRidge Foods" }],
+      acc_invoice: [
+        { id: "i1", invoice_number: "INV-0001", status: "issued", balance_due_minor: 500, acc_journal_entry: { entry_number: "JE-000123" } },
+        { id: "i2", invoice_number: "INV-0002", status: "partial", balance_due_minor: 200, acc_journal_entry: null },
+      ],
+    });
+    const detail = await getCustomerDetail(sb, "c1");
+    // Without the entry number the invoice dialog says "Not posted yet" for an issued invoice.
+    expect(detail?.openInvoices.map((i) => [i.id, i.customer_name, i.entry_number])).toEqual([
+      ["i1", "BlueRidge Foods", "JE-000123"],
+      ["i2", "BlueRidge Foods", null],
+    ]);
+    expect(detail?.openInvoices[0]).not.toHaveProperty("acc_journal_entry");
+    const call = sb.calls.find((c) => c.table === "acc_invoice")!;
+    expect(call.select).toContain("acc_journal_entry(entry_number)");
+    expect(call.eq).toContainEqual(["customer_id", "c1"]);
+    expect(call.in).toContainEqual(["status", ["issued", "partial"]]);
+    expect(call.gt).toContainEqual(["balance_due_minor", 0]);
+    // A total order, so a row cannot straddle two pages (readAllPages).
+    expect(call.order).toEqual(["issue_date", "id"]);
+    expect(call.range).toEqual([[0, 999]]);
   });
 
   it("reads each kind of document by this customer and the date range only", async () => {
