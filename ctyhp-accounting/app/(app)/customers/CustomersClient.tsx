@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import {
   Button,
   Input,
@@ -11,19 +12,35 @@ import {
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
-import { flexColumn, secondaryLine } from "@/components/ui/columns";
+import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import IconActionButton from "@/components/ui/IconActionButton";
 import type { CustomerRow } from "@/lib/db/types";
 import type { CustomerCreditRow } from "@/lib/services/credit";
-import { formatPostalAddress } from "@/lib/domain/invoice-document";
 import { creditStateColor, creditStateLabel, type CreditState } from "@/lib/domain/credit";
 import { filterContacts, type ActiveFilter } from "@/lib/domain/contact-filter";
 import { formatMoney } from "@/lib/format";
 import CustomerFormModal from "./CustomerFormModal";
 
 const money = (minor: number) => formatMoney(minor, "USD", 2);
+
+/**
+ * Every fixed column of the list: Credit limit, Owed now, Overdue, Available,
+ * Credit status, Status and Actions. The Customer cell is the elastic one and
+ * keeps at least COLUMN.TEXT_MIN of the 984px box.
+ */
+export const CUSTOMER_LIST_FIXED_WIDTHS = [
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  140,
+  100,
+  80,
+] as const;
+const [W_LIMIT, W_OWED, W_OVERDUE, W_AVAILABLE, W_CREDIT, W_STATUS, W_ACTIONS] =
+  CUSTOMER_LIST_FIXED_WIDTHS;
 
 export default function CustomersClient({
   customers,
@@ -58,10 +75,15 @@ export default function CustomersClient({
     setActiveFilter("all");
   }
 
-  const visibleCustomers = filterContacts(customers, keyword, activeFilter).filter((row) => {
-    if (creditFilter === "all") return true;
-    return creditByCustomer.get(row.id)?.status.state === creditFilter;
-  });
+  const overdueOf = (row: CustomerRow) => creditByCustomer.get(row.id)?.overdueMinor ?? 0;
+  // Overdue first, the largest first, then by name: the list opens on the
+  // customers someone should call.
+  const visibleCustomers = filterContacts(customers, keyword, activeFilter)
+    .filter((row) => {
+      if (creditFilter === "all") return true;
+      return creditByCustomer.get(row.id)?.status.state === creditFilter;
+    })
+    .sort((a, b) => overdueOf(b) - overdueOf(a) || a.name.localeCompare(b.name));
 
   // Only states the list actually contains: offering "On hold" to a register
   // with nobody on hold is a filter that can only ever return nothing.
@@ -75,41 +97,23 @@ export default function CustomersClient({
 
   const columns: TableColumnsType<CustomerRow> = [
     {
-      // Name, email and where they are, in one elastic cell. Two columns of
-      // text used to push the credit figures off the right-hand edge, and
-      // nobody sorts on an address.
+      // One line: the name, linked to the customer's page. The email and
+      // the city live on that page.
       ...flexColumn<CustomerRow>({
         title: "Customer",
         key: "name",
-        render: (_: unknown, row: CustomerRow) => {
-          const lines = formatPostalAddress(row);
-          const city = [row.city, row.region].filter(Boolean).join(", ");
-          const where = lines.length === 0 ? "No address" : city || lines[0];
-          // An email opens the mail program (3.0.10).
-          return (
-            <div style={{ minWidth: 0 }}>
-              <span title={row.name}>{row.name}</span>
-              {secondaryLine(
-                row.email ? (
-                  <>
-                    <a href={`mailto:${row.email}`}>{row.email}</a>
-                    {` · ${where}`}
-                  </>
-                ) : (
-                  `No email · ${where}`
-                ),
-                `${row.email ?? "No email"} · ${where}`,
-              )}
-            </div>
-          );
-        },
+        render: (_: unknown, row: CustomerRow) => (
+          <Link href={`/customers/${row.id}`} title={row.name}>
+            {row.name}
+          </Link>
+        ),
       }),
       sorter: (a: CustomerRow, b: CustomerRow) => a.name.localeCompare(b.name),
     },
     {
       title: "Credit limit",
       key: "credit_limit",
-      width: COLUMN.MONEY,
+      width: W_LIMIT,
       align: "right",
       render: (_, row) =>
         row.credit_limit_minor === null ? (
@@ -123,14 +127,25 @@ export default function CustomersClient({
     {
       title: "Owed now",
       key: "balance",
-      width: COLUMN.MONEY,
+      width: W_OWED,
       align: "right",
       render: (_, row) => money(creditByCustomer.get(row.id)?.openBalanceMinor ?? 0),
     },
     {
+      title: "Overdue",
+      key: "overdue",
+      width: W_OVERDUE,
+      align: "right",
+      sorter: (a: CustomerRow, b: CustomerRow) => overdueOf(a) - overdueOf(b),
+      render: (_, row) => {
+        const overdue = overdueOf(row);
+        return overdue === 0 ? "\u2014" : <span className="accounting-negative">{money(overdue)}</span>;
+      },
+    },
+    {
       title: "Available",
       key: "available",
-      width: COLUMN.MONEY,
+      width: W_AVAILABLE,
       align: "right",
       render: (_, row) => {
         const available = creditByCustomer.get(row.id)?.status.availableMinor ?? null;
@@ -145,7 +160,7 @@ export default function CustomersClient({
     {
       title: "Credit status",
       key: "credit_status",
-      width: 140,
+      width: W_CREDIT,
       render: (_, row) => {
         const status = creditByCustomer.get(row.id)?.status;
         if (!status) return "\u2014";
@@ -160,14 +175,14 @@ export default function CustomersClient({
     {
       title: "Status",
       dataIndex: "is_active",
-      width: 100,
+      width: W_STATUS,
       render: (a: boolean) => <StatusTag status={a ? "active" : "inactive"} />,
     },
     ...(canWrite
       ? [
           {
             title: "Actions",
-            width: 80,
+            width: W_ACTIONS,
             render: (_: unknown, row: CustomerRow) => (
               <IconActionButton
                 icon={<EditOutlined />}

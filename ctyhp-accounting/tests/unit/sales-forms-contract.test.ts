@@ -14,6 +14,8 @@ const read = (...parts: string[]) =>
 const lines = () => read("components", "SalesLineItems.tsx");
 const invoices = () => read("app", "(app)", "invoices", "InvoicesClient.tsx");
 const customers = () => read("app", "(app)", "customers", "CustomerFormModal.tsx");
+const customerPage = () =>
+  read("app", "(app)", "customers", "[id]", "CustomerDetailClient.tsx");
 const customerList = () => read("app", "(app)", "customers", "CustomersClient.tsx");
 const estimate = () => read("app", "(app)", "estimates", "EstimateFormModal.tsx");
 
@@ -73,12 +75,12 @@ describe("the invoice, estimate and customer forms", () => {
 });
 
 describe("customer contact details", () => {
-  it("use email and phone fields, and an email in the list opens the mail program", () => {
+  it("use email and phone fields, and an email on the customer page opens the mail program", () => {
     const source = customers();
-    const list = customerList();
+    const page = customerPage();
     expect(source).toMatch(/name="email" label="Email"[\s\S]{0,80}<Input type="email"/);
     expect(source).toMatch(/name="phone" label="Phone"[\s\S]{0,80}<Input type="tel"/);
-    expect(list).toContain("href={`mailto:${row.email}`}");
+    expect(page).toContain("href={`mailto:${customer.email}`}");
   });
 });
 
