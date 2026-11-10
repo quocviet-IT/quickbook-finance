@@ -5,10 +5,11 @@ import { useState } from "react";
 import { Alert, Descriptions, Space, Tag, Typography } from "antd";
 import type { AuditEntryRow } from "@/lib/db/types";
 import {
+  auditDisplayValue,
+  auditEntryCurrency,
   diffAuditEntry,
   documentAttribution,
   formatActor,
-  formatAuditValue,
   summarizeAuditChanges,
   type AttributionSource,
   type AuditFieldChange,
@@ -105,7 +106,9 @@ export default function DocumentAuditTrail({
             locale={{ emptyText: "No recorded change" }}
             expandable={{
               rowExpandable: (entry) => diffAuditEntry(entry).length > 0,
-              expandedRowRender: (entry) => <FieldChanges changes={diffAuditEntry(entry)} />,
+              expandedRowRender: (entry) => (
+                <FieldChanges changes={diffAuditEntry(entry)} currencyCode={auditEntryCurrency(entry)} />
+              ),
             }}
             columns={[
               {
@@ -130,7 +133,10 @@ export default function DocumentAuditTrail({
                 title: "Changed",
                 key: "changes",
                 floor: DOCUMENT_AUDIT_TRAIL_ELASTIC_FLOORS[1],
-                render: (_: unknown, entry) => summarizeAuditChanges(diffAuditEntry(entry)),
+                // Amounts are stored in cents; read them as money in the
+                // document's own currency, not as 2680000 (3.0.8).
+                render: (_: unknown, entry) =>
+                  summarizeAuditChanges(diffAuditEntry(entry), 3, auditEntryCurrency(entry)),
               }),
             ]}
           />
@@ -147,7 +153,7 @@ export default function DocumentAuditTrail({
   );
 }
 
-function FieldChanges({ changes }: { changes: AuditFieldChange[] }) {
+function FieldChanges({ changes, currencyCode }: { changes: AuditFieldChange[]; currencyCode: string | null }) {
   return (
     <DataTable<AuditFieldChange>
       rowKey="field"
@@ -158,12 +164,14 @@ function FieldChanges({ changes }: { changes: AuditFieldChange[] }) {
         flexColumn<AuditFieldChange>({
           title: "Old value",
           dataIndex: "before",
-          render: (value: string | null) => formatAuditValue(value),
+          render: (value: string | null, change: AuditFieldChange) =>
+            auditDisplayValue(change.field, value, currencyCode),
         }),
         flexColumn<AuditFieldChange>({
           title: "New value",
           dataIndex: "after",
-          render: (value: string | null) => formatAuditValue(value),
+          render: (value: string | null, change: AuditFieldChange) =>
+            auditDisplayValue(change.field, value, currencyCode),
         }),
       ]}
     />

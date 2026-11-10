@@ -1,0 +1,69 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * The 3.0.8 review of the Sales screens found five ways to lose or misread
+ * data. The rules live in lib/domain/invoice-void.ts, lib/domain/audit.ts and
+ * lib/client/destructive-confirm.ts and are tested there; this pins that the
+ * screens actually use them.
+ */
+// A Windows checkout has CRLF line endings; CI's has LF.
+const read = (...parts: string[]) =>
+  readFileSync(join(process.cwd(), ...parts), "utf8").replace(/\r\n/g, "\n");
+const invoices = () => read("app", "(app)", "invoices", "InvoicesClient.tsx");
+const customers = () => read("app", "(app)", "customers", "CustomersClient.tsx");
+
+/** The opening tag of the `<Modal` whose title attribute is `title`. */
+function modalTag(source: string, title: string): string {
+  const start = source.indexOf(`<Modal\n        title=${title}`);
+  expect(start, `a <Modal title=${title}>`).toBeGreaterThanOrEqual(0);
+  return source.slice(start, source.indexOf("\n      >", start));
+}
+
+describe("a half-written form is not thrown away by a stray key or click", () => {
+  it("New invoice asks before discarding, and a click outside does not close it", () => {
+    const source = invoices();
+    const tag = modalTag(source, '"New invoice"');
+    expect(tag).toContain("maskClosable={false}");
+    expect(tag).toContain("onCancel={closeCreate}");
+    expect(source).toMatch(/function closeCreate\(\)[\s\S]{0,400}closeOrConfirmDiscard\(/);
+    expect(source).toMatch(/useUnsavedGuard\(open && createDirty, modal, "this invoice"\)/);
+  });
+
+  it("the customer form does the same", () => {
+    const source = customers();
+    const tag = modalTag(source, '{editing ? `Edit ${editing.name}` : "New customer"}');
+    expect(tag).toContain("maskClosable={false}");
+    expect(tag).toContain("onCancel={closeForm}");
+    expect(source).toMatch(/function closeForm\(\)[\s\S]{0,400}closeOrConfirmDiscard\(/);
+    expect(source).toMatch(/useUnsavedGuard\(open && dirty, modal, "this customer"\)/);
+  });
+});
+
+describe("voiding an invoice", () => {
+  it("asks through the destructive dialog, with the words the invoice's state calls for", () => {
+    const source = invoices();
+    expect(source).toMatch(/modal\.confirm\(\s*destructiveConfirmProps\(\{\s*\.\.\.invoiceVoidConfirm\(invoice\)/);
+    // The sentence that described a journal entry a draft does not have.
+    expect(source).not.toContain("an invoice with payments applied cannot be voided");
+  });
+
+  it("offers Void by the database's rule, disabled with its reason when money is applied", () => {
+    const source = invoices();
+    expect(source).toContain("const voidOption = invoiceVoidOption(r);");
+    expect(source).toMatch(/disabled: voidOption\.blockedReason !== null/);
+  });
+});
+
+describe("change history shows amounts as money", () => {
+  it("the trail on a document formats each entry in that entry's currency", () => {
+    const source = read("components", "audit", "DocumentAuditTrail.tsx");
+    expect(source).toContain("summarizeAuditChanges(diffAuditEntry(entry), 3, auditEntryCurrency(entry))");
+    expect(source).toContain("auditDisplayValue(");
+  });
+
+  it("so does the company audit log", () => {
+    expect(read("app", "(app)", "settings", "audit", "AuditClient.tsx")).toContain("auditEntryCurrency(r)");
+  });
+});

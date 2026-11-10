@@ -48,6 +48,48 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.8",
+    date: "2026-11-10",
+    headline: "Invoices and customers no longer lose what you typed, and voiding asks more carefully.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A half-written invoice or customer is not thrown away by Escape or a stray click",
+        detail:
+          "Pressing Escape, clicking the close button or Cancel in New invoice, or in a customer's form, used to close it at once and lose what had been typed. Once something has been entered, the form now asks \"Discard this invoice?\" first, with Keep editing selected, and a click beside the form no longer closes it. Closing or reloading the browser tab asks too.",
+        route: "/invoices",
+      },
+      {
+        kind: "fixed",
+        title: "Change history shows amounts as money",
+        detail:
+          "An invoice's or a payment's change history showed amounts as stored, in cents: a payment against a $26,800.00 invoice read \"Balance due: 2680000 → 1000000\". It now reads \"Balance due: $26,800.00 → $10,000.00\", in the document's own currency, in the one-line summary and in the field-by-field detail. The audit log in Settings shows its summary the same way and still shows the stored snapshots underneath.",
+        route: "/invoices",
+      },
+      {
+        kind: "fixed",
+        title: "Void asks with Cancel selected",
+        detail:
+          "The question before voiding an invoice opened with Void selected, so pressing Enter voided it. Cancel is now selected, and Void has to be chosen.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "Void invoice says why it is unavailable once money is applied",
+        detail:
+          "An invoice with a payment, a credit or a write-off applied cannot be voided. The menu used to offer Void on a partly paid invoice and refuse only after you had confirmed. It now shows Void invoice greyed out with the reason underneath: Payments or credits are applied to it, so it cannot be voided.",
+        route: "/invoices",
+      },
+      {
+        kind: "fixed",
+        title: "Voiding a draft says the ledger does not change",
+        detail:
+          "Voiding a draft invoice used to warn that it \"reverses its journal entry\", but a draft has posted nothing. The question now names the draft by its customer and says the ledger does not change. An issued invoice's question names the journal entry it reverses.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "3.0.7",
     date: "2026-11-04",
     headline: "A scanned statement's offer to read it has room.",

@@ -12,6 +12,7 @@ import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import type { ActorRow, AuditEntryRow } from "@/lib/db/types";
 import {
+  auditEntryCurrency,
   auditTrailCsv,
   auditTrailFileName,
   diffAuditEntry,
@@ -257,8 +258,10 @@ export default function AuditClient({ tables, actors }: { tables: string[]; acto
             title: "Changed",
             key: "changes",
             floor: AUDIT_ELASTIC_FLOORS[2],
+            // Amounts read as money where the record names its currency; the
+            // raw snapshots below the row keep the stored cents as evidence.
             render: (_: unknown, r) =>
-              summarizeAuditChanges(diffAuditEntry(r, { includeHousekeeping })),
+              summarizeAuditChanges(diffAuditEntry(r, { includeHousekeeping }), 3, auditEntryCurrency(r)),
           }),
         ]}
       />

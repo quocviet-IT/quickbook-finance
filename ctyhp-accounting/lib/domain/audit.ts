@@ -10,6 +10,7 @@
 
 import { toCsv, type CsvColumn } from "@/lib/csv";
 import { statusLabel } from "@/lib/domain/status-label";
+import { formatMoney } from "@/lib/format";
 
 export interface AuditFieldChange {
   field: string;
@@ -102,17 +103,64 @@ export function auditFieldLabel(field: string): string {
 
 const STATUS_FIELDS = new Set(["status", "lifecycle", "state"]);
 
-/** A changed value as the line shows it: a status reads as its label, anything else as stored. */
-function summaryValue(field: string, value: string | null): string {
-  return STATUS_FIELDS.has(field) && value ? statusLabel(value) : formatAuditValue(value);
+/** Every `*_minor` column holds money in the currency's smallest unit (cents for USD). */
+const MINOR_UNITS_FIELD = /_minor$/;
+const WHOLE_NUMBER = /^-?\d+$/;
+
+/**
+ * The currency an entry's amounts are in: the `currency_code` the row carried,
+ * read from the snapshot it left behind (the before one when it was deleted).
+ * Null for a record that carries none.
+ */
+export function auditEntryCurrency(entry: Pick<AuditEntryLike, "before_json" | "after_json">): string | null {
+  for (const snapshot of [asRecord(entry.after_json), asRecord(entry.before_json)]) {
+    const code = snapshot?.currency_code;
+    if (typeof code === "string" && code.trim() !== "") return code;
+  }
+  return null;
 }
 
-/** One scannable line for a table cell: `Status: Draft → Issued`. */
-export function summarizeAuditChanges(changes: readonly AuditFieldChange[], limit = 3): string {
+/** Decimal places of a currency, or null when Intl does not know the code. */
+function currencyDecimals(code: string): number | null {
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: code }).resolvedOptions()
+      .maximumFractionDigits ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A changed value as a reader sees it: a status as its label, an amount as
+ * money, anything else as stored. An amount stays as stored when its currency
+ * is not known, since its decimals would be a guess: 2680000 cents read
+ * as 2,680,000 dollars was the bug this replaced.
+ */
+export function auditDisplayValue(field: string, value: string | null, currencyCode?: string | null): string {
+  if (value && STATUS_FIELDS.has(field)) return statusLabel(value);
+  if (value !== null && currencyCode && MINOR_UNITS_FIELD.test(field) && WHOLE_NUMBER.test(value)) {
+    const decimals = currencyDecimals(currencyCode);
+    if (decimals !== null) return formatMoney(Number(value), currencyCode, decimals);
+  }
+  return formatAuditValue(value);
+}
+
+/**
+ * One scannable line for a table cell: `Status: Draft → Issued`. Pass the
+ * entry's currency (auditEntryCurrency) so its amounts read as money.
+ */
+export function summarizeAuditChanges(
+  changes: readonly AuditFieldChange[],
+  limit = 3,
+  currencyCode: string | null = null,
+): string {
   if (changes.length === 0) return "No field changed";
   const shown = changes
     .slice(0, limit)
-    .map((c) => `${auditFieldLabel(c.field)}: ${summaryValue(c.field, c.before)} → ${summaryValue(c.field, c.after)}`)
+    .map(
+      (c) =>
+        `${auditFieldLabel(c.field)}: ${auditDisplayValue(c.field, c.before, currencyCode)} → ${auditDisplayValue(c.field, c.after, currencyCode)}`,
+    )
     .join("; ");
   const rest = changes.length - Math.min(limit, changes.length);
   return rest > 0 ? `${shown} (+${rest} more)` : shown;

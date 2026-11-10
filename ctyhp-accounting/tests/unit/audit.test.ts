@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  auditDisplayValue,
+  auditEntryCurrency,
   auditTrailCsv,
   auditTrailFileName,
   auditTrailRows,
@@ -120,6 +122,57 @@ describe("summarizeAuditChanges", () => {
 
   it("says so when an entry moved no visible field", () => {
     expect(summarizeAuditChanges([])).toBe("No field changed");
+  });
+
+  // Seen on production (3.0.8): a payment against a $26,800.00 invoice read
+  // "Balance due: 2680000 → 1000000", cents printed as if they were dollars.
+  it("shows an amount stored in minor units as money in the entry's currency", () => {
+    const payment = diffAuditEntry({
+      before_json: { balance_due_minor: 2680000, status: "issued", currency_code: "USD" },
+      after_json: { balance_due_minor: 1000000, status: "partial", currency_code: "USD" },
+    });
+    expect(summarizeAuditChanges(payment, 3, "USD")).toBe(
+      "Balance due: $26,800.00 → $10,000.00; Status: Issued → Partial",
+    );
+  });
+
+  it("leaves an amount as stored when the currency is not known, rather than guess its decimals", () => {
+    expect(summarizeAuditChanges([{ field: "total_minor", before: "100", after: "250" }])).toBe(
+      "Total: 100 → 250",
+    );
+  });
+});
+
+describe("auditEntryCurrency", () => {
+  it("reads the currency from the snapshot the entry left behind", () => {
+    expect(auditEntryCurrency({ before_json: null, after_json: { currency_code: "USD" } })).toBe("USD");
+  });
+
+  it("falls back to the before snapshot when the row was deleted", () => {
+    expect(auditEntryCurrency({ before_json: { currency_code: "EUR" }, after_json: null })).toBe("EUR");
+  });
+
+  it("is null for a record that carries no currency", () => {
+    expect(auditEntryCurrency({ before_json: { name: "A" }, after_json: { name: "B" } })).toBeNull();
+    expect(auditEntryCurrency({ before_json: null, after_json: { currency_code: "" } })).toBeNull();
+  });
+});
+
+describe("auditDisplayValue", () => {
+  it("formats an amount, keeps a missing value and an empty one apart, and leaves text alone", () => {
+    expect(auditDisplayValue("total_minor", "2680000", "USD")).toBe("$26,800.00");
+    expect(auditDisplayValue("balance_due_minor", "-1250", "USD")).toBe("-$12.50");
+    expect(auditDisplayValue("total_minor", null, "USD")).toBe("—");
+    expect(auditDisplayValue("memo", "", "USD")).toBe("(empty)");
+    expect(auditDisplayValue("memo", "2680000", "USD")).toBe("2680000");
+  });
+
+  it("uses the currency's own decimals", () => {
+    expect(auditDisplayValue("total_minor", "2680", "JPY")).toBe("¥2,680");
+  });
+
+  it("reads a status as its label, as the one-line summary does", () => {
+    expect(auditDisplayValue("status", "partial", null)).toBe("Partial");
   });
 });
 
