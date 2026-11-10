@@ -279,7 +279,9 @@ describe("the Invoices screen opened from an estimate", () => {
   });
 
   it("names the estimate in the invoice's detail, linking to Estimates", () => {
-    expect(client).toContain('<Link href="/estimates">{estimateMessages.fromEstimate(viewEstimate.estimate_number)}</Link>');
+    // The detail is InvoiceDetailDialog since 3.0.12.
+    const dialog = readFileSync(join(process.cwd(), "app", "(app)", "invoices", "InvoiceDetailDialog.tsx"), "utf8");
+    expect(dialog).toContain('<Link href="/estimates">{estimateMessages.fromEstimate(ready.estimate.estimate_number)}</Link>');
   });
 
   it("clears the estimate's fields when New invoice opens, so a cancelled draft cannot leak into it", () => {

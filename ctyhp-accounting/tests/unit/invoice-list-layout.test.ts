@@ -13,6 +13,9 @@ import { INVOICE_LIST_FIXED_WIDTHS } from "@/app/(app)/invoices/InvoicesClient";
 const source = () =>
   readFileSync(join(process.cwd(), "app", "(app)", "invoices", "InvoicesClient.tsx"), "utf8").replace(/\r\n/g, "\n");
 
+const dialogSource = () =>
+  readFileSync(join(process.cwd(), "app", "(app)", "invoices", "InvoiceDetailDialog.tsx"), "utf8").replace(/\r\n/g, "\n");
+
 const sum = (widths: readonly number[]) => widths.reduce((total, px) => total + px, 0);
 
 describe("the invoice list", () => {
@@ -52,7 +55,7 @@ describe("the invoice list", () => {
 
 describe("the invoice dialog", () => {
   it("opens with who, what state and which dates, then the lines with their totals", () => {
-    const s = source();
+    const s = dialogSource();
     for (const label of ['label: "Customer"', 'label: "Status"', 'label: "Issued"', 'label: "Due"', 'label: "Journal entry"']) {
       expect(s, label).toContain(label);
     }
@@ -60,11 +63,11 @@ describe("the invoice dialog", () => {
   });
 
   it("offers the invoice's actions in its footer and puts the change history last", () => {
-    const s = source();
-    const dialog = s.slice(s.indexOf("{/* View lines */}"));
+    const dialog = dialogSource();
     expect(dialog).toContain("Download PDF");
-    expect(dialog).toContain("startIssue(viewInvoice)");
-    expect(dialog).toContain("confirmVoid(viewInvoice)");
+    // The dialog calls what its parent hands it; the parent decides who may.
+    expect(dialog).toContain("onIssue(invoice)");
+    expect(dialog).toContain("onVoid(invoice)");
     expect(dialog.indexOf("<SettlementHistory")).toBeLessThan(dialog.indexOf("<DocumentAuditTrail"));
     expect(dialog.indexOf("<DataTable<InvoiceLineRow>")).toBeLessThan(dialog.indexOf("<DocumentAuditTrail"));
   });

@@ -138,8 +138,8 @@ describe("getFeedbackTriageAction reads the whole queue in one request", () => {
 
 describe("the screens send one read where they sent several", () => {
   it("the invoice drawer asks once", () => {
-    const client = source("app/(app)/invoices/InvoicesClient.tsx");
-    expect(client).toContain("getInvoiceDetailAction(inv.id, canReadAudit)");
+    const client = source("app/(app)/invoices/InvoiceDetailDialog.tsx");
+    expect(client).toContain("getInvoiceDetailAction(invoiceId, canReadAudit)");
     for (const old of ["getInvoiceLinesAction", "getInvoiceSettlementsAction", "getInvoiceAuditAction"]) {
       expect(client, old).not.toContain(old);
     }
