@@ -102,6 +102,8 @@ interface Props {
   usStates: UsStateRow[];
   actors: ActorRow[];
   canWrite: boolean;
+  /** invoice.create, as the Invoices page reads it: a Sales user holds it without canWrite. */
+  canCreateInvoice: boolean;
   canReadAudit: boolean;
 }
 
@@ -120,6 +122,7 @@ export default function CustomerDetailClient({
   usStates,
   actors,
   canWrite,
+  canCreateInvoice,
   canReadAudit,
 }: Props) {
   const { message } = App.useApp();
@@ -246,22 +249,26 @@ export default function CustomerDetailClient({
     <FilterBar
       ariaLabel={`${customer.name}: status, contact and actions`}
       actions={
-        canWrite ? (
+        canWrite || canCreateInvoice ? (
           <>
             {/* An inactive customer can still pay what they owe. */}
-            <Link href={receivePaymentHref}>
-              <Button type="primary">Receive payment</Button>
-            </Link>
-            {customer.is_active ? (
+            {canWrite ? (
+              <Link href={receivePaymentHref}>
+                <Button type="primary">Receive payment</Button>
+              </Link>
+            ) : null}
+            {canCreateInvoice && customer.is_active ? (
               <Link href={newInvoiceHref}>
                 <Button icon={<PlusOutlined />}>New invoice</Button>
               </Link>
             ) : null}
-            <RowActionsMenu
-              size="middle"
-              label={`More actions for ${customer.name}`}
-              items={[{ key: "edit", label: "Edit customer", onClick: () => setFormOpen(true) }]}
-            />
+            {canWrite ? (
+              <RowActionsMenu
+                size="middle"
+                label={`More actions for ${customer.name}`}
+                items={[{ key: "edit", label: "Edit customer", onClick: () => setFormOpen(true) }]}
+              />
+            ) : null}
           </>
         ) : null
       }
@@ -451,7 +458,7 @@ export default function CustomerDetailClient({
         emptyTitle="Nothing owed"
         emptyDescription={`${customer.name} has no invoice with a balance left to pay.`}
         emptyAction={
-          canWrite && customer.is_active ? (
+          canCreateInvoice && customer.is_active ? (
             <Link href={newInvoiceHref}>
               <Button icon={<PlusOutlined />}>New invoice</Button>
             </Link>
@@ -539,7 +546,7 @@ export default function CustomerDetailClient({
           value={txType}
           onChange={setTxType}
         />
-        <DatePicker.RangePicker aria-label="Transaction date range" value={txRange} onChange={changeRange} />
+        <DatePicker.RangePicker aria-label="Transaction date range" format="MM/DD/YYYY" value={txRange} onChange={changeRange} />
       </div>
       <DataTable<CustomerTransaction>
         rowKey={(r) => `${r.type}:${r.id}`}
@@ -641,7 +648,7 @@ export default function CustomerDetailClient({
 
   const activityTab = canReadAudit ? (
     <>
-      <p className={styles.summary}>Every change made to this customer&apos;s record, newest first.</p>
+      <p className={styles.summary}>The latest changes to this customer&apos;s record, newest first (up to 200).</p>
       {activityError ? (
         <Alert
           type="error"
@@ -690,6 +697,7 @@ export default function CustomerDetailClient({
         currencies={currencies}
         actors={actors}
         canReadAudit={canReadAudit}
+        linkCustomer={false}
         onClose={() => setViewing(null)}
         onDownloadPdf={downloadPdf}
         pdfBusy={pdfId === viewing?.id}

@@ -73,6 +73,15 @@ describe("the server page", () => {
     expect(page).toContain("{ title: customer.name }");
     expect(page).toContain("default_payment_terms_days ?? 30");
     expect(page).toContain("canWrite={canWrite(role)}");
+    // New invoice follows invoice.create, as the Invoices page does: a Sales user has it without canWrite.
+    expect(page).toContain('holdsPermission("invoice.create")');
+    expect(page).toContain("canCreateInvoice={canCreateInvoice}");
+    expect(client).toContain("canCreateInvoice: boolean;");
+    expect(client).toMatch(/canCreateInvoice \? \(\s+<>[\s\S]*?New invoice/);
+    expect(client).toContain("canCreateInvoice && customer.is_active");
+    expect(client).toContain("linkCustomer={false}");
+    expect(client).toContain('format="MM/DD/YYYY"');
+    expect(client).not.toContain("Every change made");
   });
 
   it("has a loading skeleton and a not-found page that leads back to Customers", () => {

@@ -51,6 +51,8 @@ interface Props {
   issueBusy?: boolean;
   /** Omitted when the viewer may not void. */
   onVoid?: (inv: InvoiceWithCustomer) => void;
+  /** False on that customer's own page, where a link to it would go nowhere. */
+  linkCustomer?: boolean;
 }
 
 /**
@@ -69,6 +71,7 @@ export default function InvoiceDetailDialog({
   onIssue,
   issueBusy,
   onVoid,
+  linkCustomer = true,
 }: Props) {
   const { message } = App.useApp();
   const { today } = useCompanyClock();
@@ -128,7 +131,11 @@ export default function InvoiceDetailDialog({
       {
         key: "customer",
         label: "Customer",
-        children: <Link href={`/customers/${invoice.customer_id}`}>{invoice.customer_name}</Link>,
+        children: linkCustomer ? (
+          <Link href={`/customers/${invoice.customer_id}`}>{invoice.customer_name}</Link>
+        ) : (
+          invoice.customer_name
+        ),
       },
       {
         key: "status",

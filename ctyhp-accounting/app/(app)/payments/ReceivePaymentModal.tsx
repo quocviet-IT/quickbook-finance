@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
   App,
@@ -84,8 +84,13 @@ export default function ReceivePaymentModal({
   const currency: string = Form.useWatch("currency_code", form) ?? baseCurrency;
   const amount: number = Form.useWatch("amount", form) ?? 0;
 
+  // The customer whose open invoices were asked for last: a slower earlier answer must not replace theirs.
+  const latestCustomerId = useRef<string | null>(null);
+
   async function loadOpenInvoices(customerId: string) {
+    latestCustomerId.current = customerId;
     const res = await getOpenInvoicesAction(customerId);
+    if (latestCustomerId.current !== customerId) return;
     if (res.ok && res.data) setOpenInvoices(res.data);
     else {
       setOpenInvoices([]);
@@ -113,9 +118,10 @@ export default function ReceivePaymentModal({
   useEffect(() => {
     if (!prefillCustomerId) return;
     let cancelled = false;
+    latestCustomerId.current = prefillCustomerId;
     void (async () => {
       const res = await getOpenInvoicesAction(prefillCustomerId);
-      if (cancelled) return;
+      if (cancelled || latestCustomerId.current !== prefillCustomerId) return;
       if (res.ok && res.data) setOpenInvoices(res.data);
       else message.error(res.error ?? "Failed to load open invoices");
     })();

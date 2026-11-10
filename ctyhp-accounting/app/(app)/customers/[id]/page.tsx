@@ -4,7 +4,7 @@ import { getCustomerDetail } from "@/lib/services/customer-detail";
 import { listCurrencies, listUsStates } from "@/lib/services/reference";
 import { hasPermission, listActors } from "@/lib/services/access";
 import { getCurrentCompanySettings } from "@/lib/services/company";
-import { getUserRole, canWrite } from "@/lib/auth";
+import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import { customerIdSchema } from "@/lib/domain/schemas";
 import PageHeader from "@/components/PageHeader";
 import CustomerDetailClient from "./CustomerDetailClient";
@@ -22,9 +22,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   // turn a wrong link into an error page.
   if (!customerIdSchema.safeParse(id).success) notFound();
   const sb = await createSupabaseServerClient();
-  const [detail, role, currencies, usStates, actors, canReadAudit, settings] = await Promise.all([
+  const [detail, role, canCreateInvoice, currencies, usStates, actors, canReadAudit, settings] = await Promise.all([
     getCustomerDetail(sb, id),
     getUserRole(),
+    holdsPermission("invoice.create"),
     listCurrencies(sb),
     listUsStates(sb),
     listActors(sb),
@@ -51,6 +52,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         usStates={usStates}
         actors={actors}
         canWrite={canWrite(role)}
+        canCreateInvoice={canCreateInvoice}
         canReadAudit={canReadAudit}
       />
     </div>
