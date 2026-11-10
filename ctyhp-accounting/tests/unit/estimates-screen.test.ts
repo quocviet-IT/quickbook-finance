@@ -265,7 +265,7 @@ describe("the Invoices screen opened from an estimate", () => {
 
   it("fills the form through invoiceFormFromEstimate, not by picking the customer", () => {
     expect(client).toContain("invoiceFormFromEstimate(fromEstimate,");
-    expect(client).toContain("initialValues={estimateFormValues ??");
+    expect(client).toMatch(/initialValues=\{\s*estimateFormValues\s*\?\?/);
     // applyCustomerDefaults runs only when somebody picks a customer.
     expect(client.match(/applyCustomerDefaults/g)).toHaveLength(2);
     expect(client).toContain("onChange={applyCustomerDefaults}");
