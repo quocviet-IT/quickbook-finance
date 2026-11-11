@@ -61,9 +61,22 @@ function fakeClient(
     builder.then = (resolve: (v: unknown) => unknown) => resolve({ data: tables[table] ?? [], error: null });
     return builder;
   });
-  const rpc = vi.fn(async () => ({ data: rpcResult.data ?? [], error: rpcResult.error ?? null }));
+  const rpcCalls: { eq: Pair[]; order: string[]; range: [number, number][] }[] = [];
+  // A PostgREST RPC builder: filters, orders and a range, then the answer.
+  const rpc = vi.fn(() => {
+    const call = { eq: [] as Pair[], order: [] as string[], range: [] as [number, number][] };
+    rpcCalls.push(call);
+    const answer = { data: rpcResult.data ?? [], error: rpcResult.error ?? null };
+    const builder: Record<string, unknown> = {
+      eq: (column: string, value: unknown) => (call.eq.push([column, value]), builder),
+      order: (column: string) => (call.order.push(column), builder),
+      range: (a: number, b: number) => (call.range.push([a, b]), builder),
+      then: (resolve: (v: unknown) => unknown) => resolve(answer),
+    };
+    return builder;
+  });
   const sb = { from, rpc } as unknown as SupabaseClient;
-  return Object.assign(sb, { calls });
+  return Object.assign(sb, { calls, rpcCalls });
 }
 
 describe("customer detail reads", () => {
@@ -117,6 +130,18 @@ describe("customer detail reads", () => {
     const sb = fakeClient({ acc_customer: [{ id: "c1", name: "BlueRidge Foods" }], acc_invoice: [] });
     await getCustomerDetail(sb, "c1");
     expect(sb.rpc).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ p_as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
+  });
+
+  it("asks for this customer's credit row only (3.0.14)", async () => {
+    const sb = fakeClient(
+      { acc_customer: [{ id: "c1", name: "BlueRidge Foods" }], acc_invoice: [] },
+      { data: [{ customer_id: "c1", name: "BlueRidge Foods", is_active: true, open_balance_minor: 500, overdue_minor: 0, sales_window_minor: 0 }] },
+    );
+    const detail = await getCustomerDetail(sb, "c1");
+    expect(sb.rpc).toHaveBeenCalledWith("acc_customer_credit_status", expect.anything());
+    expect(sb.rpcCalls[0].eq).toEqual([["customer_id", "c1"]]);
+    expect(detail?.credit?.customerId).toBe("c1");
+    expect(detail?.credit?.openBalanceMinor).toBe(500);
   });
 
   it("keeps the page when the credit status cannot be read", async () => {

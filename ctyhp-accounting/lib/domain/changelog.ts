@@ -48,6 +48,27 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.14",
+    date: "2026-11-11",
+    headline: "Aging reports and customer credit read every row, however many there are.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Aging reports no longer stop at 1,000 open items",
+        detail:
+          "Accounts Receivable Aging and Accounts Payable Aging asked the database for their open items in one request, and the database answers a single request with at most 1,000 rows without saying so. A company with more open invoices or bills than that would have seen some left out, and the report would have stopped reconciling to its control account. They now read every row, a page at a time. No company had more than 1,000, so no figure changes today. The By document view now lists invoices (or bills), then credits, then unapplied payments, each by number; before, each group came in whatever order the database had stored it, which changed whenever a document was updated.",
+        route: "/reports/ar-aging",
+      },
+      {
+        kind: "fixed",
+        title: "Customer credit reads every customer, and a customer's page reads only theirs",
+        detail:
+          "Customers, New invoice and the Customer Credit report read every customer's credit status in one request, with the same 1,000-row limit; they now read it a page at a time, in name order as before. A customer's page now asks for that customer's credit status alone instead of everyone's.",
+        route: "/customers",
+      },
+    ],
+  },
+  {
     version: "3.0.13",
     date: "2026-11-11",
     headline: "A statement of what a customer still owes, to print, save as PDF or email, from their page or from A/R Aging.",
