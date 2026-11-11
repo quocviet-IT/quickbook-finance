@@ -48,6 +48,48 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.18",
+    date: "2026-11-11",
+    headline: "The guide says each step in a line, and Banking has six short guides instead of one long one.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Each step is one line, with the rest under Details",
+        detail:
+          "A step now reads as what you are doing and one line on what happens: “Send it to the ledger. Press Issue on the draft's row: it gets its number and posts.” The paragraph that used to follow every step is under Details, a click away, and the search and Ask AI still read all of it. The warnings before a guide's first step show their titles and open to the full text.",
+        route: "/guide",
+      },
+      {
+        kind: "changed",
+        title: "Banking is six guides",
+        detail:
+          "The Banking guide had thirty steps on one page. It is now six guides: bringing bank lines in, matching and coding them, setting up cards, loans and related companies, reconciling to a statement, reconciling from statement files, and checking and correcting reconciled accounts. Help on Rules and on Reconcile history now opens the one guide that covers each, and the old guide's address lists the six.",
+        route: "/guide",
+      },
+      {
+        kind: "fixed",
+        title: "The guide names the buttons the screens show",
+        detail:
+          "Six steps named a button that is not on its screen: Suggest matches is Approve in the Match column, Convert to bill is Create bill, Close period and Reopen period are Close and Reopen, Add all to the books reads Add all 3 to the books with the count, and Sales tax liability is the Liability tab. Reports are named as the Reports page names them, Accounts Receivable Aging rather than AR aging. Report and Ask AI are said to be on every screen rather than on Feedback triage, and the transactions import's Import button is on the import screen rather than on Bank Transactions. A test now checks every button the guide names against the screens.",
+        route: "/guide",
+      },
+      {
+        kind: "fixed",
+        title: "Invoicing says where Issue is",
+        detail:
+          "A new invoice is saved as a draft, and Issue is on the draft's row in the list. The guide used to read as if the new invoice form issued it.",
+        route: "/guide",
+      },
+      {
+        kind: "fixed",
+        title: "A guide opened at a step shows the whole step",
+        detail:
+          "Help that opens a guide part-way down, at the step that happens on your screen, left the top of that step under the bar across the top of the page. It now stops just below it.",
+        route: "/guide",
+      },
+    ],
+  },
+  {
     version: "3.0.17",
     date: "2026-11-11",
     headline: "The guide is a page in the left menu, and every screen has a Help link.",

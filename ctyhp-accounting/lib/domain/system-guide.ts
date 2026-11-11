@@ -24,13 +24,29 @@ export interface GuideShot {
 }
 
 export interface GuideStep {
-  /** What the user is trying to achieve. */
+  /** What the user is trying to achieve, in eight words or fewer (3.0.18). */
   action: string;
-  /** The exact on-screen label of the control that does it. */
+  /**
+   * One line on what happens, fifteen words at most: the part of the step
+   * everybody reads (3.0.18). The longer explanation, when there is one, is
+   * the note.
+   */
+  summary: string;
+  /**
+   * The exact on-screen label of the control that does it. "N" stands for a
+   * count the screen prints in its place, as in "Remove these N entries", and
+   * a closing " …" for words it fills in, as in "Adjust inventory by …".
+   */
   control: string;
   /** Page the control is on. Omitted when the step happens where the flow started. */
   route?: string;
-  /** What the system does behind the control, or the rule that can block it. */
+  /** The control is on every screen, as the floating Report and Ask AI are (3.0.18). */
+  everyScreen?: boolean;
+  /**
+   * What the system does behind the control, or the rule that can block it.
+   * Folded under Details on the guide's page; the search and Ask AI read it in
+   * full. Omitted when the summary already says it all.
+   */
   note?: string;
   screenshot?: GuideShot;
 }
@@ -185,6 +201,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Create the invoice",
+        summary: "Add a line per item, then Save draft. A draft posts nothing.",
         control: "New invoice",
         route: "/invoices",
         note:
@@ -193,6 +210,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Send it to the ledger",
+        summary: "Press Issue on the draft's row: it gets its number and posts.",
         control: "Issue",
         note:
           "Issuing assigns the invoice number and posts the entry: debit Accounts " +
@@ -201,6 +219,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Give the customer a copy",
+        summary: "It prints from the issued invoice; a draft prints marked DRAFT.",
         control: "Download PDF",
         note:
           "Prints from the issued document, so what the customer receives matches " +
@@ -208,6 +227,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Record the money received",
+        summary: "Apply it to one or more open invoices of the same customer.",
         control: "Receive payment",
         route: "/payments",
         note:
@@ -216,12 +236,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check what is still outstanding",
-        control: "AR aging",
+        summary: "What each customer owes, by how overdue; it ties to Accounts Receivable.",
+        control: "Accounts Receivable Aging",
         route: "/reports/ar-aging",
-        note: "This report ties to the Accounts Receivable control account by design.",
       },
       {
-        action: "List the open invoices, and what each customer owes",
+        action: "List open invoices and customer balances",
+        summary: "Both end on the A/R Aging total and say whether it agrees with receivables.",
         control: "Open Invoices",
         route: "/reports/open-invoices",
         note:
@@ -229,7 +250,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "agrees with the receivables account. Sales by Customer adds up a period's income by customer.",
       },
       {
-        action: "Look ahead at the cash the next thirteen weeks should bring",
+        action: "Forecast the next thirteen weeks of cash",
+        summary: "Today's cash, plus what customers owe, less what you owe suppliers, week by week.",
         control: "13 Week Cash Forecast",
         route: "/reports/cash-flow-forecast",
         note:
@@ -243,13 +265,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     id: "quote-a-price",
     area: "sales",
     title: "Give a customer an estimate and turn it into an invoice",
-    purpose:
-      "Promise a customer a price before the sale, then make the invoice from it when they accept. " +
-      "Nothing reaches the books until that invoice is issued.",
+    purpose: "Promise a price before the sale, then turn it into an invoice when the customer says yes.",
     route: "/estimates",
     steps: [
       {
         action: "Write the estimate",
+        summary: "Lines work as on an invoice. Save gives it a number and posts nothing.",
         control: "New estimate",
         route: "/estimates",
         note:
@@ -259,6 +280,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Give the customer a copy",
+        summary: "It prints as a quotation, with Valid until and nothing owed.",
         control: "Download PDF",
         note:
           "Printed on the invoice's layout with Valid until in place of the due date, and Subtotal, Sales " +
@@ -267,6 +289,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Record a no",
+        summary: "Reopen brings it back if the customer changes their mind.",
         control: "Mark declined",
         note:
           "Reopen brings it back if the customer changes their mind; a declined estimate is reopened before it " +
@@ -275,6 +298,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Turn a yes into an invoice",
+        summary: "Opens New invoice with the customer and the lines filled in.",
         control: "Turn into an invoice",
         note:
           "Opens New invoice on the Invoices screen with the customer and lines filled in, marked From " +
@@ -282,6 +306,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Create the draft",
+        summary: "The estimate reads Converted and locks; the draft posts nothing yet.",
         control: "Save draft",
         route: "/invoices",
         note:
@@ -290,13 +315,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Issue the invoice",
+        summary: "It posts like any other invoice; the estimate itself never posts.",
         control: "Issue",
         route: "/invoices",
-        note:
-          "Posts it like any other invoice. The estimate never posts; only the invoice made from it does.",
       },
       {
         action: "If the sale falls through after all",
+        summary: "Voiding that invoice opens the estimate again, to reuse or decline.",
         control: "Void invoice",
         route: "/invoices",
         note:
@@ -310,14 +335,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     id: "record-a-paid-sale",
     area: "sales",
     title: "Record a sale paid on the spot",
-    purpose:
-      "A sale the customer pays for there and then, by cash, check, card or transfer: one sales receipt " +
-      "records the sale and the money together. Nothing is owed, so Accounts Receivable is never touched. " +
-      "A sale paid later is an invoice instead.",
+    purpose: "One sales receipt records the sale and the money at once. A sale paid later is an invoice instead.",
     route: "/sales-receipts",
     steps: [
       {
         action: "Write the receipt",
+        summary: "Choose the customer; one Cash Customer can stand for every walk-in sale.",
         control: "New sales receipt",
         route: "/sales-receipts",
         note:
@@ -326,6 +349,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Say where the money went",
+        summary: "Usually the bank account; Undeposited Funds only for takings banked together later.",
         control: "Deposit to",
         note:
           "It starts on the first bank account, so the deposit the bank later shows is matched to this receipt " +
@@ -334,6 +358,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Post it",
+        summary: "It is numbered and posts at once: the deposit, the income and the tax.",
         control: "Save and post",
         note:
           "Gives it its number, SR-000001 onwards, and posts at once: the deposit account up by the total, " +
@@ -342,11 +367,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Give the customer a copy",
+        summary: "It prints as a Sales Receipt, ending Paid in full.",
         control: "Download PDF",
-        note: "Printed on the invoice's layout as a Sales Receipt, sold to the customer, ending Paid in full.",
       },
       {
         action: "Correct a mistake",
+        summary: "A receipt is never edited: void it with a reason, then enter it again.",
         control: "Void",
         note:
           "A saved receipt is never edited. Void it with the reason, which is kept with it; its entries stop " +
@@ -363,6 +389,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Cancel an invoice that should not exist",
+        summary: "Voiding keeps the invoice but drops it from the reports; remove payments first.",
         control: "Void",
         route: "/invoices",
         note:
@@ -372,12 +399,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Reduce what a customer owes",
+        summary: "Apply it to an open invoice, or leave it as a credit for later.",
         control: "New credit memo",
         route: "/credit-memos",
-        note: "Apply it to an open invoice, or leave it as a credit for later.",
       },
       {
         action: "Give money back",
+        summary: "In a payment's menu, for the part not applied to an invoice.",
         control: "Refund",
         route: "/payments",
         note:
@@ -386,11 +414,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Write off what will never be collected",
+        summary: "Above the approval limit, a second person must approve it before it posts.",
         control: "Write off",
         route: "/invoices",
-        note:
-          "A write-off is a controlled action: above the configured threshold it " +
-          "needs a second person's approval before it posts.",
       },
     ],
   },
@@ -403,22 +429,19 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Enter a supplier bill",
+        summary: "The same vendor and reference cannot be entered twice.",
         control: "New bill",
         route: "/bills",
-        note:
-          "Duplicate vendor-and-reference combinations are detected, so the same " +
-          "invoice cannot be entered twice by two people.",
       },
       {
         action: "Record a direct expense",
+        summary: "Purchase tax is part of the cost; there is no separate tax line.",
         control: "New expense",
         route: "/expenses",
-        note:
-          "For US reporting, purchase-side tax is part of the cost — there is no " +
-          "separate recoverable tax line.",
       },
       {
         action: "Attach the supporting document",
+        summary: "The file stays with the entry, privately, and every look at it is logged.",
         control: "Attachments",
         note:
           "The file and its checksum are kept with the transaction, privately, so the " +
@@ -426,20 +449,19 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Pay one or many bills",
+        summary: "A payment never exceeds what is open; preparing and approving can be split.",
         control: "Pay bills",
         route: "/pay-bills",
-        note:
-          "A payment can never exceed the eligible open balance, and preparing a " +
-          "payment can be separated from approving it.",
       },
       {
         action: "See what is due",
-        control: "AP aging",
+        summary: "What each vendor is owed, by how overdue; it ties to Accounts Payable.",
+        control: "Accounts Payable Aging",
         route: "/reports/ap-aging",
-        note: "Ties to the Accounts Payable control account.",
       },
       {
-        action: "List the unpaid bills, and what is owed to each vendor",
+        action: "List unpaid bills and vendor balances",
+        summary: "Vendor Balances nets each vendor's credits and is checked against Accounts Payable.",
         control: "Unpaid Bills",
         route: "/reports/unpaid-bills",
         note:
@@ -458,11 +480,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Raise the order",
+        summary: "An order commits to the purchase; it posts nothing to the books.",
         control: "New purchase order",
         route: "/purchase-orders",
       },
       {
         action: "Receive what arrived",
+        summary: "Partial receipts are fine; stock enters inventory only through a receipt.",
         control: "Receive",
         note:
           "Partial receipts are normal. Stock only enters inventory through a " +
@@ -471,24 +495,27 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Match the supplier's bill",
-        control: "Convert to bill",
+        summary: "Makes a draft bill from what arrived; order, receipt and bill are compared.",
+        control: "Create bill",
         note:
           "Three-way matching compares order, receipt and bill. A quantity or price " +
           "variance outside tolerance raises an exception instead of posting quietly.",
       },
       {
         action: "Find what arrived but was never billed",
-        control: "Received not billed",
+        summary: "Goods received with no vendor bill yet, so not in the ledger.",
+        control: "Received Not Billed",
         route: "/purchase-orders/received-not-billed",
       },
       {
         action: "Check inventory value",
-        control: "Inventory valuation",
+        summary: "Stock on hand, valued at weighted average cost.",
+        control: "Inventory Valuation",
         route: "/reports/inventory-valuation",
-        note: "Valued at weighted average cost.",
       },
       {
-        action: "See what was bought, and that the stock adds up",
+        action: "Check purchases and that stock adds up",
+        summary: "Opening stock plus purchases, less cost of sales, should come to closing stock.",
         control: "Purchases and Inventory",
         route: "/reports/purchases-inventory",
         note:
@@ -507,6 +534,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Open the budget report",
+        summary: "Each account shows Actual, Budget, Over / Under and % of Budget.",
         control: "Budget vs Actual",
         route: "/reports",
         note:
@@ -515,6 +543,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Open the whole year as one grid",
+        summary: "Twelve months and a Year column for each budgeted account.",
         control: "Manage budget",
         note:
           "Needs permission to manage the budget. Twelve month columns and a Year column for every account " +
@@ -522,6 +551,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Fill it from the books, or by hand",
+        summary: "Copy last year's actuals, add an uplift, or type a Year total to spread.",
         control: "Start from last year’s actuals",
         note:
           "Start from this year’s actuals does the same with the current year. Uplift adds a percentage on top " +
@@ -529,7 +559,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Clear this year empties the grid.",
       },
       {
-        action: "Save",
+        action: "Save the budget",
+        summary: "Only the months you changed are written; a failed month is named.",
         control: "Save",
         note:
           "Nothing reaches the books until you press Save, which writes only the months you changed. If one " +
@@ -546,13 +577,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Start a count",
+        summary: "Dated today with the last count's lines, unless a count is still open.",
         control: "New count",
         route: "/inventory/stock-count",
-        note:
-          "Dated today, with the previous count’s lines copied in. If a count is still open, it opens that one instead.",
       },
       {
         action: "Put the counted lines in",
+        summary: "One line each: name, quantity and cost; Read it adds them.",
         control: "Paste a count sheet",
         note:
           "One line each: name, quantity, cost, and Sells for if you like. Press Read it to add them; a line that cannot " +
@@ -560,6 +591,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Keep the count",
+        summary: "Nothing posts; Difference shows how far the books are from the count.",
         control: "Save draft",
         note:
           "Nothing reaches the books. Counted at cost, On the books and Difference show the result; change the As of " +
@@ -567,6 +599,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Correct the books to the count",
+        summary: "Check the entry, then Post the adjustment; a large one needs approval.",
         control: "Adjust inventory by …",
         note:
           "Needs permission to adjust inventory, and a saved count with a difference. Choose the Inventory account and " +
@@ -577,15 +610,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
   },
   {
-    id: "banking",
+    id: "bank-lines-in",
     area: "banking",
-    title: "Match the bank and reconcile",
-    purpose:
-      "Prove that what the ledger says about cash agrees with what the bank says.",
+    title: "Bring bank lines in",
+    purpose: "Load a statement or a bank feed, and make sure what comes in adds up.",
     route: "/banking",
     steps: [
       {
         action: "Bring in the statement",
+        summary: "PDF, CSV, OFX, QFX, QBO or QIF; a line already in is skipped.",
         control: "Import statement",
         route: "/banking",
         note:
@@ -598,6 +631,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check that the statement adds up",
+        summary: "Opening plus the lines must reach the closing balance, to the cent, before importing.",
         control: "Import statement",
         route: "/banking",
         note:
@@ -613,6 +647,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Make a statement add up",
+        summary: "Tick a misread line, or type a balance the file does not print.",
         control: "Not a transaction",
         route: "/banking",
         note:
@@ -625,6 +660,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Import a statement that does not add up",
+        summary: "Administrators only, with a reason that is kept in the audit log.",
         control: "Import anyway…",
         route: "/banking",
         note:
@@ -636,6 +672,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Take back a bank-feed sync",
+        summary: "Under Bank feed syncs, Undo takes back the newest sync, with a reason.",
         control: "Undo",
         route: "/banking",
         note:
@@ -647,6 +684,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Disconnect a bank feed",
+        summary: "Removes the connection at Plaid; the lines already brought in stay.",
         control: "Disconnect",
         route: "/banking",
         note:
@@ -654,13 +692,23 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "can be connected again. If Plaid does not confirm the removal, nothing changes unless you tick " +
           "Disconnect in OneBook only. Disconnect asks for a reason.",
       },
+    ],
+  },
+  {
+    id: "code-and-match",
+    area: "banking",
+    title: "Match and code bank lines",
+    purpose: "Tie each bank line to its entry in the books, or post it to the right account.",
+    route: "/banking",
+    steps: [
       {
         action: "Match lines to the ledger",
-        control: "Suggest matches",
-        note: "Suggestions are one-to-one and need approval before they take effect.",
+        summary: "Approve a one-to-one suggestion in the Match column; until then nothing changes.",
+        control: "Approve",
       },
       {
-        action: "Say which account a line belongs to, for anything the ledger does not already hold",
+        action: "Code a line the books do not hold",
+        summary: "Type a word and pick the account; choosing it posts the line.",
         control: "Category",
         note:
           "Type a word and the accounts that answer to it are offered, closest first — an " +
@@ -672,7 +720,42 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "instead of asking again, and Change voids the entry and hands the line back.",
       },
       {
-        action: "Tell OneBook which payments repay a credit card or a loan",
+        action: "Recode a line from Uncategorized",
+        summary: "Posts a second entry that moves the amount to the account you choose.",
+        control: "Recode",
+        route: "/banking",
+        note:
+          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode posts a " +
+          "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
+          "any reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a signed-off month " +
+          "cannot be taken back with Change — recode it instead. A recoded line offers Undo recode, not Change: to code it " +
+          "again, Undo recode first.",
+      },
+      {
+        action: "Check for a charge taken twice",
+        summary: "Two charges to one payee, same amount, within 30 days; you decide what to void.",
+        control: "Possible duplicates",
+        route: "/banking/overview",
+        note:
+          "The Banking overview lists two charges to the same payee, for the same amount, within 30 days — over the last " +
+          "12 months — under Possible duplicates. A regular payment, such as rent or a subscription, is left alone unless one " +
+          "breaks its rhythm, and a charge whose description reads differently from the payee's others comes first. Review " +
+          "opens the entry; void it yourself if the bank took the money twice, since nothing is removed for you. Dismiss " +
+          "asks for a reason and the pair is not offered again. A line on a completed reconciliation is never the one " +
+          "offered for review.",
+      },
+    ],
+  },
+  {
+    id: "cards-loans-companies",
+    area: "banking",
+    title: "Set up cards, loans and related companies",
+    purpose: "Teach OneBook which bank lines repay a card or loan, or move money between your own companies.",
+    route: "/banking/rules",
+    steps: [
+      {
+        action: "Name your credit cards and loans",
+        summary: "Add card and Add loan, with the words your bank prints for their payments.",
         control: "Add card",
         route: "/banking/rules",
         note:
@@ -684,7 +767,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Post a loan payment as principal and interest",
+        summary: "Check the estimated interest against the lender's figure; the rest is principal.",
         control: "Split…",
+        route: "/banking",
         note:
           "The interest offered is an estimate — the balance owed on the books × the loan's rate ÷ 12, " +
           "or its fixed amount — shown with how it was reached. Change it to the lender's figure; the " +
@@ -693,6 +778,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Tell OneBook which companies are your own",
+        summary: "Money between companies the same owners run is a loan, never income or cost.",
         control: "Add related company",
         route: "/banking/rules",
         note:
@@ -702,46 +788,18 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "rule or history. The table shows who owes whom today. The other company's books are not written — " +
           "record its side there.",
       },
+    ],
+  },
+  {
+    id: "reconcile-by-hand",
+    area: "banking",
+    title: "Reconcile an account to a statement",
+    purpose: "Agree a bank account with one statement, line by line, until nothing is left to explain.",
+    route: "/banking/reconcile",
+    steps: [
       {
-        action: "Check an account for a statement's balance posted as payments",
-        control: "Show me the workings",
-        route: "/banking/reconcile",
-        note:
-          "Choose the account at the top of Reconcile. When a run of entries for one payee lands exactly on what " +
-          "the account itself comes to on each date, an amber card says they look like the statement's balance, " +
-          "not payments: a statement's Balance column read as amounts, because a real payment does not track the " +
-          "balance of the account it is paid from. Show me the workings lists each entry beside what the account " +
-          "came to that day with the group taken out, and the difference; click a date to see the entry.",
-      },
-      {
-        action: "Remove a balance posted as payments",
-        control: "Remove these N entries",
-        route: "/banking/reconcile",
-        note:
-          "Click it, give a reason, and click Confirm — remove all N. The whole group goes or none of it. An entry " +
-          "posted by hand or loaded from another program is reversed on its own date; an entry coded from Bank " +
-          "Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, and the reason is " +
-          "recorded on each reversing entry and in the audit log. Some entries cannot go from here, and the card " +
-          "lists them with what to do instead: " +
-          "one ticked on a completed reconciliation (reopen it first), one dated in a closed period (reopen the " +
-          "period), one already reversed, or one that belongs to a document such as an invoice, bill or payment " +
-          "(void the document). Needs the Post manual journals permission.",
-      },
-      {
-        action: "See what drags an account below zero",
-        control: "Payments not yet on a statement",
-        route: "/banking/reconcile",
-        note:
-          "When the chosen account reads below zero today, or has dropped below zero since the last statement you " +
-          "agreed, an amber card gives the figure that statement closed at, the lowest point since and the balance " +
-          "today. A bank would have charged for an overdraft and printed it, so what drags the account under is " +
-          "usually an entry that is not a payment — a balance posted as one, or the same thing entered twice. The " +
-          "card lists the largest payments not yet on a statement; reconcile the next statement and whatever the " +
-          "bank has never seen is left standing on its own. An account nobody has reconciled is flagged only while " +
-          "it is below zero now.",
-      },
-      {
-        action: "See how far each bank account has been agreed to a statement",
+        action: "See how far each account is reconciled",
+        summary: "Each account's last agreed statement, colored by its age: green, amber or red.",
         control: "Bank accounts",
         route: "/banking/reconcile",
         note:
@@ -755,6 +813,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Reconcile to a statement balance",
+        summary: "Complete needs a difference of zero, or an adjustment somebody signs for.",
         control: "New reconciliation",
         route: "/banking/reconcile",
         note:
@@ -764,7 +823,94 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "of the opposite sign is left as it was, and the message says how many to check there.",
       },
       {
-        action: "Reconcile from the statement files, one month or a year",
+        action: "Read the difference",
+        summary: "The difference in its parts; a line the size of what is left is named.",
+        control: "Left to explain",
+        route: "/banking/reconcile",
+        note:
+          "The difference is shown in its parts: Opening, when the reconciliation begins at a different figure " +
+          "from the statement's opening; On the statement, not in the books; Ticked here, not on the statement; " +
+          "and Left to explain. When exactly one line is the size of what is left, it is named: check that one " +
+          "first.",
+      },
+      {
+        action: "Set aside a misread statement line",
+        summary: "Leaves it out of the difference; Restore brings it back.",
+        control: "Not a transaction",
+        route: "/banking/reconcile",
+        note:
+          "Beside a statement line the books do not have — a line the PDF was misread into. It leaves the line out " +
+          "of Add missing lines and out of the difference; its line stays in Bank Transactions, to exclude there " +
+          "if it is not real. Restore brings it back. A line paired with the books cannot be set aside.",
+      },
+      {
+        action: "Add the lines the books are missing",
+        summary: "Posts every listed line, dated as the bank has it, then ticks them.",
+        control: "Add all N to the books",
+        route: "/banking/reconcile",
+        note:
+          "The box above the statement lines shows each line the books do not have and the account it would " +
+          "post to — by card, related company, rule or history, or else Uncategorized Income or Expense. Add all " +
+          "posts every one it lists, dated as the bank has it, or none, then pairs and ticks them; Complete stays " +
+          "yours. Or code them one by one in Bank Transactions and click Match again; no tick is ever removed.",
+      },
+      {
+        action: "Add a line held back from Add all",
+        summary: "A line that looks extra or already booked waits for you to add it.",
+        control: "Add anyway",
+        route: "/banking/reconcile",
+        note:
+          "Two kinds of line are held back and listed apart, each with why. When the statement already balances " +
+          "without the lines the books do not have, they are marked Extra: likely not transactions. When it does " +
+          "not add up and exactly one of them is the amount it is out by, that one alone is Extra. A line whose " +
+          "amount the books already hold, with the same check number or within 5 days, names the entry it looks " +
+          "like. Add anyway posts that one line alone, because two identical lines on one day can both be real.",
+      },
+      {
+        action: "Start a reconciliation again",
+        summary: "Removes the reconciliation and its ticks; the statement file and entries stay.",
+        control: "Discard this reconciliation",
+        route: "/banking/reconcile",
+        note:
+          "For a reconciliation in progress. It asks for a reason, removes the reconciliation, its ticks and the statement lines kept " +
+          "with it, and returns to Reconcile. The statement file and its bank lines stay, and any entries added to the books " +
+          "from it stay in the books. A reconciliation that posted an adjustment cannot be discarded.",
+      },
+      {
+        action: "View the statement file",
+        summary: "The statement as the bank gave it, shown inside OneBook.",
+        control: "View",
+        route: "/banking/reconcile",
+        note:
+          "Every statement OneBook reads is kept as the bank gave it, once however many reconciliations use it. " +
+          "A reconciliation shows Statement file with View and Download, and its report names the file and the " +
+          "first 12 characters of its SHA-256. View shows it inside OneBook — a PDF drawn page by page, a CSV as " +
+          "a table, a bank download as text — without the browser ever opening the file.",
+      },
+      {
+        action: "Attach the statement",
+        summary: "For an older reconciliation with no file; it must match its figures.",
+        control: "Attach the statement",
+        route: "/banking/reconcile",
+        note:
+          "A reconciliation with no statement file — made before 1.83, or whose file could not be kept — takes " +
+          "one here. The file is read in the browser and attached only if it adds up and is that reconciliation's " +
+          "statement: the same closing balance and, when it kept the statement's lines, the same lines, those " +
+          "ticked Not a transaction left out on both sides. Otherwise nothing " +
+          "is kept and the message says what differs; the reconciliation's figures never change.",
+      },
+    ],
+  },
+  {
+    id: "reconcile-from-files",
+    area: "banking",
+    title: "Reconcile from statement files",
+    purpose: "Reconcile months at a time from PDF or CSV statements, and bring an account's history forward.",
+    route: "/banking/reconcile",
+    steps: [
+      {
+        action: "Reconcile a month or a year from files",
+        summary: "Preview pairs each month with the books; Sign off signs the months that agree.",
         control: "From statement files",
         route: "/banking/reconcile",
         note:
@@ -780,7 +926,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Transactions, as Complete does.",
       },
       {
-        action: "Bring an account's history forward from its first reconciliation",
+        action: "Bring an account's history forward",
+        summary: "When the books reach the first statement's opening exactly, earlier entries are signed off.",
         control: "Bring the history forward",
         route: "/banking/reconcile",
         note:
@@ -792,7 +939,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "reconciliation.",
       },
       {
-        action: "See every account's lines not yet reconciled, and bring an account's history forward",
+        action: "See every account's unreconciled lines",
+        summary: "Each account's open lines and last reconciliation; bring history forward from here too.",
         control: "Reconcile history",
         route: "/banking/reconcile/history",
         note:
@@ -804,106 +952,64 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "says how much they are out by. A reconciliation in progress that ends on or before the date must be " +
           "finished or discarded first.",
       },
+    ],
+  },
+  {
+    id: "check-reconciliations",
+    area: "banking",
+    title: "Check and correct reconciled accounts",
+    purpose: "Find what makes a bank account disagree with its statements, and put it right.",
+    route: "/banking/reconcile",
+    steps: [
       {
-        action: "Start a reconciliation again",
-        control: "Discard this reconciliation",
+        action: "Spot a balance posted as payments",
+        summary: "An amber card flags payments that track the account's own balance.",
+        control: "Show me the workings",
         route: "/banking/reconcile",
         note:
-          "For a reconciliation in progress. It asks for a reason, removes the reconciliation, its ticks and the statement lines kept " +
-          "with it, and returns to Reconcile. The statement file and its bank lines stay, and any entries added to the books " +
-          "from it stay in the books. A reconciliation that posted an adjustment cannot be discarded.",
+          "Choose the account at the top of Reconcile. When a run of entries for one payee lands exactly on what " +
+          "the account itself comes to on each date, an amber card says they look like the statement's balance, " +
+          "not payments: a statement's Balance column read as amounts, because a real payment does not track the " +
+          "balance of the account it is paid from. Show me the workings lists each entry beside what the account " +
+          "came to that day with the group taken out, and the difference; click a date to see the entry.",
       },
       {
-        action: "Read the difference",
-        control: "Left to explain",
+        action: "Remove a balance posted as payments",
+        summary: "With a reason, the whole group is reversed or voided; nothing is deleted.",
+        control: "Remove these N entries",
         route: "/banking/reconcile",
         note:
-          "The difference is shown in its parts: Opening, when the reconciliation begins at a different figure " +
-          "from the statement's opening; On the statement, not in the books; Ticked here, not on the statement; " +
-          "and Left to explain. When exactly one line is the size of what is left, it is named: check that one " +
-          "first.",
+          "Click it, give a reason, and click Confirm — remove all N. The whole group goes or none of it. An entry " +
+          "posted by hand or loaded from another program is reversed on its own date; an entry coded from Bank " +
+          "Transactions is voided and its bank line deleted. Nothing is deleted from the ledger, and the reason is " +
+          "recorded on each reversing entry and in the audit log. Some entries cannot go from here, and the card " +
+          "lists them with what to do instead: " +
+          "one ticked on a completed reconciliation (reopen it first), one dated in a closed period (reopen the " +
+          "period), one already reversed, or one that belongs to a document such as an invoice, bill or payment " +
+          "(void the document). Needs the Post manual journals permission.",
       },
       {
-        action: "Set aside a statement line that is not a transaction",
-        control: "Not a transaction",
+        action: "See what drags an account below zero",
+        summary: "Lists the largest payments the bank has not yet shown on a statement.",
+        control: "Payments not yet on a statement",
         route: "/banking/reconcile",
         note:
-          "Beside a statement line the books do not have — a line the PDF was misread into. It leaves the line out " +
-          "of Add missing lines and out of the difference; its line stays in Bank Transactions, to exclude there " +
-          "if it is not real. Restore brings it back. A line paired with the books cannot be set aside.",
-      },
-      {
-        action: "Add what the statement has and the books do not",
-        control: "Add all to the books",
-        route: "/banking/reconcile",
-        note:
-          "The box above the statement lines shows each line the books do not have and the account it would " +
-          "post to — by card, related company, rule or history, or else Uncategorized Income or Expense. Add all " +
-          "posts every one it lists, dated as the bank has it, or none, then pairs and ticks them; Complete stays " +
-          "yours. Or code them one by one in Bank Transactions and click Match again; no tick is ever removed.",
-      },
-      {
-        action: "Add a line held back from Add all",
-        control: "Add anyway",
-        route: "/banking/reconcile",
-        note:
-          "Two kinds of line are held back and listed apart, each with why. When the statement already balances " +
-          "without the lines the books do not have, they are marked Extra: likely not transactions. When it does " +
-          "not add up and exactly one of them is the amount it is out by, that one alone is Extra. A line whose " +
-          "amount the books already hold, with the same check number or within 5 days, names the entry it looks " +
-          "like. Add anyway posts that one line alone, because two identical lines on one day can both be real.",
-      },
-      {
-        action: "Recode a line from Uncategorized",
-        control: "Recode",
-        route: "/banking",
-        note:
-          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode posts a " +
-          "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
-          "any reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a signed-off month " +
-          "cannot be taken back with Change — recode it instead. A recoded line offers Undo recode, not Change: to code it " +
-          "again, Undo recode first.",
-      },
-      {
-        action: "Check a charge that may have been taken twice",
-        control: "Possible duplicates",
-        route: "/banking/overview",
-        note:
-          "The Banking overview lists two charges to the same payee, for the same amount, within 30 days — over the last " +
-          "12 months — under Possible duplicates. A regular payment, such as rent or a subscription, is left alone unless one " +
-          "breaks its rhythm, and a charge whose description reads differently from the payee's others comes first. Review " +
-          "opens the entry; void it yourself if the bank took the money twice, since nothing is removed for you. Dismiss " +
-          "asks for a reason and the pair is not offered again. A line on a completed reconciliation is never the one " +
-          "offered for review.",
-      },
-      {
-        action: "View the statement file",
-        control: "View",
-        route: "/banking/reconcile",
-        note:
-          "Every statement OneBook reads is kept as the bank gave it, once however many reconciliations use it. " +
-          "A reconciliation shows Statement file with View and Download, and its report names the file and the " +
-          "first 12 characters of its SHA-256. View shows it inside OneBook — a PDF drawn page by page, a CSV as " +
-          "a table, a bank download as text — without the browser ever opening the file.",
-      },
-      {
-        action: "Attach the statement",
-        control: "Attach the statement",
-        route: "/banking/reconcile",
-        note:
-          "A reconciliation with no statement file — made before 1.83, or whose file could not be kept — takes " +
-          "one here. The file is read in the browser and attached only if it adds up and is that reconciliation's " +
-          "statement: the same closing balance and, when it kept the statement's lines, the same lines, those " +
-          "ticked Not a transaction left out on both sides. Otherwise nothing " +
-          "is kept and the message says what differs; the reconciliation's figures never change.",
+          "When the chosen account reads below zero today, or has dropped below zero since the last statement you " +
+          "agreed, an amber card gives the figure that statement closed at, the lowest point since and the balance " +
+          "today. A bank would have charged for an overdraft and printed it, so what drags the account under is " +
+          "usually an entry that is not a payment — a balance posted as one, or the same thing entered twice. The " +
+          "card lists the largest payments not yet on a statement; reconcile the next statement and whatever the " +
+          "bank has never seen is left standing on its own. An account nobody has reconciled is flagged only while " +
+          "it is below zero now.",
       },
       {
         action: "Reopen a completed reconciliation",
+        summary: "Needs permission and a reason, and the reopen is audited.",
         control: "Reopen",
-        note: "Needs permission and a reason, and the reopen is audited.",
       },
       {
         action: "Check that signed-off reconciliations still agree",
+        summary: "Lists each reconciliation that no longer agrees because an entry was voided.",
         control: "Reconciliation Report",
         route: "/reports/reconciliations",
         note:
@@ -921,12 +1027,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Check the books balance",
+        summary: "Total debits must equal total credits. They always do, or the post was rejected.",
         control: "Trial Balance",
         route: "/reports",
-        note: "Total debits must equal total credits. They always do, or the post was rejected.",
       },
       {
-        action: "Read every account’s balance at the month end, and open any that looks wrong",
+        action: "Read each account's month-end balance",
+        summary: "Set As of to the month's last day; click a balance to see its entries.",
         control: "Chart of Accounts",
         route: "/accounts",
         note:
@@ -938,6 +1045,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check that clearing accounts have emptied",
+        summary: "The Exception Report lists each clearing account that still holds a balance.",
         control: "Clearing accounts that have not emptied",
         route: "/reports/exceptions",
         note:
@@ -949,7 +1057,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Close the period",
-        control: "Close period",
+        summary: "Once closed, the database refuses any posting or voiding dated in it.",
+        control: "Close",
         route: "/settings/periods",
         note:
           "Needs the Close accounting periods permission, which admins hold; an admin can give it to an accountant " +
@@ -958,19 +1067,18 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Fix something in a closed period",
-        control: "Reopen period",
-        note:
-          "Reopening needs a reason and is audited. The accounting-correct route is " +
-          "usually a reversal in the open period rather than a reopen.",
+        summary: "Needs a reason and is audited; a reversal in the open period is usually better.",
+        control: "Reopen",
       },
       {
         action: "See every close and reopen of the year",
+        summary: "When, by whom, and the reason given at the time, month by month.",
         control: "Month-End Close Log",
         route: "/reports/close-log",
-        note: "When, by whom, and the reason given at the time, month by month.",
       },
       {
-        action: "Read the year's ratios against the same dates a year earlier",
+        action: "Compare this year's ratios with last year's",
+        summary: "Fifteen ratios for liquidity, leverage and margin, with the figures behind them.",
         control: "Financial Ratios",
         route: "/reports/financial-ratios",
         note:
@@ -979,6 +1087,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Take the whole ledger as one plain-text file",
+        summary: "A Beancount file for bean-check and Fava, last under Accounting.",
         control: "Beancount",
         route: "/accounting/beancount",
         note:
@@ -996,25 +1105,24 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Set up agencies and rates",
+        summary: "Give each rate its effective dates; overlapping or invalid periods are rejected.",
         control: "New rate",
         route: "/sales-tax",
-        note: "Overlapping or invalid effective periods are rejected.",
       },
       {
         action: "See what is owed",
-        control: "Sales tax liability",
+        summary: "The Liability tab reconciles to the sales tax control accounts.",
+        control: "Liability",
         route: "/sales-tax",
-        note: "Reconciles to the sales-tax control accounts.",
       },
       {
         action: "Record a remittance",
+        summary: "A filed period locks; a later correction is a linked adjustment, not an edit.",
         control: "Record payment",
-        note:
-          "A filed period is locked; a later correction becomes a linked adjustment " +
-          "rather than an edit.",
       },
       {
-        action: "See what was collected, paid over and owed, period by period",
+        action: "See tax collected, paid and owed by period",
+        summary: "Monthly, quarterly or yearly, with a proof line against the tax accounts.",
         control: "Sales Tax Liability by period",
         route: "/reports/sales-tax-liability",
         note:
@@ -1032,19 +1140,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Record vendor tax details",
+        summary: "Taxpayer ID numbers are masked on screen and kept out of reports and audit records.",
         control: "Tax profile",
         route: "/vendors",
-        note:
-          "Taxpayer identification numbers are masked on screen and never written " +
-          "into audit payloads or reports.",
       },
       {
         action: "Produce the review worksheet",
-        control: "1099 review",
+        summary: "A cash-basis review worksheet, not a filing; someone qualified must check it first.",
+        control: "1099 Review",
         route: "/reports/1099",
-        note:
-          "This is a review worksheet on a cash basis, not a filing. It must be " +
-          "checked by someone qualified before anything is submitted.",
       },
     ],
   },
@@ -1057,6 +1161,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     steps: [
       {
         action: "Give someone access",
+        summary: "Give the least role that does the job.",
         control: "Add user",
         route: "/settings/users",
         note:
@@ -1065,6 +1170,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Stop someone who has left",
+        summary: "Takes effect at once everywhere; repeat it in each of their companies.",
         control: "Suspend or Offboard",
         route: "/settings/users",
         note:
@@ -1073,6 +1179,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Set what each role may do",
+        summary: "Each switch is checked before its action runs, so a change is immediate.",
         control: "Permissions",
         route: "/settings/permissions",
         note:
@@ -1081,20 +1188,19 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Require a second pair of eyes",
+        summary: "Choose which actions need approval, above what amount; nobody approves their own.",
         control: "Approvals",
         route: "/settings/approvals",
-        note:
-          "Configure which actions need approval and above what amount. A person " +
-          "cannot approve their own request.",
       },
       {
         action: "See who changed what",
+        summary: "Every protected change records who did it, what, and the values before and after.",
         control: "Audit history",
         route: "/settings/audit",
-        note: "Every protected write records the actor, the action and the before and after values.",
       },
       {
-        action: "Review what changed, and what was voided or reversed",
+        action: "Review changes, voids and reversals",
+        summary: "The Change Log reads the audit log; nothing in OneBook is deleted.",
         control: "Change Log",
         route: "/reports/change-log",
         note:
@@ -1103,6 +1209,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Review access every quarter",
+        summary: "Confirm each role is still needed, suspend leavers, and note who reviewed.",
         control: "Users",
         route: "/settings/users",
         note:
@@ -1116,13 +1223,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     id: "set-up-a-company",
     area: "data",
     title: "Set up a new company",
-    purpose:
-      "A new company starts with its tables and its chart of accounts and little else. Settings › Company lists what "
-      + "it still needs, read from the books, and ticks each step off as it is done.",
+    purpose: "A new company starts with only a chart of accounts. Settings › Company ticks off what it still needs.",
     route: "/settings/companies",
     steps: [
       {
         action: "Create the company",
+        summary: "Platform administrators only; pick a starting chart, then choose the company at the top.",
         control: "New company",
         route: "/settings/companies",
         note:
@@ -1132,6 +1238,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Fill in the company's details",
+        summary: "Name, address, phone and email for documents, the time zone and fiscal year.",
         control: "Edit",
         route: "/settings/company",
         note:
@@ -1141,6 +1248,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Choose where new documents land",
+        summary: "Posting defaults set the accounts a new form starts on.",
         control: "Edit",
         route: "/settings/company",
         note:
@@ -1150,6 +1258,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Enter where the books start",
+        summary: "What each account held on day one; skip it if starting from nothing.",
         control: "Post opening balances",
         route: "/opening-balances",
         note:
@@ -1158,15 +1267,15 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Add the bank and card accounts",
+        summary: "Each links a ledger account to the statements reconciled against it.",
         control: "Add bank account",
         route: "/banking",
-        note: "Each one links a ledger account to the statements that will be brought in and reconciled against it.",
       },
       {
         action: "Add the people who work in the books",
+        summary: "Someone already in OneBook for another company: Add existing account.",
         control: "Add user",
         route: "/settings/users",
-        note: "Someone who already signs in to OneBook for another company is added with Add existing account instead.",
       },
     ],
   },
@@ -1174,9 +1283,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     id: "restore-a-backup",
     area: "data",
     title: "Find a backup, and open it as a second company to compare against",
-    purpose:
-      "Your books are copied on a schedule. When a figure looks wrong, open the copy from before "
-      + "it went wrong as a separate company, and read the two side by side.",
+    purpose: "Your books are copied on a schedule. Open an earlier copy as a separate company and compare.",
     route: "/settings/backups",
     cautions: [
       {
@@ -1204,7 +1311,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     ],
     steps: [
       {
-        action: "Find the day you want to go back to",
+        action: "Find the day to go back to",
+        summary: "One row per snapshot, newest first; only a Stored row can be restored.",
         control: "Backups",
         route: "/settings/backups",
         note:
@@ -1214,6 +1322,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Take a copy of the file for yourself",
+        summary: "A ZIP of one CSV per table, with its totals; the link lasts five minutes.",
         control: "Download",
         note:
           "A single ZIP holding one CSV per table, plus a manifest listing the row counts and "
@@ -1222,6 +1331,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Open that day's books as a separate company",
+        summary: "Name the new company and confirm; the company you work in is untouched.",
         control: "Restore as new company",
         note:
           "Opens a page to name the new company. Confirm with Restore into a new company: it "
@@ -1230,6 +1340,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check the copy came back whole",
+        summary: "The restored totals are compared with the snapshot's; a mismatch names the figure.",
         control: "Control totals",
         note:
           "After loading, the trial balance, the receivable and payable totals and the journal "
@@ -1241,6 +1352,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Read the two side by side",
+        summary: "Open the same report in each company; the balance sheet shows what moved.",
         control: "The company switcher",
         note:
           "Switch between the restored copy and the running books and open the same report on "
@@ -1253,67 +1365,53 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     id: "import-transactions",
     area: "data",
     title: "Bring across a list of transactions you have already categorized",
-    purpose:
-      "Load an export where every row already says which bank the money moved through and which "
-      + "account it belongs to, so each row can be posted as it stands.",
+    purpose: "Load an export where each row names its bank and its account, so every row posts as it stands.",
     route: "/settings/import",
     cautions: [
       {
-        title: "This is not the same file as a general ledger",
+        title: "One row per transaction, not a general ledger",
         body:
-          "A general ledger has one row per side of a transaction, grouped under each account. " +
-          "This tab wants the other shape: one row per transaction, naming both the bank and the " +
-          "chart-of-account. If the file is grouped into sections per account, use the General " +
-          "ledger tab instead.",
+          "A general ledger has one row per side of a transaction, grouped under each account. This tab " +
+          "wants the other shape: one row per transaction, naming both the bank and the chart-of-account. " +
+          "If the file is grouped into sections per account, use the General ledger tab instead.\n\nRows " +
+          "carrying no money are left out, and that is not a fault. A waived fee is often written as 0.00. " +
+          "There is nothing to post for those rows. They are counted on their own, apart from rows that " +
+          "really do have a problem.",
       },
       {
-        title: "Every account the file names must already be in the chart of accounts",
+        title: "Every account and bank in the file must already exist",
         body:
-          "A transaction row never creates an account — the same name means different things in " +
-          "two charts, and a typo would become a permanent account. The screen lists every name " +
-          "it cannot find and keeps the button shut until each one is answered. Answering it " +
-          "does not mean editing the file: point the name at an account you already have, or " +
-          "create it there with the type you choose.",
-      },
-      {
-        title: "A name two accounts answer to is refused, and the account code is the way out",
-        body:
-          "An imported chart can easily hold both \"1000 Cash on Hand\" and \"140 Cash on Hand\". " +
-          "A row naming only \"Cash on Hand\" is then a question, not a reference — one of those " +
-          "is a bank and the other is not — so nothing is imported under it. Two ways to answer " +
-          "it. Put the code in the file: either \"1000\" on its own, or \"1000 - Cash on Hand\" " +
-          "with the spaced hyphen; \"1000 Cash on Hand\" without the hyphen is not a form the " +
-          "chart recognizes. Or, when the file is somebody else's export and cannot be edited, " +
-          "set the account you do not use to Inactive in Chart of Accounts, under Setup — one live account " +
-          "of that name is no longer a question.",
-      },
-      {
-        title: "The bank accounts have to exist under Banking, not only in the chart",
-        body:
-          "Each row also writes a bank line, and that line is what stops a second import of the " +
-          "same file posting the same money twice. An account that is not of a bank or credit " +
-          "card type cannot be added there at all — point those rows at the account the money " +
-          "really moved through.",
+          "Every account the file names must already be in the chart of accounts. A transaction row never " +
+          "creates an account — the same name means different things in two charts, and a typo would become " +
+          "a permanent account. The screen lists every name it cannot find and keeps the button shut until " +
+          "each one is answered. Answering it does not mean editing the file: point the name at an account " +
+          "you already have, or create it there with the type you choose.\n\nA name two accounts answer to is " +
+          "refused, and the account code is the way out. An imported chart can easily hold both \"1000 Cash " +
+          "on Hand\" and \"140 Cash on Hand\". A row naming only \"Cash on Hand\" is then a question, not a " +
+          "reference — one of those is a bank and the other is not — so nothing is imported under it. Two " +
+          "ways to answer it. Put the code in the file: either \"1000\" on its own, or \"1000 - Cash on Hand\" " +
+          "with the spaced hyphen; \"1000 Cash on Hand\" without the hyphen is not a form the chart " +
+          "recognizes. Or, when the file is somebody else's export and cannot be edited, set the account " +
+          "you do not use to Inactive in Chart of Accounts, under Setup — one live account of that name is " +
+          "no longer a question.\n\nThe bank accounts have to exist under Banking, not only in the chart. " +
+          "Each row also writes a bank line, and that line is what stops a second import of the same file " +
+          "posting the same money twice. An account that is not of a bank or credit card type cannot be " +
+          "added there at all — point those rows at the account the money really moved through.",
       },
       {
         title: "Every import is recorded, and can be undone",
         body:
-          "The list under the preview shows what has been imported: the file, how many rows, over " +
-          "what dates, by whom. Undo voids the entries it posted and removes its bank lines, " +
-          "which is what frees the file to be imported again once it is corrected. Loading the " +
-          "very same file while its import is still live is refused rather than skipped in " +
-          "silence — rows from a *different* file that overlap are still recognized and skipped.",
-      },
-      {
-        title: "Rows carrying no money are left out, and that is not a fault",
-        body:
-          "A waived fee is often written as 0.00. There is nothing to post for those rows. They " +
-          "are counted on their own, apart from rows that really do have a problem.",
+          "The list under the preview shows what has been imported: the file, how many rows, over what " +
+          "dates, by whom. Undo voids the entries it posted and removes its bank lines, which is what frees " +
+          "the file to be imported again once it is corrected. Loading the very same file while its import " +
+          "is still live is refused rather than skipped in silence — rows from a *different* file that " +
+          "overlap are still recognized and skipped.",
       },
     ],
     steps: [
       {
-        action: "Open the company these transactions belong to, and read what is needed first",
+        action: "Open the Transactions tab in the right company",
+        summary: "Everything posts into the company open in the switcher at the top.",
         control: "Transactions",
         route: "/settings/import",
         note:
@@ -1329,7 +1427,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         },
       },
       {
-        action: "Read what this company is missing, before mapping anything",
+        action: "See what this company is missing",
+        summary: "Choosing the file checks every account and bank against this company at once.",
         control: "What this file needs",
         note:
           "Choosing the file is enough for this: the screen checks every account name and every " +
@@ -1344,7 +1443,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         },
       },
       {
-        action: "Choose the file, and check the columns One Book proposed",
+        action: "Choose the file and check the columns",
+        summary: "Columns are matched from the file's headings; Date and Chart of account are required.",
         control: "Choose a CSV file",
         note:
           "The columns are matched from the file's own headings and can all be changed. Date and " +
@@ -1358,6 +1458,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "See what will happen before anything happens",
+        summary: "Counts what will be created, what has a problem and what carries no money.",
         control: "See what will happen",
         note:
           "How many rows will be created, how many have a genuine problem, how many carry no " +
@@ -1370,6 +1471,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Read anything the screen refuses to import",
+        summary: "Each refusal says exactly what to fix; none is worth working around.",
         control: "The panels below the preview",
         note:
           "An account the chart does not have, a bank account Banking has not seen, and a name " +
@@ -1383,8 +1485,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Import, then check the bank",
+        summary: "Each row posts one entry and one bank line, already matched in Bank Transactions.",
         control: "Import",
-        route: "/banking",
         note:
           "Each row posts one journal entry and one bank line already marked matched, so " +
           "connecting a bank feed for the same account later cannot count the same money twice.",
@@ -1396,6 +1498,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check it landed, and keep the way back",
+        summary: "Listed under the preview; Undo voids it so a corrected file can go in.",
         control: "Undo",
         route: "/settings/import",
         note:
@@ -1416,58 +1519,44 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Bring a company's books across from QuickBooks or Wave",
     purpose:
       "Load a general ledger exported from another product so its accounts, its " +
-      "history and its balances live in One Book.",
+      "history and its balances live in OneBook.",
     route: "/settings/import",
     cautions: [
       {
-        title: "Check which company you are in first",
+        title: "Check which company you are in, and try a sample first",
         body:
-          "An import posts into the company open in the switcher at the top of the " +
-          "screen, and it says which one on the button before you press it. There is " +
-          "no way to move an import from one company to another afterwards.",
+          "An import posts into the company open in the switcher at the top of the screen, and it says " +
+          "which one on the button before you press it. There is no way to move an import from one company " +
+          "to another afterwards.\n\nTry it on a sample company before the real books. A sample company can " +
+          "be thrown away. Load the file there first, read the Trial Balance, and only then do it for real.",
       },
       {
         title: "The chart of accounts must already hold every account the file names",
         body:
-          "A ledger row never creates an account: the same name means different " +
-          "things in two charts, and a typo would become a permanent account. The " +
-          "screen lists every name it cannot find and keeps the button shut until " +
-          "each one is answered — and it is answered there, not on another screen: " +
-          "point the name at an account you already have, or create it with the type " +
-          "you choose. A name two live accounts answer to counts as one it cannot " +
-          "find, and the same picker settles that.",
+          "A ledger row never creates an account: the same name means different things in two charts, and a " +
+          "typo would become a permanent account. The screen lists every name it cannot find and keeps the " +
+          "button shut until each one is answered — and it is answered there, not on another screen: point " +
+          "the name at an account you already have, or create it with the type you choose. A name two live " +
+          "accounts answer to counts as one it cannot find, and the same picker settles that.",
       },
       {
-        title: "Undo works only while the period is still open",
+        title: "A file imports once, and Undo needs the period open",
         body:
-          "An import can be undone from the list at the bottom of the tab, which " +
-          "voids every entry it created. An entry dated in a closed period cannot be " +
-          "voided at all — the refusal says so in those words — so a mistake there has " +
-          "to be corrected with a reversing entry instead. Do not close a period until " +
-          "you have checked the import against the report you exported.",
-      },
-      {
-        title: "The same file cannot be imported twice",
-        body:
-          "One Book remembers the file, not the file name, so a second attempt is " +
-          "refused even if you rename it or pick the other mode. That is deliberate: " +
-          "a doubled ledger balances perfectly and looks entirely correct.",
-      },
-      {
-        title: "Try it on a sample company before the real books",
-        body:
-          "A sample company can be thrown away. Load the file there first, read the " +
-          "Trial Balance, and only then do it for real.",
+          "Undo works only while the period is still open. An import can be undone from the list at the " +
+          "bottom of the tab, which voids every entry it created. An entry dated in a closed period cannot " +
+          "be voided at all — the refusal says so in those words — so a mistake there has to be corrected " +
+          "with a reversing entry instead. Do not close a period until you have checked the import against " +
+          "the report you exported.\n\nThe same file cannot be imported twice. OneBook remembers the file, " +
+          "not the file name, so a second attempt is refused even if you rename it or pick the other mode. " +
+          "That is deliberate: a doubled ledger balances perfectly and looks entirely correct.",
       },
     ],
     steps: [
       {
         action: "Open the company these books belong to",
+        summary: "Everything posts into the company open here; the Import button repeats its name.",
         control: "The company switcher",
         route: "/settings/import",
-        note:
-          "Everything below posts into whichever company is open here. The import " +
-          "button repeats the name so it cannot be missed.",
         screenshot: {
           src: "/guide/import-01-tab.png",
           alt: "The import screen with the General ledger tab selected among the other import tabs",
@@ -1476,6 +1565,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Choose the General ledger tab",
+        summary: "Each row is one side of an entry, so there are no columns to match.",
         control: "General ledger",
         note:
           "The other tabs read one row per record and ask you to match columns. A " +
@@ -1490,6 +1580,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Drop the exported file in",
+        summary: "Check its accounts, lines and total debits against the export's own totals.",
         control: "Drop the Account Transactions export here",
         note:
           "The file is read in your browser. The screen then shows how many accounts, " +
@@ -1503,11 +1594,12 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Read anything the screen refuses to import",
+        summary: "A missing account, an unbalanced date or a totals mismatch stops the import.",
         control: "The red panels",
         note:
           "Three things stop an import before it starts: an account the chart does " +
           "not have, a date whose debits and credits differ, and a disagreement " +
-          "between One Book's totals and the file's own. Each names exactly what is " +
+          "between OneBook's totals and the file's own. Each names exactly what is " +
           "wrong. None of them is worth working around.",
         screenshot: {
           src: "/guide/import-04-blocked.png",
@@ -1517,6 +1609,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Choose how much to bring across",
+        summary: "The whole history keeps every transaction; Closing balances only posts one entry.",
         control: "The whole history / Closing balances only",
         note:
           "The whole history posts one journal entry per date, so every transaction " +
@@ -1532,6 +1625,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Import, then check the result",
+        summary: "It all posts or none of it does; the file is kept under Reports.",
         control: "Import",
         note:
           "Everything posts in one go: if any part of it fails, none of it lands. " +
@@ -1545,10 +1639,11 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Check the numbers against the source",
+        summary: "OneBook's trial balance should match the closing balances you exported.",
         control: "Trial Balance",
         route: "/reports",
         note:
-          "The one check worth doing every time: the trial balance in One Book should " +
+          "The one check worth doing every time: the trial balance in OneBook should " +
           "match the closing balances on the report you exported. If it does not, undo " +
           "the import while the period is still open.",
         screenshot: {
@@ -1563,30 +1658,29 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     id: "feedback",
     area: "controls",
     title: "Tell us what is wrong or missing",
-    purpose:
-      "During this test round, this is the channel that turns what you notice into a " +
-      "tracked item.",
+    purpose: "Turn what you notice into a tracked item, and follow what happens to it.",
     route: "/settings/feedback",
     steps: [
       {
         action: "Report a problem or suggest an improvement",
+        summary: "The Report button, bottom right of every page, can attach a screenshot.",
         control: "Report",
+        everyScreen: true,
         note:
           "The floating Report button works on every page. It captures a screenshot " +
           "of what you are looking at — you can send the report without it.",
       },
       {
         action: "Ask how something is meant to work",
+        summary: "Answers come from these guides; the assistant cannot see your figures.",
         control: "Ask AI",
-        note:
-          "Answers come from this system's own guides. The assistant cannot see your " +
-          "data, so it will not quote balances.",
+        everyScreen: true,
       },
       {
         action: "Follow what happens to a report",
+        summary: "Reports move through New, Reviewing, Resolved and Declined.",
         control: "Feedback triage",
         route: "/settings/feedback",
-        note: "Reports move through New, Reviewing, Resolved and Declined.",
       },
     ],
   },

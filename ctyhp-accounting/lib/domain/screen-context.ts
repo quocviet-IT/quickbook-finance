@@ -135,7 +135,7 @@ export function searchGuide(query: string, flows: readonly GuideFlow[] = GUIDE_F
     }
 
     const steps = flow.steps.filter((step) => {
-      const haystack = `${step.action} ${step.control} ${step.note ?? ""}`.toLowerCase();
+      const haystack = `${step.action} ${step.summary} ${step.control} ${step.note ?? ""}`.toLowerCase();
       return terms.some((term) => haystack.includes(term));
     });
     // A control name is what people actually type, so weight it above prose.
@@ -217,6 +217,11 @@ export interface AssistantContext {
  * out of nowhere — and to stop it telling a viewer to press a button only an
  * administrator can see.
  */
+/** What the assistant is told about a step: its line, then its note when it has one (3.0.18). */
+function stepText(step: GuideStep): string {
+  return step.note ? `${step.summary} ${step.note}` : step.summary;
+}
+
 export function describeContextForAssistant(context: AssistantContext): string {
   const screen = screenContextFor(context.route);
   const lines: string[] = [
@@ -248,17 +253,14 @@ export function describeContextForAssistant(context: AssistantContext): string {
       for (const step of flow.steps) {
         add(
           `    * ${step.action} — control "${step.control}"${step.route ? ` on ${step.route}` : ""}` +
-            `${step.note ? `. ${step.note}` : ""}`,
+            `. ${stepText(step)}`,
         );
       }
     }
   } else if (screen.flowsPassingThrough.length > 0) {
     for (const entry of screen.flowsPassingThrough) {
       for (const step of entry.steps) {
-        add(
-          `- Part of "${entry.flow.title}": ${step.action} — control "${step.control}"` +
-            `${step.note ? `. ${step.note}` : ""}`,
-        );
+        add(`- Part of "${entry.flow.title}": ${step.action} — control "${step.control}". ${stepText(step)}`);
       }
     }
   }

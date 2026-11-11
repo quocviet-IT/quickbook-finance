@@ -8,13 +8,21 @@ import type { GuideFlow } from "@/lib/domain/system-guide";
 import { screenName } from "@/lib/domain/screen-names";
 import { plural } from "@/lib/format";
 
+/** A caution merged from several keeps each one as a paragraph of its own. */
+function paragraphs(text: string): string[] {
+  return text.split("\n\n");
+}
+
 /**
  * One workflow (3.0.17): its steps in order, each naming the control that does
  * it and the screen it is on, with a link to that screen. A reader who came
  * from a screen's Help link is told so, and the steps on that screen are
  * marked; one who came for a single step lands on it (#step-n).
  *
- * The words are the guide's own, unchanged; only where they live is new.
+ * Each step is its action and one line on what happens (3.0.18). The longer
+ * note sits under Details, and a caution's body under its title, in native
+ * <details>: open and shut from the keyboard, announced as such, and found by
+ * the browser's own Find even while shut.
  */
 export default function GuideFlowView({
   flow,
@@ -61,8 +69,14 @@ export default function GuideFlowView({
               <ul>
                 {flow.cautions.map((caution) => (
                   <li key={caution.title}>
-                    <strong>{caution.title}</strong>
-                    <p className="guide-step__note">{caution.body}</p>
+                    <details className="guide-details guide-caution">
+                      <summary>{caution.title}</summary>
+                      {paragraphs(caution.body).map((paragraph, index) => (
+                        <p key={`${caution.title}-${index}`} className="guide-step__note">
+                          {paragraph}
+                        </p>
+                      ))}
+                    </details>
                   </li>
                 ))}
               </ul>
@@ -71,8 +85,11 @@ export default function GuideFlowView({
 
           <ol className="guide-steps">
             {flow.steps.map((step, index) => {
-              const screen = screenName(step.route ?? flow.route);
-              const here = from !== null && (step.route ?? flow.route) === from.route;
+              // Report and Ask AI float over every screen, so no one screen is theirs.
+              const screen = step.everyScreen ? "every screen" : screenName(step.route ?? flow.route);
+              const here = from !== null && !step.everyScreen && (step.route ?? flow.route) === from.route;
+              // A report is its own control: "Open Invoices on Open Invoices" says it twice.
+              const sameAsScreen = step.control.toLowerCase() === screen.toLowerCase();
               return (
                 <li
                   key={`${flow.id}-${index}`}
@@ -87,17 +104,24 @@ export default function GuideFlowView({
                       <span className="guide-step__visually-numbered">Step {index + 1}: </span>
                       {step.action}
                     </h2>
+                    <p className="guide-step__summary">{step.summary}</p>
                     <div className="guide-step__where">
                       <span className="guide-control">{step.control}</span>
-                      <span>on {screen}</span>
+                      {sameAsScreen ? null : <span>on {screen}</span>}
                       {here ? <span className="guide-here-tag">You were here</span> : null}
                       {step.route ? (
+                        // "Go to", not "Open": a screen called Open Invoices read "Open Open Invoices".
                         <IntentLink href={step.route} className="guide-route">
-                          Open {screen} <ArrowRightOutlined />
+                          Go to {screen} <ArrowRightOutlined />
                         </IntentLink>
                       ) : null}
                     </div>
-                    {step.note ? <p className="guide-step__note">{step.note}</p> : null}
+                    {step.note ? (
+                      <details className="guide-details">
+                        <summary>Details</summary>
+                        <p className="guide-step__note">{step.note}</p>
+                      </details>
+                    ) : null}
                     {step.screenshot ? (
                       <figure className="system-guide__shot">
                         {/* Captured from a sample company, never from real books. */}

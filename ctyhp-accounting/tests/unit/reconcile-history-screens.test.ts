@@ -628,7 +628,7 @@ describe("the Guide's reconcile steps", () => {
   });
 
   it("says a line set aside stays in Bank Transactions", () => {
-    expect(note("Set aside a statement line that is not a transaction")).toContain(
+    expect(note("Set aside a misread statement line")).toContain(
       "its line stays in Bank Transactions, to exclude there if it is not real",
     );
   });
