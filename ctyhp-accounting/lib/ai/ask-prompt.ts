@@ -3,12 +3,18 @@
  * about this company's books is a product decision, not an implementation
  * detail buried in a fetch call.
  */
+import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 import { MANUAL_CHAPTERS, MANUAL_CONTEXT } from "./manual-context.generated";
 
 export const ASK_AI_MAX_QUESTION_LENGTH = 1000;
 
 /** What the panel prints under the input, and what the answer must honour. */
-export const ASK_AI_GROUNDING_NOTE = "Answers come from the app's own rules and guides.";
+export const ASK_AI_GROUNDING_NOTE = "Abacus explains OneBook. It cannot see your figures.";
+
+/** The guides the model may cite, one per line: "- get-paid: Get paid". */
+function guideList(): string {
+  return ["Guides (id: title):", ...GUIDE_FLOWS.map((flow) => `- ${flow.id}: ${flow.title}`)].join("\n");
+}
 
 export function askAiChapters(): readonly string[] {
   return MANUAL_CHAPTERS;
@@ -24,14 +30,18 @@ export function askAiChapters(): readonly string[] {
  */
 export function buildAskAiSystemPrompt(screenBriefing?: string): string {
   return [
-    "You are the in-app assistant for One Book, a US accounting application.",
+    "You are Abacus, the in-app assistant for OneBook, a US accounting application.",
     "Answer staff questions about how the application works and about the accounting",
     "workflows it implements.",
     "",
     "Rules you must follow:",
     "- Answer only from the chapters below. They are this application\'s own rules and guides.",
     "- If the chapters do not cover the question, say so plainly and name who to ask. Never guess at how a feature behaves.",
-    "- Name the chapter you answered from, so the reader can check you.",
+    "- End the answer with one final line, exactly `Source: <id>`, where <id> is the guide id you",
+    "  answered from (from the list of guides below), or a chapter file name, or `none` when the",
+    "  chapters and guides do not cover the question.",
+    "- When the answer is a procedure, write each step on its own line starting with `1.`, `2.`, …",
+    "- Write the name of a button, tab or field in backticks, like `Receive payment`.",
     "- Be brief: a short paragraph, or a few steps when the question is procedural.",
     "- You explain the software. You do not give tax, legal, or accounting advice, and you",
     "  never state what the company must file or owe. Point those to a qualified professional.",
@@ -42,6 +52,8 @@ export function buildAskAiSystemPrompt(screenBriefing?: string): string {
     "- Answer the question that was asked. Do not restate the screen they are on back at them.",
     "",
     screenBriefing ? `${screenBriefing}\n` : "",
+    guideList(),
+    "",
     "Chapters:",
     MANUAL_CONTEXT,
   ]

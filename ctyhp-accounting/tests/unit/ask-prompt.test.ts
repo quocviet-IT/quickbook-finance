@@ -11,6 +11,7 @@ import {
   generateModule,
   readManualChapters,
 } from "../../scripts/build-manual-context.mjs";
+import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 import { MANUAL_CHAPTERS, MANUAL_CONTEXT } from "@/lib/ai/manual-context.generated";
 
 describe("manual grounding context", () => {
@@ -57,6 +58,27 @@ describe("buildAskAiSystemPrompt", () => {
     expect(prompt).toMatch(/do not give tax, legal, or accounting advice/i);
   });
 
+  it("introduces itself as Abacus", () => {
+    expect(prompt.split("\n")[0]).toBe("You are Abacus, the in-app assistant for OneBook, a US accounting application.");
+    expect(prompt).not.toContain("Ask AI");
+  });
+
+  it("asks for a final Source line naming a guide id, a chapter file or none", () => {
+    expect(prompt).toContain("`Source: <id>`");
+    expect(prompt).toMatch(/or `none` when the\s+chapters and guides do not cover/);
+  });
+
+  it("asks for numbered steps, backticked controls and bracketed routes", () => {
+    expect(prompt).toContain("starting with `1.`, `2.`");
+    expect(prompt).toContain("in backticks, like `Receive payment`");
+    expect(prompt).toContain("write the route in square brackets");
+  });
+
+  it("lists every guide by id before the chapters", () => {
+    const list = prompt.slice(prompt.indexOf("Guides (id: title):"), prompt.indexOf("Chapters:"));
+    for (const flow of GUIDE_FLOWS) expect(list).toContain(`- ${flow.id}: ${flow.title}\n`);
+  });
+
   it("forbids inventing figures, because the assistant cannot see the ledger", () => {
     expect(prompt).toMatch(/Never invent figures/i);
   });
@@ -89,6 +111,6 @@ describe("validateAskAiQuestion", () => {
 
 describe("grounding note", () => {
   it("is the sentence the panel prints under the input", () => {
-    expect(ASK_AI_GROUNDING_NOTE).toBe("Answers come from the app's own rules and guides.");
+    expect(ASK_AI_GROUNDING_NOTE).toBe("Abacus explains OneBook. It cannot see your figures.");
   });
 });

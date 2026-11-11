@@ -249,7 +249,7 @@ export function describeContextForAssistant(context: AssistantContext): string {
 
   if (screen.flowsStartingHere.length > 0) {
     for (const flow of screen.flowsStartingHere) {
-      add(`- Workflow "${flow.title}" starts here. Steps:`);
+      add(`- Workflow "${flow.title}" (guide ${flow.id}) starts here. Steps:`);
       for (const step of flow.steps) {
         add(
           `    * ${step.action} — control "${step.control}"${step.route ? ` on ${step.route}` : ""}` +
@@ -260,7 +260,7 @@ export function describeContextForAssistant(context: AssistantContext): string {
   } else if (screen.flowsPassingThrough.length > 0) {
     for (const entry of screen.flowsPassingThrough) {
       for (const step of entry.steps) {
-        add(`- Part of "${entry.flow.title}": ${step.action} — control "${step.control}". ${stepText(step)}`);
+        add(`- Part of "${entry.flow.title}" (guide ${entry.flow.id}): ${step.action} — control "${step.control}". ${stepText(step)}`);
       }
     }
   }

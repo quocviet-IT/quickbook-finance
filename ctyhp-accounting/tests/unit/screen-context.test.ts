@@ -121,6 +121,20 @@ describe("describeContextForAssistant", () => {
     expect(briefing).toContain('control "');
   });
 
+  it("names the guide beside each workflow, so the answer can cite it", () => {
+    const starting = describeContextForAssistant(base);
+    const flow = GUIDE_FLOWS.find((f) => f.route === "/invoices");
+    expect(flow).toBeDefined();
+    expect(starting).toContain(`- Workflow "${flow!.title}" (guide ${flow!.id}) starts here. Steps:`);
+
+    // A screen that only some workflow passes through, with none starting there.
+    const startRoutes = new Set(GUIDE_FLOWS.map((f) => f.route));
+    const partway = GUIDE_FLOWS.flatMap((f) => f.steps).find((step) => step.route && !startRoutes.has(step.route));
+    expect(partway).toBeDefined();
+    const through = describeContextForAssistant({ ...base, route: partway!.route! });
+    expect(through).toMatch(/- Part of "[^"]+" \(guide [a-z0-9-]+\): /);
+  });
+
   it("says plainly when the books are a sample", () => {
     const briefing = describeContextForAssistant({
       ...base,
