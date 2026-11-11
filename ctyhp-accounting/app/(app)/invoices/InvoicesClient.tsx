@@ -25,7 +25,8 @@ import {
 } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
-import { PAID_LABELS } from "@/lib/domain/status-label";
+import { InvoiceStatusTag } from "@/components/invoices/InvoiceStatusTag";
+import { isOpenInvoice } from "@/lib/domain/open-invoice";
 import FilterBar from "@/components/ui/FilterBar";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
@@ -83,8 +84,6 @@ import { closeOrConfirmDiscard, destructiveConfirmProps } from "@/lib/client/des
 import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
 import { invoiceVoidConfirm, invoiceVoidOption } from "@/lib/domain/invoice-void";
 import {
-  invoiceAttention,
-  invoiceAttentionLook,
   invoiceStatusCounts,
   sortInvoicesByAttention,
   type InvoiceStatusTab,
@@ -331,8 +330,7 @@ export default function InvoicesClient({
     if (!initialQueue) return sortInvoicesByAttention(invoices, today);
     const filtered = invoices.filter(
       (invoice) =>
-        (invoice.status === "issued" || invoice.status === "partial") &&
-        invoice.balance_due_minor > 0 &&
+        isOpenInvoice(invoice) &&
         Boolean(invoice.due_date) &&
         invoice.due_date! < initialQueue.asOf,
     );
@@ -695,12 +693,7 @@ export default function InvoicesClient({
       title: "Status",
       dataIndex: "status",
       width: INVOICE_LIST_FIXED_WIDTHS[5],
-      render: (s: InvoiceStatus, r: InvoiceWithCustomer) => {
-        const look = invoiceAttentionLook(invoiceAttention(r, today));
-        if (!look) return <StatusTag status={s} labels={PAID_LABELS} />;
-        const code = look.tone === "danger" ? "overdue" : "due_soon";
-        return <StatusTag status={code} looks={{ [code]: look }} />;
-      },
+      render: (_: InvoiceStatus, r: InvoiceWithCustomer) => <InvoiceStatusTag invoice={r} today={today} />,
     },
     {
       title: "Actions",

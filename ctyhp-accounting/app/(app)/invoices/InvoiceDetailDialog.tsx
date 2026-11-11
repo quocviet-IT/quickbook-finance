@@ -17,7 +17,7 @@ import SettlementHistory from "@/components/settlements/SettlementHistory";
 import type { SettlementEvent } from "@/lib/domain/settlement";
 import { getInvoiceDetailAction } from "./actions";
 import { invoiceVoidOption } from "@/lib/domain/invoice-void";
-import { invoiceAttention, invoiceAttentionLook } from "@/lib/domain/invoice-attention";
+import { InvoiceAttentionTag } from "@/components/invoices/InvoiceStatusTag";
 
 /** The dialog an invoice's lines open in, whose body is the lines table's box. */
 export const VIEW_INVOICE_MODAL_WIDTH = 820;
@@ -125,8 +125,6 @@ export default function InvoiceDetailDialog({
    * late or how soon when that is the point.
    */
   function headerItems(invoice: InvoiceWithCustomer): DescriptionsProps["items"] {
-    const look = invoiceAttentionLook(invoiceAttention(invoice, today));
-    const code = look?.tone === "danger" ? "overdue" : "due_soon";
     return [
       {
         key: "customer",
@@ -143,7 +141,7 @@ export default function InvoiceDetailDialog({
         children: (
           <Space size={4} wrap>
             <StatusTag status={invoice.status} labels={PAID_LABELS} />
-            {look ? <StatusTag status={code} looks={{ [code]: look }} /> : null}
+            <InvoiceAttentionTag invoice={invoice} today={today} />
           </Space>
         ),
       },

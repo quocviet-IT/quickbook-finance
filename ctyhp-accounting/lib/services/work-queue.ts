@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { onlyOpenInvoices } from "@/lib/domain/open-invoice";
 import {
   addIsoDays,
   buildWorkQueueItems,
@@ -29,14 +30,11 @@ export async function getDashboardWorkQueue(
 ): Promise<DashboardWorkQueue> {
   const dueThrough = addIsoDays(asOf, BILL_DUE_WINDOW_DAYS);
   const [invoices, bills, bankTransactions, approvals] = await Promise.all([
-    sb
-      .from("acc_invoice")
-      .select(
-        "id,invoice_number,due_date,balance_due_minor,currency_code,acc_customer(name)",
-        { count: "exact" },
-      )
-      .in("status", ["issued", "partial"])
-      .gt("balance_due_minor", 0)
+    onlyOpenInvoices(
+      sb
+        .from("acc_invoice")
+        .select("id,invoice_number,due_date,balance_due_minor,currency_code,acc_customer(name)", { count: "exact" }),
+    )
       .not("due_date", "is", null)
       .lt("due_date", asOf)
       .order("due_date", { ascending: true })

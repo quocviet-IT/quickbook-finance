@@ -37,7 +37,8 @@ import {
   type CustomerTransaction,
   type CustomerTransactionType,
 } from "@/lib/domain/customer-detail";
-import { invoiceAttention, invoiceAttentionLook, sortInvoicesByAttention } from "@/lib/domain/invoice-attention";
+import { sortInvoicesByAttention } from "@/lib/domain/invoice-attention";
+import { InvoiceStatusTag } from "@/components/invoices/InvoiceStatusTag";
 import { formatPostalAddress } from "@/lib/domain/invoice-document";
 import { APPLIED_LABELS, PAID_LABELS } from "@/lib/domain/status-label";
 import { formatDate, formatDateInTimeZone, formatMoney, plural } from "@/lib/format";
@@ -422,12 +423,9 @@ export default function CustomerDetailClient({
       title: "Status",
       dataIndex: "status",
       width: OPEN_INVOICE_FIXED_WIDTHS[5],
-      render: (s: InvoiceWithCustomer["status"], r: InvoiceWithCustomer) => {
-        const look = invoiceAttentionLook(invoiceAttention(r, today));
-        if (!look) return <StatusTag status={s} labels={PAID_LABELS} />;
-        const code = look.tone === "danger" ? "overdue" : "due_soon";
-        return <StatusTag status={code} looks={{ [code]: look }} />;
-      },
+      render: (_: InvoiceWithCustomer["status"], r: InvoiceWithCustomer) => (
+        <InvoiceStatusTag invoice={r} today={today} />
+      ),
     },
     ...(canWrite
       ? [

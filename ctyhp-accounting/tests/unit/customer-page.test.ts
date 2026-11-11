@@ -131,7 +131,8 @@ describe("the customer page", () => {
     expect(client).toContain("customerFacts(");
     expect(client).toContain("<InvoiceDetailDialog");
     expect(client).toContain("<CustomerFormModal");
-    expect(client).toContain("invoiceAttentionLook(");
+    // How late or how soon, from the one shared tag (3.0.16).
+    expect(client).toContain("<InvoiceStatusTag invoice={r} today={today} />");
     expect(client).toContain("describeDso(");
   });
 

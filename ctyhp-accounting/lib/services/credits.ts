@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { onlyOpenInvoices } from "@/lib/domain/open-invoice";
 import type { CreditMemoRow, VendorCreditRow } from "@/lib/db/types";
 import type {
   CreditMemoCreateInput,
@@ -53,14 +54,13 @@ export async function listCreditMemos(sb: SupabaseClient): Promise<CreditMemoRow
 }
 
 export async function listOpenInvoices(sb: SupabaseClient, customerId: string, currency: string) {
-  const { data, error } = await sb
-    .from("acc_invoice")
-    .select("id,invoice_number,balance_due_minor")
-    .eq("customer_id", customerId)
-    .eq("currency_code", currency)
-    .in("status", ["issued", "partial"])
-    .gt("balance_due_minor", 0)
-    .order("issue_date");
+  const { data, error } = await onlyOpenInvoices(
+    sb
+      .from("acc_invoice")
+      .select("id,invoice_number,balance_due_minor")
+      .eq("customer_id", customerId)
+      .eq("currency_code", currency),
+  ).order("issue_date");
   if (error) throw new CreditsError(error.message);
   return (data ?? []) as unknown as { id: string; invoice_number: string; balance_due_minor: number }[];
 }
