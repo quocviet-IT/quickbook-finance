@@ -521,7 +521,7 @@ describe("2.04 in the release notes and the Guide", () => {
     );
     expect(step("Not a transaction", "Make a statement add up")).toContain("Closing balance printed on the statement");
     expect(step("Import anyway…", "Import a statement that does not add up")).toContain("kept with the import and in the audit log");
-    expect(step("From statement files", "Reconcile from the statement files, one month or a year")).toContain(
+    expect(step("From statement files", "Reconcile a month or a year from files")).toContain(
       "A statement that does not add up stops the run there",
     );
   });

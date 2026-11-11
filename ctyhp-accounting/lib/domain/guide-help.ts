@@ -56,9 +56,22 @@ export function guideFlowById(id: string): GuideFlow | undefined {
   return GUIDE_FLOWS.find((flow) => flow.id === id);
 }
 
+/**
+ * Guides that were split or renamed, and where their old address goes now. A
+ * reader may have bookmarked one, or opened it from a Help link the day before.
+ */
+const RETIRED_GUIDES = new Map<string, string>([
+  // The one Banking guide became six (3.0.18); the guide lists them under Banking.
+  ["banking", `${GUIDE_ROUTE}#guide-area-banking`],
+]);
+
+export function retiredGuideTarget(id: string): string | null {
+  return RETIRED_GUIDES.get(id) ?? null;
+}
+
 /** The screen a step happens on: its own, or the one its workflow starts on. */
 export function stepScreen(flow: GuideFlow, step: GuideStep): string {
-  return screenName(step.route ?? flow.route);
+  return step.everyScreen ? "every screen" : screenName(step.route ?? flow.route);
 }
 
 /** What a workflow's card says under its purpose: "7 steps", "Starts on Invoices", "Pictures". */

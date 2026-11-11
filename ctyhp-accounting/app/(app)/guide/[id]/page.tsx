@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { GUIDE_AREAS } from "@/lib/domain/system-guide";
-import { guideFlowById, guideLanding } from "@/lib/domain/guide-help";
+import { guideFlowById, guideLanding, retiredGuideTarget } from "@/lib/domain/guide-help";
 import GuideFlowView from "./GuideFlowView";
 
 /**
@@ -16,7 +16,12 @@ export default async function GuideFlowPage({
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const flow = guideFlowById(id);
-  if (!flow) notFound();
+  if (!flow) {
+    // A guide that was split (Banking, 3.0.18) sends its old address on.
+    const moved = retiredGuideTarget(id);
+    if (moved) redirect(moved);
+    notFound();
+  }
   const from = typeof query.from === "string" ? guideLanding(query.from) : null;
   const area = GUIDE_AREAS.find((candidate) => candidate.id === flow.area);
   return (

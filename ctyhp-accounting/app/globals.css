@@ -4280,7 +4280,23 @@ body:has(.ant-drawer-open) .assistant-launcher {
   border: 1px solid var(--ob-border-default);
   border-radius: 6px;
   background: var(--ob-surface-card);
-  scroll-margin-top: 16px;
+}
+
+/* Where #step-n and #guide-area-banking land (3.0.18): below the header, which
+   stays at the top and covered the first 40px of a step at the old 16px. */
+.guide-step,
+.guide-area__title {
+  scroll-margin-top: 72px;
+}
+
+/* On a phone the header is two rows, 109px, but it is 157px until the page
+   has loaded, which is when the browser jumps to the #anchor. Clear the taller
+   one, so the target is still below the header once it shrinks. */
+@media (max-width: 575px) {
+  .guide-step,
+  .guide-area__title {
+    scroll-margin-top: 172px;
+  }
 }
 
 .guide-step:target,
@@ -4343,6 +4359,76 @@ body:has(.ant-drawer-open) .assistant-launcher {
   margin: 0;
   color: var(--ob-text-secondary);
   line-height: 1.6;
+}
+
+/* The one line every reader reads (3.0.18). */
+.guide-step__summary {
+  margin: 0;
+  color: var(--ob-text-body);
+  line-height: 1.5;
+}
+
+/* Details under a step, and a caution's body under its title (3.0.18): native
+   <details>, with the browser's marker swapped for a chevron that turns. */
+.guide-details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  border-radius: 4px;
+  color: var(--ob-intent-primary);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.guide-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-details > summary::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease-out;
+}
+
+.guide-details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.guide-details > summary:hover {
+  text-decoration: underline;
+}
+
+.guide-details > summary:focus-visible {
+  outline: 3px solid var(--ob-accent-ring);
+  outline-offset: 2px;
+}
+
+.guide-details > .guide-step__note {
+  margin-top: 6px;
+}
+
+.guide-details > .guide-step__note + .guide-step__note {
+  margin-top: 8px;
+}
+
+/* A caution's title is the warning itself, so it reads as one, not as a link. */
+.guide-caution > summary {
+  color: var(--ob-text-heading);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-details > summary::before {
+    transition: none;
+  }
 }
 
 /* Ant Design's green tag measured 3.37:1; these tokens hold 4.76:1 light, more dark. */
@@ -4459,9 +4545,11 @@ body:has(.ant-drawer-open) .assistant-launcher {
   border-radius: 8px;
   padding: 12px 14px;
 }
+/* Each caution opens with its own chevron (3.0.18), so no bullet beside it. */
 .system-guide__cautions ul {
   margin: 8px 0 0;
-  padding-left: 18px;
+  padding-left: 0;
+  list-style: none;
 }
 .system-guide__cautions > ul > li + li {
   margin-top: 10px;
