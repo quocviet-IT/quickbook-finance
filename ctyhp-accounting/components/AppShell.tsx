@@ -18,6 +18,7 @@ import {
 import {
   BankOutlined,
   BarChartOutlined,
+  BookOutlined,
   TableOutlined,
   LogoutOutlined,
   DashboardOutlined,
@@ -35,10 +36,18 @@ import type { AppRole } from "@/lib/db/types";
 import {
   findActiveGroup,
   findActivePage,
+  HELP_NAV_ITEM,
   isNavGroup,
+  NAV,
   navigationForAccess,
   type NavItem,
 } from "@/lib/domain/navigation";
+import { releasesSince } from "@/lib/domain/changelog";
+import {
+  lastReleaseSeen,
+  lastReleaseSeenServerSnapshot,
+  subscribeReleaseNotes,
+} from "@/lib/client/release-notes";
 import CompanySwitcher, { type CompanyChoice } from "./CompanySwitcher";
 import ThemeToggle from "./theme/ThemeToggle";
 import { humanizeStatus } from "@/lib/domain/status-label";
@@ -65,6 +74,7 @@ const NAV_ICONS: Record<string, ReactNode> = {
   banking: <BankOutlined />,
   accounting: <TableOutlined />,
   "/reports": <BarChartOutlined />,
+  "/guide": <BookOutlined />,
   "/settings": <SettingOutlined />,
 };
 
@@ -131,6 +141,7 @@ function NavigationMenu({
   storageKey,
   className,
   onNavigate,
+  newKeys,
 }: {
   items: NavItem[];
   pathname: string;
@@ -140,6 +151,8 @@ function NavigationMenu({
   storageKey?: string;
   className?: string;
   onNavigate?: () => void;
+  /** Entries with something unread behind them: Guide, while a release is unread (3.0.17). */
+  newKeys?: ReadonlySet<string>;
 }) {
   const rootGroupKeys = useMemo(
     () => items.filter(isNavGroup).map((item) => item.key),
@@ -202,12 +215,34 @@ function NavigationMenu({
             title: child.label,
           })),
         }
-      : {
-          key: item.key,
-          icon: NAV_ICONS[item.key],
-          label: <IntentLink href={item.key}>{item.label}</IntentLink>,
-          title: item.label,
-        };
+      : newKeys?.has(item.key)
+        ? {
+            key: item.key,
+            // A dot on the icon only where the word below cannot be seen: the
+            // collapsed sidebar shows icons alone.
+            icon: collapsed ? (
+              <Badge dot offset={[2, 0]} className="app-shell__nav-new-dot">
+                {NAV_ICONS[item.key]}
+              </Badge>
+            ) : (
+              NAV_ICONS[item.key]
+            ),
+            // A word, never a count: a browser that has never opened the notes
+            // reads every release ever made as unread.
+            label: (
+              <IntentLink href={item.key}>
+                {item.label}
+                <span className="app-shell__nav-new">New<span className="app-shell__visually-hidden">: release notes you have not read</span></span>
+              </IntentLink>
+            ),
+            title: `${item.label}: new release notes`,
+          }
+        : {
+            key: item.key,
+            icon: NAV_ICONS[item.key],
+            label: <IntentLink href={item.key}>{item.label}</IntentLink>,
+            title: item.label,
+          };
 
   return (
     <Menu
@@ -264,12 +299,26 @@ export default function AppShell({
     () => visibleNavigation.filter((item) => item.key !== "/settings"),
     [visibleNavigation],
   );
+  // The guide sits at the foot of the menu, above Settings (3.0.17). It used to
+  // open as a drawer from the floating help buttons, which people hid.
   const utilityNavigation = useMemo(
-    () => visibleNavigation.filter((item) => item.key === "/settings"),
+    () => [HELP_NAV_ITEM, ...visibleNavigation.filter((item) => item.key === "/settings")],
     [visibleNavigation],
   );
+  // Nothing is rendered as unread on the server: it cannot know what this
+  // browser has read, and a mark that appears then vanishes on every page load
+  // is how people learn to ignore it. The guide's What's new tab clears it.
+  const seenRelease = useSyncExternalStore(
+    subscribeReleaseNotes,
+    lastReleaseSeen,
+    lastReleaseSeenServerSnapshot,
+  );
+  const newKeys = useMemo(
+    () => new Set(releasesSince(seenRelease).length > 0 ? [HELP_NAV_ITEM.key] : []),
+    [seenRelease],
+  );
 
-  const activePage = findActivePage(pathname);
+  const activePage = findActivePage(pathname, [...NAV, HELP_NAV_ITEM]);
   const activePageKey = activePage?.key ?? "";
   const activeGroupKey = activePage ? findActiveGroup(activePage.key) : undefined;
   async function signOut() {
@@ -353,6 +402,7 @@ export default function AppShell({
                   activePageKey={activePageKey}
                   collapsed={collapsed}
                   className="app-shell__navigation-menu app-shell__utility-menu"
+                  newKeys={newKeys}
                 />
               )}
               <Tooltip title={collapsed ? "Expand navigation" : ""} placement="right">
@@ -408,6 +458,7 @@ export default function AppShell({
                 collapsed={false}
                 className="app-shell__navigation-menu app-shell__utility-menu"
                 onNavigate={() => setMobileNavigationOpen(false)}
+                newKeys={newKeys}
               />
             )}
           </div>
@@ -484,13 +535,7 @@ export default function AppShell({
           <div className="app-shell__content-inner">{children}</div>
         </Content>
       </Layout>
-      <AssistantLauncher
-        company={
-          activeCompany
-            ? { name: activeCompany.dbaName || activeCompany.legalName, isSample: activeCompany.isSample }
-            : null
-        }
-      />
+      <AssistantLauncher />
     </Layout>
   );
 }

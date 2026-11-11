@@ -29,17 +29,10 @@ export interface ScreenContext {
   summary: string | null;
 }
 
-/** Strip query strings, trailing slashes and record ids down to the route. */
-export function normaliseRoute(raw: string): string {
-  const path = (raw ?? "").split("?")[0].split("#")[0];
-  const trimmed = path.replace(/\/+$/, "");
-  if (trimmed === "") return "/";
-  // `/invoices/8f3c…` is still the invoices screen as far as the guide knows.
-  return trimmed.replace(
-    /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*$/i,
-    "",
-  );
-}
+// Lives in its own module so the Help link on every page can use it without
+// the guide's workflows (3.0.17); re-exported so callers keep importing it here.
+import { normaliseRoute } from "./route-path";
+export { normaliseRoute };
 
 /**
  * Everything the guide knows about this screen.

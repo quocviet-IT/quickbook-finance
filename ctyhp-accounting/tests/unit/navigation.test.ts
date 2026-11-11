@@ -13,6 +13,7 @@ import {
   settingsHubForAccess,
   findActiveGroup,
   searchKindLabel,
+  HELP_NAV_ITEM,
 } from "@/lib/domain/navigation";
 import {
   INTERNAL_REPORT_HREFS,
@@ -470,5 +471,20 @@ describe("settings pages guard themselves", () => {
       if (guardAt < 0 || (firstOtherAwait >= 0 && firstOtherAwait < guardAt)) late.push(route);
     }
     expect(late).toEqual([]);
+  });
+});
+
+describe("the Guide entry (3.0.17)", () => {
+  it("is a page of its own at /guide, kept out of the eight work areas", () => {
+    // It sits at the foot of the sidebar beside Settings: a place to look
+    // things up, not one of the jobs the menu is ordered by.
+    expect(HELP_NAV_ITEM).toEqual({ key: "/guide", label: "Guide" });
+    expect(ROUTES).toContain("/guide");
+    expect(NAV.some((item) => item.key === "/guide")).toBe(false);
+  });
+
+  it("stays selected on every guide page, not only the list of guides", () => {
+    expect(findActivePage("/guide/get-paid", [...NAV, HELP_NAV_ITEM])?.key).toBe("/guide");
+    expect(findActivePage("/guide", [...NAV, HELP_NAV_ITEM])?.key).toBe("/guide");
   });
 });

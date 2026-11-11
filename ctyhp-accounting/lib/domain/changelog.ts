@@ -48,6 +48,39 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.17",
+    date: "2026-11-11",
+    headline: "The guide is a page in the left menu, and every screen has a Help link.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Guide moved to the left menu",
+        detail:
+          "The guide used to open as a drawer from the Guide button among the floating buttons at the bottom right, and it went out of sight whenever those buttons were hidden. It now has a page of its own: Guide, at the foot of the left menu, above Settings. It opens on the guides, grouped the way the menu groups the screens, with What's new and About OneBook as tabs beside them. While a release is unread, the menu entry says New; that clears once you have read What's new.",
+        route: "/guide",
+      },
+      {
+        kind: "added",
+        title: "A Help link beside every page's title",
+        detail:
+          "Help opens the guide on what covers the screen you are on. When one guide covers it, that guide opens, at the step that happens there; when several do, they are listed first under “For the screen you were on”. It replaces the drawer's This screen tab.",
+        route: "/guide",
+      },
+      {
+        kind: "changed",
+        title: "Each guide has a page of its own",
+        detail:
+          "Its steps are numbered, each with the button that does it, the screen it is on and a link to open that screen, and a list of the steps sits beside them to jump between. Screens are named the way the menu names them, “Starts on Bank Transactions” rather than “/banking”, and so are the screens in What's new.",
+        route: "/guide",
+      },
+      {
+        kind: "changed",
+        title: "The floating buttons keep Report and Ask AI",
+        detail: "Guide is no longer among them, so hiding them no longer hides the guide.",
+      },
+    ],
+  },
+  {
     version: "3.0.16",
     date: "2026-11-11",
     headline: "Lists with action buttons are as compact as the rest.",

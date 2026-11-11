@@ -1,30 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Badge, Button, Space, Tooltip } from "antd";
-import {
-  BookOutlined,
-  DownOutlined,
-  MessageOutlined,
-  QuestionCircleOutlined,
-} from "@ant-design/icons";
+import { Button, Space, Tooltip } from "antd";
+import { DownOutlined, MessageOutlined, QuestionCircleOutlined } from "@ant-design/icons";
 import AskAiPanel from "@/components/ai/AskAiPanel";
 import ReportDialog from "@/components/feedback/ReportDialog";
-import dynamic from "next/dynamic";
-import type { GuideCompany } from "@/lib/domain/system-guide";
-
-/**
- * The guide's code arrives on the first press of Guide (2.51), not with every
- * page: the 16 workflows, the tabs and the release notes are read by someone
- * who asked for them, and every other page load no longer carries them.
- */
-const SystemGuideDrawer = dynamic(() => import("@/components/guide/SystemGuideDrawer"), { ssr: false });
-import { releasesSince } from "@/lib/domain/changelog";
-import {
-  lastReleaseSeen,
-  lastReleaseSeenServerSnapshot,
-  subscribeReleaseNotes,
-} from "@/lib/client/release-notes";
 import {
   isLauncherCollapsed,
   launcherCollapsedServerSnapshot,
@@ -33,9 +13,14 @@ import {
 } from "@/lib/client/launcher-preferences";
 
 /**
- * The floating help controls, present on every page: ask the assistant, report
- * what just went wrong, or open the guide. Marked as feedback chrome so the
- * report's screenshot leaves these buttons out of the picture.
+ * The floating help controls, present on every page: ask the assistant, or
+ * report what just went wrong. Marked as feedback chrome so the report's
+ * screenshot leaves these buttons out of the picture.
+ *
+ * The guide used to open from here too, as a drawer. People hid this cluster
+ * to see the figures under it and then could not find the guide, so in 3.0.17
+ * it became a page in the left menu, with a Help link on every screen; the
+ * release-notes dot moved with it.
  *
  * They sit over the bottom-right corner, which on a long list is where the
  * totals and the pager are, so the cluster collapses to a single small button
@@ -53,26 +38,10 @@ import {
 /** Space between the bottom of a page's content and the top of the cluster, once scrolled to the end. */
 const CLEARANCE_GAP = 12;
 
-export default function AssistantLauncher({ company = null }: { company?: GuideCompany | null } = {}) {
+export default function AssistantLauncher() {
   const box = useRef<HTMLDivElement>(null);
   const [askOpen, setAskOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
-  // Mounted from the first open on, so its close animation still plays.
-  const [guideMounted, setGuideMounted] = useState(false);
-  const openGuide = () => {
-    setGuideMounted(true);
-    setGuideOpen(true);
-  };
-  // Nothing is rendered as unread on the server: it cannot know what this
-  // browser has read, and a dot that appears then vanishes on every page load
-  // is how people learn to ignore a dot.
-  const seenRelease = useSyncExternalStore(
-    subscribeReleaseNotes,
-    lastReleaseSeen,
-    lastReleaseSeenServerSnapshot,
-  );
-  const hasNews = releasesSince(seenRelease).length > 0;
   // The stored choice is a browser-only value: the server renders expanded and
   // React swaps in the real state on hydration, without a mismatch.
   const collapsed = useSyncExternalStore(
@@ -103,27 +72,25 @@ export default function AssistantLauncher({ company = null }: { company?: GuideC
 
   return (
     <>
-      {/* Out of sight while the guide or Ask AI is open (2.51): the cluster sat on
-          the drawer's last lines, its tooltip over the text. Hidden, not removed,
-          so the room it reserves at the foot of the page does not jump. */}
+      {/* Out of sight while Ask AI is open (2.51): the cluster sat on the
+          panel's last lines, its tooltip over the text. Hidden, not removed, so
+          the room it reserves at the foot of the page does not jump. */}
       <div
         ref={box}
-        className={`assistant-launcher${guideOpen || askOpen ? " assistant-launcher--behind-panel" : ""}`}
+        className={`assistant-launcher${askOpen ? " assistant-launcher--behind-panel" : ""}`}
         data-feedback-chrome="true"
       >
         {collapsed ? (
-          <Tooltip title="Show Report, Ask AI and Guide" placement="left">
-            <Badge dot={hasNews} offset={[-4, 4]}>
-              <Button
-                type="primary"
-                shape="circle"
-                size="large"
-                icon={<QuestionCircleOutlined />}
-                onClick={() => setLauncherCollapsed(false)}
-                aria-label={hasNews ? "Show the help buttons, with unread release notes" : "Show the help buttons"}
-                aria-expanded={false}
-              />
-            </Badge>
+          <Tooltip title="Show Report and Ask AI" placement="left">
+            <Button
+              type="primary"
+              shape="circle"
+              size="large"
+              icon={<QuestionCircleOutlined />}
+              onClick={() => setLauncherCollapsed(false)}
+              aria-label="Show the help buttons"
+              aria-expanded={false}
+            />
           </Tooltip>
         ) : (
           <Space size="small" align="center" className="assistant-launcher__row">
@@ -147,25 +114,6 @@ export default function AssistantLauncher({ company = null }: { company?: GuideC
               >
                 Ask AI
               </Button>
-            </Tooltip>
-            <Tooltip
-              title={
-                hasNews
-                  ? "New in this version, and how each workflow runs"
-                  : "How each workflow runs, and which button does what"
-              }
-              placement="top"
-            >
-              <Badge dot={hasNews} offset={[-6, 4]}>
-                <Button
-                  shape="round"
-                  icon={<BookOutlined />}
-                  onClick={openGuide}
-                  aria-label={hasNews ? "System guide, with unread release notes" : "System guide"}
-                >
-                  Guide
-                </Button>
-              </Badge>
             </Tooltip>
             <Tooltip title="Hide these buttons; one ? button stays to bring them back" placement="topRight">
               <Button
@@ -191,9 +139,6 @@ export default function AssistantLauncher({ company = null }: { company?: GuideC
         }}
       />
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
-      {guideOpen || guideMounted ? (
-        <SystemGuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} company={company} />
-      ) : null}
     </>
   );
 }

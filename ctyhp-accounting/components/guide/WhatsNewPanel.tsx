@@ -1,10 +1,11 @@
 "use client";
 
 import { formatDate } from "@/lib/format";
-import Link from "next/link";
+import IntentLink from "@/components/IntentLink";
 import { Space, Tag, Typography } from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
 import { CHANGE_KIND_LABEL, versionLabel, type ChangeKind, type Release } from "@/lib/domain/changelog";
+import { screenName } from "@/lib/domain/screen-names";
 
 const KIND_COLOR: Record<ChangeKind, string> = {
   added: "green",
@@ -14,8 +15,8 @@ const KIND_COLOR: Record<ChangeKind, string> = {
 
 export interface WhatsNewPanelProps {
   releases: Release[];
-  /** Closes the drawer when a change links somewhere. */
-  onNavigate: () => void;
+  /** Called when a change's link is followed. */
+  onNavigate?: () => void;
   /**
    * The version, date and headline above the changes. Off where they are
    * already the label the release is opened by (2.51), so they are not said twice.
@@ -26,9 +27,10 @@ export interface WhatsNewPanelProps {
 /**
  * What changed, per release.
  *
- * Used twice: for the releases this browser has not read, and for the whole
- * history behind "Show every release". One renderer, so the two can never drift
- * into describing the same release differently.
+ * Used for the guide's What's new tab and for the release notes a search finds.
+ * One renderer, so the two can never drift into describing the same release
+ * differently. A change's link names the screen ("See it on Backups"), never
+ * its path (3.0.17).
  */
 export default function WhatsNewPanel({ releases, onNavigate, showHeading = true }: WhatsNewPanelProps) {
   return (
@@ -59,9 +61,9 @@ export default function WhatsNewPanel({ releases, onNavigate, showHeading = true
                   </Typography.Paragraph>
                 ) : null}
                 {change.route ? (
-                  <Link href={change.route} onClick={onNavigate}>
-                    {change.route} <ArrowRightOutlined />
-                  </Link>
+                  <IntentLink href={change.route} onClick={onNavigate}>
+                    See it on {screenName(change.route)} <ArrowRightOutlined />
+                  </IntentLink>
                 ) : null}
               </li>
             ))}

@@ -507,19 +507,17 @@ async function reportCenterScenario(page, baseUrl, safety) {
   return { route: page.url(), focusedBefore, focusedAfter: await activeFocusSnapshot(page) };
 }
 
-async function guideDrawerScenario(page, baseUrl, safety) {
+async function guidePageScenario(page, baseUrl, safety) {
   await navigate(page, baseUrl, "/dashboard", DESKTOP, safety);
-  const trigger = await tabTo(page, page.locator('[aria-label^="System guide"]'), safety);
+  // The guide is a page in the left menu (3.0.17); it used to open as a drawer
+  // from the floating help buttons.
+  await tabTo(page, page.getByRole("link", { name: /^Guide\b/ }), safety);
   const focusedBefore = await activeFocusSnapshot(page);
   await page.keyboard.press("Enter");
-  const drawer = await visibleDialog(page);
-  await tabTo(page, drawer.getByRole("button", { name: "Close" }), safety, 20);
-  await assertFocusInside(page, drawer);
-  await assertDrawerFocusWrap(page, drawer, safety);
-  await page.keyboard.press("Escape");
-  await waitForKeyboardState(drawer, "hidden", "Escape did not close the guide drawer");
+  await page.waitForURL(/\/guide(?:$|[?#])/);
+  const search = await tabTo(page, page.getByRole("textbox", { name: "Search the guides and the release notes" }), safety);
+  await assertFocused(page, search);
   assertSafety(safety);
-  await assertFocused(page, trigger);
   return { route: page.url(), focusedBefore, focusedAfter: await activeFocusSnapshot(page) };
 }
 
@@ -592,11 +590,11 @@ export const KEYBOARD_SCENARIOS = Object.freeze([
     run: reportCenterScenario,
   }),
   Object.freeze({
-    id: "guide-drawer",
+    id: "guide-page",
     route: "/dashboard",
     viewport: DESKTOP,
-    actions: Object.freeze(["Tab to guide trigger", "Enter to open drawer", "Tab within drawer", "Escape to close drawer"]),
-    run: guideDrawerScenario,
+    actions: Object.freeze(["Tab to Guide in the left menu", "Enter to open the guide", "Tab to the guide search"]),
+    run: guidePageScenario,
   }),
   Object.freeze({
     id: "import-controls",
