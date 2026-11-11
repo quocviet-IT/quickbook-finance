@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.16",
+    date: "2026-11-11",
+    headline: "Lists with action buttons are as compact as the rest.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Rows with action buttons are no taller than the others",
+        detail:
+          "On Invoices, Customers, Expenses, the Journal and every other list with buttons in its rows, a row stood 49px tall while a row on Vendors was 41px, because the buttons pushed it open. Those rows are now 41px too, so more of the list fits on the screen. The buttons are the same size as before and as easy to tap.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "3.0.15",
     date: "2026-11-11",
     headline: "Restoring a backup works again, and backups hold every kind of record.",
