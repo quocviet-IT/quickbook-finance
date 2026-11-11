@@ -19,7 +19,7 @@ import {
 } from "@/lib/domain/open-item-statement";
 
 /** Said on the Email button's tooltip when the customer has no address on file. */
-const NO_EMAIL = "No email saved for this customer: your mail program opens without a recipient.";
+const NO_EMAIL = "No email saved for this customer: your mail program opens without a recipient. Attach the PDF before sending.";
 /** The app sends no mail: the user's own mail program does, and the PDF goes with it by hand. */
 const ATTACH_HINT = "Attach the PDF before sending.";
 
@@ -33,9 +33,12 @@ const ATTACH_HINT = "Attach the PDF before sending.";
 export default function OpenItemStatementClient({
   statement,
   customerId,
+  today,
 }: {
   statement: OpenItemStatement;
   customerId: string;
+  /** The company's today: no statement is dated after it. */
+  today: string;
 }) {
   const { message } = App.useApp();
   const router = useRouter();
@@ -50,7 +53,8 @@ export default function OpenItemStatementClient({
     setDownloading(true);
     try {
       await downloadOpenItemStatementPdf(openItemStatementDocument(statement), openItemStatementFileName(statement));
-    } catch {
+    } catch (error) {
+      console.error("Statement PDF failed:", error);
       message.error("The PDF could not be made. Try again.");
     } finally {
       setDownloading(false);
@@ -58,7 +62,7 @@ export default function OpenItemStatementClient({
   }
 
   const emailButton = (
-    <Button icon={<MailOutlined />} href={email.href} title={ATTACH_HINT}>
+    <Button icon={<MailOutlined />} href={email.href}>
       Email
     </Button>
   );
@@ -75,7 +79,7 @@ export default function OpenItemStatementClient({
             <Button icon={<DownloadOutlined />} loading={downloading} onClick={downloadPdf}>
               Download PDF
             </Button>
-            {statement.customerEmail ? emailButton : <Tooltip title={NO_EMAIL}>{emailButton}</Tooltip>}
+            <Tooltip title={statement.customerEmail ? ATTACH_HINT : NO_EMAIL}>{emailButton}</Tooltip>
           </>
         }
       >
@@ -84,6 +88,7 @@ export default function OpenItemStatementClient({
           prefix={<span className={styles.fieldLabel}>As of</span>}
           format="MM/DD/YYYY"
           allowClear={false}
+          disabledDate={(day) => day.isAfter(dayjs(today))}
           value={dayjs(statement.asOf)}
           onChange={(day) => {
             if (day) router.push(`/customers/${customerId}/statement?asOf=${day.format("YYYY-MM-DD")}`);

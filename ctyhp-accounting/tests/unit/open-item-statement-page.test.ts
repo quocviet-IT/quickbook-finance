@@ -24,6 +24,10 @@ describe("the open-item statement page", () => {
     it("answers an id that names no customer with Page not found", () => {
       expect(page).toContain("customerIdSchema.safeParse(id)");
       expect(page).toContain("notFound()");
+      // Both branches: the id check, and a customer the read did not find.
+      expect(page).toMatch(/customerIdSchema\.safeParse\(id\)\.success\) notFound\(\)/);
+      expect(page).toMatch(/if \(!found\) notFound\(\)/);
+      expect(page.match(/notFound\(\)/g)?.length).toBeGreaterThanOrEqual(2);
     });
 
     it("reads the statement for the company's day, or the day asked for", () => {
@@ -66,7 +70,13 @@ describe("the open-item statement page", () => {
         expect(client, text).toMatch(shown(text));
       }
       expect(client).toContain('"Attach the PDF before sending."');
-      expect(client).toContain('"No email saved for this customer: your mail program opens without a recipient."');
+      expect(client).toContain('"No email saved for this customer: your mail program opens without a recipient. Attach the PDF before sending."');
+      // One Tooltip, always; no native title on the Email button.
+      expect(client).not.toMatch(/<Button[^>]*title=/);
+      expect(client).toContain("<Tooltip title={statement.customerEmail ? ATTACH_HINT : NO_EMAIL}>");
+      expect(client).toContain('console.error("Statement PDF failed:", error)');
+      expect(client).toContain("disabledDate={(day) => day.isAfter(dayjs(today))}");
+      expect(page).toContain("today={today}");
       expect(client).toContain('"The PDF could not be made. Try again."');
     });
   });

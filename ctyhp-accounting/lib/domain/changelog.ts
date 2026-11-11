@@ -63,7 +63,7 @@ export const RELEASES: Release[] = [
         kind: "added",
         title: "Print, Download PDF and Email",
         detail:
-          "Print prints the sheet alone. Download PDF saves it as statement-<customer>-<date>.pdf. Email opens your mail program with the customer's address, the subject \"Statement from <company> as of <date>\" and a short summary of each line and the total; attach the PDF before sending, as OneBook sends no mail itself.",
+          "Print prints the sheet alone. Download PDF saves it as statement-<customer>-<date>.pdf. Email opens your mail program with the customer's address, the subject \"Statement from <company> as of <date>\" and a short summary of up to 15 lines and the total; attach the PDF before sending, as OneBook sends no mail itself.",
         route: "/customers",
       },
       {

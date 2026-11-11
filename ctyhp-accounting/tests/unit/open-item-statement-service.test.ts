@@ -101,7 +101,7 @@ describe("readOpenItemStatement", () => {
     expect(call.name).toBe("acc_ar_ageing");
     expect(call.args).toEqual({ p_as_of: "2026-11-10" });
     expect(call.eq).toEqual([["customer_id", "c1"]]);
-    expect(call.order).toEqual(["doc_date", "doc_number"]);
+    expect(call.order).toEqual(["doc_date", "doc_number", "doc_type"]);
     expect(call.range).toEqual([[0, 999]]);
   });
 

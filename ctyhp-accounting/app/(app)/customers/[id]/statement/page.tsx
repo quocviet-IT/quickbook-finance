@@ -73,7 +73,7 @@ export default async function OpenItemStatementPage({
           { title: "Statement" },
         ]}
       />
-      <OpenItemStatementClient key={asOf} statement={statement} customerId={id} />
+      <OpenItemStatementClient key={asOf} statement={statement} customerId={id} today={today} />
     </div>
   );
 }

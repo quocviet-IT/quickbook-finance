@@ -103,6 +103,11 @@ describe("parseStatementAsOf", () => {
     expect(parseStatementAsOf("yesterday", "2026-11-10")).toBe("2026-11-10");
     expect(parseStatementAsOf(["2026-10-31", "2026-10-30"], "2026-11-10")).toBe("2026-11-10");
   });
+  it("never dates a statement after today", () => {
+    expect(parseStatementAsOf("2026-11-11", "2026-11-10")).toBe("2026-11-10");
+    expect(parseStatementAsOf("2027-01-01", "2026-11-10")).toBe("2026-11-10");
+    expect(parseStatementAsOf("2026-11-10", "2026-11-10")).toBe("2026-11-10");
+  });
 });
 
 describe("openItemDescription", () => {
@@ -135,8 +140,9 @@ describe("openItemAmountMinor", () => {
     };
     expect(openItemAmountMinor(euro, "USD")).toBe(1_080_000);
   });
-  it("falls back to the outstanding when the document was not found", () => {
-    expect(openItemAmountMinor({ ...overdueInvoice, detail: null }, "USD")).toBe(1_000_000);
+  it("shows no Amount for a document that was not found: the outstanding is not its amount", () => {
+    const s = buildOpenItemStatement(input({ items: [{ ...overdueInvoice, detail: null }] }));
+    expect(s.lines[0]).toMatchObject({ amount: "—", outstanding: "$10,000.00" });
   });
 });
 
@@ -273,8 +279,15 @@ describe("edge cases", () => {
       "Nothing dated on or before October 31, 2026 is outstanding on your account on November 10, 2026.",
     );
     expect(mail.body.split("\r\n")[2]).toBe(
-      "A statement of your account with Meridian Goods LLC: what was dated on or before October 31, 2026 and is still outstanding on November 10, 2026.",
+      "A statement of your account with Meridian Goods LLC: what was dated on or before October 31, 2026 and is still outstanding on November 10, 2026, with days overdue counted to October 31, 2026.",
     );
+  });
+
+  it("counts the past-due lines to the statement's day, not to today", () => {
+    const s = buildOpenItemStatement(input({ asOf: "2026-10-31", today: "2026-11-10", items: [overdueInvoice] }));
+    const body = openItemStatementEmail(s).body;
+    expect(body).toContain("1 of these is past the due date as of October 31, 2026.");
+    expect(body).not.toContain("1 of these is past the due date.");
   });
 
   it("is Total due, not a credit, when the total is exactly zero", () => {

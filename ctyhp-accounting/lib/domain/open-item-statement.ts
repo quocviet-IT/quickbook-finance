@@ -137,7 +137,9 @@ export function parseStatementAsOf(value: string | string[] | undefined, today: 
   const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
   const date = new Date(Date.UTC(year, month - 1, day));
   const real = date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-  return real ? value : today;
+  if (!real) return today;
+  // A statement dated in the future is never true.
+  return value > today ? today : value;
 }
 
 function shorten(text: string): string {
@@ -196,7 +198,8 @@ export function buildOpenItemStatement(input: OpenItemStatementInput): OpenItemS
       due: isInvoice ? formatDate(item.dueDate) : "—",
       age: ageText(ageDays),
       ageDays,
-      amount: money(openItemAmountMinor(item, currencyCode)),
+      // Without the document, the outstanding is not its amount.
+      amount: item.detail ? money(openItemAmountMinor(item, currencyCode)) : "—",
       outstanding: money(item.outstandingMinor),
       outstandingMinor: item.outstandingMinor,
       overdue: isInvoice && ageDays > 0,
@@ -268,7 +271,7 @@ export function openItemStatementEmail(s: OpenItemStatement): {
   const subject = `Statement from ${s.companyName} as of ${s.asOfText}`;
   const intro = s.asOfIsToday
     ? `A statement of your account with ${s.companyName} as at ${s.asOfLong}.`
-    : `A statement of your account with ${s.companyName}: what was dated on or before ${s.asOfLong} and is still outstanding on ${s.todayLong}.`;
+    : `A statement of your account with ${s.companyName}: what was dated on or before ${s.asOfLong} and is still outstanding on ${s.todayLong}, with days overdue counted to ${s.asOfLong}.`;
   const out = [`Dear ${s.customerName},`, "", intro, ""];
   if (s.lines.length === 0) {
     out.push(
@@ -287,7 +290,7 @@ export function openItemStatementEmail(s: OpenItemStatement): {
     if (more > 0) out.push(`  …and ${more} more, listed in the attached statement.`);
     out.push("", `${s.totalLabel}: ${s.totalAmount} ${s.currencyCode}`);
     if (s.overdueCount > 0) {
-      out.push("", `${s.overdueCount} of these ${s.overdueCount === 1 ? "is" : "are"} past the due date.`);
+      out.push("", `${s.overdueCount} of these ${s.overdueCount === 1 ? "is" : "are"} past the due date${s.asOfIsToday ? "" : ` as of ${s.asOfLong}`}.`);
     }
   }
   if (s.payNote) out.push("", s.payNote);

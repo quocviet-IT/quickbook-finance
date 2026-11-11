@@ -69,6 +69,7 @@ export async function readOpenItemStatement(
         .eq("customer_id", customerId)
         .order("doc_date")
         .order("doc_number")
+        .order("doc_type")
         .range(from, to),
     fail,
   );

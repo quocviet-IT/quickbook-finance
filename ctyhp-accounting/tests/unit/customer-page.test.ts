@@ -93,6 +93,12 @@ describe("the server page", () => {
   });
 });
 
+describe("the customer page, Receive payment", () => {
+  it("stays writers-only", () => {
+    expect(client).toMatch(/\{canWrite \? \(\s*<Link href=\{receivePaymentHref\}>/);
+  });
+});
+
 describe("the customer page", () => {
   it("opens on open invoices, then transactions, contact and credit, activity", () => {
     expect(client).toContain('defaultActiveKey="open"');

@@ -278,6 +278,22 @@ describe("renderInvoicePdf: the open-item statement (3.0.13)", () => {
     expect(out).not.toContain("Unit price");
   });
 
+  it("keeps Total due on the page however long the table is", async () => {
+    let paged = 0;
+    for (let n = 20; n <= 45; n++) {
+      const items = Array.from({ length: n }, (_, i) => ({ ...invoiceItem, docNumber: `INV-${String(i).padStart(6, "0")}` }));
+      const out = await text(items);
+      // jsPDF writes "<x> <y> Td", a newline, then "(Total due) Tj"; y counts up from the page foot.
+      const matches = [...out.matchAll(/([\d.]+) ([\d.]+) Td\n\(Total due\) Tj/g)];
+      expect(matches.length, `n=${n}`).toBe(1);
+      const y = Number(matches[0][2]);
+      expect(y, `n=${n}`).toBeGreaterThanOrEqual(40);
+      expect(y, `n=${n}`).toBeLessThanOrEqual(800);
+      paged++;
+    }
+    expect(paged).toBe(26);
+  });
+
   it("draws no table when nothing is open, only the sentence", async () => {
     const out = await text([]);
     expect(out).toContain("Nothing outstanding as of November 10, 2026.");

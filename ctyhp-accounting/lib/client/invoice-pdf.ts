@@ -131,6 +131,12 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
 
   // @ts-expect-error jspdf-autotable augments the document at runtime.
   let totalsY = (pdf.lastAutoTable?.finalY ?? billY) + 22;
+  // Kept whole and above the page number: a long table must not push "Total due" off the page.
+  const totalsNeed = (doc.totals.length - 1) * 14 + 18;
+  if (doc.totals.length && totalsY + totalsNeed > pdf.internal.pageSize.getHeight() - 48) {
+    pdf.addPage();
+    totalsY = 64;
+  }
   doc.totals.forEach((total, index) => {
     // The last row is the figure the reader acts on: Balance due on an
     // invoice, which the model always puts last, and Total on an estimate,
@@ -150,6 +156,10 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
     pdf.setFontSize(9);
     pdf.setTextColor(...MUTED);
     const memoLines: string[] = pdf.splitTextToSize(doc.memo, pageWidth - MARGIN * 2);
+    if (footY + memoLines.length * pdf.getLineHeight() > pdf.internal.pageSize.getHeight() - 48) {
+      pdf.addPage();
+      footY = 64;
+    }
     pdf.text(memoLines, MARGIN, footY);
     footY += memoLines.length * pdf.getLineHeight() + 8;
   }
