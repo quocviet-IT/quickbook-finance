@@ -1,4 +1,5 @@
 import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
+import { onlyOpenInvoices } from "@/lib/domain/open-invoice";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import type {
@@ -1090,11 +1091,9 @@ export async function listSettlementCandidates(
   const direction = amountMinor > 0 ? "receivable" : "payable";
 
   if (direction === "receivable") {
-    const { data, error } = await sb
-      .from("acc_invoice")
-      .select("id,invoice_number,issue_date,balance_due_minor,currency_code,acc_customer(name)")
-      .in("status", ["issued", "partial"])
-      .gt("balance_due_minor", 0);
+    const { data, error } = await onlyOpenInvoices(
+      sb.from("acc_invoice").select("id,invoice_number,issue_date,balance_due_minor,currency_code,acc_customer(name)"),
+    );
     if (error) throw new BankingError(error.message);
     return {
       direction,

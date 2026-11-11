@@ -1,4 +1,5 @@
 import "server-only";
+import { onlyOpenInvoices } from "@/lib/domain/open-invoice";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CustomerRow, InvoiceRow } from "@/lib/db/types";
 import type { InvoiceWithCustomer } from "@/lib/services/invoicing";
@@ -35,12 +36,7 @@ async function readOpenInvoices(
 ): Promise<InvoiceWithCustomer[]> {
   const rows = await readAllPages<Record<string, unknown>>(
     (from, to) =>
-      sb
-        .from("acc_invoice")
-        .select(OPEN_INVOICE_COLUMNS)
-        .eq("customer_id", customer.id)
-        .in("status", ["issued", "partial"])
-        .gt("balance_due_minor", 0)
+      onlyOpenInvoices(sb.from("acc_invoice").select(OPEN_INVOICE_COLUMNS).eq("customer_id", customer.id))
         .order("issue_date")
         .order("id")
         .range(from, to),

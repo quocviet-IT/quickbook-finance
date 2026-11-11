@@ -33,7 +33,8 @@ describe("the invoice list", () => {
   it("has a Due column, and the status says how late or how soon", () => {
     const s = source();
     expect(s).toMatch(/title: "Due",\s+dataIndex: "due_date"/);
-    expect(s).toContain("invoiceAttentionLook(");
+    // How late or how soon, from the one shared tag (3.0.16).
+    expect(s).toContain("<InvoiceStatusTag invoice={r} today={today} />");
   });
 
   // Rows were 58–59px: a second line under the customer, the balance and the status.

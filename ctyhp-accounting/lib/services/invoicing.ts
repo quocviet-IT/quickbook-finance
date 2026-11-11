@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { onlyOpenInvoices } from "@/lib/domain/open-invoice";
 import type {
   CustomerRow,
   InvoiceRow,
@@ -422,13 +423,9 @@ export async function listOpenInvoicesForCustomer(
   sb: SupabaseClient,
   customerId: string,
 ): Promise<InvoiceRow[]> {
-  const { data, error } = await sb
-    .from("acc_invoice")
-    .select("*")
-    .eq("customer_id", customerId)
-    .in("status", ["issued", "partial"])
-    .gt("balance_due_minor", 0)
-    .order("issue_date");
+  const { data, error } = await onlyOpenInvoices(
+    sb.from("acc_invoice").select("*").eq("customer_id", customerId),
+  ).order("issue_date");
   if (error) throw new InvoicingError(error.message);
   return (data ?? []) as unknown as InvoiceRow[];
 }

@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/format";
+import { onlyOpenInvoices } from "@/lib/domain/open-invoice";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountRow, BankTransactionRow } from "@/lib/db/types";
 import { findBankPairs, lastFourDigits, namedTransferTarget, type PairBank, type PairLine } from "@/lib/domain/bank-pairs";
@@ -75,11 +76,9 @@ async function openDocuments(sb: SupabaseClient): Promise<ReviewDocument[]> {
   const [invoices, bills] = await Promise.all([
     readAllPages<Record<string, unknown>>(
       (from, to) =>
-        sb
-          .from("acc_invoice")
-          .select("id,invoice_number,balance_due_minor,currency_code,acc_customer(name)")
-          .in("status", ["issued", "partial"])
-          .gt("balance_due_minor", 0)
+        onlyOpenInvoices(
+          sb.from("acc_invoice").select("id,invoice_number,balance_due_minor,currency_code,acc_customer(name)"),
+        )
           .order("id")
           .range(from, to),
       fail,

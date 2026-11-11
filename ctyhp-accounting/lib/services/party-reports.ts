@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { OPEN_INVOICE_STATUSES } from "@/lib/domain/open-invoice";
 import { buildProfitAndLoss, type LedgerBalance } from "@/lib/domain/reports";
 import {
   openDocuments,
@@ -95,7 +96,7 @@ async function documentAmounts(
   const table = side === "receivable" ? "acc_invoice" : "acc_bill";
   const number = side === "receivable" ? "invoice_number" : "bill_number";
   const date = side === "receivable" ? "issue_date" : "bill_date";
-  const open = side === "receivable" ? ["issued", "partial"] : ["open", "partial"];
+  const open = side === "receivable" ? OPEN_INVOICE_STATUSES : ["open", "partial"];
   const rows = await readAllPages<Record<string, unknown>>(
     (from, to) =>
       sb

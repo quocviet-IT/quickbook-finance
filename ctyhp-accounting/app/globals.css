@@ -1261,6 +1261,21 @@ body .ant-empty .ant-empty-description,
     transform 120ms ease;
 }
 
+/*
+ * A row with an action button stands as tall as one without (3.0.16).
+ *
+ * A 32px button inside the cell's 8px padding made those rows 49px. A row
+ * whose actions are small (24px) buttons is 41px, as on Vendors, so Invoices,
+ * Customers, Expenses and the Journal stood a row-height taller than their
+ * neighbours. The button keeps its 32px target, which a finger on a phone needs,
+ * and reaches 4px into the padding above and below it: it takes 24px of the
+ * row and the row is 41px. Small buttons are already 24px and are left alone.
+ */
+.ant-table-tbody > tr > .ant-table-cell .accounting-icon-action-wrap,
+.ant-table-tbody > tr > .ant-table-cell .ant-btn:not(.ant-btn-sm):not(.ant-btn-lg):not(.accounting-icon-action) {
+  margin-block: -4px;
+}
+
 .accounting-icon-action.ant-btn:not(:disabled):hover {
   color: var(--ob-intent-primary);
   border-color: var(--ob-accent-line);
