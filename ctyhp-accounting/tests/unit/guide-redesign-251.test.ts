@@ -7,47 +7,46 @@ function read(path: string): string {
   return readFileSync(join(process.cwd(), path), "utf8").replace(/\r/g, "");
 }
 
-describe("the System guide drawer (2.51)", () => {
-  const drawer = read("components/guide/SystemGuideDrawer.tsx");
+/**
+ * 2.51 redesigned the guide as a drawer with four tabs. In 3.0.17 the drawer
+ * became the /guide page (tests/unit/guide-page-317.test.ts); what 2.51
+ * promised its readers still holds there, and is checked there now.
+ */
+describe("what the 2.51 guide promised, on the /guide page (3.0.17)", () => {
+  const home = read("app/(app)/guide/GuideHome.tsx");
 
-  it("has four tabs: this screen, workflows, what's new and about", () => {
-    for (const label of ['text="This screen"', 'text="Workflows"', `text="What's new"`, 'text="About OneBook"']) {
-      expect(drawer).toContain(label);
-    }
+  it("still lists workflows under the areas, and says the version and the date it was released", () => {
+    expect(home).toMatch(/GUIDE_AREAS\.map\(\(area\) =>/);
+    expect(home).toContain("OneBook {versionLabel(GUIDE_VERSION)} · updated {formatDate(latest.date)}");
   });
 
-  it("lists workflows under the areas, and says the version and the date it was released", () => {
-    expect(drawer).toMatch(/GUIDE_AREAS\.map\(\(area\) =>/);
-    expect(drawer).toContain("OneBook {versionLabel(GUIDE_VERSION)} · updated {formatDate(latest.date)}");
+  it("still says which books are open", () => {
+    expect(home).toContain("companyNotice(company)");
+    expect(home).toContain("Sample company: ${company?.name}");
+    expect(home).toContain("Live books: ${company?.name}");
   });
 
-  it("says which books are open", () => {
-    expect(drawer).toContain("companyNotice(company)");
-    expect(drawer).toContain("Sample company: ${company?.name}");
-    expect(drawer).toContain("Live books: ${company?.name}");
-  });
-
-  it("is given the open company by the shell", () => {
-    const shell = read("components/AppShell.tsx");
-    expect(shell).toMatch(/<AssistantLauncher\s+company=\{/);
-    const launcher = read("components/assistant/AssistantLauncher.tsx");
-    expect(launcher).toContain("company={company}");
+  it("is given the open company by its own page, not by the shell", () => {
+    const page = read("app/(app)/guide/page.tsx");
+    expect(page).toContain("resolveActiveCompany()");
+    expect(page).toMatch(/company=\{active \?/);
   });
 });
 
 describe("the guide's code", () => {
-  it("arrives on the first press of Guide, not with every page", () => {
-    const launcher = read("components/assistant/AssistantLauncher.tsx");
-    expect(launcher).toContain('dynamic(() => import("@/components/guide/SystemGuideDrawer"), { ssr: false })');
-    expect(launcher).not.toMatch(/^import SystemGuideDrawer from/m);
-    expect(launcher).toMatch(/\{guideOpen \|\| guideMounted \? \(\s*<SystemGuideDrawer/);
+  it("loads on the guide's pages only, not with every page", () => {
+    // 2.51 got there by loading the drawer on the first press of Guide; a page
+    // of its own gets there by being a page.
+    for (const file of ["components/AppShell.tsx", "components/assistant/AssistantLauncher.tsx", "components/PageHeader.tsx"]) {
+      expect(read(file), file).not.toMatch(/from "@\/lib\/domain\/(system-guide|guide-help|screen-context)"/);
+    }
   });
 });
 
 describe("the help buttons while a panel is open", () => {
   it("step out of sight but keep their room", () => {
     const launcher = read("components/assistant/AssistantLauncher.tsx");
-    expect(launcher).toContain('guideOpen || askOpen ? " assistant-launcher--behind-panel" : ""');
+    expect(launcher).toContain('askOpen ? " assistant-launcher--behind-panel" : ""');
     const css = read("app/globals.css");
     expect(css).toMatch(/\.assistant-launcher--behind-panel \{\s*visibility: hidden;\s*pointer-events: none;\s*\}/);
   });

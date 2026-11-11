@@ -92,7 +92,7 @@ describe("keyboard quality scenarios", () => {
       "account-and-new-menus",
       "global-search-focus",
       "report-center-controls",
-      "guide-drawer",
+      "guide-page",
       "import-controls",
     ]);
     for (const scenario of KEYBOARD_SCENARIOS) {
@@ -476,7 +476,7 @@ describe("keyboard quality scenarios", () => {
       message: "Keyboard assertions passed",
     };
     const failed = {
-      id: "guide-drawer",
+      id: "guide-page",
       status: "failed",
       route: "/dashboard",
       focusedBefore: "button[role=button]:nth-structural(8)",
@@ -487,7 +487,7 @@ describe("keyboard quality scenarios", () => {
     expect(keyboardSection([passed, failed])).toEqual({
       findings: [{
         kind: "keyboard",
-        rule: "guide-drawer",
+        rule: "guide-page",
         route: "/dashboard",
         viewport: "desktop",
         target: "unavailable",

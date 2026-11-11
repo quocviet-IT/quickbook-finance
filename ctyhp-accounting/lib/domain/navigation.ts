@@ -111,6 +111,15 @@ export const NAV: NavItem[] = [
   { key: "/settings", label: "Settings" },
 ];
 
+/**
+ * The guide (3.0.17): a page of its own at the foot of the sidebar, above
+ * Settings. It used to open as a drawer from the floating help buttons, which
+ * people tucked away and then could not find. Kept out of NAV, whose eight
+ * entries are the work areas in the order the money moves; this is a place to
+ * look things up, open to everyone, so it carries no gate.
+ */
+export const HELP_NAV_ITEM: NavPage = { key: "/guide", label: "Guide" };
+
 export function navLeaves(items: NavItem[] = NAV): NavPage[] {
   return items.flatMap((item) => (isNavGroup(item) ? item.children : [item]));
 }
