@@ -264,6 +264,43 @@ describe("openItemStatementEmail", () => {
   });
 });
 
+describe("edge cases", () => {
+  it("says what a past date lists when nothing is open", () => {
+    const s = buildOpenItemStatement(input({ asOf: "2026-10-31", today: "2026-11-10", items: [] }));
+    expect(s.emptyText).toBe("Nothing dated on or before October 31, 2026 is outstanding on November 10, 2026.");
+    const mail = openItemStatementEmail(s);
+    expect(mail.body).toContain(
+      "Nothing dated on or before October 31, 2026 is outstanding on your account on November 10, 2026.",
+    );
+    expect(mail.body.split("\r\n")[2]).toBe(
+      "A statement of your account with Meridian Goods LLC: what was dated on or before October 31, 2026 and is still outstanding on November 10, 2026.",
+    );
+  });
+
+  it("is Total due, not a credit, when the total is exactly zero", () => {
+    const invoice: OpenItemSource = {
+      ...currentInvoice,
+      outstandingMinor: 120_000,
+      detail: { totalMinor: 120_000, openMinor: 120_000, currencyCode: "USD", note: null },
+    };
+    const s = buildOpenItemStatement(input({ items: [invoice, unappliedPayment] }));
+    expect(s.totalLabel).toBe("Total due");
+    expect(s.totalAmount).toBe("$0.00");
+    expect(s.payNote).toBeNull();
+    expect(s.emptyText).toBeNull();
+  });
+
+  it("says 1 day and 1 of these is past due, then 2 of these are", () => {
+    const oneDay: OpenItemSource = { ...currentInvoice, docNumber: "INV-000012", docDate: "2026-10-10", dueDate: "2026-11-09" };
+    const one = buildOpenItemStatement(input({ items: [oneDay] }));
+    expect(one.lines[0].age).toBe("1 day");
+    const mail = openItemStatementEmail(one);
+    expect(mail.body.split("\r\n").find((l) => l.includes("INV-000012"))?.endsWith("1 day overdue")).toBe(true);
+    const two = openItemStatementEmail(buildOpenItemStatement(input({ items: [oneDay, overdueInvoice] })));
+    expect(two.body).toContain("2 of these are past the due date.");
+  });
+});
+
 describe("openItemStatementDocument", () => {
   it("is what the PDF draws", () => {
     const doc = openItemStatementDocument(buildOpenItemStatement(input()));

@@ -28,7 +28,7 @@ export const STATEMENT_DESCRIPTION_MAX = 44;
 /** Lines listed in the email; a longer list keeps the mailto link short enough for every mail program. */
 export const STATEMENT_EMAIL_MAX_LINES = 15;
 
-const BUCKET_LABELS: Record<string, string> = {
+const BUCKET_LABELS: Record<(typeof AGING_BUCKETS)[number]["key"], string> = {
   current: "Current",
   d1_30: "1–30 days",
   d31_60: "31–60 days",
@@ -99,6 +99,10 @@ export interface OpenItemStatement {
   asOf: string;
   asOfText: string;
   asOfLong: string;
+  /** `asOf` is the company's today, so the amounts are as at that day. */
+  asOfIsToday: boolean;
+  /** The company's today, written out. */
+  todayLong: string;
   seller: DocumentSeller;
   party: DocumentBillTo;
   companyName: string;
@@ -204,10 +208,12 @@ export function buildOpenItemStatement(input: OpenItemStatementInput): OpenItemS
   );
   const seller = documentSeller(company);
   const asOfLong = formatLongDate(asOf);
+  const asOfIsToday = asOf === today;
+  const todayLong = formatLongDate(today);
   const footnote = [
-    asOf === today
+    asOfIsToday
       ? `Every figure is as at ${asOfLong}. Anything paid after that date is not reflected here.`
-      : `Lists what was dated on or before ${asOfLong}, aged to that date. Amounts outstanding are as they stand on ${formatLongDate(today)}.`,
+      : `Lists what was dated on or before ${asOfLong}, aged to that date. Amounts outstanding are as they stand on ${todayLong}.`,
     lines.some((line) => line.outstandingMinor < 0)
       ? "Payments not yet applied and unused credits are shown as negative amounts and reduce the total."
       : null,
@@ -219,6 +225,8 @@ export function buildOpenItemStatement(input: OpenItemStatementInput): OpenItemS
     asOf,
     asOfText: formatDate(asOf),
     asOfLong,
+    asOfIsToday,
+    todayLong,
     seller,
     party: documentBillTo(customer),
     companyName: seller.displayName,
@@ -237,7 +245,12 @@ export function buildOpenItemStatement(input: OpenItemStatementInput): OpenItemS
     totalAmount: money(Math.abs(total)),
     overdueCount: lines.filter((line) => line.overdue).length,
     payNote: statementPayNote("customer", total, company.pay_note),
-    emptyText: lines.length === 0 ? `Nothing outstanding as of ${asOfLong}.` : null,
+    emptyText:
+      lines.length === 0
+        ? asOfIsToday
+          ? `Nothing outstanding as of ${asOfLong}.`
+          : `Nothing dated on or before ${asOfLong} is outstanding on ${todayLong}.`
+        : null,
     footnote,
   };
 }
@@ -253,9 +266,16 @@ export function openItemStatementEmail(s: OpenItemStatement): {
   href: string;
 } {
   const subject = `Statement from ${s.companyName} as of ${s.asOfText}`;
-  const out = [`Dear ${s.customerName},`, "", `A statement of your account with ${s.companyName} as at ${s.asOfLong}.`, ""];
+  const intro = s.asOfIsToday
+    ? `A statement of your account with ${s.companyName} as at ${s.asOfLong}.`
+    : `A statement of your account with ${s.companyName}: what was dated on or before ${s.asOfLong} and is still outstanding on ${s.todayLong}.`;
+  const out = [`Dear ${s.customerName},`, "", intro, ""];
   if (s.lines.length === 0) {
-    out.push(`Nothing is outstanding on your account as at ${s.asOfLong}.`);
+    out.push(
+      s.asOfIsToday
+        ? `Nothing is outstanding on your account as at ${s.asOfLong}.`
+        : `Nothing dated on or before ${s.asOfLong} is outstanding on your account on ${s.todayLong}.`,
+    );
   } else {
     for (const line of s.lines.slice(0, STATEMENT_EMAIL_MAX_LINES)) {
       const parts = [line.date, line.docNumber, line.outstanding];
