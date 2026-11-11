@@ -18,7 +18,7 @@ export interface AgingItem {
 }
 
 /** Whole days between two ISO dates (asOf - dueDate), UTC, calendar-day based. */
-function daysPastDue(dueDate: string, asOf: string): number {
+export function daysPastDue(dueDate: string, asOf: string): number {
   const d = (s: string) => {
     const [y, m, day] = s.split("-").map(Number);
     return Date.UTC(y, m - 1, day);

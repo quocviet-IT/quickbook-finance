@@ -95,6 +95,17 @@ export interface DocumentTotal {
   amount: string;
 }
 
+/**
+ * Columns of a document's own, for one whose lines are not an invoice's
+ * Description · Qty · Unit price · Amount (the open-item statement, 3.0.13).
+ */
+export interface DocumentTable {
+  head: string[];
+  body: string[][];
+  /** The columns set right, as amounts are, by index. */
+  rightAligned: number[];
+}
+
 /** What the shared renderer (lib/client/invoice-pdf) draws, whatever the document. */
 export interface PrintedDocument {
   title: string;

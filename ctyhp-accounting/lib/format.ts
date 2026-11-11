@@ -89,6 +89,22 @@ export function formatDate(value: string | null | undefined): string {
   return match ? `${match[2]}/${match[3]}/${match[1]}` : value;
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * `2026-11-10` as `November 10, 2026`, for sentences a customer reads (the
+ * open-item statement, 3.0.13). Like {@link formatDate} it works on the string
+ * alone, so no time zone can move the day; anything else comes back as it was.
+ */
+export function formatLongDate(value: string): string {
+  const match = ISO_DATE.exec(value);
+  if (!match) return value;
+  return `${MONTH_NAMES[Number(match[2]) - 1]} ${Number(match[3])}, ${match[1]}`;
+}
+
 /** The two ends of a period: `01/01/2026 – 01/31/2026`; with no start, `As of 01/31/2026`. */
 export function formatDateRange(from: string | null | undefined, to: string): string {
   return from ? `${formatDate(from)} – ${formatDate(to)}` : `As of ${formatDate(to)}`;
