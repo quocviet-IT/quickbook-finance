@@ -153,7 +153,7 @@ export default function GuideFlowView({
           </div>
           <div className="guide-rail__box">
             <strong>Still stuck?</strong>
-            <span>Ask AI and Report sit at the bottom right of every screen.</span>
+            <span>Ask Abacus and Report sit at the bottom right of every screen.</span>
           </div>
         </nav>
       </div>

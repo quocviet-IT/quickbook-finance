@@ -1673,7 +1673,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       {
         action: "Ask how something is meant to work",
         summary: "Answers come from these guides; the assistant cannot see your figures.",
-        control: "Ask AI",
+        control: "Ask Abacus",
         everyScreen: true,
       },
       {
