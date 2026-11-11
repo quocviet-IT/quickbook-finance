@@ -67,7 +67,9 @@ export interface AgingOptions {
 /**
  * The order the ageing RPCs return their kinds in (0024): open documents, then
  * credits, then unapplied payments. The By document list shows rows in the
- * order they come, so a paged read puts them back in this one.
+ * order they come, so a paged read keeps the kinds in this order, each by
+ * number. Before 3.0.14 the rows within a kind came in storage order, which
+ * moved whenever a document was updated.
  */
 const KIND_ORDER: Record<string, number> = {
   invoice: 0,

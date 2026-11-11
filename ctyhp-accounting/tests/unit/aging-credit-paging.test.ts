@@ -69,7 +69,7 @@ describe("A/R and A/P Aging read every row (3.0.14)", () => {
     expect(report.rows).toHaveLength(4);
   });
 
-  it("keeps the order the By document list has always shown: documents, then credits, then payments", async () => {
+  it("lists documents, then credits, then payments, each by number", async () => {
     // As the paged read returns them: by kind name, then number.
     const rows = [arRow(9, "credit_memo", -10), arRow(1), arRow(2), arRow(5, "payment", -5)];
     const { sb } = rpcClient({ acc_ar_ageing: rows, acc_ledger_balances: [] });

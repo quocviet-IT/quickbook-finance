@@ -56,7 +56,7 @@ export const RELEASES: Release[] = [
         kind: "fixed",
         title: "Aging reports no longer stop at 1,000 open items",
         detail:
-          "Accounts Receivable Aging and Accounts Payable Aging asked the database for their open items in one request, and the database answers a single request with at most 1,000 rows without saying so. A company with more open invoices or bills than that would have seen some left out, and the report would have stopped reconciling to its control account. They now read every row, a page at a time, and list them in the same order as before. No company had more than 1,000, so no figure changes today.",
+          "Accounts Receivable Aging and Accounts Payable Aging asked the database for their open items in one request, and the database answers a single request with at most 1,000 rows without saying so. A company with more open invoices or bills than that would have seen some left out, and the report would have stopped reconciling to its control account. They now read every row, a page at a time. No company had more than 1,000, so no figure changes today. The By document view now lists invoices (or bills), then credits, then unapplied payments, each by number; before, each group came in whatever order the database had stored it, which changed whenever a document was updated.",
         route: "/reports/ar-aging",
       },
       {
