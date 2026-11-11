@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { NO_MEMO, type RequestMemo } from "./request-memo";
 import { companyToday } from "./company";
 import { computeAging, bucketOf, type AgingItem } from "@/lib/domain/aging";
+import { readAllPages } from "./paging";
 
 export class AgingError extends Error {}
 
@@ -63,11 +64,52 @@ export interface AgingOptions {
   reconcileAsOf?: string;
 }
 
+/**
+ * The order the ageing RPCs return their kinds in (0024): open documents, then
+ * credits, then unapplied payments. The By document list shows rows in the
+ * order they come, so a paged read puts them back in this one.
+ */
+const KIND_ORDER: Record<string, number> = {
+  invoice: 0,
+  bill: 0,
+  credit_memo: 1,
+  vendor_credit: 1,
+  payment: 2,
+  bill_payment: 2,
+};
+
+/**
+ * Every row of an ageing RPC (3.0.14).
+ *
+ * PostgREST caps an RPC's answer at 1,000 rows and says nothing when it does,
+ * so one request would quietly leave documents out of a company with more open
+ * items than that, and the report would stop reconciling. Paging needs a total
+ * order: a document's number is unique within its kind; the date, the party and
+ * the amount order the rows that have no number. Identical rows can still tie,
+ * but swapping two identical rows changes nothing.
+ */
+async function readAgingRows(sb: SupabaseClient, rpc: string, asOf: string, idKey: string): Promise<Record<string, unknown>[]> {
+  const rows = await readAllPages<Record<string, unknown>>(
+    (from, to) =>
+      sb
+        .rpc(rpc, { p_as_of: asOf })
+        .order("doc_type")
+        .order("doc_number")
+        .order("doc_date")
+        .order(idKey)
+        .order("balance_minor")
+        .range(from, to),
+    (message) => new AgingError(message),
+  );
+  // Stable: within a kind the rows keep the number order they were read in.
+  const kind = (row: Record<string, unknown>) => KIND_ORDER[row.doc_type as string] ?? 3;
+  return [...rows].sort((a, b) => kind(a) - kind(b));
+}
+
 async function aging(sb: SupabaseClient, rpc: string, asOf: string, idKey: string, nameKey: string, accountType: string, options: AgingOptions): Promise<AgingReport> {
   const memo = options.memo ?? NO_MEMO;
-  const { data, error } = await sb.rpc(rpc, { p_as_of: asOf });
-  if (error) throw new AgingError(error.message);
-  const rows: AgingReportRow[] = (data ?? []).map((r: Record<string, unknown>) => ({
+  const data = await readAgingRows(sb, rpc, asOf, idKey);
+  const rows: AgingReportRow[] = data.map((r: Record<string, unknown>) => ({
     entityId: r[idKey] as string, entityName: r[nameKey] as string, docType: r.doc_type as string,
     docNumber: (r.doc_number as string) ?? null, docDate: r.doc_date as string, dueDate: r.due_date as string,
     balanceMinor: Number(r.balance_minor), bucket: bucketOf(r.due_date as string, asOf),

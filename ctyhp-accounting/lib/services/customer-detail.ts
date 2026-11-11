@@ -61,8 +61,8 @@ export async function getCustomerDetail(sb: SupabaseClient, id: string): Promise
   const customer = data as CustomerRow;
   const [openInvoices, credit] = await Promise.all([
     readOpenInvoices(sb, customer),
-    // The credit read covers every customer (one RPC); a failure must not take the page down.
-    companyToday(sb).then((asOf) => listCustomerCredit(sb, { asOf })).then(
+    // This customer's row only; a failure must not take the page down.
+    companyToday(sb).then((asOf) => listCustomerCredit(sb, { asOf, customerId: id })).then(
       (rows) => ({ row: rows.find((r) => r.customerId === id) ?? null, error: null }),
       (error: unknown) => {
         console.error("Reading customer credit failed:", error instanceof Error ? error.message : error);
