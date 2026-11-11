@@ -11,6 +11,7 @@ import {
   type ExportControlTotals,
 } from "@/lib/domain/company-export";
 import { statusLabel } from "@/lib/domain/status-label";
+import { plural } from "@/lib/format";
 import { restoreOrder, type ForeignKeyConstraint } from "@/lib/domain/restore-order";
 import { createSupabaseAutomationClient } from "@/lib/db/automation";
 import { loadMigrationSources, type MigrationSource } from "@/lib/db/migration-sources";
@@ -48,6 +49,29 @@ export const RESTORE_EXCLUDED_TABLES = [
   "acc_permission",
   "acc_schema_migrations",
 ] as const;
+
+/**
+ * Restored registries whose rows the migrations seed under a key the code
+ * defines — one counter per document type, one policy per approvable action,
+ * one row per 1099 box or ageing bucket — keyed by these columns.
+ *
+ * A snapshot taken before a migration added a key holds no row for it. The
+ * 29 September Meridian snapshot (schema 0125) has no acc_sequence row for
+ * estimate (0141) or sales_receipt (0164), so the first restore of it failed
+ * on acc_number_source_sequence_key_fkey — and a copy without those counters
+ * could not number an estimate anyway (3.0.15). So the copy's own seeded row
+ * is kept for a key the snapshot predates: the row-level twin of "columns
+ * added since take their defaults". A key the snapshot holds always loads
+ * from the snapshot. Tables keyed by a uuid (the chart of accounts above all)
+ * are never here: a seeded row with a fresh uuid is not "missing" from a
+ * snapshot, it is a different row, and the company's own chart replaces it.
+ */
+export const SEEDED_KEY_TABLES: Readonly<Record<string, readonly string[]>> = {
+  acc_sequence: ["key"],
+  acc_approval_policy: ["action_key"],
+  acc_1099_box: ["code"],
+  acc_afda_rate: ["bucket_key"],
+};
 
 /**
  * Whether the restored books add up to the snapshot they came from.
@@ -246,6 +270,20 @@ export interface RestoreOutcome {
   verdictRecordError: string | null;
   /** Every reference this restore nulled rather than drop in silence. Empty when nothing needed it. */
   nulledReferences: NulledReferenceOutcome[];
+  /**
+   * Tables today's code restores but this snapshot never carried — it was
+   * taken before they joined the export — so they are empty in the copy. The
+   * control totals read only the ledger, AR and AP, and cannot see this: an
+   * older snapshot still reports "matched" without it. Empty for a snapshot
+   * taken under today's export.
+   */
+  tablesNotInSnapshot: string[];
+  /**
+   * Registry keys this snapshot predates, kept from the copy's own seed
+   * (see SEEDED_KEY_TABLES) — e.g. the estimate counter for a snapshot taken
+   * before estimates existed. Empty when the snapshot held every key.
+   */
+  seededRowsKept: Array<{ table: string; keys: string[] }>;
 }
 
 export interface RestoreDependencies {
@@ -352,8 +390,16 @@ function insertStatement(
   plan: TablePlan,
   nullability: Map<string, boolean>,
   suspendedColumns?: ReadonlySet<string>,
+  identityAlways?: ReadonlySet<string>,
 ): string {
   const columnList = plan.columns.map(ident).join(", ");
+  // A `generated always as identity` column (acc_work_policy.version, 0119)
+  // refuses an explicit value unless the statement overrides the generator —
+  // and letting it renumber instead would rewrite the history the snapshot
+  // holds. Only said where such a column is actually being loaded.
+  const overriding = plan.columns.some((column) => identityAlways?.has(column))
+    ? "\noverriding system value"
+    : "";
   const values = plan.rows
     .map(
       (row) =>
@@ -366,7 +412,23 @@ function insertStatement(
           .join(", ")})`,
     )
     .join(",\n");
-  return `insert into ${ident(schema)}.${ident(plan.table)} (${columnList})\nvalues\n${values}`;
+  return `insert into ${ident(schema)}.${ident(plan.table)} (${columnList})${overriding}\nvalues\n${values}`;
+}
+
+/**
+ * Moves a column's sequence past the values just loaded into it.
+ *
+ * An explicit INSERT leaves a serial or identity column's sequence where
+ * provisioning left it — at the start. acc_inventory_txn.seq is "the order
+ * movements were applied in" (0033); without this, the copy's next movement
+ * would take seq 1 and sort before the whole loaded history. `having` keeps an
+ * all-null column from setting the sequence to null, which Postgres refuses.
+ */
+function sequenceCatchUp(schema: string, table: string, column: string): { text: string; params: string[] } {
+  return {
+    text: `select setval(pg_get_serial_sequence($1, $2), max(${ident(column)})) from ${ident(schema)}.${ident(table)} having max(${ident(column)}) is not null`,
+    params: [`${ident(schema)}.${ident(table)}`, column],
+  };
 }
 
 /**
@@ -407,25 +469,59 @@ function suspendedWriteBack(
   return statements.length > 0 ? statements.join(";\n") : null;
 }
 
-async function readNullability(
+interface ColumnCatalog {
+  /** Per table, every column in order and whether it accepts null. */
+  nullability: Map<string, Map<string, boolean>>;
+  /** Per table, the `generated always as identity` columns — see insertStatement. */
+  identityAlways: Map<string, Set<string>>;
+  /** Per table, the columns a sequence feeds: serial and identity alike — see sequenceCatchUp. */
+  sequenceBacked: Map<string, Set<string>>;
+}
+
+/** Every row a table holds right now, each cell as text — what the copy was seeded with. */
+async function captureRows(
   client: PgLike,
   schema: string,
-): Promise<Map<string, Map<string, boolean>>> {
+  table: string,
+  columns: string[],
+): Promise<TablePlan> {
+  const selectList = columns.map((column) => `${ident(column)}::text as ${ident(column)}`).join(", ");
+  const { rows } = await client.query(`select ${selectList} from ${ident(schema)}.${ident(table)}`);
+  return {
+    table,
+    columns,
+    rows: rows.map((row) => columns.map((column) => (row[column] === null ? null : String(row[column])))),
+  };
+}
+
+async function readColumnCatalog(client: PgLike, schema: string): Promise<ColumnCatalog> {
   const { rows } = await client.query(
-    `select table_name, column_name, is_nullable
+    `select table_name, column_name, is_nullable, identity_generation, column_default
        from information_schema.columns
       where table_schema = $1
       order by table_name, ordinal_position`,
     [schema],
   );
-  const bySchema = new Map<string, Map<string, boolean>>();
+  const catalog: ColumnCatalog = {
+    nullability: new Map(),
+    identityAlways: new Map(),
+    sequenceBacked: new Map(),
+  };
+  const add = (map: Map<string, Set<string>>, table: string, column: string) =>
+    map.set(table, (map.get(table) ?? new Set<string>()).add(column));
   for (const row of rows) {
     const table = row.table_name as string;
-    const columns = bySchema.get(table) ?? new Map<string, boolean>();
-    columns.set(row.column_name as string, row.is_nullable === "YES");
-    bySchema.set(table, columns);
+    const column = row.column_name as string;
+    const columns = catalog.nullability.get(table) ?? new Map<string, boolean>();
+    columns.set(column, row.is_nullable === "YES");
+    catalog.nullability.set(table, columns);
+    const identity = row.identity_generation as string | null;
+    if (identity === "ALWAYS") add(catalog.identityAlways, table, column);
+    if (identity || /^nextval\(/i.test((row.column_default as string | null) ?? "")) {
+      add(catalog.sequenceBacked, table, column);
+    }
   }
-  return bySchema;
+  return catalog;
 }
 
 interface SchemaForeignKey extends ForeignKeyConstraint {
@@ -822,6 +918,8 @@ export async function restoreBackupIntoNewCompany(
     takenAt: row.taken_at,
   });
   const restorable = restorableTables();
+  const carried = new Set(plans.map((plan) => plan.table));
+  const tablesNotInSnapshot = restorable.filter((table) => !carried.has(table));
 
   // Measured at the snapshot's own reporting date: balances move with the
   // date (a future-dated entry is excluded until its date arrives), so any
@@ -842,6 +940,7 @@ export async function restoreBackupIntoNewCompany(
   let verdictRecorded = false;
   let verdictRecordError: string | null = null;
   const nulledReferences: NulledReferenceOutcome[] = [];
+  const seededRowsKept: Array<{ table: string; keys: string[] }> = [];
   try {
     slug = await claimSlug(client, legalName);
     await client.query("begin");
@@ -861,7 +960,8 @@ export async function restoreBackupIntoNewCompany(
       );
       const schema = provisioned.schema;
 
-      const nullability = await readNullability(client, schema);
+      const columnCatalog = await readColumnCatalog(client, schema);
+      const { nullability } = columnCatalog;
       refuseUnknownColumns(plans, nullability, row.schema_version);
 
       // The load order comes from the copy's own catalog, not from
@@ -904,21 +1004,39 @@ export async function restoreBackupIntoNewCompany(
       // copy without it cannot number an invoice. Such tables' rows are
       // captured before the clear and put back after the load, where their
       // own foreign keys check them against the snapshot's rows (loudly, if
-      // an old snapshot lacks a key today's seed refers to). A `set null` or
-      // `set default` edge would rewrite such a table silently instead of
-      // emptying it; none exists today, and one appearing must be a loud
-      // stop, not a quiet mutation.
+      // an old snapshot lacks a key today's seed refers to).
+      //
+      // A `set null` or `set default` edge would rewrite such a table silently
+      // instead of emptying it — but only the rows that hold a value in its
+      // columns. Refusing on the edge alone blocked every restore of every
+      // company from 24 October (3.0.15): acc_bank_feed_skip (0161) and
+      // acc_posting_default (0187) point at restored tables this way, and a
+      // freshly provisioned copy holds no row in either. So the copy is asked
+      // how many rows a clear would actually rewrite, and only a real one is
+      // a loud stop rather than a quiet mutation.
       const planTables = new Set(plans.map((plan) => plan.table));
       const outsideEdges = foreignKeys.filter(
         (fk) => !planTables.has(fk.fromTable) && planTables.has(fk.toTable),
       );
-      const mutating = outsideEdges.filter((fk) => fk.onDelete === "n" || fk.onDelete === "d");
-      if (mutating.length > 0) {
+      const rewrites: string[] = [];
+      for (const fk of outsideEdges.filter((edge) => edge.onDelete === "n" || edge.onDelete === "d")) {
+        // Any value at all counts, even in one column of a composite key —
+        // erring toward a refusal is the safe side of this check.
+        const { rows: counted } = await client.query(
+          `select count(*)::int as n from ${ident(schema)}.${ident(fk.fromTable)} where ${fk.columns
+            .map((column) => `${ident(column)} is not null`)
+            .join(" or ")}`,
+        );
+        const rowCount = Number(counted[0]?.n ?? 0);
+        if (rowCount > 0) {
+          rewrites.push(`${fk.fromTable} (${fk.constraintName}): ${plural(rowCount, "row")}`);
+        }
+      }
+      if (rewrites.length > 0) {
         throw new RestoreError(
           `Clearing the restored tables would silently rewrite rows in tables the snapshot does ` +
-            `not carry: ${mutating
-              .map((fk) => `${fk.fromTable} (${fk.constraintName})`)
-              .join(", ")}. The restore refuses rather than mutate what it does not manage.`,
+            `not carry: ${rewrites.join(", ")}. The restore refuses rather than mutate what it ` +
+            `does not manage.`,
         );
       }
       const preservedTables = [
@@ -1009,19 +1127,19 @@ export async function restoreBackupIntoNewCompany(
       for (const table of preservedTables) {
         const columns = [...(nullability.get(table)?.keys() ?? [])];
         if (columns.length === 0) continue;
-        const selectList = columns
-          .map((column) => `${ident(column)}::text as ${ident(column)}`)
-          .join(", ");
-        const { rows: keptRows } = await client.query(
-          `select ${selectList} from ${ident(schema)}.${ident(table)}`,
-        );
-        preserved.push({
-          table,
-          columns,
-          rows: keptRows.map((kept) =>
-            columns.map((column) => (kept[column] === null ? null : String(kept[column]))),
-          ),
-        });
+        preserved.push(await captureRows(client, schema, table, columns));
+      }
+      // The registries' seeded rows, read before the clear empties them — see
+      // SEEDED_KEY_TABLES. Only for a table the snapshot carries, with every
+      // key column: a table it does not carry is never cleared, and keys that
+      // cannot be read off the snapshot's rows cannot be compared.
+      const seeded: TablePlan[] = [];
+      for (const [table, keyColumns] of Object.entries(SEEDED_KEY_TABLES)) {
+        const plan = planByTable.get(table);
+        if (!plan || keyColumns.some((column) => !plan.columns.includes(column))) continue;
+        const columns = [...(nullability.get(table)?.keys() ?? [])];
+        if (columns.length === 0) continue;
+        seeded.push(await captureRows(client, schema, table, columns));
       }
       // A suspended constraint's columns are nulled before the clear as well:
       // a delete inside a reference cycle is as stuck as an insert, and these
@@ -1048,8 +1166,30 @@ export async function restoreBackupIntoNewCompany(
             plan,
             nullability.get(plan.table)!,
             suspendedColumnsByTable.get(plan.table),
+            columnCatalog.identityAlways.get(plan.table),
           ),
         );
+      }
+      // Put back the seeded registry rows for keys the snapshot predates —
+      // before the preserved registries below, which point at them.
+      for (const kept of seeded) {
+        const plan = planByTable.get(kept.table)!;
+        const keyColumns = SEEDED_KEY_TABLES[kept.table];
+        const keyOf = (columns: string[], row: Array<string | null>) =>
+          keyColumns.map((column) => row[columns.indexOf(column)] ?? "").join("|");
+        const inSnapshot = new Set(plan.rows.map((row) => keyOf(plan.columns, row)));
+        const missing = kept.rows.filter((row) => !inSnapshot.has(keyOf(kept.columns, row)));
+        if (missing.length === 0) continue;
+        await client.query(
+          insertStatement(
+            schema,
+            { table: kept.table, columns: kept.columns, rows: missing },
+            nullability.get(kept.table)!,
+            undefined,
+            columnCatalog.identityAlways.get(kept.table),
+          ),
+        );
+        seededRowsKept.push({ table: kept.table, keys: missing.map((row) => keyOf(kept.columns, row)) });
       }
       // Write back what the suspended constraints were loaded without; their
       // referenced rows all exist now, and the constraints check every value.
@@ -1066,7 +1206,27 @@ export async function restoreBackupIntoNewCompany(
       // manage, now that the rows they reference are loaded.
       for (const plan of preserved) {
         if (plan.rows.length === 0) continue;
-        await client.query(insertStatement(schema, plan, nullability.get(plan.table)!));
+        await client.query(
+          insertStatement(
+            schema,
+            plan,
+            nullability.get(plan.table)!,
+            undefined,
+            columnCatalog.identityAlways.get(plan.table),
+          ),
+        );
+      }
+      // Every explicit value is in; move each sequence past them, before the
+      // provenance row below or anything after the commit takes a number.
+      for (const plan of [...orderedPlans, ...preserved]) {
+        if (plan.rows.length === 0) continue;
+        for (const column of columnCatalog.sequenceBacked.get(plan.table) ?? []) {
+          // A column the snapshot never carried was filled by its default,
+          // which already advanced the sequence.
+          if (!plan.columns.includes(column)) continue;
+          const catchUp = sequenceCatchUp(schema, plan.table, column);
+          await client.query(catchUp.text, catchUp.params);
+        }
       }
       // The copy must never masquerade as the source: its audit log ends with
       // a row saying where these books came from. Written while triggers are
@@ -1087,6 +1247,8 @@ export async function restoreBackupIntoNewCompany(
             excluded_tables: RESTORE_EXCLUDED_TABLES,
             included_sensitive: true,
             nulled_references: nulledReferences,
+            tables_not_in_snapshot: tablesNotInSnapshot,
+            seeded_rows_kept: seededRowsKept,
           }),
         ],
       );
@@ -1174,5 +1336,7 @@ export async function restoreBackupIntoNewCompany(
     verdictRecorded,
     verdictRecordError,
     nulledReferences,
+    tablesNotInSnapshot,
+    seededRowsKept,
   };
 }

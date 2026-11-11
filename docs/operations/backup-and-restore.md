@@ -26,8 +26,15 @@ end is the evidence that this one works.
 | `attachments.csv` | Attachment inventory: storage path, size, sha256, scan status. File bytes are not included |
 | `README.txt` | How to read the archive |
 
-Only `acc_bank_connection_secret` is excluded: those tokens are encrypted with
-an environment key, so a copy is a live secret and a useless restore.
+Every company table is in the archive except the ones `TABLES_LEFT_OUT`
+(`ctyhp-accounting/lib/domain/company-export.ts`) names, each with its reason —
+bank-feed tokens encrypted with an environment key, the snapshot register
+itself, lists the migrations seed identically in every company, saved-report
+files, app feedback, and the sign-in policy. `manifest.json` lists them as
+`excludedTables`. The archive is also every nightly backup, so a table in
+neither list would be missing from every backup with no control total to
+notice: until 3.0.15, sixteen were. A unit test now reads the migrations and
+fails when a new table is in neither list.
 
 The archive is not a substitute for a database backup: it holds one company, not
 the database, and it does not carry the bytes of any attachment. But it is no
@@ -155,6 +162,22 @@ one. Instead:
 The restored company holds vendor tax profiles. Delete it when the comparison is
 done, and treat it as tax records until then.
 
+**Restoring an older snapshot.** A snapshot is loaded into a company built by
+today's migrations, so it can be older than the schema:
+
+- A column added since takes its default; a table added since comes back
+  empty, and the verdict lists every such kind of record by name. Snapshots
+  taken before 11 November 2026 list at least sixteen (see section 1).
+- A registry key a later migration added — the number series for estimates,
+  sales receipts and stock counts, the cash-count approval policy — keeps the
+  new company's own seeded row, so the copy can still number those documents.
+  The copy's audit log records which (`seeded_rows_kept`).
+- The chart of accounts is the company's own and is never added to: an account
+  a later migration put in every chart (Cash over and short, 0153) is absent
+  from the copy of a snapshot older than it.
+- A snapshot carrying a column or a table today's schema no longer has is
+  refused, naming it, rather than loaded without it.
+
 ## 5. Drill cadence
 
 Run a verification drill quarterly and after any migration that adds a table.
@@ -178,7 +201,11 @@ appears outside `sensitive/`.
 | Date | Performed by | Method | Result | Notes |
 |---|---|---|---|---|
 | 2026-07-29 | Accounting operations | Export manifest verified against the live database (`company-export` end-to-end test) | **Pass** | 66 tables, 957 rows, 72.8 KiB. Control totals as of 2026-07-29: trial balance 24,606,460 debit = 24,606,460 credit; AR 850,548; AP 1,586,500; 152 journal lines. Every file checksum matched; no TIN found outside `sensitive/`. Full restore into a new project not yet exercised. |
+| 2026-08-17 | Engineering | First same-company restore (section 4a) into a new company, against the live database | **Fail, fixed before release** | The hand-kept table order contradicted the schema's foreign keys in twelve places, and the first verification read raced the new schema's cache. The load order now comes from the schema's own constraints, and the read retries while the cache warms. |
+| 2026-11-11 | Accounting operations | Settings → Backups → Restore, production | **Fail** | Every restore of every company refused with "Clearing the restored tables would silently rewrite rows…" since 2026-10-24 (migrations 0161 and 0187). Found the same day: sixteen tables missing from every backup. |
+| 2026-11-11 | Engineering | Three restores of the sample company (Meridian) through the restore screen, on the 3.0.15 code against the live database | **Pass** | All five control totals matched each time (trial balance 37,252,500 = 37,252,500; AR 3,800,000; AP 620,000; 72 journal lines). 2026-11-10 snapshot (old export): sixteen kinds listed as empty. 2026-11-11 snapshot (new export): none listed; posting defaults came back identical. 2026-09-29 snapshot (schema 0125, 64 migrations older): 28 kinds listed; the estimate, sales-receipt and stock-count number series and the cash-count approval policy kept from the new company's seed. Every company's sixteen added tables read through both export paths (nightly job and the Export button). |
 
-The first entry verifies the export and the comparison procedure, not a
-recovery. Section 2 is still blank and a restore has not been performed, so
-recovery itself remains unproven — that is the next drill.
+The 2026-11-11 drills prove a same-company restore (section 4a). Section 2 is
+still blank and a restore into a new Supabase project has not been performed,
+so recovery from the loss of the whole database remains unproven — that is
+the next drill.

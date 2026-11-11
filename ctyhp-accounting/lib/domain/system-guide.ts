@@ -1235,7 +1235,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "After loading, the trial balance, the receivable and payable totals and the journal "
           + "line count are recalculated from the restored books and compared with the ones "
           + "recorded in the snapshot. A match is the evidence the copy is faithful. A mismatch "
-          + "names the figure and both values rather than failing quietly.",
+          + "names the figure and both values rather than failing quietly. A snapshot taken "
+          + "before some kinds of record were backed up (before November 11, 2026) lists those "
+          + "kinds under the verdict: they come back empty, and the totals do not cover them.",
       },
       {
         action: "Read the two side by side",

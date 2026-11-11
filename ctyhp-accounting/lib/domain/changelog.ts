@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.15",
+    date: "2026-11-11",
+    headline: "Restoring a backup works again, and backups hold every kind of record.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Restore as new company works again",
+        detail:
+          "Since October 24, every restore stopped with \"Clearing the restored tables would silently rewrite rows in tables the snapshot does not carry\", whichever company and snapshot was chosen. Two kinds of record added since then point at restored records in a way that made the restore refuse on sight. It now checks whether any row would actually change; in the new company there are none, so the restore goes ahead. It still refuses when one would.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title: "Backups hold every kind of record",
+        detail:
+          "Sixteen kinds of record were missing from every nightly backup and from Export company data: adjusting-entry marks, inventory write-downs, the statement lines of each reconciliation, bank rules and categories, posting defaults, banking preferences, the entries and invoices each import made, bank-feed lines skipped as already recorded, reasons for skipped document numbers, doubtful-account reserve rates, cash flow figures frozen at period close, financial analyses and the work queue. Nothing reported it, because the control totals read only the ledger, receivables and payables. Snapshots carry all of them from the first one after this update; that snapshot is Stored even where the books did not change, because it holds more.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "changed",
+        title: "A restore from an older snapshot says what it came back without",
+        detail:
+          "Restoring a snapshot taken before these kinds of record were backed up — or before some of them existed, like estimates and sales receipts — now lists them by name under the verdict, so an older copy cannot pass for a whole one. The copy also starts a fresh number series for any document type the snapshot predates, so it can still number an estimate; before, such a snapshot could not be restored at all.",
+        route: "/settings/backups",
+      },
+      {
+        kind: "fixed",
+        title: "Backup dates show the day the snapshot was taken",
+        detail:
+          "Settings → Backups and the restore page showed each snapshot as the evening before — the November 10 snapshot as 11/09/2026 7:00 PM — and the restore verdict named that day too. They now show the date: 11/10/2026.",
+        route: "/settings/backups",
+      },
+    ],
+  },
+  {
     version: "3.0.14",
     date: "2026-11-11",
     headline: "Aging reports and customer credit read every row, however many there are.",

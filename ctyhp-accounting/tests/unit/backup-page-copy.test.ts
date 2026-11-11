@@ -11,6 +11,35 @@ import { downloadBackupAction, listBackupsAction } from "@/app/(app)/settings/ba
 const dir = join(process.cwd(), "app", "(app)", "settings", "backups");
 const client = readFileSync(join(dir, "BackupsClient.tsx"), "utf8");
 const actions = readFileSync(join(dir, "actions.ts"), "utf8");
+const restoreClient = readFileSync(join(dir, "[id]", "restore", "RestoreClient.tsx"), "utf8");
+
+describe("the dates the backup screens show (3.0.15)", () => {
+  it("shows a snapshot's own calendar day, never a time zone's shift of it", () => {
+    // taken_at is a date (0114), and so is the restore's comparedAsOf. Through
+    // formatDateTime each became midnight UTC read in the company's time zone:
+    // the 10 November snapshot showed as "11/09/2026 7:00 PM", on the list and
+    // on the restore screen, and the verdict named the wrong day too.
+    for (const source of [client, restoreClient]) {
+      expect(source).not.toMatch(/formatDateTime\(\s*(value|snapshot\.takenAt|outcome\.comparedAsOf)/);
+    }
+    expect(client).toMatch(/formatDate\(value\)/);
+    expect(restoreClient).toMatch(/formatDate\(snapshot\.takenAt\)/);
+    // Every sentence that names the measurement date, not just the happy one.
+    expect(restoreClient.match(/formatDate\(outcome\.comparedAsOf\)/g)?.length ?? 0).toBe(3);
+    expect(restoreClient).not.toMatch(/\{outcome\.comparedAsOf\}/);
+  });
+});
+
+describe("the restore verdict's list of what an older snapshot lacks (3.0.15)", () => {
+  it("counts kinds of record in plain English", () => {
+    // "16 kind of records" was the first live drill's heading.
+    expect(restoreClient).toMatch(/plural\(outcome\.tablesNotInSnapshot\.length, "kind of record", "kinds of record"\)/);
+  });
+
+  it("names each kind the way a bookkeeper would, not by its table", () => {
+    expect(restoreClient).toMatch(/tablesNotInSnapshot\.map\(recordKindLabel\)/);
+  });
+});
 
 /**
  * Pulls the rendered text out of the one Alert this screen shows, rather than

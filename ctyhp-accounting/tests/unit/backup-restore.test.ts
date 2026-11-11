@@ -243,6 +243,9 @@ function fixtureDatasets(): ExportDataset[] {
     make("acc_tax_code", [
       { id: "tax-1", code: "TX", name: "Sales Tax", rate_bp: 825, tax_account_id: "acc-parent" },
     ]),
+    // seq is a bigserial in the live schema (0033): its values must load as
+    // they were, and its sequence must then move past them.
+    make("acc_inventory_txn", [{ id: "it-1", seq: 7, item_id: "item-1", qty: "2.0000" }]),
     make("acc_document_attachment", [
       { id: "att-1", file_name: "receipt.pdf", storage_path: "docs/receipt.pdf", size_bytes: 123 },
     ]),
@@ -328,12 +331,27 @@ interface PgCall {
   params?: unknown[];
 }
 
-function columnFixture(): Record<string, Array<{ name: string; nullable: boolean }>> {
-  const fixture: Record<string, Array<{ name: string; nullable: boolean }>> = {};
+/**
+ * One column as information_schema.columns reports it. `identity` mirrors
+ * identity_generation; `defaultExpr` mirrors column_default, where a serial
+ * column shows its `nextval(...)`.
+ */
+interface FixtureColumn {
+  name: string;
+  nullable: boolean;
+  identity?: "ALWAYS" | "BY DEFAULT";
+  defaultExpr?: string;
+}
+
+function columnFixture(): Record<string, FixtureColumn[]> {
+  const fixture: Record<string, FixtureColumn[]> = {};
   for (const dataset of fixtureDatasets()) {
     fixture[dataset.table] = dataset.columns.map((name) => ({
       name,
       nullable: !(dataset.table === "acc_currency" && name === "symbol"),
+      ...(dataset.table === "acc_inventory_txn" && name === "seq"
+        ? { defaultExpr: "nextval('acc_inventory_txn_seq_seq'::regclass)" }
+        : {}),
     }));
   }
   // Not a dataset: the snapshot does not carry this table. It exists in the
@@ -436,10 +454,21 @@ interface CatalogFixture {
    * tables answer empty, the same as a table nothing seeded.
    */
   existingRows?: Record<string, Array<Record<string, string>>>;
+  /**
+   * How many rows of a table outside the restore hold a value in the columns
+   * an `on delete set null` edge would rewrite — keyed by table name. Absent
+   * tables answer 0, the same as the freshly provisioned copy really holds.
+   */
+  referencingRows?: Record<string, number>;
+  /**
+   * What provisioning seeded into a restored registry table (acc_sequence…),
+   * as the capture before the clear reads it. Absent tables answer empty.
+   */
+  seededRows?: Record<string, Array<Record<string, string>>>;
 }
 
 function fakeProvisioningClient(
-  columns: Record<string, Array<{ name: string; nullable: boolean }>>,
+  columns: Record<string, FixtureColumn[]>,
   faults: ProvisioningFaults = {},
   catalog: CatalogFixture = {},
 ) {
@@ -457,6 +486,8 @@ function fakeProvisioningClient(
               table_name: table,
               column_name: column.name,
               is_nullable: column.nullable ? "YES" : "NO",
+              identity_generation: column.identity ?? null,
+              column_default: column.defaultExpr ?? null,
             })),
           ),
         };
@@ -479,6 +510,16 @@ function fakeProvisioningClient(
       if (existenceMatch) {
         return { rows: catalog.existingRows?.[existenceMatch[1]] ?? [] };
       }
+      // The seeded-registry capture: every column as itself, no filter.
+      const seededMatch = /^select .+ from "co_copy"\."([a-z0-9_]+)"$/.exec(text);
+      if (seededMatch && catalog.seededRows?.[seededMatch[1]]) {
+        return { rows: catalog.seededRows[seededMatch[1]] };
+      }
+      // The set-null check: how many rows of an outside table a clear would rewrite.
+      const referencingMatch = /^select count\(\*\)::int as n from "co_copy"\."([a-z0-9_]+)" where /.exec(text);
+      if (referencingMatch) {
+        return { rows: [{ n: catalog.referencingRows?.[referencingMatch[1]] ?? 0 }] };
+      }
       return { rows: [] };
     },
     async end() {
@@ -491,7 +532,7 @@ function fakeProvisioningClient(
 interface RunOverrides {
   row?: Partial<SourceRow> | null;
   bytes?: Uint8Array;
-  columns?: Record<string, Array<{ name: string; nullable: boolean }>>;
+  columns?: Record<string, FixtureColumn[]>;
   /** What the copy schema's catalog reports — the load order's one source. */
   foreignKeys?: Array<Record<string, unknown>>;
   provision?: (
@@ -505,6 +546,10 @@ interface RunOverrides {
   faults?: ProvisioningFaults;
   /** What a dangling-reference existence check finds already in the copy. */
   existingRows?: Record<string, Array<Record<string, string>>>;
+  /** Rows an `on delete set null` edge from an outside table would rewrite. */
+  referencingRows?: Record<string, number>;
+  /** What provisioning seeded into a restored registry table. */
+  seededRows?: Record<string, Array<Record<string, string>>>;
 }
 
 async function runRestore(overrides: RunOverrides = {}) {
@@ -526,6 +571,8 @@ async function runRestore(overrides: RunOverrides = {}) {
   const pg = fakeProvisioningClient(overrides.columns ?? columnFixture(), overrides.faults, {
     foreignKeys: overrides.foreignKeys,
     existingRows: overrides.existingRows,
+    referencingRows: overrides.referencingRows,
+    seededRows: overrides.seededRows,
   });
   const provisionInputs: ProvisionCompanyInput[] = [];
   const provisionSources: Array<readonly MigrationSource[]> = [];
@@ -780,6 +827,61 @@ describe("restoring a snapshot into a new company", () => {
     expect(mutationTargets(calls, "delete")).not.toContain("acc_number_source");
   });
 
+  it("keeps the seeded row for a key an older snapshot predates, so the copy can still number it (3.0.15)", async () => {
+    // The live drill of the 29 September snapshot (schema 0125) failed on
+    // acc_number_source_sequence_key_fkey: the snapshot holds no acc_sequence
+    // row for estimate (0141) or sales_receipt (0164), which did not exist
+    // yet, so the seeded registry rows naming them had nothing to point at —
+    // and even without the registry, the copy could not number an estimate.
+    // A key the snapshot predates keeps its seeded row: the row-level twin of
+    // "columns added since take their defaults".
+    const run = await runRestore({
+      seededRows: {
+        acc_sequence: [
+          { key: "invoice", prefix: "INV-", next_value: "1" },
+          { key: "estimate", prefix: "EST-", next_value: "1" },
+        ],
+      },
+    });
+    const outcome = await run.outcome;
+    const calls = run.pg.calls;
+    const capture = calls.findIndex((call) => /^select .+ from "co_copy"\."acc_sequence"$/.test(call.text));
+    const firstDelete = calls.findIndex((call) => /^delete from "co_copy"/.test(call.text));
+    expect(capture).toBeGreaterThan(-1);
+    expect(capture).toBeLessThan(firstDelete);
+    const loads = calls.filter(
+      (call) => call.params === undefined && /^insert into "co_copy"\."acc_sequence"/.test(call.text),
+    );
+    expect(loads).toHaveLength(2);
+    // The snapshot's own row wins for a key it holds: invoice comes back at 7…
+    expect(loads[0].text).toContain("('invoice', 'INV-', '7')");
+    // …and only the key it predates is kept from the seed.
+    expect(loads[1].text).toContain("'estimate'");
+    expect(loads[1].text).not.toContain("'invoice'");
+    // In place before the registry that points at it is put back.
+    const putBack = calls.findIndex(
+      (call) => call.params === undefined && /^insert into "co_copy"\."acc_number_source"/.test(call.text),
+    );
+    expect(calls.indexOf(loads[1])).toBeLessThan(putBack);
+    // Said, not silent: on the outcome and in the copy's provenance row.
+    expect(outcome.seededRowsKept).toEqual([{ table: "acc_sequence", keys: ["estimate"] }]);
+    const provenance = calls.find((call) => call.params !== undefined && /'company\.restore', \$2/.test(call.text));
+    const payload = JSON.parse((provenance?.params as unknown[])[2] as string) as Record<string, unknown>;
+    expect(payload.seeded_rows_kept).toEqual([{ table: "acc_sequence", keys: ["estimate"] }]);
+  });
+
+  it("keeps no seeded row when the snapshot holds every key", async () => {
+    const run = await runRestore({
+      seededRows: { acc_sequence: [{ key: "invoice", prefix: "INV-", next_value: "1" }] },
+    });
+    const outcome = await run.outcome;
+    const loads = run.pg.calls.filter(
+      (call) => call.params === undefined && /^insert into "co_copy"\."acc_sequence"/.test(call.text),
+    );
+    expect(loads).toHaveLength(1);
+    expect(outcome.seededRowsKept).toEqual([]);
+  });
+
   it("loads each table in a single statement, so a child row may precede its parent", async () => {
     // acc_account references itself and the export orders it by uuid, so a
     // child can come first. Foreign keys are checked at the end of a
@@ -793,6 +895,49 @@ describe("restoring a snapshot into a new company", () => {
     expect(accountInserts).toHaveLength(1);
     expect(accountInserts[0].text).toContain("'acc-child'");
     expect(accountInserts[0].text).toContain("'acc-parent'");
+  });
+
+  it("loads an always-generated identity column's own values, not fresh ones (3.0.15)", async () => {
+    // acc_work_policy.version is `generated always as identity` (0119).
+    // Postgres refuses an explicit value there unless the INSERT says
+    // `overriding system value` — and letting it renumber instead would
+    // rewrite the version history the snapshot holds.
+    const columns = columnFixture();
+    columns.acc_inventory_txn = columns.acc_inventory_txn.map((column) =>
+      column.name === "seq" ? { name: "seq", nullable: false, identity: "ALWAYS" } : column,
+    );
+    const run = await runRestore({ columns });
+    await run.outcome;
+    const loads = run.pg.calls.filter((call) => call.params === undefined);
+    const txnInsert = loads.find((call) => /^insert into "co_copy"\."acc_inventory_txn"/.test(call.text));
+    expect(txnInsert?.text).toMatch(/\)\noverriding system value\nvalues\n/);
+    expect(txnInsert?.text).toContain("'7'");
+    // Only where it is needed: an ordinary table's INSERT stays as it was.
+    const accountInsert = loads.find((call) => /^insert into "co_copy"\."acc_account"/.test(call.text));
+    expect(accountInsert?.text).not.toContain("overriding");
+  });
+
+  it("moves each sequence past the loaded values, so the copy's next row cannot reuse one (3.0.15)", async () => {
+    // acc_inventory_txn.seq is a bigserial: "the order movements were
+    // applied in". Loading seq 7 leaves its sequence at 1 in a fresh copy, so
+    // the copy's next movement would take seq 1 and sort before history.
+    const run = await runRestore();
+    await run.outcome;
+    const calls = run.pg.calls;
+    const setvals = calls.filter((call) => /^select setval\(/.test(call.text));
+    // One per sequence-backed column that was loaded — nothing else has one.
+    expect(setvals).toHaveLength(1);
+    expect(setvals[0].text).toBe(
+      'select setval(pg_get_serial_sequence($1, $2), max("seq")) from "co_copy"."acc_inventory_txn" having max("seq") is not null',
+    );
+    expect(setvals[0].params).toEqual(['"co_copy"."acc_inventory_txn"', "seq"]);
+    // After the rows it counts, and inside the transaction.
+    const setvalAt = calls.indexOf(setvals[0]);
+    const txnInsertAt = calls.findIndex(
+      (call) => call.params === undefined && /^insert into "co_copy"\."acc_inventory_txn"/.test(call.text),
+    );
+    expect(setvalAt).toBeGreaterThan(txnInsertAt);
+    expect(setvalAt).toBeLessThan(calls.findIndex((call) => call.text === "commit"));
   });
 
   it("keeps the guard triggers out of the way exactly as long as the load runs", async () => {
@@ -861,6 +1006,28 @@ describe("restoring a snapshot into a new company", () => {
     expect(provenance).toBeDefined();
     expect(provenance?.params).toContain("backup-1");
     expect(provenance?.params).toContain("restorer-1");
+  });
+
+  it("names every table the snapshot predates, so an older copy cannot pass for a whole one (3.0.15)", async () => {
+    // The control totals read only the ledger, AR and AP: a snapshot taken
+    // before a table joined the export restores with that table empty and
+    // still reports "matched". The outcome — and the copy's own provenance
+    // row — must say which tables came back empty for that reason.
+    const run = await runRestore();
+    const outcome = await run.outcome;
+    // Restored by today's code, never carried by this fixture's snapshot.
+    expect(outcome.tablesNotInSnapshot).toContain("acc_customer");
+    expect(outcome.tablesNotInSnapshot).not.toContain("acc_account");
+    expect(outcome.tablesNotInSnapshot).not.toContain(SENSITIVE_TABLE);
+    // A table a restore never loads is not "missing" from any snapshot.
+    for (const table of RESTORE_EXCLUDED_TABLES) {
+      expect(outcome.tablesNotInSnapshot).not.toContain(table);
+    }
+    const provenance = run.pg.calls.find(
+      (call) => call.params !== undefined && /'company\.restore', \$2/.test(call.text),
+    );
+    const payload = JSON.parse((provenance?.params as unknown[])[2] as string) as Record<string, unknown>;
+    expect(payload.tables_not_in_snapshot).toEqual(outcome.tablesNotInSnapshot);
   });
 
   it("checks the restored totals at the snapshot's own date, not today's", async () => {
@@ -1266,11 +1433,11 @@ describe("what a restore refuses to load at all", () => {
     expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
   });
 
-  it("refuses a schema where clearing would silently rewrite a table it does not manage", async () => {
+  it("refuses when clearing would silently rewrite rows in a table it does not manage", async () => {
     // `on delete cascade` from an outside table empties it, and the
     // preservation pass puts the rows back. `on delete set null` would
-    // instead quietly rewrite rows the restore never touches again — no such
-    // edge exists today, and one appearing must be a loud stop.
+    // instead quietly rewrite rows the restore never touches again — so when
+    // such rows exist, that must be a loud stop.
     const run = await runRestore({
       foreignKeys: [
         ...FIXTURE_FOREIGN_KEYS,
@@ -1283,10 +1450,46 @@ describe("what a restore refuses to load at all", () => {
           on_delete: "n",
         },
       ],
+      referencingRows: { acc_shadow: 2 },
     });
-    await expect(run.outcome).rejects.toThrow(/acc_shadow/);
+    await expect(run.outcome).rejects.toThrow(/acc_shadow.*2 rows/);
     expect(run.pg.calls.some((call) => call.text === "rollback")).toBe(true);
     expect(run.pg.calls.some((call) => call.text === "commit")).toBe(false);
+  });
+
+  it("goes ahead when that table holds nothing a clear could rewrite (3.0.15)", async () => {
+    // The live failure of 11 November: acc_posting_default (0187) and
+    // acc_bank_feed_skip (0161) sit outside an older snapshot and point at
+    // restored tables with `on delete set null`. A freshly provisioned copy
+    // holds no row in either, so clearing rewrites nothing — refusing on the
+    // edge's mere existence blocked every restore of every company.
+    const run = await runRestore({
+      foreignKeys: [
+        ...FIXTURE_FOREIGN_KEYS,
+        {
+          constraint_name: "acc_posting_default_deposit_account_id_fkey",
+          from_table: "acc_posting_default",
+          to_table: "acc_account",
+          columns: ["deposit_account_id"],
+          all_nullable: true,
+          on_delete: "n",
+        },
+      ],
+    });
+    const outcome = await run.outcome;
+    expect(outcome.verdict).toBe("matched");
+    // It looked before it went ahead: the check is a count, not an assumption.
+    expect(
+      run.pg.calls.some((call) =>
+        /^select count\(\*\)::int as n from "co_copy"\."acc_posting_default" where "deposit_account_id" is not null$/.test(
+          call.text,
+        ),
+      ),
+    ).toBe(true);
+    // And it never touched the table it does not manage.
+    expect(mutationTargets(run.pg.calls, "delete")).not.toContain("acc_posting_default");
+    expect(mutationTargets(run.pg.calls, "insert")).not.toContain("acc_posting_default");
+    expect(run.pg.calls.some((call) => call.text === "commit")).toBe(true);
   });
 
   it("keeps the original failure when the rollback itself dies with the connection", async () => {
