@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Segmented, Space, Typography } from "antd";
 import DataTable from "@/components/ui/DataTable";
 import ReportTable, { SummaryCell, SummaryRow } from "@/components/ui/ReportTable";
@@ -13,6 +14,7 @@ import {
 } from "@/lib/domain/aging";
 import { formatDate } from "@/lib/format";
 import type { AgingReportRow } from "@/lib/services/aging";
+import styles from "./aging-party.module.css";
 
 export type AgingGrouping = "grid" | "party" | "document";
 
@@ -51,6 +53,7 @@ export default function AgingByPartyTable({
   loading,
   companyName,
   asOf,
+  statementHref,
 }: {
   rows: AgingReportRow[];
   /** "Customer" or "Vendor" — the heading of the first column. */
@@ -65,6 +68,8 @@ export default function AgingByPartyTable({
   /** Printed above the grid: a statement says whose books it is. */
   companyName: string;
   asOf: string;
+  /** A/R only: where a customer's open-item statement lives. A/P passes nothing. */
+  statementHref?: (entityId: string) => string;
 }) {
   const pivot = pivotAgingByParty(rows);
   const grid = agingSummaryGrid(pivot);
@@ -122,7 +127,20 @@ export default function AgingByPartyTable({
                   row.kind === "total" ? <b>{label}</b> : label,
               },
               ...grid.columns.map((column, index) => ({
-                title: column.entityName,
+                title: statementHref ? (
+                  <>
+                    <span title={column.entityName}>{column.entityName}</span>
+                    <Link
+                      className={styles.statementBlock}
+                      href={statementHref(column.entityId)}
+                      aria-label={`Statement for ${column.entityName}`}
+                    >
+                      Statement
+                    </Link>
+                  </>
+                ) : (
+                  column.entityName
+                ),
                 key: column.entityId,
                 width: 140,
                 align: "right" as const,
@@ -167,7 +185,20 @@ export default function AgingByPartyTable({
               dataIndex: "entityName",
               render: (_: unknown, row: PartyAgingRow) => (
                 <>
-                  <span title={row.entityName}>{row.entityName}</span>
+                  <span className={styles.name}>
+                    <span className={styles.label} title={row.entityName}>
+                      {row.entityName}
+                    </span>
+                    {statementHref ? (
+                      <Link
+                        className={styles.statement}
+                        href={statementHref(row.entityId)}
+                        aria-label={`Statement for ${row.entityName}`}
+                      >
+                        Statement
+                      </Link>
+                    ) : null}
+                  </span>
                   {overdueLine(row.overdueMinor, row.oldestDueDate)}
                 </>
               ),

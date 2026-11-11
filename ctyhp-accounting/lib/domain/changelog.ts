@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.13",
+    date: "2026-11-11",
+    headline: "A statement of what a customer still owes, to print, save as PDF or email, from their page or from A/R Aging.",
+    changes: [
+      {
+        kind: "added",
+        title: "Open-item statement",
+        detail:
+          "Statement on a customer's page opens one sheet listing every invoice they have not paid in full, with its date, number, due date, how many days late it is, its amount and what is still outstanding. Under the list: the totals for Current, 1–30, 31–60, 61–90 and Over 90 days, Total due, and How to pay from Settings. A payment not yet applied to an invoice and a credit memo not yet used are listed as negative amounts and come off Total due, so the statement totals what the customer's row on A/R Aging does. Choose another As of date at the top; the footnote says what that date changes.",
+        route: "/customers",
+      },
+      {
+        kind: "added",
+        title: "Print, Download PDF and Email",
+        detail:
+          "Print prints the sheet alone. Download PDF saves it as statement-<customer>-<date>.pdf. Email opens your mail program with the customer's address, the subject \"Statement from <company> as of <date>\" and a short summary of up to 15 lines and the total; attach the PDF before sending, as OneBook sends no mail itself.",
+        route: "/customers",
+      },
+      {
+        kind: "added",
+        title: "Statement from A/R Aging",
+        detail:
+          "On Accounts Receivable Aging, each customer has a Statement link beside their name in the By customer view and under their name in the Summary grid. It opens the statement as of the date the report was run.",
+        route: "/reports/ar-aging",
+      },
+      {
+        kind: "changed",
+        title: "Customer Statement opens on the customer",
+        detail:
+          "The activity statement under Reports can now be opened for one customer from a link, and the open-item statement links to it as Activity statement.",
+        route: "/reports/customer-statement",
+      },
+    ],
+  },
+  {
     version: "3.0.12",
     date: "2026-11-10",
     headline: "Each customer has a page of their own: what they owe, what is late, and Receive payment one click away.",

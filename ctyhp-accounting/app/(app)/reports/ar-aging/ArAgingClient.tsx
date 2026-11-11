@@ -128,6 +128,7 @@ export default function ArAgingClient({
                 loading={loading}
                 companyName={companyName}
                 asOf={ranAsOf!}
+                statementHref={(id) => `/customers/${id}/statement?asOf=${ranAsOf}`}
                 emptyTitle="No open receivables"
                 emptyDescription="There are no customer balances outstanding as of this date."
                 documentColumns={[

@@ -7,9 +7,17 @@ import CustomerStatementClient from "./CustomerStatementClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomerStatementPage() {
+export default async function CustomerStatementPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customer?: string | string[] }>;
+}) {
+  const { customer } = await searchParams;
   const sb = await createSupabaseServerClient();
   const [ctx, customers] = await Promise.all([reportPageContext(sb), listCustomers(sb)]);
+  // A link from a customer page names who to open; an unknown id opens the empty picker.
+  const initialCustomerId =
+    typeof customer === "string" && customers.some((c) => c.id === customer) ? customer : undefined;
   return (
     <div>
       <PageHeader
@@ -19,6 +27,7 @@ export default async function CustomerStatementPage() {
       />
       <CustomerStatementClient
         customers={customers.map((c) => ({ id: c.id, name: c.name }))}
+        initialCustomerId={initialCustomerId}
         companyName={ctx.companyName}
         baseCurrency={ctx.currencyCode}
         baseDecimals={ctx.decimals}

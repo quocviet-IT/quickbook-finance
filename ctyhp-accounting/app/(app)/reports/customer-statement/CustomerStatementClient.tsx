@@ -14,6 +14,8 @@ interface Customer {
 }
 interface Props {
   customers: Customer[];
+  /** From ?customer=: the report opens on this customer. */
+  initialCustomerId?: string;
   companyName: string;
   baseCurrency: string;
   baseDecimals: number;
@@ -22,8 +24,8 @@ interface Props {
   payNote: string | null;
 }
 
-export default function CustomerStatementClient({ customers, companyName, baseCurrency, baseDecimals, presets, payNote }: Props) {
-  const [customerId, setCustomerId] = useState<string>();
+export default function CustomerStatementClient({ customers, initialCustomerId, companyName, baseCurrency, baseDecimals, presets, payNote }: Props) {
+  const [customerId, setCustomerId] = useState<string | undefined>(initialCustomerId);
   // Choosing another customer runs the report again over the dates last run.
   const [refreshKey, setRefreshKey] = useState(0);
 

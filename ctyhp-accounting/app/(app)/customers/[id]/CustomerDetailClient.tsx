@@ -16,7 +16,7 @@ import {
   type DescriptionsProps,
   type TableColumnsType,
 } from "antd";
-import { EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { EditOutlined, FileTextOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
@@ -249,28 +249,30 @@ export default function CustomerDetailClient({
     <FilterBar
       ariaLabel={`${customer.name}: status, contact and actions`}
       actions={
-        canWrite || canCreateInvoice ? (
-          <>
-            {/* An inactive customer can still pay what they owe. */}
-            {canWrite ? (
-              <Link href={receivePaymentHref}>
-                <Button type="primary">Receive payment</Button>
-              </Link>
-            ) : null}
-            {canCreateInvoice && customer.is_active ? (
-              <Link href={newInvoiceHref}>
-                <Button icon={<PlusOutlined />}>New invoice</Button>
-              </Link>
-            ) : null}
-            {canWrite ? (
-              <RowActionsMenu
-                size="middle"
-                label={`More actions for ${customer.name}`}
-                items={[{ key: "edit", label: "Edit customer", onClick: () => setFormOpen(true) }]}
-              />
-            ) : null}
-          </>
-        ) : null
+        <>
+          {/* An inactive customer can still pay what they owe. */}
+          {canWrite ? (
+            <Link href={receivePaymentHref}>
+              <Button type="primary">Receive payment</Button>
+            </Link>
+          ) : null}
+          {canCreateInvoice && customer.is_active ? (
+            <Link href={newInvoiceHref}>
+              <Button icon={<PlusOutlined />}>New invoice</Button>
+            </Link>
+          ) : null}
+          {/* Everyone who can see the customer can see what they owe. */}
+          <Link href={`/customers/${customer.id}/statement`}>
+            <Button icon={<FileTextOutlined />}>Statement</Button>
+          </Link>
+          {canWrite ? (
+            <RowActionsMenu
+              size="middle"
+              label={`More actions for ${customer.name}`}
+              items={[{ key: "edit", label: "Edit customer", onClick: () => setFormOpen(true) }]}
+            />
+          ) : null}
+        </>
       }
     >
       <div className={styles.identity}>

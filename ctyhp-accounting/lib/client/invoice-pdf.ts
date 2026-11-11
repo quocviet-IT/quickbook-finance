@@ -1,7 +1,7 @@
 "use client";
 
 import type { jsPDF } from "jspdf";
-import type { InvoiceDocument, PrintedDocument } from "@/lib/domain/invoice-document";
+import type { DocumentTable, InvoiceDocument, PrintedDocument } from "@/lib/domain/invoice-document";
 import { invoiceDocumentFileName } from "@/lib/domain/invoice-document";
 import type { EstimateDocument } from "@/lib/domain/estimate-document";
 import type { SalesReceiptDocument } from "@/lib/domain/sales-receipts";
@@ -9,9 +9,18 @@ import type { SalesReceiptDocument } from "@/lib/domain/sales-receipts";
 /**
  * What this renderer draws: an invoice, or an estimate, which adds a closing
  * line under its note (lib/domain/estimate-document), or a sales receipt,
- * which also names its customer "Sold to" (lib/domain/sales-receipts).
+ * which also names its customer "Sold to" (lib/domain/sales-receipts), or the
+ * open-item statement (lib/domain/open-item-statement, 3.0.13), which brings
+ * columns of its own and a footnote.
  */
-export type RenderableDocument = PrintedDocument & { footer?: string | null; partyHeading?: string };
+export type RenderableDocument = PrintedDocument & {
+  footer?: string | null;
+  partyHeading?: string;
+  /** Columns instead of an invoice's; an empty body draws no table at all. */
+  table?: DocumentTable;
+  /** A muted note at the very end, after How to pay. */
+  footnote?: string | null;
+};
 
 const INK: [number, number, number] = [15, 23, 42];
 const MUTED: [number, number, number] = [100, 116, 139];
@@ -99,23 +108,35 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
     billY += 12;
   }
 
-  autoTable(pdf, {
-    startY: billY + 16,
-    head: [["Description", "Qty", "Unit price", "Amount"]],
-    body: doc.lines.map((line) => [line.description, line.quantity, line.unitPrice, line.amount]),
-    theme: "grid",
-    styles: { fontSize: 9, cellPadding: 6, textColor: INK },
-    headStyles: { fillColor: ACCENT, textColor: [255, 255, 255] },
-    columnStyles: {
-      1: { halign: "right", cellWidth: 50 },
-      2: { halign: "right", cellWidth: 90 },
-      3: { halign: "right", cellWidth: 90 },
-    },
-    margin: { left: MARGIN, right: MARGIN },
-  });
+  const table = doc.table;
+  // A statement with nothing open says so in its memo; a heading over no rows says nothing.
+  if (!table || table.body.length > 0) {
+    autoTable(pdf, {
+      startY: billY + 16,
+      head: [table ? table.head : ["Description", "Qty", "Unit price", "Amount"]],
+      body: table ? table.body : doc.lines.map((line) => [line.description, line.quantity, line.unitPrice, line.amount]),
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 6, textColor: INK },
+      headStyles: { fillColor: ACCENT, textColor: [255, 255, 255] },
+      columnStyles: table
+        ? Object.fromEntries(table.rightAligned.map((index) => [index, { halign: "right" as const }]))
+        : {
+            1: { halign: "right", cellWidth: 50 },
+            2: { halign: "right", cellWidth: 90 },
+            3: { halign: "right", cellWidth: 90 },
+          },
+      margin: { left: MARGIN, right: MARGIN },
+    });
+  }
 
   // @ts-expect-error jspdf-autotable augments the document at runtime.
   let totalsY = (pdf.lastAutoTable?.finalY ?? billY) + 22;
+  // Kept whole and above the page number: a long table must not push "Total due" off the page.
+  const totalsNeed = (doc.totals.length - 1) * 14 + 18;
+  if (doc.totals.length && totalsY + totalsNeed > pdf.internal.pageSize.getHeight() - 48) {
+    pdf.addPage();
+    totalsY = 64;
+  }
   doc.totals.forEach((total, index) => {
     // The last row is the figure the reader acts on: Balance due on an
     // invoice, which the model always puts last, and Total on an estimate,
@@ -135,6 +156,10 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
     pdf.setFontSize(9);
     pdf.setTextColor(...MUTED);
     const memoLines: string[] = pdf.splitTextToSize(doc.memo, pageWidth - MARGIN * 2);
+    if (footY + memoLines.length * pdf.getLineHeight() > pdf.internal.pageSize.getHeight() - 48) {
+      pdf.addPage();
+      footY = 64;
+    }
     pdf.text(memoLines, MARGIN, footY);
     footY += memoLines.length * pdf.getLineHeight() + 8;
   }
@@ -154,6 +179,19 @@ export async function renderInvoicePdf(doc: RenderableDocument): Promise<jsPDF> 
     pdf.setFont("helvetica", "normal");
     pdf.text(noteLines, MARGIN, footY);
     footY += noteLines.length * pdf.getLineHeight() + 8;
+  }
+
+  if (doc.footnote) {
+    const footnoteLines: string[] = pdf.splitTextToSize(doc.footnote, pageWidth - MARGIN * 2);
+    if (footY + footnoteLines.length * 12 > pdf.internal.pageSize.getHeight() - 48) {
+      pdf.addPage();
+      footY = 64;
+    }
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...MUTED);
+    pdf.text(footnoteLines, MARGIN, footY);
+    footY += footnoteLines.length * pdf.getLineHeight() + 8;
   }
 
   if (doc.footer) {
@@ -215,6 +253,12 @@ export async function downloadEstimatePdf(doc: EstimateDocument): Promise<void> 
 export async function downloadSalesReceiptPdf(doc: SalesReceiptDocument): Promise<void> {
   const pdf = await renderInvoicePdf(doc);
   pdf.save(doc.fileName);
+}
+
+/** Saves the open-item statement (3.0.13) under the name lib/domain/open-item-statement gives it. */
+export async function downloadOpenItemStatementPdf(doc: RenderableDocument, fileName: string): Promise<void> {
+  const pdf = await renderInvoicePdf(doc);
+  pdf.save(fileName);
 }
 
 /** Opens the browser print dialog on the rendered document. */

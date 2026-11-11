@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildInvoiceDocument } from "@/lib/domain/invoice-document";
+import { buildOpenItemStatement, openItemStatementDocument } from "@/lib/domain/open-item-statement";
 import { buildEstimateDocument, ESTIMATE_CLOSING_LINE } from "@/lib/domain/estimate-document";
 import { renderInvoicePdf } from "@/lib/client/invoice-pdf";
 
@@ -240,5 +241,63 @@ describe("the PDF library is only loaded when a PDF is asked for", () => {
     // `import type` is erased by the compiler, so it keeps the signature
     // honest without pulling the library back into the bundle.
     expect(source).toMatch(/import type \{[^}]*jsPDF/);
+  });
+});
+
+function statementInput(items: Parameters<typeof buildOpenItemStatement>[0]["items"]) {
+  return {
+    asOf: "2026-11-10",
+    today: "2026-11-10",
+    company: { ...source.company, pay_note: "Pay by ACH to account 000123456." },
+    customer: source.customer,
+    items,
+    currencyCode: "USD",
+    decimals: 2,
+  };
+}
+const invoiceItem = {
+  docType: "invoice",
+  docNumber: "INV-000004",
+  docDate: "2026-03-24",
+  dueDate: "2026-04-23",
+  outstandingMinor: 1_000_000,
+  detail: { totalMinor: 2_680_000, openMinor: 1_000_000, currencyCode: "USD", note: "Spring order" },
+};
+
+describe("renderInvoicePdf: the open-item statement (3.0.13)", () => {
+  const text = async (items: typeof invoiceItem[]) => {
+    const pdf = await renderInvoicePdf(openItemStatementDocument(buildOpenItemStatement(statementInput(items))));
+    return new TextDecoder("latin1").decode(new Uint8Array(pdf.output("arraybuffer") as ArrayBuffer));
+  };
+
+  it("draws the statement's own columns, totals, pay note and footnote", async () => {
+    const out = await text([invoiceItem]);
+    for (const s of ["Statement", "STATEMENT FOR", "Outstanding", "Over 90 days", "Total due", "How to pay", "Every figure is as at"]) {
+      expect(out).toContain(s);
+    }
+    expect(out).not.toContain("Unit price");
+  });
+
+  it("keeps Total due on the page however long the table is", async () => {
+    let paged = 0;
+    for (let n = 20; n <= 45; n++) {
+      const items = Array.from({ length: n }, (_, i) => ({ ...invoiceItem, docNumber: `INV-${String(i).padStart(6, "0")}` }));
+      const out = await text(items);
+      // jsPDF writes "<x> <y> Td", a newline, then "(Total due) Tj"; y counts up from the page foot.
+      const matches = [...out.matchAll(/([\d.]+) ([\d.]+) Td\n\(Total due\) Tj/g)];
+      expect(matches.length, `n=${n}`).toBe(1);
+      const y = Number(matches[0][2]);
+      expect(y, `n=${n}`).toBeGreaterThanOrEqual(40);
+      expect(y, `n=${n}`).toBeLessThanOrEqual(800);
+      paged++;
+    }
+    expect(paged).toBe(26);
+  });
+
+  it("draws no table when nothing is open, only the sentence", async () => {
+    const out = await text([]);
+    expect(out).toContain("Nothing outstanding as of November 10, 2026.");
+    expect(out).not.toContain("Outstanding");
+    expect(out).not.toContain("Total due");
   });
 });

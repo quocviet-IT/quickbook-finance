@@ -1,7 +1,7 @@
 /**
  * Pure AR/AP aging. Buckets an open-item list by days past due relative to an
- * as-of date. Credits/unapplied payments carry a negative balance and land in
- * "Current". The grand total equals the net subledger balance, which must match
+ * as-of date. Credits/unapplied payments carry a negative balance and are aged
+ * from their own date like any other item (a credit dated today is Current). The grand total equals the net subledger balance, which must match
  * the AR/AP control-account balance from the ledger.
  */
 export const AGING_BUCKETS = [
@@ -18,7 +18,7 @@ export interface AgingItem {
 }
 
 /** Whole days between two ISO dates (asOf - dueDate), UTC, calendar-day based. */
-function daysPastDue(dueDate: string, asOf: string): number {
+export function daysPastDue(dueDate: string, asOf: string): number {
   const d = (s: string) => {
     const [y, m, day] = s.split("-").map(Number);
     return Date.UTC(y, m - 1, day);
