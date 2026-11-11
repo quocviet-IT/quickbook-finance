@@ -1,9 +1,9 @@
 "use client";
 
-import { useCompanyClock } from "@/components/CompanyClock";
-import { formatDateTime, plural } from "@/lib/format";
+import { formatDate, plural } from "@/lib/format";
 import { useState } from "react";
 import { Alert, Button, Descriptions, Input, Space, Typography } from "antd";
+import { recordKindLabel } from "@/lib/domain/company-export";
 import { formatBytes } from "@/lib/domain/feedback-attachment";
 import { statusLabel } from "@/lib/domain/status-label";
 import { restoreBackupAction } from "./actions";
@@ -40,7 +40,6 @@ export default function RestoreClient({
   snapshot: RestoreSnapshot | null;
   loadError: string | null;
 }) {
-  const { timeZone } = useCompanyClock();
   const [name, setName] = useState("");
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<RestoreOutcome | null>(null);
@@ -75,7 +74,9 @@ export default function RestoreClient({
         size="small"
         column={1}
         items={[
-          { key: "date", label: "Snapshot date", children: formatDateTime(snapshot.takenAt, timeZone) },
+          // A date, not a moment (0114): read through a time zone it showed
+          // the evening before (3.0.15).
+          { key: "date", label: "Snapshot date", children: formatDate(snapshot.takenAt) },
           {
             key: "size",
             label: "Size",
@@ -175,7 +176,7 @@ export default function RestoreClient({
               type="success"
               showIcon
               message="The books came back whole"
-              description={`Every control total of "${outcome.legalName}" matches the snapshot, measured as of ${formatDateTime(outcome.comparedAsOf, timeZone)}. Open it from the company menu to work with the two sets of books side by side.`}
+              description={`Every control total of "${outcome.legalName}" matches the snapshot, measured as of ${formatDate(outcome.comparedAsOf)}. Open it from the company menu to work with the two sets of books side by side.`}
             />
           ) : outcome.verdict === "mismatched" ? (
             <Alert
@@ -187,7 +188,7 @@ export default function RestoreClient({
                   <p style={{ marginTop: 0 }}>
                     The company &quot;{outcome.legalName}&quot; was still created so the two sets of
                     books can be compared side by side. These figures disagree (measured as of{" "}
-                    {outcome.comparedAsOf}):
+                    {formatDate(outcome.comparedAsOf)}):
                   </p>
                   <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
                     {outcome.differences.map((difference) => (
@@ -215,7 +216,7 @@ export default function RestoreClient({
                   <p style={{ margin: 0 }}>
                     To check them yourself, open &quot;{outcome.legalName}&quot; from the company
                     menu, run the Trial Balance and the AR and AP aging reports as of{" "}
-                    {outcome.comparedAsOf}, and compare each total against the snapshot figures
+                    {formatDate(outcome.comparedAsOf)}, and compare each total against the snapshot figures
                     below.
                   </p>
                 </>
@@ -245,6 +246,28 @@ export default function RestoreClient({
                     </li>
                   ))}
                 </ul>
+              }
+            />
+          )}
+          {outcome.tablesNotInSnapshot.length === 0 ? null : (
+            // The control totals read the ledger, AR and AP only, so "matched"
+            // above cannot see a kind of record this snapshot predates. Saying
+            // so is what keeps an older copy from passing for a whole one.
+            <Alert
+              type="warning"
+              showIcon
+              message={`${plural(outcome.tablesNotInSnapshot.length, "kind of record", "kinds of record")} came back empty`}
+              description={
+                <>
+                  <p style={{ marginTop: 0 }}>
+                    This snapshot was taken before backups held these — some did not exist in
+                    One Book yet — so &quot;{outcome.legalName}&quot; has none. The control totals
+                    below do not cover them. Snapshots taken from now on carry them.
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    {outcome.tablesNotInSnapshot.map(recordKindLabel).join(", ")}.
+                  </p>
+                </>
               }
             />
           )}

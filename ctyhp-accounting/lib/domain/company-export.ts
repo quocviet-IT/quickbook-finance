@@ -3,10 +3,70 @@
  * written, and what the manifest claims. No database access lives here.
  */
 
+import { auditEntityLabel } from "./audit-entities";
+
 export const SENSITIVE_TABLE = "acc_vendor_tax_profile";
 
-/** Encrypted with an environment key, so a copy is a live secret and a useless restore. */
-export const EXCLUDED_TABLES: readonly string[] = ["acc_bank_connection_secret"];
+/**
+ * Plain names for the kinds of record 3.0.15 added to the export — what a
+ * restore of an older snapshot lists as having come back empty. The rest fall
+ * back to the audit log's names (auditEntityLabel). The first live drill
+ * showed "Afda rate" and "Number gap note" to a bookkeeper; these say it.
+ */
+export const RECORD_KIND_LABELS: Readonly<Record<string, string>> = {
+  acc_cash_flow_close_snapshot: "Cash flow figures frozen at period close",
+  acc_posting_default: "Posting defaults",
+  acc_number_gap_note: "Reasons for skipped document numbers",
+  acc_adjusting_entry: "Adjusting-entry marks",
+  acc_afda_rate: "Doubtful-account reserve rates",
+  acc_inventory_writedown: "Inventory write-downs",
+  acc_bank_rule: "Bank rules",
+  acc_bank_category: "Bank categories",
+  acc_banking_preference: "Banking preferences",
+  acc_import_batch_entry: "Journal entries each import made",
+  acc_import_batch_document: "Invoices each import made",
+  acc_bank_feed_skip: "Bank-feed lines skipped as already recorded",
+  acc_reconciliation_statement_line: "Statement lines of each reconciliation",
+  acc_financial_analysis: "Financial analysis",
+  acc_work_policy: "Work queue settings",
+  acc_work_item_state: "Work queue item status",
+};
+
+/** A kind of record as a person would name it, never as its table. */
+export function recordKindLabel(table: string): string {
+  return RECORD_KIND_LABELS[table] ?? auditEntityLabel(table);
+}
+
+/**
+ * Every company table the archive deliberately does not carry, with the reason.
+ *
+ * The archive is also every nightly backup, so a table missing from both this
+ * list and EXPORT_TABLES is a table no backup holds — and the control totals,
+ * which read only the ledger, AR and AP, cannot notice. 3.0.15 found 23 such
+ * tables; tests/unit/company-export-coverage.test.ts reads the migrations so a
+ * new one fails there instead.
+ */
+export const TABLES_LEFT_OUT: Readonly<Record<string, string>> = {
+  acc_bank_connection_secret:
+    "Bank-feed access tokens, encrypted with this deployment's key: a copy is a live secret, and useless after a restore, where the bank is connected again instead.",
+  acc_backup:
+    "This company's own register of nightly snapshots. Carried into a restore, it would point the copy at the source company's files.",
+  acc_us_state:
+    "The list of US states. The migrations seed it identically in every company, so a copy already holds the same rows.",
+  acc_number_source:
+    "Which documents are numbered from which sequence. The migrations write it, not people, and a restore keeps the copy's own seeded rows.",
+  acc_saved_report:
+    "Saved reports and kept statement files are files in storage, which the archive does not carry; a row without its file is not a report.",
+  acc_feedback_report:
+    "Feedback people sent to One Book's developers about the app itself, not part of the company's books.",
+  acc_feedback_attachment:
+    "The screenshots attached to that feedback, stored as files outside the archive like the feedback itself.",
+  acc_two_step_policy:
+    "Whether signing in needs a second step: an access setting, like the user list a restore also leaves behind. The copy's only user is whoever restored it.",
+};
+
+/** What manifest.json lists as excludedTables: every table above. */
+export const EXCLUDED_TABLES: readonly string[] = Object.keys(TABLES_LEFT_OUT);
 
 /** Every table written to data/, in dependency order so the archive reads top-down. */
 export const EXPORT_TABLES: readonly string[] = [
@@ -16,16 +76,24 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_company_setting_version",
   "acc_accounting_period",
   "acc_period_event",
+  // The cash-flow figures frozen when a period closed (0081).
+  "acc_cash_flow_close_snapshot",
   "acc_permission",
   "acc_role_permission",
   "acc_app_user",
   "acc_approval_policy",
   "acc_approval_request",
   "acc_account",
+  // Which accounts a new deposit, payment, sale or purchase starts from (0187).
+  "acc_posting_default",
   "acc_sequence",
+  // Why a document number was skipped (0066).
+  "acc_number_gap_note",
   "acc_journal_entry",
   "acc_journal_line",
   "acc_journal_reversal_link",
+  // Which journal entries are year-end adjustments (0124).
+  "acc_adjusting_entry",
   "acc_customer",
   "acc_vendor",
   "acc_item",
@@ -48,6 +116,8 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_credit_memo_allocation",
   "acc_customer_refund",
   "acc_write_off",
+  // The reserve rate for each age of receivable (0093).
+  "acc_afda_rate",
   "acc_bill",
   "acc_bill_line",
   "acc_bill_payment",
@@ -64,6 +134,8 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_po_variance_exception",
   "acc_purchasing_config",
   "acc_inventory_txn",
+  // Stock written down to what it can still be sold for (0079).
+  "acc_inventory_writedown",
   // Stock Count (0139): a count references accounts, a journal entry and an approval request.
   "acc_stock_count",
   "acc_stock_count_line",
@@ -75,6 +147,11 @@ export const EXPORT_TABLES: readonly string[] = [
   "acc_fixed_asset",
   "acc_asset_depreciation_schedule",
   "acc_bank_account",
+  // Bank rules, the categories a bank line can take, and the banking
+  // preferences (0126, 0098, 0127).
+  "acc_bank_rule",
+  "acc_bank_category",
+  "acc_banking_preference",
   // Cards and loans (0129): which accounts a bank payment repays.
   "acc_repayment_account",
   // Related companies (0131): which account carries what each owes or is owed.
@@ -90,17 +167,30 @@ export const EXPORT_TABLES: readonly string[] = [
   // dependency order even though the actual load order is derived from the
   // schema's own foreign keys at restore time, not from this list.
   "acc_import_batch",
+  // Which entries and invoices each import made, so an import can be undone
+  // (0102, 0116).
+  "acc_import_batch_entry",
+  "acc_import_batch_document",
   "acc_bank_transaction",
   // What each bank-feed sync added or retired (0137), so a sync can be undone.
   "acc_bank_feed_sync_change",
+  // Bank-feed lines skipped because the books already held them (0161).
+  "acc_bank_feed_skip",
   "acc_reconciliation",
   "acc_reconciliation_line",
   "acc_statement_reconciliation",
+  // The statement lines a reconciliation was worked from (0132).
+  "acc_reconciliation_statement_line",
   "acc_tax_payment",
   "acc_budget",
   "acc_budget_line",
   "acc_recurring_template",
   "acc_recurring_run",
+  // Frozen financial analyses (0115).
+  "acc_financial_analysis",
+  // The work queue: its thresholds, and what was done about each item (0119, 0118).
+  "acc_work_policy",
+  "acc_work_item_state",
   "acc_document_attachment",
   "acc_document_access_log",
   "acc_audit_log",
@@ -114,9 +204,10 @@ export const EXPORT_TABLES: readonly string[] = [
  * can repeat rows page one already returned and drop others in their place. The
  * largest company here holds 20,740 journal lines, twenty-one pages of them.
  *
- * Most tables key on `id`, which is the default. These eight key on text and
- * have no `id` column at all; ordering them by one would not drift quietly, it
- * would throw, because Postgres validates the column even on an empty table.
+ * Most tables key on `id`, which is the default. These have no `id` column at
+ * all; ordering them by one would not drift quietly, it would throw, because
+ * Postgres validates the column even on an empty table — and one table
+ * throwing fails the whole nightly backup. Each lists its primary key.
  */
 export const ORDER_COLUMNS: Record<string, string[]> = {
   acc_schema_migrations: ["filename"],
@@ -127,6 +218,13 @@ export const ORDER_COLUMNS: Record<string, string[]> = {
   acc_sequence: ["key"],
   acc_purchasing_config: ["singleton"],
   acc_1099_box: ["code"],
+  acc_cash_flow_close_snapshot: ["period_id"],
+  acc_number_gap_note: ["sequence_key", "number_value"],
+  acc_adjusting_entry: ["journal_entry_id"],
+  acc_afda_rate: ["bucket_key"],
+  acc_import_batch_entry: ["batch_id", "journal_entry_id"],
+  acc_import_batch_document: ["batch_id", "document_kind", "document_id"],
+  acc_work_item_state: ["work_key"],
 };
 
 export function orderColumnsFor(table: string): string[] {

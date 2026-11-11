@@ -13,9 +13,10 @@ import { compareControlTotals, readSnapshotArchive, type TablePlan } from "@/lib
  * database. The export is built by buildExportArchive (the bytes the button
  * and the nightly backup produce) and read by readSnapshotArchive (the checks
  * and the parse restoreBackupIntoNewCompany runs before it loads a row).
- * The load into Postgres itself is proved against a real database by
- * scripts/backup-restore-roundtrip.live.ts; this file proves everything up to
- * the INSERT, on every push.
+ * The load into Postgres itself is proved only by restoring a real snapshot
+ * into a new company — the drill log in docs/operations/backup-and-restore.md
+ * records each one; this file proves everything up to the INSERT, on every
+ * push.
  *
  * Made-up books only: no real company's names or figures.
  */
