@@ -77,7 +77,7 @@ describe("the server page", () => {
     expect(page).toContain('holdsPermission("invoice.create")');
     expect(page).toContain("canCreateInvoice={canCreateInvoice}");
     expect(client).toContain("canCreateInvoice: boolean;");
-    expect(client).toMatch(/canCreateInvoice \? \(\s+<>[\s\S]*?New invoice/);
+    expect(client).toMatch(/canCreateInvoice && customer\.is_active \? \(\s+<Link[\s\S]*?New invoice/);
     expect(client).toContain("canCreateInvoice && customer.is_active");
     expect(client).toContain("linkCustomer={false}");
     expect(client).toContain('format="MM/DD/YYYY"');
@@ -197,5 +197,12 @@ describe("the change history is one table, shared", () => {
     expect(trail).toContain("export function ChangeHistoryUnavailable(");
     expect(trail).toContain("<ChangeHistoryTable");
     expect(trail).toContain("auditEntryCurrency(entry) ?? currencyFallback ?? null");
+  });
+
+  it("gives every reader a Statement button, ungated", () => {
+    const client = route("CustomerDetailClient.tsx");
+    expect(client).toContain("href={`/customers/${customer.id}/statement`}");
+    expect(client).toContain(">Statement</Button>");
+    expect(client).not.toMatch(/canWrite \|\| canCreateInvoice \?/);
   });
 });

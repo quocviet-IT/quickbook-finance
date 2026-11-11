@@ -1,0 +1,32 @@
+.name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statement {
+  flex: none;
+  font-size: 12px;
+}
+
+.statementBlock {
+  display: block;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+/* A printed aging report carries no links. */
+@media print {
+  .statement,
+  .statementBlock {
+    display: none;
+  }
+}
